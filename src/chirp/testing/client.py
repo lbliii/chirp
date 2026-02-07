@@ -1,4 +1,4 @@
-"""Test client for chirp applications.
+"""Async test client for chirp applications.
 
 Uses the same Request and Response types as production.
 No wrapper translation layer.
@@ -6,139 +6,11 @@ No wrapper translation layer.
 
 import asyncio
 import contextlib
-from dataclasses import dataclass, field
 from typing import Any
 
 from chirp.app import App
 from chirp.http.response import Response
-from chirp.realtime.events import SSEEvent
-
-# ---------------------------------------------------------------------------
-# Fragment assertion helpers
-# ---------------------------------------------------------------------------
-
-
-def assert_is_fragment(response: Response, *, status: int = 200) -> None:
-    """Assert the response is a fragment (has content, no full page wrapper).
-
-    Checks that the response has the expected status and does **not**
-    contain ``<html>`` / ``</html>`` tags that indicate a full page.
-    """
-    assert response.status == status, (
-        f"Expected status {status}, got {response.status}"
-    )
-    lower = response.text.lower()
-    assert "<html>" not in lower, "Response contains full page <html> wrapper"
-    assert "</html>" not in lower, "Response contains full page </html> wrapper"
-    assert len(response.text.strip()) > 0, "Fragment body is empty"
-
-
-def assert_fragment_contains(response: Response, text: str) -> None:
-    """Assert the fragment response body contains the given text."""
-    assert text in response.text, (
-        f"Fragment does not contain {text!r}.\n"
-        f"Response body: {response.text[:500]}"
-    )
-
-
-def assert_fragment_not_contains(response: Response, text: str) -> None:
-    """Assert the fragment response body does **not** contain the given text."""
-    assert text not in response.text, (
-        f"Fragment unexpectedly contains {text!r}.\n"
-        f"Response body: {response.text[:500]}"
-    )
-
-
-def assert_is_error_fragment(response: Response, *, status: int | None = None) -> None:
-    """Assert the response is a chirp error fragment snippet.
-
-    Error fragments contain ``class="chirp-error"`` and a ``data-status``
-    attribute matching the HTTP status code.
-    """
-    assert 'class="chirp-error"' in response.text, (
-        "Response is not a chirp error fragment (missing class=\"chirp-error\").\n"
-        f"Response body: {response.text[:500]}"
-    )
-    if status is not None:
-        assert response.status == status, (
-            f"Expected status {status}, got {response.status}"
-        )
-        assert f'data-status="{status}"' in response.text, (
-            f"Error fragment missing data-status=\"{status}\".\n"
-            f"Response body: {response.text[:500]}"
-        )
-
-
-# ---------------------------------------------------------------------------
-# SSE testing utilities
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class SSETestResult:
-    """Collected events from an SSE endpoint.
-
-    Returned by ``TestClient.sse()`` after the connection closes.
-    """
-
-    events: tuple[SSEEvent, ...]
-    heartbeats: int
-    status: int
-    headers: dict[str, str] = field(default_factory=dict)
-
-
-def _parse_sse_frames(raw: str) -> tuple[list[SSEEvent], int]:
-    """Parse raw SSE text into structured events and heartbeat count.
-
-    Splits on double-newline boundaries. Each block is parsed into an
-    ``SSEEvent``. Comment lines (starting with ``:``) are counted as
-    heartbeats if they contain "heartbeat".
-    """
-    events: list[SSEEvent] = []
-    heartbeats = 0
-
-    # SSE frames are separated by blank lines (\n\n)
-    blocks = raw.split("\n\n")
-
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-
-        # Check for heartbeat comments
-        if block.startswith(":"):
-            if "heartbeat" in block:
-                heartbeats += 1
-            continue
-
-        # Parse SSE fields
-        event_type: str | None = None
-        data_lines: list[str] = []
-        event_id: str | None = None
-        retry: int | None = None
-
-        for line in block.split("\n"):
-            if line.startswith("event: "):
-                event_type = line[7:]
-            elif line.startswith("data: "):
-                data_lines.append(line[6:])
-            elif line.startswith("id: "):
-                event_id = line[4:]
-            elif line.startswith("retry: "):
-                with contextlib.suppress(ValueError):
-                    retry = int(line[7:])
-            elif line.startswith(":") and "heartbeat" in line:
-                heartbeats += 1
-
-        if data_lines:
-            events.append(SSEEvent(
-                data="\n".join(data_lines),
-                event=event_type,
-                id=event_id,
-                retry=retry,
-            ))
-
-    return events, heartbeats
+from chirp.testing.sse import SSETestResult, parse_sse_frames
 
 
 class TestClient:
@@ -359,7 +231,7 @@ class TestClient:
 
         # Parse collected SSE data
         raw_text = b"".join(body_buffer).decode("utf-8", errors="replace")
-        events, heartbeats = _parse_sse_frames(raw_text)
+        events, heartbeats = parse_sse_frames(raw_text)
 
         # Build response headers dict
         resp_headers: dict[str, str] = {}
