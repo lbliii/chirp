@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Documentation</h1>
+
+<form class="search-form"
+      hx-post="/ask"
+      hx-ext="sse"
+      sse-connect="/ask"
+      sse-swap="fragment"
+      hx-swap="innerHTML"
+      hx-target="#results">
+    <input type="text" name="question"
+           placeholder="Ask anything about the docs..."
+           autocomplete="off">
+    <button type="submit">Ask</button>
+</form>
+
+<div id="results">
+    <div id="sources"></div>
+    <div id="answer" class="answer"></div>
+</div>
+{% endblock %}

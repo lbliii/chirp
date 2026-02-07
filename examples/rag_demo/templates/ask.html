@@ -1,0 +1,14 @@
+{# Blocks rendered independently as SSE fragments #}
+
+{% block sources %}
+<div id="sources" class="sources">
+    <h2>Sources</h2>
+    {% for doc in sources %}
+    <a href="{{ doc.url }}">{{ doc.title }}</a>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block answer %}
+<div id="answer" class="answer{% if text %} streaming{% endif %}">{{ text }}</div>
+{% endblock %}

@@ -15,6 +15,7 @@ from chirp.http.response import Redirect, Response, SSEResponse, StreamingRespon
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import Fragment, Stream, Template
+from chirp.templating.streaming import has_async_context, render_stream_async
 
 
 def negotiate(
@@ -31,6 +32,7 @@ def negotiate(
     3. ``Template``         -> render via kida -> Response
     4. ``Fragment``         -> render block via kida -> Response
     5. ``Stream``           -> kida render_stream() -> StreamingResponse
+                               (async sources resolved concurrently)
     6. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
     7. ``str``              -> 200, text/html
     8. ``bytes``            -> 200, application/octet-stream
@@ -73,6 +75,14 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
+            if has_async_context(value.context):
+                # Async sources detected — resolve concurrently, then stream
+                chunks = render_stream_async(kida_env, value)
+                return StreamingResponse(
+                    chunks=chunks,
+                    content_type="text/html; charset=utf-8",
+                )
+            # All context values are resolved — use sync streaming
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream(value.context)
             return StreamingResponse(

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title | default("Docs") }}</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            background: #fafafa;
+            max-width: 48rem;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        h1 { font-size: 1.75rem; margin-bottom: 1rem; }
+        h2 { font-size: 1.25rem; margin-bottom: 0.5rem; color: #16213e; }
+        .search-form {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        .search-form input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+        .search-form button {
+            padding: 0.75rem 1.5rem;
+            background: #0f3460;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .search-form button:hover { background: #16213e; }
+        .sources {
+            background: #f0f4ff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .sources a {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: white;
+            border-radius: 0.25rem;
+            color: #0f3460;
+            text-decoration: none;
+            margin: 0.25rem;
+            font-size: 0.875rem;
+            border: 1px solid #ddd;
+        }
+        .answer {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #eee;
+            min-height: 4rem;
+            white-space: pre-wrap;
+        }
+        .answer:empty::after {
+            content: "Ask a question about the docs...";
+            color: #999;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .streaming { animation: pulse 1.5s ease-in-out infinite; }
+    </style>
+</head>
+<body>
+    {% block content %}{% endblock %}
+</body>
+</html>

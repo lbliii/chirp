@@ -14,6 +14,19 @@ Basic usage::
         return "Hello, World!"
 
     app.run()
+
+Data access (``pip install chirp[data]``)::
+
+    from chirp.data import Database
+    db = Database("sqlite:///app.db")
+    users = await db.fetch(User, "SELECT * FROM users")
+
+AI streaming (``pip install chirp[ai]``)::
+
+    from chirp.ai import LLM
+    llm = LLM("anthropic:claude-sonnet-4-20250514")
+    async for token in llm.stream("Explain:"):
+        ...
 """
 
 # Declare free-threading support (PEP 703)
