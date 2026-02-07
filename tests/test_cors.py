@@ -171,6 +171,44 @@ class TestCORSExposeHeaders:
             assert "X-Rate-Limit" in exposed
 
 
+class TestCORSMultipleOrigins:
+    """Multiple allowed origins."""
+
+    async def test_first_origin_allowed(self) -> None:
+        app = _make_cors_app(CORSConfig(
+            allow_origins=("https://a.com", "https://b.com", "https://c.com"),
+        ))
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/api/data",
+                headers={"Origin": "https://a.com"},
+            )
+            assert ("access-control-allow-origin", "https://a.com") in response.headers
+
+    async def test_second_origin_allowed(self) -> None:
+        app = _make_cors_app(CORSConfig(
+            allow_origins=("https://a.com", "https://b.com"),
+        ))
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/api/data",
+                headers={"Origin": "https://b.com"},
+            )
+            assert ("access-control-allow-origin", "https://b.com") in response.headers
+
+    async def test_unlisted_origin_blocked(self) -> None:
+        app = _make_cors_app(CORSConfig(
+            allow_origins=("https://a.com", "https://b.com"),
+        ))
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/api/data",
+                headers={"Origin": "https://evil.com"},
+            )
+            header_names = {name for name, _ in response.headers}
+            assert "access-control-allow-origin" not in header_names
+
+
 class TestCORSDefaults:
     """Default configuration (restrictive)."""
 

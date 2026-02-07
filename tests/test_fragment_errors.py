@@ -157,6 +157,82 @@ class TestCustomErrorHandlersWithRequest:
             assert "something broke" in response.text
 
 
+class TestAsyncErrorHandlers:
+    """Async error handlers must be awaited."""
+
+    async def test_async_error_handler(self) -> None:
+        app = App()
+
+        @app.error(404)
+        async def not_found(request: Request):
+            return "async 404"
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/missing")
+            assert response.status == 404
+            assert response.text == "async 404"
+
+    async def test_async_500_handler(self) -> None:
+        app = App()
+
+        @app.error(500)
+        async def server_error(request: Request, exc: Exception):
+            return Response(body=f"async error: {exc}", status=500)
+
+        @app.route("/boom")
+        def boom():
+            msg = "kaboom"
+            raise ValueError(msg)
+
+        async with TestClient(app) as client:
+            response = await client.get("/boom")
+            assert response.status == 500
+            assert "kaboom" in response.text
+
+    async def test_async_error_handler_with_fragment(self) -> None:
+        app = App()
+
+        @app.error(404)
+        async def not_found(request: Request):
+            if request.is_fragment:
+                return '<span class="err">gone</span>'
+            return "not found"
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            frag = await client.fragment("/missing")
+            assert frag.status == 404
+            assert frag.text == '<span class="err">gone</span>'
+
+
+class TestCustomHTTPErrorSubclass:
+    """Custom HTTPError subclasses with fragment detection."""
+
+    async def test_custom_http_error_fragment(self) -> None:
+        app = App()
+
+        @app.route("/forbidden")
+        def forbidden():
+            raise HTTPError(status=403, detail="Access denied")
+
+        async with TestClient(app) as client:
+            frag = await client.fragment("/forbidden")
+            assert frag.status == 403
+            assert 'class="chirp-error"' in frag.text
+            assert "Access denied" in frag.text
+
+            full = await client.get("/forbidden")
+            assert full.status == 403
+            assert 'class="chirp-error"' not in full.text
+
+
 class TestDebugModeFragmentErrors:
     """Debug mode with fragment requests."""
 

@@ -65,6 +65,11 @@ class _RequestGlobals:
             store.set(d)
         return d
 
+    def _reset(self) -> None:
+        """Clear the store for the current context. Called by the handler after each request."""
+        store: ContextVar[dict[str, Any] | None] = object.__getattribute__(self, "_store")
+        store.set(None)
+
     def __getattr__(self, name: str) -> Any:
         d = self._get_dict()
         try:

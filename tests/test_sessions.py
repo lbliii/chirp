@@ -160,6 +160,75 @@ class TestSessionSecurity:
             assert r.text == "data=none"
 
 
+class TestSessionDataTypes:
+    async def test_session_with_nested_data(self) -> None:
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["user"] = {"name": "alice", "roles": ["admin", "editor"]}
+            session["prefs"] = [1, 2, 3]
+            return "set"
+
+        @app.route("/get")
+        def get_data():
+            session = get_session()
+            user = session.get("user", {})
+            prefs = session.get("prefs", [])
+            return f"name={user.get('name')},roles={len(user.get('roles', []))},prefs={prefs}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+
+            r2 = await client.get("/get", headers={"Cookie": f"chirp_session={cookie}"})
+            assert "name=alice" in r2.text
+            assert "roles=2" in r2.text
+            assert "prefs=[1, 2, 3]" in r2.text
+
+    async def test_session_key_removal(self) -> None:
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["keep"] = "yes"
+            session["remove"] = "later"
+            return "set"
+
+        @app.route("/remove")
+        def remove_key():
+            session = get_session()
+            session.pop("remove", None)
+            return f"keys={sorted(session.keys())}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+
+            r2 = await client.get("/remove", headers={"Cookie": f"chirp_session={cookie}"})
+            assert r2.text == "keys=['keep']"
+
+    async def test_empty_session_still_gets_cookie(self) -> None:
+        """Even an empty session should receive a Set-Cookie (for sliding expiration)."""
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/empty")
+        def empty():
+            _ = get_session()  # access but don't modify
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.get("/empty")
+            assert response.status == 200
+            cookie = _extract_session_cookie(response, "chirp_session")
+            assert cookie is not None
+
+
 class TestSessionCookieAttributes:
     async def test_custom_cookie_name(self) -> None:
         app = App()

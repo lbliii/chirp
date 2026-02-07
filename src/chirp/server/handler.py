@@ -13,7 +13,7 @@ from typing import Any
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
-from chirp.context import request_var
+from chirp.context import g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response
@@ -65,10 +65,11 @@ async def handle_request(
         response = await handler(request)
 
     except HTTPError as exc:
-        response = _handle_http_error(exc, request, error_handlers, kida_env, debug)
+        response = await _handle_http_error(exc, request, error_handlers, kida_env, debug)
     except Exception as exc:
-        response = _handle_internal_error(exc, request, error_handlers, kida_env, debug)
+        response = await _handle_internal_error(exc, request, error_handlers, kida_env, debug)
     finally:
+        g._reset()
         request_var.reset(token)
 
     await _send_response(response, send)
@@ -134,7 +135,7 @@ def _build_handler_kwargs(
     return kwargs
 
 
-def _call_error_handler(
+async def _call_error_handler(
     handler: Callable[..., Any],
     request: Request,
     exc: Exception,
@@ -143,6 +144,7 @@ def _call_error_handler(
     """Invoke a user-registered error handler with introspected arguments.
 
     Error handlers may accept zero, one (request), or two (request, exc) args.
+    Supports both sync and async error handlers.
     """
     sig = inspect.signature(handler)
     params = list(sig.parameters.values())
@@ -154,6 +156,9 @@ def _call_error_handler(
     else:
         result = handler()
 
+    if inspect.isawaitable(result):
+        result = await result
+
     if isinstance(result, Response):
         return result
     return negotiate(result, kida_env=kida_env)
@@ -164,7 +169,7 @@ def _default_fragment_error(status: int, detail: str) -> str:
     return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
 
 
-def _handle_http_error(
+async def _handle_http_error(
     exc: HTTPError,
     request: Request,
     error_handlers: dict[int | type, Callable[..., Any]],
@@ -175,7 +180,7 @@ def _handle_http_error(
     # Try exact exception type, then status code
     handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
     if handler is not None:
-        response = _call_error_handler(handler, request, exc, kida_env)
+        response = await _call_error_handler(handler, request, exc, kida_env)
         # Preserve the HTTP status from the exception unless the handler
         # explicitly returned a Response with its own status
         if response.status == 200:
@@ -196,7 +201,7 @@ def _handle_http_error(
     return resp
 
 
-def _handle_internal_error(
+async def _handle_internal_error(
     exc: Exception,
     request: Request,
     error_handlers: dict[int | type, Callable[..., Any]],
@@ -206,7 +211,7 @@ def _handle_internal_error(
     """Handle unexpected exceptions as 500 errors."""
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:
-        return _call_error_handler(handler, request, exc, kida_env)
+        return await _call_error_handler(handler, request, exc, kida_env)
 
     if debug:
         import traceback

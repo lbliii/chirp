@@ -152,6 +152,22 @@ class TestStaticFilePathTraversal:
             assert response.status in (403, 404)
 
 
+class TestStaticFileHeadRequest:
+    async def test_head_serves_file(self, static_dir) -> None:
+        """HEAD requests should return headers but the ASGI handler sends body too."""
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.request("HEAD", "/static/style.css")
+            assert response.status == 200
+            assert "text/css" in response.content_type
+
+
 class TestStaticFileCaching:
     async def test_cache_control_header(self, static_dir) -> None:
         app = App()

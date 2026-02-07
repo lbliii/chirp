@@ -137,3 +137,52 @@ class TestContextInRequestPipeline:
             r2 = await client.get("/count")
             assert r1.text == "count=1"
             assert r2.text == "count=2"
+
+    async def test_request_var_reset_after_error(self) -> None:
+        """request_var should be reset even when a handler raises."""
+        app = App()
+
+        @app.route("/boom")
+        def boom():
+            msg = "handler error"
+            raise RuntimeError(msg)
+
+        @app.route("/ok")
+        def ok():
+            return "fine"
+
+        async with TestClient(app) as client:
+            # First request raises — context should still be cleaned up
+            r1 = await client.get("/boom")
+            assert r1.status == 500
+
+            # Second request should work normally
+            r2 = await client.get("/ok")
+            assert r2.status == 200
+            assert r2.text == "fine"
+
+    async def test_g_not_leaked_between_requests(self) -> None:
+        """g attributes from one request should not leak to the next."""
+        app = App()
+
+        async def set_if_first(request: Request, next):
+            if request.path == "/first":
+                g.secret = "leaked"
+            return await next(request)
+
+        app.add_middleware(set_if_first)
+
+        @app.route("/first")
+        def first():
+            return f"secret={g.secret}"
+
+        @app.route("/second")
+        def second():
+            return f"has_secret={'secret' in g}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/first")
+            assert r1.text == "secret=leaked"
+
+            r2 = await client.get("/second")
+            assert r2.text == "has_secret=False"
