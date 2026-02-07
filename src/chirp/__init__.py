@@ -21,25 +21,24 @@ _Py_mod_gil = 0
 
 __version__ = "0.1.0-dev"
 __all__ = [
-    # App
     "AnyResponse",
     "App",
     "AppConfig",
-    # Real-time
+    "ChirpError",
+    "ConfigurationError",
     "EventStream",
     "Fragment",
-    # Middleware
+    "HTTPError",
+    "MethodNotAllowed",
     "Middleware",
     "Next",
+    "NotFound",
     "Redirect",
-    # HTTP
     "Request",
     "Response",
     "SSEEvent",
     "Stream",
-    # Templates
     "Template",
-    # Context
     "g",
     "get_request",
 ]
@@ -89,6 +88,11 @@ def __getattr__(name: str) -> object:
         from chirp import context as _ctx
 
         return getattr(_ctx, name)
+
+    if name in ("ChirpError", "ConfigurationError", "HTTPError", "MethodNotAllowed", "NotFound"):
+        from chirp import errors as _errors
+
+        return getattr(_errors, name)
 
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

@@ -155,7 +155,7 @@ class Router:
         result = self._match_node(self._root, parts, 0, {})
 
         if result is None:
-            raise NotFound(f"No route matches {path!r}")
+            raise NotFound(f"No route matches {method} {path!r}")
 
         node, params = result
 
@@ -168,7 +168,7 @@ class Router:
             all_methods = frozenset(node.routes_by_method)
             raise MethodNotAllowed(all_methods)
 
-        raise NotFound(f"No route matches {path!r}")
+        raise NotFound(f"No route matches {method} {path!r}")
 
     def _match_node(
         self,

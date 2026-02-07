@@ -1,4 +1,4 @@
-"""Tests for chirp.errors — exception hierarchy."""
+"""Tests for chirp.errors — exception hierarchy and error messages."""
 
 import pytest
 
@@ -9,6 +9,8 @@ from chirp.errors import (
     MethodNotAllowed,
     NotFound,
 )
+from chirp.routing.route import Route
+from chirp.routing.router import Router
 
 
 class TestHierarchy:
@@ -69,7 +71,14 @@ class TestMethodNotAllowed:
     def test_defaults(self) -> None:
         err = MethodNotAllowed(frozenset({"GET", "POST"}))
         assert err.status == 405
-        assert err.detail == "Method Not Allowed"
+        # Detail includes allowed methods
+        assert "GET" in err.detail
+        assert "POST" in err.detail
+        assert "Method not allowed" in err.detail
+
+    def test_custom_detail(self) -> None:
+        err = MethodNotAllowed(frozenset({"GET"}), detail="Custom message")
+        assert err.detail == "Custom message"
 
     def test_allow_header(self) -> None:
         err = MethodNotAllowed(frozenset({"GET", "POST", "DELETE"}))
@@ -78,6 +87,74 @@ class TestMethodNotAllowed:
         # Sorted alphabetically
         assert allow_headers["Allow"] == "DELETE, GET, POST"
 
+    def test_detail_matches_allow_header(self) -> None:
+        err = MethodNotAllowed(frozenset({"GET", "PUT"}))
+        allow_headers = dict(err.headers)
+        # Allowed methods appear in both the detail and the Allow header
+        assert "GET" in err.detail
+        assert "PUT" in err.detail
+        assert allow_headers["Allow"] == "GET, PUT"
+
     def test_catchable_as_http_error(self) -> None:
         with pytest.raises(HTTPError):
             raise MethodNotAllowed(frozenset({"GET"}))
+
+
+class TestRouterErrorMessages:
+    """Router raises NotFound and MethodNotAllowed with informative details."""
+
+    def _make_router(self) -> Router:
+        """Build a simple router for testing error messages."""
+
+        def handler():
+            return "ok"
+
+        router = Router()
+        router.add(Route(path="/items", handler=handler, methods=frozenset({"GET"}), name=None))
+        router.add(
+            Route(path="/items", handler=handler, methods=frozenset({"POST"}), name=None)
+        )
+        router.compile()
+        return router
+
+    def test_not_found_includes_method_and_path(self) -> None:
+        router = self._make_router()
+        with pytest.raises(NotFound, match="GET") as exc_info:
+            router.match("GET", "/nonexistent")
+        assert "/nonexistent" in exc_info.value.detail
+
+    def test_method_not_allowed_includes_allowed_methods(self) -> None:
+        router = self._make_router()
+        with pytest.raises(MethodNotAllowed) as exc_info:
+            router.match("DELETE", "/items")
+        assert "GET" in exc_info.value.detail
+        assert "POST" in exc_info.value.detail
+
+
+class TestErrorExports:
+    """Error types are importable from the top-level chirp package."""
+
+    def test_import_chirp_error(self) -> None:
+        import chirp
+
+        assert chirp.ChirpError is ChirpError
+
+    def test_import_http_error(self) -> None:
+        import chirp
+
+        assert chirp.HTTPError is HTTPError
+
+    def test_import_not_found(self) -> None:
+        import chirp
+
+        assert chirp.NotFound is NotFound
+
+    def test_import_method_not_allowed(self) -> None:
+        import chirp
+
+        assert chirp.MethodNotAllowed is MethodNotAllowed
+
+    def test_import_configuration_error(self) -> None:
+        import chirp
+
+        assert chirp.ConfigurationError is ConfigurationError

@@ -46,13 +46,15 @@ class NotFound(HTTPError):  # noqa: N818 — conventional name in web frameworks
 class MethodNotAllowed(HTTPError):  # noqa: N818 — conventional name in web frameworks
     """405 — route exists but not for this HTTP method.
 
-    Includes an ``Allow`` header listing the valid methods.
+    Includes an ``Allow`` header listing the valid methods and embeds
+    the allowed methods in the detail string for developer visibility.
     """
 
-    def __init__(self, allowed: frozenset[str], detail: str = "Method Not Allowed") -> None:
+    def __init__(self, allowed: frozenset[str], detail: str = "") -> None:
         allow_value = ", ".join(sorted(allowed))
+        default_detail = f"Method not allowed. Allowed methods: {allow_value}"
         super().__init__(
             status=405,
-            detail=detail,
+            detail=detail or default_detail,
             headers=(("Allow", allow_value),),
         )

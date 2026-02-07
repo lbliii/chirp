@@ -66,15 +66,21 @@ class TestNegotiateTemplateTypes:
         assert "<form>" not in result.text
 
     def test_template_without_env_raises(self) -> None:
-        with pytest.raises(RuntimeError, match="requires kida integration"):
+        from chirp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="requires kida integration"):
             negotiate(Template("page.html", title="Home"))
 
     def test_fragment_without_env_raises(self) -> None:
-        with pytest.raises(RuntimeError, match="requires kida integration"):
+        from chirp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="requires kida integration"):
             negotiate(Fragment("search.html", "results"))
 
     def test_stream_without_env_raises(self) -> None:
-        with pytest.raises(RuntimeError, match="requires kida integration"):
+        from chirp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="requires kida integration"):
             negotiate(Stream("dashboard.html"))
 
     def test_stream_returns_streaming_response(self, tmp_path) -> None:

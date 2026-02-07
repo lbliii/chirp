@@ -10,6 +10,7 @@ from typing import Any
 
 from kida import Environment
 
+from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, Response, SSEResponse, StreamingResponse
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
@@ -53,7 +54,7 @@ def negotiate(
                     "Template return type requires kida integration. "
                     "Ensure a template_dir is configured in AppConfig."
                 )
-                raise RuntimeError(msg)
+                raise ConfigurationError(msg)
             html = render_template(kida_env, value)
             return Response(body=html, content_type="text/html; charset=utf-8")
         case Fragment():
@@ -62,7 +63,7 @@ def negotiate(
                     "Fragment return type requires kida integration. "
                     "Ensure a template_dir is configured in AppConfig."
                 )
-                raise RuntimeError(msg)
+                raise ConfigurationError(msg)
             html = render_fragment(kida_env, value)
             return Response(body=html, content_type="text/html; charset=utf-8")
         case Stream():
@@ -71,7 +72,7 @@ def negotiate(
                     "Stream return type requires kida integration. "
                     "Ensure a template_dir is configured in AppConfig."
                 )
-                raise RuntimeError(msg)
+                raise ConfigurationError(msg)
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream(value.context)
             return StreamingResponse(
