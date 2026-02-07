@@ -1,4 +1,4 @@
-# Chirp
+# ⌁⌁ Chirp
 
 **A Python web framework for the modern web platform.**
 
