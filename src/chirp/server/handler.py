@@ -20,7 +20,9 @@ from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.middleware.protocol import AnyResponse
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
+from chirp.server.errors import handle_http_error, handle_internal_error
 from chirp.server.negotiation import negotiate
+from chirp.server.sender import send_response, send_streaming_response
 
 
 async def handle_request(
@@ -65,9 +67,9 @@ async def handle_request(
         response = await handler(request)
 
     except HTTPError as exc:
-        response = await _handle_http_error(exc, request, error_handlers, kida_env, debug)
+        response = await handle_http_error(exc, request, error_handlers, kida_env, debug)
     except Exception as exc:
-        response = await _handle_internal_error(exc, request, error_handlers, kida_env, debug)
+        response = await handle_internal_error(exc, request, error_handlers, kida_env, debug)
     finally:
         g._reset()
         request_var.reset(token)
@@ -83,9 +85,9 @@ async def handle_request(
             kida_env=response.kida_env,
         )
     elif isinstance(response, StreamingResponse):
-        await _send_streaming_response(response, send, debug=debug)
+        await send_streaming_response(response, send, debug=debug)
     else:
-        await _send_response(response, send)
+        await send_response(response, send)
 
 
 async def _invoke_handler(
@@ -146,193 +148,3 @@ def _build_handler_kwargs(
                 kwargs[name] = value
 
     return kwargs
-
-
-async def _call_error_handler(
-    handler: Callable[..., Any],
-    request: Request,
-    exc: Exception,
-    kida_env: Environment | None,
-) -> Response:
-    """Invoke a user-registered error handler with introspected arguments.
-
-    Error handlers may accept zero, one (request), or two (request, exc) args.
-    Supports both sync and async error handlers.
-    """
-    sig = inspect.signature(handler)
-    params = list(sig.parameters.values())
-
-    if len(params) >= 2:
-        result = handler(request, exc)
-    elif len(params) == 1:
-        result = handler(request)
-    else:
-        result = handler()
-
-    if inspect.isawaitable(result):
-        result = await result
-
-    if isinstance(result, Response):
-        return result
-    return negotiate(result, kida_env=kida_env)
-
-
-def _default_fragment_error(status: int, detail: str) -> str:
-    """Minimal HTML snippet for fragment error responses."""
-    return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
-
-
-async def _handle_http_error(
-    exc: HTTPError,
-    request: Request,
-    error_handlers: dict[int | type, Callable[..., Any]],
-    kida_env: Environment | None,
-    debug: bool,
-) -> Response:
-    """Map an HTTPError to a Response using registered error handlers."""
-    # Try exact exception type, then status code
-    handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
-    if handler is not None:
-        response = await _call_error_handler(handler, request, exc, kida_env)
-        # Preserve the HTTP status from the exception unless the handler
-        # explicitly returned a Response with its own status
-        if response.status == 200:
-            response = response.with_status(exc.status)
-        return response
-
-    # Default error response
-    detail = exc.detail or f"Error {exc.status}"
-    if debug and exc.detail:
-        detail = f"{exc.status}: {exc.detail}"
-
-    # Fragment-aware: return a snippet instead of a full page
-    body = _default_fragment_error(exc.status, detail) if request.is_fragment else detail
-
-    resp = Response(body=body).with_status(exc.status)
-    for name, value in exc.headers:
-        resp = resp.with_header(name, value)
-    return resp
-
-
-async def _handle_internal_error(
-    exc: Exception,
-    request: Request,
-    error_handlers: dict[int | type, Callable[..., Any]],
-    kida_env: Environment | None,
-    debug: bool,
-) -> Response:
-    """Handle unexpected exceptions as 500 errors."""
-    handler = error_handlers.get(500) or error_handlers.get(type(exc))
-    if handler is not None:
-        return await _call_error_handler(handler, request, exc, kida_env)
-
-    if debug:
-        import traceback
-
-        tb = traceback.format_exc()
-        if request.is_fragment:
-            return Response(
-                body=f'<div class="chirp-error" data-status="500"><pre>{tb}</pre></div>',
-                status=500,
-            )
-        return Response(body=f"<pre>{tb}</pre>", status=500)
-
-    if request.is_fragment:
-        return Response(body=_default_fragment_error(500, "Internal Server Error"), status=500)
-
-    return Response(body="Internal Server Error", status=500)
-
-
-async def _send_response(response: Response, send: Send) -> None:
-    """Translate a chirp Response into ASGI send() calls."""
-    # Build raw headers
-    raw_headers: list[tuple[bytes, bytes]] = [
-        (b"content-type", response.content_type.encode("latin-1")),
-    ]
-    for name, value in response.headers:
-        raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
-    raw_headers.extend(
-        (b"set-cookie", cookie.to_header_value().encode("latin-1"))
-        for cookie in response.cookies
-    )
-
-    body = response.body_bytes
-
-    raw_headers.append((b"content-length", str(len(body)).encode("latin-1")))
-
-    await send({
-        "type": "http.response.start",
-        "status": response.status,
-        "headers": raw_headers,
-    })
-    await send({
-        "type": "http.response.body",
-        "body": body,
-    })
-
-
-async def _send_streaming_response(
-    response: StreamingResponse,
-    send: Send,
-    *,
-    debug: bool = False,
-) -> None:
-    """Send a streaming response via chunked transfer encoding.
-
-    Sends headers immediately, then each chunk as an ASGI body
-    message with ``more_body=True``. Closes with an empty body.
-    On mid-stream error, emits an HTML comment and closes.
-    """
-    from collections.abc import AsyncIterator
-
-    raw_headers: list[tuple[bytes, bytes]] = [
-        (b"content-type", response.content_type.encode("latin-1")),
-    ]
-    for name, value in response.headers:
-        raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
-
-    # No content-length for chunked transfer
-    await send({
-        "type": "http.response.start",
-        "status": response.status,
-        "headers": raw_headers,
-    })
-
-    try:
-        if isinstance(response.chunks, AsyncIterator):
-            async for chunk in response.chunks:
-                if chunk:
-                    await send({
-                        "type": "http.response.body",
-                        "body": chunk.encode("utf-8"),
-                        "more_body": True,
-                    })
-        else:
-            for chunk in response.chunks:
-                if chunk:
-                    await send({
-                        "type": "http.response.body",
-                        "body": chunk.encode("utf-8"),
-                        "more_body": True,
-                    })
-    except Exception as exc:
-        # Mid-stream error: emit HTML comment and close
-        import traceback
-
-        if debug:
-            tb = traceback.format_exc()
-            error_chunk = f"<!-- chirp: render error\n{tb}\n-->"
-        else:
-            error_chunk = "<!-- chirp: render error -->"
-        await send({
-            "type": "http.response.body",
-            "body": error_chunk.encode("utf-8"),
-            "more_body": True,
-        })
-
-    # Close the stream
-    await send({
-        "type": "http.response.body",
-        "body": b"",
-        "more_body": False,
-    })

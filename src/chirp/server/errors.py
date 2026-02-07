@@ -1,0 +1,111 @@
+"""Error handling pipeline for chirp requests.
+
+Maps HTTPError exceptions and unexpected failures to appropriate
+Response objects, using registered error handlers or sensible defaults.
+"""
+
+import inspect
+from collections.abc import Callable
+from typing import Any
+
+from kida import Environment
+
+from chirp.errors import HTTPError
+from chirp.http.request import Request
+from chirp.http.response import Response
+from chirp.server.negotiation import negotiate
+
+
+def default_fragment_error(status: int, detail: str) -> str:
+    """Minimal HTML snippet for fragment error responses."""
+    return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
+
+
+async def call_error_handler(
+    handler: Callable[..., Any],
+    request: Request,
+    exc: Exception,
+    kida_env: Environment | None,
+) -> Response:
+    """Invoke a user-registered error handler with introspected arguments.
+
+    Error handlers may accept zero, one (request), or two (request, exc) args.
+    Supports both sync and async error handlers.
+    """
+    sig = inspect.signature(handler)
+    params = list(sig.parameters.values())
+
+    if len(params) >= 2:
+        result = handler(request, exc)
+    elif len(params) == 1:
+        result = handler(request)
+    else:
+        result = handler()
+
+    if inspect.isawaitable(result):
+        result = await result
+
+    if isinstance(result, Response):
+        return result
+    return negotiate(result, kida_env=kida_env)
+
+
+async def handle_http_error(
+    exc: HTTPError,
+    request: Request,
+    error_handlers: dict[int | type, Callable[..., Any]],
+    kida_env: Environment | None,
+    debug: bool,
+) -> Response:
+    """Map an HTTPError to a Response using registered error handlers."""
+    # Try exact exception type, then status code
+    handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
+    if handler is not None:
+        response = await call_error_handler(handler, request, exc, kida_env)
+        # Preserve the HTTP status from the exception unless the handler
+        # explicitly returned a Response with its own status
+        if response.status == 200:
+            response = response.with_status(exc.status)
+        return response
+
+    # Default error response
+    detail = exc.detail or f"Error {exc.status}"
+    if debug and exc.detail:
+        detail = f"{exc.status}: {exc.detail}"
+
+    # Fragment-aware: return a snippet instead of a full page
+    body = default_fragment_error(exc.status, detail) if request.is_fragment else detail
+
+    resp = Response(body=body).with_status(exc.status)
+    for name, value in exc.headers:
+        resp = resp.with_header(name, value)
+    return resp
+
+
+async def handle_internal_error(
+    exc: Exception,
+    request: Request,
+    error_handlers: dict[int | type, Callable[..., Any]],
+    kida_env: Environment | None,
+    debug: bool,
+) -> Response:
+    """Handle unexpected exceptions as 500 errors."""
+    handler = error_handlers.get(500) or error_handlers.get(type(exc))
+    if handler is not None:
+        return await call_error_handler(handler, request, exc, kida_env)
+
+    if debug:
+        import traceback
+
+        tb = traceback.format_exc()
+        if request.is_fragment:
+            return Response(
+                body=f'<div class="chirp-error" data-status="500"><pre>{tb}</pre></div>',
+                status=500,
+            )
+        return Response(body=f"<pre>{tb}</pre>", status=500)
+
+    if request.is_fragment:
+        return Response(body=default_fragment_error(500, "Internal Server Error"), status=500)
+
+    return Response(body="Internal Server Error", status=500)
