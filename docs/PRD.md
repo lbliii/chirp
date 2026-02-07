@@ -278,8 +278,8 @@ and thread-based interactions.
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| ~~Kida lacks block-level rendering~~ | ~~Blocks Phase 3~~ | ~~Medium~~ | **RESOLVED**: `render_block()` exists in kida v0.1.2 |
-| Kida lacks streaming rendering | Blocks Phase 5 | Medium | `RenderedTemplate` stub exists; plan compiler work alongside Phases 2-4 |
+| ~~Kida lacks block-level rendering~~ | ~~Blocks Phase 3~~ | ~~Medium~~ | **RESOLVED**: `render_block()` integrated in Phase 2; 12 contract tests in kida repo |
+| Kida lacks streaming rendering | Blocks Phase 5 | Medium | `RenderedTemplate` stub exists; plan compiler work alongside Phases 3-4 |
 | Streaming HTML mid-stream errors | Poor UX on failure | Medium | Define error recovery protocol; test extensively |
 | anyio compatibility issues on 3.14t | Blocks free-threading | Low | anyio already tests on 3.14; monitor upstream |
 | htmx changes fragment detection pattern | Breaks `is_fragment` | Low | Abstract detection behind a method; easy to update |

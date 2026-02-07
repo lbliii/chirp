@@ -471,52 +471,76 @@ async def test_fragment():
 
 ## Phased Roadmap
 
-### Phase 0: Foundation
+### Phase 0: Foundation ✅
 
 Establish the project structure, tooling, and core abstractions.
 
-- [ ] Project scaffolding: `pyproject.toml`, ruff, ty, test infrastructure
-- [ ] `AppConfig` frozen dataclass
-- [ ] `Request` frozen dataclass with typed attributes
-- [ ] `Response` with `.with_*()` chainable API
-- [ ] Immutable `Headers` and `QueryParams`
-- [ ] Path parameter parsing and type conversion
+- [x] Project scaffolding: `pyproject.toml`, ruff, ty, test infrastructure
+- [x] `AppConfig` frozen dataclass
+- [x] `Request` frozen dataclass with typed attributes
+- [x] `Response` with `.with_*()` chainable API
+- [x] Immutable `Headers` and `QueryParams`
+- [x] Path parameter parsing and type conversion
 
-### Phase 1: Routing and App
+Additional primitives built during foundation:
+- [x] `MultiValueMapping` protocol (shared by Headers, QueryParams, future FormData)
+- [x] Error hierarchy: `ChirpError`, `HTTPError`, `NotFound`, `MethodNotAllowed`, `ConfigurationError`
+- [x] Cookie consolidation: `parse_cookies()` + `SetCookie` in one module
+- [x] `Handler` and `ErrorHandler` type aliases
+- [x] `HTTPScope` typed ASGI dataclass
+
+### Phase 1: Routing and App ✅
 
 The minimal "hello world" works.
 
-- [ ] Route definition and registration via `@app.route()`
-- [ ] Compiled route table (freeze on `app.run()`)
-- [ ] Return-value content negotiation (str, dict, Response, Redirect)
-- [ ] ASGI handler translating between ASGI scope/messages and chirp types
-- [ ] Basic error handling with `@app.error()`
-- [ ] Development server with auto-reload
+- [x] Route definition and registration via `@app.route()`
+- [x] Compiled route table (freeze on `app.run()`)
+- [x] Return-value content negotiation (str, dict, Response, Redirect, tuples)
+- [x] ASGI handler translating between ASGI scope/messages and chirp types
+- [x] Basic error handling with `@app.error()`
+- [ ] Development server with auto-reload (blocked on pounce ASGI server)
 
-### Phase 2: Kida Integration
+Additional work completed:
+- [x] Trie-based router with static, parameterized, and catch-all path matching
+- [x] Handler signature introspection for automatic Request + path param injection
+- [x] Thread-safe `App._freeze()` with double-check locking for free-threading
+
+### Phase 2: Kida Integration ✅
 
 Templates become a first-class return type.
 
-- [ ] Kida environment setup bound to app
-- [ ] `Template` return type with rendering
-- [ ] `@app.template_filter()` and `@app.template_global()` decorators
+- [x] Kida environment setup bound to app (`templating/integration.py`)
+- [x] `Template` return type renders via kida
+- [x] `Fragment` return type renders named blocks via kida `render_block()`
+- [x] `@app.template_filter()` and `@app.template_global()` decorators
 - [ ] Template auto-reload in debug mode
 
-### Phase 3: Fragments and htmx
+Implementation notes:
+- Kida `Environment` is created once during `App._freeze()` and threaded through
+  the request pipeline via explicit parameters (no globals, no ContextVar)
+- `render_block()` only sees blocks the template explicitly defines or overrides --
+  inherited parent blocks that aren't overridden are not available via Fragment
+- Contract tests for `render_block()` and `list_blocks()` added to kida repo (12 tests)
+
+### Phase 3: Fragments and htmx ✅
 
 The key differentiator lands.
 
-- [ ] `Fragment` return type -- render a named block from a template
-- [ ] `request.is_fragment` detection (HX-Request header)
+- [x] `Fragment` return type -- render a named block from a template
+- [x] `request.is_fragment` detection (HX-Request header)
 - [ ] Fragment-aware error handling
-- [ ] Kida block-level rendering integration (kida `render_block()` verified available in v0.1.2)
+- [x] Kida block-level rendering integration (kida `render_block()` verified available in v0.1.2)
+
+Additional htmx detection:
+- [x] `request.htmx_target` -- HX-Target header
+- [x] `request.htmx_trigger` -- HX-Trigger header
 
 ### Phase 4: Middleware and Sessions
 
 The framework becomes usable for real applications.
 
-- [ ] `Middleware` protocol definition
-- [ ] Middleware pipeline execution
+- [x] `Middleware` protocol definition
+- [x] Middleware pipeline execution
 - [ ] Built-in CORS middleware
 - [ ] Built-in static file serving
 - [ ] Session middleware (signed cookies via optional itsdangerous)
@@ -526,7 +550,8 @@ The framework becomes usable for real applications.
 
 Progressive page rendering.
 
-- [ ] `Stream` return type with chunked transfer encoding
+- [x] `Stream` return type defined (placeholder negotiation)
+- [ ] Chunked transfer encoding in ASGI handler
 - [ ] Kida streaming renderer (requires kida compiler work -- `RenderedTemplate` stub exists)
 - [ ] Async context values that resolve and stream independently
 - [ ] Proper error handling mid-stream
@@ -535,7 +560,8 @@ Progressive page rendering.
 
 Server-Sent Events for live HTML updates.
 
-- [ ] `EventStream` return type
+- [x] `EventStream` return type defined (placeholder negotiation)
+- [x] `SSEEvent` with wire-format `encode()` method
 - [ ] SSE protocol implementation over ASGI
 - [ ] Fragment rendering in SSE events
 - [ ] Connection lifecycle management (connect, disconnect, heartbeat)
@@ -544,7 +570,8 @@ Server-Sent Events for live HTML updates.
 
 Production readiness.
 
-- [ ] `TestClient` with async context manager
+- [x] `TestClient` with async context manager
+- [x] `TestClient.fragment()` method for htmx testing
 - [ ] Fragment assertion helpers
 - [ ] SSE testing utilities
 - [ ] Comprehensive error messages

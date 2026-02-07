@@ -1,8 +1,8 @@
 # Architecture Design Document: Chirp
 
-**Version**: 0.1.0-draft
+**Version**: 0.1.0
 **Date**: 2026-02-07
-**Status**: Draft
+**Status**: Active (Phases 0-2 implemented)
 
 ---
 
@@ -636,11 +636,11 @@ env = Environment(
 )
 ```
 
-Required kida capabilities:
-- `Environment.get_template()` -- exists today
-- `Template.render()` -- exists today
-- `Template.render_block()` -- **may need to be added to kida**
-- `Template.render_stream()` -- **may need to be added to kida**
+Required kida capabilities (verified and integrated as of Phase 2 completion):
+- `Environment.get_template()` -- ✅ integrated via `templating/integration.py`
+- `Template.render()` -- ✅ integrated, used by `Template` return type
+- `Template.render_block()` -- ✅ integrated, used by `Fragment` return type
+- `Template.render_stream()` -- **not yet implemented in kida** (stub exists, blocks Phase 5)
 
 ### 9.3 anyio Async Runtime
 

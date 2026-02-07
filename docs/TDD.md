@@ -1199,28 +1199,34 @@ chirp/
 
 The following kida capabilities are needed. Verified against kida v0.1.2 (2026-02-07).
 
-| Capability | Kida Status | Chirp Phase |
-|------------|-------------|-------------|
-| `Environment(loader=...)` | Exists | Phase 2 |
-| `env.get_template(name)` | Exists | Phase 2 |
-| `template.render(**ctx)` | Exists | Phase 2 |
-| `template.render_async(**ctx)` | Exists (wraps render in `asyncio.to_thread`) | Phase 2 |
-| `env.add_filter(name, func)` | Exists | Phase 2 |
-| `env.add_global(name, value)` | Exists | Phase 2 |
-| `template.render_block(name, **ctx)` | **Exists** | Phase 3 |
-| `template.list_blocks()` | **Exists** | Phase 3 |
-| `template.render_stream(**ctx)` | **Not implemented** (stub `RenderedTemplate` class exists) | Phase 5 |
+| Capability | Kida Status | Chirp Phase | Chirp Status |
+|------------|-------------|-------------|--------------|
+| `Environment(loader=...)` | Exists | Phase 2 | ✅ Integrated |
+| `env.get_template(name)` | Exists | Phase 2 | ✅ Integrated |
+| `template.render(**ctx)` | Exists | Phase 2 | ✅ Integrated |
+| `template.render_async(**ctx)` | Exists (wraps render in `asyncio.to_thread`) | Phase 2 | Not yet used |
+| `env.update_filters(dict)` | Exists | Phase 2 | ✅ Integrated |
+| `env.add_global(name, value)` | Exists | Phase 2 | ✅ Integrated |
+| `template.render_block(name, **ctx)` | **Exists** | Phase 3 | ✅ Integrated |
+| `template.list_blocks()` | **Exists** | Phase 3 | Available (not yet exposed to user API) |
+| `template.render_stream(**ctx)` | **Not implemented** (stub `RenderedTemplate` class exists) | Phase 5 | Blocked on kida |
 
-### render_block — Verified Available
+### render_block — Integrated
 
-Kida already compiles each `{% block %}` as an independent `_block_{name}(ctx, _blocks)`
-function in the template namespace. `template.render_block("results_list", **ctx)` renders
-just that block without the full template. `template.list_blocks()` returns available names.
+Kida compiles each `{% block %}` as an independent `_block_{name}(ctx, _blocks)` function in
+the template namespace. `template.render_block("results_list", **ctx)` renders just that block
+without the full template. `template.list_blocks()` returns available block names.
 
 **Location:** `kida/template/core.py:436-501`
 
-This means chirp's `Fragment` return type can work with kida as-is. No kida changes needed
-for Phase 3.
+**Important semantic:** `render_block()` and `list_blocks()` only expose blocks that the
+template itself defines or overrides. Blocks inherited from a parent template (via
+`{% extends %}`) that are not overridden are *not* available. This is by design -- the child
+template only "owns" what it explicitly declares.
+
+Chirp's `Fragment` return type uses `render_block()` via `templating/integration.py`. Contract
+tests for `render_block()` and `list_blocks()` are in the kida repo (`tests/test_render_block.py`,
+12 tests).
 
 ### render_stream — Requires Kida Work
 
