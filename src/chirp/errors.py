@@ -36,14 +36,14 @@ class HTTPError(ChirpError):
         return str(self.status)
 
 
-class NotFound(HTTPError):
+class NotFound(HTTPError):  # noqa: N818 — conventional name in web frameworks
     """404 — no route matched the request path."""
 
     def __init__(self, detail: str = "Not Found") -> None:
         super().__init__(status=404, detail=detail)
 
 
-class MethodNotAllowed(HTTPError):
+class MethodNotAllowed(HTTPError):  # noqa: N818 — conventional name in web frameworks
     """405 — route exists but not for this HTTP method.
 
     Includes an ``Allow`` header listing the valid methods.

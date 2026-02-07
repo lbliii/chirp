@@ -27,8 +27,7 @@ class SSEEvent:
             lines.append(f"id: {self.id}")
         if self.retry is not None:
             lines.append(f"retry: {self.retry}")
-        for line in self.data.split("\n"):
-            lines.append(f"data: {line}")
+        lines.extend(f"data: {line}" for line in self.data.split("\n"))
         lines.append("")  # Trailing newline to terminate the event
         return "\n".join(lines) + "\n"
 

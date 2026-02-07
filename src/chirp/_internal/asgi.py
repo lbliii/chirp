@@ -6,12 +6,12 @@ dataclasses for internal use. Users never see these.
 
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import Any
 
 # Raw ASGI types (matching the spec)
-Scope: TypeAlias = MutableMapping[str, Any]
-Receive: TypeAlias = Callable[[], Awaitable[MutableMapping[str, Any]]]
-Send: TypeAlias = Callable[[MutableMapping[str, Any]], Awaitable[None]]
+type Scope = MutableMapping[str, Any]
+type Receive = Callable[[], Awaitable[MutableMapping[str, Any]]]
+type Send = Callable[[MutableMapping[str, Any]], Awaitable[None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +34,7 @@ class HTTPScope:
     client: tuple[str, int] | None
 
     @classmethod
-    def from_scope(cls, scope: Scope) -> "HTTPScope":
+    def from_scope(cls, scope: Scope) -> HTTPScope:
         """Parse raw ASGI scope into typed object."""
         server = scope.get("server")
         client = scope.get("client")

@@ -26,20 +26,20 @@ class Response:
 
     # -- Chainable transformations --
 
-    def with_status(self, status: int) -> "Response":
+    def with_status(self, status: int) -> Response:
         """Return a new Response with a different status code."""
         return replace(self, status=status)
 
-    def with_header(self, name: str, value: str) -> "Response":
+    def with_header(self, name: str, value: str) -> Response:
         """Return a new Response with an additional header."""
         return replace(self, headers=(*self.headers, (name, value)))
 
-    def with_headers(self, headers: Mapping[str, str]) -> "Response":
+    def with_headers(self, headers: Mapping[str, str]) -> Response:
         """Return a new Response with additional headers."""
         new = tuple(headers.items())
         return replace(self, headers=(*self.headers, *new))
 
-    def with_content_type(self, content_type: str) -> "Response":
+    def with_content_type(self, content_type: str) -> Response:
         """Return a new Response with a different content type."""
         return replace(self, content_type=content_type)
 
@@ -54,7 +54,7 @@ class Response:
         secure: bool = False,
         httponly: bool = True,
         samesite: str = "lax",
-    ) -> "Response":
+    ) -> Response:
         """Return a new Response with an additional Set-Cookie."""
         cookie = SetCookie(
             name=name,
@@ -68,7 +68,7 @@ class Response:
         )
         return replace(self, cookies=(*self.cookies, cookie))
 
-    def without_cookie(self, name: str, path: str = "/") -> "Response":
+    def without_cookie(self, name: str, path: str = "/") -> Response:
         """Return a new Response that deletes a cookie (Max-Age=0)."""
         cookie = SetCookie(name=name, value="", max_age=0, path=path)
         return replace(self, cookies=(*self.cookies, cookie))

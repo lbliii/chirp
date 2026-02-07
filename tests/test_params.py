@@ -38,11 +38,11 @@ class TestConvertParam:
         assert convert_param("docs/api/v2", "path") == "docs/api/v2"
 
     def test_int_invalid_raises(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             convert_param("abc", "int")
 
     def test_float_invalid_raises(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="could not convert"):
             convert_param("abc", "float")
 
     def test_unknown_type_raises(self) -> None:

@@ -8,13 +8,13 @@ No base class required. The framework checks the shape, not the lineage.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 from chirp.http.request import Request
 from chirp.http.response import Response
 
 # The next handler in the middleware chain
-Next: TypeAlias = Callable[[Request], Awaitable[Response]]
+type Next = Callable[[Request], Awaitable[Response]]
 
 
 class Middleware(Protocol):

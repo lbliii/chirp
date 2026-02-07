@@ -1,6 +1,5 @@
 """Tests for chirp.http.request — frozen Request with async body access."""
 
-import asyncio
 import json
 
 import pytest
@@ -205,9 +204,7 @@ class TestRequestBody:
         scope = _make_scope()
         req = Request.from_asgi(scope, _make_receive(b"chunk1", b"chunk2"))
 
-        chunks = []
-        async for chunk in req.stream():
-            chunks.append(chunk)
+        chunks = [chunk async for chunk in req.stream()]
         assert chunks == [b"chunk1", b"chunk2"]
 
 

@@ -1,0 +1,14 @@
+<html>
+<body>
+<form>
+  <input type="search" name="q">
+</form>
+{% block results_list %}
+<div id="results">
+{% for item in results %}
+  <div class="result">{{ item }}</div>
+{% endfor %}
+</div>
+{% endblock %}
+</body>
+</html>

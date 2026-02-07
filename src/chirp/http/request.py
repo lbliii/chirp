@@ -74,7 +74,7 @@ class Request:
     @property
     def url(self) -> str:
         """Full request URL (path + query string)."""
-        qs = self.query._raw  # noqa: SLF001
+        qs = self.query._raw
         if qs:
             return f"{self.path}?{qs.decode('latin-1')}"
         return self.path
@@ -83,9 +83,7 @@ class Request:
 
     async def body(self) -> bytes:
         """Read the full request body."""
-        chunks: list[bytes] = []
-        async for chunk in self.stream():
-            chunks.append(chunk)
+        chunks = [chunk async for chunk in self.stream()]
         return b"".join(chunks)
 
     async def stream(self) -> AsyncGenerator[bytes]:
@@ -118,7 +116,7 @@ class Request:
         scope: dict[str, Any],
         receive: Receive,
         path_params: dict[str, str] | None = None,
-    ) -> "Request":
+    ) -> Request:
         """Create a Request from an ASGI scope and receive callable."""
         headers = Headers(tuple(scope.get("headers", ())))
         server = scope.get("server")
