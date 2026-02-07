@@ -10,7 +10,12 @@ from chirp.app import App
 from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.templating.returns import Fragment, Template
-from chirp.testing import TestClient
+from chirp.testing import (
+    TestClient,
+    assert_fragment_contains,
+    assert_fragment_not_contains,
+    assert_is_fragment,
+)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -92,12 +97,11 @@ class TestFragmentRendering:
 
         async with TestClient(app) as client:
             response = await client.get("/search")
-            assert response.status == 200
-            assert '<div id="results">' in response.text
-            assert "one" in response.text
-            assert "two" in response.text
-            # Fragment should NOT contain the full page wrapper
-            assert "<form>" not in response.text
+            assert_is_fragment(response)
+            assert_fragment_contains(response, '<div id="results">')
+            assert_fragment_contains(response, "one")
+            assert_fragment_contains(response, "two")
+            assert_fragment_not_contains(response, "<form>")
 
     async def test_fragment_vs_full_page(self) -> None:
         """Same template, different scope based on request type."""
@@ -118,9 +122,10 @@ class TestFragmentRendering:
 
             # Fragment only includes the results block
             frag = await client.fragment("/search")
-            assert "<form>" not in frag.text
-            assert "alpha" in frag.text
-            assert '<div id="results">' in frag.text
+            assert_is_fragment(frag)
+            assert_fragment_not_contains(frag, "<form>")
+            assert_fragment_contains(frag, "alpha")
+            assert_fragment_contains(frag, '<div id="results">')
 
     async def test_fragment_empty_results(self) -> None:
         app = _app()
@@ -131,8 +136,8 @@ class TestFragmentRendering:
 
         async with TestClient(app) as client:
             response = await client.get("/search")
-            assert response.status == 200
-            assert '<div id="results">' in response.text
+            assert_is_fragment(response)
+            assert_fragment_contains(response, '<div id="results">')
 
 
 class TestTemplateFilters:
@@ -224,4 +229,4 @@ class TestMixedReturnTypes:
             assert text_resp.text == "plain text"
 
             frag_resp = await client.get("/fragment")
-            assert '<div id="results">' in frag_resp.text
+            assert_fragment_contains(frag_resp, '<div id="results">')

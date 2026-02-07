@@ -10,7 +10,11 @@ from chirp.config import AppConfig
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response
-from chirp.testing import TestClient
+from chirp.testing import (
+    TestClient,
+    assert_fragment_contains,
+    assert_is_error_fragment,
+)
 
 
 class TestDefaultFragmentErrors:
@@ -25,10 +29,8 @@ class TestDefaultFragmentErrors:
 
         async with TestClient(app) as client:
             response = await client.fragment("/nonexistent")
-            assert response.status == 404
-            assert 'class="chirp-error"' in response.text
-            assert 'data-status="404"' in response.text
-            assert "No route matches" in response.text
+            assert_is_error_fragment(response, status=404)
+            assert_fragment_contains(response, "No route matches")
 
     async def test_404_normal_returns_plain_text(self) -> None:
         app = App()
@@ -51,8 +53,7 @@ class TestDefaultFragmentErrors:
 
         async with TestClient(app) as client:
             response = await client.fragment("/items", method="POST")
-            assert response.status == 405
-            assert 'class="chirp-error"' in response.text
+            assert_is_error_fragment(response, status=405)
 
     async def test_500_fragment_returns_snippet(self) -> None:
         app = App()
@@ -64,9 +65,8 @@ class TestDefaultFragmentErrors:
 
         async with TestClient(app) as client:
             response = await client.fragment("/boom")
-            assert response.status == 500
-            assert 'class="chirp-error"' in response.text
-            assert "Internal Server Error" in response.text
+            assert_is_error_fragment(response, status=500)
+            assert_fragment_contains(response, "Internal Server Error")
 
     async def test_500_normal_returns_plain_text(self) -> None:
         app = App()
@@ -224,9 +224,8 @@ class TestCustomHTTPErrorSubclass:
 
         async with TestClient(app) as client:
             frag = await client.fragment("/forbidden")
-            assert frag.status == 403
-            assert 'class="chirp-error"' in frag.text
-            assert "Access denied" in frag.text
+            assert_is_error_fragment(frag, status=403)
+            assert_fragment_contains(frag, "Access denied")
 
             full = await client.get("/forbidden")
             assert full.status == 403
@@ -246,10 +245,9 @@ class TestDebugModeFragmentErrors:
 
         async with TestClient(app) as client:
             response = await client.fragment("/boom")
-            assert response.status == 500
-            assert 'class="chirp-error"' in response.text
-            assert "debug error" in response.text
-            assert "<pre>" in response.text
+            assert_is_error_fragment(response, status=500)
+            assert_fragment_contains(response, "debug error")
+            assert_fragment_contains(response, "<pre>")
 
     async def test_debug_500_normal_includes_traceback(self) -> None:
         app = App(config=AppConfig(debug=True))
