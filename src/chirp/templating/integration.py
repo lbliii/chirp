@@ -27,6 +27,7 @@ def create_environment(
     env = Environment(
         loader=FileSystemLoader(str(config.template_dir)),
         autoescape=config.autoescape,
+        auto_reload=config.debug,
     )
 
     # Register user-defined filters
