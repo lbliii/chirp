@@ -17,7 +17,7 @@ app.run()
 Chirp serves HTML beautifully — full pages, fragments, streams, and real-time events — all
 through its built-in template engine, [kida](https://github.com/lbliii/kida).
 
-**Status:** Pre-alpha (Phases 0-2 complete, Phase 3 in progress). See [ROADMAP.md](ROADMAP.md) for the full vision.
+**Status:** Pre-alpha (Phases 0-4 complete). See [ROADMAP.md](ROADMAP.md) for the full vision.
 
 ## Key Ideas
 

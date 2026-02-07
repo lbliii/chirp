@@ -1,8 +1,8 @@
 # Architecture Design Document: Chirp
 
-**Version**: 0.1.0
+**Version**: 0.2.0
 **Date**: 2026-02-07
-**Status**: Active (Phases 0-2 implemented)
+**Status**: Active (Phases 0-4 implemented)
 
 ---
 
@@ -260,6 +260,30 @@ async def execute(request, middlewares, handler):
 
 **Compilation:** The middleware chain is built at freeze time. The list of middleware
 functions is captured as a tuple. No middleware can be added after `app.run()`.
+
+**Built-in middleware (all implemented):**
+
+| Middleware | Module | Purpose |
+|------------|--------|---------|
+| `CORSMiddleware` | `middleware.builtin` | Cross-Origin Resource Sharing (preflight, credentials, expose-headers) |
+| `StaticFiles` | `middleware.static` | Serve static files with MIME detection and path traversal protection |
+| `SessionMiddleware` | `middleware.sessions` | Signed cookie sessions via optional `itsdangerous` dependency |
+
+**Request-scoped context (implemented):**
+
+The handler pipeline sets a `ContextVar` (`request_var`) before dispatch and resets it in a
+`finally` block. A mutable namespace (`g`) is also available per-request, inspired by Flask
+but backed by ContextVar for free-threading safety. Both are reset after each request.
+
+```python
+from chirp.context import get_request, g
+
+# In middleware:
+g.user = authenticate(request)
+
+# In handler:
+user = g.user
+```
 
 ### 4.5 Content Negotiation
 

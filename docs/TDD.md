@@ -1,8 +1,8 @@
 # Technical Design Document: Chirp Core Types and Protocols
 
-**Version**: 0.1.0-draft
+**Version**: 0.2.0
 **Date**: 2026-02-07
-**Status**: Draft
+**Status**: Active (Phases 0-4 implemented)
 
 ---
 
@@ -1036,6 +1036,9 @@ from chirp.realtime.events import EventStream, SSEEvent
 # Middleware
 from chirp.middleware.protocol import Middleware, Next
 
+# Context
+from chirp.context import get_request, g
+
 __all__ = [
     # App
     "App",
@@ -1054,7 +1057,17 @@ __all__ = [
     # Middleware
     "Middleware",
     "Next",
+    # Context
+    "get_request",
+    "g",
 ]
+```
+
+**Built-in middleware (separate imports):**
+
+```python
+from chirp.middleware import CORSMiddleware, CORSConfig, StaticFiles
+from chirp.middleware.sessions import SessionMiddleware, SessionConfig, get_session
 ```
 
 **Minimal import for hello world:**
@@ -1066,7 +1079,7 @@ from chirp import App
 **Full import for a real application:**
 
 ```python
-from chirp import App, AppConfig, Request, Template, Fragment, EventStream
+from chirp import App, AppConfig, Request, Template, Fragment, EventStream, g
 ```
 
 ---
@@ -1163,6 +1176,7 @@ chirp/
 ├── py.typed                 # PEP 561 marker
 ├── app.py                   # App class (setup + freeze + ASGI)
 ├── config.py                # AppConfig frozen dataclass
+├── context.py               # Request-scoped ContextVar (request_var, g namespace)
 ├── http/
 │   ├── __init__.py          # Re-export Request, Response, etc.
 │   ├── request.py           # Request frozen dataclass
@@ -1176,8 +1190,11 @@ chirp/
 │   ├── router.py            # Router with compile + match
 │   └── params.py            # Path parameter converters
 ├── middleware/
-│   ├── __init__.py
-│   └── protocol.py          # Middleware Protocol + Next type
+│   ├── __init__.py          # Re-export protocols + built-in middleware
+│   ├── protocol.py          # Middleware Protocol + Next type
+│   ├── builtin.py           # CORSMiddleware + CORSConfig
+│   ├── static.py            # StaticFiles middleware
+│   └── sessions.py          # SessionMiddleware + SessionConfig + get_session
 ├── templating/
 │   ├── __init__.py
 │   └── returns.py           # Template, Fragment, Stream
@@ -1186,11 +1203,13 @@ chirp/
 │   └── events.py            # EventStream, SSEEvent
 ├── server/
 │   ├── __init__.py
+│   ├── handler.py           # ASGI request handler (dispatch + error handling)
 │   └── negotiation.py       # Content negotiation dispatch
 ├── testing.py               # TestClient
 └── _internal/
     ├── __init__.py
-    └── asgi.py              # Typed ASGI definitions
+    ├── asgi.py              # Typed ASGI definitions
+    └── multimap.py          # MultiValueMapping protocol
 ```
 
 ---

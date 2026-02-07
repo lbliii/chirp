@@ -133,15 +133,15 @@ and thread-based interactions.
 | F-016 | Fragment request detection | `request.is_fragment` detects HX-Request header |
 | F-017 | Block-level rendering in kida | Render a named block without the full template |
 
-### 4.4 Middleware (P1 -- Should Have)
+### 4.4 Middleware (P1 -- Should Have) -- IMPLEMENTED
 
-| ID | Requirement | Acceptance Criteria |
-|----|-------------|---------------------|
-| F-018 | Protocol-based middleware | Functions and callables matching the protocol |
-| F-019 | Middleware pipeline | Ordered execution with next-handler chaining |
-| F-020 | CORS middleware (built-in) | Configurable origins, methods, headers |
-| F-021 | Static file serving | Serve files from a directory |
-| F-022 | Session middleware | Signed cookies via optional itsdangerous dep |
+| ID | Requirement | Acceptance Criteria | Status |
+|----|-------------|---------------------|--------|
+| F-018 | Protocol-based middleware | Functions and callables matching the protocol | Done |
+| F-019 | Middleware pipeline | Ordered execution with next-handler chaining | Done |
+| F-020 | CORS middleware (built-in) | Configurable origins, methods, headers | Done |
+| F-021 | Static file serving | Serve files from a directory | Done |
+| F-022 | Session middleware | Signed cookies via optional itsdangerous dep | Done |
 
 ### 4.5 Streaming HTML (P1 -- Should Have)
 
@@ -260,8 +260,8 @@ and thread-based interactions.
 
 ### 7.3 v0.3.0 (Phase 4-5)
 
-- Middleware pipeline works
-- Sessions and CORS are usable
+- ~~Middleware pipeline works~~ Done
+- ~~Sessions and CORS are usable~~ Done
 - Streaming HTML sends chunks progressively
 - Dashboard example streams multiple data sources
 

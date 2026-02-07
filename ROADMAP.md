@@ -528,23 +528,32 @@ The key differentiator lands.
 
 - [x] `Fragment` return type -- render a named block from a template
 - [x] `request.is_fragment` detection (HX-Request header)
-- [ ] Fragment-aware error handling
+- [x] Fragment-aware error handling (htmx errors return `<div class="chirp-error">` snippets)
 - [x] Kida block-level rendering integration (kida `render_block()` verified available in v0.1.2)
 
 Additional htmx detection:
 - [x] `request.htmx_target` -- HX-Target header
 - [x] `request.htmx_trigger` -- HX-Trigger header
 
-### Phase 4: Middleware and Sessions
+### Phase 4: Middleware and Sessions ✅
 
 The framework becomes usable for real applications.
 
 - [x] `Middleware` protocol definition
 - [x] Middleware pipeline execution
-- [ ] Built-in CORS middleware
-- [ ] Built-in static file serving
-- [ ] Session middleware (signed cookies via optional itsdangerous)
-- [ ] Request-scoped user context via ContextVar
+- [x] Built-in CORS middleware (`CORSMiddleware` with `CORSConfig`)
+- [x] Built-in static file serving (`StaticFiles` with path traversal protection)
+- [x] Session middleware (signed cookies via optional `itsdangerous`)
+- [x] Request-scoped user context via ContextVar (`request_var`, `g` namespace)
+
+Implementation notes:
+- Error handlers now receive `(request, exception)` via signature introspection (backward-compatible
+  with zero-arg handlers). Supports both sync and async error handlers.
+- `g` is a mutable per-request namespace backed by ContextVar, reset after each request.
+- `CORSMiddleware` handles preflight OPTIONS, credentials, expose-headers, multiple origins.
+- `StaticFiles` resolves paths and checks `is_relative_to()` to prevent traversal.
+- `SessionMiddleware` requires `itsdangerous` (optional dep). Raises `ConfigurationError` if missing.
+  Session data is JSON-serialized into a signed cookie with sliding expiration.
 
 ### Phase 5: Streaming HTML
 
