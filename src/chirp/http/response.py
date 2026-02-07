@@ -4,8 +4,9 @@ Each transformation returns a new Response. Immutable by convention,
 built incrementally by design.
 """
 
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from collections.abc import AsyncIterator, Iterator, Mapping
+from dataclasses import dataclass, field, replace
+from typing import Any
 
 from chirp.http.cookies import SetCookie
 
@@ -97,3 +98,29 @@ class Redirect:
     url: str
     status: int = 302
     headers: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class StreamingResponse:
+    """A streaming HTTP response that sends chunks progressively.
+
+    Used for chunked transfer encoding: headers are sent immediately,
+    then each chunk is sent as an ASGI body message with ``more_body=True``.
+    """
+
+    chunks: Iterator[str] | AsyncIterator[str]
+    status: int = 200
+    content_type: str = "text/html; charset=utf-8"
+    headers: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SSEResponse:
+    """Sentinel response for Server-Sent Events.
+
+    Wraps an EventStream and requires direct ASGI send/receive access
+    (the handler bypasses the normal _send_response path).
+    """
+
+    event_stream: Any  # EventStream (avoided import cycle)
+    kida_env: Any = None  # kida Environment | None

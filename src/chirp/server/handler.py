@@ -16,7 +16,7 @@ from chirp._internal.asgi import Receive, Scope, Send
 from chirp.context import g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
-from chirp.http.response import Response
+from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.middleware.protocol import Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
@@ -72,7 +72,20 @@ async def handle_request(
         g._reset()
         request_var.reset(token)
 
-    await _send_response(response, send)
+    # Dispatch based on response type
+    if isinstance(response, SSEResponse):
+        from chirp.realtime.sse import handle_sse
+
+        await handle_sse(
+            response.event_stream,
+            send,
+            receive,
+            kida_env=response.kida_env,
+        )
+    elif isinstance(response, StreamingResponse):
+        await _send_streaming_response(response, send, debug=debug)
+    else:
+        await _send_response(response, send)
 
 
 async def _invoke_handler(
@@ -255,4 +268,71 @@ async def _send_response(response: Response, send: Send) -> None:
     await send({
         "type": "http.response.body",
         "body": body,
+    })
+
+
+async def _send_streaming_response(
+    response: StreamingResponse,
+    send: Send,
+    *,
+    debug: bool = False,
+) -> None:
+    """Send a streaming response via chunked transfer encoding.
+
+    Sends headers immediately, then each chunk as an ASGI body
+    message with ``more_body=True``. Closes with an empty body.
+    On mid-stream error, emits an HTML comment and closes.
+    """
+    from collections.abc import AsyncIterator
+
+    raw_headers: list[tuple[bytes, bytes]] = [
+        (b"content-type", response.content_type.encode("latin-1")),
+    ]
+    for name, value in response.headers:
+        raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
+
+    # No content-length for chunked transfer
+    await send({
+        "type": "http.response.start",
+        "status": response.status,
+        "headers": raw_headers,
+    })
+
+    try:
+        if isinstance(response.chunks, AsyncIterator):
+            async for chunk in response.chunks:
+                if chunk:
+                    await send({
+                        "type": "http.response.body",
+                        "body": chunk.encode("utf-8"),
+                        "more_body": True,
+                    })
+        else:
+            for chunk in response.chunks:
+                if chunk:
+                    await send({
+                        "type": "http.response.body",
+                        "body": chunk.encode("utf-8"),
+                        "more_body": True,
+                    })
+    except Exception as exc:
+        # Mid-stream error: emit HTML comment and close
+        import traceback
+
+        if debug:
+            tb = traceback.format_exc()
+            error_chunk = f"<!-- chirp: render error\n{tb}\n-->"
+        else:
+            error_chunk = "<!-- chirp: render error -->"
+        await send({
+            "type": "http.response.body",
+            "body": error_chunk.encode("utf-8"),
+            "more_body": True,
+        })
+
+    # Close the stream
+    await send({
+        "type": "http.response.body",
+        "body": b"",
+        "more_body": False,
     })

@@ -1,0 +1,18 @@
+{
+  "id": "6de0077d",
+  "type": "docs_staged",
+  "timestamp": "2026-02-07T16:09:00.217222Z",
+  "message": "5 doc(s) staged for commit",
+  "suggested_action": "::a",
+  "acknowledged": false,
+  "metadata": {
+    "file_count": 5
+  },
+  "files": [
+    "README.md",
+    "ROADMAP.md",
+    "docs/ARD.md",
+    "docs/PRD.md",
+    "docs/TDD.md"
+  ]
+}
