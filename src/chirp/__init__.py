@@ -22,6 +22,7 @@ _Py_mod_gil = 0
 __version__ = "0.1.0-dev"
 __all__ = [
     # App
+    "AnyResponse",
     "App",
     "AppConfig",
     # Real-time
@@ -79,7 +80,7 @@ def __getattr__(name: str) -> object:
 
         return getattr(_events, name)
 
-    if name in ("Middleware", "Next"):
+    if name in ("AnyResponse", "Middleware", "Next"):
         from chirp.middleware import protocol as _mw
 
         return getattr(_mw, name)

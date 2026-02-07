@@ -17,7 +17,7 @@ from chirp.context import g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
-from chirp.middleware.protocol import Next
+from chirp.middleware.protocol import AnyResponse
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.negotiation import negotiate
@@ -46,7 +46,7 @@ async def handle_request(
 
     try:
         # Build the innermost handler (router dispatch)
-        async def dispatch(req: Request) -> Response | StreamingResponse | SSEResponse:
+        async def dispatch(req: Request) -> AnyResponse:
             match = router.match(req.method, req.path)
             return await _invoke_handler(match, req, kida_env=kida_env)
 
@@ -93,7 +93,7 @@ async def _invoke_handler(
     request: Request,
     *,
     kida_env: Environment | None = None,
-) -> Response | StreamingResponse | SSEResponse:
+) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
 

@@ -106,12 +106,33 @@ class StreamingResponse:
 
     Used for chunked transfer encoding: headers are sent immediately,
     then each chunk is sent as an ASGI body message with ``more_body=True``.
+
+    Supports the same ``.with_*()`` chainable API as ``Response``
+    so middleware can modify headers/status without knowing the
+    response is streamed.
     """
 
     chunks: Iterator[str] | AsyncIterator[str]
     status: int = 200
     content_type: str = "text/html; charset=utf-8"
     headers: tuple[tuple[str, str], ...] = ()
+
+    def with_status(self, status: int) -> StreamingResponse:
+        """Return a new StreamingResponse with a different status code."""
+        return replace(self, status=status)
+
+    def with_header(self, name: str, value: str) -> StreamingResponse:
+        """Return a new StreamingResponse with an additional header."""
+        return replace(self, headers=(*self.headers, (name, value)))
+
+    def with_headers(self, headers: Mapping[str, str]) -> StreamingResponse:
+        """Return a new StreamingResponse with additional headers."""
+        new = tuple(headers.items())
+        return replace(self, headers=(*self.headers, *new))
+
+    def with_content_type(self, content_type: str) -> StreamingResponse:
+        """Return a new StreamingResponse with a different content type."""
+        return replace(self, content_type=content_type)
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +141,27 @@ class SSEResponse:
 
     Wraps an EventStream and requires direct ASGI send/receive access
     (the handler bypasses the normal _send_response path).
+
+    Provides no-op ``.with_*()`` methods so middleware chains don't crash.
+    SSE headers (text/event-stream, no-cache) are always sent by the SSE
+    handler itself; any middleware header modifications are ignored.
     """
 
     event_stream: Any  # EventStream (avoided import cycle)
     kida_env: Any = None  # kida Environment | None
+
+    def with_status(self, status: int) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE always sends 200."""
+        return self
+
+    def with_header(self, name: str, value: str) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE headers are fixed by the protocol handler."""
+        return self
+
+    def with_headers(self, headers: Mapping[str, str]) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE headers are fixed by the protocol handler."""
+        return self
+
+    def with_content_type(self, content_type: str) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE content type is always text/event-stream."""
+        return self
