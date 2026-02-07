@@ -498,7 +498,7 @@ The minimal "hello world" works.
 - [x] Return-value content negotiation (str, dict, Response, Redirect, tuples)
 - [x] ASGI handler translating between ASGI scope/messages and chirp types
 - [x] Basic error handling with `@app.error()`
-- [ ] Development server with auto-reload (blocked on pounce ASGI server)
+- [x] Development server with auto-reload via pounce ASGI server (`server/dev.py`)
 
 Additional work completed:
 - [x] Trie-based router with static, parameterized, and catch-all path matching
@@ -513,7 +513,7 @@ Templates become a first-class return type.
 - [x] `Template` return type renders via kida
 - [x] `Fragment` return type renders named blocks via kida `render_block()`
 - [x] `@app.template_filter()` and `@app.template_global()` decorators
-- [ ] Template auto-reload in debug mode
+- [x] Template auto-reload in debug mode (`auto_reload=config.debug` passed to kida Environment)
 
 Implementation notes:
 - Kida `Environment` is created once during `App._freeze()` and threaded through
@@ -555,25 +555,38 @@ Implementation notes:
 - `SessionMiddleware` requires `itsdangerous` (optional dep). Raises `ConfigurationError` if missing.
   Session data is JSON-serialized into a signed cookie with sliding expiration.
 
-### Phase 5: Streaming HTML
+### Phase 5: Streaming HTML ✅
 
 Progressive page rendering.
 
-- [x] `Stream` return type defined (placeholder negotiation)
-- [ ] Chunked transfer encoding in ASGI handler
-- [ ] Kida streaming renderer (requires kida compiler work -- `RenderedTemplate` stub exists)
-- [ ] Async context values that resolve and stream independently
-- [ ] Proper error handling mid-stream
+- [x] `Stream` return type defined
+- [x] Chunked transfer encoding in ASGI handler (`_send_streaming_response` in `handler.py`)
+- [x] Kida streaming renderer (`render_stream()` implemented -- dual-mode compiler generates both StringBuilder and generator functions)
+- [x] `StreamingResponse` dataclass with chainable `.with_*()` methods for middleware compatibility
+- [x] Content negotiation wires `Stream` → kida `render_stream()` → chunked ASGI
+- [x] Mid-stream error handling (HTML comment injection + graceful stream close)
 
-### Phase 6: Real-Time
+Implementation notes:
+- Kida's compiler now generates both `render()` (StringBuilder) and `render_stream()` (generator) from each template in a single compilation pass. No performance impact on `render()`.
+- `StreamingResponse` is a peer to `Response` with the same chainable API (`with_status`, `with_header`, `with_headers`, `with_content_type`) using `dataclasses.replace` for immutability.
+- Middleware protocol updated: `Next` returns `AnyResponse = Response | StreamingResponse | SSEResponse`.
+
+### Phase 6: Real-Time ✅
 
 Server-Sent Events for live HTML updates.
 
-- [x] `EventStream` return type defined (placeholder negotiation)
+- [x] `EventStream` return type defined
 - [x] `SSEEvent` with wire-format `encode()` method
-- [ ] SSE protocol implementation over ASGI
-- [ ] Fragment rendering in SSE events
-- [ ] Connection lifecycle management (connect, disconnect, heartbeat)
+- [x] SSE protocol implementation over ASGI (`handle_sse` in `realtime/sse.py`)
+- [x] Fragment rendering in SSE events (kida `Fragment` → render via kida env → SSE data frame)
+- [x] Connection lifecycle management (event producer task, disconnect monitor, heartbeat on idle)
+- [x] `SSEResponse` dataclass with no-op `.with_*()` methods (SSE headers are fixed by protocol)
+- [x] Content negotiation wires `EventStream` → `SSEResponse` → `handle_sse` dispatch
+
+Implementation notes:
+- SSE handler launches two concurrent tasks: an event producer (consumes `EventStream.generator`, formats events, sends as ASGI body chunks) and a disconnect monitor (waits for `http.disconnect`, cancels producer).
+- `_format_event()` handles `SSEEvent`, `Fragment` (rendered via kida), `str`, and `dict` (JSON-serialized) types.
+- Heartbeat comments (`: heartbeat`) sent when idle to keep the connection alive.
 
 ### Phase 7: Testing and Polish
 

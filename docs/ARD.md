@@ -1,8 +1,8 @@
 # Architecture Design Document: Chirp
 
-**Version**: 0.2.0
+**Version**: 0.3.0
 **Date**: 2026-02-07
-**Status**: Active (Phases 0-4 implemented)
+**Status**: Active (Phases 0-6 implemented)
 
 ---
 
@@ -31,7 +31,7 @@
 ```
                     ┌──────────────────────────────────┐
                     │         ASGI Server              │
-                    │  (uvicorn / granian / hypercorn) │
+                    │  (pounce / uvicorn / granian)    │
                     └───────────────┬──────────────────┘
                                     │ ASGI protocol
                                     │ (scope, receive, send)
@@ -237,12 +237,18 @@ with an `Allow` header listing valid methods.
 **Protocol:**
 
 ```python
+type AnyResponse = Response | StreamingResponse | SSEResponse
+
 class Middleware(Protocol):
-    async def __call__(self, request: Request, next: Next) -> Response: ...
+    async def __call__(self, request: Request, next: Next) -> AnyResponse: ...
 
 # Where Next is:
-type Next = Callable[[Request], Awaitable[Response]]
+type Next = Callable[[Request], Awaitable[AnyResponse]]
 ```
+
+All three response types support chainable `.with_status()`, `.with_header()`, `.with_headers()`,
+and `.with_content_type()` methods. `StreamingResponse` uses `dataclasses.replace` for immutability.
+`SSEResponse` provides no-op versions since SSE headers are fixed by the protocol.
 
 **Execution model:** Middleware forms a chain. Each middleware receives the request and a
 `next` function. Calling `next(request)` passes control to the next middleware (or the route
@@ -299,8 +305,8 @@ checks on the return value:
 | `Redirect` | `Response(status=302, headers={"Location": url})` |
 | `Template` | Render via kida, `Response(content_type="text/html")` |
 | `Fragment` | Render block via kida, `Response(content_type="text/html")` |
-| `Stream` | Start chunked response, stream kida sections |
-| `EventStream` | Start SSE response, stream events |
+| `Stream` | kida `render_stream()` → `StreamingResponse` → chunked ASGI |
+| `EventStream` | `SSEResponse` → `handle_sse` (event producer + disconnect monitor) |
 | `tuple[value, int]` | Content-negotiate the value, override status |
 | `tuple[value, int, dict]` | Content-negotiate the value, override status and headers |
 
@@ -309,9 +315,10 @@ checks on the return value:
 **Environment lifecycle:**
 1. App freeze triggers kida `Environment` creation
 2. `AppConfig.template_dir` sets the `FileSystemLoader` path
-3. Registered filters and globals are added to the environment
-4. The environment is stored on the frozen app (immutable after creation)
-5. Each render call uses the shared environment (kida is thread-safe)
+3. `auto_reload=config.debug` enables template reloading in development, caching in production
+4. Registered filters and globals are added to the environment
+5. The environment is stored on the frozen app (immutable after creation)
+6. Each render call uses the shared environment (kida is thread-safe)
 
 **Rendering dispatch:**
 
@@ -326,18 +333,17 @@ async def render_fragment(env, fragment: Fragment) -> str:
     tmpl = env.get_template(fragment.template_name)
     return tmpl.render_block(fragment.block_name, **fragment.context)
 
-# Stream: progressive render
-async def render_stream(env, stream: Stream) -> AsyncIterator[str]:
+# Stream: progressive render (yields chunks via generator)
+def render_stream(env, stream: Stream) -> Iterator[str]:
     tmpl = env.get_template(stream.template_name)
-    async for chunk in tmpl.render_stream(**stream.context):
-        yield chunk
+    return tmpl.render_stream(**stream.context)
 ```
 
-**Kida status (verified v0.1.2):**
-- `render()` -- exists, uses StringBuilder pattern
-- `render_block()` -- **exists**, blocks are compiled as independent functions
-- `render_stream()` -- **not implemented**, stub `RenderedTemplate` class exists; requires
-  kida compiler changes to yield at block boundaries (tracked for Phase 5)
+**Kida status (verified v0.1.3-dev):**
+- `render()` -- StringBuilder pattern (fastest, default)
+- `render_block()` -- blocks compiled as independent functions
+- `render_stream()` -- generator pattern, yields at every statement boundary; dual-mode
+  compiler generates both functions from each template in a single compilation pass
 
 ### 4.7 SSE Architecture
 
@@ -386,8 +392,20 @@ data: <div class="notification">User joined</div>
     └──────────────┘
 ```
 
-**Disconnect detection:** The ASGI `receive` channel signals client disconnection. The SSE
-handler monitors this and cancels the event generator via `anyio.CancelScope`.
+**Disconnect detection:** The ASGI `receive` channel signals client disconnection via
+`http.disconnect`. The SSE handler launches a dedicated disconnect monitor task that awaits
+this message and cancels the event producer task. Event generator cleanup runs automatically
+via task cancellation.
+
+**Event formatting:** `_format_event()` handles multiple yield types:
+- `SSEEvent` → full SSE wire format with optional `event:`, `id:`, `retry:` fields
+- `Fragment` → rendered via kida, sent as `event: fragment\ndata: <html>...`
+- `str` → sent as `data: <string>`
+- `dict` → JSON-serialized, sent as `data: {"json": ...}`
+
+**Response type:** `SSEResponse` is dispatched directly by the ASGI handler (bypasses
+`_send_response`). Its `.with_*()` methods are no-ops since SSE headers are fixed by
+the protocol (`text/event-stream`, `no-cache`, `keep-alive`).
 
 ---
 
@@ -615,8 +633,9 @@ Streaming HTML and SSE have special error handling needs because headers are alr
            │      └── events.py      (depends on templating/returns.py)
            │
            ├── chirp/server/
-           │      ├── handler.py     (depends on http/, routing/, middleware/)
-           │      └── dev.py         (depends on handler.py; external: anyio)
+           │      ├── handler.py     (depends on http/, routing/, middleware/, realtime/)
+           │      ├── negotiation.py (depends on http/, templating/; external: kida)
+           │      └── dev.py         (external: pounce)
            │
            └── chirp/_internal/
                   └── asgi.py        (no internal deps; ASGI type definitions)
@@ -638,9 +657,9 @@ app = App()
 # ... register routes ...
 
 # For ASGI servers:
+# pounce app:app       (recommended -- same ecosystem, free-threading native)
 # uvicorn app:app
 # granian app:app
-# hypercorn app:app
 
 # The App.__call__ method implements:
 async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None: ...
@@ -660,11 +679,11 @@ env = Environment(
 )
 ```
 
-Required kida capabilities (verified and integrated as of Phase 2 completion):
+Required kida capabilities (all integrated as of Phase 6 completion):
 - `Environment.get_template()` -- ✅ integrated via `templating/integration.py`
 - `Template.render()` -- ✅ integrated, used by `Template` return type
 - `Template.render_block()` -- ✅ integrated, used by `Fragment` return type
-- `Template.render_stream()` -- **not yet implemented in kida** (stub exists, blocks Phase 5)
+- `Template.render_stream()` -- ✅ integrated, used by `Stream` return type (kida dual-mode compiler generates both StringBuilder and generator functions per template)
 
 ### 9.3 anyio Async Runtime
 

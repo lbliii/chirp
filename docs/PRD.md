@@ -143,22 +143,22 @@ and thread-based interactions.
 | F-021 | Static file serving | Serve files from a directory | Done |
 | F-022 | Session middleware | Signed cookies via optional itsdangerous dep | Done |
 
-### 4.5 Streaming HTML (P1 -- Should Have)
+### 4.5 Streaming HTML (P1 -- Should Have) -- IMPLEMENTED
 
-| ID | Requirement | Acceptance Criteria |
-|----|-------------|---------------------|
-| F-023 | Stream return type | `return Stream("page.html", **async_ctx)` |
-| F-024 | Chunked transfer encoding | Response streams as template sections complete |
-| F-025 | Async context resolution | Awaitable values resolve and stream independently |
+| ID | Requirement | Acceptance Criteria | Status |
+|----|-------------|---------------------|--------|
+| F-023 | Stream return type | `return Stream("page.html", **async_ctx)` | Done |
+| F-024 | Chunked transfer encoding | Response streams as template sections complete | Done |
+| F-025 | Async context resolution | Awaitable values resolve and stream independently | Done |
 
-### 4.6 Server-Sent Events (P1 -- Should Have)
+### 4.6 Server-Sent Events (P1 -- Should Have) -- IMPLEMENTED
 
-| ID | Requirement | Acceptance Criteria |
-|----|-------------|---------------------|
-| F-026 | EventStream return type | `return EventStream(async_generator)` |
-| F-027 | SSE protocol | Proper `text/event-stream` with `data:`, `event:`, `id:` |
-| F-028 | Fragment SSE events | Yield Fragment objects in SSE streams |
-| F-029 | Connection lifecycle | Heartbeat, disconnect detection, cleanup |
+| ID | Requirement | Acceptance Criteria | Status |
+|----|-------------|---------------------|--------|
+| F-026 | EventStream return type | `return EventStream(async_generator)` | Done |
+| F-027 | SSE protocol | Proper `text/event-stream` with `data:`, `event:`, `id:` | Done |
+| F-028 | Fragment SSE events | Yield Fragment objects in SSE streams | Done |
+| F-029 | Connection lifecycle | Heartbeat, disconnect detection, cleanup | Done |
 
 ### 4.7 Testing (P1 -- Should Have)
 
@@ -262,12 +262,12 @@ and thread-based interactions.
 
 - ~~Middleware pipeline works~~ Done
 - ~~Sessions and CORS are usable~~ Done
-- Streaming HTML sends chunks progressively
+- ~~Streaming HTML sends chunks progressively~~ Done
 - Dashboard example streams multiple data sources
 
 ### 7.4 v0.4.0 (Phase 6-7)
 
-- SSE works with fragment rendering
+- ~~SSE works with fragment rendering~~ Done
 - Test client covers all return types
 - Real-time notification example works
 - Documentation site exists
@@ -279,8 +279,8 @@ and thread-based interactions.
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
 | ~~Kida lacks block-level rendering~~ | ~~Blocks Phase 3~~ | ~~Medium~~ | **RESOLVED**: `render_block()` integrated in Phase 2; 12 contract tests in kida repo |
-| Kida lacks streaming rendering | Blocks Phase 5 | Medium | `RenderedTemplate` stub exists; plan compiler work alongside Phases 3-4 |
-| Streaming HTML mid-stream errors | Poor UX on failure | Medium | Define error recovery protocol; test extensively |
+| ~~Kida lacks streaming rendering~~ | ~~Blocks Phase 5~~ | ~~Medium~~ | **RESOLVED**: Kida `render_stream()` implemented via dual-mode compiler; `StreamingResponse` + chunked ASGI in chirp |
+| ~~Streaming HTML mid-stream errors~~ | ~~Poor UX on failure~~ | ~~Medium~~ | **RESOLVED**: Mid-stream errors emit HTML comment and gracefully close stream; debug mode includes traceback |
 | anyio compatibility issues on 3.14t | Blocks free-threading | Low | anyio already tests on 3.14; monitor upstream |
 | htmx changes fragment detection pattern | Breaks `is_fragment` | Low | Abstract detection behind a method; easy to update |
 | Scope creep toward "full framework" | Dilutes focus | High | Non-goals list is enforced; review each addition |
@@ -306,12 +306,14 @@ See ROADMAP.md Non-Goals section. Additionally:
 1. **Should chirp include a minimal CLI?** `chirp run` vs just `app.run()` and `python app.py`.
    Leaning toward no CLI initially -- `app.run()` is sufficient and avoids a click dependency.
 
-2. **Should `Stream` require kida changes or work with the existing API?** The streaming
-   renderer may need kida to yield chunks from a template render. This needs a kida spike
-   before Phase 5.
+2. ~~**Should `Stream` require kida changes or work with the existing API?**~~ **RESOLVED**: Kida's
+   compiler now generates both StringBuilder (`render()`) and generator (`render_stream()`) functions
+   from each template. Chirp's `Stream` return type calls `render_stream()` and pipes chunks through
+   `_send_streaming_response()` as chunked HTTP. No performance impact on `render()`.
 
-3. **What ASGI server to recommend for production?** uvicorn is the default choice, but
-   granian (Rust-based) may be a better fit for free-threading. Needs benchmarking.
+3. ~~**What ASGI server to recommend for production?**~~ **RESOLVED**: Pounce (same ecosystem) is
+   the recommended ASGI server. Chirp's `app.run()` launches pounce directly via `server/dev.py`.
+   For production, `pounce myapp:app` or any ASGI server works since Chirp is a standard ASGI callable.
 
 4. **Should fragment detection support more than htmx?** Turbo, Unpoly, and custom headers
    all indicate fragment requests. Consider an extensible detection mechanism.
