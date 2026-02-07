@@ -46,12 +46,12 @@ async def handle_request(
 
     try:
         # Build the innermost handler (router dispatch)
-        async def dispatch(req: Request) -> Response:
+        async def dispatch(req: Request) -> Response | StreamingResponse | SSEResponse:
             match = router.match(req.method, req.path)
             return await _invoke_handler(match, req, kida_env=kida_env)
 
         # Wrap middleware around the dispatch
-        handler: Next = dispatch
+        handler = dispatch
         for mw in reversed(middleware):
             outer = handler
             mw_ref = mw
@@ -93,7 +93,7 @@ async def _invoke_handler(
     request: Request,
     *,
     kida_env: Environment | None = None,
-) -> Response:
+) -> Response | StreamingResponse | SSEResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
 

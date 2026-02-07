@@ -73,17 +73,29 @@ class TestNegotiateTemplateTypes:
         with pytest.raises(RuntimeError, match="requires kida integration"):
             negotiate(Fragment("search.html", "results"))
 
-    def test_stream_placeholder(self) -> None:
-        result = negotiate(Stream("dashboard.html"))
-        assert result.status == 200
-        assert "dashboard.html" in result.text
+    def test_stream_without_env_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="requires kida integration"):
+            negotiate(Stream("dashboard.html"))
 
-    def test_event_stream_placeholder(self) -> None:
+    def test_stream_returns_streaming_response(self, tmp_path) -> None:
+        from chirp.http.response import StreamingResponse
+
+        env = Environment(loader=FileSystemLoader(str(tmp_path)))
+        (tmp_path / "dash.html").write_text("Hello {{ name }}")
+        result = negotiate(Stream("dash.html", name="World"), kida_env=env)
+        assert isinstance(result, StreamingResponse)
+        assert result.content_type == "text/html; charset=utf-8"
+        assert "".join(result.chunks) == "Hello World"
+
+    def test_event_stream_returns_sse_response(self) -> None:
+        from chirp.http.response import SSEResponse
+
         async def gen():
             yield "hello"
 
         result = negotiate(EventStream(generator=gen()))
-        assert result.content_type == "text/event-stream"
+        assert isinstance(result, SSEResponse)
+        assert result.event_stream.generator is not None
 
 
 class TestNegotiatePrimitives:
