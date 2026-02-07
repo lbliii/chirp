@@ -1,0 +1,213 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chirp"
+version = "0.1.0-dev"
+description = "A Python web framework for the modern web platform — HTML fragments, streaming, SSE, free-threading ready"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Bengal Contributors", email = "lbeezr@icloud.com" }]
+keywords = [
+    "web-framework",
+    "asgi",
+    "html-over-the-wire",
+    "htmx",
+    "sse",
+    "streaming",
+    "free-threading",
+    "templates",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Typing :: Typed",
+]
+dependencies = [
+    "kida-templates>=0.1.2",  # Template engine (same ecosystem, same author)
+    "anyio>=4.0",             # Async runtime (backend-agnostic, structured concurrency)
+]
+
+[project.optional-dependencies]
+# Form/multipart parsing (security-critical, battle-tested)
+forms = ["python-multipart>=0.0.18"]
+
+# Signed cookie sessions
+sessions = ["itsdangerous>=2.2.0"]
+
+# Test client transport
+testing = ["httpx>=0.27.0"]
+
+# All optional features
+all = [
+    "python-multipart>=0.0.18",
+    "itsdangerous>=2.2.0",
+    "httpx>=0.27.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/lbliii/chirp"
+Documentation = "https://github.com/lbliii/chirp"
+Repository = "https://github.com/lbliii/chirp"
+Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+chirp = ["py.typed"]
+
+# =============================================================================
+# Ruff — Linter & Formatter
+# =============================================================================
+# Matches bengal/kida/patitas/rosettes rule set
+# Line length: 100 (consistent across all projects)
+# Target: Python 3.14 (free-threading)
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, variables, etc.)
+    "UP",   # pyupgrade — Python modernization
+    "B",    # flake8-bugbear — common bugs and design problems
+    "SIM",  # flake8-simplify — simplify code
+    "I",    # isort — import sorting
+    "N",    # pep8-naming — naming conventions
+    "PIE",  # misc lints (unnecessary pass, duplicate dict keys, etc.)
+    "PERF", # perflint — performance anti-patterns
+    "C4",   # unnecessary comprehensions/list()/dict() calls
+    "RUF",  # Ruff-specific (unused noqa, mutable class defaults, etc.)
+    "PT",   # flake8-pytest-style — pytest best practices
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]    # Allow unused imports in __init__ files (re-exports)
+"tests/**/*.py" = ["S101"]  # Allow assert in tests
+
+# =============================================================================
+# ty — Type Checker (Rust-based, Astral)
+# =============================================================================
+# Strict by default. chirp targets zero type: ignore comments.
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+exclude = ["dist/", "build/", "tests/"]
+
+[tool.ty.rules]
+# Strict: all rules are errors by default.
+# Only relax what produces genuine false positives.
+unused-ignore-comment = "warn"  # Flag stale type: ignore for cleanup
+
+# =============================================================================
+# Pytest
+# =============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = ["-ra", "-q", "--strict-markers"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration tests requiring full app setup",
+]
+
+# =============================================================================
+# Coverage
+# =============================================================================
+
+[tool.coverage.run]
+source = ["src/chirp"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 1
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "def __repr__",
+]
+
+# =============================================================================
+# Development Dependencies (PEP 735 — install with: uv sync --group dev)
+# =============================================================================
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest>=9.0.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=6.0.0",
+    "pytest-timeout>=2.3.0",
+    "pytest-xdist>=3.5.0",
+    "hypothesis>=6.100.0",
+    # Type Checking
+    "ty>=0.0.11",
+    # Linting & Formatting
+    "ruff>=0.14.0",
+    # Pre-commit
+    "pre-commit>=4.0.0",
+    # Test utilities (optional deps needed for full test suite)
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.18",
+    "itsdangerous>=2.2.0",
+]
+
+# =============================================================================
+# Task Runner (poethepoet) — use: poe <task>
+# =============================================================================
+
+[tool.poe.tasks]
+# Testing
+test = { cmd = "pytest", help = "Run full test suite" }
+test-fast = { cmd = "pytest tests/ -x -q --timeout=10", help = "Fast feedback loop" }
+test-cov = { cmd = "pytest tests/ --cov=chirp --cov-report=term-missing", help = "Run tests with coverage" }
+
+# Type Checking
+ty = { cmd = "ty check src/chirp/", help = "Run ty type checker" }
+ty-strict = { cmd = "ty check src/chirp/ --error-on-warning", help = "Strict type checking" }
+
+# Linting & Formatting
+lint = { cmd = "ruff check .", help = "Run ruff linter" }
+lint-fix = { cmd = "ruff check . --fix", help = "Run ruff linter with auto-fix" }
+format = { cmd = "ruff format .", help = "Format code with ruff" }
+format-check = { cmd = "ruff format . --check", help = "Check formatting" }
+
+# CI Pipeline
+ci = { sequence = ["lint", "format-check", "ty", "test"], help = "Full CI check" }
+check = { sequence = ["lint", "format-check", "ty"], help = "Quick check (no tests)" }
+
+# Build & Release
+dist = { shell = "rm -rf dist/ && uv build && ls -la dist/", help = "Build distribution" }
+
+# Cleanup
+clean.shell = """
+rm -rf dist build .pytest_cache .coverage htmlcov .ruff_cache .ty_cache
+find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+"""
+clean.help = "Remove build artifacts and caches"
