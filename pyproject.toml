@@ -1,9 +1,9 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chirp"
+name = "bengal-chirp"
 version = "0.1.0-dev"
 description = "A Python web framework for the modern web platform — HTML fragments, streaming, SSE, free-threading ready"
 readme = "README.md"
@@ -46,11 +46,29 @@ sessions = ["itsdangerous>=2.2.0"]
 # Test client transport
 testing = ["httpx>=0.27.0"]
 
+# Typed async database access (SQLite)
+data = ["aiosqlite>=0.20.0"]
+
+# Typed async database access (PostgreSQL)
+data-pg = ["asyncpg>=0.30.0"]
+
+# LLM streaming (provider-agnostic via raw HTTP)
+ai = ["httpx>=0.27.0"]
+
 # All optional features
 all = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "httpx>=0.27.0",
+    "aiosqlite>=0.20.0",
+]
+
+# Full stack: framework + data + AI
+full = [
+    "python-multipart>=0.0.18",
+    "itsdangerous>=2.2.0",
+    "httpx>=0.27.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.urls]
