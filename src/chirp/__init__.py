@@ -38,6 +38,9 @@ __all__ = [
     "Stream",
     # Templates
     "Template",
+    # Context
+    "g",
+    "get_request",
 ]
 
 
@@ -80,6 +83,11 @@ def __getattr__(name: str) -> object:
         from chirp.middleware import protocol as _mw
 
         return getattr(_mw, name)
+
+    if name in ("g", "get_request"):
+        from chirp import context as _ctx
+
+        return getattr(_ctx, name)
 
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

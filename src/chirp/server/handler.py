@@ -7,11 +7,13 @@ and sends Response back through ASGI send().
 
 import inspect
 from collections.abc import Callable
+from contextvars import Token
 from typing import Any
 
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
+from chirp.context import request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response
@@ -36,11 +38,17 @@ async def handle_request(
     if scope["type"] != "http":
         return
 
+    # Build Request from ASGI scope
+    request = Request.from_asgi(scope, receive)
+
+    # Set request context var (reset after dispatch)
+    token: Token[Request] = request_var.set(request)
+
     try:
         # Build the innermost handler (router dispatch)
-        async def dispatch(request: Request) -> Response:
-            match = router.match(request.method, request.path)
-            return await _invoke_handler(match, request, kida_env=kida_env)
+        async def dispatch(req: Request) -> Response:
+            match = router.match(req.method, req.path)
+            return await _invoke_handler(match, req, kida_env=kida_env)
 
         # Wrap middleware around the dispatch
         handler: Next = dispatch
@@ -53,16 +61,15 @@ async def handle_request(
 
             handler = make_next
 
-        # Build Request from ASGI scope
-        request = Request.from_asgi(scope, receive)
-
         # Execute the full pipeline
         response = await handler(request)
 
     except HTTPError as exc:
-        response = _handle_http_error(exc, error_handlers, kida_env, debug)
+        response = _handle_http_error(exc, request, error_handlers, kida_env, debug)
     except Exception as exc:
-        response = _handle_internal_error(exc, error_handlers, kida_env, debug)
+        response = _handle_internal_error(exc, request, error_handlers, kida_env, debug)
+    finally:
+        request_var.reset(token)
 
     await _send_response(response, send)
 
@@ -127,29 +134,61 @@ def _build_handler_kwargs(
     return kwargs
 
 
+def _call_error_handler(
+    handler: Callable[..., Any],
+    request: Request,
+    exc: Exception,
+    kida_env: Environment | None,
+) -> Response:
+    """Invoke a user-registered error handler with introspected arguments.
+
+    Error handlers may accept zero, one (request), or two (request, exc) args.
+    """
+    sig = inspect.signature(handler)
+    params = list(sig.parameters.values())
+
+    if len(params) >= 2:
+        result = handler(request, exc)
+    elif len(params) == 1:
+        result = handler(request)
+    else:
+        result = handler()
+
+    if isinstance(result, Response):
+        return result
+    return negotiate(result, kida_env=kida_env)
+
+
+def _default_fragment_error(status: int, detail: str) -> str:
+    """Minimal HTML snippet for fragment error responses."""
+    return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
+
+
 def _handle_http_error(
     exc: HTTPError,
+    request: Request,
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
 ) -> Response:
     """Map an HTTPError to a Response using registered error handlers."""
-    # Try exact exception type
-    handler = error_handlers.get(type(exc))
-    if handler is None:
-        # Try status code
-        handler = error_handlers.get(exc.status)
+    # Try exact exception type, then status code
+    handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
     if handler is not None:
-        # Error handlers return values just like route handlers
-        result = handler()
-        if isinstance(result, Response):
-            return result
-        return negotiate(result, kida_env=kida_env)
+        response = _call_error_handler(handler, request, exc, kida_env)
+        # Preserve the HTTP status from the exception unless the handler
+        # explicitly returned a Response with its own status
+        if response.status == 200:
+            response = response.with_status(exc.status)
+        return response
 
     # Default error response
-    body = exc.detail or f"Error {exc.status}"
+    detail = exc.detail or f"Error {exc.status}"
     if debug and exc.detail:
-        body = f"{exc.status}: {exc.detail}"
+        detail = f"{exc.status}: {exc.detail}"
+
+    # Fragment-aware: return a snippet instead of a full page
+    body = _default_fragment_error(exc.status, detail) if request.is_fragment else detail
 
     resp = Response(body=body).with_status(exc.status)
     for name, value in exc.headers:
@@ -159,6 +198,7 @@ def _handle_http_error(
 
 def _handle_internal_error(
     exc: Exception,
+    request: Request,
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
@@ -166,16 +206,21 @@ def _handle_internal_error(
     """Handle unexpected exceptions as 500 errors."""
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:
-        result = handler()
-        if isinstance(result, Response):
-            return result
-        return negotiate(result, kida_env=kida_env)
+        return _call_error_handler(handler, request, exc, kida_env)
 
     if debug:
         import traceback
 
         tb = traceback.format_exc()
+        if request.is_fragment:
+            return Response(
+                body=f'<div class="chirp-error" data-status="500"><pre>{tb}</pre></div>',
+                status=500,
+            )
         return Response(body=f"<pre>{tb}</pre>", status=500)
+
+    if request.is_fragment:
+        return Response(body=_default_fragment_error(500, "Internal Server Error"), status=500)
 
     return Response(body="Internal Server Error", status=500)
 
