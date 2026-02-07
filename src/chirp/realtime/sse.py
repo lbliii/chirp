@@ -6,6 +6,7 @@ and sends periodic heartbeat comments to keep the connection alive.
 """
 
 import asyncio
+import contextlib
 import json as json_module
 from typing import Any
 
@@ -56,32 +57,45 @@ async def handle_sse(
                 return
 
     async def produce_events() -> None:
-        """Consume generator and send SSE events."""
+        """Consume generator and send SSE events.
+
+        Wraps each ``__anext__()`` in ``asyncio.shield`` + ``wait_for``
+        so that heartbeat comments are sent when the generator is idle
+        longer than ``heartbeat_interval``, without cancelling the
+        pending ``__anext__()`` coroutine.
+        """
         try:
             heartbeat_interval = event_stream.heartbeat_interval
+            gen_iter = event_stream.generator.__aiter__()
+            pending_next: asyncio.Task[Any] | None = None
 
-            async def next_event_with_heartbeat():
-                """Get next event, sending heartbeats on idle."""
-                gen = event_stream.generator.__aiter__()
-                while True:
-                    try:
-                        value = await asyncio.wait_for(
-                            gen.__anext__(),
-                            timeout=heartbeat_interval,
-                        )
-                        return value
-                    except TimeoutError:
-                        # Send heartbeat comment
-                        if disconnected.is_set():
-                            return None
-                        await send({
-                            "type": "http.response.body",
-                            "body": b": heartbeat\n\n",
-                            "more_body": True,
-                        })
+            while not disconnected.is_set():
+                # Get or create the task for the next value
+                if pending_next is None:
+                    pending_next = asyncio.create_task(gen_iter.__anext__())
 
-            async for value in event_stream.generator:
-                if disconnected.is_set():
+                # Wait for it with a heartbeat timeout.
+                # asyncio.shield prevents wait_for from cancelling the
+                # underlying task on timeout — the __anext__() call
+                # survives across heartbeat intervals.
+                try:
+                    value = await asyncio.wait_for(
+                        asyncio.shield(pending_next),
+                        timeout=heartbeat_interval,
+                    )
+                    pending_next = None  # consumed — create fresh next time
+                except TimeoutError:
+                    # Generator is idle — send heartbeat, keep waiting
+                    if disconnected.is_set():
+                        break
+                    await send({
+                        "type": "http.response.body",
+                        "body": b": heartbeat\n\n",
+                        "more_body": True,
+                    })
+                    continue
+                except StopAsyncIteration:
+                    pending_next = None
                     break
 
                 sse_text = _format_event(
@@ -95,6 +109,12 @@ async def handle_sse(
                         "body": sse_text.encode("utf-8"),
                         "more_body": True,
                     })
+
+            # Clean up any pending task
+            if pending_next is not None and not pending_next.done():
+                pending_next.cancel()
+                with contextlib.suppress(asyncio.CancelledError, StopAsyncIteration):
+                    await pending_next
         except asyncio.CancelledError:
             pass
 
@@ -104,16 +124,14 @@ async def handle_sse(
 
     try:
         # Wait for either the producer to finish or disconnect
-        done, pending = await asyncio.wait(
+        _done, pending = await asyncio.wait(
             {producer_task, monitor_task},
             return_when=asyncio.FIRST_COMPLETED,
         )
         for task in pending:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
     finally:
         # Close the stream
         await send({
