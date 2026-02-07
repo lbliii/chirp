@@ -152,16 +152,19 @@ class App:
         host: str | None = None,
         port: int | None = None,
     ) -> None:
-        """Start the development server.
+        """Start the development server via pounce.
 
         Compiles the app (freezing routes, middleware, templates)
-        and starts serving requests.
+        and starts serving requests with auto-reload enabled.
         """
         self._ensure_frozen()
-        # Dev server implementation deferred to server/dev.py
+
         _host = host or self.config.host
         _port = port or self.config.port
-        print(f"chirp dev server running on http://{_host}:{_port}")
+
+        from chirp.server.dev import run_dev_server
+
+        run_dev_server(self, _host, _port, reload=self.config.debug)
 
     # -- ASGI interface --
 
