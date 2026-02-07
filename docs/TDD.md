@@ -2,7 +2,7 @@
 
 **Version**: 0.2.0
 **Date**: 2026-02-07
-**Status**: Active (Phases 0-4 implemented)
+**Status**: Active (Phases 0-7 implemented, documentation site pending)
 
 ---
 
@@ -1086,18 +1086,16 @@ from chirp import App, AppConfig, Request, Template, Fragment, EventStream, g
 
 ## 11. Testing Interface
 
+### 11.1 TestClient
+
 ```python
-# chirp/testing.py (interface sketch)
-
-from chirp.app import App
-from chirp.http.request import Request
-from chirp.http.response import Response
-
+# chirp/testing.py
 
 class TestClient:
     """Async test client for chirp applications.
 
-    Returns the same Response type used in production.
+    Returns the same Response type used in production. Auto-freezes the
+    app on entry if not already frozen.
 
     Usage:
         async with TestClient(app) as client:
@@ -1105,63 +1103,66 @@ class TestClient:
             assert response.status == 200
     """
 
-    def __init__(self, app: App) -> None:
-        self.app = app
+    async def get(path, *, headers=None, query=None) -> Response: ...
+    async def post(path, *, headers=None, json=None, data=None) -> Response: ...
+    async def put(path, *, headers=None, json=None, data=None) -> Response: ...
+    async def patch(path, *, headers=None, json=None, data=None) -> Response: ...
+    async def delete(path, *, headers=None) -> Response: ...
+    async def request(method, path, *, headers=None, body=None) -> Response: ...
 
-    async def __aenter__(self) -> TestClient:
-        if not self.app._frozen:
-            self.app._freeze()
-        return self
+    # Fragment request (sets HX-Request: true)
+    async def fragment(path, *, method="GET", headers=None) -> Response: ...
 
-    async def __aexit__(self, *args: object) -> None:
-        pass
+    # SSE endpoint testing
+    async def sse(
+        path, *, headers=None, max_events=10, disconnect_after=None
+    ) -> SSETestResult: ...
+```
 
-    async def get(
-        self,
-        path: str,
-        *,
-        headers: dict[str, str] | None = None,
-        query: dict[str, str] | None = None,
-    ) -> Response:
-        """Send a GET request."""
-        ...
+### 11.2 SSE Test Utilities
 
-    async def post(
-        self,
-        path: str,
-        *,
-        headers: dict[str, str] | None = None,
-        json: dict[str, object] | None = None,
-        data: dict[str, str] | None = None,
-    ) -> Response:
-        """Send a POST request."""
-        ...
+```python
+@dataclass(frozen=True, slots=True)
+class SSETestResult:
+    """Result of connecting to an SSE endpoint via TestClient.sse()."""
+    events: list[SSEEvent]       # Parsed SSE events (type, data, id, retry)
+    heartbeats: int              # Count of `: heartbeat` comment frames
+    status: int                  # HTTP status code
+    headers: dict[str, str]      # Response headers
+```
 
-    async def request(
-        self,
-        method: str,
-        path: str,
-        *,
-        headers: dict[str, str] | None = None,
-        body: bytes | None = None,
-    ) -> Response:
-        """Send an arbitrary request."""
-        ...
+`TestClient.sse()` connects to an SSE endpoint, collects events into an
+`SSETestResult`, and cleanly disconnects. Two disconnect strategies:
 
-    # -- Fragment helpers --
+- `max_events` (default 10): disconnect after receiving N data events.
+- `disconnect_after`: disconnect after N seconds (time-based, for heartbeat testing).
 
-    async def fragment(
-        self,
-        path: str,
-        *,
-        method: str = "GET",
-        headers: dict[str, str] | None = None,
-    ) -> Response:
-        """Send a fragment request (sets HX-Request header)."""
-        fragment_headers = {"HX-Request": "true"}
-        if headers:
-            fragment_headers.update(headers)
-        return await self.request(method, path, headers=fragment_headers)
+Implementation detail: the `send()` callback yields control via `asyncio.sleep(0)`
+after triggering a disconnect to prevent event loop starvation from fast generators.
+
+### 11.3 Fragment Assertion Helpers
+
+Standalone functions for asserting properties of HTML fragment responses.
+Designed to be used with `TestClient` responses in test code.
+
+```python
+def assert_is_fragment(response: Response, *, status: int = 200) -> None:
+    """Assert response is an HTML fragment (not a full page).
+
+    Checks: status matches, no <html>/<head>/<body> wrapper, body non-empty.
+    """
+
+def assert_fragment_contains(response: Response, *texts: str, status: int = 200) -> None:
+    """Assert fragment body contains all given substrings."""
+
+def assert_fragment_not_contains(response: Response, *texts: str, status: int = 200) -> None:
+    """Assert fragment body does not contain any of the given substrings."""
+
+def assert_is_error_fragment(response: Response, *, status: int = 500) -> None:
+    """Assert response is a chirp error fragment.
+
+    Checks: class="chirp-error" present, data-status attribute matches status.
+    """
 ```
 
 ---
@@ -1198,14 +1199,16 @@ chirp/
 ├── templating/
 │   ├── __init__.py
 │   └── returns.py           # Template, Fragment, Stream
+├── errors.py                # Error hierarchy: ChirpError, HTTPError, NotFound, etc.
 ├── realtime/
 │   ├── __init__.py
-│   └── events.py            # EventStream, SSEEvent
+│   ├── events.py            # EventStream, SSEEvent
+│   └── sse.py               # SSE ASGI handler (produce/disconnect/heartbeat)
 ├── server/
 │   ├── __init__.py
 │   ├── handler.py           # ASGI request handler (dispatch + error handling)
 │   └── negotiation.py       # Content negotiation dispatch
-├── testing.py               # TestClient
+├── testing.py               # TestClient + fragment assertions + SSE test utilities
 └── _internal/
     ├── __init__.py
     ├── asgi.py              # Typed ASGI definitions

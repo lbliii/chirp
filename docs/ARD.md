@@ -2,7 +2,7 @@
 
 **Version**: 0.3.0
 **Date**: 2026-02-07
-**Status**: Active (Phases 0-6 implemented)
+**Status**: Active (Phases 0-7 implemented, documentation site pending)
 
 ---
 
@@ -229,8 +229,10 @@ class RouteMatch:
     # Converted params are produced by the handler dispatcher
 ```
 
-**No match:** Returns a 404 through the error handler system. Method not allowed returns 405
-with an `Allow` header listing valid methods.
+**No match:** Returns a 404 through the error handler system. The detail message includes the
+HTTP method and path (e.g., `"No route matches GET '/foo'"`). Method not allowed returns 405
+with an `Allow` header listing valid methods and the allowed methods embedded in the detail
+message body (e.g., `"Method 'POST' not allowed. Allowed: GET, HEAD"`).
 
 ### 4.4 Middleware Pipeline
 

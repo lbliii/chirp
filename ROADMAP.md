@@ -586,7 +586,9 @@ Server-Sent Events for live HTML updates.
 Implementation notes:
 - SSE handler launches two concurrent tasks: an event producer (consumes `EventStream.generator`, formats events, sends as ASGI body chunks) and a disconnect monitor (waits for `http.disconnect`, cancels producer).
 - `_format_event()` handles `SSEEvent`, `Fragment` (rendered via kida), `str`, and `dict` (JSON-serialized) types.
-- Heartbeat comments (`: heartbeat`) sent when idle to keep the connection alive.
+- Heartbeat comments (`: heartbeat`) sent when idle via `asyncio.shield` + `wait_for`
+  pattern. Each `__anext__()` call is wrapped in a shielded task so that heartbeat
+  timeouts don't cancel the pending generator coroutine.
 
 ### Phase 7: Testing and Polish
 
@@ -594,10 +596,29 @@ Production readiness.
 
 - [x] `TestClient` with async context manager
 - [x] `TestClient.fragment()` method for htmx testing
-- [ ] Fragment assertion helpers
-- [ ] SSE testing utilities
-- [ ] Comprehensive error messages
+- [x] Fragment assertion helpers
+- [x] SSE testing utilities
+- [x] Comprehensive error messages
 - [ ] Documentation site (built with bengal, naturally)
+
+Implementation notes:
+- Fragment assertion helpers (`assert_is_fragment`, `assert_fragment_contains`,
+  `assert_fragment_not_contains`, `assert_is_error_fragment`) added to `testing.py`
+  as standalone functions. Tests use these instead of raw string assertions.
+- `TestClient.sse()` method connects to SSE endpoints, collects structured `SSEEvent`
+  objects into an `SSETestResult`. Supports `max_events` (event-count disconnect) and
+  `disconnect_after` (time-based disconnect). Uses `asyncio.sleep(0)` in the send
+  callback to yield control when the producer loop would otherwise starve the event loop.
+- SSE integration testing revealed a bug: `produce_events()` in `realtime/sse.py` had a
+  `next_event_with_heartbeat()` helper that was defined but never called (dead code).
+  Replaced with `asyncio.shield` + `wait_for` pattern that sends heartbeat comments on
+  idle without cancelling the pending generator coroutine.
+- `MethodNotAllowed` detail now includes allowed methods in the message body, not just
+  the `Allow` header. Router `NotFound` includes the HTTP method in the detail string.
+- `negotiation.py` raises `ConfigurationError` (from the error hierarchy) instead of
+  bare `RuntimeError` for missing kida integration.
+- Error types (`ChirpError`, `HTTPError`, `NotFound`, `MethodNotAllowed`,
+  `ConfigurationError`) exported from `chirp.__init__` for discoverability.
 
 ---
 
