@@ -1,0 +1,37 @@
+<html>
+<head>
+  <title>Todo App</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
+    .done { text-decoration: line-through; opacity: 0.6; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    input[type="text"] { flex: 1; padding: 0.5rem; }
+    button { padding: 0.25rem 0.5rem; cursor: pointer; }
+    form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+<h1>Todos</h1>
+<form hx-post="/todos" hx-target="#todo-list" hx-swap="outerHTML">
+  <input type="text" name="text" placeholder="What needs to be done?" autofocus>
+  <button type="submit">Add</button>
+</form>
+{% block todo_list %}
+<ul id="todo-list">
+  {% for todo in todos %}
+  <li>
+    <span class="{{ todo | completed_class }}">{{ todo.text }}</span>
+    <button hx-post="/todos/{{ todo.id }}/toggle" hx-target="#todo-list" hx-swap="outerHTML">
+      {{ "done" if todo.done else "todo" }}
+    </button>
+    <button hx-delete="/todos/{{ todo.id }}" hx-target="#todo-list" hx-swap="outerHTML">
+      remove
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}
+</body>
+</html>

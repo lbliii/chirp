@@ -121,7 +121,7 @@ unused-ignore-comment = "warn"  # Flag stale type: ignore for cleanup
 # =============================================================================
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "examples"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
@@ -186,6 +186,7 @@ dev = [
 # Testing
 test = { cmd = "pytest", help = "Run full test suite" }
 test-fast = { cmd = "pytest tests/ -x -q --timeout=10", help = "Fast feedback loop" }
+test-examples = { cmd = "pytest examples/ -x -q", help = "Run example tests" }
 test-cov = { cmd = "pytest tests/ --cov=chirp --cov-report=term-missing", help = "Run tests with coverage" }
 
 # Type Checking

@@ -1,0 +1,15 @@
+<html>
+<head>
+  <title>{% block title %}Chirp App{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
+    .notification { padding: 0.75rem; margin: 0.5rem 0; border-left: 3px solid #3b82f6; background: #f8fafc; }
+    .notification strong { display: block; margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+{% block content %}{% endblock %}
+</body>
+</html>
