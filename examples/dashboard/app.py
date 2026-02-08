@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Stream
+from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Stream, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -123,9 +123,9 @@ def sensor_count(readings: dict[str, SensorReading]) -> str:
 
 @app.route("/")
 def index():
-    """Full dashboard — streamed progressively via Kida render_stream()."""
+    """Full dashboard — rendered via Kida and served as a single response."""
     readings = _get_all()
-    return Stream("dashboard.html", readings=readings)
+    return Template("dashboard.html", readings=readings)
 
 
 @app.route("/events")
@@ -161,14 +161,19 @@ def events():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from pounce.config import ServerConfig
-    from pounce.server import Server
+    try:
+        from pounce.config import ServerConfig
+        from pounce.server import Server
 
-    app._ensure_frozen()
-    config = ServerConfig(host="127.0.0.1", port=8000, workers=4)
-    server = Server(config, app)
-    print("Weather Station Dashboard")
-    print("  http://127.0.0.1:8000")
-    print("  4 worker threads (free-threading)")
-    print()
-    server.run()
+        app._ensure_frozen()
+        config = ServerConfig(host="127.0.0.1", port=8000, workers=4)
+        server = Server(config, app)
+        print("Weather Station Dashboard")
+        print("  http://127.0.0.1:8000")
+        print("  4 worker threads (free-threading)")
+        print()
+        server.run()
+    except ImportError:
+        # Pounce not installed — fall back to single-worker dev server
+        print("Weather Station Dashboard (single worker — install pounce for multi-worker)")
+        app.run()

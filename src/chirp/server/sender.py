@@ -51,11 +51,12 @@ async def send_streaming_response(
     """
     raw_headers: list[tuple[bytes, bytes]] = [
         (b"content-type", response.content_type.encode("latin-1")),
+        (b"transfer-encoding", b"chunked"),
     ]
     for name, value in response.headers:
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
 
-    # No content-length for chunked transfer
+    # No content-length — chunked transfer encoding signals body boundaries
     await send({
         "type": "http.response.start",
         "status": response.status,
