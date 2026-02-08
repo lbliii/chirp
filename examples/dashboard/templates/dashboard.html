@@ -1,0 +1,95 @@
+<html>
+<head>
+  <title>Weather Station</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 1.5rem;
+    }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; font-weight: 600; color: #f8fafc; }
+    header p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+    .summary-bar {
+      display: flex; justify-content: center; gap: 2rem;
+      padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+      background: #1e293b; border-radius: 0.5rem;
+      font-size: 0.9rem; color: #cbd5e1;
+    }
+    .summary-bar span { white-space: nowrap; }
+    .summary-bar strong { color: #f8fafc; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem; max-width: 900px; margin: 0 auto;
+    }
+    .card {
+      background: #1e293b; border-radius: 0.75rem;
+      padding: 1.25rem; transition: background 0.3s;
+    }
+    .card:hover { background: #273549; }
+    .card h3 { font-size: 0.85rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+    .temp { font-size: 2.25rem; font-weight: 700; color: #f8fafc; margin: 0.5rem 0; }
+    .meta { display: flex; gap: 1rem; font-size: 0.8rem; color: #64748b; }
+    .meta span { white-space: nowrap; }
+    time { display: block; font-size: 0.7rem; color: #475569; margin-top: 0.75rem; }
+    .sse-sink { display: none; }
+    footer { text-align: center; margin-top: 2rem; font-size: 0.75rem; color: #475569; }
+  </style>
+</head>
+<body>
+  <header>
+    {% cache "nav-header", ttl=60 %}
+    <h1>Weather Station</h1>
+    <p>Live sensor data &mdash; Pounce + Chirp + Kida</p>
+    {% end %}
+  </header>
+
+  {% block summary_bar %}
+  <div id="summary" class="summary-bar" hx-swap-oob="outerHTML">
+    <span>Sensors: <strong>{{ readings | sensor_count }}</strong></span>
+    <span>Avg temp: <strong>{{ readings | avg_temp }}&deg;C</strong></span>
+    <span>Max wind: <strong>{{ readings | max_wind }} kph</strong></span>
+  </div>
+  {% end %}
+
+  <div class="grid">
+    {% for reading in readings.values() %}
+    <div id="sensor-{{ reading.sensor_id }}" class="card">
+      <h3>{{ reading.location }}</h3>
+      <div class="temp">{{ reading.temp_c | round(1) }}&deg;C</div>
+      <div class="meta">
+        <span>Humidity: {{ reading.humidity | round(0) }}%</span>
+        <span>Wind: {{ reading.wind_kph | round(1) }} kph</span>
+      </div>
+      <time>{{ reading.updated_at }}</time>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div hx-ext="sse" sse-connect="/events">
+    <div sse-swap="fragment" class="sse-sink"></div>
+  </div>
+
+  {% block sensor_card %}
+  {% if reading is defined %}
+  <div id="sensor-{{ reading.sensor_id }}" class="card" hx-swap-oob="outerHTML">
+    <h3>{{ reading.location }}</h3>
+    <div class="temp">{{ reading.temp_c | round(1) }}&deg;C</div>
+    <div class="meta">
+      <span>Humidity: {{ reading.humidity | round(0) }}%</span>
+      <span>Wind: {{ reading.wind_kph | round(1) }} kph</span>
+    </div>
+    <time>{{ reading.updated_at }}</time>
+  </div>
+  {% end %}
+  {% end %}
+
+  <footer>
+    Streaming HTML &middot; Fragment caching &middot; Server-Sent Events &middot; Free-threading
+  </footer>
+</body>
+</html>

@@ -34,6 +34,16 @@ all three SSE payload types.
 cd examples/sse && python app.py
 ```
 
+### `dashboard/` — Full Stack Showcase
+
+The complete Pounce + Chirp + Kida pipeline. A weather station with 6 live sensors:
+streaming initial render, fragment caching, SSE-driven updates, and multi-worker
+free-threading. Open your browser and watch the data change.
+
+```bash
+cd examples/dashboard && python app.py
+```
+
 ## Running Tests
 
 Each example has a `test_app.py` that verifies it works through the ASGI pipeline
@@ -49,19 +59,23 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | sse |
-|---|:---:|:---:|:---:|
-| `@app.route()` | x | x | x |
-| Path parameters | x | x | |
-| String returns | x | | |
-| Dict/JSON returns | x | | |
-| `Response` chaining | x | | |
-| `@app.error()` | x | | |
-| `Template` | | x | x |
-| `Fragment` | | x | x |
-| `request.is_fragment` | | x | |
-| `@app.template_filter()` | | x | |
-| `EventStream` | | | x |
-| `SSEEvent` | | | x |
-| `TestClient.fragment()` | | x | |
-| `TestClient.sse()` | | | x |
+| Feature | hello | todo | sse | dashboard |
+|---|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x |
+| Path parameters | x | x | | |
+| String returns | x | | | |
+| Dict/JSON returns | x | | | |
+| `Response` chaining | x | | | |
+| `@app.error()` | x | | | |
+| `Template` | | x | x | |
+| `Fragment` | | x | x | x |
+| `Stream` | | | | x |
+| `request.is_fragment` | | x | | |
+| `@app.template_filter()` | | x | | x |
+| `EventStream` | | | x | x |
+| `SSEEvent` | | | x | |
+| `{% cache %}` | | | | x |
+| `hx-swap-oob` | | | | x |
+| Multi-worker Pounce | | | | x |
+| `TestClient.fragment()` | | x | | |
+| `TestClient.sse()` | | | x | x |
