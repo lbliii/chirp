@@ -6,6 +6,7 @@ No wrapper translation layer.
 
 import asyncio
 import contextlib
+import inspect
 from typing import Any
 
 from chirp.app import App
@@ -34,10 +35,17 @@ class TestClient:
 
     async def __aenter__(self) -> TestClient:
         self.app._ensure_frozen()
+        for hook in self.app._startup_hooks:
+            result = hook()
+            if inspect.isawaitable(result):
+                await result
         return self
 
     async def __aexit__(self, *args: object) -> None:
-        pass
+        for hook in self.app._shutdown_hooks:
+            result = hook()
+            if inspect.isawaitable(result):
+                await result
 
     async def get(
         self,

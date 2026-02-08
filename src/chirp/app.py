@@ -4,6 +4,7 @@ Mutable during setup (route registration, middleware, filters).
 Frozen at runtime when app.run() or __call__() is first invoked.
 """
 
+import inspect
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -55,6 +56,8 @@ class App:
         "_pending_routes",
         # Compiled state (populated by _freeze)
         "_router",
+        "_shutdown_hooks",
+        "_startup_hooks",
         "_template_filters",
         "_template_globals",
         "config",
@@ -67,6 +70,8 @@ class App:
         self._error_handlers: dict[int | type, ErrorHandler] = {}
         self._template_filters: dict[str, Callable[..., Any]] = {}
         self._template_globals: dict[str, Any] = {}
+        self._startup_hooks: list[Callable[..., Any]] = []
+        self._shutdown_hooks: list[Callable[..., Any]] = []
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
 
@@ -145,7 +150,41 @@ class App:
 
         return decorator
 
-    # -- Lifecycle --
+    # -- Lifecycle hooks --
+
+    def on_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register an async or sync startup hook via decorator.
+
+        Hooks run in registration order during ASGI lifespan startup,
+        before the server begins accepting HTTP requests.
+
+        Usage::
+
+            @app.on_startup
+            async def setup():
+                await db.connect()
+        """
+        self._check_not_frozen()
+        self._startup_hooks.append(func)
+        return func
+
+    def on_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register an async or sync shutdown hook via decorator.
+
+        Hooks run in registration order during ASGI lifespan shutdown,
+        after the server stops accepting new requests.
+
+        Usage::
+
+            @app.on_shutdown
+            async def teardown():
+                await db.disconnect()
+        """
+        self._check_not_frozen()
+        self._shutdown_hooks.append(func)
+        return func
+
+    # -- Server --
 
     def run(
         self,
@@ -169,7 +208,15 @@ class App:
     # -- ASGI interface --
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """ASGI 3.0 entry point."""
+        """ASGI 3.0 entry point.
+
+        Handles lifespan scopes directly, then delegates HTTP scopes
+        to the request handler pipeline.
+        """
+        if scope["type"] == "lifespan":
+            await self._handle_lifespan(scope, receive, send)
+            return
+
         self._ensure_frozen()
 
         assert self._router is not None
@@ -184,6 +231,46 @@ class App:
             kida_env=self._kida_env,
             debug=self.config.debug,
         )
+
+    async def _handle_lifespan(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        """Run the ASGI lifespan protocol.
+
+        Freezes the app at startup (before first HTTP request), then
+        runs registered startup/shutdown hooks and signals completion
+        back to the server.
+        """
+        self._ensure_frozen()
+
+        while True:
+            message = await receive()
+            msg_type = message["type"]
+
+            if msg_type == "lifespan.startup":
+                try:
+                    for hook in self._startup_hooks:
+                        result = hook()
+                        if inspect.isawaitable(result):
+                            await result
+                    await send({"type": "lifespan.startup.complete"})
+                except Exception as exc:
+                    await send({
+                        "type": "lifespan.startup.failed",
+                        "message": str(exc),
+                    })
+                    return
+
+            elif msg_type == "lifespan.shutdown":
+                for hook in self._shutdown_hooks:
+                    result = hook()
+                    if inspect.isawaitable(result):
+                        await result
+                await send({"type": "lifespan.shutdown.complete"})
+                return
 
     # -- Internal --
 
