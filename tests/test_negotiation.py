@@ -279,6 +279,45 @@ class TestNegotiateTuples:
         assert "<title>Created</title>" in result.text
 
 
+class TestNegotiateEdgeCases:
+    """Edge cases for ValidationError and OOB negotiation."""
+
+    def test_validation_error_in_tuple_preserves_422(self, kida_env: Environment) -> None:
+        """Wrapping ValidationError in a (value, 422) tuple still returns 422."""
+        result = negotiate(
+            (ValidationError("form.html", "form_body", errors={"x": ["err"]}), 422),
+            kida_env=kida_env,
+        )
+        assert result.status == 422
+
+    def test_validation_error_tuple_can_override_status(self, kida_env: Environment) -> None:
+        """A tuple can override ValidationError's default 422 to another code."""
+        result = negotiate(
+            (ValidationError("form.html", "form_body", errors={}), 400),
+            kida_env=kida_env,
+        )
+        assert result.status == 400
+
+    def test_oob_with_zero_fragments(self, kida_env: Environment) -> None:
+        """OOB with only a main and no OOB fragments renders normally."""
+        result = negotiate(
+            OOB(Fragment("search.html", "results_list", results=["only"])),
+            kida_env=kida_env,
+        )
+        assert result.status == 200
+        assert "only" in result.text
+        assert 'hx-swap-oob' not in result.text
+
+    def test_fragment_tuple_422(self, kida_env: Environment) -> None:
+        """Plain Fragment in a (value, 422) tuple works for manual validation."""
+        result = negotiate(
+            (Fragment("search.html", "results_list", results=["err"]), 422),
+            kida_env=kida_env,
+        )
+        assert result.status == 422
+        assert "err" in result.text
+
+
 class TestNegotiateErrors:
     def test_unknown_type_raises(self) -> None:
         with pytest.raises(TypeError, match="Cannot convert"):

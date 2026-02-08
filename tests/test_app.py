@@ -303,6 +303,45 @@ class TestAppE2E:
             fragment = await client.fragment("/search")
             assert fragment.text == "fragment only"
 
+    async def test_fragment_with_target(self) -> None:
+        app = App()
+
+        @app.route("/search")
+        def search(request: Request):
+            target = request.htmx_target or "none"
+            return f"target={target}"
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/search", target="#results")
+            assert "target=#results" in response.text
+
+    async def test_fragment_with_trigger(self) -> None:
+        app = App()
+
+        @app.route("/search")
+        def search(request: Request):
+            trigger = request.htmx_trigger or "none"
+            return f"trigger={trigger}"
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/search", trigger="search-btn")
+            assert "trigger=search-btn" in response.text
+
+    async def test_fragment_with_history_restore(self) -> None:
+        app = App()
+
+        @app.route("/page")
+        def page(request: Request):
+            if request.is_history_restore:
+                return "full restore"
+            if request.is_fragment:
+                return "fragment"
+            return "full page"
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/page", history_restore=True)
+            assert response.text == "full restore"
+
     async def test_tuple_status_override(self) -> None:
         app = App()
 
