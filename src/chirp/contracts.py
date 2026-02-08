@@ -154,13 +154,16 @@ def _collect_route_paths(router: Router) -> dict[str, frozenset[str]]:
     """Build a mapping of path → allowed methods from the router.
 
     Returns a dict where keys are route path patterns and values are
-    sets of allowed HTTP methods.
+    sets of allowed HTTP methods.  Multiple routes on the same path
+    have their methods merged.
 
     """
-    path_methods: dict[str, frozenset[str]] = {}
+    path_methods: dict[str, set[str]] = {}
     for route in router.routes:
-        path_methods[route.path] = route.methods
-    return path_methods
+        if route.path not in path_methods:
+            path_methods[route.path] = set()
+        path_methods[route.path].update(route.methods)
+    return {path: frozenset(methods) for path, methods in path_methods.items()}
 
 
 def _path_matches_route(url: str, route_path: str) -> bool:

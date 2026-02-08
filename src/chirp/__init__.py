@@ -108,5 +108,10 @@ def __getattr__(name: str) -> object:
 
         return getattr(_errors, name)
 
+    if name == "ToolCallEvent":
+        from chirp.tools.events import ToolCallEvent
+
+        return ToolCallEvent
+
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

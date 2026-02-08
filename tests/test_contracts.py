@@ -208,7 +208,8 @@ class TestCheckHypermediaSurface:
             return "ok"
 
         result = check_hypermedia_surface(app)
-        assert result.routes_checked == 2
+        # Same path, different methods = 1 unique path
+        assert result.routes_checked == 1
         # No templates to scan, so no target issues
         assert result.ok
 

@@ -10,6 +10,7 @@ Run:
 """
 
 import asyncio
+import contextvars
 import threading
 import time
 from dataclasses import dataclass
@@ -62,30 +63,11 @@ _stories: dict[int, Story] = {}
 _story_ids: list[int] = []
 _lock = threading.Lock()
 
-# Per-event-loop httpx clients.  Each Pounce worker thread runs its own asyncio
-# event loop.  httpx's connection pool binds internal asyncio primitives to the
-# loop where the client is first used, so we need one client per loop to avoid
-# cross-loop RuntimeError.
-_clients: dict[int, httpx.AsyncClient] = {}
-_clients_lock = threading.Lock()
-
-
-async def _get_client() -> httpx.AsyncClient:
-    """Return an ``httpx.AsyncClient`` bound to the current event loop.
-
-    Creates a new client lazily on first access per loop, then caches it.
-    """
-    loop_id = id(asyncio.get_running_loop())
-    client = _clients.get(loop_id)
-    if client is not None:
-        return client
-    with _clients_lock:
-        client = _clients.get(loop_id)
-        if client is not None:
-            return client
-        client = httpx.AsyncClient(base_url=HN_BASE, timeout=10.0)
-        _clients[loop_id] = client
-        return client
+# Per-worker httpx client.  Each pounce worker thread runs its own asyncio
+# event loop, so each worker creates its own client via on_worker_startup.
+_client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.ContextVar(
+    "hn_client", default=None,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -170,8 +152,10 @@ def _get_stories(count: int = 30) -> list[Story]:
 
 async def _fetch_item(item_id: int) -> dict | None:
     """Fetch a single item from the HN API. Returns None on failure."""
+    client = _client_var.get()
+    if client is None:
+        return None
     try:
-        client = await _get_client()
         resp = await client.get(f"item/{item_id}.json")
         resp.raise_for_status()
         data = resp.json()
@@ -182,8 +166,10 @@ async def _fetch_item(item_id: int) -> dict | None:
 
 async def _fetch_stories(count: int = 30) -> list[Story]:
     """Fetch top story IDs then fetch each story concurrently."""
+    client = _client_var.get()
+    if client is None:
+        return []
     try:
-        client = await _get_client()
         resp = await client.get("topstories.json")
         resp.raise_for_status()
         ids = resp.json()
@@ -242,28 +228,32 @@ async def _fetch_comment_tree(comment_id: int, depth: int = 3) -> Comment | None
 # ---------------------------------------------------------------------------
 
 
-@app.on_startup
-async def startup() -> None:
-    """Refresh stories from the live API.
+@app.on_worker_startup
+async def worker_startup() -> None:
+    """Create an httpx client for this worker's event loop.
 
-    The httpx client is created lazily per event loop (see ``_get_client``),
-    so startup just pre-populates the cache.  Seed data from module load is
-    already available, so a network failure here is non-fatal.
+    Each pounce worker thread gets its own event loop.  httpx's
+    connection pool binds asyncio primitives to the loop where the
+    client is created, so we create one client per worker here.
     """
+    _client_var.set(httpx.AsyncClient(base_url=HN_BASE, timeout=10.0))
+
+    # Pre-populate the story cache on the first worker that runs.
+    # Seed data from module load is already available, so a network
+    # failure here is non-fatal.
     try:
         await _refresh_stories()
     except Exception:
         pass  # seed data is already loaded
 
 
-@app.on_shutdown
-async def shutdown() -> None:
-    """Close the httpx client for the current event loop."""
-    loop_id = id(asyncio.get_running_loop())
-    with _clients_lock:
-        client = _clients.pop(loop_id, None)
+@app.on_worker_shutdown
+async def worker_shutdown() -> None:
+    """Close the httpx client for this worker."""
+    client = _client_var.get()
     if client:
         await client.aclose()
+        _client_var.set(None)
 
 
 # ---------------------------------------------------------------------------
