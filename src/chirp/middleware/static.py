@@ -10,6 +10,7 @@ Falls through to the next handler for non-matching paths.
 import mimetypes
 from pathlib import Path
 
+from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.middleware.protocol import AnyResponse, Next
@@ -127,10 +128,25 @@ class StaticFiles:
         )
 
     async def _handle_not_found(self, next: Next, request: Request) -> AnyResponse:
-        """Serve a custom 404 page or fall through."""
-        if self._not_found_page:
-            error_path = (self._directory / self._not_found_page).resolve()
-            if error_path.is_relative_to(self._directory) and error_path.is_file():
-                return self._serve_file(error_path, status=404)
+        """Fall through to the inner handler; serve custom 404 if it also fails.
 
-        return await next(request)
+        This lets application routes (e.g. SSE endpoints) take priority
+        over the custom 404 page.  When ``not_found_page`` is set, the
+        router's ``NotFound`` exception is caught and the custom page
+        is served instead.
+        """
+        if not self._not_found_page:
+            # No custom page — let the exception propagate normally
+            return await next(request)
+
+        error_path = (self._directory / self._not_found_page).resolve()
+        if not (error_path.is_relative_to(self._directory) and error_path.is_file()):
+            # Custom page doesn't exist — fall through
+            return await next(request)
+
+        try:
+            return await next(request)
+        except HTTPError as exc:
+            if exc.status != 404:
+                raise
+            return self._serve_file(error_path, status=404)
