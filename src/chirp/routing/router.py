@@ -140,6 +140,45 @@ class Router:
         for method in route.methods:
             node.routes_by_method[method] = route
 
+    @property
+    def routes(self) -> list[Route]:
+        """Return all registered routes.
+
+        Traverses the trie to collect every unique Route object.
+        Useful for introspection and contract validation.
+
+        """
+        seen: set[int] = set()
+        result: list[Route] = []
+        self._collect_routes(self._root, seen, result)
+        return result
+
+    def _collect_routes(
+        self,
+        node: _TrieNode,
+        seen: set[int],
+        result: list[Route],
+    ) -> None:
+        """Recursively collect routes from the trie."""
+        for route in node.routes_by_method.values():
+            route_id = id(route)
+            if route_id not in seen:
+                seen.add(route_id)
+                result.append(route)
+
+        for child in node.children.values():
+            self._collect_routes(child, seen, result)
+
+        if node.param_child is not None:
+            self._collect_routes(node.param_child.node, seen, result)
+
+        if node.catch_all_route is not None:
+            for route in node.catch_all_route.route_by_method.values():
+                route_id = id(route)
+                if route_id not in seen:
+                    seen.add(route_id)
+                    result.append(route)
+
     def compile(self) -> None:
         """Freeze the router. No more routes can be added."""
         self._compiled = True

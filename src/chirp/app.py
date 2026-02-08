@@ -1,6 +1,6 @@
 """Chirp application class.
 
-Mutable during setup (route registration, middleware, filters).
+Mutable during setup (route registration, middleware, filters, tools).
 Frozen at runtime when app.run() or __call__() is first invoked.
 """
 
@@ -20,6 +20,8 @@ from chirp.routing.route import Route
 from chirp.routing.router import Router
 from chirp.server.handler import handle_request
 from chirp.templating.integration import create_environment
+from chirp.tools.events import ToolEventBus
+from chirp.tools.registry import ToolRegistry, compile_tools
 
 
 @dataclass(slots=True)
@@ -30,6 +32,15 @@ class _PendingRoute:
     handler: Handler
     methods: list[str] | None
     name: str | None
+
+
+@dataclass(slots=True)
+class _PendingTool:
+    """A tool waiting to be compiled."""
+
+    name: str
+    description: str
+    handler: Callable[..., Any]
 
 
 class App:
@@ -54,31 +65,46 @@ class App:
         "_middleware",
         "_middleware_list",
         "_pending_routes",
+        "_pending_tools",
         # Compiled state (populated by _freeze)
         "_router",
         "_shutdown_hooks",
         "_startup_hooks",
         "_template_filters",
         "_template_globals",
+        # Tool support (MCP)
+        "_tool_events",
+        "_tool_registry",
+        # Per-worker lifecycle hooks (run on each worker's event loop)
+        "_worker_shutdown_hooks",
+        "_worker_startup_hooks",
         "config",
     )
 
     def __init__(self, config: AppConfig | None = None) -> None:
         self.config: AppConfig = config or AppConfig()
         self._pending_routes: list[_PendingRoute] = []
+        self._pending_tools: list[_PendingTool] = []
         self._middleware_list: list[Middleware] = []
         self._error_handlers: dict[int | type, ErrorHandler] = {}
         self._template_filters: dict[str, Callable[..., Any]] = {}
         self._template_globals: dict[str, Any] = {}
         self._startup_hooks: list[Callable[..., Any]] = []
         self._shutdown_hooks: list[Callable[..., Any]] = []
+        self._worker_startup_hooks: list[Callable[..., Any]] = []
+        self._worker_shutdown_hooks: list[Callable[..., Any]] = []
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
+
+        # Tool event bus — created eagerly so subscribers can register
+        # before freeze. The bus itself is thread-safe.
+        self._tool_events: ToolEventBus = ToolEventBus()
 
         # Compiled state — set during _freeze()
         self._router: Router | None = None
         self._middleware: tuple[Callable[..., Any], ...] = ()
         self._kida_env: Environment | None = None
+        self._tool_registry: ToolRegistry | None = None
 
     # -- Route registration --
 
@@ -97,6 +123,52 @@ class App:
             return func
 
         return decorator
+
+    # -- Tool registration --
+
+    def tool(
+        self,
+        name: str,
+        *,
+        description: str = "",
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register a function as an MCP tool via decorator.
+
+        The tool is callable by MCP clients via JSON-RPC at ``/mcp``
+        and can also be called directly from route handlers as a
+        normal Python function.
+
+        Tool calls emit ``ToolCallEvent`` to ``app.tool_events``
+        for real-time dashboard subscriptions.
+
+        Usage::
+
+            @app.tool("search", description="Search inventory")
+            async def search(query: str, category: str | None = None) -> list[dict]:
+                return await db.search(query, category=category)
+        """
+
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self._check_not_frozen()
+            self._pending_tools.append(_PendingTool(name, description, func))
+            return func
+
+        return decorator
+
+    @property
+    def tool_events(self) -> ToolEventBus:
+        """Public access to the tool event bus for SSE subscriptions.
+
+        Usage::
+
+            @app.route("/dashboard/feed")
+            async def feed(request: Request):
+                async def stream():
+                    async for event in app.tool_events.subscribe():
+                        yield Fragment("dashboard.html", "row", event=event)
+                return EventStream(stream())
+        """
+        return self._tool_events
 
     # -- Error handlers --
 
@@ -184,6 +256,46 @@ class App:
         self._shutdown_hooks.append(func)
         return func
 
+    def on_worker_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a per-worker startup hook via decorator.
+
+        Unlike ``on_startup`` (which runs once during ASGI lifespan),
+        this hook runs **on each worker's event loop** before that worker
+        begins accepting connections.  Use this for async resources that
+        bind to the event loop (httpx clients, DB connection pools, etc.).
+
+        Requires a server that sends ``pounce.worker.startup`` scopes
+        (e.g. pounce).  Under other servers, the hooks simply never fire.
+
+        Usage::
+
+            @app.on_worker_startup
+            async def create_client():
+                _client_var.set(httpx.AsyncClient(...))
+        """
+        self._check_not_frozen()
+        self._worker_startup_hooks.append(func)
+        return func
+
+    def on_worker_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a per-worker shutdown hook via decorator.
+
+        Runs **on each worker's event loop** after that worker stops
+        accepting connections.  Pair with ``on_worker_startup`` for
+        per-worker resource cleanup.
+
+        Usage::
+
+            @app.on_worker_shutdown
+            async def close_client():
+                client = _client_var.get(None)
+                if client:
+                    await client.aclose()
+        """
+        self._check_not_frozen()
+        self._worker_shutdown_hooks.append(func)
+        return func
+
     # -- Server --
 
     def run(
@@ -210,16 +322,36 @@ class App:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """ASGI 3.0 entry point.
 
-        Handles lifespan scopes directly, then delegates HTTP scopes
-        to the request handler pipeline.
+        Handles lifespan and per-worker lifecycle scopes directly,
+        then delegates HTTP scopes to the request handler pipeline.
         """
         if scope["type"] == "lifespan":
             await self._handle_lifespan(scope, receive, send)
             return
 
+        if scope["type"] == "pounce.worker.startup":
+            await self._handle_worker_startup()
+            return
+
+        if scope["type"] == "pounce.worker.shutdown":
+            await self._handle_worker_shutdown()
+            return
+
         self._ensure_frozen()
 
         assert self._router is not None
+
+        # Intercept MCP requests at /mcp before normal routing
+        if (
+            scope["type"] == "http"
+            and scope.get("path") == "/mcp"
+            and self._tool_registry is not None
+            and len(self._tool_registry) > 0
+        ):
+            from chirp.tools.handler import handle_mcp
+
+            await handle_mcp(scope, receive, send, registry=self._tool_registry)
+            return
 
         await handle_request(
             scope,
@@ -272,6 +404,32 @@ class App:
                 await send({"type": "lifespan.shutdown.complete"})
                 return
 
+    # -- Per-worker lifecycle --
+
+    async def _handle_worker_startup(self) -> None:
+        """Run registered per-worker startup hooks.
+
+        Called by pounce when a worker thread starts, on that worker's
+        event loop.  Errors propagate to pounce, which prevents the
+        worker from accepting connections.
+        """
+        for hook in self._worker_startup_hooks:
+            result = hook()
+            if inspect.isawaitable(result):
+                await result
+
+    async def _handle_worker_shutdown(self) -> None:
+        """Run registered per-worker shutdown hooks.
+
+        Called by pounce when a worker thread stops, on that worker's
+        event loop.  Errors propagate to pounce, which logs and
+        continues shutdown.
+        """
+        for hook in self._worker_shutdown_hooks:
+            result = hook()
+            if inspect.isawaitable(result):
+                await result
+
     # -- Internal --
 
     def _ensure_frozen(self) -> None:
@@ -317,7 +475,33 @@ class App:
             self._template_globals,
         )
 
+        # 4. Compile tool registry (schema generation happens here so
+        #    errors surface at startup, not at runtime)
+        self._tool_registry = compile_tools(
+            [(t.name, t.description, t.handler) for t in self._pending_tools],
+            self._tool_events,
+        )
+
         self._frozen = True
+
+    def check(self) -> None:
+        """Validate the hypermedia surface and print results.
+
+        Freezes the app if needed, then checks that every htmx target,
+        form action, and fragment contract resolves to a valid route.
+        Raises ``SystemExit(1)`` if errors are found.
+
+        Usage::
+
+            app.check()  # prints results and exits on errors
+
+        """
+        from chirp.contracts import CheckResult, check_hypermedia_surface
+
+        result: CheckResult = check_hypermedia_surface(self)
+        print(result.summary())  # noqa: T201
+        if not result.ok:
+            raise SystemExit(1)
 
     def _check_not_frozen(self) -> None:
         if self._frozen:

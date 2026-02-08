@@ -52,6 +52,7 @@ __all__ = [
     "SSEEvent",
     "Stream",
     "Template",
+    "ToolCallEvent",
     "g",
     "get_request",
 ]

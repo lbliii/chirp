@@ -4,14 +4,19 @@ Frozen metadata with async body access. The request is honest about
 what it is: received data that doesn't change.
 """
 
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator, Mapping
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from chirp._internal.asgi import Receive
 from chirp.http.cookies import parse_cookies
 from chirp.http.headers import Headers
 from chirp.http.query import QueryParams
+
+if TYPE_CHECKING:
+    from chirp.http.forms import FormData
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +42,10 @@ class Request:
 
     # Private: ASGI receive callable for body streaming
     _receive: Receive
+
+    # Private: mutable cache for body and parsed form data
+    # (dict contents are mutable even though the field reference is frozen)
+    _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     # -- Computed properties --
 
@@ -82,9 +91,17 @@ class Request:
     # -- Async body access --
 
     async def body(self) -> bytes:
-        """Read the full request body."""
+        """Read the full request body.
+
+        Result is cached — the ASGI receive is consumed once, then
+        the same bytes are returned on subsequent calls.
+        """
+        if "_body" in self._cache:
+            return self._cache["_body"]
         chunks = [chunk async for chunk in self.stream()]
-        return b"".join(chunks)
+        result = b"".join(chunks)
+        self._cache["_body"] = result
+        return result
 
     async def stream(self) -> AsyncGenerator[bytes]:
         """Stream the request body in chunks."""
@@ -107,6 +124,37 @@ class Request:
         """Read the body as text (UTF-8)."""
         raw = await self.body()
         return raw.decode("utf-8")
+
+    async def form(self) -> FormData:
+        """Parse the body as form data (URL-encoded or multipart).
+
+        Result is cached — the body is read and parsed once, then
+        the same ``FormData`` is returned on subsequent calls.
+
+        Supports ``application/x-www-form-urlencoded`` (stdlib) and
+        ``multipart/form-data`` (requires ``pip install chirp[forms]``).
+
+        Returns:
+            Parsed ``FormData`` implementing ``MultiValueMapping``.
+
+        Raises:
+            ValueError: If Content-Type is not a form encoding.
+            ConfigurationError: If multipart is needed but
+                ``python-multipart`` is not installed.
+        """
+        if "_form" in self._cache:
+            return self._cache["_form"]
+
+        from chirp.http.forms import parse_form_data
+
+        ct = self.content_type or "application/x-www-form-urlencoded"
+        raw = await self.body()
+        result = await parse_form_data(raw, ct)
+
+        # Cache in the mutable dict (frozen dataclass allows mutating
+        # the dict object itself, just not replacing the field reference)
+        self._cache["_form"] = result
+        return result
 
     # -- Factory --
 

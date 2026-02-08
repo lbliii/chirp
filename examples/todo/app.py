@@ -9,7 +9,6 @@ Run:
 
 import threading
 from pathlib import Path
-from urllib.parse import parse_qs
 
 from chirp import App, AppConfig, Fragment, Request, Template
 
@@ -82,9 +81,8 @@ def index(request: Request):
 @app.route("/todos", methods=["POST"])
 async def add_todo(request: Request):
     """Add a todo item — always returns the list fragment for htmx swap."""
-    body = await request.text()
-    form_data = parse_qs(body)
-    text = form_data.get("text", [""])[0].strip()
+    form = await request.form()
+    text = (form.get("text") or "").strip()
     if text:
         _add_todo(text)
     todos = _get_todos()

@@ -7,15 +7,19 @@ Built-in middleware:
     CORSMiddleware -- Cross-Origin Resource Sharing
     StaticFiles -- Serve static files from a directory
     SessionMiddleware -- Signed cookie sessions (requires itsdangerous)
+    CSRFMiddleware -- CSRF token protection (requires SessionMiddleware)
 """
 
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.protocol import Middleware, Next
 from chirp.middleware.static import StaticFiles
 
 __all__ = [
     "CORSConfig",
     "CORSMiddleware",
+    "CSRFConfig",
+    "CSRFMiddleware",
     "Middleware",
     "Next",
     "StaticFiles",

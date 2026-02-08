@@ -17,7 +17,7 @@ from chirp.context import g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
-from chirp.middleware.protocol import AnyResponse
+from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
@@ -100,6 +100,7 @@ async def _invoke_handler(
     handler = match.route.handler
 
     # Inject Request into the updated request with path_params
+    # Carry over _cache so body/form data parsed by middleware isn't lost
     request = Request(
         method=request.method,
         path=request.path,
@@ -111,6 +112,7 @@ async def _invoke_handler(
         client=request.client,
         cookies=request.cookies,
         _receive=request._receive,
+        _cache=request._cache,
     )
 
     # Build kwargs from handler signature
