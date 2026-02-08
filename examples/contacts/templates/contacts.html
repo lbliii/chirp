@@ -1,0 +1,133 @@
+<html>
+<head>
+  <title>Contacts</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; color: #1e293b; }
+    h1 { display: flex; align-items: center; gap: 0.75rem; }
+    .count { font-size: 0.85rem; background: #e2e8f0; color: #475569; padding: 0.15rem 0.5rem; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th { text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; padding: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 0.5rem; border-bottom: 1px solid #f1f5f9; }
+    .actions { display: flex; gap: 0.25rem; }
+    button { padding: 0.25rem 0.5rem; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-size: 0.8rem; }
+    button:hover { background: #e2e8f0; }
+    button.danger { color: #dc2626; border-color: #fca5a5; }
+    button.danger:hover { background: #fee2e2; }
+    input[type="text"], input[type="email"] { padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
+    form.add-form { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 1.5rem; }
+    form.add-form input { flex: 1; }
+    .errors { color: #dc2626; font-size: 0.8rem; margin: 0.25rem 0; list-style: none; padding: 0; }
+    .errors li { margin: 0.15rem 0; }
+    .search { margin-bottom: 1rem; }
+    .search input { width: 100%; padding: 0.5rem; }
+    .empty { color: #94a3b8; font-style: italic; padding: 1rem 0.5rem; }
+    .toast { position: fixed; bottom: 1rem; right: 1rem; background: #1e293b; color: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+<h1>Contacts {% block contact_count %}<span id="contact-count" class="count">{{ count | default(0) }}</span>{% endblock %}</h1>
+
+<div class="search">
+  <input type="text" name="q" placeholder="Search contacts..."
+         hx-get="/contacts/search" hx-target="#contact-table" hx-swap="outerHTML"
+         hx-trigger="input changed delay:300ms, search">
+</div>
+
+<div id="form-section">
+{% block contact_form %}
+<form class="add-form" hx-post="/contacts" hx-target="#contact-table" hx-swap="outerHTML">
+  <input type="text" name="name" placeholder="Name" value="{{ form.name if form is defined and form else '' }}">
+  <input type="email" name="email" placeholder="Email" value="{{ form.email if form is defined and form else '' }}">
+  <button type="submit">Add</button>
+</form>
+{% if errors is defined and errors %}
+<ul class="errors">
+  {% for field, msgs in errors.items() %}
+    {% for msg in msgs %}
+    <li>{{ field }}: {{ msg }}</li>
+    {% endfor %}
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}
+</div>
+
+{% block contact_table %}
+<table id="contact-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for contact in contacts %}
+    <tr id="contact-{{ contact.id }}">
+      <td>{{ contact.name }}</td>
+      <td>{{ contact.email }}</td>
+      <td class="actions">
+        <button hx-get="/contacts/{{ contact.id }}/edit" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
+        <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not contacts %}
+    <tr><td colspan="3" class="empty">No contacts found.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endblock %}
+
+{% block contact_row %}
+{% if contact is defined %}
+<tr id="contact-{{ contact.id }}">
+  <td>{{ contact.name }}</td>
+  <td>{{ contact.email }}</td>
+  <td class="actions">
+    <button hx-get="/contacts/{{ contact.id }}/edit" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
+    <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
+  </td>
+</tr>
+{% endif %}
+{% endblock %}
+
+{% block edit_row %}
+{% if contact is defined %}
+<tr id="contact-{{ contact.id }}">
+  <td>
+    <input type="text" name="name" value="{{ contact.name }}" form="edit-{{ contact.id }}">
+    {% if errors is defined and errors.name is defined %}
+    <ul class="errors">{% for msg in errors.name %}<li>{{ msg }}</li>{% endfor %}</ul>
+    {% endif %}
+  </td>
+  <td>
+    <input type="email" name="email" value="{{ contact.email }}" form="edit-{{ contact.id }}">
+    {% if errors is defined and errors.email is defined %}
+    <ul class="errors">{% for msg in errors.email %}<li>{{ msg }}</li>{% endfor %}</ul>
+    {% endif %}
+  </td>
+  <td class="actions">
+    <form id="edit-{{ contact.id }}" hx-put="/contacts/{{ contact.id }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML"
+          hx-encoding="application/x-www-form-urlencoded" style="display:inline;">
+      <button type="submit">save</button>
+    </form>
+    <button hx-get="/" hx-target="#contact-table" hx-swap="outerHTML">cancel</button>
+  </td>
+</tr>
+{% endif %}
+{% endblock %}
+
+<div id="toast" class="toast"></div>
+<script>
+  document.body.addEventListener("contactDeleted", function() {
+    var t = document.getElementById("toast");
+    t.textContent = "Contact deleted.";
+    t.classList.add("show");
+    setTimeout(function() { t.classList.remove("show"); }, 2000);
+  });
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@ Run:
 import threading
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Request, Template
+from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -80,13 +80,17 @@ def index(request: Request):
 
 @app.route("/todos", methods=["POST"])
 async def add_todo(request: Request):
-    """Add a todo item — always returns the list fragment for htmx swap."""
+    """Add a todo item — returns the list fragment or a 422 validation error."""
     form = await request.form()
     text = (form.get("text") or "").strip()
-    if text:
-        _add_todo(text)
-    todos = _get_todos()
-    return Fragment("index.html", "todo_list", todos=todos)
+    if not text:
+        return ValidationError(
+            "index.html", "todo_list",
+            error="Todo text is required",
+            todos=_get_todos(),
+        )
+    _add_todo(text)
+    return Fragment("index.html", "todo_list", todos=_get_todos())
 
 
 @app.route("/todos/{todo_id}/toggle", methods=["POST"])

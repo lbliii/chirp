@@ -70,16 +70,24 @@ def assert_is_error_fragment(response: Response, *, status: int | None = None) -
 def hx_headers(response: Response) -> dict[str, str]:
     """Extract all HX-* response headers into a dict.
 
+    Keys are normalized to canonical htmx casing (e.g. ``HX-Push-Url``)
+    regardless of whether the response went through the ASGI sender
+    (which lowercases header names per the HTTP spec).
+
     Useful for quick inspection in tests::
 
         headers = hx_headers(response)
         assert headers["HX-Redirect"] == "/dashboard"
     """
-    return {
-        name: value
-        for name, value in response.headers
-        if name.upper().startswith("HX-")
-    }
+    result: dict[str, str] = {}
+    for name, value in response.headers:
+        if name.upper().startswith("HX-"):
+            # Normalize: "hx-push-url" / "HX-Push-Url" -> "HX-Push-Url"
+            canonical = "HX-" + "-".join(
+                p.capitalize() for p in name.split("-")[1:]
+            )
+            result[canonical] = value
+    return result
 
 
 def assert_hx_redirect(response: Response, url: str) -> None:

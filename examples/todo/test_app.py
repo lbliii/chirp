@@ -80,16 +80,35 @@ class TestTodoOperations:
             assert_fragment_not_contains(response, "First")
             assert_fragment_contains(response, "Second")
 
-    async def test_empty_text_ignored(self, example_app) -> None:
+    async def test_empty_text_returns_422(self, example_app) -> None:
+        """Empty text triggers a ValidationError — 422 with error message."""
         async with TestClient(example_app) as client:
             response = await client.post(
                 "/todos",
                 body=b"text=",
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            assert_is_fragment(response)
-            # List should still be empty — no todo added
-            assert "<li>" not in response.text
+            assert response.status == 422
+            assert "required" in response.text.lower()
+
+    async def test_validation_error_still_renders_list(self, example_app) -> None:
+        """A validation error still renders existing todos in the fragment."""
+        async with TestClient(example_app) as client:
+            # Add a valid todo first
+            await client.post(
+                "/todos",
+                body=b"text=Existing+item",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+            # Submit empty — should get 422 but still see the existing todo
+            response = await client.post(
+                "/todos",
+                body=b"text=",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.status == 422
+            assert_fragment_contains(response, "Existing item")
 
     async def test_isolation_between_tests(self, example_app) -> None:
         """Each test gets a fresh app with an empty todo list."""

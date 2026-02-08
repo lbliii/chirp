@@ -18,10 +18,22 @@ cd examples/hello && python app.py
 
 The killer feature. A todo list where the same template renders as a full page or a fragment,
 depending on whether the request came from htmx. Add, toggle, and delete items with partial
-page updates — zero client-side JavaScript.
+page updates — zero client-side JavaScript. Empty submissions return a `ValidationError`
+with a 422 status and an inline error message.
 
 ```bash
 cd examples/todo && python app.py
+```
+
+### `contacts/` — htmx CRUD with Validation
+
+The canonical htmx demo: a contacts list with add, inline edit, delete, and search. Exercises
+every htmx ergonomic feature in one app — `ValidationError` for 422 form errors, `OOB` for
+multi-fragment updates (table + count badge), `HX-Trigger` for toast notifications on delete,
+and `HX-Push-Url` for bookmarkable edit URLs. Tests use all `assert_hx_*` helpers.
+
+```bash
+cd examples/contacts && python app.py
 ```
 
 ### `sse/` — Real-Time Events
@@ -144,32 +156,37 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | sse | dashboard | hackernews | rag_demo |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x |
-| Path parameters | x | x | | | x | |
-| String returns | x | | | | | |
-| Dict/JSON returns | x | | | | | |
-| `Response` chaining | x | | | | | |
-| `@app.error()` | x | | | | | |
-| `Template` | | x | x | | x | x |
-| `Fragment` | | x | x | x | x | x |
-| `Stream` | | | | x | | |
-| `request.is_fragment` | | x | | | x | |
-| `@app.template_filter()` | | x | | x | x | |
-| `EventStream` | | | x | x | x | x |
-| `SSEEvent` | | | x | | | |
-| `{% cache %}` | | | | x | x | |
-| `hx-swap-oob` | | | | x | x | |
-| Multi-worker Pounce | | | | x | x | x |
-| `TestClient.fragment()` | | x | | | x | |
-| `TestClient.sse()` | | | x | x | x | |
-| `@app.on_startup` | | | | | x | x |
-| `@app.on_worker_startup` | | | | | x | x |
-| `@app.on_worker_shutdown` | | | | | x | x |
-| `httpx` (real API) | | | | | x | |
-| `chirp.data` (SQLite) | | | | | | x |
-| `chirp.ai` (LLM streaming) | | | | | | x |
-| `ContextVar` per-worker | | | | | x | x |
-| Recursive `{% def %}` | | | | | x | |
-| View Transitions | | | | | x | |
+| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | x | |
+| String returns | x | | | | | | |
+| Dict/JSON returns | x | | | | | | |
+| `Response` chaining | x | | | | | | |
+| `@app.error()` | x | | | | | | |
+| `Template` | | x | | x | | x | x |
+| `Fragment` | | x | x | x | x | x | x |
+| `Page` | | | x | | | x | |
+| `ValidationError` | | x | x | | | | |
+| `OOB` | | | x | | | | |
+| `Stream` | | | | | x | | |
+| `request.is_fragment` | | x | | | | x | |
+| `@app.template_filter()` | | x | | | x | x | |
+| `EventStream` | | | | x | x | x | x |
+| `SSEEvent` | | | | x | | | |
+| `{% cache %}` | | | | | x | x | |
+| `hx-swap-oob` | | | x | | x | x | |
+| `with_hx_*()` headers | | | x | | | | |
+| `assert_hx_*` test helpers | | | x | | | | |
+| Multi-worker Pounce | | | | | x | x | x |
+| `TestClient.fragment()` | | x | | | | x | |
+| `TestClient.sse()` | | | | x | x | x | |
+| `@app.on_startup` | | | | | | x | x |
+| `@app.on_worker_startup` | | | | | | x | x |
+| `@app.on_worker_shutdown` | | | | | | x | x |
+| `httpx` (real API) | | | | | | x | |
+| `chirp.data` (SQLite) | | | | | | | x |
+| `chirp.ai` (LLM streaming) | | | | | | | x |
+| `ContextVar` per-worker | | | | | | x | x |
+| Recursive `{% def %}` | | | | | | x | |
+| View Transitions | | | | | | x | |
