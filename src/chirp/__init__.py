@@ -46,6 +46,7 @@ __all__ = [
     "Middleware",
     "Next",
     "NotFound",
+    "OOB",
     "Page",
     "Redirect",
     "Request",
@@ -53,6 +54,7 @@ __all__ = [
     "SSEEvent",
     "Stream",
     "Template",
+    "ValidationError",
     "ToolCallEvent",
     "g",
     "get_request",
@@ -84,7 +86,7 @@ def __getattr__(name: str) -> object:
 
         return getattr(_resp, name)
 
-    if name in ("Template", "Fragment", "Page", "Stream"):
+    if name in ("Template", "Fragment", "Page", "Stream", "ValidationError", "OOB"):
         from chirp.templating import returns as _tmpl
 
         return getattr(_tmpl, name)
