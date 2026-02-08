@@ -11,6 +11,7 @@ Free-threading safety:
 """
 
 import asyncio
+import contextlib
 import threading
 import uuid
 from collections.abc import AsyncIterator
@@ -59,11 +60,8 @@ class ToolEventBus:
         with self._lock:
             subscribers = set(self._subscribers)
         for queue in subscribers:
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(event)
-            except asyncio.QueueFull:
-                # Drop event for slow consumers rather than blocking
-                pass
 
     async def subscribe(self) -> AsyncIterator[ToolCallEvent]:
         """Subscribe to tool call events.
@@ -92,8 +90,6 @@ class ToolEventBus:
         """
         with self._lock:
             for queue in self._subscribers:
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(None)
-                except asyncio.QueueFull:
-                    pass
             self._subscribers.clear()
