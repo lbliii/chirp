@@ -1,154 +1,351 @@
 <html>
+
 <head>
   <title>HN Live Reader</title>
   <meta name="view-transition" content="same-origin">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background: #0f172a; color: #e2e8f0;
+      background: #0f172a;
+      color: #e2e8f0;
       min-height: 100vh;
     }
-    a { color: inherit; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .container { max-width: 780px; margin: 0 auto; padding: 1rem 1.25rem; }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 1rem 1.25rem;
+    }
 
     /* Header */
     .site-header {
-      background: #1e293b; border-bottom: 2px solid #f97316;
+      background: #1e293b;
+      border-bottom: 2px solid #f97316;
       padding: 0.75rem 0;
     }
+
     .site-header .container {
-      display: flex; align-items: center; gap: 0.75rem; padding-top: 0; padding-bottom: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding-top: 0;
+      padding-bottom: 0;
     }
+
     .site-header .logo {
-      background: #f97316; color: #0f172a;
-      font-weight: 800; font-size: 0.85rem;
-      padding: 0.15rem 0.4rem; border-radius: 3px;
+      background: #f97316;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
       letter-spacing: 0.02em;
     }
+
     .site-header h1 {
-      font-size: 0.95rem; font-weight: 600; color: #f8fafc;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #f8fafc;
     }
+
     .site-header .tagline {
-      font-size: 0.75rem; color: #64748b; margin-left: auto;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-left: auto;
     }
 
     /* Story list */
-    .story-list { list-style: none; }
+    .story-list {
+      list-style: none;
+    }
+
     .story-item {
-      display: flex; align-items: baseline; gap: 0.6rem;
-      padding: 0.6rem 0; border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #1e293b;
     }
-    .story-item:last-child { border-bottom: none; }
+
+    .story-item:last-child {
+      border-bottom: none;
+    }
+
     .story-rank {
-      color: #475569; font-size: 0.85rem; min-width: 1.8rem;
-      text-align: right; font-variant-numeric: tabular-nums;
+      color: #475569;
+      font-size: 0.85rem;
+      min-width: 1.8rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
-    .story-content { flex: 1; min-width: 0; }
+
+    .story-content {
+      flex: 1;
+      min-width: 0;
+    }
+
     .story-title {
-      font-size: 0.95rem; color: #f1f5f9; line-height: 1.4;
+      font-size: 0.95rem;
+      color: #f1f5f9;
+      line-height: 1.4;
     }
-    .story-title:hover { color: #f97316; }
+
+    .story-title:hover {
+      color: #f97316;
+    }
+
     .story-domain {
-      font-size: 0.75rem; color: #64748b; margin-left: 0.4rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-left: 0.4rem;
     }
+
     .story-meta-line {
-      font-size: 0.75rem; color: #64748b; margin-top: 0.2rem;
-      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
-    .story-meta-line .score { color: #f97316; font-weight: 500; }
-    .story-meta-line a:hover { color: #cbd5e1; }
+
+    .story-meta-line .score {
+      color: #f97316;
+      font-weight: 500;
+    }
+
+    .story-meta-line a:hover {
+      color: #cbd5e1;
+    }
+
     /* Flash animation — fires when htmx OOB-swaps a new element into the DOM */
     .story-meta-line[hx-swap-oob] {
       animation: score-flash 1.2s ease-out;
     }
+
     @keyframes score-flash {
-      0%   { background: rgba(249, 115, 22, 0.35); border-radius: 3px; }
-      100% { background: transparent; }
+      0% {
+        background: rgba(249, 115, 22, 0.35);
+        border-radius: 3px;
+      }
+
+      100% {
+        background: transparent;
+      }
     }
 
     /* Story detail */
-    .story-detail { padding: 1.5rem 0; }
+    .story-detail {
+      padding: 1.5rem 0;
+    }
+
     .story-detail .back {
-      display: inline-block; color: #64748b; font-size: 0.8rem;
+      display: inline-block;
+      color: #64748b;
+      font-size: 0.8rem;
       margin-bottom: 1rem;
     }
-    .story-detail .back:hover { color: #f97316; }
+
+    .story-detail .back:hover {
+      color: #f97316;
+    }
+
     .story-detail h2 {
-      font-size: 1.25rem; color: #f8fafc; line-height: 1.4;
+      font-size: 1.25rem;
+      color: #f8fafc;
+      line-height: 1.4;
       margin-bottom: 0.3rem;
     }
+
     .story-detail .detail-meta {
-      font-size: 0.8rem; color: #64748b; margin-bottom: 1.5rem;
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 1.5rem;
     }
-    .story-detail .detail-meta .score { color: #f97316; font-weight: 500; }
-    .story-detail .detail-meta a { color: #94a3b8; }
-    .story-detail .detail-meta a:hover { color: #f97316; }
+
+    .story-detail .detail-meta .score {
+      color: #f97316;
+      font-weight: 500;
+    }
+
+    .story-detail .detail-meta a {
+      color: #94a3b8;
+    }
+
+    .story-detail .detail-meta a:hover {
+      color: #f97316;
+    }
 
     /* Comments */
     .comments-header {
-      font-size: 0.85rem; color: #94a3b8; font-weight: 600;
-      margin-bottom: 1rem; padding-bottom: 0.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
       border-bottom: 1px solid #1e293b;
     }
+
     .comment {
       padding: 0.6rem 0 0.6rem 1rem;
       border-left: 2px solid #1e293b;
       margin-bottom: 0.3rem;
     }
-    .comment:hover { border-left-color: #334155; }
+
+    .comment:hover {
+      border-left-color: #334155;
+    }
+
     .comment-meta {
-      font-size: 0.75rem; color: #64748b; margin-bottom: 0.3rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 0.3rem;
     }
-    .comment-meta .author { color: #94a3b8; font-weight: 500; }
+
+    .comment-meta .author {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
     .comment-text {
-      font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      line-height: 1.5;
     }
-    .comment-text a { color: #60a5fa; }
-    .comment-text a:hover { color: #93bbfd; }
-    .comment-text p { margin-bottom: 0.5em; }
-    .comment-text p:last-child { margin-bottom: 0; }
+
+    .comment-text a {
+      color: #60a5fa;
+    }
+
+    .comment-text a:hover {
+      color: #93bbfd;
+    }
+
+    .comment-text p {
+      margin-bottom: 0.5em;
+    }
+
+    .comment-text p:last-child {
+      margin-bottom: 0;
+    }
+
     .comment-text pre {
-      background: #1e293b; padding: 0.5rem; border-radius: 4px;
-      overflow-x: auto; font-size: 0.8rem; margin: 0.5em 0;
+      background: #1e293b;
+      padding: 0.5rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      margin: 0.5em 0;
     }
-    .comment-text code { font-size: 0.82em; }
-    .comment-replies { margin-top: 0.4rem; }
-    .no-comments { color: #475569; font-size: 0.85rem; font-style: italic; }
+
+    .comment-text code {
+      font-size: 0.82em;
+    }
+
+    .comment-replies {
+      margin-top: 0.4rem;
+    }
+
+    .no-comments {
+      color: #475569;
+      font-size: 0.85rem;
+      font-style: italic;
+    }
 
     /* Live indicator */
     .live-badge {
-      display: inline-flex; align-items: center; gap: 0.35rem;
-      font-size: 0.7rem; color: #4ade80; margin-left: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      color: #4ade80;
+      margin-left: 0.75rem;
     }
+
     .live-dot {
-      width: 6px; height: 6px; background: #4ade80;
-      border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+      width: 6px;
+      height: 6px;
+      background: #4ade80;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
     }
+
     @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
-      50%      { opacity: 0.6; box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
+
+      0%,
+      100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5);
+      }
+
+      50% {
+        opacity: 0.6;
+        box-shadow: 0 0 0 4px rgba(74, 222, 128, 0);
+      }
     }
 
     /* View Transitions */
-    @view-transition { navigation: auto; }
-    ::view-transition-old(page-content) { animation: fade-out 0.15s ease-out; }
-    ::view-transition-new(page-content) { animation: fade-in 0.2s ease-in; }
-    @keyframes fade-out { to { opacity: 0; transform: translateY(-4px); } }
-    @keyframes fade-in  { from { opacity: 0; transform: translateY(4px); } }
-    #main { view-transition-name: page-content; }
+    @view-transition {
+      navigation: auto;
+    }
+
+    ::view-transition-old(page-content) {
+      animation: fade-out 0.15s ease-out;
+    }
+
+    ::view-transition-new(page-content) {
+      animation: fade-in 0.2s ease-in;
+    }
+
+    @keyframes fade-out {
+      to {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+    }
+
+    #main {
+      view-transition-name: page-content;
+    }
 
     /* Utility */
-    .sse-sink { display: none; }
+    .sse-sink {
+      display: none;
+    }
+
     footer {
-      text-align: center; padding: 2rem 0 1rem;
-      font-size: 0.7rem; color: #334155;
+      text-align: center;
+      padding: 2rem 0 1rem;
+      font-size: 0.7rem;
+      color: #334155;
     }
   </style>
 </head>
+
 <body>
 
   {% cache "site-header", ttl=300 %}
@@ -178,14 +375,16 @@
             <a class="story-title" href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>
             <span class="story-domain">({{ story.domain }})</span>
             {% else %}
-            <a class="story-title" href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main" hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.title }}</a>
+            <a class="story-title" href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main"
+              hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.title }}</a>
             {% end %}
           </div>
           <div class="story-meta-line" id="meta-{{ story.id }}">
             <span class="score">{{ story.score | pluralize("point") }}</span>
             <span>by {{ story.by }}</span>
             <span>{{ story.time | timeago }}</span>
-            <a href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main" hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.descendants | pluralize("comment") }}</a>
+            <a href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main"
+              hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.descendants | pluralize("comment") }}</a>
           </div>
         </div>
       </li>
@@ -203,7 +402,8 @@
     {# ---- Story Detail ---- #}
     {% block story_detail %}
     <div class="story-detail">
-      <a class="back" href="/" hx-get="/" hx-target="#main" hx-swap="innerHTML transition:true" hx-push-url="true">&larr; Back</a>
+      <a class="back" href="/" hx-get="/" hx-target="#main" hx-swap="innerHTML transition:true"
+        hx-push-url="true">&larr; Back</a>
       <h2>
         {% if story.url %}
         <a href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>
@@ -254,21 +454,26 @@
 
   </div>
 
-  {# OOB fragment for SSE score updates — rendered independently, swapped by ID #}
+  {# OOB fragment for SSE score updates — rendered independently, swapped by ID.
+  Must include the same htmx attributes as the story list so that
+  OOB-swapped meta lines preserve htmx navigation behavior. #}
   {% block story_meta %}
   {% if story is defined %}
   <div class="story-meta-line" id="meta-{{ story.id }}" hx-swap-oob="outerHTML">
     <span class="score">{{ story.score | pluralize("point") }}</span>
     <span>by {{ story.by }}</span>
     <span>{{ story.time | timeago }}</span>
-    <a href="/story/{{ story.id }}">{{ story.descendants | pluralize("comment") }}</a>
+    <a href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main" hx-swap="innerHTML transition:true"
+      hx-push-url="true">{{ story.descendants | pluralize("comment") }}</a>
   </div>
   {% end %}
   {% end %}
 
   <footer>
-    Real API &middot; Streaming HTML &middot; Server-Sent Events &middot; Recursive fragments &middot; View Transitions &middot; Free-threading
+    Real API &middot; Streaming HTML &middot; Server-Sent Events &middot; Recursive fragments &middot; View Transitions
+    &middot; Free-threading
   </footer>
 
 </body>
+
 </html>

@@ -123,7 +123,7 @@ async def _invoke_handler(
     if inspect.isawaitable(result):
         result = await result
 
-    return negotiate(result, kida_env=kida_env)
+    return negotiate(result, kida_env=kida_env, request=request)
 
 
 def _build_handler_kwargs(

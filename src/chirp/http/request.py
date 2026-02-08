@@ -55,6 +55,11 @@ class Request:
         return self.headers.get("hx-request") == "true"
 
     @property
+    def is_history_restore(self) -> bool:
+        """True if htmx is restoring from history (cache miss on back/forward)."""
+        return self.headers.get("hx-history-restore-request") == "true"
+
+    @property
     def htmx_target(self) -> str | None:
         """The target element ID from HX-Target header."""
         return self.headers.get("hx-target")

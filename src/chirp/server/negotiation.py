@@ -6,7 +6,7 @@ no magic, fully predictable.
 """
 
 import json as json_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
@@ -14,14 +14,18 @@ from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, Response, SSEResponse, StreamingResponse
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
-from chirp.templating.returns import Fragment, Stream, Template
+from chirp.templating.returns import Fragment, Page, Stream, Template
 from chirp.templating.streaming import has_async_context, render_stream_async
+
+if TYPE_CHECKING:
+    from chirp.http.request import Request
 
 
 def negotiate(
     value: Any,
     *,
     kida_env: Environment | None = None,
+    request: Request | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Convert a route handler's return value to a Response.
 
@@ -31,14 +35,15 @@ def negotiate(
     2. ``Redirect``         -> 302 with Location header
     3. ``Template``         -> render via kida -> Response
     4. ``Fragment``         -> render block via kida -> Response
-    5. ``Stream``           -> kida render_stream() -> StreamingResponse
+    5. ``Page``             -> Template or Fragment based on request headers
+    6. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    6. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
-    7. ``str``              -> 200, text/html
-    8. ``bytes``            -> 200, application/octet-stream
-    9. ``dict`` / ``list``  -> 200, application/json
-    10. ``(value, int)``    -> negotiate value, override status
-    11. ``(value, int, dict)`` -> negotiate value, override status + headers
+    7. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    8. ``str``              -> 200, text/html
+    9. ``bytes``            -> 200, application/octet-stream
+    10. ``dict`` / ``list`` -> 200, application/json
+    11. ``(value, int)``    -> negotiate value, override status
+    12. ``(value, int, dict)`` -> negotiate value, override status + headers
     """
     match value:
         case Response():
@@ -67,6 +72,24 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             html = render_fragment(kida_env, value)
+            return Response(body=html, content_type="text/html; charset=utf-8")
+        case Page():
+            if kida_env is None:
+                msg = (
+                    "Page return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            if (
+                request is not None
+                and request.is_fragment
+                and not request.is_history_restore
+            ):
+                frag = Fragment(value.name, value.block_name, **value.context)
+                html = render_fragment(kida_env, frag)
+            else:
+                tpl = Template(value.name, **value.context)
+                html = render_template(kida_env, tpl)
             return Response(body=html, content_type="text/html; charset=utf-8")
         case Stream():
             if kida_env is None:

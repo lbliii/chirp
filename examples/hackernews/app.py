@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, Template
+from chirp import App, AppConfig, EventStream, Fragment, Page, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -294,16 +294,14 @@ def pluralize(count: int, singular: str, plural: str | None = None) -> str:
 
 
 @app.route("/")
-def index(request: Request):
+def index():
     """Front page — top 30 stories from Hacker News."""
     stories = _get_stories(30)
-    if request.is_fragment:
-        return Fragment("hackernews.html", "story_list", stories=stories)
-    return Template("hackernews.html", stories=stories, page="list")
+    return Page("hackernews.html", "story_list", stories=stories, page="list")
 
 
 @app.route("/story/{story_id}")
-async def story_detail(story_id: int, request: Request):
+async def story_detail(story_id: int):
     """Story detail page with threaded comments."""
     # Fetch fresh story data
     data = await _fetch_item(story_id)
@@ -318,12 +316,9 @@ async def story_detail(story_id: int, request: Request):
     results = await asyncio.gather(*tasks, return_exceptions=True)
     comments = [r for r in results if isinstance(r, Comment)]
 
-    if request.is_fragment:
-        return Fragment(
-            "hackernews.html", "story_detail", story=story, comments=comments
-        )
-    return Template(
-        "hackernews.html", story=story, comments=comments, page="detail"
+    return Page(
+        "hackernews.html", "story_detail",
+        story=story, comments=comments, page="detail",
     )
 
 
