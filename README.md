@@ -17,8 +17,9 @@ app.run()
 Chirp serves HTML beautifully — full pages, fragments, streams, and real-time events — all
 through its built-in template engine, [kida](https://github.com/lbliii/kida).
 
-**Status:** Pre-alpha — Phases 0-7 complete. Routing, Kida integration, fragment rendering,
-middleware, streaming HTML, Server-Sent Events, and test utilities all implemented. 53
+**Status:** Alpha — Phases 0-7 complete, plus typed hypermedia contracts. Routing, Kida
+integration, fragment rendering, middleware, streaming HTML, Server-Sent Events, test
+utilities, and compile-time validation of the server-client surface all implemented. 53
 source modules. See [ROADMAP.md](ROADMAP.md) for the full vision.
 
 ---
@@ -170,6 +171,37 @@ includes CORS, static file serving, and signed cookie sessions.
 
 ---
 
+## Typed Hypermedia Contracts
+
+Chirp validates the server-client boundary at startup — something React/Next.js can't do
+without JavaScript:
+
+```python
+issues = app.check()
+for issue in issues:
+    print(f"{issue.severity}: {issue.message}")
+```
+
+Every `hx-get`, `hx-post`, and `action` attribute in your templates is checked against the
+registered route table. Every `Fragment` and `SSE` return type is checked against available
+template blocks. Broken references become compile-time errors, not runtime 404s.
+
+Use the `@contract` decorator for fine-grained route-level contracts:
+
+```python
+from chirp.contracts import contract, FragmentContract
+
+@app.route("/search")
+@contract(
+    returns=[FragmentContract("search.html", "results_list")],
+    htmx_triggers=["hx-get"],
+)
+async def search(request: Request):
+    ...
+```
+
+---
+
 ## Key Ideas
 
 - **HTML over the wire.** Serve full pages, template fragments, streaming HTML, and
@@ -180,6 +212,9 @@ includes CORS, static file serving, and signed cookie sessions.
   `type: ignore` comments. `ty` passes clean.
 - **Free-threading native.** Designed for Python 3.14t from the first line. Immutable data
   structures, ContextVar isolation, `_Py_mod_gil = 0`.
+- **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
+  startup — every `hx-get` resolves to a route, every `Fragment` references a real block.
+  Compile-time safety for the server-client boundary.
 - **Minimal dependencies.** `kida` + `anyio`. Everything else is optional.
 
 ---
