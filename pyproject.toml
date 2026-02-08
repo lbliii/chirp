@@ -34,6 +34,7 @@ classifiers = [
 dependencies = [
     "kida-templates>=0.1.2",  # Template engine (same ecosystem, same author)
     "anyio>=4.0",             # Async runtime (backend-agnostic, structured concurrency)
+    "bengal-pounce>=0.4.0",   # ASGI server (same ecosystem, powers app.run())
 ]
 
 [project.optional-dependencies]
