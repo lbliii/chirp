@@ -1,0 +1,30 @@
+<html>
+<body>
+{% block form_body %}
+<form id="user-form" hx-post="/submit">
+  <input name="email" value="{{ form.email | default('') }}">
+  {% if errors %}
+  <ul class="errors">
+  {% for field, msgs in errors.items() %}
+    {% for msg in msgs %}
+    <li>{{ field }}: {{ msg }}</li>
+    {% endfor %}
+  {% endfor %}
+  </ul>
+  {% endif %}
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
+{% block form_errors %}
+<div id="error-banner">
+{% if errors %}
+  {% for field, msgs in errors.items() %}
+    {% for msg in msgs %}
+    <p class="error">{{ field }}: {{ msg }}</p>
+    {% endfor %}
+  {% endfor %}
+{% endif %}
+</div>
+{% endblock %}
+</body>
+</html>

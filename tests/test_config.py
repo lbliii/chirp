@@ -20,6 +20,7 @@ class TestAppConfig:
         assert cfg.static_dir == "static"
         assert cfg.static_url == "/static"
         assert cfg.sse_heartbeat_interval == 15.0
+        assert cfg.mcp_path == "/mcp"
         assert cfg.max_content_length == 16 * 1024 * 1024
 
     def test_override(self) -> None:

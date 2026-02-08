@@ -91,6 +91,123 @@ class TestResponse:
         assert r.cookies[0].secure is True
 
 
+class TestHtmxResponseHeaders:
+    """Tests for .with_hx_*() chainable htmx response header helpers."""
+
+    def test_hx_redirect(self) -> None:
+        r = Response().with_hx_redirect("/dashboard")
+        assert ("HX-Redirect", "/dashboard") in r.headers
+
+    def test_hx_location_simple(self) -> None:
+        r = Response().with_hx_location("/new-page")
+        assert ("HX-Location", "/new-page") in r.headers
+
+    def test_hx_location_with_target(self) -> None:
+        r = Response().with_hx_location("/page", target="#main")
+        header = dict(r.headers)["HX-Location"]
+        import json
+        obj = json.loads(header)
+        assert obj["path"] == "/page"
+        assert obj["target"] == "#main"
+
+    def test_hx_location_with_all_options(self) -> None:
+        r = Response().with_hx_location(
+            "/page", target="#content", swap="innerHTML", source="#trigger"
+        )
+        header = dict(r.headers)["HX-Location"]
+        import json
+        obj = json.loads(header)
+        assert obj == {
+            "path": "/page",
+            "target": "#content",
+            "swap": "innerHTML",
+            "source": "#trigger",
+        }
+
+    def test_hx_retarget(self) -> None:
+        r = Response().with_hx_retarget("#errors")
+        assert ("HX-Retarget", "#errors") in r.headers
+
+    def test_hx_reswap(self) -> None:
+        r = Response().with_hx_reswap("innerHTML")
+        assert ("HX-Reswap", "innerHTML") in r.headers
+
+    def test_hx_trigger_string(self) -> None:
+        r = Response().with_hx_trigger("closeModal")
+        assert ("HX-Trigger", "closeModal") in r.headers
+
+    def test_hx_trigger_dict(self) -> None:
+        r = Response().with_hx_trigger({"showToast": {"message": "Saved!"}})
+        header = dict(r.headers)["HX-Trigger"]
+        import json
+        obj = json.loads(header)
+        assert obj == {"showToast": {"message": "Saved!"}}
+
+    def test_hx_trigger_after_settle_string(self) -> None:
+        r = Response().with_hx_trigger_after_settle("highlight")
+        assert ("HX-Trigger-After-Settle", "highlight") in r.headers
+
+    def test_hx_trigger_after_settle_dict(self) -> None:
+        r = Response().with_hx_trigger_after_settle({"flash": {"level": "info"}})
+        header = dict(r.headers)["HX-Trigger-After-Settle"]
+        import json
+        assert json.loads(header) == {"flash": {"level": "info"}}
+
+    def test_hx_trigger_after_swap_string(self) -> None:
+        r = Response().with_hx_trigger_after_swap("scrollTop")
+        assert ("HX-Trigger-After-Swap", "scrollTop") in r.headers
+
+    def test_hx_trigger_after_swap_dict(self) -> None:
+        r = Response().with_hx_trigger_after_swap({"animate": True})
+        header = dict(r.headers)["HX-Trigger-After-Swap"]
+        import json
+        assert json.loads(header) == {"animate": True}
+
+    def test_hx_push_url_string(self) -> None:
+        r = Response().with_hx_push_url("/new-url")
+        assert ("HX-Push-Url", "/new-url") in r.headers
+
+    def test_hx_push_url_false(self) -> None:
+        r = Response().with_hx_push_url(False)
+        assert ("HX-Push-Url", "false") in r.headers
+
+    def test_hx_push_url_true(self) -> None:
+        r = Response().with_hx_push_url(True)
+        assert ("HX-Push-Url", "true") in r.headers
+
+    def test_hx_replace_url_string(self) -> None:
+        r = Response().with_hx_replace_url("/replaced")
+        assert ("HX-Replace-Url", "/replaced") in r.headers
+
+    def test_hx_replace_url_false(self) -> None:
+        r = Response().with_hx_replace_url(False)
+        assert ("HX-Replace-Url", "false") in r.headers
+
+    def test_hx_refresh(self) -> None:
+        r = Response().with_hx_refresh()
+        assert ("HX-Refresh", "true") in r.headers
+
+    def test_chaining_multiple_hx_headers(self) -> None:
+        r = (
+            Response(body="<div>errors</div>")
+            .with_status(422)
+            .with_hx_retarget("#form-errors")
+            .with_hx_reswap("innerHTML")
+            .with_hx_trigger("validationFailed")
+        )
+        assert r.status == 422
+        headers = dict(r.headers)
+        assert headers["HX-Retarget"] == "#form-errors"
+        assert headers["HX-Reswap"] == "innerHTML"
+        assert headers["HX-Trigger"] == "validationFailed"
+
+    def test_immutability_preserved(self) -> None:
+        r1 = Response(body="ok")
+        r2 = r1.with_hx_redirect("/home")
+        assert r1.headers == ()
+        assert ("HX-Redirect", "/home") in r2.headers
+
+
 class TestRedirect:
     def test_defaults(self) -> None:
         r = Redirect("/login")
