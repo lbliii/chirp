@@ -78,6 +78,15 @@ Documentation = "https://github.com/lbliii/chirp"
 Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
+# =============================================================================
+# uv — Local source overrides for unpublished ecosystem packages
+# =============================================================================
+# pounce is a sibling repo in the same workspace; not yet on PyPI.
+# kida-templates IS on PyPI but we often iterate locally.
+
+[tool.uv.sources]
+bengal-pounce = { path = "../pounce", editable = true }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
