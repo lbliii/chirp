@@ -9,6 +9,8 @@ answers with cited sources. The entire app is ~50 lines of Python.
 - **chirp.ai** — Streaming LLM responses via Anthropic's Claude
 - **EventStream + Fragment** — Server-rendered HTML pushed via SSE
 - **htmx** — Browser swaps fragments into the DOM, no JS framework
+- **Per-worker lifecycle** — `@app.on_worker_startup` / `@app.on_worker_shutdown` for DB connections
+- **Multi-worker Pounce** — 4 worker threads with free-threading
 
 ## Architecture
 
@@ -24,6 +26,24 @@ SSE event: fragment
 Browser shows streaming text
 ```
 
+## Lifecycle (multi-worker)
+
+```
+Startup (once):
+    on_startup → temp DB connect → CREATE TABLE, seed data → disconnect
+
+Per worker (×4):
+    on_worker_startup  → Database(URL), connect, store in ContextVar
+    serve requests     → _db_var.get() — each worker uses its own connection
+    on_worker_shutdown → disconnect, clear ContextVar
+```
+
+The split matters because `aiosqlite` binds internal asyncio primitives to
+the event loop where the connection was created. Each pounce worker runs
+its own event loop in a separate thread, so database connections must be
+created per-worker. Schema migration and seeding only need to happen once,
+so those stay in `on_startup`.
+
 ## Run
 
 ```bash
@@ -33,11 +53,15 @@ export ANTHROPIC_API_KEY="sk-..."
 # Install dependencies
 pip install chirp[ai,data]
 
-# Run
+# Run (single worker — dev mode)
+python examples/rag_demo/app.py
+
+# Run (multi-worker — install pounce first)
+pip install pounce
 python examples/rag_demo/app.py
 ```
 
-Open http://localhost:8000 and ask a question.
+Open http://127.0.0.1:8000 and ask a question.
 
 ## Zero JavaScript
 

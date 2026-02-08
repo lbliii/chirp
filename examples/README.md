@@ -56,6 +56,19 @@ pip install httpx  # or pip install chirp[all]
 cd examples/hackernews && python app.py
 ```
 
+### `rag_demo/` — RAG with Streaming AI Answers
+
+A documentation site with AI-powered Q&A. SQLite stores docs, Claude streams answers
+with cited sources. Demonstrates per-worker lifecycle hooks — global `on_startup` for
+schema migration, `on_worker_startup` / `on_worker_shutdown` for per-worker database
+connections via `ContextVar`. Multi-worker Pounce for free-threading.
+
+```bash
+pip install chirp[ai,data]
+export ANTHROPIC_API_KEY="sk-..."
+cd examples/rag_demo && python app.py
+```
+
 ## Patterns
 
 Lessons from building these examples — things that aren't bugs but require
@@ -131,27 +144,32 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | sse | dashboard | hackernews |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x |
-| Path parameters | x | x | | | x |
-| String returns | x | | | | |
-| Dict/JSON returns | x | | | | |
-| `Response` chaining | x | | | | |
-| `@app.error()` | x | | | | |
-| `Template` | | x | x | | x |
-| `Fragment` | | x | x | x | x |
-| `Stream` | | | | x | |
-| `request.is_fragment` | | x | | | x |
-| `@app.template_filter()` | | x | | x | x |
-| `EventStream` | | | x | x | x |
-| `SSEEvent` | | | x | | |
-| `{% cache %}` | | | | x | x |
-| `hx-swap-oob` | | | | x | x |
-| Multi-worker Pounce | | | | x | x |
-| `TestClient.fragment()` | | x | | | x |
-| `TestClient.sse()` | | | x | x | x |
-| `@app.on_startup` | | | | | x |
-| `httpx` (real API) | | | | | x |
-| Recursive `{% def %}` | | | | | x |
-| View Transitions | | | | | x |
+| Feature | hello | todo | sse | dashboard | hackernews | rag_demo |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x |
+| Path parameters | x | x | | | x | |
+| String returns | x | | | | | |
+| Dict/JSON returns | x | | | | | |
+| `Response` chaining | x | | | | | |
+| `@app.error()` | x | | | | | |
+| `Template` | | x | x | | x | x |
+| `Fragment` | | x | x | x | x | x |
+| `Stream` | | | | x | | |
+| `request.is_fragment` | | x | | | x | |
+| `@app.template_filter()` | | x | | x | x | |
+| `EventStream` | | | x | x | x | x |
+| `SSEEvent` | | | x | | | |
+| `{% cache %}` | | | | x | x | |
+| `hx-swap-oob` | | | | x | x | |
+| Multi-worker Pounce | | | | x | x | x |
+| `TestClient.fragment()` | | x | | | x | |
+| `TestClient.sse()` | | | x | x | x | |
+| `@app.on_startup` | | | | | x | x |
+| `@app.on_worker_startup` | | | | | x | x |
+| `@app.on_worker_shutdown` | | | | | x | x |
+| `httpx` (real API) | | | | | x | |
+| `chirp.data` (SQLite) | | | | | | x |
+| `chirp.ai` (LLM streaming) | | | | | | x |
+| `ContextVar` per-worker | | | | | x | x |
+| Recursive `{% def %}` | | | | | x | |
+| View Transitions | | | | | x | |

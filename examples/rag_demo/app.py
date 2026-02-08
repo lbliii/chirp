@@ -18,8 +18,15 @@ Architecture::
         ↓ llm.stream() — stream AI answer with context
         ↓ yield Fragment — re-rendered HTML block per token
     SSE → htmx swaps fragments into DOM
+
+Lifecycle (multi-worker)::
+
+    on_startup          → one-time schema migration + seeding (lifespan thread)
+    on_worker_startup   → per-worker DB connection (worker's event loop)
+    on_worker_shutdown  → per-worker DB disconnect
 """
 
+import contextvars
 from dataclasses import dataclass
 
 from chirp import App, AppConfig, EventStream, Fragment, Template
@@ -43,7 +50,18 @@ class Document:
 # -- Setup --
 
 app = App(AppConfig(template_dir="examples/rag_demo/templates", debug=True))
-db = Database("sqlite:///examples/rag_demo/docs.db")
+
+DB_URL = "sqlite:///examples/rag_demo/docs.db"
+
+# Per-worker database connection.  Each pounce worker thread runs its own
+# asyncio event loop.  aiosqlite binds internal asyncio primitives to the
+# loop where the connection is created, so we need one per worker.
+_db_var: contextvars.ContextVar[Database | None] = contextvars.ContextVar(
+    "rag_db", default=None,
+)
+
+# LLM is safe at module level — creates a fresh httpx.AsyncClient per
+# request, no shared connection pool.
 llm = LLM("anthropic:claude-sonnet-4-20250514")
 
 
@@ -67,11 +85,12 @@ async def ask(request) -> EventStream:
     question = (await request.form())["question"]
 
     # Data: find relevant documents
+    db = _db_var.get()
     sources = await db.fetch(
         Document,
         "SELECT id, title, content, url FROM docs WHERE content LIKE ? LIMIT 5",
         f"%{question}%",
-    )
+    ) if db else []
 
     # AI: stream answer with context
     context = "\n\n".join(f"# {d.title}\n{d.content}" for d in sources)
@@ -96,30 +115,49 @@ async def ask(request) -> EventStream:
 
 @app.on_startup
 async def setup() -> None:
-    """Initialize the database with sample docs."""
+    """One-time schema migration and seeding (global lifespan).
+
+    Creates a temporary DB connection to run DDL and seed data, then
+    disconnects.  This runs once before workers are spawned.
+    """
+    db = Database(DB_URL)
     await db.connect()
-    await db.execute("""
-        CREATE TABLE IF NOT EXISTS docs (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            url TEXT NOT NULL
-        )
-    """)
-    # Seed sample data if empty
-    count = await db.fetch_val("SELECT COUNT(*) FROM docs")
-    if count == 0:
-        for title, content, url in _SAMPLE_DOCS:
-            await db.execute(
-                "INSERT INTO docs (title, content, url) VALUES (?, ?, ?)",
-                title, content, url,
+    try:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS docs (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                url TEXT NOT NULL
             )
+        """)
+        # Seed sample data if empty
+        count = await db.fetch_val("SELECT COUNT(*) FROM docs")
+        if count == 0:
+            for title, content, url in _SAMPLE_DOCS:
+                await db.execute(
+                    "INSERT INTO docs (title, content, url) VALUES (?, ?, ?)",
+                    title, content, url,
+                )
+    finally:
+        await db.disconnect()
 
 
-@app.on_shutdown
-async def teardown() -> None:
-    """Close database connections."""
-    await db.disconnect()
+@app.on_worker_startup
+async def worker_start() -> None:
+    """Per-worker DB connection (bound to this worker's event loop)."""
+    db = Database(DB_URL)
+    await db.connect()
+    _db_var.set(db)
+
+
+@app.on_worker_shutdown
+async def worker_stop() -> None:
+    """Close per-worker DB connection."""
+    db = _db_var.get()
+    if db:
+        await db.disconnect()
+        _db_var.set(None)
 
 
 # -- Sample data --
@@ -161,5 +199,24 @@ _SAMPLE_DOCS = [
     ),
 ]
 
+# ---------------------------------------------------------------------------
+# Entry point — multi-worker Pounce for the full demo
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    app.run()
+    try:
+        from pounce.config import ServerConfig
+        from pounce.server import Server
+
+        app._ensure_frozen()
+        server_config = ServerConfig(host="127.0.0.1", port=8000, workers=4)
+        server = Server(server_config, app)
+        print("RAG Demo — Streaming AI Answers")
+        print("  http://127.0.0.1:8000")
+        print("  4 worker threads (free-threading)")
+        print()
+        server.run()
+    except ImportError:
+        # Pounce not installed — fall back to single-worker dev server
+        print("RAG Demo (single worker — install pounce for multi-worker)")
+        app.run()
