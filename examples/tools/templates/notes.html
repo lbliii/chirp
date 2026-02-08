@@ -1,0 +1,157 @@
+<html>
+<head>
+  <title>Notes &mdash; MCP Tools</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 1.5rem;
+    }
+    code { font-family: "SF Mono", Menlo, monospace; font-size: 0.85em; color: #94a3b8; }
+    .container { max-width: 860px; margin: 0 auto; }
+
+    /* Header */
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; font-weight: 600; color: #f8fafc; }
+    header p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+
+    /* Layout */
+    .columns {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+    }
+    @media (max-width: 640px) { .columns { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: #1e293b; border-radius: 0.75rem; padding: 1.25rem;
+    }
+    .panel h2 {
+      font-size: 0.8rem; color: #94a3b8; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    /* Form */
+    .note-form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+    .note-form input {
+      background: #0f172a; border: 1px solid #334155; border-radius: 0.375rem;
+      color: #e2e8f0; padding: 0.5rem 0.75rem; font-size: 0.875rem;
+    }
+    .note-form input::placeholder { color: #64748b; }
+    .note-form input:focus { outline: none; border-color: #3b82f6; }
+    .note-form button {
+      background: #3b82f6; color: #fff; border: none; border-radius: 0.375rem;
+      padding: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+    }
+    .note-form button:hover { background: #2563eb; }
+
+    /* Notes */
+    .note {
+      padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.875rem; display: flex; align-items: baseline; gap: 0.5rem;
+    }
+    .note:last-child { border-bottom: none; }
+    .note-text { color: #f1f5f9; }
+    .tag {
+      font-size: 0.7rem; color: #94a3b8; background: #334155;
+      padding: 0.1rem 0.4rem; border-radius: 0.25rem; white-space: nowrap;
+    }
+
+    /* Activity feed */
+    .activity-item {
+      padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.8rem; animation: fade-in 0.3s ease;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-header { display: flex; align-items: center; gap: 0.5rem; }
+    .tool-name { color: #f97316; font-weight: 600; font-family: "SF Mono", Menlo, monospace; }
+    .call-time { color: #475569; font-size: 0.7rem; font-family: "SF Mono", Menlo, monospace; }
+    .call-args { color: #64748b; font-size: 0.75rem; margin-top: 0.15rem; font-family: "SF Mono", Menlo, monospace; }
+
+    .empty { color: #475569; font-size: 0.8rem; font-style: italic; }
+
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.7rem; color: #4ade80; margin-left: 0.5rem;
+    }
+    .live-dot {
+      width: 6px; height: 6px; background: #4ade80;
+      border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    footer { text-align: center; margin-top: 2rem; font-size: 0.7rem; color: #334155; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Notes</h1>
+      <p>
+        Humans use the form &middot; AI agents use <code>/mcp</code>
+        <span class="live-badge"><span class="live-dot"></span> LIVE</span>
+      </p>
+    </header>
+
+    <div class="columns">
+      <!-- Notes panel -->
+      <div class="panel">
+        <h2>Notes</h2>
+        <form class="note-form" hx-post="/notes" hx-target="#note-list" hx-swap="outerHTML"
+              hx-on::after-request="this.reset()">
+          <input name="text" placeholder="What's on your mind?" required autocomplete="off">
+          <input name="tag" placeholder="Tag (optional)" autocomplete="off">
+          <button type="submit">Add Note</button>
+        </form>
+
+        {% block note_list %}
+        <div id="note-list">
+          {% for note in notes %}
+          <div class="note">
+            <span class="note-text">{{ note.text }}</span>
+            {% if note.tag %}<span class="tag">{{ note.tag }}</span>{% end %}
+          </div>
+          {% endfor %}
+          {% if not notes %}
+          <p class="empty">No notes yet.</p>
+          {% end %}
+        </div>
+        {% end %}
+      </div>
+
+      <!-- Activity panel -->
+      <div class="panel">
+        <h2>Agent Activity</h2>
+        <div id="activity" hx-ext="sse" sse-connect="/feed" sse-swap="fragment" hx-swap="afterbegin">
+          <p class="empty">Waiting for MCP tool calls&hellip;</p>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      MCP Tools &middot; Server-Sent Events &middot; htmx &middot; Free-threading
+    </footer>
+  </div>
+
+  {% block activity_row %}
+  {% if event is defined %}
+  <div class="activity-item">
+    <div class="activity-header">
+      <span class="tool-name">{{ event.tool_name }}</span>
+      <span class="call-time">{{ event.timestamp | format_time }}</span>
+    </div>
+    <div class="call-args">{{ event.arguments | format_args }}</div>
+  </div>
+  {% end %}
+  {% end %}
+</body>
+</html>

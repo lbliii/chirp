@@ -302,11 +302,20 @@ class App:
         self,
         host: str | None = None,
         port: int | None = None,
+        *,
+        lifecycle_collector: object | None = None,
     ) -> None:
         """Start the development server via pounce.
 
         Compiles the app (freezing routes, middleware, templates)
         and starts serving requests with auto-reload enabled.
+
+        Args:
+            host: Override bind host.
+            port: Override bind port.
+            lifecycle_collector: Optional Pounce LifecycleCollector for
+                observability.  Forwarded to the Pounce Server.
+
         """
         self._ensure_frozen()
 
@@ -315,7 +324,11 @@ class App:
 
         from chirp.server.dev import run_dev_server
 
-        run_dev_server(self, _host, _port, reload=self.config.debug)
+        run_dev_server(
+            self, _host, _port,
+            reload=self.config.debug,
+            lifecycle_collector=lifecycle_collector,
+        )
 
     # -- ASGI interface --
 

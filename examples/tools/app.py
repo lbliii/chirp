@@ -1,39 +1,32 @@
-"""MCP Tools — the simplest chirp app with tool support.
+"""MCP Tools — humans use forms, AI agents use /mcp.
 
-Registers Python functions as MCP tools that AI agents can discover
-and call via JSON-RPC at ``/mcp``. The same functions are also
-available to normal route handlers.
+Registers Python functions as MCP tools alongside normal HTTP routes.
+Open the app in a browser to see notes and a live activity feed.
+When an MCP client calls tools, activity appears in real-time via SSE.
 
 Run:
     python app.py
 
-Try with curl:
-    # Initialize MCP session
-    curl -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' \
-        -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}'
-
+Try the MCP endpoint with curl:
     # List available tools
     curl -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' \
-        -d '{"jsonrpc":"2.0","method":"tools/list","id":2,"params":{}}'
+        -d '{"jsonrpc":"2.0","method":"tools/list","id":1,"params":{}}'
 
-    # Add a note
+    # Add a note (watch it appear in the browser's activity feed!)
     curl -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' \
-        -d '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"add_note","arguments":{"text":"Buy milk","tag":"errands"}}}'
-
-    # List all notes
-    curl -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' \
-        -d '{"jsonrpc":"2.0","method":"tools/call","id":4,"params":{"name":"list_notes","arguments":{}}}'
-
-    # Search notes
-    curl -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' \
-        -d '{"jsonrpc":"2.0","method":"tools/call","id":5,"params":{"name":"search_notes","arguments":{"query":"milk"}}}'
+        -d '{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"add_note","arguments":{"text":"Hello from an agent!","tag":"mcp"}}}'
 """
 
 import threading
+from datetime import UTC, datetime
+from pathlib import Path
 
-from chirp import App
+from chirp import App, AppConfig, EventStream, Fragment, Request, Template
 
-app = App()
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+config = AppConfig(template_dir=TEMPLATES_DIR)
+app = App(config=config)
 
 # ---------------------------------------------------------------------------
 # In-memory storage — thread-safe for free-threading
@@ -45,7 +38,7 @@ _next_id = 1
 
 
 # ---------------------------------------------------------------------------
-# Tools — callable by MCP clients and route handlers alike
+# Tools — callable by MCP clients AND by route handlers
 # ---------------------------------------------------------------------------
 
 
@@ -73,13 +66,58 @@ def search_notes(query: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Routes — humans interact here, tools power the data
+# Template filters
+# ---------------------------------------------------------------------------
+
+
+@app.template_filter("format_args")
+def format_args(args: dict) -> str:
+    """Format tool call arguments for display."""
+    if not args:
+        return "\u2014"
+    parts = []
+    for k, v in args.items():
+        parts.append(f'{k}="{v}"' if isinstance(v, str) else f"{k}={v}")
+    return ", ".join(parts)
+
+
+@app.template_filter("format_time")
+def format_time(ts: float) -> str:
+    """Format a unix timestamp as HH:MM:SS."""
+    return datetime.fromtimestamp(ts, UTC).strftime("%H:%M:%S")
+
+
+# ---------------------------------------------------------------------------
+# Routes
 # ---------------------------------------------------------------------------
 
 
 @app.route("/")
 def index():
-    return {"notes": list_notes(), "tool_count": 3}
+    """Full page — notes list and activity feed."""
+    return Template("notes.html", notes=list_notes())
+
+
+@app.route("/notes", methods=["POST"])
+async def post_note(request: Request):
+    """Add a note via form submission — returns the notes list fragment."""
+    form = await request.form()
+    text = (form.get("text") or "").strip()
+    tag = (form.get("tag") or "").strip() or None
+    if text:
+        add_note(text, tag=tag)
+    return Fragment("notes.html", "note_list", notes=list_notes())
+
+
+@app.route("/feed")
+def feed():
+    """Stream tool call events via SSE for the live activity feed."""
+
+    async def generate():
+        async for event in app.tool_events.subscribe():
+            yield Fragment("notes.html", "activity_row", event=event)
+
+    return EventStream(generate())
 
 
 if __name__ == "__main__":

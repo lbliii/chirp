@@ -11,15 +11,50 @@ def _mcp(method: str, *, params: dict | None = None, rpc_id: int = 1) -> dict:
 
 
 class TestRoutes:
-    """Verify the HTTP routes still work alongside tools."""
+    """Verify the HTTP routes work alongside tools."""
 
-    async def test_index_returns_json(self, example_app) -> None:
+    async def test_index_renders_html(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
-            data = json.loads(response.text)
-            assert data["tool_count"] == 3
-            assert data["notes"] == []
+            assert "Notes" in response.text
+            assert "MCP tool calls" in response.text
+
+    async def test_index_shows_empty_state(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/")
+            assert "No notes yet" in response.text
+
+    async def test_post_note_via_form(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.post(
+                "/notes",
+                body=b"text=Buy+milk&tag=errands",
+                headers={"content-type": "application/x-www-form-urlencoded"},
+            )
+            assert response.status == 200
+            assert "Buy milk" in response.text
+            assert "errands" in response.text
+
+    async def test_post_empty_text_ignored(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            await client.post(
+                "/notes",
+                body=b"text=&tag=",
+                headers={"content-type": "application/x-www-form-urlencoded"},
+            )
+            response = await client.get("/")
+            assert "No notes yet" in response.text
+
+    async def test_notes_visible_after_add(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            await client.post(
+                "/notes",
+                body=b"text=Hello+world",
+                headers={"content-type": "application/x-www-form-urlencoded"},
+            )
+            response = await client.get("/")
+            assert "Hello world" in response.text
 
 
 class TestMCPHandshake:
@@ -55,7 +90,7 @@ class TestToolCalls:
 
     async def test_add_and_list(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            # Add a note
+            # Add a note via MCP
             response = await client.post(
                 "/mcp",
                 json=_mcp(
@@ -137,3 +172,20 @@ class TestToolCalls:
             body = json.loads(response.text)
             assert "error" in body
             assert "not found" in body["error"]["message"].lower()
+
+    async def test_mcp_note_visible_on_page(self, example_app) -> None:
+        """Notes added via MCP show up on the HTML page."""
+        async with TestClient(example_app) as client:
+            await client.post(
+                "/mcp",
+                json=_mcp(
+                    "tools/call",
+                    params={
+                        "name": "add_note",
+                        "arguments": {"text": "Agent note", "tag": "ai"},
+                    },
+                ),
+            )
+            response = await client.get("/")
+            assert "Agent note" in response.text
+            assert "ai" in response.text

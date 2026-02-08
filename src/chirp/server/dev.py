@@ -18,6 +18,7 @@ def run_dev_server(
     port: int,
     *,
     reload: bool = True,
+    lifecycle_collector: object | None = None,
 ) -> None:
     """Start a pounce dev server with the given chirp App.
 
@@ -30,6 +31,8 @@ def run_dev_server(
         host: Bind host address.
         port: Bind port number.
         reload: Enable auto-reload on file changes (default True).
+        lifecycle_collector: Optional Pounce LifecycleCollector for
+            observability.  Forwarded to the Pounce Server.
     """
     from pounce.config import ServerConfig
     from pounce.server import Server
@@ -40,5 +43,5 @@ def run_dev_server(
         workers=1,
         reload=reload,
     )
-    server = Server(config, app)
+    server = Server(config, app, lifecycle_collector=lifecycle_collector)
     server.run()
