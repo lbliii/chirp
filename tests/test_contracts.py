@@ -10,6 +10,7 @@ from chirp.contracts import (
     SSEContract,
     Severity,
     _attr_to_method,
+    _check_accessibility,
     _extract_targets_from_source,
     _path_matches_route,
     check_hypermedia_surface,
@@ -188,6 +189,92 @@ class TestCheckResult:
         assert "/missing" in summary
 
 
+class TestCheckAccessibility:
+    """_check_accessibility warns on hx-* attrs on non-interactive elements."""
+
+    def test_div_with_hx_get_warns(self):
+        html = '<div hx-get="/items">load</div>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "accessibility"
+        assert "<div>" in issues[0].message
+        assert "test.html" == issues[0].template
+
+    def test_span_with_hx_post_warns(self):
+        html = '<span class="btn" hx-post="/submit">go</span>'
+        issues = _check_accessibility(html, "form.html")
+        assert len(issues) == 1
+        assert "<span>" in issues[0].message
+
+    def test_button_is_interactive_no_warning(self):
+        html = '<button hx-post="/submit">go</button>'
+        issues = _check_accessibility(html, "form.html")
+        assert len(issues) == 0
+
+    def test_a_tag_is_interactive_no_warning(self):
+        html = '<a hx-get="/page" hx-push-url="true">link</a>'
+        issues = _check_accessibility(html, "nav.html")
+        assert len(issues) == 0
+
+    def test_input_is_interactive_no_warning(self):
+        html = '<input hx-get="/search" hx-trigger="keyup">'
+        issues = _check_accessibility(html, "search.html")
+        assert len(issues) == 0
+
+    def test_form_is_interactive_no_warning(self):
+        html = '<form hx-post="/submit">...</form>'
+        issues = _check_accessibility(html, "form.html")
+        assert len(issues) == 0
+
+    def test_div_with_role_no_warning(self):
+        html = '<div role="button" hx-get="/items">load</div>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 0
+
+    def test_div_with_tabindex_no_warning(self):
+        html = '<div tabindex="0" hx-get="/items">load</div>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 0
+
+    def test_div_with_role_and_tabindex_no_warning(self):
+        html = '<div role="button" tabindex="0" hx-post="/action">do</div>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 0
+
+    def test_multiple_elements_mixed(self):
+        html = """
+        <button hx-post="/ok">good</button>
+        <div hx-get="/bad">bad</div>
+        <a hx-get="/fine">fine</a>
+        <span hx-delete="/also-bad">bad</span>
+        <li role="button" hx-get="/ok-with-role">ok</li>
+        """
+        issues = _check_accessibility(html, "mixed.html")
+        # Only <div> and <span> should warn (li has role)
+        assert len(issues) == 2
+        messages = [i.message for i in issues]
+        assert any("<div>" in m for m in messages)
+        assert any("<span>" in m for m in messages)
+
+    def test_no_hx_url_attrs_no_warnings(self):
+        html = '<div class="container"><span>text</span></div>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 0
+
+    def test_section_with_hx_get_warns(self):
+        html = '<section hx-get="/content">loading...</section>'
+        issues = _check_accessibility(html, "test.html")
+        assert len(issues) == 1
+        assert "<section>" in issues[0].message
+
+    def test_tr_with_hx_get_warns(self):
+        html = '<tr hx-get="/row/1">...</tr>'
+        issues = _check_accessibility(html, "table.html")
+        assert len(issues) == 1
+        assert "<tr>" in issues[0].message
+
+
 class TestCheckHypermediaSurface:
     """Integration test for the full hypermedia check."""
 
@@ -263,3 +350,51 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert result.ok
         assert result.targets_found == 2
+
+    def test_accessibility_warnings_in_surface_check(self, tmp_path):
+        """Accessibility warnings surface through the full check."""
+        (tmp_path / "index.html").write_text(
+            '<div hx-get="/api/items">load</div>'
+            '<button hx-post="/api/items">add</button>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        @app.route("/api/items", methods=["POST"])
+        async def create_item():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        # Routes match, so no errors — but div triggers a11y warning
+        assert result.ok
+        a11y_warnings = [
+            i for i in result.warnings if i.category == "accessibility"
+        ]
+        assert len(a11y_warnings) == 1
+        assert "<div>" in a11y_warnings[0].message
+
+    def test_no_accessibility_warnings_when_all_interactive(self, tmp_path):
+        """No a11y warnings when all htmx attrs are on interactive elements."""
+        (tmp_path / "index.html").write_text(
+            '<a hx-get="/api/items">load</a>'
+            '<button hx-post="/api/items">add</button>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        @app.route("/api/items", methods=["POST"])
+        async def create_item():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        assert result.ok
+        a11y_warnings = [
+            i for i in result.warnings if i.category == "accessibility"
+        ]
+        assert len(a11y_warnings) == 0

@@ -14,7 +14,7 @@ from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, Response, SSEResponse, StreamingResponse
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
-from chirp.templating.returns import Fragment, Page, Stream, Template, ValidationError
+from chirp.templating.returns import Fragment, OOB, Page, Stream, Template, ValidationError
 from chirp.templating.streaming import has_async_context, render_stream_async
 
 if TYPE_CHECKING:
@@ -37,14 +37,15 @@ def negotiate(
     4. ``Fragment``         -> render block via kida -> Response
     5. ``Page``             -> Template or Fragment based on request headers
     6. ``ValidationError``  -> Fragment + 422 + optional HX-Retarget
-    7. ``Stream``           -> kida render_stream() -> StreamingResponse
+    7. ``OOB``              -> primary + hx-swap-oob fragments
+    8. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    8. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
-    9. ``str``              -> 200, text/html
-    10. ``bytes``           -> 200, application/octet-stream
-    11. ``dict`` / ``list`` -> 200, application/json
-    12. ``(value, int)``    -> negotiate value, override status
-    13. ``(value, int, dict)`` -> negotiate value, override status + headers
+    9. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    10. ``str``             -> 200, text/html
+    11. ``bytes``           -> 200, application/octet-stream
+    12. ``dict`` / ``list`` -> 200, application/json
+    13. ``(value, int)``    -> negotiate value, override status
+    14. ``(value, int, dict)`` -> negotiate value, override status + headers
     """
     match value:
         case Response():
@@ -107,6 +108,26 @@ def negotiate(
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
+        case OOB():
+            if kida_env is None:
+                msg = (
+                    "OOB return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            # Render the primary fragment/template
+            main_response = negotiate(value.main, kida_env=kida_env, request=request)
+            parts: list[str] = [main_response.text if isinstance(main_response, Response)
+                                else ""]
+            # Render each OOB fragment and wrap with hx-swap-oob
+            for frag in value.oob_fragments:
+                html = render_fragment(kida_env, frag)
+                target_id = frag.target if frag.target is not None else frag.block_name
+                parts.append(
+                    f'<div id="{target_id}" hx-swap-oob="true">{html}</div>'
+                )
+            body = "\n".join(parts)
+            return Response(body=body, content_type="text/html; charset=utf-8")
         case Stream():
             if kida_env is None:
                 msg = (

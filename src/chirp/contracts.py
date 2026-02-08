@@ -137,6 +137,59 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
     return targets
 
 
+# ---------------------------------------------------------------------------
+# Accessibility scanner — htmx on non-interactive elements
+# ---------------------------------------------------------------------------
+
+# Elements that are natively interactive (keyboard-focusable, have roles)
+_INTERACTIVE_ELEMENTS = frozenset({
+    "a", "button", "input", "select", "textarea", "form", "details", "summary",
+})
+
+# Regex: capture the opening tag surrounding an hx-* URL attribute.
+# Matches e.g. <div class="card" hx-get="/items" hx-target="#main">
+# Group 1: tag name, Group 0: full opening tag up to the hx- attr.
+_HX_TAG_PATTERN = re.compile(
+    r"<(\w+)\b([^>]*?)\s+(?:hx-(?:get|post|put|patch|delete))\s*=",
+    re.IGNORECASE,
+)
+
+
+def _check_accessibility(source: str, template_name: str) -> list[ContractIssue]:
+    """Check for htmx URL attributes on non-interactive elements.
+
+    Warns when ``hx-get``, ``hx-post``, etc. appear on elements like
+    ``<div>`` or ``<span>`` without ``role`` or ``tabindex`` attributes
+    that would make them accessible to keyboard and screen reader users.
+    """
+    issues: list[ContractIssue] = []
+    for match in _HX_TAG_PATTERN.finditer(source):
+        tag_name = match.group(1).lower()
+        if tag_name in _INTERACTIVE_ELEMENTS:
+            continue
+        # Check the preceding attributes in this tag for role or tabindex
+        preceding_attrs = match.group(2)
+        full_tag_end = source.find(">", match.end())
+        trailing_attrs = source[match.end():full_tag_end] if full_tag_end != -1 else ""
+        all_attrs = preceding_attrs + " " + trailing_attrs
+        has_role = "role=" in all_attrs.lower()
+        has_tabindex = "tabindex=" in all_attrs.lower()
+        if not has_role and not has_tabindex:
+            # Find which hx- attribute triggered this
+            hx_match = re.search(r"hx-(?:get|post|put|patch|delete)", all_attrs)
+            hx_attr = hx_match.group(0) if hx_match else "hx-*"
+            issues.append(ContractIssue(
+                severity=Severity.WARNING,
+                category="accessibility",
+                message=(
+                    f"{hx_attr} on <{tag_name}> — use <button> or <a>, "
+                    f"or add role=\"button\" tabindex=\"0\" for accessibility."
+                ),
+                template=template_name,
+            ))
+    return issues
+
+
 def _attr_to_method(attr: str) -> str:
     """Map an htmx attribute name to its HTTP method."""
     if attr == "action":
@@ -244,8 +297,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
        HTML resolves to a registered route with the correct method.
     3. **Form actions**: Every ``action="/path"`` in template HTML
        resolves to a registered route.
-    4. **Orphan routes**: Routes that are never referenced from templates
+    4. **Accessibility**: htmx URL attributes on non-interactive elements
+       (``<div>``, ``<span>``, etc.) without ``role`` or ``tabindex``
        (warning, not error).
+    5. **Orphan routes**: Routes that are never referenced from templates
+       (info, not error).
 
     Args:
         app: A frozen Chirp application.
@@ -355,7 +411,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         template=tmpl_name,
                     ))
 
-        # 4. Check for orphan routes (routes never referenced from templates)
+        # 4. Check accessibility — htmx on non-interactive elements
+        for tmpl_name, source in template_sources.items():
+            a11y_issues = _check_accessibility(source, tmpl_name)
+            result.issues.extend(a11y_issues)
+
+        # 5. Check for orphan routes (routes never referenced from templates)
         for route_path in route_paths:
             if route_path not in referenced_paths and route_path != "/":
                 result.issues.append(ContractIssue(

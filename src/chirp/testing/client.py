@@ -102,13 +102,34 @@ class TestClient:
         path: str,
         *,
         method: str = "GET",
+        target: str | None = None,
+        trigger: str | None = None,
+        history_restore: bool = False,
         headers: dict[str, str] | None = None,
+        body: bytes | None = None,
     ) -> Response:
-        """Send a fragment request (sets HX-Request header)."""
-        fragment_headers = {"HX-Request": "true"}
+        """Send a fragment request (sets HX-Request header).
+
+        Args:
+            path: The URL path to request.
+            method: HTTP method (default GET).
+            target: Sets the ``HX-Target`` header (element ID being targeted).
+            trigger: Sets the ``HX-Trigger`` header (element that triggered).
+            history_restore: If True, sets ``HX-History-Restore-Request: true``
+                to simulate a back/forward navigation cache miss.
+            headers: Additional headers to include.
+            body: Request body bytes (for POST/PUT).
+        """
+        fragment_headers: dict[str, str] = {"HX-Request": "true"}
+        if target is not None:
+            fragment_headers["HX-Target"] = target
+        if trigger is not None:
+            fragment_headers["HX-Trigger"] = trigger
+        if history_restore:
+            fragment_headers["HX-History-Restore-Request"] = "true"
         if headers:
             fragment_headers.update(headers)
-        return await self.request(method, path, headers=fragment_headers)
+        return await self.request(method, path, headers=fragment_headers, body=body)
 
     async def sse(
         self,

@@ -29,18 +29,36 @@ class Template:
 class Fragment:
     """Render a named block from a kida template.
 
+    When used inside an ``OOB`` response, *target* specifies the DOM
+    element ID for the out-of-band swap.  If *target* is ``None``
+    (the default), the block name is used as the target ID.
+
     Usage::
 
         return Fragment("search.html", "results_list", results=results)
+
+    With explicit OOB target::
+
+        Fragment("cart.html", "counter", target="cart-counter", count=5)
     """
 
     template_name: str
     block_name: str
+    target: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, template_name: str, block_name: str, /, **context: Any) -> None:
+    def __init__(
+        self,
+        template_name: str,
+        block_name: str,
+        /,
+        *,
+        target: str | None = None,
+        **context: Any,
+    ) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
+        object.__setattr__(self, "target", target)
         object.__setattr__(self, "context", context)
 
 
@@ -144,3 +162,41 @@ class Stream:
     def __init__(self, template_name: str, /, **context: Any) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "context", context)
+
+
+@dataclass(frozen=True, slots=True)
+class OOB:
+    """Compose a primary response with out-of-band fragment swaps.
+
+    htmx processes the first element as the normal swap target, then
+    scans for elements with ``hx-swap-oob`` and swaps them into the
+    page by ID.  ``OOB`` renders all fragments into a single HTML
+    response with the correct attributes.
+
+    Each OOB fragment's target ID defaults to its ``block_name``
+    (convention), but can be overridden via ``Fragment(..., target="id")``.
+
+    Usage::
+
+        return OOB(
+            Fragment("products.html", "list", products=products),
+            Fragment("cart.html", "counter", count=new_count),
+            Fragment("notifications.html", "badge", unread=3),
+        )
+
+    The first fragment is the primary swap target.  All subsequent
+    fragments are rendered with ``hx-swap-oob="true"`` and an ``id``
+    matching their target.
+    """
+
+    main: Fragment | Template | Page
+    oob_fragments: tuple[Fragment, ...]
+
+    def __init__(
+        self,
+        main: Fragment | Template | Page,
+        /,
+        *oob_fragments: Fragment,
+    ) -> None:
+        object.__setattr__(self, "main", main)
+        object.__setattr__(self, "oob_fragments", oob_fragments)
