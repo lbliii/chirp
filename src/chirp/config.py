@@ -36,5 +36,8 @@ class AppConfig:
     # SSE
     sse_heartbeat_interval: float = 15.0
 
+    # MCP (Model Context Protocol)
+    mcp_path: str = "/mcp"
+
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB

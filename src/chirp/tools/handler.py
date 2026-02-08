@@ -1,23 +1,22 @@
-"""MCP JSON-RPC protocol handler over ASGI.
+"""MCP JSON-RPC protocol handler.
 
-Handles the Model Context Protocol's Streamable HTTP transport at a
-dedicated path (default: ``/mcp``). Receives JSON-RPC POST requests,
-dispatches to the tool registry, and sends JSON-RPC responses.
+Handles the Model Context Protocol's Streamable HTTP transport.
+Receives a chirp ``Request``, returns a chirp ``Response`` — this means
+it participates in the normal middleware pipeline (auth, CORS, rate
+limiting all apply).
 
 Implements the minimal MCP surface for v1:
     - ``initialize`` — capability negotiation (tools only)
+    - ``notifications/initialized`` — client acknowledgment (no-op)
     - ``tools/list`` — return registered tool schemas
     - ``tools/call`` — dispatch to tool handler, return result
-
-This is a dedicated ASGI handler (like ``realtime/sse.py``), not a
-regular chirp route. It receives raw ASGI scope/receive/send and
-handles JSON-RPC framing itself.
 """
 
 import json as json_module
 from typing import Any
 
-from chirp._internal.asgi import Receive, Scope, Send
+from chirp.http.request import Request
+from chirp.http.response import Response
 from chirp.tools.registry import ToolRegistry
 
 # MCP protocol version
@@ -34,88 +33,98 @@ _SERVER_CAPABILITIES = {
 }
 
 
-async def handle_mcp(
-    scope: Scope,
-    receive: Receive,
-    send: Send,
-    *,
+async def handle_mcp_request(
+    request: Request,
     registry: ToolRegistry,
-) -> None:
-    """Handle an MCP JSON-RPC request over HTTP.
+) -> Response:
+    """Handle an MCP JSON-RPC request.
 
-    Reads the full request body, parses the JSON-RPC envelope, dispatches
-    to the appropriate method, and sends a JSON-RPC response.
+    Takes a chirp Request, returns a chirp Response. This function is
+    called from within the middleware pipeline in ``handle_request()``,
+    so all middleware (auth, CORS, rate limiting) applies.
     """
-    method = scope.get("method", "GET")
-
     # MCP Streamable HTTP: only POST carries JSON-RPC
-    if method != "POST":
-        await _send_json(send, status=405, body={
+    if request.method != "POST":
+        return _json_response(405, {
             "jsonrpc": "2.0",
             "error": {"code": -32600, "message": "Method not allowed. Use POST."},
             "id": None,
         })
-        return
 
     # Read request body
-    body = await _read_body(receive)
+    body = await request.body()
     if not body:
-        await _send_json(send, status=400, body={
+        return _json_response(400, {
             "jsonrpc": "2.0",
             "error": {"code": -32700, "message": "Empty request body"},
             "id": None,
         })
-        return
 
     # Parse JSON-RPC
     try:
-        request = json_module.loads(body)
+        rpc_request = json_module.loads(body)
     except json_module.JSONDecodeError:
-        await _send_json(send, status=400, body={
+        return _json_response(400, {
             "jsonrpc": "2.0",
             "error": {"code": -32700, "message": "Parse error"},
             "id": None,
         })
-        return
 
     # Validate JSON-RPC structure
-    if not isinstance(request, dict):
-        await _send_json(send, status=400, body={
+    if not isinstance(rpc_request, dict):
+        return _json_response(400, {
             "jsonrpc": "2.0",
             "error": {"code": -32600, "message": "Invalid request — expected object"},
             "id": None,
         })
-        return
 
-    rpc_method = request.get("method")
-    rpc_id = request.get("id")
-    params = request.get("params", {})
+    rpc_method = rpc_request.get("method")
+    rpc_id = rpc_request.get("id")
+    params = rpc_request.get("params", {})
+
+    # JSON-RPC notifications have no "id" — they expect no response.
+    # MCP's notifications/initialized is the primary example.
+    is_notification = "id" not in rpc_request
 
     if not rpc_method:
-        await _send_json(send, status=400, body={
+        return _json_response(400, {
             "jsonrpc": "2.0",
             "error": {"code": -32600, "message": "Missing 'method' field"},
             "id": rpc_id,
         })
-        return
+
+    # Handle notifications (no response expected)
+    if is_notification:
+        return _handle_notification(rpc_method)
 
     # Dispatch to MCP methods
     result = await _dispatch(rpc_method, params, registry=registry)
 
     if isinstance(result, dict) and "error" in result:
-        # Error response
-        await _send_json(send, status=200, body={
+        return _json_response(200, {
             "jsonrpc": "2.0",
             "error": result["error"],
             "id": rpc_id,
         })
-    else:
-        # Success response
-        await _send_json(send, status=200, body={
-            "jsonrpc": "2.0",
-            "result": result,
-            "id": rpc_id,
-        })
+
+    return _json_response(200, {
+        "jsonrpc": "2.0",
+        "result": result,
+        "id": rpc_id,
+    })
+
+
+def _handle_notification(method: str) -> Response:
+    """Handle a JSON-RPC notification (no response expected).
+
+    MCP clients send ``notifications/initialized`` after the initialize
+    handshake completes. Per JSON-RPC spec, notifications have no ``id``
+    and the server MUST NOT reply. We return 204 No Content.
+    """
+    # Accept all notifications silently — notifications/initialized
+    # is the common case, but future MCP versions may add others.
+    _ = method  # acknowledged but not dispatched
+    return Response(body="", status=204)
 
 
 async def _dispatch(
@@ -187,39 +196,10 @@ def _format_result(result: Any) -> dict[str, Any]:
     return {"type": "text", "text": str(result)}
 
 
-# -- ASGI helpers --
-
-
-async def _read_body(receive: Receive) -> bytes:
-    """Read the full request body from ASGI receive."""
-    chunks: list[bytes] = []
-    while True:
-        message = await receive()
-        body = message.get("body", b"")
-        if body:
-            chunks.append(body)
-        if not message.get("more_body", False):
-            break
-    return b"".join(chunks)
-
-
-async def _send_json(
-    send: Send,
-    *,
-    status: int,
-    body: dict[str, Any],
-) -> None:
-    """Send a JSON response over ASGI."""
-    payload = json_module.dumps(body, default=str).encode("utf-8")
-    await send({
-        "type": "http.response.start",
-        "status": status,
-        "headers": [
-            (b"content-type", b"application/json"),
-            (b"content-length", str(len(payload)).encode("latin-1")),
-        ],
-    })
-    await send({
-        "type": "http.response.body",
-        "body": payload,
-    })
+def _json_response(status: int, body: dict[str, Any]) -> Response:
+    """Build a chirp Response with JSON content."""
+    return Response(
+        body=json_module.dumps(body, default=str),
+        status=status,
+        content_type="application/json; charset=utf-8",
+    )

@@ -341,18 +341,6 @@ class App:
 
         assert self._router is not None
 
-        # Intercept MCP requests at /mcp before normal routing
-        if (
-            scope["type"] == "http"
-            and scope.get("path") == "/mcp"
-            and self._tool_registry is not None
-            and len(self._tool_registry) > 0
-        ):
-            from chirp.tools.handler import handle_mcp
-
-            await handle_mcp(scope, receive, send, registry=self._tool_registry)
-            return
-
         await handle_request(
             scope,
             receive,
@@ -362,6 +350,8 @@ class App:
             error_handlers=self._error_handlers,
             kida_env=self._kida_env,
             debug=self.config.debug,
+            tool_registry=self._tool_registry,
+            mcp_path=self.config.mcp_path,
         )
 
     async def _handle_lifespan(
@@ -401,6 +391,8 @@ class App:
                     result = hook()
                     if inspect.isawaitable(result):
                         await result
+                # Close tool event bus so SSE subscribers disconnect cleanly
+                self._tool_events.close()
                 await send({"type": "lifespan.shutdown.complete"})
                 return
 

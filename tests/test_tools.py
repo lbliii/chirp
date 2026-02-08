@@ -8,7 +8,11 @@ from typing import Any
 import pytest
 
 from chirp.app import App
+from chirp.config import AppConfig
+from chirp.http.request import Request
+from chirp.http.response import Response
 from chirp.tools.events import ToolCallEvent, ToolEventBus
+from chirp.tools.handler import handle_mcp_request
 from chirp.tools.registry import ToolDef, ToolRegistry, compile_tools
 from chirp.tools.schema import function_to_schema
 
@@ -75,8 +79,6 @@ class TestFunctionToSchema:
 
     def test_request_param_excluded(self) -> None:
         """Parameters named 'request' or annotated as Request are excluded."""
-        from chirp.http.request import Request
-
         def func(request: Request, query: str) -> None:
             pass
 
@@ -380,60 +382,54 @@ class TestToolRegistryEvents:
 
 
 # =============================================================================
-# MCP handler tests
+# MCP handler tests (Request/Response level)
 # =============================================================================
 
 
-class TestMCPHandler:
-    """Test the MCP JSON-RPC protocol handler over ASGI."""
+def _make_request(
+    *,
+    method: str = "POST",
+    path: str = "/mcp",
+    body: dict | bytes | None = None,
+) -> Request:
+    """Build a chirp Request for MCP handler tests."""
+    if isinstance(body, dict):
+        raw_body = json.dumps(body).encode("utf-8")
+    elif isinstance(body, bytes):
+        raw_body = body
+    else:
+        raw_body = b""
 
-    async def _call_mcp(
-        self,
-        registry: ToolRegistry,
-        *,
-        method: str = "POST",
-        body: dict | bytes | None = None,
-    ) -> tuple[int, dict]:
-        """Simulate an ASGI HTTP request to the MCP handler."""
-        from chirp.tools.handler import handle_mcp
+    body_sent = False
 
-        scope: dict[str, Any] = {
+    async def receive():
+        nonlocal body_sent
+        if not body_sent:
+            body_sent = True
+            return {"type": "http.request", "body": raw_body, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    return Request.from_asgi(
+        {
             "type": "http",
             "method": method,
-            "path": "/mcp",
+            "path": path,
             "headers": [(b"content-type", b"application/json")],
-        }
+            "query_string": b"",
+        },
+        receive,
+    )
 
-        # Build receive callable
-        if isinstance(body, dict):
-            raw_body = json.dumps(body).encode("utf-8")
-        elif isinstance(body, bytes):
-            raw_body = body
-        else:
-            raw_body = b""
 
-        body_sent = False
+def _parse_response(response: Response) -> tuple[int, dict]:
+    """Extract status and JSON body from a chirp Response."""
+    body_bytes = response.body_bytes
+    body = json.loads(body_bytes) if body_bytes else {}
+    return response.status, body
 
-        async def receive():
-            nonlocal body_sent
-            if not body_sent:
-                body_sent = True
-                return {"type": "http.request", "body": raw_body, "more_body": False}
-            return {"type": "http.disconnect"}
 
-        # Capture response
-        status = 0
-        response_body = b""
-
-        async def send(message):
-            nonlocal status, response_body
-            if message["type"] == "http.response.start":
-                status = message["status"]
-            elif message["type"] == "http.response.body":
-                response_body += message.get("body", b"")
-
-        await handle_mcp(scope, receive, send, registry=registry)
-        return status, json.loads(response_body) if response_body else {}
+class TestMCPHandler:
+    """Test the MCP JSON-RPC protocol handler at the Request/Response level."""
 
     def _make_registry(self) -> ToolRegistry:
         async def search(query: str, limit: int = 10) -> list[dict]:
@@ -453,10 +449,11 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_initialize(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
+        request = _make_request(
             body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
         )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         assert body["id"] == 1
         assert "protocolVersion" in body["result"]
@@ -466,10 +463,11 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_list(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
+        request = _make_request(
             body={"jsonrpc": "2.0", "method": "tools/list", "id": 2, "params": {}},
         )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         tools = body["result"]["tools"]
         assert len(tools) == 2
@@ -479,10 +477,11 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_list_schema(self) -> None:
         registry = self._make_registry()
-        _status, body = await self._call_mcp(
-            registry,
+        request = _make_request(
             body={"jsonrpc": "2.0", "method": "tools/list", "id": 3, "params": {}},
         )
+        response = await handle_mcp_request(request, registry)
+        _status, body = _parse_response(response)
         tools = body["result"]["tools"]
         search_tool = next(t for t in tools if t["name"] == "search")
         schema = search_tool["inputSchema"]
@@ -493,15 +492,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body={
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "id": 4,
-                "params": {"name": "greet", "arguments": {"name": "World"}},
-            },
-        )
+        request = _make_request(body={
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "id": 4,
+            "params": {"name": "greet", "arguments": {"name": "World"}},
+        })
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         assert body["id"] == 4
         content = body["result"]["content"]
@@ -512,15 +510,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call_async(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body={
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "id": 5,
-                "params": {"name": "search", "arguments": {"query": "test"}},
-            },
-        )
+        request = _make_request(body={
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "id": 5,
+            "params": {"name": "search", "arguments": {"query": "test"}},
+        })
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         content = body["result"]["content"]
         result = json.loads(content[0]["text"])
@@ -529,15 +526,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call_not_found(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body={
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "id": 6,
-                "params": {"name": "missing", "arguments": {}},
-            },
-        )
+        request = _make_request(body={
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "id": 6,
+            "params": {"name": "missing", "arguments": {}},
+        })
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         assert "error" in body
         assert body["error"]["code"] == -32602
@@ -545,10 +541,11 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_method_not_found(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body={"jsonrpc": "2.0", "method": "unknown/method", "id": 7, "params": {}},
-        )
+        request = _make_request(body={
+            "jsonrpc": "2.0", "method": "unknown/method", "id": 7, "params": {},
+        })
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 200
         assert "error" in body
         assert body["error"]["code"] == -32601
@@ -556,47 +553,86 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_invalid_json(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body=b"not json{{{",
-        )
+        request = _make_request(body=b"not json{{{")
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 400
         assert body["error"]["code"] == -32700
 
     @pytest.mark.asyncio
     async def test_empty_body(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body=b"",
-        )
+        request = _make_request(body=b"")
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 400
         assert body["error"]["code"] == -32700
 
     @pytest.mark.asyncio
     async def test_get_method_rejected(self) -> None:
         registry = self._make_registry()
-        status, _body = await self._call_mcp(
-            registry,
-            method="GET",
-            body=None,
-        )
-        assert status == 405
+        request = _make_request(method="GET")
+        response = await handle_mcp_request(request, registry)
+        assert response.status == 405
 
     @pytest.mark.asyncio
     async def test_missing_rpc_method(self) -> None:
         registry = self._make_registry()
-        status, body = await self._call_mcp(
-            registry,
-            body={"jsonrpc": "2.0", "id": 8},
-        )
+        request = _make_request(body={"jsonrpc": "2.0", "id": 8})
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
         assert status == 400
         assert body["error"]["code"] == -32600
+
+    @pytest.mark.asyncio
+    async def test_notifications_initialized(self) -> None:
+        """notifications/initialized has no id — server returns 204."""
+        registry = self._make_registry()
+        request = _make_request(body={
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            # No "id" — this is a JSON-RPC notification
+        })
+        response = await handle_mcp_request(request, registry)
+        assert response.status == 204
+
+    @pytest.mark.asyncio
+    async def test_notification_unknown_method(self) -> None:
+        """Any notification (no id) gets 204, even for unknown methods."""
+        registry = self._make_registry()
+        request = _make_request(body={
+            "jsonrpc": "2.0",
+            "method": "notifications/something_else",
+        })
+        response = await handle_mcp_request(request, registry)
+        assert response.status == 204
 
 
 # =============================================================================
 # App integration tests
 # =============================================================================
+
+
+def _make_asgi_harness() -> (
+    tuple[
+        Any,  # receive
+        Any,  # send
+        dict,  # result container {status, body}
+    ]
+):
+    """Build ASGI receive/send for app integration tests."""
+    result: dict[str, Any] = {"status": 0, "body": b""}
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict) -> None:
+        if message["type"] == "http.response.start":
+            result["status"] = message["status"]
+        elif message["type"] == "http.response.body":
+            result["body"] += message.get("body", b"")
+
+    return receive, send, result
 
 
 class TestAppToolIntegration:
@@ -742,3 +778,174 @@ class TestAppToolIntegration:
 
         assert status == 200
         assert b"This is a regular page" in response_body
+
+    @pytest.mark.asyncio
+    async def test_middleware_applies_to_mcp(self) -> None:
+        """Middleware runs on MCP requests (auth, CORS, etc.)."""
+        app = App()
+        middleware_called = False
+
+        async def tracking_middleware(request, next):
+            nonlocal middleware_called
+            middleware_called = True
+            response = await next(request)
+            return response.with_header("X-Middleware", "applied")
+
+        app.add_middleware(tracking_middleware)
+
+        @app.route("/")
+        def index():
+            return "hello"
+
+        @app.tool("echo", description="Echo")
+        def echo(message: str) -> str:
+            return message
+
+        body = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": 1,
+            "params": {},
+        }).encode("utf-8")
+
+        body_sent = False
+
+        async def receive():
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        status = 0
+        response_body = b""
+        response_headers: list[tuple[bytes, bytes]] = []
+
+        async def send(message):
+            nonlocal status, response_body
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                response_headers.extend(message.get("headers", []))
+            elif message["type"] == "http.response.body":
+                response_body += message.get("body", b"")
+
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "POST",
+            "path": "/mcp",
+            "headers": [(b"content-type", b"application/json")],
+            "query_string": b"",
+        }
+
+        await app(scope, receive, send)
+
+        assert status == 200
+        assert middleware_called
+        # Check the middleware header was applied
+        header_dict = dict(response_headers)
+        assert header_dict.get(b"x-middleware") == b"applied"
+
+    @pytest.mark.asyncio
+    async def test_configurable_mcp_path(self) -> None:
+        """MCP endpoint respects AppConfig.mcp_path."""
+        config = AppConfig(mcp_path="/api/mcp")
+        app = App(config=config)
+
+        @app.route("/")
+        def index():
+            return "hello"
+
+        @app.tool("echo", description="Echo")
+        def echo(message: str) -> str:
+            return message
+
+        body = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": 1,
+            "params": {},
+        }).encode("utf-8")
+
+        body_sent = False
+
+        async def receive():
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        status = 0
+        response_body = b""
+
+        async def send(message):
+            nonlocal status, response_body
+            if message["type"] == "http.response.start":
+                status = message["status"]
+            elif message["type"] == "http.response.body":
+                response_body += message.get("body", b"")
+
+        # Hit the custom path
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/mcp",
+            "headers": [(b"content-type", b"application/json")],
+            "query_string": b"",
+        }
+
+        await app(scope, receive, send)
+
+        assert status == 200
+        result = json.loads(response_body)
+        assert "tools" in result["result"]
+
+    @pytest.mark.asyncio
+    async def test_lifespan_shutdown_closes_event_bus(self) -> None:
+        """Lifespan shutdown calls ToolEventBus.close()."""
+        app = App()
+
+        @app.route("/")
+        def index():
+            return "hello"
+
+        @app.tool("echo", description="Echo")
+        def echo(message: str) -> str:
+            return message
+
+        # Start a subscriber
+        subscriber_done = False
+
+        async def subscriber():
+            nonlocal subscriber_done
+            async for _event in app.tool_events.subscribe():
+                pass
+            subscriber_done = True
+
+        task = asyncio.create_task(subscriber())
+        await asyncio.sleep(0.01)
+
+        # Simulate lifespan startup + shutdown
+        messages = iter([
+            {"type": "lifespan.startup"},
+            {"type": "lifespan.shutdown"},
+        ])
+
+        async def receive():
+            return next(messages)
+
+        sends: list[dict] = []
+
+        async def send(message):
+            sends.append(message)
+
+        await app({"type": "lifespan"}, receive, send)
+
+        # The subscriber should have been signaled to stop
+        await asyncio.wait_for(task, timeout=2.0)
+        assert subscriber_done
+
+        # Verify lifespan completed normally
+        send_types = [s["type"] for s in sends]
+        assert "lifespan.startup.complete" in send_types
+        assert "lifespan.shutdown.complete" in send_types

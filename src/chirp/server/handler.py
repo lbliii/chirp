@@ -23,6 +23,7 @@ from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
 from chirp.server.negotiation import negotiate
 from chirp.server.sender import send_response, send_streaming_response
+from chirp.tools.registry import ToolRegistry
 
 
 async def handle_request(
@@ -35,6 +36,8 @@ async def handle_request(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None = None,
     debug: bool,
+    tool_registry: ToolRegistry | None = None,
+    mcp_path: str = "/mcp",
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -47,8 +50,18 @@ async def handle_request(
     token: Token[Request] = request_var.set(request)
 
     try:
-        # Build the innermost handler (router dispatch)
+        # Build the innermost handler (router dispatch + MCP)
         async def dispatch(req: Request) -> AnyResponse:
+            # MCP endpoint — dispatched inside middleware so auth/CORS apply
+            if (
+                tool_registry is not None
+                and len(tool_registry) > 0
+                and req.path == mcp_path
+            ):
+                from chirp.tools.handler import handle_mcp_request
+
+                return await handle_mcp_request(req, tool_registry)
+
             match = router.match(req.method, req.path)
             return await _invoke_handler(match, req, kida_env=kida_env)
 
