@@ -114,6 +114,18 @@ without cloud API keys.
 cd examples/ollama && python app.py
 ```
 
+### `tools/` — MCP Tools with Live Activity Feed
+
+Registers Python functions as MCP tools alongside normal HTTP routes. A browser UI
+shows notes and a live SSE activity feed — when an MCP client calls a tool, the call
+appears in real-time. Demonstrates `@app.tool()` for dual-interface endpoints (human
+form + AI agent JSON-RPC), `app.tool_events.subscribe()` for streaming tool call events,
+and `ToolCallEvent`.
+
+```bash
+cd examples/tools && python app.py
+```
+
 ### `signup/` — Registration Form with Validation & CSRF
 
 The chirp forms showcase. A registration form with `validate()` and built-in rules
@@ -245,60 +257,63 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo | static_site | auth | signup | upload | survey | wizard | search |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
-| Path parameters | x | x | x | | | x | | | | | x | | x | |
-| String returns | x | | | | | | | | | | | | | |
-| Dict/JSON returns | x | | | | | | | | | | | | | |
-| `Response` chaining | x | | | | | | | | | | | | | |
-| `@app.error()` | x | | | | | | | | | | | | | |
-| `Template` | | x | | x | | x | x | | x | x | x | x | x | |
-| `Fragment` | | x | x | x | x | x | x | | | | | | | |
-| `Page` | | | x | | | x | | | | | | | | x |
-| `ValidationError` | | x | x | | | | | | | x | x | x | x | |
-| `OOB` | | | x | | | | | | | | | | | |
-| `Stream` | | | | | x | | | | | | | | | |
-| `request.is_fragment` | | x | | | | x | | | | | | | | |
-| `request.query` | | | | | | | | | | | | | | x |
-| `@app.template_filter()` | | x | | | x | x | | | | | x | | | |
-| `EventStream` | | | | x | x | x | x | x | | | | | | |
-| `SSEEvent` | | | | x | | | | | | | | | | |
-| `{% cache %}` | | | | | x | x | | | | | | | | |
-| `hx-swap-oob` | | | x | | x | x | | | | | | | | |
-| `with_hx_*()` headers | | | x | | | | | | | | | | | |
-| `assert_hx_*` test helpers | | | x | | | | | | | | | | | |
-| Multi-worker Pounce | | | | | x | x | x | | | | | | | |
-| `TestClient.fragment()` | | x | | | | x | | | | | | | | x |
-| `TestClient.sse()` | | | | x | x | x | | x | | | | | | |
-| `@app.on_startup` | | | | | | x | x | | | | | | | |
-| `@app.on_worker_startup` | | | | | | x | x | | | | | | | |
-| `@app.on_worker_shutdown` | | | | | | x | x | | | | | | | |
-| `httpx` (real API) | | | | | | x | | | | | | | | |
-| `chirp.data` (SQLite) | | | | | | | x | | | | | | | |
-| `chirp.ai` (LLM streaming) | | | | | | | x | | | | | | | |
-| `ContextVar` per-worker | | | | | | x | x | | | | | | | |
-| Recursive `{% def %}` | | | | | | x | | | | | | | | |
-| View Transitions | | | | | | x | | | | | | | | |
-| `StaticFiles` (root prefix) | | | | | | | | x | | | x | | | |
-| `HTMLInject` | | | | | | | | x | | | | | | |
-| Custom 404 page | | | | | | | | x | | | | | | |
-| `SessionMiddleware` | | | | | | | | | x | x | | | x | |
-| `AuthMiddleware` | | | | | | | | | x | | | | | |
-| `@login_required` | | | | | | | | | x | | | | | |
-| `login()` / `logout()` | | | | | | | | | x | | | | | |
-| `current_user()` template global | | | | | | | | | x | | | | | |
-| `hash_password` / `verify_password` | | | | | | | | | x | | | | | |
-| `Redirect` | | | | | | | | | x | x | x | | x | |
-| `validate()` + built-in rules | | | | | | | | | | x | x | x | x | |
-| `CSRFMiddleware` + `csrf_field()` | | | | | | | | | | x | x | | | |
-| `UploadFile` / multipart | | | | | | | | | | | x | | | |
-| `form.files` / `file.save()` | | | | | | | | | | | x | | | |
-| `form.get_list()` (multi-value) | | | | | | | | | | | | x | | |
-| `one_of` validator | | | | | | | | | | | | x | | |
-| `integer` / `number` validator | | | | | | | | | | | | x | | |
-| `matches` validator | | | | | | | | | | x | | | x | |
-| Session-persisted form flow | | | | | | | | | | | | | x | |
-| `get_session()` | | | | | | | | | | x | | | x | |
-| GET query-param forms | | | | | | | | | | | | | | x |
-| `hx-push-url` search | | | | | | | | | | | | | | x |
+| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo | static_site | auth | ollama | tools | signup | upload | survey | wizard | search |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | x | | | | | | | x | | x | |
+| String returns | x | | | | | | | | | | | | | | | |
+| Dict/JSON returns | x | | | | | | | | | | | | | | | |
+| `Response` chaining | x | | | | | | | | | | | | | | | |
+| `@app.error()` | x | | | | | | | | | | | | | | | |
+| `Template` | | x | | x | | x | x | | x | x | x | x | x | x | x | |
+| `Fragment` | | x | x | x | x | x | x | | | | x | | | | | |
+| `Page` | | | x | | | x | | | | | | | | | | x |
+| `ValidationError` | | x | x | | | | | | | | | x | x | x | x | |
+| `OOB` | | | x | | | | | | | | | | | | | |
+| `Stream` | | | | | x | | | | | | | | | | | |
+| `request.is_fragment` | | x | | | | x | | | | | | | | | | |
+| `request.query` | | | | | | | | | | | | | | | | x |
+| `request.form()` | | | x | | | | | | x | x | x | x | x | x | x | |
+| `@app.template_filter()` | | x | | | x | x | | | | | x | | x | | | |
+| `EventStream` | | | | x | x | x | x | x | | x | x | | | | | |
+| `SSEEvent` | | | | x | | | | | | | | | | | | |
+| `{% cache %}` | | | | | x | x | | | | | | | | | | |
+| `hx-swap-oob` | | | x | | x | x | | | | | | | | | | |
+| `with_hx_*()` headers | | | x | | | | | | | | | | | | | |
+| `assert_hx_*` test helpers | | | x | | | | | | | | | | | | | |
+| Multi-worker Pounce | | | | | x | x | x | | | | | | | | | |
+| `TestClient.fragment()` | | x | | | | x | | | | | | | | | | x |
+| `TestClient.sse()` | | | | x | x | x | | x | | | | | | | | |
+| `@app.on_startup` | | | | | | x | x | | | | | | | | | |
+| `@app.on_worker_startup` | | | | | | x | x | | | | | | | | | |
+| `@app.on_worker_shutdown` | | | | | | x | x | | | | | | | | | |
+| `httpx` (real API) | | | | | | x | | | | | | | | | | |
+| `chirp.data` (SQLite) | | | | | | | x | | | | | | | | | |
+| `chirp.ai` (LLM streaming) | | | | | | | x | | | x | | | | | | |
+| `ContextVar` per-worker | | | | | | x | x | | | | | | | | | |
+| Recursive `{% def %}` | | | | | | x | | | | | | | | | | |
+| View Transitions | | | | | | x | | | | | | | | | | |
+| `StaticFiles` (root prefix) | | | | | | | | x | | | | | x | | | |
+| `HTMLInject` | | | | | | | | x | | | | | | | | |
+| Custom 404 page | | | | | | | | x | | | | | | | | |
+| `SessionMiddleware` | | | | | | | | | x | | | x | | | x | |
+| `AuthMiddleware` | | | | | | | | | x | | | | | | | |
+| `@login_required` | | | | | | | | | x | | | | | | | |
+| `login()` / `logout()` | | | | | | | | | x | | | | | | | |
+| `current_user()` template global | | | | | | | | | x | | | | | | | |
+| `hash_password` / `verify_password` | | | | | | | | | x | | | | | | | |
+| `Redirect` | | | | | | | | | x | | | x | x | | x | |
+| `validate()` + built-in rules | | | | | | | | | | | | x | x | x | x | |
+| `CSRFMiddleware` + `csrf_field()` | | | | | | | | | | | | x | x | | | |
+| `UploadFile` / multipart | | | | | | | | | | | | | x | | | |
+| `form.files` / `file.save()` | | | | | | | | | | | | | x | | | |
+| `form.get_list()` (multi-value) | | | | | | | | | | | | | | x | | |
+| `one_of` validator | | | | | | | | | | | | | | x | | |
+| `integer` / `number` validator | | | | | | | | | | | | | | x | | |
+| `matches` validator | | | | | | | | | | | | x | | | x | |
+| Session-persisted form flow | | | | | | | | | | | | | | | x | |
+| `get_session()` | | | | | | | | | | | | x | | | x | |
+| GET query-param forms | | | | | | | | | | | | | | | | x |
+| `hx-push-url` search | | | | | | | | | | | | | | | | x |
+| `@app.tool()` (MCP tools) | | | | | | | | | | | x | | | | | |
+| `app.tool_events.subscribe()` | | | | | | | | | | | x | | | | | |

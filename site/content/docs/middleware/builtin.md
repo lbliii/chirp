@@ -169,6 +169,10 @@ def do_logout():
     return Redirect("/")
 ```
 
+:::{note}
+Both `login()` and `logout()` **regenerate the session** automatically to prevent session fixation attacks. All previous session data is discarded -- the new session starts empty (with only the user ID set on login).
+:::
+
 ### Route Protection
 
 Use `@login_required` and `@requires()` to protect routes. Both work with sync and async handlers:
@@ -189,6 +193,25 @@ def admin_panel():
 ```
 
 Content-negotiated responses: browser requests redirect to `login_url`, API requests get 401/403 JSON errors.
+
+### Safe Redirects
+
+When `@login_required` redirects to `login_url`, it appends a URL-encoded `?next=` parameter. To safely honour this after login, use `is_safe_url()`:
+
+```python
+from chirp import is_safe_url, Redirect
+
+@app.route("/login", methods=["POST"])
+async def do_login(request: Request):
+    # ... verify credentials ...
+    login(user)
+    next_url = request.query.get("next", "/dashboard")
+    if not is_safe_url(next_url):
+        next_url = "/dashboard"
+    return Redirect(next_url)
+```
+
+`is_safe_url(url)` returns `True` only for relative paths on the same origin (starts with `/`, not `//`, no scheme). This prevents open redirect attacks where an attacker crafts a login link like `/login?next=//evil.com`.
 
 ### Templates
 

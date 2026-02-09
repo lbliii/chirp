@@ -52,6 +52,7 @@ from chirp import (
     logout,
     login_required,
     requires,
+    is_safe_url,
 
     # Errors
     ChirpError,
@@ -153,10 +154,11 @@ Convenience for 302 redirects: `Redirect(url)`.
 | Export | Description |
 |--------|-------------|
 | `get_user()` | Get the current authenticated user (or `AnonymousUser`) |
-| `login(user)` | Set the authenticated user in the session |
-| `logout()` | Clear the authenticated user from the session |
+| `login(user)` | Regenerate session and set the authenticated user |
+| `logout()` | Regenerate session and clear the authenticated user |
 | `@login_required` | Decorator: require authentication |
 | `@requires(*permissions)` | Decorator: require specific permissions |
+| `is_safe_url(url)` | Check whether a redirect URL is safe (relative, same origin) |
 
 See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
 
