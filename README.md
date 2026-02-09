@@ -166,8 +166,12 @@ async def timing(request: Request, next: Next) -> Response:
 app.add_middleware(timing)
 ```
 
-A function that takes a request and a `next`, returns a response. Built-in middleware
-includes CORS, static file serving, and signed cookie sessions.
+A function that takes a request and a `next`, returns a response. Built-in middleware:
+
+- **CORS** — cross-origin resource sharing
+- **StaticFiles** — static file serving with index resolution, trailing-slash redirects, custom 404 pages, and root-prefix support (`prefix="/"` for static site hosting)
+- **HTMLInject** — inject a snippet (e.g. a live-reload script) into every HTML response before `</body>`
+- **Sessions** — signed cookie sessions
 
 ---
 

@@ -1,0 +1,30 @@
+"""Security utilities — route protection and password hashing.
+
+Route protection decorators::
+
+    from chirp.security import login_required, requires
+
+    @app.route("/dashboard")
+    @login_required
+    def dashboard():
+        ...
+
+    @app.route("/admin")
+    @requires("admin")
+    def admin_panel():
+        ...
+
+Password hashing (``pip install chirp[auth]``)::
+
+    from chirp.security import hash_password, verify_password
+
+    hashed = hash_password("my-password")
+    ok = verify_password("my-password", hashed)
+"""
+
+from chirp.security.decorators import login_required, requires
+
+__all__ = [
+    "login_required",
+    "requires",
+]

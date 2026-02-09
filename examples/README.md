@@ -81,6 +81,28 @@ export ANTHROPIC_API_KEY="sk-..."
 cd examples/rag_demo && python app.py
 ```
 
+### `static_site/` — Static Site Serving with Live Reload
+
+Serves a pre-built static site from a `public/` directory with `StaticFiles` at the root
+prefix, custom 404 pages, and `HTMLInject` for injecting a live-reload SSE client into every
+HTML response. An SSE endpoint (`/__reload__`) signals the browser when files change. Shows
+how chirp can replace a traditional dev server for static site generators.
+
+```bash
+cd examples/static_site && python app.py
+```
+
+### `ollama/` — Local LLM Chat with Ollama
+
+A chat interface powered by a local Ollama instance. Streaming AI responses via SSE,
+conversation history, and model selection. Demonstrates real-world LLM integration
+without cloud API keys.
+
+```bash
+# Requires ollama running locally
+cd examples/ollama && python app.py
+```
+
 ## Patterns
 
 Lessons from building these examples — things that aren't bugs but require
@@ -156,37 +178,40 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x | x |
-| Path parameters | x | x | x | | | x | |
-| String returns | x | | | | | | |
-| Dict/JSON returns | x | | | | | | |
-| `Response` chaining | x | | | | | | |
-| `@app.error()` | x | | | | | | |
-| `Template` | | x | | x | | x | x |
-| `Fragment` | | x | x | x | x | x | x |
-| `Page` | | | x | | | x | |
-| `ValidationError` | | x | x | | | | |
-| `OOB` | | | x | | | | |
-| `Stream` | | | | | x | | |
-| `request.is_fragment` | | x | | | | x | |
-| `@app.template_filter()` | | x | | | x | x | |
-| `EventStream` | | | | x | x | x | x |
-| `SSEEvent` | | | | x | | | |
-| `{% cache %}` | | | | | x | x | |
-| `hx-swap-oob` | | | x | | x | x | |
-| `with_hx_*()` headers | | | x | | | | |
-| `assert_hx_*` test helpers | | | x | | | | |
-| Multi-worker Pounce | | | | | x | x | x |
-| `TestClient.fragment()` | | x | | | | x | |
-| `TestClient.sse()` | | | | x | x | x | |
-| `@app.on_startup` | | | | | | x | x |
-| `@app.on_worker_startup` | | | | | | x | x |
-| `@app.on_worker_shutdown` | | | | | | x | x |
-| `httpx` (real API) | | | | | | x | |
-| `chirp.data` (SQLite) | | | | | | | x |
-| `chirp.ai` (LLM streaming) | | | | | | | x |
-| `ContextVar` per-worker | | | | | | x | x |
-| Recursive `{% def %}` | | | | | | x | |
-| View Transitions | | | | | | x | |
+| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo | static_site |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | x | | |
+| String returns | x | | | | | | | |
+| Dict/JSON returns | x | | | | | | | |
+| `Response` chaining | x | | | | | | | |
+| `@app.error()` | x | | | | | | | |
+| `Template` | | x | | x | | x | x | |
+| `Fragment` | | x | x | x | x | x | x | |
+| `Page` | | | x | | | x | | |
+| `ValidationError` | | x | x | | | | | |
+| `OOB` | | | x | | | | | |
+| `Stream` | | | | | x | | | |
+| `request.is_fragment` | | x | | | | x | | |
+| `@app.template_filter()` | | x | | | x | x | | |
+| `EventStream` | | | | x | x | x | x | x |
+| `SSEEvent` | | | | x | | | | |
+| `{% cache %}` | | | | | x | x | | |
+| `hx-swap-oob` | | | x | | x | x | | |
+| `with_hx_*()` headers | | | x | | | | | |
+| `assert_hx_*` test helpers | | | x | | | | | |
+| Multi-worker Pounce | | | | | x | x | x | |
+| `TestClient.fragment()` | | x | | | | x | | |
+| `TestClient.sse()` | | | | x | x | x | | x |
+| `@app.on_startup` | | | | | | x | x | |
+| `@app.on_worker_startup` | | | | | | x | x | |
+| `@app.on_worker_shutdown` | | | | | | x | x | |
+| `httpx` (real API) | | | | | | x | | |
+| `chirp.data` (SQLite) | | | | | | | x | |
+| `chirp.ai` (LLM streaming) | | | | | | | x | |
+| `ContextVar` per-worker | | | | | | x | x | |
+| Recursive `{% def %}` | | | | | | x | | |
+| View Transitions | | | | | | x | | |
+| `StaticFiles` (root prefix) | | | | | | | | x |
+| `HTMLInject` | | | | | | | | x |
+| Custom 404 page | | | | | | | | x |

@@ -265,3 +265,110 @@ class TestDebugModeFragmentErrors:
             assert "RuntimeError" in response.text
             # Full page uses error-page wrapper, not chirp-error
             assert 'class="error-page"' in response.text
+
+
+class TestHtmxErrorHeaders:
+    """Fragment error responses include htmx retargeting headers."""
+
+    async def test_404_fragment_has_htmx_headers(self) -> None:
+        app = App()
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/nonexistent")
+            headers = dict(response.headers)
+            assert headers.get("HX-Retarget") == "#chirp-error"
+            assert headers.get("HX-Reswap") == "innerHTML"
+            assert headers.get("HX-Trigger") == "chirpError"
+
+    async def test_500_fragment_has_htmx_headers(self) -> None:
+        app = App()
+
+        @app.route("/boom")
+        def boom():
+            msg = "kaboom"
+            raise RuntimeError(msg)
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/boom")
+            headers = dict(response.headers)
+            assert headers.get("HX-Retarget") == "#chirp-error"
+            assert headers.get("HX-Reswap") == "innerHTML"
+            assert headers.get("HX-Trigger") == "chirpError"
+
+    async def test_non_fragment_has_no_htmx_headers(self) -> None:
+        app = App()
+
+        @app.route("/boom")
+        def boom():
+            msg = "kaboom"
+            raise RuntimeError(msg)
+
+        async with TestClient(app) as client:
+            response = await client.get("/boom")
+            headers = dict(response.headers)
+            assert "HX-Retarget" not in headers
+            assert "HX-Reswap" not in headers
+            assert "HX-Trigger" not in headers
+
+    async def test_debug_500_fragment_has_htmx_headers(self) -> None:
+        app = App(config=AppConfig(debug=True))
+
+        @app.route("/boom")
+        def boom():
+            msg = "debug kaboom"
+            raise RuntimeError(msg)
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/boom")
+            headers = dict(response.headers)
+            assert headers.get("HX-Retarget") == "#chirp-error"
+            assert headers.get("HX-Reswap") == "innerHTML"
+
+    async def test_custom_http_error_fragment_has_htmx_headers(self) -> None:
+        app = App()
+
+        @app.route("/forbidden")
+        def forbidden():
+            raise HTTPError(status=403, detail="Access denied")
+
+        async with TestClient(app) as client:
+            response = await client.fragment("/forbidden")
+            headers = dict(response.headers)
+            assert headers.get("HX-Retarget") == "#chirp-error"
+
+
+class TestErrorLogging:
+    """Error handlers emit log records."""
+
+    async def test_500_logs_exception(self, caplog) -> None:
+        app = App()
+
+        @app.route("/boom")
+        def boom():
+            msg = "log test"
+            raise RuntimeError(msg)
+
+        with caplog.at_level("ERROR", logger="chirp.server"):
+            async with TestClient(app) as client:
+                await client.get("/boom")
+
+        assert any("500 GET /boom" in r.message for r in caplog.records)
+        # logger.exception() captures the traceback
+        assert any(r.exc_info for r in caplog.records)
+
+    async def test_404_logs_at_debug_level(self, caplog) -> None:
+        app = App()
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        with caplog.at_level("DEBUG", logger="chirp.server"):
+            async with TestClient(app) as client:
+                await client.get("/missing")
+
+        assert any("404" in r.message and "/missing" in r.message for r in caplog.records)
