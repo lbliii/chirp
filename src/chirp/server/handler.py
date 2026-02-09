@@ -13,6 +13,7 @@ from typing import Any
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
+from chirp._internal.invoke import invoke
 from chirp.context import g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
@@ -132,10 +133,8 @@ async def _invoke_handler(
     # Build kwargs from handler signature
     kwargs = _build_handler_kwargs(handler, request, match.path_params)
 
-    # Call the handler
-    result = handler(**kwargs)
-    if inspect.isawaitable(result):
-        result = await result
+    # Call the handler (sync or async — invoke() handles both)
+    result = await invoke(handler, **kwargs)
 
     return negotiate(result, kida_env=kida_env, request=request)
 

@@ -27,6 +27,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
+from chirp._internal.invoke import invoke
 from chirp.errors import HTTPError
 
 
@@ -87,7 +88,7 @@ def login_required(handler: Callable) -> Callable:
                 )
             raise HTTPError(status=401, detail="Authentication required")
 
-        return await handler(*args, **kwargs)
+        return await invoke(handler, *args, **kwargs)
 
     return wrapper
 
@@ -150,7 +151,7 @@ def requires(*permissions: str) -> Callable:
                     detail=f"Missing permissions: {', '.join(sorted(missing))}",
                 )
 
-            return await handler(*args, **kwargs)
+            return await invoke(handler, *args, **kwargs)
 
         return wrapper
 
