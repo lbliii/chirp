@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
+from chirp.data import Query
 from chirp.middleware.csrf import CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
@@ -33,6 +34,9 @@ class Todo:
     text: str
     done: bool
 
+
+# Reusable query — immutable, so safe to define once at module level
+ALL_TODOS = Query(Todo, "todos").order_by("id")
 
 # ---------------------------------------------------------------------------
 # App — database connects at startup, migrations run automatically
@@ -57,7 +61,7 @@ app.add_middleware(CSRFMiddleware())
 @app.route("/")
 async def index(request: Request):
     """Full page or fragment depending on htmx request."""
-    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+    todos = await ALL_TODOS.fetch(app.db)
     if request.is_fragment:
         return Fragment("index.html", "todo_list", todos=todos)
     return Template("index.html", todos=todos)
@@ -69,7 +73,7 @@ async def add_todo(request: Request):
     form = await request.form()
     text = (form.get("text") or "").strip()
     if not text:
-        todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+        todos = await ALL_TODOS.fetch(app.db)
         return ValidationError(
             "index.html",
             "todo_list",
@@ -77,7 +81,7 @@ async def add_todo(request: Request):
             todos=todos,
         )
     await app.db.execute("INSERT INTO todos (text, done) VALUES (?, ?)", text, False)
-    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+    todos = await ALL_TODOS.fetch(app.db)
     return Fragment("index.html", "todo_list", todos=todos)
 
 
@@ -87,7 +91,7 @@ async def toggle_todo(todo_id: int):
     await app.db.execute(
         "UPDATE todos SET done = NOT done WHERE id = ?", todo_id
     )
-    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+    todos = await ALL_TODOS.fetch(app.db)
     return Fragment("index.html", "todo_list", todos=todos)
 
 
@@ -95,7 +99,7 @@ async def toggle_todo(todo_id: int):
 async def delete_todo(todo_id: int):
     """Delete a todo — returns the list fragment."""
     await app.db.execute("DELETE FROM todos WHERE id = ?", todo_id)
-    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+    todos = await ALL_TODOS.fetch(app.db)
     return Fragment("index.html", "todo_list", todos=todos)
 
 

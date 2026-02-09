@@ -23,8 +23,8 @@ JavaScript. Empty submissions return a `ValidationError` with a 422 status and a
 error message. Restart the server and your todos are still there.
 
 Uses `App(db=..., migrations=...)` for zero-boilerplate database setup, a frozen `Todo`
-dataclass that flows from SQL query through to template, and a single migration file for
-the schema.
+dataclass that flows from SQL query through to template, a reusable `Query` builder for
+typed reads, and a single migration file for the schema.
 
 ```bash
 pip install chirp[data]
@@ -77,9 +77,9 @@ cd examples/hackernews && python app.py
 ### `dashboard_live/` — Live Sales Dashboard with chirp.data
 
 The data layer flagship. A real-time sales dashboard powered by `chirp.data`:
-`App(db=..., migrations=...)` for zero-boilerplate database setup, SQL queries
-mapped to frozen dataclasses, atomic transactions for order creation, and SSE
-fragments that push live updates to the browser. New orders appear every few
+`App(db=..., migrations=...)` for zero-boilerplate database setup, `Query` builder
+for typed reads, atomic transactions for order creation, and SSE fragments that
+push live updates to the browser. New orders appear every few
 seconds — stats update in real-time. Zero client-side JavaScript beyond htmx.
 
 With PostgreSQL, swap the polling loop for `db.listen("new_orders")` —
@@ -313,6 +313,7 @@ pytest examples/hello/
 | `httpx` (real API) | | | | | | | x | | | | | | | | | | |
 | `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | |
 | `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | |
+| `Query` builder | | x | | | | x | | | | | | | | | | | |
 | `db.transaction()` | | | | | | x | | | | | | | | | | | |
 | `db.execute_many()` | | | | | | x | | | | | | | | | | | |
 | `db.fetch_val()` | | | | | | x | | | | | | | | | | | |

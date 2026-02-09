@@ -1,6 +1,11 @@
-# ⌁⌁ chirp
+# ⌁⌁ Chirp
 
-A Python web framework for the modern web platform.
+[![PyPI version](https://img.shields.io/pypi/v/bengal-chirp.svg)](https://pypi.org/project/bengal-chirp/)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://pypi.org/project/bengal-chirp/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://pypi.org/project/bengal-chirp/)
+
+**A Python web framework for the modern web platform.**
 
 ```python
 from chirp import App
@@ -13,14 +18,6 @@ def index():
 
 app.run()
 ```
-
-Chirp serves HTML beautifully — full pages, fragments, streams, and real-time events — all
-through its built-in template engine, [kida](https://github.com/lbliii/kida).
-
-**Status:** Alpha — Phases 0-7 complete, plus typed hypermedia contracts. Routing, Kida
-integration, fragment rendering, middleware, streaming HTML, Server-Sent Events, test
-utilities, and compile-time validation of the server-client surface all implemented. 53
-source modules. See [ROADMAP.md](ROADMAP.md) for the full vision.
 
 ---
 
@@ -30,44 +27,61 @@ Flask (2010) and FastAPI (2018) were designed for a different web. Flask assumes
 full HTML pages or bolt on extensions for everything. FastAPI assumes you serve JSON to a
 JavaScript frontend. Neither reflects where the web platform is in 2026:
 
-- The browser has `<dialog>`, `popover`, View Transitions, container queries, and anchor
-  positioning. Most of what required a JS framework is now native HTML and CSS.
-- htmx proved that servers can send HTML fragments and the browser can swap them in —
-  partial page updates with no custom JavaScript.
-- Streaming HTML lets the server send the page shell immediately and fill in content as
-  data becomes available. No loading spinners, no skeleton screens.
-- Server-Sent Events push real-time updates over plain HTTP. No WebSocket protocol upgrade,
-  no special infrastructure.
-
-No Python framework is built around these capabilities. Flask and Django treat templates as
-"render a full page, return a string." FastAPI doesn't have a template story at all. None of
-them can render a template *block* as a fragment. None of them stream HTML as it renders.
-None of them have first-class SSE support for pushing HTML updates.
+- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries — most of what required a JS framework is now native HTML and CSS
+- **HTML over the wire** — htmx proved that servers can send HTML fragments and the browser can swap them in — partial page updates with no custom JavaScript
+- **Streaming HTML** — Send the page shell immediately and fill in content as data becomes available. No loading spinners, no skeleton screens
+- **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure
 
 Chirp is designed from scratch for this reality.
 
 ---
 
-## Quick Start
+## Installation
 
-```python
-from chirp import App
-
-app = App()
-
-@app.route("/")
-def index():
-    return "Hello, World!"
-
-app.run()
+```bash
+pip install bengal-chirp
 ```
 
-Five lines to hello world. Flask-familiar on the surface — because Flask got the surface
-right.
+Requires Python 3.14+
 
 ---
 
-## Return Values, Not Response Construction
+## Quick Start
+
+| Function | Description |
+|----------|-------------|
+| `App()` | Create an application |
+| `@app.route(path)` | Register a route handler |
+| `Template(name, **ctx)` | Render a full template |
+| `Fragment(name, block, **ctx)` | Render a named template block |
+| `Stream(name, **ctx)` | Stream HTML progressively |
+| `EventStream(gen)` | Server-Sent Events stream |
+| `app.run()` | Start the development server |
+
+---
+
+## Features
+
+| Feature | Description | Docs |
+|---------|-------------|------|
+| **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
+| **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
+| **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
+| **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/streaming/) |
+| **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/streaming/server-sent-events/) |
+| **Middleware** | CORS, sessions, static files, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
+| **Contracts** | Compile-time validation of hypermedia surface | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
+| **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/testing/) |
+| **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/data/) |
+
+📚 **Full documentation**: [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
+
+---
+
+## Usage
+
+<details>
+<summary><strong>Return Values</strong> — Type-driven content negotiation</summary>
 
 Route functions return *values*. The framework handles content negotiation based on the type:
 
@@ -84,12 +98,12 @@ return Redirect("/login")                       # -> 302
 
 No `make_response()`. No `jsonify()`. The type *is* the intent.
 
----
+</details>
 
-## Fragments and htmx
+<details>
+<summary><strong>Fragments and htmx</strong> — Render template blocks independently</summary>
 
-This is Chirp's key innovation. Kida can render a named block from a template independently,
-without rendering the whole page:
+Kida can render a named block from a template independently, without rendering the whole page:
 
 ```html
 {# templates/search.html #}
@@ -119,12 +133,13 @@ async def search(request: Request):
 Full page request renders everything. htmx request renders just the `results_list` block.
 Same template, same data, different scope. No separate "partials" directory.
 
----
+</details>
 
-## Streaming and Real-Time
+<details>
+<summary><strong>Streaming HTML</strong> — Progressive rendering</summary>
 
-**Streaming HTML** — Kida renders template sections as they complete. The browser receives
-the shell immediately and content fills in progressively:
+Kida renders template sections as they complete. The browser receives the shell immediately
+and content fills in progressively:
 
 ```python
 @app.route("/dashboard")
@@ -136,7 +151,12 @@ async def dashboard(request: Request):
     )
 ```
 
-**Server-Sent Events** — push Kida-rendered HTML fragments to the browser in real-time:
+</details>
+
+<details>
+<summary><strong>Server-Sent Events</strong> — Real-time HTML updates</summary>
+
+Push Kida-rendered HTML fragments to the browser in real-time:
 
 ```python
 @app.route("/notifications")
@@ -150,9 +170,10 @@ async def notifications(request: Request):
 Combined with htmx's SSE support, this enables real-time UI updates with zero client-side
 JavaScript. The server renders HTML, the browser swaps it in.
 
----
+</details>
 
-## Middleware
+<details>
+<summary><strong>Middleware</strong> — Composable request/response pipeline</summary>
 
 No base class. No inheritance. A middleware is anything that matches the protocol:
 
@@ -166,19 +187,14 @@ async def timing(request: Request, next: Next) -> Response:
 app.add_middleware(timing)
 ```
 
-A function that takes a request and a `next`, returns a response. Built-in middleware:
+Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions.
 
-- **CORS** — cross-origin resource sharing
-- **StaticFiles** — static file serving with index resolution, trailing-slash redirects, custom 404 pages, and root-prefix support (`prefix="/"` for static site hosting)
-- **HTMLInject** — inject a snippet (e.g. a live-reload script) into every HTML response before `</body>`
-- **Sessions** — signed cookie sessions
+</details>
 
----
+<details>
+<summary><strong>Typed Contracts</strong> — Compile-time hypermedia validation</summary>
 
-## Typed Hypermedia Contracts
-
-Chirp validates the server-client boundary at startup — something React/Next.js can't do
-without JavaScript:
+Chirp validates the server-client boundary at startup:
 
 ```python
 issues = app.check()
@@ -190,19 +206,7 @@ Every `hx-get`, `hx-post`, and `action` attribute in your templates is checked a
 registered route table. Every `Fragment` and `SSE` return type is checked against available
 template blocks. Broken references become compile-time errors, not runtime 404s.
 
-Use the `@contract` decorator for fine-grained route-level contracts:
-
-```python
-from chirp.contracts import contract, FragmentContract
-
-@app.route("/search")
-@contract(
-    returns=[FragmentContract("search.html", "results_list")],
-    htmx_triggers=["hx-get"],
-)
-async def search(request: Request):
-    ...
-```
+</details>
 
 ---
 
@@ -213,33 +217,60 @@ async def search(request: Request):
 - **Kida built in.** Same author, no seam. Fragment rendering, streaming templates, and
   filter registration are first-class features, not afterthoughts.
 - **Typed end-to-end.** Frozen config, frozen request, chainable response. Zero
-  `type: ignore` comments. `ty` passes clean.
+  `type: ignore` comments.
 - **Free-threading native.** Designed for Python 3.14t from the first line. Immutable data
-  structures, ContextVar isolation, `_Py_mod_gil = 0`.
+  structures, ContextVar isolation.
 - **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
-  startup — every `hx-get` resolves to a route, every `Fragment` references a real block.
-  Compile-time safety for the server-client boundary.
+  startup.
 - **Minimal dependencies.** `kida` + `anyio`. Everything else is optional.
 
 ---
 
-## Requirements
+## Documentation
 
-- Python >= 3.14
+📚 **[lbliii.github.io/chirp](https://lbliii.github.io/chirp/)**
+
+| Section | Description |
+|---------|-------------|
+| [Get Started](https://lbliii.github.io/chirp/docs/get-started/) | Installation and quickstart |
+| [Core Concepts](https://lbliii.github.io/chirp/docs/core-concepts/) | App lifecycle, return values, configuration |
+| [Routing](https://lbliii.github.io/chirp/docs/routing/) | Routes, requests, responses |
+| [Templates](https://lbliii.github.io/chirp/docs/templates/) | Rendering, fragments, filters |
+| [Streaming](https://lbliii.github.io/chirp/docs/streaming/) | HTML streaming and Server-Sent Events |
+| [Middleware](https://lbliii.github.io/chirp/docs/middleware/) | Built-in and custom middleware |
+| [Data](https://lbliii.github.io/chirp/docs/data/) | Database integration and forms |
+| [Testing](https://lbliii.github.io/chirp/docs/testing/) | Test client and assertions |
+| [Tutorials](https://lbliii.github.io/chirp/docs/tutorials/) | Flask migration, htmx patterns |
+| [Reference](https://lbliii.github.io/chirp/docs/reference/) | API documentation |
 
 ---
 
-## Part of the Bengal Ecosystem
+## Development
 
+```bash
+git clone https://github.com/lbliii/chirp.git
+cd chirp
+uv sync --group dev
+pytest
 ```
-purr        Content runtime   (connects everything)
-pounce      ASGI server       (serves apps)
-chirp       Web framework     (serves HTML)
-kida        Template engine   (renders HTML)
-patitas     Markdown parser   (parses content)
-rosettes    Syntax highlighter (highlights code)
-bengal      Static site gen   (builds sites)
-```
+
+---
+
+## The Bengal Ecosystem
+
+A structured reactive stack — every layer written in pure Python for 3.14t free-threading.
+
+| | | | |
+|--:|---|---|---|
+| **ᓚᘏᗢ** | [Bengal](https://github.com/lbliii/bengal) | Static site generator | [Docs](https://lbliii.github.io/bengal/) |
+| **∿∿** | [Purr](https://github.com/lbliii/purr) | Content runtime | — |
+| **⌁⌁** | **Chirp** | Web framework ← You are here | [Docs](https://lbliii.github.io/chirp/) |
+| **⟩⟩·** | [Pounce](https://github.com/lbliii/pounce) | ASGI server | [Docs](https://lbliii.github.io/pounce/) |
+| **)彡** | [Kida](https://github.com/lbliii/kida) | Template engine | [Docs](https://lbliii.github.io/kida/) |
+| **ฅᨐฅ** | [Patitas](https://github.com/lbliii/patitas) | Markdown parser | [Docs](https://lbliii.github.io/patitas/) |
+| **⌾⌾⌾** | [Rosettes](https://github.com/lbliii/rosettes) | Syntax highlighter | [Docs](https://lbliii.github.io/rosettes/) |
+
+Python-native. Free-threading ready. No npm required.
 
 ---
 

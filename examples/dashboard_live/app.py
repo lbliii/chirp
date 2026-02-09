@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from chirp import App, AppConfig, EventStream, Fragment, Template
+from chirp.data import Query
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
@@ -66,6 +67,9 @@ class Stats:
     avg_order: float
 
 
+# Reusable base query — immutable, safe to define at module level
+ORDERS = Query(Order, "orders")
+
 # ---------------------------------------------------------------------------
 # Seed data — populate the database on first run
 # ---------------------------------------------------------------------------
@@ -74,7 +78,7 @@ class Stats:
 @app.on_startup
 async def seed_data():
     """Insert sample orders if the table is empty."""
-    count = await app.db.fetch_val("SELECT COUNT(*) FROM orders")
+    count = await ORDERS.count(app.db)
     if count > 0:
         return
 
@@ -100,25 +104,21 @@ async def seed_data():
 
 async def get_stats() -> Stats:
     """Compute dashboard statistics from the database."""
-    total = await app.db.fetch_val("SELECT COUNT(*) FROM orders") or 0
+    total = await ORDERS.count(app.db)
     revenue = await app.db.fetch_val("SELECT COALESCE(SUM(amount), 0) FROM orders") or 0.0
-    pending = await app.db.fetch_val("SELECT COUNT(*) FROM orders WHERE status = ?", "pending") or 0
+    pending = await ORDERS.where("status = ?", "pending").count(app.db)
     avg = round(revenue / total, 2) if total > 0 else 0.0
     return Stats(
-        total_orders=int(total),
+        total_orders=total,
         total_revenue=round(float(revenue), 2),
-        pending_count=int(pending),
+        pending_count=pending,
         avg_order=avg,
     )
 
 
 async def get_recent_orders(limit: int = 10) -> list[Order]:
     """Fetch the most recent orders."""
-    return await app.db.fetch(
-        Order,
-        "SELECT * FROM orders ORDER BY id DESC LIMIT ?",
-        limit,
-    )
+    return await ORDERS.order_by("id DESC").take(limit).fetch(app.db)
 
 
 async def create_random_order() -> Order:
@@ -137,10 +137,7 @@ async def create_random_order() -> Order:
             "pending",
             now,
         )
-        order = await app.db.fetch_one(
-            Order,
-            "SELECT * FROM orders ORDER BY id DESC LIMIT 1",
-        )
+        order = await ORDERS.order_by("id DESC").fetch_one(app.db)
 
     assert order is not None
     return order

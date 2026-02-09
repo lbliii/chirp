@@ -165,6 +165,148 @@ async for user in db.stream(User, "SELECT * FROM users", batch_size=100):
 | `execute_many(sql, params_seq)` | `int` | Total rows affected |
 | `stream(cls, sql, *params)` | `AsyncIterator[T]` | Cursor-based row iteration |
 
+## Query Builder
+
+For dynamic queries with optional filters, use `Query` — an immutable query builder that follows the same chaining pattern as `Response.with_*()`. Each method returns a new `Query`, so the original is never mutated.
+
+```python
+from chirp.data import Query
+
+@dataclass(frozen=True, slots=True)
+class Todo:
+    id: int
+    text: str
+    done: bool
+
+# Build a query with optional filters
+todos = await (
+    Query(Todo, "todos")
+    .where("done = ?", False)
+    .where_if(search, "text LIKE ?", f"%{search}%")
+    .order_by("id DESC")
+    .take(20)
+    .fetch(db)
+)
+```
+
+### Why Not Just SQL?
+
+Simple queries are fine as raw SQL. But when filters are conditional, string concatenation gets ugly fast:
+
+```python
+# Without Query — fragile string building
+sql = "SELECT * FROM todos WHERE 1=1"
+params = []
+if status:
+    sql += " AND done = ?"
+    params.append(status == "done")
+if search:
+    sql += " AND text LIKE ?"
+    params.append(f"%{search}%")
+sql += " ORDER BY id DESC LIMIT 20"
+todos = await db.fetch(Todo, sql, *params)
+```
+
+```python
+# With Query — clean, chainable, immutable
+todos = await (
+    Query(Todo, "todos")
+    .where_if(status, "done = ?", status == "done")
+    .where_if(search, "text LIKE ?", f"%{search}%")
+    .order_by("id DESC")
+    .take(20)
+    .fetch(db)
+)
+```
+
+### Building Queries
+
+Every method returns a new frozen `Query`. Chain them in any order:
+
+```python
+q = (
+    Query(Todo, "todos")
+    .select("id, text, done")          # columns (default: *)
+    .where("done = ?", False)          # WHERE clause (multiple are ANDed)
+    .where_if(search, "text LIKE ?", f"%{search}%")  # conditional WHERE
+    .order_by("id DESC")               # ORDER BY
+    .take(20)                          # LIMIT
+    .skip(40)                          # OFFSET
+)
+```
+
+### Transparency
+
+Inspect exactly what SQL will run — no hidden queries:
+
+```python
+print(q.sql)
+# SELECT id, text, done FROM todos WHERE done = ? AND text LIKE ? ORDER BY id DESC LIMIT 20 OFFSET 40
+
+print(q.params)
+# (False, '%milk%')
+```
+
+### Executing Queries
+
+`Query` delegates to the same `Database` methods you already know:
+
+```python
+# All matching rows
+todos = await q.fetch(db)          # list[Todo]
+
+# First match
+todo = await q.fetch_one(db)       # Todo | None
+
+# Count matching rows (ignores LIMIT/OFFSET)
+n = await q.count(db)              # int
+
+# Check existence
+found = await q.exists(db)         # bool
+
+# Stream large results
+async for todo in q.stream(db):    # AsyncIterator[Todo]
+    process(todo)
+```
+
+### Reusable Queries
+
+Since queries are immutable, define a base query once and branch from it:
+
+```python
+# Module-level — safe because it's frozen
+ALL_TODOS = Query(Todo, "todos").order_by("id")
+
+# In handlers — branch from the base
+@app.route("/todos")
+async def list_todos(request):
+    search = request.query.get("q")
+    todos = await (
+        ALL_TODOS
+        .where_if(search, "text LIKE ?", f"%{search}%")
+        .fetch(app.db)
+    )
+    return Template("todos.html", todos=todos)
+```
+
+### Reference
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `where(clause, *params)` | `Query[T]` | Add a WHERE clause (multiple are ANDed) |
+| `where_if(cond, clause, *params)` | `Query[T]` | Add a WHERE clause only if `cond` is truthy |
+| `order_by(clause)` | `Query[T]` | Set ORDER BY |
+| `take(n)` | `Query[T]` | Set LIMIT |
+| `skip(n)` | `Query[T]` | Set OFFSET |
+| `select(columns)` | `Query[T]` | Set columns to SELECT (default: `*`) |
+| `fetch(db)` | `list[T]` | Execute and return all rows |
+| `fetch_one(db)` | `T \| None` | Execute and return first row |
+| `count(db)` | `int` | COUNT(*) with same WHERE clauses |
+| `exists(db)` | `bool` | Check if any row matches |
+| `stream(db)` | `AsyncIterator[T]` | Yield rows incrementally |
+| `.sql` | `str` | The exact SQL that will execute |
+| `.params` | `tuple` | The bound parameters |
+
 ## Transactions
 
 Wrap multiple statements in an atomic transaction:

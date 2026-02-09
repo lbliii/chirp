@@ -25,6 +25,13 @@ cascade:
 Typed async queries, row mapping, transactions, streaming, and LISTEN/NOTIFY.
 :::{/card}
 
+:::{card} Query Builder
+:icon: search
+:link: ./database#query-builder
+:description: Immutable chainable queries
+Dynamic filters with `where_if()`, transparent SQL, typed results.
+:::{/card}
+
 :::{card} Migrations
 :icon: arrow-up-circle
 :link: ./database#migrations

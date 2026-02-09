@@ -679,7 +679,7 @@ class TestExports:
         import chirp.data
 
         expected = {"Database", "DataError", "DriverNotInstalledError",
-                    "MigrationError", "Notification", "get_db", "migrate"}
+                    "MigrationError", "Notification", "Query", "get_db", "migrate"}
         assert set(chirp.data.__all__) == expected
 
     def test_error_hierarchy(self) -> None:

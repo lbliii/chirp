@@ -95,11 +95,14 @@ async def handle_sse(
                     # Timeout: generator is idle — send heartbeat
                     if disconnected.is_set():
                         break
-                    await send({
-                        "type": "http.response.body",
-                        "body": b": heartbeat\n\n",
-                        "more_body": True,
-                    })
+                    try:
+                        await send({
+                            "type": "http.response.body",
+                            "body": b": heartbeat\n\n",
+                            "more_body": True,
+                        })
+                    except RuntimeError:
+                        break  # Response already closed (client disconnected)
                     continue
 
                 # Task completed — retrieve result
@@ -115,11 +118,14 @@ async def handle_sse(
                     kida_env=kida_env,
                 )
                 if sse_text:
-                    await send({
-                        "type": "http.response.body",
-                        "body": sse_text.encode("utf-8"),
-                        "more_body": True,
-                    })
+                    try:
+                        await send({
+                            "type": "http.response.body",
+                            "body": sse_text.encode("utf-8"),
+                            "more_body": True,
+                        })
+                    except RuntimeError:
+                        break  # Response already closed (client disconnected)
         except asyncio.CancelledError:
             pass
         except Exception as exc:
