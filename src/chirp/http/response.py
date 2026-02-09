@@ -278,3 +278,60 @@ class SSEResponse:
     ) -> SSEResponse:
         """No-op: SSE responses don't carry Set-Cookie headers."""
         return self
+
+    def without_cookie(self, name: str = "", path: str = "/") -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE responses don't carry Set-Cookie headers."""
+        return self
+
+    # -- htmx no-ops (SSE streams bypass normal response headers) --
+
+    def with_hx_redirect(self, url: str) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Redirect."""
+        return self
+
+    def with_hx_location(  # noqa: ARG002
+        self,
+        url: str = "",
+        *,
+        target: str | None = None,
+        swap: str | None = None,
+        source: str | None = None,
+    ) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Location."""
+        return self
+
+    def with_hx_retarget(self, selector: str) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Retarget."""
+        return self
+
+    def with_hx_reswap(self, strategy: str) -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Reswap."""
+        return self
+
+    def with_hx_trigger(self, event: str | dict[str, Any] = "") -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Trigger."""
+        return self
+
+    def with_hx_trigger_after_settle(  # noqa: ARG002
+        self, event: str | dict[str, Any] = ""
+    ) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Trigger-After-Settle."""
+        return self
+
+    def with_hx_trigger_after_swap(  # noqa: ARG002
+        self, event: str | dict[str, Any] = ""
+    ) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Trigger-After-Swap."""
+        return self
+
+    def with_hx_push_url(self, url: str | bool = "") -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Push-Url."""
+        return self
+
+    def with_hx_replace_url(self, url: str | bool = "") -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Replace-Url."""
+        return self
+
+    def with_hx_refresh(self) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Refresh."""
+        return self

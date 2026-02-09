@@ -1,5 +1,7 @@
 """Tests for the kanban example — auth, board rendering, CRUD, move, filter, SSE."""
 
+import re
+
 from chirp.testing import (
     TestClient,
     assert_fragment_contains,
@@ -12,7 +14,7 @@ _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 
 
 # ---------------------------------------------------------------------------
-# Auth helpers
+# Auth helpers (CSRF-aware)
 # ---------------------------------------------------------------------------
 
 
@@ -24,16 +26,50 @@ def _extract_cookie(response, name: str = "chirp_session") -> str | None:
     return None
 
 
+def _extract_csrf_token(html: str) -> str | None:
+    """Extract CSRF token from a rendered form (hidden input)."""
+    m = re.search(r'name="_csrf_token"\s+value="([^"]+)"', html)
+    return m.group(1) if m else None
+
+
+def _extract_csrf_meta(html: str) -> str | None:
+    """Extract CSRF token from a meta tag (for htmx requests)."""
+    m = re.search(r'name="csrf-token"\s+content="([^"]+)"', html)
+    return m.group(1) if m else None
+
+
 async def _login(client, username: str = "alice") -> dict[str, str]:
-    """Log in and return a cookie header dict for subsequent requests."""
-    r = await client.post(
-        "/login",
-        body=f"username={username}&password=password".encode(),
-        headers=_FORM_CT,
-    )
-    cookie = _extract_cookie(r)
+    """Log in (CSRF-aware) and return auth + CSRF headers for subsequent requests."""
+    # 1. GET login page to establish session and get CSRF token
+    page = await client.get("/login")
+    session_cookie = _extract_cookie(page)
+    csrf_token = _extract_csrf_token(page.text)
+
+    headers = {**_FORM_CT}
+    if session_cookie:
+        headers["Cookie"] = f"chirp_session={session_cookie}"
+
+    body = f"username={username}&password=password"
+    if csrf_token:
+        body += f"&_csrf_token={csrf_token}"
+
+    # 2. POST login
+    r = await client.post("/login", body=body.encode(), headers=headers)
+    cookie = _extract_cookie(r) or session_cookie
     assert cookie is not None, f"Login failed for {username}"
-    return {"Cookie": f"chirp_session={cookie}"}
+
+    # 3. GET the board page to get the authenticated session's CSRF token.
+    #    The session middleware may set a new cookie here (with the CSRF
+    #    token persisted), so we must capture it.
+    board = await client.get("/", headers={"Cookie": f"chirp_session={cookie}"})
+    board_cookie = _extract_cookie(board) or cookie
+    fresh_csrf = _extract_csrf_meta(board.text) or csrf_token
+
+    # For subsequent requests, include both the session cookie and CSRF header
+    auth_headers: dict[str, str] = {"Cookie": f"chirp_session={board_cookie}"}
+    if fresh_csrf:
+        auth_headers["X-CSRF-Token"] = fresh_csrf
+    return auth_headers
 
 
 # ---------------------------------------------------------------------------
@@ -64,11 +100,17 @@ class TestAuth:
 
     async def test_valid_login_redirects(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post(
-                "/login",
-                body=b"username=alice&password=password",
-                headers=_FORM_CT,
-            )
+            # GET login page to get session + CSRF token
+            page = await client.get("/login")
+            session = _extract_cookie(page)
+            csrf = _extract_csrf_token(page.text)
+            headers = {**_FORM_CT}
+            if session:
+                headers["Cookie"] = f"chirp_session={session}"
+            body = b"username=alice&password=password"
+            if csrf:
+                body += f"&_csrf_token={csrf}".encode()
+            response = await client.post("/login", body=body, headers=headers)
             assert response.status == 302
             location = ""
             for hname, hvalue in response.headers:
@@ -78,18 +120,28 @@ class TestAuth:
 
     async def test_invalid_login_shows_error(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post(
-                "/login",
-                body=b"username=alice&password=wrong",
-                headers=_FORM_CT,
-            )
+            # GET login page to get session + CSRF token
+            page = await client.get("/login")
+            session = _extract_cookie(page)
+            csrf = _extract_csrf_token(page.text)
+            headers = {**_FORM_CT}
+            if session:
+                headers["Cookie"] = f"chirp_session={session}"
+            body = b"username=alice&password=wrong"
+            if csrf:
+                body += f"&_csrf_token={csrf}".encode()
+            response = await client.post("/login", body=body, headers=headers)
             assert response.status == 200
             assert "Invalid" in response.text
 
     async def test_logout_redirects_to_login(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
-            response = await client.post("/logout", headers=auth)
+            response = await client.post(
+                "/logout",
+                headers={**_FORM_CT, **auth},
+                body=b"",
+            )
             assert response.status == 302
             location = ""
             for hname, hvalue in response.headers:
@@ -101,13 +153,19 @@ class TestAuth:
         """Alice, Bob, and Carol can all log in."""
         async with TestClient(example_app) as client:
             for name in ("alice", "bob", "carol"):
-                r = await client.post(
-                    "/login",
-                    body=f"username={name}&password=password".encode(),
-                    headers=_FORM_CT,
-                )
+                # GET login page for session + CSRF
+                page = await client.get("/login")
+                session = _extract_cookie(page)
+                csrf = _extract_csrf_token(page.text)
+                headers = {**_FORM_CT}
+                if session:
+                    headers["Cookie"] = f"chirp_session={session}"
+                body = f"username={name}&password=password"
+                if csrf:
+                    body += f"&_csrf_token={csrf}"
+                r = await client.post("/login", body=body.encode(), headers=headers)
                 assert r.status == 302, f"{name} login failed"
-                assert _extract_cookie(r) is not None
+                assert _extract_cookie(r) is not None or session is not None
 
     async def test_current_user_shown_in_header(self, example_app) -> None:
         """Board shows logged-in user's name in the header."""

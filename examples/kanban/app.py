@@ -50,11 +50,15 @@ from chirp import (
     login_required,
     logout,
 )
+from chirp.http.forms import form_from
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.static import StaticFiles
 from chirp.security.passwords import hash_password, verify_password
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+STATIC_DIR = Path(__file__).parent / "static"
 
 # ---------------------------------------------------------------------------
 # User model + in-memory "database"
@@ -71,19 +75,36 @@ class User:
     is_authenticated: bool = True
 
 
-# Pre-hash the demo password so verify_password works correctly
-_DEMO_HASH = hash_password("password")
+# Lazy-init demo password hash to avoid running argon2/scrypt on every import
+# (saves ~200ms+ per test module reload).
+_demo_hash: str | None = None
 
-USERS: dict[str, User] = {
-    "alice": User(id="alice", name="Alice", password_hash=_DEMO_HASH),
-    "bob": User(id="bob", name="Bob", password_hash=_DEMO_HASH),
-    "carol": User(id="carol", name="Carol", password_hash=_DEMO_HASH),
-}
+
+def _get_demo_hash() -> str:
+    global _demo_hash
+    if _demo_hash is None:
+        _demo_hash = hash_password("password")
+    return _demo_hash
+
+
+_users: dict[str, User] | None = None
+
+
+def _get_users() -> dict[str, User]:
+    global _users
+    if _users is None:
+        h = _get_demo_hash()
+        _users = {
+            "alice": User(id="alice", name="Alice", password_hash=h),
+            "bob": User(id="bob", name="Bob", password_hash=h),
+            "carol": User(id="carol", name="Carol", password_hash=h),
+        }
+    return _users
 
 
 async def load_user(user_id: str) -> User | None:
     """Load a user by ID — called by AuthMiddleware on each request."""
-    return USERS.get(user_id)
+    return _get_users().get(user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +114,10 @@ async def load_user(user_id: str) -> User | None:
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
 
+app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key="kanban-demo-secret")))
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
+app.add_middleware(CSRFMiddleware(CSRFConfig()))
 
 # ---------------------------------------------------------------------------
 # Column definitions
@@ -134,6 +157,29 @@ class Task:
     assignee: str | None
     tags: tuple[str, ...]
     created_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class TaskForm:
+    """Form binding for creating a new task."""
+
+    title: str
+    description: str = ""
+    status: str = "backlog"
+    priority: str = "medium"
+    assignee: str = ""
+    tags: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class EditTaskForm:
+    """Form binding for editing an existing task."""
+
+    title: str
+    description: str = ""
+    priority: str = "medium"
+    assignee: str = ""
+    tags: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +450,7 @@ def _stats_fragment(tasks: list[Task] | None = None) -> Fragment:
 @app.route("/login")
 def login_page():
     """Show the login form."""
-    return Template("login.html", error="", users=USERS)
+    return Template("login.html", error="", users=_get_users())
 
 
 @app.route("/login", methods=["POST"])
@@ -414,7 +460,7 @@ async def do_login(request: Request):
     username = form.get("username", "").strip().lower()
     password = form.get("password", "")
 
-    user = USERS.get(username)
+    user = _get_users().get(username)
     if user and verify_password(password, user.password_hash):
         login(user)
         next_url = request.query.get("next", "/")
@@ -422,7 +468,7 @@ async def do_login(request: Request):
             next_url = "/"
         return Redirect(next_url)
 
-    return Template("login.html", error="Invalid username or password", users=USERS)
+    return Template("login.html", error="Invalid username or password", users=_get_users())
 
 
 @app.route("/logout", methods=["POST"])
@@ -449,30 +495,25 @@ def index(request: Request):
 @login_required
 async def add_task(request: Request):
     """Add a task — returns OOB (column + stats) or ValidationError."""
-    form = await request.form()
-    title = form.get("title", "")
-    description = form.get("description", "")
-    status = form.get("status", "backlog")
-    priority = form.get("priority", "medium")
-    assignee = form.get("assignee", "").strip() or get_user().name
-    raw_tags = form.get("tags", "")
-    tags = tuple(t.strip() for t in raw_tags.split(",") if t.strip())
+    f = await form_from(request, TaskForm)
+    assignee = f.assignee or get_user().name
+    tags = tuple(t.strip() for t in f.tags.split(",") if t.strip())
 
-    errors = _validate_task(title, status, priority)
+    errors = _validate_task(f.title, f.status, f.priority)
     if errors:
         return ValidationError(
             "board.html",
             "add_form",
             errors=errors,
             columns=COLUMNS,
-            form={"title": title, "description": description, "status": status,
-                  "priority": priority, "assignee": assignee or "", "tags": raw_tags},
+            form={"title": f.title, "description": f.description, "status": f.status,
+                  "priority": f.priority, "assignee": assignee, "tags": f.tags},
         )
 
-    _add_task(title, description, status, priority, assignee, tags)
+    _add_task(f.title, f.description, f.status, f.priority, assignee, tags)
     tasks = _get_tasks()
     return OOB(
-        _column_fragment(status, tasks),
+        _column_fragment(f.status, tasks),
         _stats_fragment(tasks),
     )
 
@@ -491,19 +532,15 @@ def edit_task(task_id: int):
 @login_required
 async def save_task(request: Request, task_id: int):
     """Save an edited task — returns OOB (card + stats) or ValidationError."""
-    form = await request.form()
-    title = form.get("title", "")
-    description = form.get("description", "")
-    priority = form.get("priority", "medium")
-    assignee = form.get("assignee", "").strip() or None
-    raw_tags = form.get("tags", "")
-    tags = tuple(t.strip() for t in raw_tags.split(",") if t.strip())
+    f = await form_from(request, EditTaskForm)
+    assignee = f.assignee or None
+    tags = tuple(t.strip() for t in f.tags.split(",") if t.strip())
 
     task = _get_task(task_id)
     if task is None:
         return ("Task not found", 404)
 
-    errors = _validate_task(title, task.status, priority)
+    errors = _validate_task(f.title, task.status, f.priority)
     if errors:
         return ValidationError(
             "task_form.html",
@@ -514,9 +551,9 @@ async def save_task(request: Request, task_id: int):
 
     updated = _update_task(
         task_id,
-        title=title,
-        description=description,
-        priority=priority,
+        title=f.title,
+        description=f.description,
+        priority=f.priority,
         assignee=assignee,
         tags=tags,
     )

@@ -1,16 +1,21 @@
-"""Form data parsing — URL-encoded and multipart.
+"""Form data parsing and binding — URL-encoded and multipart.
 
 Implements ``MultiValueMapping`` for consistent access across
 ``Headers``, ``QueryParams``, and ``FormData``.
+
+``form_from()`` provides lightweight dataclass binding: define a
+frozen dataclass, pass it to ``form_from(request, MyForm)``, and get
+a populated instance. No magic validation — just binding with type
+coercion for ``str``, ``int``, ``float``, and ``bool``.
 
 ``python-multipart`` is an optional dependency (``pip install chirp[forms]``).
 URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 """
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, fields as dc_fields
 from pathlib import Path
-from typing import Any
+from typing import Any, get_type_hints
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +107,115 @@ class FormData(Mapping[str, str]):
     def get_list(self, key: str) -> list[str]:
         """Return all values for *key* (checkboxes, multi-selects)."""
         return list(self._data.get(key, []))
+
+
+class FormBindingError(Exception):
+    """Raised when form data cannot be bound to a dataclass.
+
+    Attributes:
+        errors: Dict mapping field names to lists of error messages.
+    """
+
+    def __init__(self, errors: dict[str, list[str]]) -> None:
+        self.errors = errors
+        fields = ", ".join(sorted(errors))
+        super().__init__(f"Form binding failed for: {fields}")
+
+
+# Type coercion map for form_from()
+_COERCIONS: dict[type, Any] = {
+    str: lambda v: v.strip(),
+    int: int,
+    float: float,
+    bool: lambda v: v.lower() in ("true", "1", "yes", "on"),
+}
+
+
+async def form_from[T](request: Any, datacls: type[T]) -> T:
+    """Bind form data from a request to a dataclass instance.
+
+    Reads ``request.form()`` and populates the given dataclass.
+    Fields with defaults are optional; fields without defaults are required.
+    String fields are stripped of whitespace by default.
+
+    Supports ``str``, ``int``, ``float``, and ``bool`` type coercion.
+    Raises ``FormBindingError`` with a dict of errors for missing or
+    invalid fields.
+
+    Usage::
+
+        @dataclass(frozen=True, slots=True)
+        class TaskForm:
+            title: str
+            description: str = ""
+            priority: str = "medium"
+
+        @app.route("/tasks", methods=["POST"])
+        async def add_task(request: Request):
+            form = await form_from(request, TaskForm)
+            # form.title, form.description, form.priority are populated
+
+    Args:
+        request: A Chirp Request object (anything with an async ``.form()`` method).
+        datacls: A dataclass class to bind form data into.
+
+    Returns:
+        An instance of ``datacls`` populated from the form.
+
+    Raises:
+        FormBindingError: If required fields are missing or type coercion fails.
+    """
+    from dataclasses import MISSING
+
+    form = await request.form()
+    hints = get_type_hints(datacls)
+    field_defs = dc_fields(datacls)
+
+    errors: dict[str, list[str]] = {}
+    values: dict[str, Any] = {}
+
+    for f in field_defs:
+        raw = form.get(f.name)
+        has_default = f.default is not MISSING or f.default_factory is not MISSING  # type: ignore[attr-defined]
+
+        if raw is None:
+            # Field missing from form data entirely
+            if f.default is not MISSING:
+                values[f.name] = f.default
+            elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
+                values[f.name] = f.default_factory()  # type: ignore[attr-defined]
+            else:
+                errors.setdefault(f.name, []).append(f"{f.name} is required.")
+            continue
+
+        # Coerce to target type
+        hint = hints.get(f.name, str)
+        base_type = _unwrap_optional(hint)
+        coerce = _COERCIONS.get(base_type, base_type)
+
+        try:
+            values[f.name] = coerce(raw)
+        except (ValueError, TypeError):
+            errors.setdefault(f.name, []).append(
+                f"Invalid value for {f.name}: expected {base_type.__name__}."
+            )
+
+    if errors:
+        raise FormBindingError(errors)
+
+    return datacls(**values)
+
+
+def _unwrap_optional(hint: Any) -> type:
+    """Extract the base type from ``X | None`` or plain ``X``."""
+    import types
+
+    if isinstance(hint, types.UnionType):
+        # e.g. str | None → pick the non-None type
+        args = [a for a in hint.__args__ if a is not type(None)]
+        if args:
+            return args[0]
+    return hint if isinstance(hint, type) else str
 
 
 async def parse_form_data(

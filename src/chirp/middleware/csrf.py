@@ -29,6 +29,7 @@ htmx (via meta tag)::
 import secrets
 from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from chirp.errors import ConfigurationError, HTTPError
 from chirp.http.request import Request
@@ -125,6 +126,13 @@ class CSRFMiddleware:
     """
 
     __slots__ = ("_config",)
+
+    # Template globals auto-registered by App._freeze() when this
+    # middleware is present. Any middleware can define this attribute.
+    template_globals: ClassVar[dict[str, Any]] = {
+        "csrf_field": csrf_field,
+        "csrf_token": csrf_token,
+    }
 
     def __init__(self, config: CSRFConfig | None = None) -> None:
         self._config = config or CSRFConfig()

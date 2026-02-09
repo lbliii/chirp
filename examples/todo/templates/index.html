@@ -1,6 +1,7 @@
 <html>
 <head>
   <title>Todo App</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
@@ -13,6 +14,12 @@
   </style>
 </head>
 <body>
+<script>
+  document.body.addEventListener("htmx:configRequest", function(event) {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) { event.detail.headers["X-CSRF-Token"] = meta.content; }
+  });
+</script>
 <h1>Todos</h1>
 <form hx-post="/todos" hx-target="#todo-list" hx-swap="outerHTML">
   <input type="text" name="text" placeholder="What needs to be done?" autofocus>

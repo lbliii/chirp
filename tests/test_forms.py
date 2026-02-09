@@ -1,9 +1,11 @@
-"""Tests for form data parsing — URL-encoded and multipart."""
+"""Tests for form data parsing, binding, and multipart."""
+
+from dataclasses import dataclass
 
 import pytest
 
 from chirp.app import App
-from chirp.http.forms import FormData, UploadFile, parse_form_data
+from chirp.http.forms import FormBindingError, FormData, UploadFile, form_from, parse_form_data
 from chirp.http.request import Request
 from chirp.testing import TestClient
 
@@ -176,3 +178,184 @@ class TestRequestForm:
             response = await client.post("/submit", body=b"key=value")
             assert response.status == 200
             assert response.text == "val=value"
+
+
+# ---------------------------------------------------------------------------
+# form_from() — dataclass binding
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SimpleForm:
+    title: str
+    description: str = ""
+    priority: str = "medium"
+
+
+@dataclass(frozen=True, slots=True)
+class TypedForm:
+    name: str
+    age: int
+    score: float = 0.0
+    active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class OptionalForm:
+    name: str
+    nickname: str | None = None
+
+
+class TestFormFrom:
+    """Tests for form_from() — dataclass form binding."""
+
+    async def test_basic_binding(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, SimpleForm)
+            return f"{form.title}|{form.description}|{form.priority}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=My+Task&description=Do+stuff&priority=high",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "My Task|Do stuff|high"
+
+    async def test_defaults_applied(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, SimpleForm)
+            return f"{form.title}|{form.description}|{form.priority}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=Test",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "Test||medium"
+
+    async def test_missing_required_field(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                form = await form_from(request, SimpleForm)
+                return f"ok: {form.title}"
+            except FormBindingError as e:
+                return f"error: {sorted(e.errors.keys())}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "error:" in response.text
+            assert "title" in response.text
+
+    async def test_int_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, TypedForm)
+            return f"{form.name}|{form.age}|{type(form.age).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Alice&age=30",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "Alice|30|int"
+
+    async def test_float_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, TypedForm)
+            return f"{form.score}|{type(form.score).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Bob&age=25&score=9.5",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "9.5|float"
+
+    async def test_bool_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, TypedForm)
+            return f"{form.active}|{type(form.active).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Bob&age=25&active=on",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "True|bool"
+
+    async def test_invalid_int_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                form = await form_from(request, TypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {sorted(e.errors.keys())}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Alice&age=notanumber",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "age" in response.text
+
+    async def test_whitespace_stripped(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, SimpleForm)
+            return f"[{form.title}]"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=++Hello++",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "[Hello]"
+
+    async def test_optional_field_none(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, OptionalForm)
+            return f"{form.name}|{form.nickname}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Alice",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "Alice|None"

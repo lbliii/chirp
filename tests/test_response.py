@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.http.response import Redirect, Response
+from chirp.http.response import Redirect, Response, SSEResponse
 
 
 class TestResponse:
@@ -206,6 +206,58 @@ class TestHtmxResponseHeaders:
         r2 = r1.with_hx_redirect("/home")
         assert r1.headers == ()
         assert ("HX-Redirect", "/home") in r2.headers
+
+
+class TestSSEResponse:
+    """SSEResponse no-op surface must cover every with_*/without_* on Response."""
+
+    def test_sse_returns_self_for_all_noop_methods(self) -> None:
+        """Every no-op method returns the same SSEResponse instance."""
+        sse = SSEResponse(event_stream=None)
+        assert sse.with_status(200) is sse
+        assert sse.with_header("X-Foo", "bar") is sse
+        assert sse.with_headers({"A": "1"}) is sse
+        assert sse.with_content_type("text/plain") is sse
+        assert sse.with_cookie("name", "val") is sse
+        assert sse.without_cookie("name") is sse
+        assert sse.with_hx_redirect("/url") is sse
+        assert sse.with_hx_location("/url") is sse
+        assert sse.with_hx_location("/url", target="#t", swap="innerHTML") is sse
+        assert sse.with_hx_retarget("#sel") is sse
+        assert sse.with_hx_reswap("outerHTML") is sse
+        assert sse.with_hx_trigger("evt") is sse
+        assert sse.with_hx_trigger({"a": 1}) is sse
+        assert sse.with_hx_trigger_after_settle("evt") is sse
+        assert sse.with_hx_trigger_after_swap("evt") is sse
+        assert sse.with_hx_push_url("/url") is sse
+        assert sse.with_hx_push_url(False) is sse
+        assert sse.with_hx_replace_url("/url") is sse
+        assert sse.with_hx_replace_url(False) is sse
+        assert sse.with_hx_refresh() is sse
+
+    def test_sse_covers_all_response_with_methods(self) -> None:
+        """SSEResponse has a no-op for every with_*/without_* method on Response.
+
+        This test auto-detects new methods added to Response, so drift
+        between the two classes is caught immediately.
+        """
+        response_methods = {
+            name
+            for name in dir(Response)
+            if (name.startswith("with_") or name.startswith("without_"))
+            and callable(getattr(Response, name))
+        }
+        sse_methods = {
+            name
+            for name in dir(SSEResponse)
+            if (name.startswith("with_") or name.startswith("without_"))
+            and callable(getattr(SSEResponse, name))
+        }
+        missing = response_methods - sse_methods
+        assert not missing, (
+            f"SSEResponse is missing no-op methods for: {sorted(missing)}. "
+            f"Add them to SSEResponse so middleware chains don't crash."
+        )
 
 
 class TestRedirect:

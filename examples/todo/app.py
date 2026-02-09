@@ -1,57 +1,50 @@
-"""Todo List — htmx fragments with chirp.
+"""Todo List — htmx fragments with chirp.data persistence.
 
-Demonstrates the killer feature: same template renders as a full page
-or a fragment, depending on whether the request came from htmx.
+Demonstrates two killer features together:
+1. Same template renders as a full page or a fragment (htmx)
+2. SQL in, frozen dataclasses out (chirp.data)
+
+Add todos, restart the server, and they're still there.
 
 Run:
+    pip install chirp[data]
     python app.py
 """
 
-import threading
+from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
+from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-
-config = AppConfig(template_dir=TEMPLATES_DIR)
-app = App(config=config)
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+DB_PATH = Path(__file__).parent / "todo.db"
 
 # ---------------------------------------------------------------------------
-# In-memory storage — thread-safe for free-threading
+# Data model — frozen dataclass, same object from DB through to template
 # ---------------------------------------------------------------------------
 
-_todos: list[dict] = []
-_lock = threading.Lock()
-_next_id = 1
+
+@dataclass(frozen=True, slots=True)
+class Todo:
+    id: int
+    text: str
+    done: bool
 
 
-def _get_todos() -> list[dict]:
-    with _lock:
-        return list(_todos)
+# ---------------------------------------------------------------------------
+# App — database connects at startup, migrations run automatically
+# ---------------------------------------------------------------------------
 
-
-def _add_todo(text: str) -> dict:
-    global _next_id
-    with _lock:
-        todo = {"id": _next_id, "text": text, "done": False}
-        _next_id += 1
-        _todos.append(todo)
-        return todo
-
-
-def _toggle_todo(todo_id: int) -> None:
-    with _lock:
-        for todo in _todos:
-            if todo["id"] == todo_id:
-                todo["done"] = not todo["done"]
-                return
-
-
-def _delete_todo(todo_id: int) -> None:
-    with _lock:
-        _todos[:] = [t for t in _todos if t["id"] != todo_id]
-
+app = App(
+    config=AppConfig(template_dir=TEMPLATES_DIR),
+    db=f"sqlite:///{DB_PATH}",
+    migrations=str(MIGRATIONS_DIR),
+)
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key="todo-demo-secret")))
+app.add_middleware(CSRFMiddleware())
 
 # No custom filter needed — using inline ternary in the template instead:
 #   class="{{ 'done' if todo.done else '' }}"
@@ -62,9 +55,9 @@ def _delete_todo(todo_id: int) -> None:
 
 
 @app.route("/")
-def index(request: Request):
+async def index(request: Request):
     """Full page or fragment depending on htmx request."""
-    todos = _get_todos()
+    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
     if request.is_fragment:
         return Fragment("index.html", "todo_list", todos=todos)
     return Template("index.html", todos=todos)
@@ -76,28 +69,33 @@ async def add_todo(request: Request):
     form = await request.form()
     text = (form.get("text") or "").strip()
     if not text:
+        todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
         return ValidationError(
-            "index.html", "todo_list",
+            "index.html",
+            "todo_list",
             error="Todo text is required",
-            todos=_get_todos(),
+            todos=todos,
         )
-    _add_todo(text)
-    return Fragment("index.html", "todo_list", todos=_get_todos())
+    await app.db.execute("INSERT INTO todos (text, done) VALUES (?, ?)", text, False)
+    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
+    return Fragment("index.html", "todo_list", todos=todos)
 
 
 @app.route("/todos/{todo_id}/toggle", methods=["POST"])
-def toggle_todo(todo_id: int):
+async def toggle_todo(todo_id: int):
     """Toggle a todo's completion state — returns the list fragment."""
-    _toggle_todo(todo_id)
-    todos = _get_todos()
+    await app.db.execute(
+        "UPDATE todos SET done = NOT done WHERE id = ?", todo_id
+    )
+    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
     return Fragment("index.html", "todo_list", todos=todos)
 
 
 @app.route("/todos/{todo_id}", methods=["DELETE"])
-def delete_todo(todo_id: int):
+async def delete_todo(todo_id: int):
     """Delete a todo — returns the list fragment."""
-    _delete_todo(todo_id)
-    todos = _get_todos()
+    await app.db.execute("DELETE FROM todos WHERE id = ?", todo_id)
+    todos = await app.db.fetch(Todo, "SELECT * FROM todos ORDER BY id")
     return Fragment("index.html", "todo_list", todos=todos)
 
 
