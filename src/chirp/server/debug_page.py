@@ -137,6 +137,12 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
 
     ctx: dict[str, Any] = {"type": cls_name}
 
+    # Extract error code and docs URL (available on all Kida exceptions)
+    error_code = getattr(exc, "code", None)
+    if error_code is not None:
+        ctx["error_code"] = getattr(error_code, "value", None)
+        ctx["docs_url"] = getattr(error_code, "docs_url", None)
+
     if cls_name == "TemplateSyntaxError":
         ctx["template"] = getattr(exc, "filename", None) or getattr(exc, "name", None)
         ctx["lineno"] = getattr(exc, "lineno", None)
@@ -160,6 +166,11 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["values"] = getattr(exc, "values", {})
         ctx["suggestion"] = getattr(exc, "suggestion", None)
         ctx["message"] = getattr(exc, "message", str(exc))
+        # Extract source snippet (new: runtime errors now have source context)
+        snippet = getattr(exc, "source_snippet", None)
+        if snippet is not None:
+            ctx["source_lines"] = list(getattr(snippet, "lines", ()))
+            ctx["snippet_error_line"] = getattr(snippet, "error_line", None)
         return ctx
 
     if cls_name == "UndefinedError":
@@ -167,6 +178,11 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["lineno"] = getattr(exc, "lineno", None)
         ctx["variable"] = getattr(exc, "name", None)
         ctx["message"] = str(exc)
+        # Extract source snippet (new: UndefinedError now has source context)
+        snippet = getattr(exc, "source_snippet", None)
+        if snippet is not None:
+            ctx["source_lines"] = list(getattr(snippet, "lines", ()))
+            ctx["snippet_error_line"] = getattr(snippet, "error_line", None)
         return ctx
 
     if cls_name == "TemplateNotFoundError":
@@ -385,7 +401,17 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     """Render the kida template error panel."""
     parts: list[str] = []
     parts.append('<div class="template-panel">')
-    parts.append(f'<h3>Template Error: {_esc(ctx["type"])}</h3>')
+
+    # Error code badge + type header
+    error_code = ctx.get("error_code")
+    if error_code:
+        parts.append(
+            f'<h3><span style="background:#f7768e;color:#1a1b26;padding:2px 8px;'
+            f'border-radius:3px;font-size:0.85em;margin-right:8px">{_esc(error_code)}</span>'
+            f'Template Error: {_esc(ctx["type"])}</h3>'
+        )
+    else:
+        parts.append(f'<h3>Template Error: {_esc(ctx["type"])}</h3>')
 
     message = ctx.get("message", "")
     parts.append(f'<div class="exc-message">{_esc(message)}</div>')
@@ -404,10 +430,11 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     if expression:
         parts.append(f'<div class="request-line"><span class="label">Expression</span><span class="val">{_esc(expression)}</span></div>')
 
-    # Source lines (for syntax errors)
+    # Source lines (syntax errors have lineno as highlight, runtime/undefined use snippet_error_line)
     source_lines = ctx.get("source_lines")
-    if source_lines and lineno:
-        parts.append(f'<div class="template-source">{_render_source_lines(source_lines, lineno)}</div>')
+    highlight_line = ctx.get("snippet_error_line") or lineno
+    if source_lines and highlight_line:
+        parts.append(f'<div class="template-source">{_render_source_lines(source_lines, highlight_line)}</div>')
 
     # Values (for runtime errors)
     values = ctx.get("values", {})
@@ -430,6 +457,15 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     suggestion = ctx.get("suggestion")
     if suggestion:
         parts.append(f'<div class="template-suggestion">💡 {_esc(suggestion)}</div>')
+
+    # Docs link
+    docs_url = ctx.get("docs_url")
+    if docs_url and error_code:
+        parts.append(
+            f'<div class="template-suggestion" style="margin-top:8px">'
+            f'📖 <a href="{_esc(docs_url)}" style="color:#7aa2f7">'
+            f'{_esc(error_code)} documentation</a></div>'
+        )
 
     parts.append("</div>")
     return "".join(parts)
