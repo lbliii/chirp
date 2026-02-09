@@ -152,11 +152,13 @@ Convenience for 302 redirects: `Redirect(url)`.
 
 | Export | Description |
 |--------|-------------|
-| `get_user()` | Get the current authenticated user |
+| `get_user()` | Get the current authenticated user (or `AnonymousUser`) |
 | `login(user)` | Set the authenticated user in the session |
-| `logout()` | Clear the authenticated user |
+| `logout()` | Clear the authenticated user from the session |
 | `@login_required` | Decorator: require authentication |
-| `@requires(role)` | Decorator: require a specific role |
+| `@requires(*permissions)` | Decorator: require specific permissions |
+
+See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
 
 ## Errors
 

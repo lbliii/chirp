@@ -194,35 +194,50 @@ app.add_middleware(timing)
 
 Chirp uses a single middleware function instead of separate before/after hooks.
 
-## Sessions
+## Sessions and Auth
 
 :::{tab-set}
 :::{tab-item} Flask
 ```python
-from flask import session
+from flask import session, redirect
+from flask_login import login_user, login_required
 
 @app.route("/login", methods=["POST"])
-def login():
+def do_login():
     session["user_id"] = user.id
+    login_user(user)
     return redirect("/dashboard")
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("dashboard.html")
 ```
 :::{/tab-item}
 
 :::{tab-item} Chirp
 ```python
-from chirp import g, Redirect
+from chirp import login, logout, login_required, get_user, Redirect, Template
 
 @app.route("/login", methods=["POST"])
-async def login(request: Request):
+async def do_login(request: Request):
     form = await request.form()
-    user = authenticate(form)
-    g.session["user_id"] = user.id
-    return Redirect("/dashboard")
+    user = await verify_credentials(form["username"], form["password"])
+    if user:
+        login(user)
+        return Redirect("/dashboard")
+    return Template("login.html", error="Invalid credentials")
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    user = get_user()
+    return Template("dashboard.html", user=user)
 ```
 :::{/tab-item}
 :::{/tab-set}
 
-Chirp sessions live on `g.session` (requires `SessionMiddleware`).
+Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/middleware/builtin|Built-in Middleware]] for setup.
 
 ## What Chirp Adds
 
@@ -245,7 +260,9 @@ Beyond Flask equivalents, Chirp offers:
 | `request.args` | `request.query` |
 | `request` (global) | `request` (parameter) |
 | `redirect()` | `Redirect(...)` |
-| `session["key"]` | `g.session["key"]` |
+| `session["key"]` | `get_session()["key"]` |
+| `login_user(user)` | `login(user)` |
+| `@login_required` | `@login_required` |
 | `@app.errorhandler` | `@app.error` |
 | `<int:id>` | `{id:int}` |
 | N/A | `Fragment(...)` |
