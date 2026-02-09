@@ -41,6 +41,7 @@ __all__ = [
     "ChirpError",
     "ConfigurationError",
     "EventStream",
+    "FormBindingError",
     "Fragment",
     "HTTPError",
     "MethodNotAllowed",
@@ -56,6 +57,7 @@ __all__ = [
     "Template",
     "ToolCallEvent",
     "ValidationError",
+    "form_from",
     "g",
     "get_request",
     "get_user",
@@ -131,6 +133,11 @@ def __getattr__(name: str) -> object:
         from chirp import errors as _errors
 
         return getattr(_errors, name)
+
+    if name in ("form_from", "FormBindingError"):
+        from chirp.http import forms as _forms
+
+        return getattr(_forms, name)
 
     if name == "ToolCallEvent":
         from chirp.tools.events import ToolCallEvent

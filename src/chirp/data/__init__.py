@@ -26,6 +26,7 @@ Requires ``aiosqlite`` (for SQLite) or ``asyncpg`` (for PostgreSQL)::
 from chirp.data.database import Database, Notification, get_db
 from chirp.data.errors import DataError, DriverNotInstalledError, MigrationError
 from chirp.data.migrate import migrate
+from chirp.data.query import Query
 
 __all__ = [
     "DataError",
@@ -33,6 +34,7 @@ __all__ = [
     "DriverNotInstalledError",
     "MigrationError",
     "Notification",
+    "Query",
     "get_db",
     "migrate",
 ]

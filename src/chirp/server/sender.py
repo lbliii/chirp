@@ -83,15 +83,39 @@ async def send_streaming_response(
                         "body": chunk.encode("utf-8"),
                         "more_body": True,
                     })
-    except Exception:
-        # Mid-stream error: always log, emit HTML comment, and close
-        logger.exception("Streaming response error")
+    except Exception as exc:
+        # Mid-stream error: log with structured formatting, emit visible error
+        import sys
 
-        import traceback
+        from chirp.server.terminal_errors import _is_kida_error
+
+        # Log: use format_compact for kida errors, exception for others
+        if _is_kida_error(exc) and hasattr(exc, "format_compact"):
+            logger.error("Streaming error:\n%s", exc.format_compact())
+        else:
+            logger.exception("Streaming response error")
 
         if debug:
-            tb = traceback.format_exc()
-            error_chunk = f"<!-- chirp: render error\n{tb}\n-->"
+            # Visible error div instead of invisible HTML comment
+            if _is_kida_error(exc) and hasattr(exc, "format_compact"):
+                error_msg = exc.format_compact()
+            else:
+                import traceback
+
+                error_msg = traceback.format_exc()
+            # Escape HTML in the error message
+            escaped = (
+                error_msg
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+            error_chunk = (
+                '<div class="chirp-error" data-status="500"'
+                f' style="white-space:pre-wrap;font-family:monospace;'
+                f'padding:1em;background:#1a1b26;color:#c0caf5;border:2px solid #f7768e">'
+                f"{escaped}</div>"
+            )
         else:
             error_chunk = "<!-- chirp: render error -->"
         await send({
@@ -99,6 +123,8 @@ async def send_streaming_response(
             "body": error_chunk.encode("utf-8"),
             "more_body": True,
         })
+        # Re-store exception info for any caller that needs it
+        sys.exc_info()
 
     # Close the stream
     await send({

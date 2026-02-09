@@ -113,7 +113,9 @@ async def handle_internal_error(
     debug: bool,
 ) -> Response:
     """Handle unexpected exceptions as 500 errors."""
-    logger.exception("500 %s %s", request.method, request.path)
+    from chirp.server.terminal_errors import log_error
+
+    log_error(exc, request)
 
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:

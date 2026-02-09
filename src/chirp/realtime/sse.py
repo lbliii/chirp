@@ -116,12 +116,21 @@ async def handle_sse(
         except asyncio.CancelledError:
             pass
         except Exception as exc:
-            logger.exception("SSE event generator error")
+            # Log with structured formatting for kida errors
+            from chirp.server.terminal_errors import _is_kida_error
+
+            if _is_kida_error(exc) and hasattr(exc, "format_compact"):
+                logger.error("SSE error:\n%s", exc.format_compact())
+            else:
+                logger.exception("SSE event generator error")
             # Send an error event so the client can react
             if debug:
-                import traceback
+                if _is_kida_error(exc) and hasattr(exc, "format_compact"):
+                    detail = exc.format_compact()
+                else:
+                    import traceback
 
-                detail = traceback.format_exc()
+                    detail = traceback.format_exc()
             else:
                 detail = "Internal server error"
             error_event = SSEEvent(data=detail, event="error")

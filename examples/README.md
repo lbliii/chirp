@@ -14,14 +14,20 @@ No templates. Pure Python. Chirp in ~30 lines.
 cd examples/hello && python app.py
 ```
 
-### `todo/` — htmx Fragments
+### `todo/` — htmx Fragments + Database Persistence
 
-The killer feature. A todo list where the same template renders as a full page or a fragment,
-depending on whether the request came from htmx. Add, toggle, and delete items with partial
-page updates — zero client-side JavaScript. Empty submissions return a `ValidationError`
-with a 422 status and an inline error message.
+The killer feature, now with persistence. A todo list backed by `chirp.data` (SQLite) where
+the same template renders as a full page or a fragment, depending on whether the request
+came from htmx. Add, toggle, and delete items with partial page updates — zero client-side
+JavaScript. Empty submissions return a `ValidationError` with a 422 status and an inline
+error message. Restart the server and your todos are still there.
+
+Uses `App(db=..., migrations=...)` for zero-boilerplate database setup, a frozen `Todo`
+dataclass that flows from SQL query through to template, and a single migration file for
+the schema.
 
 ```bash
+pip install chirp[data]
 cd examples/todo && python app.py
 ```
 
@@ -305,8 +311,8 @@ pytest examples/hello/
 | `@app.on_worker_startup` | | | | | | | x | x | | | | | | | | | |
 | `@app.on_worker_shutdown` | | | | | | | x | x | | | | | | | | | |
 | `httpx` (real API) | | | | | | | x | | | | | | | | | | |
-| `chirp.data` (SQLite) | | | | | | x | | x | | | | | | | | | |
-| `App(db=..., migrations=...)` | | | | | | x | | | | | | | | | | | |
+| `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | |
+| `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | |
 | `db.transaction()` | | | | | | x | | | | | | | | | | | |
 | `db.execute_many()` | | | | | | x | | | | | | | | | | | |
 | `db.fetch_val()` | | | | | | x | | | | | | | | | | | |
