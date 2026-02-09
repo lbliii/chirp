@@ -3,10 +3,13 @@
 Handles both standard single-body responses and chunked streaming responses.
 """
 
+import logging
 from collections.abc import AsyncIterator
 
 from chirp._internal.asgi import Send
 from chirp.http.response import Response, StreamingResponse
+
+logger = logging.getLogger("chirp.server")
 
 
 async def send_response(response: Response, send: Send) -> None:
@@ -81,7 +84,9 @@ async def send_streaming_response(
                         "more_body": True,
                     })
     except Exception:
-        # Mid-stream error: emit HTML comment and close
+        # Mid-stream error: always log, emit HTML comment, and close
+        logger.exception("Streaming response error")
+
         import traceback
 
         if debug:

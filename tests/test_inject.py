@@ -93,6 +93,42 @@ class TestHTMLInjectSkips:
             response = await client.get("/api")
             assert SCRIPT_TAG not in response.text
 
+    async def test_skips_sse_response(self) -> None:
+        """SSE (EventStream) responses are passed through unchanged."""
+        import asyncio
+
+        from chirp import EventStream, SSEEvent
+
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG))
+
+        @app.route("/events")
+        def events():
+            async def stream():
+                yield SSEEvent(data="</body>", event="test")
+
+            return EventStream(stream())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+            assert result.status == 200
+            assert result.events[0].data == "</body>"
+
+    async def test_handles_html_with_charset(self) -> None:
+        """Injection works when content_type includes charset."""
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG))
+
+        @app.route("/")
+        def index():
+            return "<html><body>Hi</body></html>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            # chirp sets text/html; charset=utf-8 by default
+            assert "text/html" in response.content_type
+            assert SCRIPT_TAG + "</body>" in response.text
+
 
 class TestHTMLInjectWithStaticFiles:
     async def test_injects_into_static_html(self, tmp_path) -> None:

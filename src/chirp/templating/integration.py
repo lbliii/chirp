@@ -28,6 +28,8 @@ def create_environment(
         loader=FileSystemLoader(str(config.template_dir)),
         autoescape=config.autoescape,
         auto_reload=config.debug,
+        trim_blocks=config.trim_blocks,
+        lstrip_blocks=config.lstrip_blocks,
     )
 
     # Register user-defined filters

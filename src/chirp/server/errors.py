@@ -5,6 +5,7 @@ Response objects, using registered error handlers or sensible defaults.
 """
 
 import inspect
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -15,10 +16,30 @@ from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.server.negotiation import negotiate
 
+logger = logging.getLogger("chirp.server")
+
 
 def default_fragment_error(status: int, detail: str) -> str:
     """Minimal HTML snippet for fragment error responses."""
     return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
+
+
+def _with_htmx_error_headers(response: Response, request: Request) -> Response:
+    """Add htmx error-handling headers when the request is a fragment.
+
+    Headers added:
+    - ``HX-Retarget: #chirp-error`` — redirect error content to a dedicated container
+    - ``HX-Reswap: innerHTML`` — replace (not append) the error content
+    - ``HX-Trigger: chirpError`` — fire a client-side event for custom handling
+    """
+    if not request.is_fragment:
+        return response
+    return (
+        response
+        .with_header("HX-Retarget", "#chirp-error")
+        .with_header("HX-Reswap", "innerHTML")
+        .with_header("HX-Trigger", "chirpError")
+    )
 
 
 async def call_error_handler(
@@ -58,6 +79,8 @@ async def handle_http_error(
     debug: bool,
 ) -> Response:
     """Map an HTTPError to a Response using registered error handlers."""
+    logger.debug("%d %s %s — %s", exc.status, request.method, request.path, exc.detail)
+
     # Try exact exception type, then status code
     handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
     if handler is not None:
@@ -79,7 +102,7 @@ async def handle_http_error(
     resp = Response(body=body).with_status(exc.status)
     for name, value in exc.headers:
         resp = resp.with_header(name, value)
-    return resp
+    return _with_htmx_error_headers(resp, request)
 
 
 async def handle_internal_error(
@@ -90,22 +113,20 @@ async def handle_internal_error(
     debug: bool,
 ) -> Response:
     """Handle unexpected exceptions as 500 errors."""
+    logger.exception("500 %s %s", request.method, request.path)
+
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:
         return await call_error_handler(handler, request, exc, kida_env)
 
     if debug:
-        import traceback
+        from chirp.server.debug_page import render_debug_page
 
-        tb = traceback.format_exc()
-        if request.is_fragment:
-            return Response(
-                body=f'<div class="chirp-error" data-status="500"><pre>{tb}</pre></div>',
-                status=500,
-            )
-        return Response(body=f"<pre>{tb}</pre>", status=500)
+        body = render_debug_page(exc, request, is_fragment=request.is_fragment)
+        return _with_htmx_error_headers(Response(body=body, status=500), request)
 
     if request.is_fragment:
-        return Response(body=default_fragment_error(500, "Internal Server Error"), status=500)
+        resp = Response(body=default_fragment_error(500, "Internal Server Error"), status=500)
+        return _with_htmx_error_headers(resp, request)
 
     return Response(body="Internal Server Error", status=500)

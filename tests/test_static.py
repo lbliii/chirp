@@ -302,6 +302,40 @@ class TestIndexResolution:
             assert response.status == 200
             assert "<h1>Docs</h1>" in response.text
 
+    async def test_custom_index_filename(self, tmp_path) -> None:
+        """The index parameter controls which file is served for directories."""
+        site = tmp_path / "site"
+        site.mkdir()
+        (site / "default.htm").write_text("<h1>Default</h1>")
+
+        app = App()
+        app.add_middleware(StaticFiles(
+            directory=site, prefix="/", index="default.htm",
+        ))
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert "<h1>Default</h1>" in response.text
+
+    async def test_root_without_index_falls_through(self, tmp_path) -> None:
+        """GET / falls through when the root has no index file."""
+        site = tmp_path / "site"
+        site.mkdir()
+        (site / "about.html").write_text("about")
+
+        app = App()
+        app.add_middleware(StaticFiles(directory=site, prefix="/"))
+
+        @app.route("/")
+        def home():
+            return "dynamic home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert response.text == "dynamic home"
+
 
 # ------------------------------------------------------------------
 # Custom 404 page
@@ -351,3 +385,32 @@ class TestCustomNotFoundPage:
             response = await client.get("/nope.css")
             # Should fall through to 404 from the router (no custom page found)
             assert response.status == 404
+
+    async def test_not_found_page_traversal_blocked(self, static_dir) -> None:
+        """Path traversal in not_found_page is blocked."""
+        app = App()
+        app.add_middleware(StaticFiles(
+            directory=static_dir, prefix="/",
+            not_found_page="../../../etc/passwd",
+        ))
+
+        async with TestClient(app) as client:
+            # not_found_page resolves outside directory — falls through
+            response = await client.get("/nonexistent")
+            assert response.status == 404
+
+    async def test_custom_404_lets_routes_through(self, static_dir) -> None:
+        """Dynamic routes take priority over the custom 404 page."""
+        app = App()
+        app.add_middleware(StaticFiles(
+            directory=static_dir, prefix="/", not_found_page="404.html",
+        ))
+
+        @app.route("/api/health")
+        def health():
+            return {"status": "ok"}
+
+        async with TestClient(app) as client:
+            response = await client.get("/api/health")
+            assert response.status == 200
+            assert "ok" in response.text

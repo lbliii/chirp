@@ -44,3 +44,19 @@ class TestAppConfig:
     def test_static_dir_none(self) -> None:
         cfg = AppConfig(static_dir=None)
         assert cfg.static_dir is None
+
+    def test_reload_include_default(self) -> None:
+        cfg = AppConfig()
+        assert cfg.reload_include == ()
+
+    def test_reload_dirs_default(self) -> None:
+        cfg = AppConfig()
+        assert cfg.reload_dirs == ()
+
+    def test_reload_include_custom(self) -> None:
+        cfg = AppConfig(reload_include=(".html", ".css", ".md"))
+        assert cfg.reload_include == (".html", ".css", ".md")
+
+    def test_reload_dirs_custom(self) -> None:
+        cfg = AppConfig(reload_dirs=("./templates", "./static"))
+        assert cfg.reload_dirs == ("./templates", "./static")

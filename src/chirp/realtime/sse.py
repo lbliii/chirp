@@ -8,6 +8,7 @@ and sends periodic heartbeat comments to keep the connection alive.
 import asyncio
 import contextlib
 import json as json_module
+import logging
 from typing import Any
 
 from kida import Environment
@@ -15,6 +16,8 @@ from kida import Environment
 from chirp._internal.asgi import Receive, Send
 from chirp.realtime.events import EventStream, SSEEvent
 from chirp.templating.returns import Fragment
+
+logger = logging.getLogger("chirp.server")
 
 
 async def handle_sse(
@@ -117,6 +120,16 @@ async def handle_sse(
                     await pending_next
         except asyncio.CancelledError:
             pass
+        except Exception:
+            logger.exception("SSE event generator error")
+            # Send an error event so the client can react
+            error_event = SSEEvent(data="Internal server error", event="error")
+            with contextlib.suppress(Exception):
+                await send({
+                    "type": "http.response.body",
+                    "body": error_event.encode().encode("utf-8"),
+                    "more_body": True,
+                })
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())
