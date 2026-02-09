@@ -269,3 +269,12 @@ class SSEResponse:
     def with_content_type(self, content_type: str) -> SSEResponse:  # noqa: ARG002
         """No-op: SSE content type is always text/event-stream."""
         return self
+
+    def with_cookie(  # noqa: ARG002
+        self,
+        name: str = "",
+        value: str = "",
+        **kwargs: Any,
+    ) -> SSEResponse:
+        """No-op: SSE responses don't carry Set-Cookie headers."""
+        return self
