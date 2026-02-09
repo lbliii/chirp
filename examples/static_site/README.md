@@ -26,13 +26,11 @@ pounce examples.static_site.app:app --reload --reload-include ".html,.css"
 
 ## How It Works
 
-```
-Browser ──GET /──▶ HTMLInject ──▶ StaticFiles ──▶ public/index.html
-                      │
-                      ▼
-              injects <script> before </body>
-                      │
-                      ▼
-              Browser opens EventSource("/__reload__")
-              and reloads on "reload" events
+```mermaid
+flowchart LR
+    Browser -- "GET /" --> HTMLInject
+    HTMLInject --> StaticFiles
+    StaticFiles --> HTML["public/index.html"]
+    HTMLInject --> Inject["injects script before /body"]
+    Inject --> Reload["Browser opens EventSource('/__reload__')\nand reloads on 'reload' events"]
 ```

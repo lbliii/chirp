@@ -12,12 +12,12 @@ category: reference
 
 ## Error Hierarchy
 
-```
-ChirpError
-├── ConfigurationError   # Invalid config (missing secret_key, etc.)
-└── HTTPError            # HTTP-level errors
-    ├── NotFound         # 404
-    └── MethodNotAllowed # 405
+```mermaid
+flowchart TD
+    ChirpError --> ConfigurationError["ConfigurationError\nInvalid config (missing secret_key, etc.)"]
+    ChirpError --> HTTPError["HTTPError\nHTTP-level errors"]
+    HTTPError --> NotFound["NotFound — 404"]
+    HTTPError --> MethodNotAllowed["MethodNotAllowed — 405"]
 ```
 
 All Chirp exceptions inherit from `ChirpError`. HTTP errors carry a status code and detail message.

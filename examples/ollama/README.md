@@ -70,25 +70,25 @@ Try asking things like:
 
 ## Architecture
 
-```
-Browser ──POST /chat──▶ Chirp (saves message, returns scaffolding)
-   │                      │
-   │◀─ user bubble + ─────┘  (htmx swaps HTML)
-   │   SSE-connected div
-   │
-   ├──GET /chat/stream──▶ Chirp ──POST /api/chat──▶ Ollama
-   │                      │                          │
-   │                      │◀── tool_calls ───────────┘
-   │                      │
-   │                      ├──▶ ToolRegistry.call_tool()
-   │                      │       └──▶ ToolEventBus.emit()
-   │                      │
-   │◀─ SSE /feed ─────────┤  (activity panel lights up)
-   │                      │
-   │                      ├──▶ Ollama (streaming, with tool results)
-   │                      │◀── tokens ──────────────┘
-   │                      │
-   │◀─ SSE tokens ────────┘  (assistant bubble grows word-by-word)
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Chirp
+    participant Ollama
+
+    Browser->>Chirp: POST /chat
+    Chirp-->>Browser: user bubble + SSE-connected div (htmx swaps HTML)
+
+    Browser->>Chirp: GET /chat/stream
+    Chirp->>Ollama: POST /api/chat
+    Ollama-->>Chirp: tool_calls
+
+    Note over Chirp: ToolRegistry.call_tool()<br>→ ToolEventBus.emit()
+    Chirp-->>Browser: SSE /feed (activity panel lights up)
+
+    Chirp->>Ollama: streaming, with tool results
+    Ollama-->>Chirp: tokens
+    Chirp-->>Browser: SSE tokens (assistant bubble grows word-by-word)
 ```
 
 The key insight: `ToolRegistry.call_tool()` is the bridge. It dispatches

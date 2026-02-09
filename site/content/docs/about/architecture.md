@@ -14,30 +14,38 @@ category: explanation
 
 Chirp is organized into three layers, each with a clear responsibility:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Surface Layer -- What developers touch                 │
-│                                                         │
-│  App          @app.route()      AppConfig               │
-│  Template     Fragment          Stream                  │
-│  EventStream  Response          Redirect                │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│  Core Layer -- Typed, immutable where honest            │
-│                                                         │
-│  Request (frozen, slots)    Router (compiled)            │
-│  Response (.with_*() chain) Middleware (Protocol)        │
-│  Headers (immutable)        Route (frozen)               │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│  Engine Layer -- ASGI + integrations                    │
-│                                                         │
-│  ASGI handler        Kida environment                   │
-│  Dev server          SSE handler                        │
-│  anyio runtime                                          │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Surface["Surface Layer — What developers touch"]
+        S1["App"]
+        S2["@app.route()"]
+        S3["AppConfig"]
+        S4["Template"]
+        S5["Fragment"]
+        S6["Stream"]
+        S7["EventStream"]
+        S8["Response"]
+        S9["Redirect"]
+    end
+
+    subgraph Core["Core Layer — Typed, immutable where honest"]
+        C1["Request (frozen, slots)"]
+        C2["Router (compiled)"]
+        C3["Response (.with_*() chain)"]
+        C4["Middleware (Protocol)"]
+        C5["Headers (immutable)"]
+        C6["Route (frozen)"]
+    end
+
+    subgraph Engine["Engine Layer — ASGI + integrations"]
+        E1["ASGI handler"]
+        E2["Kida environment"]
+        E3["Dev server"]
+        E4["SSE handler"]
+        E5["anyio runtime"]
+    end
+
+    Surface --> Core --> Engine
 ```
 
 ### Surface Layer
@@ -96,10 +104,11 @@ A request flows through the system like this:
 
 Chirp owns the developer interface and delegates commodity infrastructure:
 
-```
-chirp (the framework)
-├── kida          # Template engine (same author, same ecosystem)
-└── anyio         # Async runtime (not worth rewriting)
+```mermaid
+flowchart TD
+    chirp["chirp (the framework)"]
+    chirp --> kida["kida — Template engine\n(same author, same ecosystem)"]
+    chirp --> anyio["anyio — Async runtime\n(not worth rewriting)"]
 ```
 
 Optional extras add focused capabilities without bloating the core:

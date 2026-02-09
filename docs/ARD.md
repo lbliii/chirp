@@ -28,47 +28,21 @@
 
 ## 2. System Context
 
-```
-                    ┌──────────────────────────────────┐
-                    │         ASGI Server              │
-                    │  (pounce / uvicorn / granian)    │
-                    └───────────────┬──────────────────┘
-                                    │ ASGI protocol
-                                    │ (scope, receive, send)
-                    ┌───────────────▼──────────────────┐
-                    │           Chirp App               │
-                    │                                   │
-                    │  ┌─────────────────────────────┐  │
-                    │  │     ASGI Handler             │  │
-                    │  │  (typed scope translation)   │  │
-                    │  └──────────────┬──────────────┘  │
-                    │                 │                  │
-                    │  ┌──────────────▼──────────────┐  │
-                    │  │   Middleware Pipeline        │  │
-                    │  │  (function chain)            │  │
-                    │  └──────────────┬──────────────┘  │
-                    │                 │                  │
-                    │  ┌──────────────▼──────────────┐  │
-                    │  │       Router                 │  │
-                    │  │  (compiled route table)      │  │
-                    │  └──────────────┬──────────────┘  │
-                    │                 │                  │
-                    │  ┌──────────────▼──────────────┐  │
-                    │  │    Route Handler             │  │
-                    │  │  (user function)             │  │
-                    │  └──────────────┬──────────────┘  │
-                    │                 │                  │
-                    │  ┌──────────────▼──────────────┐  │
-                    │  │   Content Negotiation        │  │
-                    │  │  (return value -> Response)  │  │
-                    │  └──────────────┬──────────────┘  │
-                    │                 │                  │
-                    │  ┌──────────────▼──────────────┐  │
-                    │  │      Kida Engine             │  │
-                    │  │  (Template / Fragment /      │  │
-                    │  │   Stream rendering)          │  │
-                    │  └─────────────────────────────┘  │
-                    └───────────────────────────────────┘
+```mermaid
+flowchart TD
+    Server["ASGI Server\n(pounce / uvicorn / granian)"]
+    Server -->|"ASGI protocol\n(scope, receive, send)"| ChirpApp
+
+    subgraph ChirpApp["Chirp App"]
+        Handler["ASGI Handler\n(typed scope translation)"]
+        MW["Middleware Pipeline\n(function chain)"]
+        Router["Router\n(compiled route table)"]
+        Route["Route Handler\n(user function)"]
+        CN["Content Negotiation\n(return value → Response)"]
+        Kida["Kida Engine\n(Template / Fragment /\nStream rendering)"]
+
+        Handler --> MW --> Router --> Route --> CN --> Kida
+    end
 ```
 
 ---
@@ -132,14 +106,14 @@ core, core depends on engine. No upward dependencies. No circular imports.
 
 ### 4.1 App Lifecycle
 
-```
-    ┌─────────┐     ┌──────────┐     ┌────────┐     ┌─────────┐
-    │  SETUP  │────>│ COMPILE  │────>│ FROZEN │────>│ RUNNING │
-    └─────────┘     └──────────┘     └────────┘     └─────────┘
+```mermaid
+flowchart LR
+    SETUP["**SETUP**\n@app.route()\n@app.error()\nadd_middleware()"]
+    COMPILE["**COMPILE**\napp.run()\ntriggers\ncompilation"]
+    FROZEN["**FROZEN**\nRoute table\nis immutable\nNo mutation"]
+    RUNNING["**RUNNING**\nServing\nrequests"]
 
-    @app.route()     app.run()        Route table     Serving
-    @app.error()     triggers         is immutable    requests
-    add_middleware()  compilation      No mutation
+    SETUP --> COMPILE --> FROZEN --> RUNNING
 ```
 
 **Setup phase** (mutable): Decorators register routes, error handlers, middleware, template
@@ -157,55 +131,19 @@ frozen pipeline. Request-scoped state uses ContextVar, never shared mutable stat
 
 ### 4.2 Request Flow
 
-```
-    ASGI scope + receive
-           │
-           ▼
-    ┌──────────────┐
-    │ ASGIHandler   │  Translate scope dict -> typed Request
-    │               │  Set ContextVar for request scope
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ Middleware 1  │  async def mw(request, next) -> Response
-    │  (e.g. CORS) │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ Middleware N  │  Each middleware calls next(request)
-    │  (e.g. auth) │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │   Router     │  Match path -> Route -> handler function
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Handler     │  User function executes, returns a value
-    │  (user code) │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────────┐
-    │ ContentNegotiator │  Map return value to Response:
-    │                   │    str       -> Response(text/html)
-    │                   │    dict      -> Response(application/json)
-    │                   │    Template  -> kida render -> Response
-    │                   │    Fragment  -> kida block render -> Response
-    │                   │    Stream    -> chunked Response
-    │                   │    EventStream -> SSE Response
-    │                   │    Response  -> pass through
-    └──────┬───────────┘
-           │
-           ▼
-    Response flows back through middleware (reverse order)
-           │
-           ▼
-    ASGIHandler translates Response -> ASGI send() calls
+```mermaid
+flowchart TD
+    A["ASGI scope + receive"]
+    B["ASGIHandler\nTranslate scope dict → typed Request\nSet ContextVar for request scope"]
+    C["Middleware 1 (e.g. CORS)\nasync def mw(request, next) → Response"]
+    D["Middleware N (e.g. auth)\nEach middleware calls next(request)"]
+    E["Router\nMatch path → Route → handler function"]
+    F["Handler (user code)\nUser function executes, returns a value"]
+    G["ContentNegotiator\nstr → Response(text/html)\ndict → Response(application/json)\nTemplate → kida render → Response\nFragment → kida block render → Response\nStream → chunked Response\nEventStream → SSE Response\nResponse → pass through"]
+    H["Response flows back through middleware\n(reverse order)"]
+    I["ASGIHandler translates\nResponse → ASGI send() calls"]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I
 ```
 
 ### 4.3 Router Design
@@ -368,30 +306,15 @@ data: <div class="notification">User joined</div>
 
 **Connection lifecycle:**
 
-```
-    Client connects (GET /events)
-           │
-           ▼
-    ┌──────────────┐
-    │ SSEHandler   │  Set headers, begin streaming
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ Event Loop   │  Consume async generator from handler
-    │              │  Yield: Fragment -> render -> SSE data frame
-    │              │  Yield: str -> SSE data frame
-    │              │  Yield: dict -> JSON SSE data frame
-    │              │  Heartbeat every N seconds
-    └──────┬───────┘
-           │
-           ▼
-    Client disconnects OR generator exhausts
-           │
-           ▼
-    ┌──────────────┐
-    │   Cleanup    │  Cancel generator, release resources
-    └──────────────┘
+```mermaid
+flowchart TD
+    A["Client connects (GET /events)"]
+    B["SSEHandler\nSet headers, begin streaming"]
+    C["Event Loop\nConsume async generator from handler\nYield: Fragment → render → SSE data frame\nYield: str → SSE data frame\nYield: dict → JSON SSE data frame\nHeartbeat every N seconds"]
+    D["Client disconnects OR generator exhausts"]
+    E["Cleanup\nCancel generator, release resources"]
+
+    A --> B --> C --> D --> E
 ```
 
 **Disconnect detection:** The ASGI `receive` channel signals client disconnection via
@@ -415,89 +338,82 @@ the protocol (`text/event-stream`, `no-cache`, `keep-alive`).
 
 ### 5.1 Full Page Request
 
-```
-    Browser                    Chirp                       Kida
-       │                         │                           │
-       │── GET /dashboard ──────>│                           │
-       │                         │── match route ───────────>│
-       │                         │<── handler returns        │
-       │                         │   Template("dash.html")   │
-       │                         │── render full template ──>│
-       │                         │<── complete HTML ─────────│
-       │<── 200 text/html ──────│                           │
-       │   (full page)           │                           │
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Chirp
+    participant Kida
+
+    Browser->>Chirp: GET /dashboard
+    Chirp->>Kida: match route
+    Kida-->>Chirp: handler returns Template("dash.html")
+    Chirp->>Kida: render full template
+    Kida-->>Chirp: complete HTML
+    Chirp-->>Browser: 200 text/html (full page)
 ```
 
 ### 5.2 Fragment Request (htmx)
 
-```
-    Browser + htmx             Chirp                       Kida
-       │                         │                           │
-       │── GET /search?q=foo ──>│                           │
-       │   HX-Request: true      │                           │
-       │                         │── match route            │
-       │                         │── request.is_fragment    │
-       │                         │   = True                  │
-       │                         │<── handler returns        │
-       │                         │   Fragment("search.html", │
-       │                         │     "results_list")       │
-       │                         │── render block only ────>│
-       │                         │<── block HTML ───────────│
-       │<── 200 text/html ──────│                           │
-       │   (fragment only)       │                           │
-       │                         │                           │
-       │── htmx swaps into      │                           │
-       │   target element        │                           │
+```mermaid
+sequenceDiagram
+    participant Browser as Browser + htmx
+    participant Chirp
+    participant Kida
+
+    Browser->>Chirp: GET /search?q=foo (HX-Request: true)
+    Note over Chirp: match route, request.is_fragment = True
+    Chirp->>Chirp: handler returns Fragment("search.html", "results_list")
+    Chirp->>Kida: render block only
+    Kida-->>Chirp: block HTML
+    Chirp-->>Browser: 200 text/html (fragment only)
+    Note over Browser: htmx swaps into target element
 ```
 
 ### 5.3 Streaming HTML
 
-```
-    Browser                    Chirp                       Kida
-       │                         │                           │
-       │── GET /dashboard ──────>│                           │
-       │                         │── match route            │
-       │                         │<── handler returns        │
-       │                         │   Stream("dash.html",    │
-       │                         │     stats=load_stats(),   │
-       │                         │     feed=load_feed())     │
-       │                         │                           │
-       │<── 200 chunked ────────│                           │
-       │   (header + nav HTML)   │── stream header ────────>│
-       │                         │<── header chunk ─────────│
-       │                         │                           │
-       │<── chunk ──────────────│── stats resolves ────────>│
-       │   (stats section)       │<── stats chunk ──────────│
-       │                         │                           │
-       │<── chunk ──────────────│── feed resolves ─────────>│
-       │   (feed section)        │<── feed chunk ───────────│
-       │                         │                           │
-       │<── end ────────────────│                           │
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Chirp
+    participant Kida
+
+    Browser->>Chirp: GET /dashboard
+    Note over Chirp: match route, handler returns<br>Stream("dash.html", stats=load_stats(), feed=load_feed())
+    Chirp->>Kida: stream header
+    Kida-->>Chirp: header chunk
+    Chirp-->>Browser: 200 chunked (header + nav HTML)
+    Chirp->>Kida: stats resolves
+    Kida-->>Chirp: stats chunk
+    Chirp-->>Browser: chunk (stats section)
+    Chirp->>Kida: feed resolves
+    Kida-->>Chirp: feed chunk
+    Chirp-->>Browser: chunk (feed section)
+    Chirp-->>Browser: end
 ```
 
 ### 5.4 Server-Sent Events
 
-```
-    Browser + htmx             Chirp                    App Logic
-       │                         │                           │
-       │── GET /notifications ──>│                           │
-       │                         │── match route            │
-       │                         │<── handler returns        │
-       │                         │   EventStream(stream())   │
-       │                         │                           │
-       │<── 200 text/event-     │                           │
-       │   stream                │                           │
-       │                         │                           │
-       │                         │<── event from bus ───────│
-       │<── event: fragment ────│── render Fragment ───────>│
-       │   data: <div>...</div>  │                           │
-       │                         │                           │
-       │                         │<── event from bus ───────│
-       │<── event: fragment ────│── render Fragment ───────>│
-       │   data: <div>...</div>  │                           │
-       │                         │                           │
-       │── disconnect ──────────>│── cancel generator ──────>│
-       │                         │── cleanup resources       │
+```mermaid
+sequenceDiagram
+    participant Browser as Browser + htmx
+    participant Chirp
+    participant App as App Logic
+
+    Browser->>Chirp: GET /notifications
+    Note over Chirp: match route, handler returns EventStream(stream())
+    Chirp-->>Browser: 200 text/event-stream
+
+    App->>Chirp: event from bus
+    Chirp->>App: render Fragment
+    Chirp-->>Browser: event: fragment, data: <div>...</div>
+
+    App->>Chirp: event from bus
+    Chirp->>App: render Fragment
+    Chirp-->>Browser: event: fragment, data: <div>...</div>
+
+    Browser->>Chirp: disconnect
+    Chirp->>App: cancel generator
+    Note over Chirp: cleanup resources
 ```
 
 ---
@@ -561,21 +477,20 @@ free-threading safe -- each thread/task gets its own value without locking.
 
 ### 7.1 Error Flow
 
-```
-    Handler raises/returns error
-           │
-           ▼
-    ┌──────────────────┐
-    │ Error Dispatcher  │  Match exception type or status code
-    │                   │  to registered @app.error() handler
-    └──────┬───────────┘
-           │
-           ├── Handler found: call handler, content-negotiate result
-           │
-           └── No handler: default error response
-                  │
-                  ├── Debug mode: detailed error page with traceback
-                  └── Production: minimal error response
+```mermaid
+flowchart TD
+    A["Handler raises/returns error"]
+    B["Error Dispatcher\nMatch exception type or status code\nto registered @app.error() handler"]
+    C["Handler found:\ncall handler, content-negotiate result"]
+    D{"No handler"}
+    E["Debug mode:\ndetailed error page\nwith traceback"]
+    F["Production:\nminimal error response"]
+
+    A --> B
+    B -->|match| C
+    B -->|no match| D
+    D -->|debug=True| E
+    D -->|production| F
 ```
 
 ### 7.2 Error Handler Resolution

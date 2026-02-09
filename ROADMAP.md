@@ -114,30 +114,38 @@ chirp/
 
 ### Core Abstractions
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Surface Layer -- What developers touch                 │
-│                                                         │
-│  App          @app.route()      AppConfig               │
-│  Template     Fragment          Stream                  │
-│  EventStream  Response          Redirect                │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│  Core Layer -- Typed, immutable where honest            │
-│                                                         │
-│  Request (frozen, slots)    Router (compiled)            │
-│  Response (.with_*() chain) Middleware (Protocol)        │
-│  Headers (immutable)        Route (frozen)               │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│  Engine Layer -- ASGI + integrations                    │
-│                                                         │
-│  ASGI handler        Kida environment                   │
-│  Dev server          SSE handler                        │
-│  anyio runtime                                          │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Surface["Surface Layer — What developers touch"]
+        S1["App"]
+        S2["@app.route()"]
+        S3["AppConfig"]
+        S4["Template"]
+        S5["Fragment"]
+        S6["Stream"]
+        S7["EventStream"]
+        S8["Response"]
+        S9["Redirect"]
+    end
+
+    subgraph Core["Core Layer — Typed, immutable where honest"]
+        C1["Request (frozen, slots)"]
+        C2["Router (compiled)"]
+        C3["Response (.with_*() chain)"]
+        C4["Middleware (Protocol)"]
+        C5["Headers (immutable)"]
+        C6["Route (frozen)"]
+    end
+
+    subgraph Engine["Engine Layer — ASGI + integrations"]
+        E1["ASGI handler"]
+        E2["Kida environment"]
+        E3["Dev server"]
+        E4["SSE handler"]
+        E5["anyio runtime"]
+    end
+
+    Surface --> Core --> Engine
 ```
 
 ---
@@ -402,10 +410,11 @@ after the fact.
 
 ### Core (minimal)
 
-```
-chirp (the framework)
-├── kida          # template engine -- same ecosystem, same author
-└── anyio         # async runtime -- good, minimal, not worth rewriting
+```mermaid
+flowchart TD
+    chirp["chirp (the framework)"]
+    chirp --> kida["kida — template engine\n(same ecosystem, same author)"]
+    chirp --> anyio["anyio — async runtime\n(good, minimal, not worth rewriting)"]
 ```
 
 ### Optional (explicit extras)
