@@ -191,6 +191,10 @@ exclude_lines = [
 # =============================================================================
 
 [dependency-groups]
+docs = [
+    "bengal>=0.1.9",   # Static site generator for documentation
+    "lunr>=0.7.0",     # Pre-built search index
+]
 dev = [
     # Testing
     "pytest>=9.0.2",
