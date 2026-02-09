@@ -332,3 +332,65 @@ class TestSSEGeneratorError:
         assert len(result.events) >= 2
         assert result.events[0].data == "ok-1"
         assert result.events[1].data == "ok-2"
+
+    async def test_generator_error_sends_error_event(self) -> None:
+        """SSE error event is sent when the generator raises."""
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "before"
+                msg = "boom"
+                raise RuntimeError(msg)
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=10, disconnect_after=2.0)
+
+        # Find the error event among collected events
+        error_events = [e for e in result.events if e.event == "error"]
+        assert len(error_events) >= 1
+        assert "Internal server error" in error_events[0].data
+
+    async def test_generator_error_logs_exception(self, caplog) -> None:
+        """SSE generator errors are logged via logger.exception()."""
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "before"
+                msg = "sse log test"
+                raise RuntimeError(msg)
+
+            return EventStream(gen())
+
+        with caplog.at_level("ERROR", logger="chirp.server"):
+            async with TestClient(app) as client:
+                await client.sse("/events", max_events=10, disconnect_after=2.0)
+
+        assert any("SSE event generator error" in r.message for r in caplog.records)
+
+    async def test_debug_mode_error_includes_traceback(self) -> None:
+        """Debug mode SSE error events include the full traceback."""
+        app = App(config=AppConfig(debug=True))
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "before-error"
+                msg = "debug sse error"
+                raise RuntimeError(msg)
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=10, disconnect_after=2.0)
+
+        error_events = [e for e in result.events if e.event == "error"]
+        assert len(error_events) >= 1
+        # Debug mode includes the traceback with "RuntimeError" and the message
+        assert "RuntimeError" in error_events[0].data
+        assert "debug sse error" in error_events[0].data

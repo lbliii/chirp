@@ -279,10 +279,12 @@ class TestHtmxErrorHeaders:
 
         async with TestClient(app) as client:
             response = await client.fragment("/nonexistent")
-            headers = dict(response.headers)
-            assert headers.get("HX-Retarget") == "#chirp-error"
-            assert headers.get("HX-Reswap") == "innerHTML"
-            assert headers.get("HX-Trigger") == "chirpError"
+            from chirp.testing import hx_headers
+
+            hx = hx_headers(response)
+            assert hx.get("HX-Retarget") == "#chirp-error"
+            assert hx.get("HX-Reswap") == "innerHTML"
+            assert hx.get("HX-Trigger") == "chirpError"
 
     async def test_500_fragment_has_htmx_headers(self) -> None:
         app = App()
@@ -294,10 +296,12 @@ class TestHtmxErrorHeaders:
 
         async with TestClient(app) as client:
             response = await client.fragment("/boom")
-            headers = dict(response.headers)
-            assert headers.get("HX-Retarget") == "#chirp-error"
-            assert headers.get("HX-Reswap") == "innerHTML"
-            assert headers.get("HX-Trigger") == "chirpError"
+            from chirp.testing import hx_headers
+
+            hx = hx_headers(response)
+            assert hx.get("HX-Retarget") == "#chirp-error"
+            assert hx.get("HX-Reswap") == "innerHTML"
+            assert hx.get("HX-Trigger") == "chirpError"
 
     async def test_non_fragment_has_no_htmx_headers(self) -> None:
         app = App()
@@ -309,10 +313,12 @@ class TestHtmxErrorHeaders:
 
         async with TestClient(app) as client:
             response = await client.get("/boom")
-            headers = dict(response.headers)
-            assert "HX-Retarget" not in headers
-            assert "HX-Reswap" not in headers
-            assert "HX-Trigger" not in headers
+            from chirp.testing import hx_headers
+
+            hx = hx_headers(response)
+            assert "HX-Retarget" not in hx
+            assert "HX-Reswap" not in hx
+            assert "HX-Trigger" not in hx
 
     async def test_debug_500_fragment_has_htmx_headers(self) -> None:
         app = App(config=AppConfig(debug=True))
@@ -324,9 +330,11 @@ class TestHtmxErrorHeaders:
 
         async with TestClient(app) as client:
             response = await client.fragment("/boom")
-            headers = dict(response.headers)
-            assert headers.get("HX-Retarget") == "#chirp-error"
-            assert headers.get("HX-Reswap") == "innerHTML"
+            from chirp.testing import hx_headers
+
+            hx = hx_headers(response)
+            assert hx.get("HX-Retarget") == "#chirp-error"
+            assert hx.get("HX-Reswap") == "innerHTML"
 
     async def test_custom_http_error_fragment_has_htmx_headers(self) -> None:
         app = App()
@@ -337,8 +345,10 @@ class TestHtmxErrorHeaders:
 
         async with TestClient(app) as client:
             response = await client.fragment("/forbidden")
-            headers = dict(response.headers)
-            assert headers.get("HX-Retarget") == "#chirp-error"
+            from chirp.testing import hx_headers
+
+            hx = hx_headers(response)
+            assert hx.get("HX-Retarget") == "#chirp-error"
 
 
 class TestErrorLogging:

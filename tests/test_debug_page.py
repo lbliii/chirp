@@ -345,11 +345,12 @@ class TestRenderDebugPageFull:
         # Should contain at least one source-line div
         assert 'class="source-line' in html
 
-    def test_no_chirp_error_class(self) -> None:
-        """Full page should NOT have the chirp-error fragment wrapper."""
+    def test_no_chirp_error_fragment_wrapper(self) -> None:
+        """Full page should NOT use the chirp-error-fragment div wrapper."""
         exc, _ = _raise_and_capture()
         html = render_debug_page(exc, _make_request())
-        assert 'chirp-error-fragment' not in html
+        # The CSS class name appears in the stylesheet, but the wrapper div should not
+        assert 'class="chirp-error chirp-error-fragment"' not in html
 
     def test_editor_links_when_env_set(self, monkeypatch) -> None:
         monkeypatch.setenv("CHIRP_EDITOR", "vscode")
