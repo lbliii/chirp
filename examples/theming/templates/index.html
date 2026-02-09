@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Theming Demo — Home{% endblock %}
+
+{% block content %}
+<h1>Theme Modes</h1>
+<p class="muted">
+  Dark and light mode using CSS custom properties and the
+  <code>prefers-color-scheme</code> media query.  Click the toggle
+  in the nav to cycle between <strong>System</strong>,
+  <strong>Light</strong>, and <strong>Dark</strong>.
+</p>
+
+<h2>How it works</h2>
+<div class="card">
+  <p>
+    <strong>Layer 1</strong> — CSS custom properties define light-mode
+    tokens on <code>:root</code>.
+  </p>
+  <p>
+    <strong>Layer 2</strong> — A <code>prefers-color-scheme: dark</code>
+    media query overrides those tokens automatically when the OS is in
+    dark mode.
+  </p>
+  <p>
+    <strong>Layer 3</strong> — A <code>data-theme</code> attribute on
+    <code>&lt;html&gt;</code> lets the user override the OS preference.
+    The choice is saved to <code>localStorage</code>.
+  </p>
+</div>
+
+<h2>Sample elements</h2>
+
+<p>
+  Regular paragraph text.  Here's a <a href="/about">link to the about page</a>
+  and some <code>inline code</code> to show how tokens adapt.
+</p>
+
+<div class="card">
+  <h2 style="margin-top: 0;">Card component</h2>
+  <p class="muted">
+    Cards use <code>--surface</code> for the background and
+    <code>--border</code> for the outline.  Both shift automatically.
+  </p>
+  <a href="/about" class="btn">Visit About</a>
+</div>
+
+<h2>Code block</h2>
+<pre><code>:root {
+  --bg: #ffffff;
+  --fg: #1a1a2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a;
+    --fg: #e2e8f0;
+  }
+}</code></pre>
+
+<p class="muted">
+  No JavaScript required for the baseline — the browser handles it.
+  The toggle adds a small script for explicit user control.
+</p>
+{% endblock %}

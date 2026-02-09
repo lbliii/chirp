@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Theming Demo{% endblock %}</title>
+
+  {# --- Anti-FOUC: apply stored theme before first paint --- #}
+  <script>
+    (function() {
+      var t = localStorage.getItem("theme");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+
+  <style>
+    /* =============================================================
+       Layer 1: Light defaults
+       ============================================================= */
+    :root {
+      --bg:      #ffffff;
+      --fg:      #1a1a2e;
+      --muted:   #6b7280;
+      --surface: #f4f4f8;
+      --border:  #d1d5db;
+      --accent:  #6366f1;
+      --accent-fg: #ffffff;
+      --code-bg: #f0f0f5;
+      --radius:  0.5rem;
+    }
+
+    /* =============================================================
+       Layer 2: Automatic dark via OS preference
+       ============================================================= */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:      #0f172a;
+        --fg:      #e2e8f0;
+        --muted:   #94a3b8;
+        --surface: #1e293b;
+        --border:  #334155;
+        --accent:  #818cf8;
+        --accent-fg: #0f172a;
+        --code-bg: #1e293b;
+      }
+    }
+
+    /* =============================================================
+       Layer 3: Explicit user override via data-theme attribute.
+       These selectors are more specific than :root, so they win.
+       ============================================================= */
+    [data-theme="light"] {
+      --bg:      #ffffff;
+      --fg:      #1a1a2e;
+      --muted:   #6b7280;
+      --surface: #f4f4f8;
+      --border:  #d1d5db;
+      --accent:  #6366f1;
+      --accent-fg: #ffffff;
+      --code-bg: #f0f0f5;
+    }
+
+    [data-theme="dark"] {
+      --bg:      #0f172a;
+      --fg:      #e2e8f0;
+      --muted:   #94a3b8;
+      --surface: #1e293b;
+      --border:  #334155;
+      --accent:  #818cf8;
+      --accent-fg: #0f172a;
+      --code-bg: #1e293b;
+    }
+
+    /* =============================================================
+       Base styles using the custom properties
+       ============================================================= */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    a { color: var(--accent); }
+    a:hover { text-decoration: none; }
+
+    /* --- Navigation --- */
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    nav a { text-decoration: none; font-weight: 500; }
+    nav .spacer { flex: 1; }
+
+    /* --- Theme toggle button --- */
+    .theme-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .theme-toggle:hover {
+      border-color: var(--accent);
+    }
+
+    /* --- Reusable component styles --- */
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin: 1.5rem 0 0.5rem; }
+    p { margin-bottom: 1rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .muted { color: var(--muted); }
+
+    code {
+      background: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    pre code { background: none; padding: 0; }
+
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: var(--accent-fg);
+      border: none;
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: inherit;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.9; color: var(--accent-fg); }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/about">About</a>
+    <span class="spacer"></span>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      System
+    </button>
+  </nav>
+
+  {% block content %}{% endblock %}
+
+  {# --- Theme toggle logic --- #}
+  <script>
+    (function() {
+      // Cycle: system → light → dark → system
+      var states = ["system", "light", "dark"];
+      var labels = { system: "System", light: "Light", dark: "Dark" };
+      var btn = document.getElementById("theme-toggle");
+
+      function current() {
+        return localStorage.getItem("theme") || "system";
+      }
+
+      function apply(mode) {
+        if (mode === "system") {
+          document.documentElement.removeAttribute("data-theme");
+          localStorage.removeItem("theme");
+        } else {
+          document.documentElement.setAttribute("data-theme", mode);
+          localStorage.setItem("theme", mode);
+        }
+        btn.textContent = labels[mode];
+      }
+
+      // Set initial label
+      apply(current());
+
+      btn.addEventListener("click", function() {
+        var idx = states.indexOf(current());
+        var next = states[(idx + 1) % states.length];
+        apply(next);
+      });
+    })();
+  </script>
+</body>
+</html>

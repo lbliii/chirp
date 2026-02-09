@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Theming Demo — About{% endblock %}
+
+{% block content %}
+<h1>About</h1>
+<p>
+  This page exists to show that the theme persists across navigation.
+  Your choice is stored in <code>localStorage</code>, so it survives
+  page loads and browser restarts.
+</p>
+
+<div class="card">
+  <p>
+    When set to <strong>System</strong>, the <code>data-theme</code>
+    attribute is removed and the <code>prefers-color-scheme</code>
+    media query takes over — your OS decides.
+  </p>
+  <p class="muted">
+    Try changing your OS appearance setting while in System mode to
+    see it update automatically.
+  </p>
+</div>
+
+<p><a href="/">&larr; Back to home</a></p>
+{% endblock %}
