@@ -217,15 +217,18 @@ def dashboard():
 
 :::{tab-item} Chirp
 ```python
-from chirp import login, logout, login_required, get_user, Redirect, Template
+from chirp import login, logout, login_required, get_user, is_safe_url, Redirect, Template
 
 @app.route("/login", methods=["POST"])
 async def do_login(request: Request):
     form = await request.form()
     user = await verify_credentials(form["username"], form["password"])
     if user:
-        login(user)
-        return Redirect("/dashboard")
+        login(user)  # regenerates session automatically
+        next_url = request.query.get("next", "/dashboard")
+        if not is_safe_url(next_url):
+            next_url = "/dashboard"
+        return Redirect(next_url)
     return Template("login.html", error="Invalid credentials")
 
 @app.route("/dashboard")
@@ -237,7 +240,7 @@ def dashboard():
 :::{/tab-item}
 :::{/tab-set}
 
-Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/middleware/builtin|Built-in Middleware]] for setup.
+Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/middleware/builtin|Built-in Middleware]] for setup.
 
 ## What Chirp Adds
 
@@ -261,8 +264,9 @@ Beyond Flask equivalents, Chirp offers:
 | `request` (global) | `request` (parameter) |
 | `redirect()` | `Redirect(...)` |
 | `session["key"]` | `get_session()["key"]` |
-| `login_user(user)` | `login(user)` |
+| `login_user(user)` | `login(user)` (regenerates session) |
 | `@login_required` | `@login_required` |
+| N/A | `is_safe_url(url)` |
 | `@app.errorhandler` | `@app.error` |
 | `<int:id>` | `{id:int}` |
 | N/A | `Fragment(...)` |

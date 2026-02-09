@@ -97,7 +97,8 @@ cd examples/static_site && python app.py
 The most basic authentication example. A login form, a protected dashboard, and logout.
 Hardcoded credentials (`admin` / `password`) with password hashing. Shows the full
 `SessionMiddleware` → `AuthMiddleware` → `@login_required` pipeline, `login()` / `logout()`
-helpers, `current_user()` in templates, and `hash_password` / `verify_password`.
+helpers (both regenerate the session automatically), `current_user()` in templates,
+`hash_password` / `verify_password`, and `is_safe_url()` for validating `?next=` redirects.
 
 ```bash
 cd examples/auth && python app.py
@@ -302,6 +303,7 @@ pytest examples/hello/
 | `login()` / `logout()` | | | | | | | | | x | | | | | | | |
 | `current_user()` template global | | | | | | | | | x | | | | | | | |
 | `hash_password` / `verify_password` | | | | | | | | | x | | | | | | | |
+| `is_safe_url()` | | | | | | | | | x | | | | | | | |
 | `Redirect` | | | | | | | | | x | | | x | x | | x | |
 | `validate()` + built-in rules | | | | | | | | | | | | x | x | x | x | |
 | `CSRFMiddleware` + `csrf_field()` | | | | | | | | | | | | x | x | | | |
