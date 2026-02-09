@@ -1,0 +1,100 @@
+---
+title: Filters
+description: Register custom template filters and globals
+draft: false
+weight: 30
+lang: en
+type: doc
+tags: [templates, filters, globals, kida]
+keywords: [filter, global, template-filter, template-global, jinja, kida]
+category: guide
+---
+
+## Template Filters
+
+Filters transform values in templates. Register them with `@app.template_filter()`:
+
+```python
+@app.template_filter()
+def currency(value: float) -> str:
+    return f"${value:,.2f}"
+
+@app.template_filter()
+def pluralize(count: int, singular: str, plural: str) -> str:
+    return singular if count == 1 else plural
+```
+
+Use them in templates with the pipe syntax:
+
+```html
+<span class="price">{{ product.price | currency }}</span>
+<span>{{ count }} {{ count | pluralize("item", "items") }}</span>
+```
+
+## Named Filters
+
+By default, the function name becomes the filter name. Override it with an argument:
+
+```python
+@app.template_filter("fmt_date")
+def format_date(dt: datetime) -> str:
+    return dt.strftime("%B %d, %Y")
+```
+
+```html
+<time>{{ post.created_at | fmt_date }}</time>
+```
+
+## Template Globals
+
+Globals are functions or values available in every template without being passed in the context:
+
+```python
+@app.template_global()
+def site_name() -> str:
+    return "My App"
+
+@app.template_global()
+def current_year() -> int:
+    return datetime.now().year
+```
+
+```html
+<footer>&copy; {{ current_year() }} {{ site_name() }}</footer>
+```
+
+## Registration Timing
+
+Filters and globals must be registered during the setup phase (before `app.run()` or the first request). They become part of the kida environment at freeze time.
+
+```python
+app = App()
+
+# Register during setup
+@app.template_filter()
+def upper(value: str) -> str:
+    return value.upper()
+
+# This works
+app.run()
+
+# Registering after freeze would raise an error
+```
+
+## Type Safety
+
+Filters are regular Python functions with full type annotations. Your IDE provides autocomplete and type checking for filter arguments.
+
+```python
+@app.template_filter()
+def truncate(value: str, length: int = 50, suffix: str = "...") -> str:
+    if len(value) <= length:
+        return value
+    return value[:length].rsplit(" ", 1)[0] + suffix
+```
+
+## Next Steps
+
+- [[docs/templates/rendering|Rendering]] -- How templates are rendered
+- [[docs/core-concepts/app-lifecycle|App Lifecycle]] -- When filters are registered
+- [[docs/reference/api|API Reference]] -- Complete API surface

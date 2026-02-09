@@ -1,0 +1,15 @@
+# Output Configuration
+# ====================
+
+outputs:
+  # HTML output for all pages
+  html:
+    enabled: true
+
+  # JSON index for search
+  json:
+    enabled: true
+
+  # Plain text for LLM consumption
+  txt:
+    enabled: true

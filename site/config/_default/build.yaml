@@ -1,0 +1,23 @@
+# Build Configuration
+# ===================
+
+build:
+  output_dir: "public"
+  incremental: true
+
+# Build-time badge artifacts
+build_badge:
+  enabled: true
+
+assets:
+  minify: true
+  fingerprint: true
+
+html_output:
+  mode: "pretty"
+  remove_comments: true
+  collapse_blank_lines: true
+
+health_check:
+  enabled: true
+  verbose: false

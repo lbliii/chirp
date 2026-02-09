@@ -1,0 +1,39 @@
+# Theme Configuration
+# ===================
+
+theme:
+  name: "default"
+
+  # Appearance
+  default_appearance: "light"
+  default_palette: "charcoal-bengal"
+
+  # Syntax Highlighting
+  syntax_highlighting:
+    theme: "auto"
+    css_class_style: "semantic"
+
+  # Feature Flags
+  features:
+    # Navigation
+    - navigation.breadcrumbs
+    - navigation.toc
+    - navigation.toc.sticky
+    - navigation.prev_next
+    - navigation.back_to_top
+
+    # Content
+    - content.code.copy
+    - content.reading_time
+    - graph.contextual
+
+    # Search (core feature + UI enhancements)
+    - search
+    - search.suggest
+    - search.highlight
+
+    # Accessibility
+    - accessibility.skip_link
+
+  max_tags_display: 10
+  popular_tags_count: 20

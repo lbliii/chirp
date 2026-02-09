@@ -1,0 +1,24 @@
+# Search Configuration
+# ====================
+
+search:
+  enabled: true
+  index_content: true
+  index_headings: true
+  min_word_length: 2
+
+  # Fields to index
+  fields:
+    - title
+    - description
+    - content
+    - tags
+    - keywords
+
+  # Weights for search ranking
+  weights:
+    title: 10
+    description: 5
+    headings: 3
+    content: 1
+    tags: 2

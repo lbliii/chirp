@@ -1,0 +1,10 @@
+# Site Configuration
+# ==================
+
+site:
+  title: "Chirp"
+  logo_text: "⌁⌁"
+  description: "A Python web framework for the modern web platform"
+  language: "en"
+
+template_engine: kida

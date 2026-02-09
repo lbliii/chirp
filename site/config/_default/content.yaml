@@ -1,0 +1,28 @@
+# Content Configuration
+# =====================
+
+markdown:
+  parser: "patitas"
+
+content:
+  default_type: "doc"
+
+  # Excerpt & Summaries
+  excerpt_length: 200
+  summary_length: 160
+
+  # Reading Time
+  reading_speed: 200
+
+  # Related Content
+  related_count: 5
+  related_threshold: 0.25
+
+  # Table of Contents
+  toc_depth: 4
+  toc_min_headings: 2
+  toc_style: "nested"
+
+  # Content Organization
+  sort_pages_by: "weight"
+  sort_order: "asc"

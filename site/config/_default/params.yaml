@@ -1,0 +1,12 @@
+# Custom Parameters
+# =================
+
+params:
+  # Site-specific custom variables
+  project_status: "alpha"
+
+  # Repository URL (renders GitHub icon in navigation if set)
+  repo_url: "https://github.com/lbliii/chirp"
+
+  # Minimum Python version
+  min_python: "3.14"

@@ -1,0 +1,14 @@
+# Production Environment
+# =======================
+
+site:
+  # GitHub Pages project site: deployed at /chirp
+  baseurl: "/chirp"
+
+build:
+  incremental: true
+  strict_mode: true
+
+assets:
+  minify: true
+  fingerprint: true

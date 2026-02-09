@@ -1,0 +1,53 @@
+# Autodoc Configuration
+# ======================
+# Generates API documentation from Chirp's Python source
+
+autodoc:
+  # GitHub repository for source links (owner/repo format)
+  github_repo: "lbliii/chirp"
+  github_branch: "main"
+
+  # Python API Documentation
+  python:
+    enabled: true
+    source_dirs:
+      - ../src/chirp  # Document the Chirp package
+
+    docstring_style: auto  # Auto-detect docstring format
+
+    # Output prefix for Python API docs
+    # Places generated docs under /api/
+    output_prefix: "api"
+
+    # Display name for sidebar and page headings
+    display_name: "Chirp API Reference"
+
+    # Exclude test, cache, build artifacts
+    exclude:
+      # Tests
+      - "*/tests/*"
+      - "*/test_*.py"
+      - "*_test.py"
+      # Build artifacts and caches
+      - "*/__pycache__/*"
+      - "*/.pytest_cache/*"
+      - "*/build/*"
+      - "*/dist/*"
+      - "*.egg-info/*"
+      # Virtual environments
+      - "*/.venv/*"
+      - "*/venv/*"
+      # Hidden directories
+      - "*/.*"
+
+    # Member visibility
+    include_private: false  # Skip _private methods
+    include_special: false  # Skip __special__ methods
+
+  # CLI Documentation (Chirp has no CLI)
+  cli:
+    enabled: false
+
+  # OpenAPI Documentation (Chirp is not a JSON API framework)
+  openapi:
+    enabled: false

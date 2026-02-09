@@ -1,0 +1,6 @@
+# Font Configuration
+# ==================
+
+fonts:
+  # Use default system fonts
+  enabled: false

@@ -1,0 +1,13 @@
+# Local Development Environment
+# ==============================
+
+site:
+  baseurl: ""
+
+build:
+  incremental: true
+  strict_mode: false
+
+assets:
+  minify: false
+  fingerprint: false

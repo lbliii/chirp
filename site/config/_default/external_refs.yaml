@@ -1,0 +1,41 @@
+# External References Configuration
+# ==================================
+
+external_refs:
+  # Links to related projects in the Bengal ecosystem
+  bengal:
+    url: "https://lbliii.github.io/bengal"
+    description: "Bengal static site generator"
+
+  kida:
+    url: "https://lbliii.github.io/kida"
+    description: "Kida template engine"
+
+  rosettes:
+    url: "https://lbliii.github.io/rosettes"
+    description: "Rosettes syntax highlighter"
+
+  patitas:
+    url: "https://lbliii.github.io/patitas"
+    description: "Patitas Markdown parser"
+
+  pounce:
+    url: "https://lbliii.github.io/pounce"
+    description: "Pounce ASGI server"
+
+  purr:
+    url: "https://lbliii.github.io/purr"
+    description: "Purr content runtime"
+
+  # External documentation
+  asgi:
+    url: "https://asgi.readthedocs.io/"
+    description: "ASGI specification"
+
+  htmx:
+    url: "https://htmx.org/"
+    description: "htmx - high power tools for HTML"
+
+  pep703:
+    url: "https://peps.python.org/pep-0703/"
+    description: "PEP 703 — Free-threading CPython"
