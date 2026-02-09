@@ -59,15 +59,15 @@ def _is_app_frame(filename: str) -> bool:
     return not filename.startswith(stdlib_prefix)
 
 
-def format_template_error(exc: BaseException, request: Request) -> str:
+def format_template_error(exc: BaseException, request: Request | None = None) -> str:
     """Format a Kida template error for terminal display.
 
     Uses ``exc.format_compact()`` and wraps it with a banner and
-    request context.
+    request context (when available).
 
     Args:
         exc: A Kida template exception (TemplateError subclass).
-        request: The request that triggered the error.
+        request: The request that triggered the error (optional).
 
     Returns:
         Formatted multi-line string for terminal output.
@@ -83,9 +83,10 @@ def format_template_error(exc: BaseException, request: Request) -> str:
     else:
         parts.append(str(exc))
 
-    # Request context
-    parts.append("")
-    parts.append(f"  Route: {request.method} {request.path}")
+    # Request context (when available)
+    if request is not None:
+        parts.append("")
+        parts.append(f"  Route: {request.method} {request.path}")
 
     # Close banner
     parts.append("-" * _BANNER_WIDTH)
@@ -145,7 +146,7 @@ def format_minimal_error(exc: BaseException) -> str:
     return f"{type(exc).__name__}{location}: {exc}"
 
 
-def log_error(exc: BaseException, request: Request) -> None:
+def log_error(exc: BaseException, request: Request | None = None) -> None:
     """Log an internal error with appropriate formatting.
 
     Detects Kida template errors and formats them cleanly. For non-template
@@ -157,14 +158,21 @@ def log_error(exc: BaseException, request: Request) -> None:
 
     Args:
         exc: The exception that caused the 500 error.
-        request: The request that triggered the error.
+        request: The request that triggered the error (optional for
+            streaming/SSE contexts where a request may not be available).
     """
+    # Build a prefix for log messages
+    prefix = (
+        f"500 {request.method} {request.path}"
+        if request is not None
+        else "Server error"
+    )
+
     if _is_kida_error(exc):
         # Template errors get the clean format
         logger.error(
-            "500 %s %s\n%s",
-            request.method,
-            request.path,
+            "%s\n%s",
+            prefix,
             format_template_error(exc, request),
         )
         return
@@ -174,19 +182,17 @@ def log_error(exc: BaseException, request: Request) -> None:
 
     if traceback_style == "full":
         # Full Python traceback (original behavior)
-        logger.exception("500 %s %s", request.method, request.path)
+        logger.exception(prefix)
     elif traceback_style == "minimal":
         logger.error(
-            "500 %s %s — %s",
-            request.method,
-            request.path,
+            "%s — %s",
+            prefix,
             format_minimal_error(exc),
         )
     else:
         # Default: compact (app frames only)
         logger.error(
-            "500 %s %s\n%s",
-            request.method,
-            request.path,
+            "%s\n%s",
+            prefix,
             format_compact_traceback(exc),
         )

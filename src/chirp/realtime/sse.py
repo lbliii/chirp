@@ -63,10 +63,16 @@ async def handle_sse(
     async def produce_events() -> None:
         """Consume generator and send SSE events.
 
-        Wraps each ``__anext__()`` in ``asyncio.shield`` + ``wait_for``
-        so that heartbeat comments are sent when the generator is idle
-        longer than ``heartbeat_interval``, without cancelling the
-        pending ``__anext__()`` coroutine.
+        Uses ``asyncio.wait`` with a timeout to send heartbeat comments
+        when the generator is idle.  The pending ``__anext__()`` task
+        survives across heartbeat intervals because ``asyncio.wait``
+        does not cancel tasks on timeout (unlike ``wait_for``).
+
+        Previous implementation used ``wait_for(shield(pending_next))``
+        which caused ``StopAsyncIteration exception in shielded future``
+        noise: when the shield wrapper was cancelled on disconnect,
+        ``asyncio.shield``'s ``_log_on_exception`` callback fired before
+        the ``finally`` block could suppress the exception.
         """
         pending_next: asyncio.Task[Any] | None = None
         try:
@@ -78,18 +84,15 @@ async def handle_sse(
                 if pending_next is None:
                     pending_next = asyncio.create_task(gen_iter.__anext__())
 
-                # Wait for it with a heartbeat timeout.
-                # asyncio.shield prevents wait_for from cancelling the
-                # underlying task on timeout — the __anext__() call
-                # survives across heartbeat intervals.
-                try:
-                    value = await asyncio.wait_for(
-                        asyncio.shield(pending_next),
-                        timeout=heartbeat_interval,
-                    )
-                    pending_next = None  # consumed — create fresh next time
-                except TimeoutError:
-                    # Generator is idle — send heartbeat, keep waiting
+                # Wait with timeout — asyncio.wait does NOT cancel the
+                # task on timeout, so __anext__() survives across
+                # heartbeat intervals without needing asyncio.shield.
+                done, _ = await asyncio.wait(
+                    {pending_next}, timeout=heartbeat_interval,
+                )
+
+                if not done:
+                    # Timeout: generator is idle — send heartbeat
                     if disconnected.is_set():
                         break
                     await send({
@@ -98,8 +101,12 @@ async def handle_sse(
                         "more_body": True,
                     })
                     continue
+
+                # Task completed — retrieve result
+                pending_next = None
+                try:
+                    value = done.pop().result()
                 except StopAsyncIteration:
-                    pending_next = None
                     break
 
                 sse_text = _format_event(
@@ -117,12 +124,10 @@ async def handle_sse(
             pass
         except Exception as exc:
             # Log with structured formatting for kida errors
-            from chirp.server.terminal_errors import _is_kida_error
+            from chirp.server.terminal_errors import _is_kida_error, log_error
 
-            if _is_kida_error(exc) and hasattr(exc, "format_compact"):
-                logger.error("SSE error:\n%s", exc.format_compact())
-            else:
-                logger.exception("SSE event generator error")
+            log_error(exc)
+
             # Send an error event so the client can react
             if debug:
                 if _is_kida_error(exc) and hasattr(exc, "format_compact"):
@@ -143,8 +148,6 @@ async def handle_sse(
         finally:
             # Always clean up pending __anext__ task — whether we exited
             # normally, via CancelledError (disconnect), or via exception.
-            # Without this, a completed task's StopAsyncIteration goes
-            # unretrieved and Python logs a noisy warning.
             if pending_next is not None:
                 if not pending_next.done():
                     pending_next.cancel()

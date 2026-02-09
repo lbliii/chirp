@@ -367,8 +367,8 @@ class TestErrorLogging:
                 await client.get("/boom")
 
         assert any("500 GET /boom" in r.message for r in caplog.records)
-        # logger.exception() captures the traceback
-        assert any(r.exc_info for r in caplog.records)
+        # Compact format includes app-level traceback in the message itself
+        assert any("RuntimeError" in r.message for r in caplog.records)
 
     async def test_404_logs_at_debug_level(self, caplog) -> None:
         app = App()

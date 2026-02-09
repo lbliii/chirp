@@ -87,13 +87,9 @@ async def send_streaming_response(
         # Mid-stream error: log with structured formatting, emit visible error
         import sys
 
-        from chirp.server.terminal_errors import _is_kida_error
+        from chirp.server.terminal_errors import _is_kida_error, log_error
 
-        # Log: use format_compact for kida errors, exception for others
-        if _is_kida_error(exc) and hasattr(exc, "format_compact"):
-            logger.error("Streaming error:\n%s", exc.format_compact())
-        else:
-            logger.exception("Streaming response error")
+        log_error(exc)
 
         if debug:
             # Visible error div instead of invisible HTML comment

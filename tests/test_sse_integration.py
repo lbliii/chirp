@@ -412,7 +412,8 @@ class TestSSEGeneratorError:
             async with TestClient(app) as client:
                 await client.sse("/events", max_events=10, disconnect_after=2.0)
 
-        assert any("SSE event generator error" in r.message for r in caplog.records)
+        # log_error() formats with compact traceback including error type
+        assert any("RuntimeError" in r.message for r in caplog.records)
 
     async def test_debug_mode_error_includes_traceback(self) -> None:
         """Debug mode SSE error events include the full traceback."""
