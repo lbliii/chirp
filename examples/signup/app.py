@@ -18,6 +18,7 @@ Run:
     python app.py
 """
 
+import os
 from pathlib import Path
 
 from chirp import App, AppConfig, Redirect, Request, Template, ValidationError
@@ -34,7 +35,9 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
 
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key="change-me-in-production")))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 
 # Register CSRF template global

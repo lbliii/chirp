@@ -46,6 +46,8 @@ async def handle_sse(
             (b"content-type", b"text/event-stream"),
             (b"cache-control", b"no-cache"),
             (b"connection", b"keep-alive"),
+            (b"x-accel-buffering", b"no"),
+            (b"access-control-allow-origin", b"*"),
         ],
     })
 

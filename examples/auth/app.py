@@ -15,6 +15,7 @@ Run:
     python app.py
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,7 +72,9 @@ async def load_user(user_id: str) -> User | None:
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
 
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key="change-me-in-production")))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
 
 # ---------------------------------------------------------------------------

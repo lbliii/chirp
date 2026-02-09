@@ -541,8 +541,16 @@ class App:
         router.compile()
         self._router = router
 
-        # 2. Capture middleware as immutable tuple
-        self._middleware = tuple(self._middleware_list)
+        # 2. Capture middleware as immutable tuple — append debug
+        #    overlays automatically when debug=True so the developer
+        #    doesn't have to wire them up manually.
+        middleware_list = list(self._middleware_list)
+        if self.config.debug:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.htmx_debug import HTMX_DEBUG_SCRIPT
+
+            middleware_list.append(HTMLInject(HTMX_DEBUG_SCRIPT))
+        self._middleware = tuple(middleware_list)
 
         # 2b. Collect template globals from middleware
         # Middleware can define a `template_globals` dict attribute to

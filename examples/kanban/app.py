@@ -27,6 +27,7 @@ Run:
 """
 
 import asyncio
+import os
 import random
 import threading
 from dataclasses import dataclass, replace
@@ -115,7 +116,9 @@ config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
 
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key="kanban-demo-secret")))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 

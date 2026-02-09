@@ -1,6 +1,6 @@
 """Typed async database access.
 
-Supports SQLite (via ``aiosqlite``) and PostgreSQL (via ``asyncpg``).
+Supports SQLite (via stdlib ``sqlite3`` + ``anyio``) and PostgreSQL (via ``asyncpg``).
 SQL in, frozen dataclasses out.
 
 Connection URL format::
@@ -25,6 +25,8 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, overload
+
+import anyio
 
 from chirp.data._mapping import map_row, map_rows
 from chirp.data.errors import (
@@ -134,12 +136,13 @@ class Database:
             await db.execute("INSERT INTO profiles ...", user_id)
     """
 
-    __slots__ = ("_config", "_driver", "_initialized", "_lock", "_pool")
+    __slots__ = ("_async_lock", "_config", "_driver", "_initialized", "_lock", "_pool")
 
     def __init__(self, url: str, /, *, pool_size: int = 5, echo: bool = False) -> None:
         self._config = DatabaseConfig(url=url, pool_size=pool_size, echo=echo)
         self._driver = _detect_driver(url)
         self._lock = threading.Lock()
+        self._async_lock: anyio.Lock | None = None  # Created lazily on first use
         self._pool: Any = None
         self._initialized = False
 
@@ -152,11 +155,16 @@ class Database:
         If inside a ``transaction()`` block, reuses the transaction's
         connection (no acquire/release — the transaction owns it).
         Otherwise acquires from the pool and releases on exit.
+
+        SQLite connections are serialized via an async lock to prevent
+        concurrent thread-pool dispatches on the same connection — matching
+        the serialization guarantee that ``aiosqlite`` provided via its
+        dedicated thread.
         """
         if not self._initialized:
             await self.connect()
 
-        # Inside a transaction — reuse its connection
+        # Inside a transaction — reuse its connection (lock already held)
         try:
             conn = _current_conn.get()
             yield conn
@@ -166,7 +174,12 @@ class Database:
 
         # Acquire fresh connection from pool
         if self._driver == "sqlite":
-            yield self._pool  # SQLite: pool IS the connection
+            # Lazy-init the async lock (can't create in __init__ before
+            # an event loop exists).
+            if self._async_lock is None:
+                self._async_lock = anyio.Lock()
+            async with self._async_lock:
+                yield self._pool  # SQLite: pool IS the connection
         else:
             conn = await self._pool.acquire()
             try:
@@ -207,29 +220,34 @@ class Database:
 
         # Top-level transaction — acquire a dedicated connection
         if self._driver == "sqlite":
-            conn = self._pool
+            if self._async_lock is None:
+                self._async_lock = anyio.Lock()
+            async with self._async_lock:
+                conn = self._pool
+                token = _current_conn.set(conn)
+                try:
+                    conn.autocommit = False
+                    yield
+                    await conn.commit()
+                except BaseException:
+                    await conn.rollback()
+                    raise
+                finally:
+                    conn.autocommit = True
+                    _current_conn.reset(token)
         else:
             conn = await self._pool.acquire()
-
-        token = _current_conn.set(conn)
-        try:
-            if self._driver == "sqlite":
-                yield
-                await conn.commit()
-            else:
+            token = _current_conn.set(conn)
+            try:
                 tr = conn.transaction()
                 await tr.start()
                 yield
                 await tr.commit()
-        except BaseException:
-            if self._driver == "sqlite":
-                await conn.rollback()
-            else:
+            except BaseException:
                 await tr.rollback()
-            raise
-        finally:
-            _current_conn.reset(token)
-            if self._driver != "sqlite":
+                raise
+            finally:
+                _current_conn.reset(token)
                 await self._pool.release(conn)
 
     # -- Echo / query logging --
@@ -321,6 +339,32 @@ class Database:
                 raise QueryError(str(exc)) from exc
             finally:
                 self._log_query(sql, params, time.perf_counter() - t0)
+
+    async def execute_script(self, sql: str, /) -> None:
+        """Execute multiple SQL statements at once (SQLite only).
+
+        Useful for migrations that contain multiple statements::
+
+            await db.execute_script('''
+                CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+                CREATE INDEX idx_users_name ON users(name);
+            ''')
+
+        For PostgreSQL, use ``execute()`` with individual statements
+        inside a ``transaction()`` block instead.
+        """
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                if self._driver == "sqlite":
+                    await conn.executescript(sql)
+                else:
+                    # PostgreSQL handles multi-statement SQL natively
+                    await conn.execute(sql)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, (), time.perf_counter() - t0)
 
     async def execute_many(
         self,
@@ -532,18 +576,13 @@ async def _create_pool(driver: str, config: DatabaseConfig) -> Any:
 
 
 async def _create_sqlite_pool(config: DatabaseConfig) -> Any:
-    try:
-        import aiosqlite
-    except ImportError:
-        msg = (
-            "chirp.data requires 'aiosqlite' for SQLite databases. "
-            "Install it with: pip install chirp[data]"
-        )
-        raise DriverNotInstalledError(msg) from None
+    import sqlite3
+
+    from chirp.data._sqlite import connect as sqlite_connect
 
     path = _parse_sqlite_path(config.url)
-    conn = await aiosqlite.connect(path)
-    conn.row_factory = aiosqlite.Row
+    conn = await sqlite_connect(path)
+    conn.row_factory = sqlite3.Row
     # Enable WAL mode for better concurrent read performance
     await conn.execute("PRAGMA journal_mode=WAL")
     await conn.execute("PRAGMA foreign_keys=ON")
@@ -644,8 +683,6 @@ async def _execute_many(
 ) -> int:
     if driver == "sqlite":
         cursor = await conn.executemany(sql, params_seq)
-        if not _in_transaction():
-            await conn.commit()
         return cursor.rowcount
 
     # PostgreSQL — asyncpg's executemany returns None, count manually
@@ -656,10 +693,6 @@ async def _execute_many(
 async def _execute_statement(driver: str, conn: Any, sql: str, params: tuple[Any, ...]) -> int:
     if driver == "sqlite":
         cursor = await conn.execute(sql, params)
-        # Only auto-commit outside managed transactions.
-        # Inside a transaction(), commit is handled by the context manager.
-        if not _in_transaction():
-            await conn.commit()
         return cursor.rowcount
 
     # PostgreSQL

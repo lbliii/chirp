@@ -124,16 +124,20 @@ async def _get_applied_versions(db: Database) -> set[int]:
 
 
 async def _apply_migration(db: Database, migration: Migration) -> None:
-    """Apply a single migration inside a transaction."""
+    """Apply a single migration.
+
+    Uses ``execute_script`` for SQLite to support multi-statement migration
+    files (e.g. CREATE TABLE + CREATE INDEX in one file). The tracking
+    record is inserted separately after the migration succeeds.
+    """
     now = datetime.now(UTC).isoformat()
-    async with db.transaction():
-        await db.execute(migration.sql)
-        await db.execute(
-            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) VALUES (?, ?, ?)",
-            migration.version,
-            migration.name,
-            now,
-        )
+    await db.execute_script(migration.sql)
+    await db.execute(
+        f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) VALUES (?, ?, ?)",
+        migration.version,
+        migration.name,
+        now,
+    )
 
 
 async def migrate(db: Database, directory: str | Path) -> MigrationResult:

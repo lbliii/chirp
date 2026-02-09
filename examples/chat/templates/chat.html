@@ -1,0 +1,77 @@
+<html>
+<head>
+  <title>Chat Room</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
+    h1 { margin-bottom: 0.5rem; }
+    .info { color: #6b7280; font-size: 0.85rem; margin-bottom: 1rem; }
+    #messages { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem;
+                height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
+    .msg { padding: 0.25rem 0; }
+    .msg-user { font-weight: 600; color: #1d4ed8; }
+    .msg-text { margin-left: 0.25rem; }
+    .msg-time { color: #9ca3af; font-size: 0.75rem; margin-left: 0.5rem; }
+    .empty-chat { color: #9ca3af; font-style: italic; padding: 2rem; text-align: center; }
+    #send-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    #send-form input { flex: 1; padding: 0.5rem; font-size: 1rem; }
+    #send-form button { padding: 0.5rem 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+{# ── Reusable message component via {% def %} ──────────────────── #}
+
+{% globals %}
+{% def chat_message(msg) %}
+{% spaceless %}
+<div class="msg">
+  <span class="msg-user">{{ msg.username | capitalize }}</span>
+  <span class="msg-text">{{ msg.text }}</span>
+  <span class="msg-time">{{ msg.timestamp | timeago }}</span>
+</div>
+{% end %}
+{% end %}
+{% end %}{# globals #}
+
+{# ── Page ───────────────────────────────────────────────────────── #}
+
+<h1>Chat Room</h1>
+<p class="info">Logged in as <strong>{{ username ?? 'Anonymous' }}</strong></p>
+
+<div id="messages"
+     hx-ext="sse"
+     sse-connect="/chat/events"
+     sse-swap="fragment"
+     hx-swap="beforeend">
+  {% unless messages %}
+  <p class="empty-chat">No messages yet. Say something!</p>
+  {% else %}
+  {% for msg in messages %}
+  {% block message %}
+  {{ chat_message(msg) }}
+  {% endblock %}
+  {% end %}
+  {% end %}
+</div>
+
+<form id="send-form"
+      hx-post="/chat/send"
+      hx-swap="none"
+      hx-on::after-request="this.reset()">
+  <input type="text" name="message" placeholder="Type a message..." autocomplete="off" autofocus>
+  <button type="submit">Send</button>
+</form>
+
+<script>
+  {# Auto-scroll + remove empty placeholder on first message #}
+  const el = document.getElementById("messages");
+  new MutationObserver(() => {
+    const empty = el.querySelector(".empty-chat");
+    if (empty) empty.remove();
+    el.scrollTop = el.scrollHeight;
+  }).observe(el, { childList: true });
+</script>
+</body>
+</html>

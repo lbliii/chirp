@@ -11,6 +11,7 @@ from typing import Any
 from kida import Environment, FileSystemLoader
 
 from chirp.config import AppConfig
+from chirp.templating.filters import BUILTIN_FILTERS
 from chirp.templating.returns import Fragment, Template
 
 
@@ -32,7 +33,10 @@ def create_environment(
         lstrip_blocks=config.lstrip_blocks,
     )
 
-    # Register user-defined filters
+    # Register chirp's built-in filters (field_errors, qs, etc.)
+    env.update_filters(BUILTIN_FILTERS)
+
+    # Register user-defined filters (may override built-ins)
     if filters:
         env.update_filters(filters)
 

@@ -11,6 +11,7 @@ Run:
     python app.py
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,7 +48,9 @@ app = App(
     db=f"sqlite:///{DB_PATH}",
     migrations=str(MIGRATIONS_DIR),
 )
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key="todo-demo-secret")))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware())
 
 # No custom filter needed — using inline ternary in the template instead:

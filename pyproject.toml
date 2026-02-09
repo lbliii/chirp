@@ -50,9 +50,6 @@ auth = ["argon2-cffi>=23.1.0"]
 # Test client transport
 testing = ["httpx>=0.27.0"]
 
-# Typed async database access (SQLite)
-data = ["aiosqlite>=0.20.0"]
-
 # Typed async database access (PostgreSQL)
 data-pg = ["asyncpg>=0.30.0"]
 
@@ -65,7 +62,7 @@ all = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "aiosqlite>=0.20.0",
+    "asyncpg>=0.30.0",
 ]
 
 # Full stack: framework + data + AI
@@ -74,7 +71,7 @@ full = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "aiosqlite>=0.20.0",
+    "asyncpg>=0.30.0",
 ]
 
 [project.urls]
@@ -91,6 +88,7 @@ Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 [tool.uv.sources]
 bengal-pounce = { path = "../pounce", editable = true }
+kida-templates = { path = "../kida", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -138,6 +138,145 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
 
 
 # ---------------------------------------------------------------------------
+# hx-target selector scanner — cross-reference against element IDs
+# ---------------------------------------------------------------------------
+
+# Regex: hx-target="..." values (ID selectors, extended selectors, keywords)
+_HX_TARGET_PATTERN = re.compile(
+    r'hx-target\s*=\s*["\']([^"\']*)["\']',
+)
+
+# Regex: static id="..." values in HTML
+_ID_PATTERN = re.compile(
+    r'\bid\s*=\s*["\']([^"\']*)["\']',
+)
+
+# htmx extended CSS selectors — traversal-based, not validatable statically
+_HTMX_EXTENDED_PREFIXES = frozenset({
+    "closest", "find", "next", "previous",
+})
+
+# htmx special target keywords that don't reference a DOM element by ID
+_HTMX_SPECIAL_TARGETS = frozenset({
+    "this", "body", "window", "document",
+})
+
+
+def _extract_hx_target_selectors(source: str) -> list[str]:
+    """Extract ``hx-target`` values from template source.
+
+    Returns raw selector strings, skipping template expressions.
+    """
+    selectors: list[str] = []
+    for match in _HX_TARGET_PATTERN.finditer(source):
+        value = match.group(1).strip()
+        # Skip template expressions
+        if "{{" in value or "{%" in value:
+            continue
+        if value:
+            selectors.append(value)
+    return selectors
+
+
+def _extract_static_ids(source: str) -> set[str]:
+    """Extract all static ``id`` attribute values from template HTML.
+
+    Skips IDs containing template expressions (these are dynamic and
+    cannot be validated at compile time).
+    """
+    ids: set[str] = set()
+    for match in _ID_PATTERN.finditer(source):
+        value = match.group(1).strip()
+        if value and "{{" not in value and "{%" not in value:
+            ids.add(value)
+    return ids
+
+
+def _edit_distance(a: str, b: str) -> int:
+    """Levenshtein distance between two strings."""
+    if len(a) > len(b):
+        a, b = b, a
+    prev = list(range(len(a) + 1))
+    for j in range(1, len(b) + 1):
+        curr = [j] + [0] * len(a)
+        for i in range(1, len(a) + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            curr[i] = min(curr[i - 1] + 1, prev[i] + 1, prev[i - 1] + cost)
+        prev = curr
+    return prev[len(a)]
+
+
+def _closest_id(target: str, ids: set[str], *, max_dist: int = 3) -> str | None:
+    """Find the closest ID by edit distance, or ``None`` if nothing is close."""
+    if not ids:
+        return None
+    target_lower = target.lower()
+    best: str | None = None
+    best_dist = max_dist + 1
+    for candidate in sorted(ids):  # sorted for determinism
+        dist = _edit_distance(target_lower, candidate.lower())
+        if dist < best_dist:
+            best_dist = dist
+            best = candidate
+    return best if best_dist <= max_dist else None
+
+
+def _check_hx_target_selectors(
+    template_sources: dict[str, str],
+    all_ids: set[str],
+) -> tuple[list[ContractIssue], int]:
+    """Validate ``hx-target`` selectors against the pool of static element IDs.
+
+    Only validates simple ``#id`` selectors.  Extended selectors (``closest``,
+    ``find``, ``next``, ``previous``) and special keywords (``this``, ``body``)
+    are skipped — they can't be validated statically.
+
+    Returns:
+        A tuple of (issues, targets_validated).
+    """
+    issues: list[ContractIssue] = []
+    validated = 0
+
+    for tmpl_name, source in template_sources.items():
+        selectors = _extract_hx_target_selectors(source)
+        for selector in selectors:
+            first_word = selector.split()[0] if selector else ""
+
+            # Skip special keywords
+            if first_word.lower() in _HTMX_SPECIAL_TARGETS:
+                continue
+            # Skip extended traversal selectors
+            if first_word.lower() in _HTMX_EXTENDED_PREFIXES:
+                continue
+
+            # Validate #id selectors
+            if selector.startswith("#"):
+                # Only simple selectors — no compound (#foo .bar)
+                if " " in selector:
+                    continue
+                target_id = selector[1:]
+                if not target_id:
+                    continue
+                validated += 1
+                if target_id not in all_ids:
+                    suggestion = _closest_id(target_id, all_ids)
+                    hint = f' Did you mean "#{suggestion}"?' if suggestion else ""
+                    issues.append(ContractIssue(
+                        severity=Severity.WARNING,
+                        category="hx-target",
+                        message=(
+                            f'hx-target="#{target_id}" — no element with '
+                            f'id="{target_id}" found in any template.{hint}'
+                        ),
+                        template=tmpl_name,
+                        details=f'Available IDs: {", ".join(sorted(all_ids)[:10])}'
+                        if all_ids else None,
+                    ))
+
+    return issues, validated
+
+
+# ---------------------------------------------------------------------------
 # Accessibility scanner — htmx on non-interactive elements
 # ---------------------------------------------------------------------------
 
@@ -256,6 +395,7 @@ class CheckResult:
     routes_checked: int = 0
     templates_scanned: int = 0
     targets_found: int = 0
+    hx_targets_validated: int = 0
 
     @property
     def errors(self) -> list[ContractIssue]:
@@ -274,16 +414,21 @@ class CheckResult:
         lines = [
             f"Checked {self.routes_checked} routes, "
             f"scanned {self.templates_scanned} templates, "
-            f"found {self.targets_found} hypermedia targets.",
+            f"found {self.targets_found} hypermedia targets, "
+            f"validated {self.hx_targets_validated} hx-target selectors.",
         ]
-        if self.ok:
-            lines.append("No errors found.")
+        if self.ok and not self.warnings:
+            lines.append("No issues found.")
+        elif self.ok:
+            lines.append(f"No errors. {len(self.warnings)} warning(s).")
         else:
             lines.append(f"{len(self.errors)} error(s), {len(self.warnings)} warning(s).")
         for issue in self.issues:
             prefix = issue.severity.value.upper()
             loc = f" in {issue.template}" if issue.template else ""
             lines.append(f"  [{prefix}] {issue.message}{loc}")
+            if issue.details:
+                lines.append(f"           {issue.details}")
         return "\n".join(lines)
 
 
@@ -293,14 +438,17 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     Checks:
     1. **Fragment references**: Every route with a FragmentContract
        references a template and block that exist.
-    2. **htmx targets**: Every ``hx-get``, ``hx-post``, etc. in template
-       HTML resolves to a registered route with the correct method.
+    2. **htmx URL targets**: Every ``hx-get``, ``hx-post``, etc. in
+       template HTML resolves to a registered route with the correct method.
     3. **Form actions**: Every ``action="/path"`` in template HTML
        resolves to a registered route.
-    4. **Accessibility**: htmx URL attributes on non-interactive elements
+    4. **hx-target selectors**: Every ``hx-target="#id"`` in template HTML
+       references an element ID that exists somewhere in the template tree
+       (warning — IDs may come from dynamic expressions or JS).
+    5. **Accessibility**: htmx URL attributes on non-interactive elements
        (``<div>``, ``<span>``, etc.) without ``role`` or ``tabindex``
        (warning, not error).
-    5. **Orphan routes**: Routes that are never referenced from templates
+    6. **Orphan routes**: Routes that are never referenced from templates
        (info, not error).
 
     Args:
@@ -411,12 +559,22 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         template=tmpl_name,
                     ))
 
-        # 4. Check accessibility — htmx on non-interactive elements
+        # 4. Check hx-target selectors against static element IDs
+        all_ids: set[str] = set()
+        for source in template_sources.values():
+            all_ids.update(_extract_static_ids(source))
+        hx_target_issues, hx_validated = _check_hx_target_selectors(
+            template_sources, all_ids,
+        )
+        result.hx_targets_validated = hx_validated
+        result.issues.extend(hx_target_issues)
+
+        # 5. Check accessibility — htmx on non-interactive elements
         for tmpl_name, source in template_sources.items():
             a11y_issues = _check_accessibility(source, tmpl_name)
             result.issues.extend(a11y_issues)
 
-        # 5. Check for orphan routes (routes never referenced from templates)
+        # 6. Check for orphan routes (routes never referenced from templates)
         for route_path in route_paths:
             if route_path not in referenced_paths and route_path != "/":
                 result.issues.append(ContractIssue(

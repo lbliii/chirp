@@ -16,6 +16,7 @@ Run:
 
 import contextvars
 import json as json_module
+import os
 import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -30,7 +31,7 @@ from chirp.tools.registry import ToolRegistry
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
-OLLAMA_BASE = "http://localhost:11434"
+OLLAMA_BASE = os.environ.get("OLLAMA_BASE", "http://localhost:11434")
 DEFAULT_MODEL = "llama3.2:3b"
 
 # Current model — global, thread-safe (single-user demo)

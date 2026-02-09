@@ -27,6 +27,7 @@ Lifecycle (multi-worker)::
 """
 
 import contextvars
+import os
 from dataclasses import dataclass
 
 from chirp import App, AppConfig, EventStream, Fragment, Template
@@ -51,7 +52,7 @@ class Document:
 
 app = App(AppConfig(template_dir="examples/rag_demo/templates", debug=True))
 
-DB_URL = "sqlite:///examples/rag_demo/docs.db"
+DB_URL = os.environ.get("DB_URL", "sqlite:///examples/rag_demo/docs.db")
 
 # Per-worker database connection.  Each pounce worker thread runs its own
 # asyncio event loop.  aiosqlite binds internal asyncio primitives to the

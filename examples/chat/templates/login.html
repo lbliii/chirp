@@ -1,0 +1,24 @@
+<html>
+<head>
+  <title>Chat — Join</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 400px; margin: 4rem auto; }
+    h1 { margin-bottom: 1.5rem; }
+    form { display: flex; flex-direction: column; gap: 0.75rem; }
+    input { padding: 0.5rem; font-size: 1rem; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+    .error { color: #dc2626; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<h1>Join Chat</h1>
+{# ?? null coalescing — no need for {% if error is defined and error %} #}
+{% unless not (error ?? '') %}
+<p class="error">{{ error }}</p>
+{% end %}
+<form method="POST" action="/login">
+  <input type="text" name="username" placeholder="Pick a username" autofocus required>
+  <button type="submit">Join</button>
+</form>
+</body>
+</html>

@@ -20,6 +20,7 @@ Run:
     python app.py
 """
 
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -47,7 +48,9 @@ _MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
 
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key="change-me-in-production")))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 app.add_middleware(StaticFiles(directory=str(UPLOADS_DIR), prefix="/uploads"))
 
