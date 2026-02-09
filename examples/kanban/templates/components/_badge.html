@@ -1,0 +1,16 @@
+{#- Reusable badge components — {% def %} + {% match %} -#}
+
+{% def priority_badge(priority) %}
+{% spaceless %}
+{% match priority %}
+  {% case "high" %}<span class="badge badge-high">High</span>
+  {% case "medium" %}<span class="badge badge-medium">Medium</span>
+  {% case "low" %}<span class="badge badge-low">Low</span>
+  {% case _ %}<span class="badge">{{ priority | capitalize }}</span>
+{% end %}
+{% end %}
+{% end %}
+
+{% def tag_badge(tag) %}
+{% spaceless %}<span class="tag">{{ tag }}</span>{% end %}
+{% end %}

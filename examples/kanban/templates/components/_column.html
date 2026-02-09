@@ -1,0 +1,15 @@
+{#- Column component — {% def %} with {% slot %} for caller content.
+    Used via {% from...import %} + {% call %}.
+-#}
+
+{% def column(column_id, column_name, count=0) %}
+<div class="column" id="column-{{ column_id }}" hx-swap-oob="outerHTML">
+  <div class="column-header">
+    <h3>{{ column_name }}</h3>
+    <span class="count">{{ count }}</span>
+  </div>
+  <div class="column-body" data-status="{{ column_id }}">
+    {% slot %}
+  </div>
+</div>
+{% end %}

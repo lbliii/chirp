@@ -1,0 +1,11 @@
+{#- Reusable form field — {% def %} with default parameters -#}
+
+{% def field(name, label, type="text", value="", placeholder="", required=true) %}
+<div class="form-field">
+  <label for="field-{{ name }}">{{ label }}</label>
+  <input type="{{ type }}" id="field-{{ name }}" name="{{ name }}"
+         value="{{ value }}"
+         placeholder="{{ placeholder }}"
+         {{ "required" if required else "" }}>
+</div>
+{% end %}

@@ -1,0 +1,57 @@
+{#- Task card component
+    Kida features: {% from...import %}, {% def %}, {{ ?.  }}, {{ ?? }},
+    {% with expr as name %}, {% match %}, {% unless %}, | truncate
+-#}
+
+{% from "components/_badge.html" import priority_badge, tag_badge %}
+
+{% def task_card(task) %}
+<div id="task-{{ task.id }}" class="card priority-{{ task.priority }}"
+     draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
+  <div class="card-header">
+    {{ priority_badge(task.priority) }}
+    <span class="assignee">{{ task?.assignee ?? "Unassigned" }}</span>
+  </div>
+  <h4 class="card-title"
+      hx-get="/tasks/{{ task.id }}/edit"
+      hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
+    {{ task.title }}
+  </h4>
+  {% if task.description %}
+  <p class="card-desc">{{ task.description | truncate(80) }}</p>
+  {% end %}
+  {% unless task.tags == () %}
+  <div class="card-tags">
+    {% for tag in task.tags %}
+      {{ tag_badge(tag) }}
+    {% end %}
+  </div>
+  {% end %}
+  <div class="card-footer">
+    <time class="card-time">{{ task.created_at }}</time>
+    <div class="move-actions">
+      {% match task.status %}
+        {% case "backlog" %}
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/in_progress"
+                  hx-swap="none" title="Move to In Progress">&rarr;</button>
+        {% case "in_progress" %}
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/backlog"
+                  hx-swap="none" title="Move to Backlog">&larr;</button>
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/review"
+                  hx-swap="none" title="Move to Review">&rarr;</button>
+        {% case "review" %}
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/in_progress"
+                  hx-swap="none" title="Move back">&larr;</button>
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/done"
+                  hx-swap="none" title="Move to Done">&rarr;</button>
+        {% case "done" %}
+          <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/review"
+                  hx-swap="none" title="Move back">&larr;</button>
+      {% end %}
+      <button class="move-btn danger" hx-delete="/tasks/{{ task.id }}"
+              hx-swap="none" hx-confirm="Delete &quot;{{ task.title }}&quot;?"
+              title="Delete task">&times;</button>
+    </div>
+  </div>
+</div>
+{% end %}

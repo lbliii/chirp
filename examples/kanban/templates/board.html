@@ -1,0 +1,473 @@
+{#- Kanban Board — main template (standalone, like contacts/dashboard).
+
+    Kida features showcased:
+    - {% from...import %}  — component imports from separate templates
+    - {% call %} + {% slot %} — column component with caller content
+    - {% let %}             — scoped computed variables
+    - {% unless %}          — negated conditionals
+    - {% cache %}           — fragment caching for stats
+    - | selectattr          — filter by attribute
+    - | map(attribute=)     — extract field values
+    - | unique              — deduplicate
+    - | compact             — remove None values
+    - | sort(attribute=)    — sort within columns
+    - | length              — counts
+    - | lower, | capitalize — string transforms
+    - loop.index, is odd    — alternating card tints
+-#}
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kanban Board</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    :root {
+      --bg:         #0f172a;
+      --fg:         #e2e8f0;
+      --muted:      #94a3b8;
+      --surface:    #1e293b;
+      --surface-2:  #273549;
+      --border:     #334155;
+      --accent:     #818cf8;
+      --accent-fg:  #0f172a;
+      --danger:     #f87171;
+      --danger-bg:  rgba(248,113,113,0.1);
+      --high:       #f87171;
+      --high-bg:    rgba(248,113,113,0.12);
+      --medium:     #fbbf24;
+      --medium-bg:  rgba(251,191,36,0.12);
+      --low:        #94a3b8;
+      --low-bg:     rgba(148,163,184,0.10);
+      --radius:     0.5rem;
+      --radius-sm:  0.25rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--fg);
+      min-height: 100vh; line-height: 1.5;
+    }
+
+    /* Layout */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+    .app-header {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .app-header h1 { font-size: 1.25rem; font-weight: 700; color: #f8fafc; }
+    .stats {
+      display: flex; gap: 1.25rem; margin-left: auto;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .stats strong { color: var(--fg); }
+
+    /* Sidebar */
+    .sidebar {
+      padding: 1.25rem 1rem;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+    .sidebar h3 {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted);
+      margin: 1.25rem 0 0.5rem;
+    }
+    .sidebar h3:first-child { margin-top: 0; }
+    .sidebar label {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.2rem 0; font-size: 0.85rem;
+      cursor: pointer; color: var(--fg);
+    }
+    .sidebar label:hover { color: var(--accent); }
+    .sidebar input[type="checkbox"] { accent-color: var(--accent); }
+    .sidebar .muted { color: var(--muted); font-size: 0.8rem; font-style: italic; }
+    .main-content { padding: 1.25rem; overflow-x: auto; }
+
+    /* Board */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap: 1rem; min-height: 60vh;
+    }
+    .column {
+      display: flex; flex-direction: column;
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .column-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .column-header h3 {
+      font-size: 0.8rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+    }
+    .count {
+      font-size: 0.75rem; font-weight: 600;
+      background: var(--border); color: var(--fg);
+      padding: 0.1rem 0.45rem; border-radius: 999px;
+      min-width: 1.4rem; text-align: center;
+    }
+    .column-body {
+      flex: 1; padding: 0.5rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      min-height: 100px;
+    }
+    .column-body .empty {
+      color: var(--muted); font-size: 0.8rem;
+      font-style: italic; text-align: center; padding: 1.5rem 0.5rem;
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.75rem;
+      transition: border-color 0.15s, box-shadow 0.15s; cursor: grab;
+    }
+    .card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(129,140,248,0.15);
+    }
+    .card.priority-high { border-left: 3px solid var(--high); }
+    .card.priority-medium { border-left: 3px solid var(--medium); }
+    .card.priority-low { border-left: 3px solid var(--low); }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.35rem;
+    }
+    .card-title {
+      font-size: 0.9rem; font-weight: 600; color: #f8fafc;
+      cursor: pointer; margin-bottom: 0.25rem;
+    }
+    .card-title:hover { color: var(--accent); }
+    .card-desc {
+      font-size: 0.8rem; color: var(--muted);
+      margin-bottom: 0.4rem; line-height: 1.4;
+    }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.4rem; }
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 0.25rem;
+    }
+    .card-time { font-size: 0.7rem; color: var(--muted); }
+    .card-wrapper.alt .card { background: var(--surface-2); }
+
+    /* Badges + tags */
+    .badge {
+      display: inline-block; font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      padding: 0.1rem 0.4rem; border-radius: var(--radius-sm);
+    }
+    .badge-high { background: var(--high-bg); color: var(--high); }
+    .badge-medium { background: var(--medium-bg); color: var(--medium); }
+    .badge-low { background: var(--low-bg); color: var(--low); }
+    .assignee { font-size: 0.7rem; color: var(--muted); }
+    .tag {
+      display: inline-block; font-size: 0.65rem;
+      padding: 0.05rem 0.35rem; border-radius: var(--radius-sm);
+      background: var(--border); color: var(--fg);
+    }
+
+    /* Move buttons */
+    .move-actions { display: flex; gap: 0.15rem; }
+    .move-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); width: 1.5rem; height: 1.5rem;
+      border-radius: var(--radius-sm); cursor: pointer;
+      font-size: 0.75rem; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .move-btn:hover { background: var(--surface-2); color: var(--fg); }
+    .move-btn.danger:hover {
+      background: var(--danger-bg); color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    /* Add form */
+    .add-form {
+      display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;
+      margin-top: 1rem; padding: 1rem;
+      background: var(--surface); border-radius: var(--radius);
+    }
+    .form-field { display: flex; flex-direction: column; gap: 0.2rem; }
+    .form-field label {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted);
+    }
+    .add-form input[type="text"], .add-form select {
+      padding: 0.4rem 0.6rem; background: var(--bg);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--fg); font-size: 0.85rem; font-family: inherit;
+    }
+    .add-form input:focus, .add-form select:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(129,140,248,0.15);
+    }
+    .add-form .form-field:first-child { flex: 2; }
+    .add-form button[type="submit"] {
+      padding: 0.4rem 1rem; background: var(--accent);
+      color: var(--accent-fg); border: none; border-radius: var(--radius-sm);
+      font-size: 0.85rem; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .add-form button[type="submit"]:hover { opacity: 0.9; }
+    .form-errors {
+      color: var(--danger); font-size: 0.8rem; list-style: none; margin-top: 0.25rem;
+    }
+
+    /* Edit form */
+    .card.edit-mode { cursor: default; }
+    .card.edit-mode input, .card.edit-mode textarea, .card.edit-mode select {
+      width: 100%; padding: 0.35rem 0.5rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--fg); font-size: 0.85rem; font-family: inherit;
+      margin-bottom: 0.35rem;
+    }
+    .card.edit-mode textarea { resize: vertical; min-height: 3rem; }
+    .card.edit-mode input:focus, .card.edit-mode textarea:focus, .card.edit-mode select:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .card.edit-mode label {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      color: var(--muted); display: block; margin-bottom: 0.1rem;
+    }
+    .edit-actions { display: flex; gap: 0.4rem; margin-top: 0.25rem; }
+    .edit-actions button {
+      padding: 0.3rem 0.75rem; border-radius: var(--radius-sm);
+      font-size: 0.8rem; font-family: inherit; cursor: pointer;
+      border: 1px solid var(--border);
+    }
+    .btn-save {
+      background: var(--accent); color: var(--accent-fg);
+      border-color: var(--accent); font-weight: 600;
+    }
+    .btn-cancel { background: transparent; color: var(--muted); }
+    .btn-cancel:hover { color: var(--fg); background: var(--surface-2); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1rem; right: 1rem;
+      background: var(--surface); color: var(--fg);
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem; border-radius: var(--radius);
+      font-size: 0.85rem; opacity: 0; transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .app-layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+      .board { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .board { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  {# ================================================================
+     Header with stats
+     ================================================================ #}
+  <header class="app-header">
+    <h1>Kanban Board</h1>
+    {% block header_stats %}
+    <div id="board-stats" class="stats" hx-swap-oob="outerHTML">
+      {% cache "board-stats", ttl=30 %}
+      <span><strong>{{ all_tasks | length }}</strong> tasks</span>
+      <span><strong>{{ all_tasks | selectattr("priority", "equalto", "high") | list | length }}</strong> high priority</span>
+      {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+      <span><strong>{{ assignees | length }}</strong> people</span>
+      {% end %}
+    </div>
+    {% end %}
+  </header>
+
+  {# ================================================================
+     Filter sidebar — {% let %}, | map, | compact, | unique, | sort
+     ================================================================ #}
+  <aside class="sidebar">
+    <h3>Priority</h3>
+    {% for p in ["high", "medium", "low"] %}
+      <label>
+        <input type="checkbox" name="priority" value="{{ p }}"
+               {{ "checked" if p in active_filters.priority else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ p | capitalize }}
+      </label>
+    {% end %}
+
+    <h3>Assignee</h3>
+    {% let all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
+    {% unless all_assignees %}
+      <p class="muted">No assignees.</p>
+    {% end %}
+    {% for person in all_assignees %}
+      <label>
+        <input type="checkbox" name="assignee" value="{{ person }}"
+               {{ "checked" if person in active_filters.assignee else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ person }}
+      </label>
+    {% end %}
+
+    <h3>Tags</h3>
+    {% let all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
+    {% unless all_tags %}
+      <p class="muted">No tags yet.</p>
+    {% end %}
+    {% for tag in all_tags %}
+      <label>
+        <input type="checkbox" name="tag" value="{{ tag }}"
+               {{ "checked" if tag in active_filters.tag else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ tag }}
+      </label>
+    {% end %}
+  </aside>
+
+  {# ================================================================
+     Main content — board + add form
+     ================================================================ #}
+  <div class="main-content">
+
+    {# --- Full board: 4 columns via {% call column() %} --- #}
+    {% block board %}
+    {% from "components/_card.html" import task_card %}
+    {% from "components/_column.html" import column %}
+    <div id="board" class="board">
+      {% for col_id, col_name in columns %}
+        {% let col_tasks = board.get(col_id, []) %}
+        {% call column(col_id, col_name, col_tasks | length) %}
+          {% unless col_tasks %}
+            <p class="empty">No tasks in {{ col_name | lower }}.</p>
+          {% end %}
+          {% for task in col_tasks | sort(attribute="created_at") %}
+            {% if loop.index is odd %}
+            <div class="card-wrapper alt">
+            {% else %}
+            <div class="card-wrapper">
+            {% end %}
+              {{ task_card(task) }}
+            </div>
+          {% end %}
+        {% end %}
+      {% end %}
+    </div>
+    {% end %}
+
+    {# --- Quick-add form --- #}
+    {% block add_form %}
+    {% from "components/_field.html" import field %}
+    <form class="add-form" hx-post="/tasks" hx-swap="none">
+      {{ field("title", "Task", placeholder="What needs doing?") }}
+      <div class="form-field">
+        <label for="field-status">Column</label>
+        <select id="field-status" name="status">
+          {% for col_id, col_name in columns %}
+          <option value="{{ col_id }}">{{ col_name }}</option>
+          {% end %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="field-priority">Priority</label>
+        <select id="field-priority" name="priority">
+          {% for p in ["low", "medium", "high"] %}
+          <option value="{{ p }}" {{ "selected" if p == "medium" else "" }}>
+            {{ p | capitalize }}
+          </option>
+          {% end %}
+        </select>
+      </div>
+      {{ field("assignee", "Assignee", placeholder="Name (optional)", required=false) }}
+      {{ field("tags", "Tags", placeholder="Comma-separated", required=false) }}
+      <button type="submit">Add Task</button>
+    </form>
+    {% if errors is defined and errors %}
+    <ul class="form-errors">
+      {% for fld, msgs in errors.items() %}
+        {% for msg in msgs %}
+        <li>{{ fld | capitalize }}: {{ msg }}</li>
+        {% end %}
+      {% end %}
+    </ul>
+    {% end %}
+    {% end %}
+
+  </div>
+
+</div>
+
+{# SSE connection for live updates #}
+<div hx-ext="sse" sse-connect="/events">
+  <div sse-swap="fragment" style="display:none;"></div>
+</div>
+
+{# Toast for delete notifications #}
+<div id="toast" class="toast"></div>
+<script>
+  document.body.addEventListener("taskDeleted", function() {
+    var t = document.getElementById("toast");
+    t.textContent = "Task deleted.";
+    t.classList.add("show");
+    setTimeout(function() { t.classList.remove("show"); }, 2000);
+  });
+</script>
+
+{# ==================================================================
+   Fragment blocks for OOB rendering (not shown on full page load)
+   ================================================================== #}
+
+{# Single column — rendered for OOB swaps when tasks move #}
+{% block column_block %}
+{% from "components/_card.html" import task_card %}
+{% from "components/_column.html" import column %}
+{% if column_id is defined %}
+{% call column(column_id, column_name, tasks | length) %}
+  {% unless tasks %}
+    <p class="empty">No tasks.</p>
+  {% end %}
+  {% for task in tasks | sort(attribute="created_at") %}
+    {% if loop.index is odd %}
+    <div class="card-wrapper alt">
+    {% else %}
+    <div class="card-wrapper">
+    {% end %}
+      {{ task_card(task) }}
+    </div>
+  {% end %}
+{% end %}
+{% end %}
+{% end %}
+
+{# Single task card — rendered for OOB swap after edit #}
+{% block task_card_block %}
+{% from "components/_card.html" import task_card %}
+{% if task is defined %}
+<div id="task-{{ task.id }}" hx-swap-oob="outerHTML">
+  {{ task_card(task) }}
+</div>
+{% end %}
+{% end %}
+
+</body>
+</html>

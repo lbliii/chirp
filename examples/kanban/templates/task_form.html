@@ -1,0 +1,43 @@
+{#- Inline edit form — replaces a card when the title is clicked.
+    Kida features: {{ ?. }}, {{ ?? }}, | join, {% from...import %}, | capitalize
+-#}
+
+{% block edit_form %}
+{% from "components/_field.html" import field %}
+<form id="task-{{ task.id }}" class="card edit-mode"
+      hx-put="/tasks/{{ task.id }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
+
+  {{ field("title", "Title", value=task.title) }}
+
+  <label>Description</label>
+  <textarea name="description" placeholder="Optional details...">{{ task?.description ?? "" }}</textarea>
+
+  <label>Priority</label>
+  <select name="priority">
+    {% for p in ["low", "medium", "high"] %}
+    <option value="{{ p }}" {{ "selected" if task.priority == p else "" }}>
+      {{ p | capitalize }}
+    </option>
+    {% end %}
+  </select>
+
+  {{ field("assignee", "Assignee", value=task?.assignee ?? "", placeholder="Name (optional)", required=false) }}
+  {{ field("tags", "Tags", value=task.tags | join(", "), placeholder="Comma-separated", required=false) }}
+
+  {% if errors is defined and errors %}
+  <ul class="form-errors">
+    {% for fld, msgs in errors.items() %}
+      {% for msg in msgs %}
+      <li>{{ fld | capitalize }}: {{ msg }}</li>
+      {% end %}
+    {% end %}
+  </ul>
+  {% end %}
+
+  <div class="edit-actions">
+    <button type="submit" class="btn-save">Save</button>
+    <button type="button" class="btn-cancel"
+            hx-get="/" hx-target="#board" hx-swap="outerHTML">Cancel</button>
+  </div>
+</form>
+{% end %}
