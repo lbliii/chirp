@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome{% endblock %}
+
+{% block content %}
+<h1>Welcome, {{ username }}!</h1>
+<p style="margin-top: 1rem; color: #475569;">Your account has been created. You're all set.</p>
+<p style="margin-top: 1.5rem;"><a href="/signup">&larr; Register another account</a></p>
+{% endblock %}

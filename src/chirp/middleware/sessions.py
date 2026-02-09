@@ -38,6 +38,28 @@ def get_session() -> dict[str, Any]:
     return session
 
 
+def regenerate_session() -> dict[str, Any]:
+    """Clear the session and return a fresh empty dict.
+
+    Prevents session fixation by discarding all data from the
+    previous session. The ``SessionMiddleware`` re-signs the new
+    (empty) dict on the response, producing a fresh cookie value.
+
+    Called automatically by ``login()`` and ``logout()``. Can also
+    be called directly when you need to rotate the session::
+
+        from chirp.middleware.sessions import regenerate_session
+
+        regenerate_session()  # old data gone, new cookie on response
+
+    Raises ``LookupError`` if called outside a request with
+    ``SessionMiddleware`` active.
+    """
+    session = get_session()
+    session.clear()
+    return session
+
+
 # -- Configuration --
 
 

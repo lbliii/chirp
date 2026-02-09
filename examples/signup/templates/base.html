@@ -1,0 +1,23 @@
+<html>
+<head>
+  <title>{% block title %}Signup Demo{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
+    h1 { margin-bottom: 1.5rem; font-size: 1.5rem; }
+    label { display: block; margin-top: 1rem; font-weight: 600; font-size: 0.875rem; }
+    input { display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    input.error { border-color: #dc2626; }
+    button { display: block; width: 100%; padding: 0.6rem; margin-top: 1.5rem; background: #1e293b; color: #f8fafc; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
+    button:hover { background: #334155; }
+    .field-error { color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; }
+    .hint { color: #64748b; font-size: 0.8rem; margin-top: 0.2rem; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>

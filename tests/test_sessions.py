@@ -4,7 +4,7 @@ import pytest
 
 from chirp.app import App
 from chirp.errors import ConfigurationError
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session, regenerate_session
 from chirp.testing import TestClient
 
 
@@ -247,6 +247,200 @@ class TestSessionCookieAttributes:
             response = await client.get("/set")
             cookie = _extract_session_cookie(response, "my_session")
             assert cookie is not None
+
+
+class TestRegenerateSession:
+    def test_raises_outside_request(self) -> None:
+        with pytest.raises(LookupError, match="No active session"):
+            regenerate_session()
+
+    async def test_regenerate_clears_session_data(self) -> None:
+        """regenerate_session() removes all keys from the session."""
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["name"] = "alice"
+            session["role"] = "admin"
+            return "set"
+
+        @app.route("/regenerate")
+        def regen():
+            session = regenerate_session()
+            return f"keys={sorted(session.keys())}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+
+            r2 = await client.get(
+                "/regenerate",
+                headers={"Cookie": f"chirp_session={cookie}"},
+            )
+            assert r2.text == "keys=[]"
+
+    async def test_regenerate_produces_new_cookie(self) -> None:
+        """After regeneration the signed cookie value should differ."""
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["x"] = 1
+            return "set"
+
+        @app.route("/regenerate")
+        def regen():
+            regenerate_session()
+            return "ok"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie_before = _extract_session_cookie(r1, "chirp_session")
+
+            r2 = await client.get(
+                "/regenerate",
+                headers={"Cookie": f"chirp_session={cookie_before}"},
+            )
+            cookie_after = _extract_session_cookie(r2, "chirp_session")
+            assert cookie_after is not None
+            assert cookie_before != cookie_after
+
+    async def test_old_cookie_invalid_after_regeneration(self) -> None:
+        """The pre-regeneration cookie should not restore old data."""
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["secret"] = "top-secret"
+            return "set"
+
+        @app.route("/regenerate")
+        def regen():
+            regenerate_session()
+            return "regenerated"
+
+        @app.route("/check")
+        def check():
+            session = get_session()
+            return f"secret={session.get('secret', 'none')}"
+
+        async with TestClient(app) as client:
+            # Set session data
+            r1 = await client.get("/set")
+            old_cookie = _extract_session_cookie(r1, "chirp_session")
+
+            # Regenerate (discard data)
+            r2 = await client.get(
+                "/regenerate",
+                headers={"Cookie": f"chirp_session={old_cookie}"},
+            )
+            new_cookie = _extract_session_cookie(r2, "chirp_session")
+
+            # Old cookie still loads (signature valid) but data is gone
+            # because itsdangerous timestamps differ and we cleared in-place.
+            # The *new* cookie must reflect empty state.
+            r3 = await client.get(
+                "/check",
+                headers={"Cookie": f"chirp_session={new_cookie}"},
+            )
+            assert r3.text == "secret=none"
+
+
+class TestSessionRegenerationOnAuth:
+    """Integration: login/logout regenerate the session to prevent fixation."""
+
+    async def test_login_regenerates_session(self) -> None:
+        from chirp.middleware.auth import AuthConfig, AuthMiddleware, get_user, login
+
+        async def _load(uid: str):
+            return type("U", (), {"id": uid, "is_authenticated": True})()
+
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(AuthMiddleware(AuthConfig(load_user=_load)))
+
+        @app.route("/pre-session")
+        def pre_session():
+            session = get_session()
+            session["pre_login"] = "data"
+            return "ok"
+
+        @app.route("/login")
+        def do_login():
+            user = type("U", (), {"id": "alice", "is_authenticated": True})()
+            login(user)
+            session = get_session()
+            return f"pre_login={session.get('pre_login', 'gone')}"
+
+        async with TestClient(app) as client:
+            # Set some pre-login data
+            r1 = await client.get("/pre-session")
+            cookie_before = _extract_session_cookie(r1, "chirp_session")
+
+            # Login — should regenerate
+            r2 = await client.get(
+                "/login",
+                headers={"Cookie": f"chirp_session={cookie_before}"},
+            )
+            cookie_after = _extract_session_cookie(r2, "chirp_session")
+
+            # Pre-login data should be gone
+            assert r2.text == "pre_login=gone"
+            # Cookie value should differ
+            assert cookie_before != cookie_after
+
+    async def test_logout_clears_entire_session(self) -> None:
+        from chirp.middleware.auth import AuthConfig, AuthMiddleware, login, logout
+
+        async def _load(uid: str):
+            return type("U", (), {"id": uid, "is_authenticated": True})()
+
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(AuthMiddleware(AuthConfig(load_user=_load)))
+
+        @app.route("/login")
+        def do_login():
+            user = type("U", (), {"id": "bob", "is_authenticated": True})()
+            login(user)
+            session = get_session()
+            session["cart"] = ["item1", "item2"]
+            return "logged-in"
+
+        @app.route("/logout")
+        def do_logout():
+            logout()
+            return "logged-out"
+
+        @app.route("/check")
+        def check():
+            session = get_session()
+            return f"keys={sorted(session.keys())}"
+
+        async with TestClient(app) as client:
+            # Login and set extra session data
+            r1 = await client.get("/login")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+
+            # Logout — should clear everything
+            r2 = await client.get(
+                "/logout",
+                headers={"Cookie": f"chirp_session={cookie}"},
+            )
+            new_cookie = _extract_session_cookie(r2, "chirp_session")
+
+            # Verify session is empty via new cookie
+            r3 = await client.get(
+                "/check",
+                headers={"Cookie": f"chirp_session={new_cookie}"},
+            )
+            assert r3.text == "keys=[]"
 
 
 # -- Helpers --

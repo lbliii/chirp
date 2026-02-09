@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account{% endblock %}
+
+{% block content %}
+<h1>Create an account</h1>
+
+{% block signup_form %}
+<form method="post" action="/signup">
+  {{ csrf_field() }}
+
+  <label for="username">Username</label>
+  <input type="text" id="username" name="username"
+         value="{{ form.username if form is defined and form else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'username' in errors else '' }}"
+         placeholder="janedoe">
+  {% if errors is defined and errors and 'username' in errors %}
+    {% for msg in errors['username'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+  <p class="hint">3–30 characters. Letters, numbers, underscores.</p>
+
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email"
+         value="{{ form.email if form is defined and form else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'email' in errors else '' }}"
+         placeholder="jane@example.com">
+  {% if errors is defined and errors and 'email' in errors %}
+    {% for msg in errors['email'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password"
+         class="{{ 'error' if errors is defined and errors and 'password' in errors else '' }}"
+         placeholder="At least 8 characters">
+  {% if errors is defined and errors and 'password' in errors %}
+    {% for msg in errors['password'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="confirm_password">Confirm password</label>
+  <input type="password" id="confirm_password" name="confirm_password"
+         class="{{ 'error' if errors is defined and errors and 'confirm_password' in errors else '' }}"
+         placeholder="Type your password again">
+  {% if errors is defined and errors and 'confirm_password' in errors %}
+    {% for msg in errors['confirm_password'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <button type="submit">Create account</button>
+</form>
+{% endblock %}
+{% endblock %}

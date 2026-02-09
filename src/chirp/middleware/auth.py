@@ -122,8 +122,9 @@ _active_config: ContextVar[AuthConfig | None] = ContextVar(
 
 
 def login(user: User) -> None:
-    """Log in a user — set session + ContextVar.
+    """Log in a user — regenerate session, set user ID, update ContextVar.
 
+    Regenerates the session to prevent session fixation attacks.
     Call from your login handler after verifying credentials::
 
         user = await verify_credentials(email, password)
@@ -133,37 +134,37 @@ def login(user: User) -> None:
 
     Requires ``SessionMiddleware`` and ``AuthMiddleware`` to be active.
     """
-    from chirp.middleware.sessions import get_session
+    from chirp.middleware.sessions import regenerate_session
 
     config = _active_config.get()
     if config is None:
         msg = "login() requires AuthMiddleware to be active."
         raise LookupError(msg)
 
-    session = get_session()
+    session = regenerate_session()
     session[config.session_key] = user.id
     _user_var.set(user)
 
 
 def logout() -> None:
-    """Log out the current user — clear session + ContextVar.
+    """Log out the current user — regenerate session + clear ContextVar.
 
-    Call from your logout handler::
+    Regenerates the session to discard all session data (not just the
+    user ID). Call from your logout handler::
 
         logout()
         return Redirect("/")
 
     Requires ``SessionMiddleware`` and ``AuthMiddleware`` to be active.
     """
-    from chirp.middleware.sessions import get_session
+    from chirp.middleware.sessions import regenerate_session
 
     config = _active_config.get()
     if config is None:
         msg = "logout() requires AuthMiddleware to be active."
         raise LookupError(msg)
 
-    session = get_session()
-    session.pop(config.session_key, None)
+    regenerate_session()
     _user_var.set(_ANONYMOUS)
 
 
