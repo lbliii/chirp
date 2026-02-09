@@ -577,6 +577,30 @@ class App:
 
         self._frozen = True
 
+        # 5. Auto-validate hypermedia surface in debug mode.
+        #    Prints warnings to the terminal at startup so the developer
+        #    sees broken hx-target selectors, missing routes, and
+        #    accessibility issues before opening a browser.
+        #    Warnings only — never blocks startup (false positives are
+        #    possible for dynamic IDs).
+        if self.config.debug:
+            self._run_debug_checks()
+
+    def _run_debug_checks(self) -> None:
+        """Run contract checks and print results to stderr.
+
+        Uses the rich terminal formatter so output matches the pounce
+        startup banner's visual language.  Printed even when there are
+        no issues (confirms checks ran).
+        """
+        import sys
+
+        from chirp.contracts import check_hypermedia_surface
+        from chirp.server.terminal_checks import format_check_result
+
+        result = check_hypermedia_surface(self)
+        sys.stderr.write(format_check_result(result))
+
     def check(self) -> None:
         """Validate the hypermedia surface and print results.
 
@@ -589,10 +613,11 @@ class App:
             app.check()  # prints results and exits on errors
 
         """
-        from chirp.contracts import CheckResult, check_hypermedia_surface
+        from chirp.contracts import check_hypermedia_surface
+        from chirp.server.terminal_checks import format_check_result
 
-        result: CheckResult = check_hypermedia_surface(self)
-        print(result.summary())
+        result = check_hypermedia_surface(self)
+        print(format_check_result(result, color=None))
         if not result.ok:
             raise SystemExit(1)
 
