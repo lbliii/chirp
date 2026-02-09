@@ -5,6 +5,14 @@ All notable changes to chirp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Built-in template filters** — `field_errors` extracts validation messages for a single
+  form field from an errors dict. `qs` builds URL query strings, automatically omitting
+  falsy values. Both are auto-registered in the Kida environment at startup.
+
 ## [0.1.0] — 2026-02-09
 
 Initial release of Chirp — a Python web framework for HTML-over-the-wire apps,
