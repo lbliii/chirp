@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Survey Results{% endblock %}
+
+{% block content %}
+<h1>Thanks, {{ name }}!</h1>
+<p class="subtitle">Here's a summary of your responses.</p>
+
+<dl>
+  <dt>Name</dt>
+  <dd>{{ name }}</dd>
+
+  <dt>Age</dt>
+  <dd>{{ age }}</dd>
+
+  <dt>Interests</dt>
+  <dd>
+    {% for interest in interests %}
+    <span class="tag">{{ interest }}</span>
+    {% endfor %}
+  </dd>
+
+  <dt>Experience</dt>
+  <dd>{{ experience }}</dd>
+
+  <dt>Country</dt>
+  <dd>{{ country }}</dd>
+
+  {% if comments %}
+  <dt>Comments</dt>
+  <dd>{{ comments }}</dd>
+  {% endif %}
+</dl>
+
+<hr>
+<p><a href="/">&larr; Take the survey again</a></p>
+{% endblock %}

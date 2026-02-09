@@ -23,6 +23,7 @@ Usage::
         return Template("admin.html")
 """
 
+import logging
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
@@ -30,6 +31,8 @@ from urllib.parse import quote
 
 from chirp._internal.invoke import invoke
 from chirp.errors import HTTPError
+
+_log = logging.getLogger("chirp.security")
 
 
 def _is_api_request(request: Any) -> bool:
@@ -138,18 +141,21 @@ def requires(*permissions: str) -> Callable:
 
             # Check permissions
             if not isinstance(user, UserWithPermissions):
-                raise HTTPError(
-                    status=403,
-                    detail="User model does not support permissions",
+                _log.warning(
+                    "User %s model does not implement permissions protocol",
+                    user.id,
                 )
+                raise HTTPError(status=403, detail="Forbidden")
 
             required = frozenset(permissions)
             if not required.issubset(user.permissions):
                 missing = required - user.permissions
-                raise HTTPError(
-                    status=403,
-                    detail=f"Missing permissions: {', '.join(sorted(missing))}",
+                _log.warning(
+                    "User %s missing permissions: %s",
+                    user.id,
+                    ", ".join(sorted(missing)),
                 )
+                raise HTTPError(status=403, detail="Forbidden")
 
             return await invoke(handler, *args, **kwargs)
 

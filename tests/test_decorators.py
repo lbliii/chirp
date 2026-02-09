@@ -341,3 +341,65 @@ class TestPublicRoutes:
             response = await client.get("/public")
             assert response.status == 200
             assert response.text == "public"
+
+
+# ---------------------------------------------------------------------------
+# 403 body must not leak permission names
+# ---------------------------------------------------------------------------
+
+
+class TestPermissionRedaction:
+    async def test_missing_permission_not_in_body(self) -> None:
+        """403 response body says 'Forbidden', not specific permission names."""
+        app = _make_app()
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/admin",
+                headers={"Authorization": "Bearer tok_alice"},
+            )
+            assert response.status == 403
+            body = response.text
+            assert "admin" not in body.lower() or body == "Forbidden"
+            assert "Forbidden" in body
+
+    async def test_no_permissions_model_not_in_body(self) -> None:
+        """403 for missing permissions protocol says 'Forbidden' only."""
+        _simple_users: dict[str, SimpleUser] = {
+            "tok_simple": SimpleUser(id="s1"),
+        }
+
+        async def verify(token: str) -> SimpleUser | None:
+            return _simple_users.get(token)
+
+        app = App()
+        app.add_middleware(AuthMiddleware(AuthConfig(verify_token=verify)))
+
+        @app.route("/admin")
+        @requires("admin")
+        def admin():
+            return "admin"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/admin",
+                headers={"Authorization": "Bearer tok_simple"},
+            )
+            assert response.status == 403
+            body = response.text
+            assert "permissions" not in body.lower()
+            assert "Forbidden" in body
+
+    async def test_multiple_missing_permissions_redacted(self) -> None:
+        """403 for multiple missing permissions doesn't leak any names."""
+        app = _make_app()
+        async with TestClient(app) as client:
+            # carol has editor only, /both needs admin + editor
+            response = await client.get(
+                "/both",
+                headers={"Authorization": "Bearer tok_carol"},
+            )
+            assert response.status == 403
+            body = response.text
+            assert "admin" not in body.lower() or body == "Forbidden"
+            assert "editor" not in body.lower() or body == "Forbidden"
+            assert "Forbidden" in body

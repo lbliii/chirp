@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Developer Survey{% endblock %}
+
+{% block content %}
+<h1>Developer Survey</h1>
+<p class="subtitle">Tell us about yourself and your interests.</p>
+
+{% block survey_form %}
+<form method="post" action="/submit">
+
+  <label for="name">Full name</label>
+  <input type="text" id="name" name="name"
+         value="{{ form.name if form is defined and form else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'name' in errors else '' }}"
+         placeholder="Jane Doe">
+  {% if errors is defined and errors and 'name' in errors %}
+    {% for msg in errors['name'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="age">Age</label>
+  <input type="number" id="age" name="age" min="1" max="150"
+         value="{{ form.age if form is defined and form else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'age' in errors else '' }}"
+         placeholder="25">
+  {% if errors is defined and errors and 'age' in errors %}
+    {% for msg in errors['age'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label>Interests <span class="hint">(select all that apply)</span></label>
+  <div class="checkbox-group">
+    {% for key, label in interests %}
+    <label>
+      <input type="checkbox" name="interests" value="{{ key }}"
+             {{ 'checked' if selected_interests is defined and selected_interests and key in selected_interests else '' }}>
+      {{ label }}
+    </label>
+    {% endfor %}
+  </div>
+  {% if errors is defined and errors and 'interests' in errors %}
+    {% for msg in errors['interests'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label>Experience level</label>
+  <div class="radio-group">
+    {% for key, label in experience_levels %}
+    <label>
+      <input type="radio" name="experience" value="{{ key }}"
+             {{ 'checked' if form is defined and form and form.experience == key else '' }}>
+      {{ label }}
+    </label>
+    {% endfor %}
+  </div>
+  {% if errors is defined and errors and 'experience' in errors %}
+    {% for msg in errors['experience'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="country">Country</label>
+  <select id="country" name="country"
+          class="{{ 'error' if errors is defined and errors and 'country' in errors else '' }}">
+    {% for key, label in countries %}
+    <option value="{{ key }}"
+            {{ 'selected' if form is defined and form and form.country == key else '' }}>
+      {{ label }}
+    </option>
+    {% endfor %}
+  </select>
+  {% if errors is defined and errors and 'country' in errors %}
+    {% for msg in errors['country'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="comments">Comments <span class="hint">(optional)</span></label>
+  <textarea id="comments" name="comments"
+            class="{{ 'error' if errors is defined and errors and 'comments' in errors else '' }}"
+            placeholder="Anything else you'd like to share?">{{ form.comments if form is defined and form else '' }}</textarea>
+  {% if errors is defined and errors and 'comments' in errors %}
+    {% for msg in errors['comments'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <button type="submit">Submit survey</button>
+</form>
+{% endblock %}
+{% endblock %}
