@@ -92,25 +92,25 @@ def _make_app() -> App:
 
     @app.route("/dashboard")
     @login_required
-    async def dashboard():
+    def dashboard():
         user = get_user()
         return f"dashboard:id={user.id}"
 
     @app.route("/admin")
     @requires("admin")
-    async def admin_panel():
+    def admin_panel():
         user = get_user()
         return f"admin:id={user.id}"
 
     @app.route("/editor")
     @requires("editor")
-    async def editor_panel():
+    def editor_panel():
         user = get_user()
         return f"editor:id={user.id}"
 
     @app.route("/both")
     @requires("admin", "editor")
-    async def both_required():
+    def both_required():
         user = get_user()
         return f"both:id={user.id}"
 
@@ -318,7 +318,7 @@ class TestRequiresNoPermissionsModel:
 
         @app.route("/admin")
         @requires("admin")
-        async def admin():
+        def admin():
             return "admin"
 
         async with TestClient(app) as client:
@@ -341,76 +341,3 @@ class TestPublicRoutes:
             response = await client.get("/public")
             assert response.status == 200
             assert response.text == "public"
-
-
-# ---------------------------------------------------------------------------
-# Sync handler support — decorators must work with both def and async def
-# ---------------------------------------------------------------------------
-
-
-class TestSyncHandlers:
-    """Decorators must handle sync (def) handlers, not just async def."""
-
-    async def test_login_required_sync_handler(self) -> None:
-        """@login_required works with a plain def handler."""
-        app = App()
-        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
-        app.add_middleware(AuthMiddleware(AuthConfig(
-            load_user=_load_user,
-            verify_token=_verify_token,
-        )))
-
-        @app.route("/do-login")
-        def do_login():
-            login(_USERS["1"])
-            return "ok"
-
-        @app.route("/sync-dashboard")
-        @login_required
-        def sync_dashboard():
-            user = get_user()
-            return f"sync:id={user.id}"
-
-        async with TestClient(app) as client:
-            # Unauthenticated → redirect (decorator runs)
-            r1 = await client.get("/sync-dashboard")
-            assert r1.status == 302
-
-            # Login
-            r2 = await client.get("/do-login")
-            cookie = _extract_cookie(r2, "chirp_session")
-
-            # Authenticated → sync handler returns correctly
-            r3 = await client.get(
-                "/sync-dashboard",
-                headers={"Cookie": f"chirp_session={cookie}"},
-            )
-            assert r3.status == 200
-            assert r3.text == "sync:id=1"
-
-    async def test_requires_sync_handler(self) -> None:
-        """@requires works with a plain def handler."""
-        app = App()
-        app.add_middleware(AuthMiddleware(AuthConfig(verify_token=_verify_token)))
-
-        @app.route("/sync-admin")
-        @requires("admin")
-        def sync_admin():
-            user = get_user()
-            return f"sync-admin:id={user.id}"
-
-        async with TestClient(app) as client:
-            # bob has admin permission
-            r1 = await client.get(
-                "/sync-admin",
-                headers={"Authorization": "Bearer tok_bob"},
-            )
-            assert r1.status == 200
-            assert r1.text == "sync-admin:id=2"
-
-            # alice has no permissions → 403
-            r2 = await client.get(
-                "/sync-admin",
-                headers={"Authorization": "Bearer tok_alice"},
-            )
-            assert r2.status == 403
