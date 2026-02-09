@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.1.0-dev"
+version = "0.1.0"
 description = "A Python web framework for the modern web platform — HTML fragments, streaming, SSE, free-threading ready"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -21,7 +21,7 @@ keywords = [
     "templates",
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
