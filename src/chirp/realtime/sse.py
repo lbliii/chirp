@@ -68,10 +68,10 @@ async def handle_sse(
         longer than ``heartbeat_interval``, without cancelling the
         pending ``__anext__()`` coroutine.
         """
+        pending_next: asyncio.Task[Any] | None = None
         try:
             heartbeat_interval = event_stream.heartbeat_interval
             gen_iter = event_stream.generator.__aiter__()
-            pending_next: asyncio.Task[Any] | None = None
 
             while not disconnected.is_set():
                 # Get or create the task for the next value
@@ -113,12 +113,6 @@ async def handle_sse(
                         "body": sse_text.encode("utf-8"),
                         "more_body": True,
                     })
-
-            # Clean up any pending task
-            if pending_next is not None and not pending_next.done():
-                pending_next.cancel()
-                with contextlib.suppress(asyncio.CancelledError, StopAsyncIteration):
-                    await pending_next
         except asyncio.CancelledError:
             pass
         except Exception as exc:
@@ -137,6 +131,16 @@ async def handle_sse(
                     "body": error_event.encode().encode("utf-8"),
                     "more_body": True,
                 })
+        finally:
+            # Always clean up pending __anext__ task — whether we exited
+            # normally, via CancelledError (disconnect), or via exception.
+            # Without this, a completed task's StopAsyncIteration goes
+            # unretrieved and Python logs a noisy warning.
+            if pending_next is not None:
+                if not pending_next.done():
+                    pending_next.cancel()
+                with contextlib.suppress(asyncio.CancelledError, StopAsyncIteration):
+                    await pending_next
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())
