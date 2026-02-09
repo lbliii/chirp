@@ -32,6 +32,7 @@ _SCRYPT_R = 8  # Block size
 _SCRYPT_P = 1  # Parallelism
 _SCRYPT_DKLEN = 64  # Derived key length
 _SALT_LENGTH = 16  # Salt length in bytes
+_SCRYPT_MAXMEM = 128 * _SCRYPT_N * _SCRYPT_R + 1024  # OpenSSL memory limit
 
 
 def _has_argon2() -> bool:
@@ -58,6 +59,7 @@ def _hash_scrypt(password: str) -> str:
         n=_SCRYPT_N,
         r=_SCRYPT_R,
         p=_SCRYPT_P,
+        maxmem=_SCRYPT_MAXMEM,
         dklen=_SCRYPT_DKLEN,
     )
     salt_b64 = base64.b64encode(salt).decode("ascii")
@@ -84,12 +86,16 @@ def _verify_scrypt(password: str, phc_hash: str) -> bool:
     except Exception:
         return False
 
+    n = params.get("n", _SCRYPT_N)
+    r = params.get("r", _SCRYPT_R)
+    maxmem = 128 * n * r + 1024
     dk = hashlib.scrypt(
         password.encode("utf-8"),
         salt=salt,
-        n=params.get("n", _SCRYPT_N),
-        r=params.get("r", _SCRYPT_R),
+        n=n,
+        r=r,
         p=params.get("p", _SCRYPT_P),
+        maxmem=maxmem,
         dklen=len(expected_dk),
     )
 

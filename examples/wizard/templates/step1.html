@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout — Personal Info{% endblock %}
+
+{% block content %}
+<h1>Personal Information</h1>
+
+{% block step_form %}
+<form method="post" action="/step/1">
+
+  <div class="row">
+    <div>
+      <label for="first_name">First name</label>
+      <input type="text" id="first_name" name="first_name"
+             value="{{ form.first_name if form is defined and form and form.first_name else '' }}"
+             class="{{ 'error' if errors is defined and errors and 'first_name' in errors else '' }}"
+             placeholder="Jane">
+      {% if errors is defined and errors and 'first_name' in errors %}
+        {% for msg in errors['first_name'] %}
+        <p class="field-error">{{ msg }}</p>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div>
+      <label for="last_name">Last name</label>
+      <input type="text" id="last_name" name="last_name"
+             value="{{ form.last_name if form is defined and form and form.last_name else '' }}"
+             class="{{ 'error' if errors is defined and errors and 'last_name' in errors else '' }}"
+             placeholder="Doe">
+      {% if errors is defined and errors and 'last_name' in errors %}
+        {% for msg in errors['last_name'] %}
+        <p class="field-error">{{ msg }}</p>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email"
+         value="{{ form.email if form is defined and form and form.email else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'email' in errors else '' }}"
+         placeholder="jane@example.com">
+  {% if errors is defined and errors and 'email' in errors %}
+    {% for msg in errors['email'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="phone">Phone <span class="hint">(optional)</span></label>
+  <input type="tel" id="phone" name="phone"
+         value="{{ form.phone if form is defined and form and form.phone else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'phone' in errors else '' }}"
+         placeholder="(555) 123-4567">
+  {% if errors is defined and errors and 'phone' in errors %}
+    {% for msg in errors['phone'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">Continue to shipping &rarr;</button>
+  </div>
+</form>
+{% endblock %}
+{% endblock %}

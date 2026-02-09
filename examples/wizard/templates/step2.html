@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout — Shipping Address{% endblock %}
+
+{% block content %}
+<h1>Shipping Address</h1>
+
+{% block step_form %}
+<form method="post" action="/step/2">
+
+  <label for="address">Street address</label>
+  <input type="text" id="address" name="address"
+         value="{{ form.address if form is defined and form and form.address else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'address' in errors else '' }}"
+         placeholder="123 Main St, Apt 4">
+  {% if errors is defined and errors and 'address' in errors %}
+    {% for msg in errors['address'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <label for="city">City</label>
+  <input type="text" id="city" name="city"
+         value="{{ form.city if form is defined and form and form.city else '' }}"
+         class="{{ 'error' if errors is defined and errors and 'city' in errors else '' }}"
+         placeholder="San Francisco">
+  {% if errors is defined and errors and 'city' in errors %}
+    {% for msg in errors['city'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row">
+    <div>
+      <label for="state">State</label>
+      <input type="text" id="state" name="state" maxlength="2"
+             value="{{ form.state if form is defined and form and form.state else '' }}"
+             class="{{ 'error' if errors is defined and errors and 'state' in errors else '' }}"
+             placeholder="CA">
+      {% if errors is defined and errors and 'state' in errors %}
+        {% for msg in errors['state'] %}
+        <p class="field-error">{{ msg }}</p>
+        {% endfor %}
+      {% endif %}
+      <p class="hint">2-letter code</p>
+    </div>
+    <div>
+      <label for="zip_code">Zip code</label>
+      <input type="text" id="zip_code" name="zip_code"
+             value="{{ form.zip_code if form is defined and form and form.zip_code else '' }}"
+             class="{{ 'error' if errors is defined and errors and 'zip_code' in errors else '' }}"
+             placeholder="94102">
+      {% if errors is defined and errors and 'zip_code' in errors %}
+        {% for msg in errors['zip_code'] %}
+        <p class="field-error">{{ msg }}</p>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="actions">
+    <a href="/step/1" class="btn btn-secondary">&larr; Back</a>
+    <button type="submit" class="btn btn-primary">Review order &rarr;</button>
+  </div>
+</form>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout — Review{% endblock %}
+
+{% block content %}
+<h1>Review Your Order</h1>
+
+<p class="section-label">Personal Information</p>
+<dl>
+  <dt>Name</dt>
+  <dd>{{ form.first_name }} {{ form.last_name }}</dd>
+  <dt>Email</dt>
+  <dd>{{ form.email }}</dd>
+  {% if form.phone %}
+  <dt>Phone</dt>
+  <dd>{{ form.phone }}</dd>
+  {% endif %}
+</dl>
+
+<hr>
+
+<p class="section-label">Shipping Address</p>
+<dl>
+  <dt>Address</dt>
+  <dd>{{ form.address }}</dd>
+  <dt>City, State, Zip</dt>
+  <dd>{{ form.city }}, {{ form.state }} {{ form.zip_code }}</dd>
+</dl>
+
+<hr>
+
+<div class="actions">
+  <a href="/step/2" class="btn btn-secondary">&larr; Back</a>
+  <form method="post" action="/confirm" style="flex: 1;">
+    <button type="submit" class="btn btn-primary" style="width: 100%;">Confirm order</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+<html>
+<head>
+  <title>{% block title %}Checkout{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
+    h1 { margin-bottom: 1.5rem; font-size: 1.5rem; }
+    .steps { display: flex; gap: 0; margin-bottom: 2rem; }
+    .step-indicator { flex: 1; text-align: center; padding: 0.6rem 0; font-size: 0.8rem; font-weight: 600; border-bottom: 3px solid #e2e8f0; color: #94a3b8; }
+    .step-indicator.active { border-color: #1e293b; color: #1e293b; }
+    .step-indicator.done { border-color: #22c55e; color: #22c55e; }
+    label { display: block; margin-top: 0.75rem; font-weight: 600; font-size: 0.875rem; }
+    input[type="text"], input[type="email"], input[type="tel"] {
+      display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem;
+      border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;
+    }
+    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    input.error { border-color: #dc2626; }
+    .field-error { color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; }
+    .hint { color: #64748b; font-size: 0.8rem; margin-top: 0.2rem; }
+    .row { display: flex; gap: 0.75rem; }
+    .row > * { flex: 1; }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+    .btn { display: block; flex: 1; padding: 0.6rem; text-align: center; border-radius: 6px; font-size: 0.9rem; cursor: pointer; text-decoration: none; border: none; font-family: inherit; }
+    .btn-primary { background: #1e293b; color: #f8fafc; }
+    .btn-primary:hover { background: #334155; }
+    .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    dl { margin-top: 0.5rem; }
+    dt { font-weight: 600; margin-top: 0.75rem; font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+    dd { margin-top: 0.15rem; }
+    .section-label { font-weight: 600; font-size: 0.9rem; margin-top: 1.5rem; margin-bottom: 0.25rem; color: #475569; }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
+  </style>
+</head>
+<body>
+  <div class="steps">
+    <div class="step-indicator {{ 'active' if step is defined and step == 1 else ('done' if step is defined and step > 1 else '') }}">1. Personal Info</div>
+    <div class="step-indicator {{ 'active' if step is defined and step == 2 else ('done' if step is defined and step > 2 else '') }}">2. Shipping</div>
+    <div class="step-indicator {{ 'active' if step is defined and step == 3 else '' }}">3. Review</div>
+  </div>
+  {% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Order Confirmed{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 2rem 0;">
+  <h1 style="color: #22c55e;">Order Confirmed!</h1>
+  <p style="margin-top: 1rem; color: #475569;">
+    Thanks, {{ order.first_name }}. Your order is on its way to:
+  </p>
+  <p style="margin-top: 0.5rem; font-weight: 600;">
+    {{ order.address }}<br>
+    {{ order.city }}, {{ order.state }} {{ order.zip_code }}
+  </p>
+  <p style="margin-top: 0.5rem; color: #64748b;">
+    Confirmation sent to {{ order.email }}.
+  </p>
+  <p style="margin-top: 2rem;">
+    <a href="/">Start a new order &rarr;</a>
+  </p>
+</div>
+{% endblock %}
