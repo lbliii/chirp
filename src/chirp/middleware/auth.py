@@ -31,7 +31,7 @@ Usage::
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
@@ -201,6 +201,26 @@ class AuthConfig:
 # ---------------------------------------------------------------------------
 
 
+def current_user() -> User:
+    """Return the current user for templates.
+
+    Template-friendly alias for ``get_user()``. Returns ``AnonymousUser``
+    if no user is authenticated, never raises.
+
+    Registered as a template global when ``AuthMiddleware`` is active::
+
+        {% if current_user().is_authenticated %}
+            <a href="/profile">{{ current_user().name }}</a>
+        {% else %}
+            <a href="/login">Sign in</a>
+        {% endif %}
+    """
+    try:
+        return _user_var.get()
+    except LookupError:
+        return _ANONYMOUS
+
+
 class AuthMiddleware:
     """Dual-mode authentication middleware.
 
@@ -225,6 +245,12 @@ class AuthMiddleware:
     """
 
     __slots__ = ("_config",)
+
+    # Template globals auto-registered by App._freeze() when this
+    # middleware is present. Any middleware can define this attribute.
+    template_globals: ClassVar[dict[str, Any]] = {
+        "current_user": current_user,
+    }
 
     def __init__(self, config: AuthConfig | None = None) -> None:
         self._config = config or AuthConfig()

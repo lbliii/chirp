@@ -475,6 +475,15 @@ class App:
         # 2. Capture middleware as immutable tuple
         self._middleware = tuple(self._middleware_list)
 
+        # 2b. Collect template globals from middleware
+        # Middleware can define a `template_globals` dict attribute to
+        # auto-register template globals (e.g. AuthMiddleware → current_user).
+        for mw in self._middleware:
+            mw_globals = getattr(mw, "template_globals", None)
+            if mw_globals and isinstance(mw_globals, dict):
+                for name, func in mw_globals.items():
+                    self._template_globals.setdefault(name, func)
+
         # 3. Initialize kida environment
         self._kida_env = create_environment(
             self.config,

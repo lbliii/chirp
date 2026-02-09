@@ -23,8 +23,11 @@ Password hashing (``pip install chirp[auth]``)::
 """
 
 from chirp.security.decorators import login_required, requires
+from chirp.security.passwords import hash_password, verify_password
 
 __all__ = [
+    "hash_password",
     "login_required",
     "requires",
+    "verify_password",
 ]

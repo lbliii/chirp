@@ -34,6 +34,7 @@ _Py_mod_gil = 0
 
 __version__ = "0.1.0-dev"
 __all__ = [
+    "OOB",
     "AnyResponse",
     "App",
     "AppConfig",
@@ -46,7 +47,6 @@ __all__ = [
     "Middleware",
     "Next",
     "NotFound",
-    "OOB",
     "Page",
     "Redirect",
     "Request",
@@ -54,10 +54,15 @@ __all__ = [
     "SSEEvent",
     "Stream",
     "Template",
-    "ValidationError",
     "ToolCallEvent",
+    "ValidationError",
     "g",
     "get_request",
+    "get_user",
+    "login",
+    "login_required",
+    "logout",
+    "requires",
 ]
 
 
@@ -105,6 +110,16 @@ def __getattr__(name: str) -> object:
         from chirp import context as _ctx
 
         return getattr(_ctx, name)
+
+    if name in ("get_user", "login", "logout"):
+        from chirp.middleware import auth as _auth
+
+        return getattr(_auth, name)
+
+    if name in ("login_required", "requires"):
+        from chirp.security import decorators as _decorators
+
+        return getattr(_decorators, name)
 
     if name in ("ChirpError", "ConfigurationError", "HTTPError", "MethodNotAllowed", "NotFound"):
         from chirp import errors as _errors

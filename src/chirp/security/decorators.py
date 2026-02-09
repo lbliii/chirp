@@ -45,10 +45,7 @@ def _is_api_request(request: Any) -> bool:
     # If accept explicitly mentions json but not html, treat as API
     has_json = "application/json" in accept
     has_html = "text/html" in accept
-    if has_json and not has_html:
-        return True
-
-    return False
+    return bool(has_json and not has_html)
 
 
 def login_required(handler: Callable) -> Callable:

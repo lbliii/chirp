@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from chirp.app import App
 from chirp.middleware.auth import AuthConfig, AuthMiddleware, get_user, login
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.security.decorators import login_required, requires
 from chirp.testing import TestClient
 
