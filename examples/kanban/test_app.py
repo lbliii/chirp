@@ -1,4 +1,4 @@
-"""Tests for the kanban example — board rendering, CRUD, move, filter, SSE."""
+"""Tests for the kanban example — auth, board rendering, CRUD, move, filter, SSE."""
 
 from chirp.testing import (
     TestClient,
@@ -12,6 +12,123 @@ _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 
 
 # ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_cookie(response, name: str = "chirp_session") -> str | None:
+    """Extract a Set-Cookie value from response headers."""
+    for hname, hvalue in response.headers:
+        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
+            return hvalue.split(";")[0].partition("=")[2]
+    return None
+
+
+async def _login(client, username: str = "alice") -> dict[str, str]:
+    """Log in and return a cookie header dict for subsequent requests."""
+    r = await client.post(
+        "/login",
+        body=f"username={username}&password=password".encode(),
+        headers=_FORM_CT,
+    )
+    cookie = _extract_cookie(r)
+    assert cookie is not None, f"Login failed for {username}"
+    return {"Cookie": f"chirp_session={cookie}"}
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+
+class TestAuth:
+    """Login, logout, and protected route behaviour."""
+
+    async def test_board_redirects_to_login(self, example_app) -> None:
+        """Unauthenticated GET / returns 302 to /login."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/")
+            assert response.status == 302
+            location = ""
+            for hname, hvalue in response.headers:
+                if hname == "location":
+                    location = hvalue
+            assert "/login" in location
+
+    async def test_login_page_renders(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/login")
+            assert response.status == 200
+            assert "username" in response.text.lower()
+            assert "password" in response.text.lower()
+
+    async def test_valid_login_redirects(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.post(
+                "/login",
+                body=b"username=alice&password=password",
+                headers=_FORM_CT,
+            )
+            assert response.status == 302
+            location = ""
+            for hname, hvalue in response.headers:
+                if hname == "location":
+                    location = hvalue
+            assert location == "/"
+
+    async def test_invalid_login_shows_error(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.post(
+                "/login",
+                body=b"username=alice&password=wrong",
+                headers=_FORM_CT,
+            )
+            assert response.status == 200
+            assert "Invalid" in response.text
+
+    async def test_logout_redirects_to_login(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            response = await client.post("/logout", headers=auth)
+            assert response.status == 302
+            location = ""
+            for hname, hvalue in response.headers:
+                if hname == "location":
+                    location = hvalue
+            assert "/login" in location
+
+    async def test_all_demo_users_can_login(self, example_app) -> None:
+        """Alice, Bob, and Carol can all log in."""
+        async with TestClient(example_app) as client:
+            for name in ("alice", "bob", "carol"):
+                r = await client.post(
+                    "/login",
+                    body=f"username={name}&password=password".encode(),
+                    headers=_FORM_CT,
+                )
+                assert r.status == 302, f"{name} login failed"
+                assert _extract_cookie(r) is not None
+
+    async def test_current_user_shown_in_header(self, example_app) -> None:
+        """Board shows logged-in user's name in the header."""
+        async with TestClient(example_app) as client:
+            auth = await _login(client, "bob")
+            response = await client.get("/", headers=auth)
+            assert response.status == 200
+            assert "Bob" in response.text
+            assert "user-info" in response.text
+
+    async def test_own_cards_highlighted(self, example_app) -> None:
+        """Cards assigned to the logged-in user get the 'you' badge."""
+        async with TestClient(example_app) as client:
+            auth = await _login(client, "alice")
+            response = await client.get("/", headers=auth)
+            assert response.status == 200
+            assert "you-badge" in response.text
+            assert "is-mine" in response.text
+
+
+# ---------------------------------------------------------------------------
 # Board rendering
 # ---------------------------------------------------------------------------
 
@@ -21,14 +138,16 @@ class TestBoard:
 
     async def test_index_full_page(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             assert response.status == 200
             assert "<html" in response.text
             assert "Kanban Board" in response.text
 
     async def test_index_contains_all_columns(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             assert 'id="column-backlog"' in response.text
             assert 'id="column-in_progress"' in response.text
             assert 'id="column-review"' in response.text
@@ -36,7 +155,8 @@ class TestBoard:
 
     async def test_index_contains_seed_tasks(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             assert "Design landing page" in response.text
             assert "Implement auth flow" in response.text
             assert "Add search indexing" in response.text
@@ -45,21 +165,24 @@ class TestBoard:
     async def test_index_fragment(self, example_app) -> None:
         """Fragment request returns just the board, not the full page."""
         async with TestClient(example_app) as client:
-            response = await client.fragment("/")
+            auth = await _login(client)
+            response = await client.fragment("/", headers=auth)
             assert_is_fragment(response)
             assert_fragment_contains(response, 'id="board"')
             assert_fragment_not_contains(response, "<html")
 
     async def test_index_contains_stats(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             assert 'id="board-stats"' in response.text
             assert "tasks" in response.text
             assert "high priority" in response.text
 
     async def test_index_contains_filter_sidebar(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             # Priority filter checkboxes
             assert 'name="priority"' in response.text
             # Assignee filter should list seed assignees
@@ -70,7 +193,8 @@ class TestBoard:
     async def test_index_contains_kida_features(self, example_app) -> None:
         """Verify Kida template features rendered correctly (no raw tags)."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            auth = await _login(client)
+            response = await client.get("/", headers=auth)
             # Priority badges rendered via {% match %}
             assert "badge-high" in response.text
             assert "badge-medium" in response.text
@@ -89,10 +213,11 @@ class TestAddTask:
 
     async def test_add_valid(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.post(
                 "/tasks",
                 body=b"title=New+task&status=backlog&priority=high&assignee=Dave&tags=urgent",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 200
             assert "New task" in response.text
@@ -100,46 +225,48 @@ class TestAddTask:
     async def test_add_returns_oob(self, example_app) -> None:
         """Successful add returns OOB fragments with hx-swap-oob."""
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.post(
                 "/tasks",
                 body=b"title=OOB+test&status=in_progress&priority=low",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 200
             assert "hx-swap-oob" in response.text
 
     async def test_add_empty_title_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.post(
                 "/tasks",
                 body=b"title=&status=backlog&priority=medium",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 422
             assert "required" in response.text.lower()
 
     async def test_add_invalid_priority_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.post(
                 "/tasks",
                 body=b"title=Test&status=backlog&priority=critical",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 422
             assert "Invalid priority" in response.text
 
-    async def test_add_with_optional_fields_empty(self, example_app) -> None:
-        """Assignee and tags can be empty."""
+    async def test_add_auto_assigns_current_user(self, example_app) -> None:
+        """When assignee is empty, auto-assigns the logged-in user."""
         async with TestClient(example_app) as client:
+            auth = await _login(client, "bob")
             response = await client.post(
                 "/tasks",
-                body=b"title=Minimal+task&status=backlog&priority=low&assignee=&tags=",
-                headers=_FORM_CT,
+                body=b"title=Auto+assign+test&status=backlog&priority=low&assignee=&tags=",
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 200
-            assert "Minimal task" in response.text
-            # Unassigned should appear (via null coalescing)
-            assert "Unassigned" in response.text
+            assert "Bob" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -153,43 +280,48 @@ class TestEditTask:
     async def test_edit_form(self, example_app) -> None:
         """GET returns the inline edit form fragment."""
         async with TestClient(example_app) as client:
-            response = await client.get("/tasks/1/edit")
+            auth = await _login(client)
+            response = await client.get("/tasks/1/edit", headers=auth)
             assert response.status == 200
             assert 'name="title"' in response.text
             assert "Design landing page" in response.text
 
     async def test_edit_form_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/tasks/9999/edit")
+            auth = await _login(client)
+            response = await client.get("/tasks/9999/edit", headers=auth)
             assert response.status == 404
 
     async def test_save_valid(self, example_app) -> None:
         """PUT with valid data returns OOB updated card + stats."""
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.put(
                 "/tasks/1",
                 body=b"title=Updated+title&description=New+desc&priority=low&assignee=Eve&tags=new",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 200
             assert "Updated title" in response.text
 
     async def test_save_invalid_empty_title(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.put(
                 "/tasks/1",
                 body=b"title=&description=test&priority=high&assignee=&tags=",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 422
             assert "required" in response.text.lower()
 
     async def test_save_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             response = await client.put(
                 "/tasks/9999",
                 body=b"title=Test&description=&priority=low&assignee=&tags=",
-                headers=_FORM_CT,
+                headers={**_FORM_CT, **auth},
             )
             assert response.status == 404
 
@@ -205,7 +337,8 @@ class TestMoveTask:
     async def test_move_to_adjacent(self, example_app) -> None:
         """Move task 1 (done → review) returns OOB with both columns."""
         async with TestClient(example_app) as client:
-            response = await client.post("/tasks/1/move/review")
+            auth = await _login(client)
+            response = await client.post("/tasks/1/move/review", headers=auth)
             assert response.status == 200
             assert "hx-swap-oob" in response.text
             # Both source and destination columns should be in the response
@@ -214,25 +347,29 @@ class TestMoveTask:
 
     async def test_move_invalid_status(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post("/tasks/1/move/invalid")
+            auth = await _login(client)
+            response = await client.post("/tasks/1/move/invalid", headers=auth)
             assert response.status == 400
 
     async def test_move_same_column(self, example_app) -> None:
         """Moving to the same column is rejected."""
         async with TestClient(example_app) as client:
+            auth = await _login(client)
             # Task 1 is in "done"
-            response = await client.post("/tasks/1/move/done")
+            response = await client.post("/tasks/1/move/done", headers=auth)
             assert response.status == 400
 
     async def test_move_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post("/tasks/9999/move/backlog")
+            auth = await _login(client)
+            response = await client.post("/tasks/9999/move/backlog", headers=auth)
             assert response.status == 404
 
     async def test_move_updates_stats(self, example_app) -> None:
         """Move response includes the stats bar OOB fragment."""
         async with TestClient(example_app) as client:
-            response = await client.post("/tasks/1/move/review")
+            auth = await _login(client)
+            response = await client.post("/tasks/1/move/review", headers=auth)
             assert 'id="board-stats"' in response.text
 
 
@@ -247,24 +384,28 @@ class TestDeleteTask:
     async def test_delete(self, example_app) -> None:
         """Delete removes the task and returns updated column."""
         async with TestClient(example_app) as client:
-            response = await client.delete("/tasks/1")
+            auth = await _login(client)
+            response = await client.delete("/tasks/1", headers=auth)
             assert response.status == 200
             # Task 1 ("Design landing page") should no longer appear
             assert "Design landing page" not in response.text
 
     async def test_delete_fires_trigger(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.delete("/tasks/1")
+            auth = await _login(client)
+            response = await client.delete("/tasks/1", headers=auth)
             assert_hx_trigger(response, "taskDeleted")
 
     async def test_delete_returns_oob(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.delete("/tasks/1")
+            auth = await _login(client)
+            response = await client.delete("/tasks/1", headers=auth)
             assert "hx-swap-oob" in response.text
 
     async def test_delete_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.delete("/tasks/9999")
+            auth = await _login(client)
+            response = await client.delete("/tasks/9999", headers=auth)
             assert response.status == 404
 
 
@@ -278,7 +419,8 @@ class TestFilter:
 
     async def test_filter_by_priority(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/filter?priority=high")
+            auth = await _login(client)
+            response = await client.get("/filter?priority=high", headers=auth)
             assert response.status == 200
             # High-priority tasks should be present
             assert "Implement auth flow" in response.text
@@ -287,7 +429,8 @@ class TestFilter:
 
     async def test_filter_by_assignee(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/filter?assignee=Alice")
+            auth = await _login(client)
+            response = await client.get("/filter?assignee=Alice", headers=auth)
             assert response.status == 200
             assert "Design landing page" in response.text
             assert "Add search indexing" in response.text
@@ -296,7 +439,8 @@ class TestFilter:
 
     async def test_filter_by_tag(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/filter?tag=security")
+            auth = await _login(client)
+            response = await client.get("/filter?tag=security", headers=auth)
             assert response.status == 200
             assert "Implement auth flow" in response.text
             assert "Rate limiting middleware" in response.text
@@ -306,7 +450,8 @@ class TestFilter:
     async def test_filter_no_results(self, example_app) -> None:
         """Filter that matches nothing returns empty columns."""
         async with TestClient(example_app) as client:
-            response = await client.get("/filter?assignee=Nobody")
+            auth = await _login(client)
+            response = await client.get("/filter?assignee=Nobody", headers=auth)
             assert response.status == 200
             assert "no tasks" in response.text.lower()
 
@@ -322,7 +467,8 @@ class TestSSE:
     async def test_sse_returns_events(self, example_app) -> None:
         """SSE stream emits fragment events with OOB swaps."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=3)
+            auth = await _login(client)
+            result = await client.sse("/events", max_events=3, headers=auth)
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 3
@@ -330,7 +476,8 @@ class TestSSE:
     async def test_sse_events_are_fragments(self, example_app) -> None:
         """Fragment events contain rendered HTML, not raw template syntax."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=3)
+            auth = await _login(client)
+            result = await client.sse("/events", max_events=3, headers=auth)
         fragment_events = [e for e in result.events if e.event == "fragment"]
         assert len(fragment_events) >= 3
         for evt in fragment_events:
@@ -340,7 +487,8 @@ class TestSSE:
     async def test_sse_includes_oob_swaps(self, example_app) -> None:
         """SSE fragment events include hx-swap-oob for targeted updates."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=3)
+            auth = await _login(client)
+            result = await client.sse("/events", max_events=3, headers=auth)
         fragment_events = [e for e in result.events if e.event == "fragment"]
         oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
         assert len(oob_events) >= 1

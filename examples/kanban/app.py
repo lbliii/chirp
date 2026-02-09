@@ -1,4 +1,4 @@
-"""Kanban Board — full-featured task board with live updates.
+"""Kanban Board — full-featured task board with auth and live updates.
 
 Demonstrates Chirp's htmx ergonomics (OOB multi-fragment swaps, SSE
 live updates, inline editing) alongside Kida template features that
@@ -6,7 +6,14 @@ aren't showcased in the other examples: pattern matching, optional
 chaining, null coalescing, embed, component imports, scoped variables,
 fragment caching, and a dozen+ built-in filters.
 
+Auth layer shows how ``SessionMiddleware`` + ``AuthMiddleware`` compose
+with everything else.  Three demo accounts (Alice, Bob, Carol) share a
+single board — the logged-in user's cards are highlighted.
+
 Demonstrates:
+- ``SessionMiddleware`` + ``AuthMiddleware`` setup
+- ``login()`` / ``logout()`` helpers with ``@login_required``
+- ``current_user()`` template global for identity-aware rendering
 - ``OOB`` for multi-target updates (source column + dest column + stats)
 - ``EventStream`` with simulated live activity from "other users"
 - ``Fragment`` / ``Page`` for full-page vs partial rendering
@@ -26,12 +33,68 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chirp import App, AppConfig, EventStream, Fragment, OOB, Page, Request, ValidationError
+from chirp import (
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    OOB,
+    Page,
+    Redirect,
+    Request,
+    Template,
+    ValidationError,
+    get_user,
+    is_safe_url,
+    login,
+    login_required,
+    logout,
+)
+from chirp.middleware.auth import AuthConfig, AuthMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.security.passwords import hash_password, verify_password
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+# ---------------------------------------------------------------------------
+# User model + in-memory "database"
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class User:
+    """Minimal user model — satisfies chirp's User protocol."""
+
+    id: str
+    name: str
+    password_hash: str
+    is_authenticated: bool = True
+
+
+# Pre-hash the demo password so verify_password works correctly
+_DEMO_HASH = hash_password("password")
+
+USERS: dict[str, User] = {
+    "alice": User(id="alice", name="Alice", password_hash=_DEMO_HASH),
+    "bob": User(id="bob", name="Bob", password_hash=_DEMO_HASH),
+    "carol": User(id="carol", name="Carol", password_hash=_DEMO_HASH),
+}
+
+
+async def load_user(user_id: str) -> User | None:
+    """Load a user by ID — called by AuthMiddleware on each request."""
+    return USERS.get(user_id)
+
+
+# ---------------------------------------------------------------------------
+# App setup
+# ---------------------------------------------------------------------------
+
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
+
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key="kanban-demo-secret")))
+app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
 
 # ---------------------------------------------------------------------------
 # Column definitions
@@ -334,11 +397,48 @@ def _stats_fragment(tasks: list[Task] | None = None) -> Fragment:
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Auth routes
+# ---------------------------------------------------------------------------
+
+
+@app.route("/login")
+def login_page():
+    """Show the login form."""
+    return Template("login.html", error="", users=USERS)
+
+
+@app.route("/login", methods=["POST"])
+async def do_login(request: Request):
+    """Handle login form submission."""
+    form = await request.form()
+    username = form.get("username", "").strip().lower()
+    password = form.get("password", "")
+
+    user = USERS.get(username)
+    if user and verify_password(password, user.password_hash):
+        login(user)
+        next_url = request.query.get("next", "/")
+        if not is_safe_url(next_url):
+            next_url = "/"
+        return Redirect(next_url)
+
+    return Template("login.html", error="Invalid username or password", users=USERS)
+
+
+@app.route("/logout", methods=["POST"])
+def do_logout():
+    """Log out and redirect to login."""
+    logout()
+    return Redirect("/login")
+
+
+# ---------------------------------------------------------------------------
+# Board routes (all protected)
 # ---------------------------------------------------------------------------
 
 
 @app.route("/")
+@login_required
 def index(request: Request):
     """Full board page or board fragment depending on htmx request."""
     ctx = _board_context()
@@ -346,6 +446,7 @@ def index(request: Request):
 
 
 @app.route("/tasks", methods=["POST"])
+@login_required
 async def add_task(request: Request):
     """Add a task — returns OOB (column + stats) or ValidationError."""
     form = await request.form()
@@ -353,7 +454,7 @@ async def add_task(request: Request):
     description = form.get("description", "")
     status = form.get("status", "backlog")
     priority = form.get("priority", "medium")
-    assignee = form.get("assignee", "").strip() or None
+    assignee = form.get("assignee", "").strip() or get_user().name
     raw_tags = form.get("tags", "")
     tags = tuple(t.strip() for t in raw_tags.split(",") if t.strip())
 
@@ -377,6 +478,7 @@ async def add_task(request: Request):
 
 
 @app.route("/tasks/{task_id}/edit")
+@login_required
 def edit_task(task_id: int):
     """Return the inline edit form for a task card."""
     task = _get_task(task_id)
@@ -386,6 +488,7 @@ def edit_task(task_id: int):
 
 
 @app.route("/tasks/{task_id}", methods=["PUT"])
+@login_required
 async def save_task(request: Request, task_id: int):
     """Save an edited task — returns OOB (card + stats) or ValidationError."""
     form = await request.form()
@@ -428,6 +531,7 @@ async def save_task(request: Request, task_id: int):
 
 
 @app.route("/tasks/{task_id}/move/{new_status}", methods=["POST"])
+@login_required
 def move_task(task_id: int, new_status: str):
     """Move a task to a different column — returns OOB for both columns + stats."""
     if new_status not in COLUMN_IDS:
@@ -452,6 +556,7 @@ def move_task(task_id: int, new_status: str):
 
 
 @app.route("/tasks/{task_id}", methods=["DELETE"])
+@login_required
 def delete_task_route(task_id: int):
     """Delete a task — returns updated column + stats with HX-Trigger."""
     task = _get_task(task_id)
@@ -473,6 +578,7 @@ def delete_task_route(task_id: int):
 
 
 @app.route("/filter")
+@login_required
 def filter_board(request: Request):
     """Filter the board by priority, assignee, or tag."""
     priority_filter = request.query.get_list("priority")
@@ -504,6 +610,7 @@ def filter_board(request: Request):
 
 
 @app.route("/events")
+@login_required
 def events():
     """SSE endpoint — simulates live task movement from other users.
 

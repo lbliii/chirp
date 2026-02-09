@@ -68,10 +68,28 @@
     }
     .app-header h1 { font-size: 1.25rem; font-weight: 700; color: #f8fafc; }
     .stats {
-      display: flex; gap: 1.25rem; margin-left: auto;
+      display: flex; gap: 1.25rem;
       font-size: 0.8rem; color: var(--muted);
     }
     .stats strong { color: var(--fg); }
+    .user-info {
+      display: flex; align-items: center; gap: 0.6rem;
+      margin-left: auto;
+    }
+    .avatar {
+      display: flex; align-items: center; justify-content: center;
+      width: 1.75rem; height: 1.75rem;
+      background: var(--accent); color: var(--accent-fg);
+      border-radius: 50%; font-size: 0.75rem; font-weight: 700;
+    }
+    .user-info .name { font-size: 0.85rem; color: var(--fg); font-weight: 500; }
+    .btn-logout {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm); font-size: 0.75rem;
+      cursor: pointer; font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-logout:hover { color: var(--danger); border-color: var(--danger); }
 
     /* Sidebar */
     .sidebar {
@@ -175,7 +193,14 @@
     .badge-high { background: var(--high-bg); color: var(--high); }
     .badge-medium { background: var(--medium-bg); color: var(--medium); }
     .badge-low { background: var(--low-bg); color: var(--low); }
-    .assignee { font-size: 0.7rem; color: var(--muted); }
+    .assignee { font-size: 0.7rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.25rem; }
+    .you-badge {
+      font-size: 0.55rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(129,140,248,0.15); color: var(--accent);
+      padding: 0.05rem 0.3rem; border-radius: var(--radius-sm);
+    }
+    .card.is-mine { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(129,140,248,0.1); }
     .tag {
       display: inline-block; font-size: 0.65rem;
       padding: 0.05rem 0.35rem; border-radius: var(--radius-sm);
@@ -297,6 +322,14 @@
       {% end %}
     </div>
     {% end %}
+    {% let user = current_user() %}
+    <div class="user-info">
+      <span class="avatar">{{ user.name | first | upper }}</span>
+      <span class="name">{{ user.name }}</span>
+      <form method="post" action="/logout" style="margin:0">
+        <button type="submit" class="btn-logout">Logout</button>
+      </form>
+    </div>
   </header>
 
   {# ================================================================

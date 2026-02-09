@@ -1,0 +1,120 @@
+{#- Login page — standalone with kanban dark theme.
+    Kida features: {% if %}, {% for %}
+-#}
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Kanban Board</title>
+  <style>
+    :root {
+      --bg:         #0f172a;
+      --fg:         #e2e8f0;
+      --muted:      #94a3b8;
+      --surface:    #1e293b;
+      --border:     #334155;
+      --accent:     #818cf8;
+      --accent-fg:  #0f172a;
+      --danger:     #f87171;
+      --radius:     0.5rem;
+      --radius-sm:  0.25rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--fg);
+      min-height: 100vh; line-height: 1.5;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      width: 100%; max-width: 380px;
+    }
+    .login-card h1 {
+      font-size: 1.5rem; font-weight: 700; color: #f8fafc;
+      margin-bottom: 0.25rem;
+    }
+    .login-card .subtitle {
+      font-size: 0.85rem; color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    .login-card label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: var(--muted); margin-bottom: 0.25rem;
+    }
+    .login-card input {
+      display: block; width: 100%;
+      padding: 0.55rem 0.75rem; margin-bottom: 1rem;
+      background: var(--bg); color: var(--fg);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+    }
+    .login-card input:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(129,140,248,0.2);
+    }
+    .login-card button {
+      display: block; width: 100%;
+      padding: 0.6rem; margin-top: 0.5rem;
+      background: var(--accent); color: var(--accent-fg);
+      border: none; border-radius: var(--radius-sm);
+      font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .login-card button:hover { opacity: 0.9; }
+    .error {
+      background: rgba(248,113,113,0.1);
+      color: var(--danger);
+      padding: 0.5rem 0.75rem; border-radius: var(--radius-sm);
+      font-size: 0.85rem; margin-bottom: 1rem;
+    }
+    .hint {
+      margin-top: 1.5rem; padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .hint strong { color: var(--fg); }
+    .hint ul {
+      list-style: none; margin-top: 0.35rem;
+    }
+    .hint li::before {
+      content: "→ "; color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Kanban Board</h1>
+    <p class="subtitle">Sign in to your workspace</p>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% end %}
+
+    <form method="post" action="/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" required autofocus>
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+
+      <button type="submit">Sign in</button>
+    </form>
+
+    <div class="hint">
+      <p><strong>Demo accounts</strong> (password: <code>password</code>)</p>
+      <ul>
+        {% for uid, u in users.items() %}
+        <li><strong>{{ uid }}</strong> — {{ u.name }}</li>
+        {% end %}
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

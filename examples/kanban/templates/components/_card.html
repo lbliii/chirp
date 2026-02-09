@@ -1,16 +1,22 @@
 {#- Task card component
     Kida features: {% from...import %}, {% def %}, {{ ?.  }}, {{ ?? }},
-    {% with expr as name %}, {% match %}, {% unless %}, | truncate
+    {% match %}, {% unless %}, | truncate, current_user(), is eq(), | first, | upper
 -#}
 
 {% from "components/_badge.html" import priority_badge, tag_badge %}
 
 {% def task_card(task) %}
-<div id="task-{{ task.id }}" class="card priority-{{ task.priority }}"
+{% let me = current_user() %}
+<div id="task-{{ task.id }}" class="card priority-{{ task.priority }}{{ " is-mine" if me.name is eq(task?.assignee) else "" }}"
      draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
   <div class="card-header">
     {{ priority_badge(task.priority) }}
-    <span class="assignee">{{ task?.assignee ?? "Unassigned" }}</span>
+    <span class="assignee">
+      {{ task?.assignee ?? "Unassigned" }}
+      {% if me.name is eq(task?.assignee) %}
+        <span class="you-badge">you</span>
+      {% end %}
+    </span>
   </div>
   <h4 class="card-title"
       hx-get="/tasks/{{ task.id }}/edit"
