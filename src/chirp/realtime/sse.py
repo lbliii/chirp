@@ -26,6 +26,7 @@ async def handle_sse(
     receive: Receive,
     *,
     kida_env: Environment | None = None,
+    debug: bool = False,
 ) -> None:
     """Stream Server-Sent Events over an ASGI connection.
 
@@ -120,10 +121,16 @@ async def handle_sse(
                     await pending_next
         except asyncio.CancelledError:
             pass
-        except Exception:
+        except Exception as exc:
             logger.exception("SSE event generator error")
             # Send an error event so the client can react
-            error_event = SSEEvent(data="Internal server error", event="error")
+            if debug:
+                import traceback
+
+                detail = traceback.format_exc()
+            else:
+                detail = "Internal server error"
+            error_event = SSEEvent(data=detail, event="error")
             with contextlib.suppress(Exception):
                 await send({
                     "type": "http.response.body",

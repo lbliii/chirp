@@ -96,6 +96,7 @@ async def handle_request(
             send,
             receive,
             kida_env=response.kida_env,
+            debug=debug,
         )
     elif isinstance(response, StreamingResponse):
         await send_streaming_response(response, send, debug=debug)
