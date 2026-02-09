@@ -37,8 +37,7 @@ def parse_sse_frames(raw: str) -> tuple[list[SSEEvent], int]:
     blocks = raw.split("\n\n")
 
     for block in blocks:
-        block = block.strip()
-        if not block:
+        if not block.strip():
             continue
 
         # Check for heartbeat comments
