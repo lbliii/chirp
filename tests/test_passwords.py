@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from chirp.security.passwords import (
+    _SCRYPT_N,
     _SCRYPT_PREFIX,
     _hash_scrypt,
     _verify_scrypt,
@@ -128,6 +129,48 @@ class TestArgon2:
         assert verify_password("cross-test", scrypt_hash) is True
         assert verify_password("wrong", argon2_hash) is False
         assert verify_password("wrong", scrypt_hash) is False
+
+
+# ---------------------------------------------------------------------------
+# Scrypt parameter strength
+# ---------------------------------------------------------------------------
+
+
+class TestScryptParams:
+    def test_n_parameter_is_2_16(self) -> None:
+        """Default N should be 2^16 (65536) for 2026 security standards."""
+        assert _SCRYPT_N == 2**16
+
+    def test_new_hashes_use_n_65536(self) -> None:
+        """Newly created hashes embed N=65536 in the PHC string."""
+        hashed = _hash_scrypt("test")
+        assert "n=65536" in hashed
+
+    def test_old_n_16384_hashes_still_verify(self) -> None:
+        """Hashes created with the old N=2^14 must still verify.
+
+        _verify_scrypt reads N from the PHC string, so it uses the
+        embedded value, not the current default.
+        """
+        import base64
+        import hashlib
+
+        # Simulate an old hash with N=16384
+        salt = b"old-salt-16bytes"
+        dk = hashlib.scrypt(
+            b"old-password",
+            salt=salt,
+            n=2**14,
+            r=8,
+            p=1,
+            dklen=64,
+        )
+        salt_b64 = base64.b64encode(salt).decode("ascii")
+        dk_b64 = base64.b64encode(dk).decode("ascii")
+        old_hash = f"$scrypt$n=16384,r=8,p=1${salt_b64}${dk_b64}"
+
+        assert _verify_scrypt("old-password", old_hash) is True
+        assert _verify_scrypt("wrong", old_hash) is False
 
 
 # ---------------------------------------------------------------------------

@@ -26,8 +26,8 @@ import os
 _ARGON2_PREFIX = "$argon2"
 _SCRYPT_PREFIX = "$scrypt$"
 
-# Scrypt parameters (balanced for security and compatibility)
-_SCRYPT_N = 2**14  # CPU/memory cost
+# Scrypt parameters — N=2^16 exceeds OWASP minimum (2^14) for 2026
+_SCRYPT_N = 2**16  # CPU/memory cost
 _SCRYPT_R = 8  # Block size
 _SCRYPT_P = 1  # Parallelism
 _SCRYPT_DKLEN = 64  # Derived key length
