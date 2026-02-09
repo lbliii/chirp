@@ -23,12 +23,16 @@ Requires ``aiosqlite`` (for SQLite) or ``asyncpg`` (for PostgreSQL)::
     pip install chirp[data-pg]    # PostgreSQL
 """
 
-from chirp.data.database import Database, get_db
-from chirp.data.errors import DataError, DriverNotInstalledError
+from chirp.data.database import Database, Notification, get_db
+from chirp.data.errors import DataError, DriverNotInstalledError, MigrationError
+from chirp.data.migrate import migrate
 
 __all__ = [
     "DataError",
     "Database",
     "DriverNotInstalledError",
+    "MigrationError",
+    "Notification",
     "get_db",
+    "migrate",
 ]

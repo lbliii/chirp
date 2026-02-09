@@ -390,7 +390,7 @@
     <div id="board" class="board">
       {% for col_id, col_name in columns %}
         {% let col_tasks = board.get(col_id, []) %}
-        {% call column(col_id, col_name, col_tasks | length) %}
+        {% call column(col_id, col_name, col_tasks | length, oob=false) %}
           {% unless col_tasks %}
             <p class="empty">No tasks in {{ col_name | lower }}.</p>
           {% end %}

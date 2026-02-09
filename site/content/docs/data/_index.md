@@ -15,14 +15,21 @@ cascade:
 ---
 
 :::{cards}
-:columns: 2
+:columns: 3
 :gap: medium
 
 :::{card} Database
 :icon: database
 :link: ./database
 :description: SQLite and PostgreSQL access
-The Database class with async queries and row mapping.
+Typed async queries, row mapping, transactions, streaming, and LISTEN/NOTIFY.
+:::{/card}
+
+:::{card} Migrations
+:icon: arrow-up-circle
+:link: ./database#migrations
+:description: Forward-only SQL migrations
+Numbered SQL files, automatic tracking, runs at startup.
 :::{/card}
 
 :::{card} Forms & Validation

@@ -1,0 +1,152 @@
+<html>
+<head>
+  <title>Live Sales Dashboard</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 1.5rem;
+    }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; font-weight: 600; color: #f8fafc; }
+    header p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem; max-width: 800px; margin: 0 auto 1.5rem;
+    }
+    .stat-card {
+      background: #1e293b; border-radius: 0.75rem;
+      padding: 1rem; text-align: center;
+    }
+    .stat-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin-top: 0.25rem; }
+    .stat-card .value.revenue { color: #4ade80; }
+    .stat-card .value.pending { color: #fbbf24; }
+
+    .orders-section { max-width: 800px; margin: 0 auto; }
+    .orders-section h2 {
+      font-size: 1rem; font-weight: 500; color: #94a3b8;
+      margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; padding: 0.5rem 0.75rem;
+      font-size: 0.75rem; color: #64748b; text-transform: uppercase;
+      letter-spacing: 0.05em; border-bottom: 1px solid #1e293b;
+    }
+    td {
+      padding: 0.75rem; font-size: 0.85rem;
+      border-bottom: 1px solid #1e293b;
+    }
+    tr { transition: background 0.3s; }
+    tr:hover { background: #1e293b; }
+    tr.new-order { animation: flash 1.5s ease-out; }
+
+    .badge {
+      display: inline-block; padding: 0.15rem 0.5rem;
+      border-radius: 9999px; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .badge.pending { background: #422006; color: #fbbf24; }
+    .badge.shipped { background: #0c4a6e; color: #38bdf8; }
+    .badge.delivered { background: #052e16; color: #4ade80; }
+
+    .amount { font-variant-numeric: tabular-nums; }
+
+    .sse-sink { display: none; }
+    footer { text-align: center; margin-top: 2rem; font-size: 0.75rem; color: #475569; }
+
+    @keyframes flash {
+      0% { background: #1e3a5f; }
+      100% { background: transparent; }
+    }
+
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Live Sales Dashboard</h1>
+    <p>SQL &rarr; frozen dataclass &rarr; template fragment &rarr; SSE &rarr; browser</p>
+  </header>
+
+  {% block stats_bar %}
+  <div id="stats" class="stats" hx-swap-oob="outerHTML">
+    <div class="stat-card">
+      <div class="label">Total Orders</div>
+      <div class="value">{{ stats.total_orders }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Revenue</div>
+      <div class="value revenue">${{ "%.2f" | format(stats.total_revenue) }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Pending</div>
+      <div class="value pending">{{ stats.pending_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Order</div>
+      <div class="value">${{ "%.2f" | format(stats.avg_order) }}</div>
+    </div>
+  </div>
+  {% end %}
+
+  <div class="orders-section">
+    <h2>Recent Orders</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="orders">
+        {% for order in orders %}
+        <tr id="order-{{ order.id }}">
+          <td>{{ order.id }}</td>
+          <td>{{ order.customer }}</td>
+          <td>{{ order.product }}</td>
+          <td class="amount">${{ "%.2f" | format(order.amount) }}</td>
+          <td><span class="badge {{ order.status }}">{{ order.status }}</span></td>
+          <td>{{ order.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SSE connection — htmx swaps fragments by ID -->
+  <div hx-ext="sse" sse-connect="/events">
+    <div sse-swap="fragment" class="sse-sink"></div>
+  </div>
+
+  {% block order_row %}
+  {% if order is defined %}
+  <tr id="order-{{ order.id }}" class="new-order" hx-swap-oob="afterbegin:#orders">
+    <td>{{ order.id }}</td>
+    <td>{{ order.customer }}</td>
+    <td>{{ order.product }}</td>
+    <td class="amount">${{ "%.2f" | format(order.amount) }}</td>
+    <td><span class="badge {{ order.status }}">{{ order.status }}</span></td>
+    <td>{{ order.created_at }}</td>
+  </tr>
+  {% end %}
+  {% end %}
+
+  <footer>
+    chirp.data &middot; SQL in, frozen dataclasses out &middot; Transactions &middot; Migrations &middot; SSE
+  </footer>
+</body>
+</html>

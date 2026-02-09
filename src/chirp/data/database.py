@@ -15,6 +15,8 @@ Free-threading safety:
     - All public methods are async — no sync I/O on the calling thread
 """
 
+import asyncio
+import contextlib
 import sys
 import threading
 import time
@@ -26,7 +28,6 @@ from typing import Any, overload
 
 from chirp.data._mapping import map_row, map_rows
 from chirp.data.errors import (
-    ConnectionError,
     DataError,
     DriverNotInstalledError,
     QueryError,
@@ -38,10 +39,10 @@ from chirp.data.errors import (
 _current_conn: ContextVar[Any] = ContextVar("chirp_db_conn")
 
 # App-level database accessor (set by App during lifespan startup).
-_db_var: ContextVar["Database"] = ContextVar("chirp_db")
+_db_var: ContextVar[Database] = ContextVar("chirp_db")
 
 
-def get_db() -> "Database":
+def get_db() -> Database:
     """Return the app-level database instance.
 
     Available when a ``Database`` is configured on the ``App``::
@@ -78,6 +79,19 @@ class DatabaseConfig:
     url: str
     pool_size: int = 5
     echo: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Notification:
+    """A notification received from PostgreSQL LISTEN/NOTIFY.
+
+    Attributes:
+        channel: The notification channel name.
+        payload: The notification payload string (may be empty).
+    """
+
+    channel: str
+    payload: str
 
 
 class Database:
@@ -226,7 +240,7 @@ class Database:
             return
         ms = elapsed * 1000
         param_str = f"  params={params!r}" if params else ""
-        print(f"[chirp.data] {ms:6.1f}ms  {sql}{param_str}", file=sys.stderr)  # noqa: T201
+        print(f"[chirp.data] {ms:6.1f}ms  {sql}{param_str}", file=sys.stderr)
 
     # -- Public query API --
 
@@ -282,9 +296,7 @@ class Database:
         t0 = time.perf_counter()
         async with self._connection() as conn:
             try:
-                async for row in _execute_stream(
-                    self._driver, conn, sql, params, batch_size
-                ):
+                async for row in _execute_stream(self._driver, conn, sql, params, batch_size):
                     yield map_row(cls, row)
             except Exception as exc:
                 raise QueryError(str(exc)) from exc
@@ -341,9 +353,7 @@ class Database:
     @overload
     async def fetch_val[T](self, sql: str, /, *params: Any, as_type: type[T]) -> T | None: ...
 
-    async def fetch_val(
-        self, sql: str, /, *params: Any, as_type: type | None = None
-    ) -> Any:
+    async def fetch_val(self, sql: str, /, *params: Any, as_type: type | None = None) -> Any:
         """Execute a query and return the first column of the first row.
 
         Useful for COUNT, SUM, MAX, etc.
@@ -367,6 +377,79 @@ class Database:
                 raise QueryError(str(exc)) from exc
             finally:
                 self._log_query(sql, params, time.perf_counter() - t0)
+
+    # -- LISTEN/NOTIFY (PostgreSQL only) --
+
+    async def listen(self, *channels: str) -> AsyncIterator[Notification]:
+        """Listen for PostgreSQL NOTIFY events on one or more channels.
+
+        Opens a **dedicated connection** (not from the pool) that stays
+        open for the lifetime of the iterator.  Yields ``Notification``
+        objects as they arrive.
+
+        Pair with chirp's ``EventStream`` for real-time HTML updates::
+
+            @app.route("/orders/live")
+            async def live_orders(request):
+                async def generate():
+                    async for note in app.db.listen("new_orders"):
+                        order = await app.db.fetch_one(
+                            Order, "SELECT * FROM orders WHERE id = $1",
+                            int(note.payload),
+                        )
+                        if order:
+                            yield Fragment("orders.html", "row", order=order)
+                return EventStream(generate())
+
+        SQLite does not support LISTEN/NOTIFY — raises ``DataError``.
+        """
+        if self._driver == "sqlite":
+            msg = (
+                "LISTEN/NOTIFY is a PostgreSQL feature. "
+                "SQLite does not support real-time notifications."
+            )
+            raise DataError(msg)
+
+        if not self._initialized:
+            await self.connect()
+
+        if not channels:
+            msg = "listen() requires at least one channel name"
+            raise DataError(msg)
+
+        try:
+            import asyncpg
+        except ImportError:
+            msg = (
+                "chirp.data requires 'asyncpg' for PostgreSQL LISTEN/NOTIFY. "
+                "Install it with: pip install chirp[data-pg]"
+            )
+            raise DriverNotInstalledError(msg) from None
+
+        # Open a dedicated connection for LISTEN (not from pool)
+        conn = await asyncpg.connect(self._config.url)
+        queue: asyncio.Queue[Notification] = asyncio.Queue()
+
+        def _on_notify(
+            conn: Any,
+            pid: int,
+            channel: str,
+            payload: str,
+        ) -> None:
+            queue.put_nowait(Notification(channel=channel, payload=payload))
+
+        try:
+            for channel in channels:
+                await conn.add_listener(channel, _on_notify)
+
+            while True:
+                notification = await queue.get()
+                yield notification
+        finally:
+            for channel in channels:
+                with contextlib.suppress(Exception):
+                    await conn.remove_listener(channel, _on_notify)
+            await conn.close()
 
     # -- Lifecycle --
 
@@ -397,7 +480,7 @@ class Database:
 
     # -- Context manager --
 
-    async def __aenter__(self) -> "Database":
+    async def __aenter__(self) -> Database:
         await self.connect()
         return self
 
@@ -416,7 +499,7 @@ def _detect_driver(url: str) -> str:
     """Detect the database driver from the URL scheme."""
     if url.startswith("sqlite"):
         return "sqlite"
-    if url.startswith("postgresql") or url.startswith("postgres"):
+    if url.startswith(("postgresql", "postgres")):
         return "postgresql"
     msg = (
         f"Unsupported database URL scheme: {url!r}. "
@@ -570,9 +653,7 @@ async def _execute_many(
     return len(params_seq)
 
 
-async def _execute_statement(
-    driver: str, conn: Any, sql: str, params: tuple[Any, ...]
-) -> int:
+async def _execute_statement(driver: str, conn: Any, sql: str, params: tuple[Any, ...]) -> int:
     if driver == "sqlite":
         cursor = await conn.execute(sql, params)
         # Only auto-commit outside managed transactions.

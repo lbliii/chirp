@@ -70,6 +70,7 @@ class App:
         "_kida_env",
         "_middleware",
         "_middleware_list",
+        "_migrations_dir",
         "_pending_routes",
         "_pending_tools",
         # Compiled state (populated by _freeze)
@@ -92,6 +93,7 @@ class App:
         config: AppConfig | None = None,
         *,
         db: Database | str | None = None,
+        migrations: str | None = None,
     ) -> None:
         self.config: AppConfig = config or AppConfig()
         self._pending_routes: list[_PendingRoute] = []
@@ -115,6 +117,9 @@ class App:
             self._db: Database | None = _Database(db)
         else:
             self._db = db
+
+        # Migrations directory — when set with db, migrations run at startup.
+        self._migrations_dir: str | None = migrations
 
         # Tool event bus — created eagerly so subscribers can register
         # before freeze. The bus itself is thread-safe.
@@ -367,7 +372,9 @@ class App:
         from chirp.server.dev import run_dev_server
 
         run_dev_server(
-            self, _host, _port,
+            self,
+            _host,
+            _port,
             reload=self.config.debug,
             reload_include=self.config.reload_include,
             reload_dirs=self.config.reload_dirs,
@@ -435,7 +442,14 @@ class App:
                     if self._db is not None:
                         await self._db.connect()
                         from chirp.data.database import _db_var
+
                         _db_var.set(self._db)
+
+                        # Run migrations if a directory is configured
+                        if self._migrations_dir is not None:
+                            from chirp.data.migrate import migrate
+
+                            await migrate(self._db, self._migrations_dir)
 
                     for hook in self._startup_hooks:
                         result = hook()
@@ -443,10 +457,12 @@ class App:
                             await result
                     await send({"type": "lifespan.startup.complete"})
                 except Exception as exc:
-                    await send({
-                        "type": "lifespan.startup.failed",
-                        "message": str(exc),
-                    })
+                    await send(
+                        {
+                            "type": "lifespan.startup.failed",
+                            "message": str(exc),
+                        }
+                    )
                     return
 
             elif msg_type == "lifespan.shutdown":
@@ -568,7 +584,7 @@ class App:
         from chirp.contracts import CheckResult, check_hypermedia_surface
 
         result: CheckResult = check_hypermedia_surface(self)
-        print(result.summary())  # noqa: T201
+        print(result.summary())
         if not result.ok:
             raise SystemExit(1)
 

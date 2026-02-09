@@ -35,6 +35,20 @@ class TestClient:
 
     async def __aenter__(self) -> TestClient:
         self.app._ensure_frozen()
+
+        # Mirror lifespan database setup (connect, set accessor, migrate).
+        # This matches the behaviour in App._handle_lifespan so that
+        # apps using App(db=..., migrations=...) work under TestClient.
+        if self.app._db is not None:
+            await self.app._db.connect()
+            from chirp.data.database import _db_var
+
+            _db_var.set(self.app._db)
+            if self.app._migrations_dir is not None:
+                from chirp.data.migrate import migrate
+
+                await migrate(self.app._db, self.app._migrations_dir)
+
         for hook in self.app._startup_hooks:
             result = hook()
             if inspect.isawaitable(result):
@@ -46,6 +60,10 @@ class TestClient:
             result = hook()
             if inspect.isawaitable(result):
                 await result
+
+        # Mirror lifespan database teardown.
+        if self.app._db is not None:
+            await self.app._db.disconnect()
 
     async def get(
         self,
