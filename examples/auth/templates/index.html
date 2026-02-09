@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Auth Demo</h1>
+{% if current_user().is_authenticated %}
+  <p>Logged in as <strong>{{ current_user().name }}</strong>.</p>
+{% else %}
+  <p>You are not logged in. <a href="/login">Sign in</a> to continue.</p>
+{% endif %}
+{% endblock %}

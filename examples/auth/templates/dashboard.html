@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p>Welcome, <strong>{{ user.name }}</strong>! This page is protected by <code>@login_required</code>.</p>
+{% endblock %}
