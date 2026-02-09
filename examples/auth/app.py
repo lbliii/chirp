@@ -18,7 +18,18 @@ Run:
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Redirect, Request, Template, get_user, login, login_required, logout
+from chirp import (
+    App,
+    AppConfig,
+    Redirect,
+    Request,
+    Template,
+    get_user,
+    is_safe_url,
+    login,
+    login_required,
+    logout,
+)
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.security.passwords import hash_password, verify_password
@@ -90,7 +101,11 @@ async def do_login(request: Request):
     user = USERS.get(username)
     if user and verify_password(password, user.password_hash):
         login(user)
-        return Redirect("/dashboard")
+        # Honour ?next= only if the URL is safe (relative, same origin)
+        next_url = request.query.get("next", "/dashboard")
+        if not is_safe_url(next_url):
+            next_url = "/dashboard"
+        return Redirect(next_url)
 
     return Template("login.html", error="Invalid username or password")
 

@@ -60,6 +60,7 @@ __all__ = [
     "get_request",
     "get_user",
     "login",
+    "is_safe_url",
     "login_required",
     "logout",
     "requires",
@@ -115,6 +116,11 @@ def __getattr__(name: str) -> object:
         from chirp.middleware import auth as _auth
 
         return getattr(_auth, name)
+
+    if name == "is_safe_url":
+        from chirp.security.urls import is_safe_url
+
+        return is_safe_url
 
     if name in ("login_required", "requires"):
         from chirp.security import decorators as _decorators

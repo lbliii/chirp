@@ -26,6 +26,7 @@ Usage::
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
+from urllib.parse import quote
 
 from chirp._internal.invoke import invoke
 from chirp.errors import HTTPError
@@ -77,8 +78,7 @@ def login_required(handler: Callable) -> Callable:
             config = _active_config.get()
             login_url = config.login_url if config else "/login"
             if login_url:
-                # Include the original URL as a ?next= parameter
-                next_url = request.url
+                next_url = quote(request.url, safe="")
                 separator = "&" if "?" in login_url else "?"
                 redirect_url = f"{login_url}{separator}next={next_url}"
                 raise HTTPError(
@@ -126,7 +126,7 @@ def requires(*permissions: str) -> Callable:
                 config = _active_config.get()
                 login_url = config.login_url if config else "/login"
                 if login_url:
-                    next_url = request.url
+                    next_url = quote(request.url, safe="")
                     separator = "&" if "?" in login_url else "?"
                     redirect_url = f"{login_url}{separator}next={next_url}"
                     raise HTTPError(

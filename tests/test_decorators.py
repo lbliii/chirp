@@ -131,7 +131,7 @@ class TestLoginRequiredBrowser:
             location = _get_header(response, "location")
             assert location is not None
             assert "/login" in location
-            assert "next=/dashboard" in location
+            assert "next=%2Fdashboard" in location
 
     async def test_authenticated_browser_passes(self) -> None:
         app = _make_app()
@@ -153,7 +153,7 @@ class TestLoginRequiredBrowser:
             assert response.status == 302
             location = _get_header(response, "location")
             assert location is not None
-            assert "next=/dashboard%3Ftab%3Dsettings" in location or "next=/dashboard?tab=settings" in location
+            assert "next=%2Fdashboard%3Ftab%3Dsettings" in location
 
 
 # ---------------------------------------------------------------------------

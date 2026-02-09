@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{{ photo.title }}{% endblock %}
+
+{% block content %}
+<p><a href="/">&larr; Back to gallery</a></p>
+
+<h1 style="margin-top: 1rem;">{{ photo.title }}</h1>
+
+<img src="/uploads/{{ photo.filename }}" alt="{{ photo.title }}"
+     style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 8px; margin-top: 1rem; background: #f1f5f9;">
+
+<div style="margin-top: 1rem;">
+  {% if photo.description %}
+  <p>{{ photo.description }}</p>
+  {% endif %}
+  <p class="hint" style="margin-top: 0.5rem;">
+    {{ photo.content_type }} &middot; {{ photo.size | filesize }}
+  </p>
+</div>
+
+<form method="post" action="/photos/{{ photo.id }}" style="margin-top: 1.5rem;">
+  {{ csrf_field() }}
+  <input type="hidden" name="_method" value="DELETE">
+  <button type="submit" style="background: #dc2626;">Delete photo</button>
+</form>
+{% endblock %}
