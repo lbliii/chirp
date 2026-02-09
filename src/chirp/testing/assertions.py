@@ -45,11 +45,14 @@ def assert_fragment_not_contains(response: Response, text: str) -> None:
 def assert_is_error_fragment(response: Response, *, status: int | None = None) -> None:
     """Assert the response is a chirp error fragment snippet.
 
-    Error fragments contain ``class="chirp-error"`` and a ``data-status``
+    Error fragments contain the ``chirp-error`` CSS class and a ``data-status``
     attribute matching the HTTP status code.
     """
-    assert 'class="chirp-error"' in response.text, (
-        "Response is not a chirp error fragment (missing class=\"chirp-error\").\n"
+    import re
+
+    has_class = bool(re.search(r'class="[^"]*\bchirp-error\b[^"]*"', response.text))
+    assert has_class, (
+        "Response is not a chirp error fragment (missing chirp-error class).\n"
         f"Response body: {response.text[:500]}"
     )
     if status is not None:

@@ -567,7 +567,7 @@ def render_debug_page(
 
     if is_fragment:
         return (
-            f'<div class="chirp-error-fragment" data-status="500">'
+            f'<div class="chirp-error chirp-error-fragment" data-status="500">'
             f"<style>{_CSS}</style>"
             f"{body_html}"
             f"<script>{_TOGGLE_JS}</script>"

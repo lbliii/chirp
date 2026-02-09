@@ -247,7 +247,8 @@ class TestDebugModeFragmentErrors:
             response = await client.fragment("/boom")
             assert_is_error_fragment(response, status=500)
             assert_fragment_contains(response, "debug error")
-            assert_fragment_contains(response, "<pre>")
+            # Rich debug page renders source context (not bare <pre>)
+            assert_fragment_contains(response, "RuntimeError")
 
     async def test_debug_500_normal_includes_traceback(self) -> None:
         app = App(config=AppConfig(debug=True))
@@ -260,7 +261,7 @@ class TestDebugModeFragmentErrors:
         async with TestClient(app) as client:
             response = await client.get("/boom")
             assert response.status == 500
-            assert "<pre>" in response.text
             assert "debug error" in response.text
-            # Normal (non-fragment) should NOT have the chirp-error wrapper
-            assert 'class="chirp-error"' not in response.text
+            assert "RuntimeError" in response.text
+            # Full page uses error-page wrapper, not chirp-error
+            assert 'class="error-page"' in response.text

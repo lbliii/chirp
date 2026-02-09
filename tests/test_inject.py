@@ -95,8 +95,6 @@ class TestHTMLInjectSkips:
 
     async def test_skips_sse_response(self) -> None:
         """SSE (EventStream) responses are passed through unchanged."""
-        import asyncio
-
         from chirp import EventStream, SSEEvent
 
         app = App()
@@ -110,8 +108,10 @@ class TestHTMLInjectSkips:
             return EventStream(stream())
 
         async with TestClient(app) as client:
-            result = await client.sse("/events", max_events=1)
+            result = await client.sse("/events", max_events=1, disconnect_after=2.0)
             assert result.status == 200
+            assert len(result.events) == 1
+            # The </body> data should NOT have been modified by HTMLInject
             assert result.events[0].data == "</body>"
 
     async def test_handles_html_with_charset(self) -> None:
