@@ -131,6 +131,55 @@ def handle_404(request: Request):
 
 Built-in error handling automatically returns `<div class="chirp-error">` snippets for htmx requests.
 
+## Terminal Error Formatting
+
+During development, Chirp formats errors for the terminal with structured, readable output instead of raw Python tracebacks.
+
+### Template Errors
+
+When a Kida template error occurs, Chirp displays the error with its code, source snippet, and route context:
+
+```
+-- Template Error -----------------------------------------------
+K-RUN-001: Undefined variable 'usernme' in base.html:42
+
+     |
+> 42 | <h1>{{ usernme }}</h1>
+     |
+
+Hint: Did you mean 'username'?
+Docs: https://kida.dev/docs/errors/#k-run-001
+
+  Route: GET /dashboard
+-----------------------------------------------------------------
+```
+
+### Non-Template Errors
+
+For other exceptions, Chirp filters tracebacks to show only application frames (hiding framework and stdlib internals).
+
+### Traceback Verbosity
+
+Control terminal traceback style with the `CHIRP_TRACEBACK` environment variable:
+
+| Value | Behavior |
+|-------|----------|
+| `compact` | App frames only (default) |
+| `full` | Full Python traceback |
+| `minimal` | Single-line error summary |
+
+```bash
+# Show full tracebacks during deep debugging
+CHIRP_TRACEBACK=full chirp run
+
+# Minimal output for CI/production
+CHIRP_TRACEBACK=minimal chirp run
+```
+
+### Streaming and SSE Errors
+
+Errors during chunked streaming or SSE connections use the same formatting pipeline. In debug mode, streaming errors render as a visible `<div class="chirp-error">` element in the page, and SSE errors are sent as an `event: error` message the client can handle.
+
 ## Debug Pages
 
 When `AppConfig(debug=True)`, unhandled exceptions render a detailed debug page with:
@@ -138,6 +187,7 @@ When `AppConfig(debug=True)`, unhandled exceptions render a detailed debug page 
 - Full traceback with source code context
 - Request details (method, path, headers, query parameters)
 - Application configuration
+- **Template error panel** with error code, source snippet, and docs link (for Kida errors)
 
 :::{warning}
 Debug pages expose internal details. Never enable `debug=True` in production.
