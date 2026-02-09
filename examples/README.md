@@ -114,6 +114,62 @@ without cloud API keys.
 cd examples/ollama && python app.py
 ```
 
+### `signup/` — Registration Form with Validation & CSRF
+
+The chirp forms showcase. A registration form with `validate()` and built-in rules
+(`required`, `min_length`, `max_length`, `email`, `matches`), a custom validator
+for password confirmation, `CSRFMiddleware` for token protection, and `ValidationError`
+for re-rendering with per-field errors. Sessions store the username for the welcome page.
+
+```bash
+cd examples/signup && python app.py
+```
+
+### `upload/` — Photo Gallery with File Uploads
+
+Multipart form handling from end to end. Upload photos with title and description,
+validate file type and size, save to disk with `UploadFile.save()`, and browse the
+gallery. Serves uploaded images via `StaticFiles` middleware. Shows `form.files.get()`,
+`enctype="multipart/form-data"`, and file metadata (`.filename`, `.content_type`, `.size`).
+
+```bash
+pip install chirp[forms]  # python-multipart
+cd examples/upload && python app.py
+```
+
+### `survey/` — Multi-Field Survey with Checkboxes & Radios
+
+Every HTML form input type in one app. Text, number, checkboxes (`get_list()`), radio
+buttons, `<select>`, and `<textarea>`. Validates with `required`, `one_of`, `integer`,
+and a custom age-range rule. Demonstrates multi-value field handling — the part of form
+parsing that `get()` alone can't cover.
+
+```bash
+cd examples/survey && python app.py
+```
+
+### `wizard/` — Multi-Step Checkout Form
+
+A 3-step form wizard with session-persisted data: personal info → shipping address →
+review & confirm. Each step validates independently with `validate()`, redirects forward
+on success, and guards against skipping steps. The review page reads back all collected
+data, and confirmation clears the session. Back navigation preserves previously entered values.
+
+```bash
+cd examples/wizard && python app.py
+```
+
+### `search/` — Book Search with GET Forms & htmx
+
+GET-based forms — no POST, no CSRF. A book catalog with text search, genre filtering, and
+sort controls. Uses `request.query` for reading query parameters and `Page` for automatic
+full-page vs fragment rendering. htmx drives search-as-you-type with `hx-get`, `hx-push-url`,
+and `hx-include` so the URL always reflects the current search state.
+
+```bash
+cd examples/search && python app.py
+```
+
 ## Patterns
 
 Lessons from building these examples — things that aren't bugs but require
@@ -189,47 +245,60 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo | static_site | auth |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x | x | x | x |
-| Path parameters | x | x | x | | | x | | | |
-| String returns | x | | | | | | | | |
-| Dict/JSON returns | x | | | | | | | | |
-| `Response` chaining | x | | | | | | | | |
-| `@app.error()` | x | | | | | | | | |
-| `Template` | | x | | x | | x | x | | x |
-| `Fragment` | | x | x | x | x | x | x | | |
-| `Page` | | | x | | | x | | | |
-| `ValidationError` | | x | x | | | | | | |
-| `OOB` | | | x | | | | | | |
-| `Stream` | | | | | x | | | | |
-| `request.is_fragment` | | x | | | | x | | | |
-| `@app.template_filter()` | | x | | | x | x | | | |
-| `EventStream` | | | | x | x | x | x | x | |
-| `SSEEvent` | | | | x | | | | | |
-| `{% cache %}` | | | | | x | x | | | |
-| `hx-swap-oob` | | | x | | x | x | | | |
-| `with_hx_*()` headers | | | x | | | | | | |
-| `assert_hx_*` test helpers | | | x | | | | | | |
-| Multi-worker Pounce | | | | | x | x | x | | |
-| `TestClient.fragment()` | | x | | | | x | | | |
-| `TestClient.sse()` | | | | x | x | x | | x | |
-| `@app.on_startup` | | | | | | x | x | | |
-| `@app.on_worker_startup` | | | | | | x | x | | |
-| `@app.on_worker_shutdown` | | | | | | x | x | | |
-| `httpx` (real API) | | | | | | x | | | |
-| `chirp.data` (SQLite) | | | | | | | x | | |
-| `chirp.ai` (LLM streaming) | | | | | | | x | | |
-| `ContextVar` per-worker | | | | | | x | x | | |
-| Recursive `{% def %}` | | | | | | x | | | |
-| View Transitions | | | | | | x | | | |
-| `StaticFiles` (root prefix) | | | | | | | | x | |
-| `HTMLInject` | | | | | | | | x | |
-| Custom 404 page | | | | | | | | x | |
-| `SessionMiddleware` | | | | | | | | | x |
-| `AuthMiddleware` | | | | | | | | | x |
-| `@login_required` | | | | | | | | | x |
-| `login()` / `logout()` | | | | | | | | | x |
-| `current_user()` template global | | | | | | | | | x |
-| `hash_password` / `verify_password` | | | | | | | | | x |
-| `Redirect` | | | | | | | | | x |
+| Feature | hello | todo | contacts | sse | dashboard | hackernews | rag_demo | static_site | auth | signup | upload | survey | wizard | search |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | x | | | | | x | | x | |
+| String returns | x | | | | | | | | | | | | | |
+| Dict/JSON returns | x | | | | | | | | | | | | | |
+| `Response` chaining | x | | | | | | | | | | | | | |
+| `@app.error()` | x | | | | | | | | | | | | | |
+| `Template` | | x | | x | | x | x | | x | x | x | x | x | |
+| `Fragment` | | x | x | x | x | x | x | | | | | | | |
+| `Page` | | | x | | | x | | | | | | | | x |
+| `ValidationError` | | x | x | | | | | | | x | x | x | x | |
+| `OOB` | | | x | | | | | | | | | | | |
+| `Stream` | | | | | x | | | | | | | | | |
+| `request.is_fragment` | | x | | | | x | | | | | | | | |
+| `request.query` | | | | | | | | | | | | | | x |
+| `@app.template_filter()` | | x | | | x | x | | | | | x | | | |
+| `EventStream` | | | | x | x | x | x | x | | | | | | |
+| `SSEEvent` | | | | x | | | | | | | | | | |
+| `{% cache %}` | | | | | x | x | | | | | | | | |
+| `hx-swap-oob` | | | x | | x | x | | | | | | | | |
+| `with_hx_*()` headers | | | x | | | | | | | | | | | |
+| `assert_hx_*` test helpers | | | x | | | | | | | | | | | |
+| Multi-worker Pounce | | | | | x | x | x | | | | | | | |
+| `TestClient.fragment()` | | x | | | | x | | | | | | | | x |
+| `TestClient.sse()` | | | | x | x | x | | x | | | | | | |
+| `@app.on_startup` | | | | | | x | x | | | | | | | |
+| `@app.on_worker_startup` | | | | | | x | x | | | | | | | |
+| `@app.on_worker_shutdown` | | | | | | x | x | | | | | | | |
+| `httpx` (real API) | | | | | | x | | | | | | | | |
+| `chirp.data` (SQLite) | | | | | | | x | | | | | | | |
+| `chirp.ai` (LLM streaming) | | | | | | | x | | | | | | | |
+| `ContextVar` per-worker | | | | | | x | x | | | | | | | |
+| Recursive `{% def %}` | | | | | | x | | | | | | | | |
+| View Transitions | | | | | | x | | | | | | | | |
+| `StaticFiles` (root prefix) | | | | | | | | x | | | x | | | |
+| `HTMLInject` | | | | | | | | x | | | | | | |
+| Custom 404 page | | | | | | | | x | | | | | | |
+| `SessionMiddleware` | | | | | | | | | x | x | | | x | |
+| `AuthMiddleware` | | | | | | | | | x | | | | | |
+| `@login_required` | | | | | | | | | x | | | | | |
+| `login()` / `logout()` | | | | | | | | | x | | | | | |
+| `current_user()` template global | | | | | | | | | x | | | | | |
+| `hash_password` / `verify_password` | | | | | | | | | x | | | | | |
+| `Redirect` | | | | | | | | | x | x | x | | x | |
+| `validate()` + built-in rules | | | | | | | | | | x | x | x | x | |
+| `CSRFMiddleware` + `csrf_field()` | | | | | | | | | | x | x | | | |
+| `UploadFile` / multipart | | | | | | | | | | | x | | | |
+| `form.files` / `file.save()` | | | | | | | | | | | x | | | |
+| `form.get_list()` (multi-value) | | | | | | | | | | | | x | | |
+| `one_of` validator | | | | | | | | | | | | x | | |
+| `integer` / `number` validator | | | | | | | | | | | | x | | |
+| `matches` validator | | | | | | | | | | x | | | x | |
+| Session-persisted form flow | | | | | | | | | | | | | x | |
+| `get_session()` | | | | | | | | | | x | | | x | |
+| GET query-param forms | | | | | | | | | | | | | | x |
+| `hx-push-url` search | | | | | | | | | | | | | | x |

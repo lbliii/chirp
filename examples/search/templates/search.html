@@ -1,0 +1,87 @@
+<html>
+<head>
+  <title>Book Search</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
+    h1 { margin-bottom: 1rem; font-size: 1.5rem; }
+    .search-form { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .search-row { display: flex; gap: 0.5rem; }
+    .search-row input[type="text"] { flex: 1; }
+    input[type="text"] { padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+    input[type="text"]:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    select { padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; background: #fff; }
+    select:focus { outline: none; border-color: #3b82f6; }
+    .filters { display: flex; gap: 0.5rem; }
+    .meta { color: #64748b; font-size: 0.85rem; margin-bottom: 1rem; }
+    .book-list { list-style: none; }
+    .book { padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
+    .book:last-child { border-bottom: none; }
+    .book-title { font-weight: 600; font-size: 0.95rem; }
+    .book-author { color: #475569; font-size: 0.875rem; margin-top: 0.15rem; }
+    .book-meta { display: flex; gap: 0.75rem; margin-top: 0.25rem; font-size: 0.8rem; color: #94a3b8; }
+    .badge { display: inline-block; background: #e2e8f0; color: #475569; padding: 0.1rem 0.4rem; border-radius: 999px; font-size: 0.75rem; }
+    .star { color: #f59e0b; }
+    .empty { color: #94a3b8; font-style: italic; padding: 2rem 0; text-align: center; }
+  </style>
+</head>
+<body>
+<h1>Book Search</h1>
+
+<form class="search-form"
+      hx-get="/" hx-target="#results" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="submit">
+  <div class="search-row">
+    <input type="text" name="q" value="{{ query }}"
+           placeholder="Search by title or author..."
+           hx-get="/" hx-target="#results" hx-swap="outerHTML"
+           hx-push-url="true" hx-trigger="input changed delay:300ms"
+           hx-include="closest form">
+  </div>
+  <div class="filters">
+    <select name="genre"
+            hx-get="/" hx-target="#results" hx-swap="outerHTML"
+            hx-push-url="true" hx-trigger="change"
+            hx-include="closest form">
+      {% for key, label in genres %}
+      <option value="{{ key }}" {{ 'selected' if genre == key else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="sort"
+            hx-get="/" hx-target="#results" hx-swap="outerHTML"
+            hx-push-url="true" hx-trigger="change"
+            hx-include="closest form">
+      {% for key, label in sort_options %}
+      <option value="{{ key }}" {{ 'selected' if sort == key else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+{% block results %}
+<div id="results">
+  <p class="meta">{{ result_count }} book{{ 's' if result_count != 1 else '' }} found</p>
+
+  {% if books %}
+  <ul class="book-list">
+    {% for book in books %}
+    <li class="book">
+      <div class="book-title">{{ book.title }}</div>
+      <div class="book-author">{{ book.author }}</div>
+      <div class="book-meta">
+        <span class="badge">{{ book.genre }}</span>
+        <span>{{ book.year }}</span>
+        <span><span class="star">&#9733;</span> {{ book.rating }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No books match your search. Try different keywords or filters.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+</body>
+</html>
