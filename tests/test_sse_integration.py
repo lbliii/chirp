@@ -222,6 +222,47 @@ class TestFragmentSSE:
 class TestSSEDisconnect:
     """Client disconnect terminates the stream cleanly."""
 
+    async def test_disconnect_during_pending_anext_no_warnings(
+        self, recwarn,
+    ) -> None:
+        """Disconnect while __anext__ is pending must not leak StopAsyncIteration.
+
+        Previously, the pending_next task cleanup was inside the try block and
+        skipped when CancelledError jumped to the except handler. The orphaned
+        task's StopAsyncIteration went unretrieved, producing a noisy warning.
+        """
+        import asyncio
+        import warnings
+
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "first"
+                # Block long enough for the client to disconnect
+                await asyncio.sleep(10)
+                yield "never-sent"
+
+            return EventStream(gen())
+
+        # Capture warnings at runtime
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            async with TestClient(app) as client:
+                result = await client.sse("/events", disconnect_after=0.15)
+
+        assert len(result.events) >= 1
+        assert result.events[0].data == "first"
+
+        # No StopAsyncIteration warnings should have been logged
+        stop_warnings = [
+            w for w in caught if "StopAsyncIteration" in str(w.message)
+        ]
+        assert stop_warnings == [], (
+            f"Unexpected StopAsyncIteration warnings: {stop_warnings}"
+        )
+
     async def test_disconnect_after_n_events(self) -> None:
         """Infinite generator, but client disconnects after 3 events."""
         app = App()
