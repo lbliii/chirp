@@ -27,7 +27,7 @@
   </style>
 </head>
 <body>
-<h1>Contacts {% block contact_count %}<span id="contact-count" class="count">{{ count | default(0) }}</span>{% endblock %}</h1>
+<h1>Contacts {% block contact_count %}<span id="contact-count" class="count">{{ count ?? 0 }}</span>{% endblock %}</h1>
 
 <div class="search">
   <input type="text" name="q" placeholder="Search contacts..."
@@ -38,19 +38,15 @@
 <div id="form-section">
 {% block contact_form %}
 <form class="add-form" hx-post="/contacts" hx-target="#contact-table" hx-swap="outerHTML">
-  <input type="text" name="name" placeholder="Name" value="{{ form.name if form is defined and form else '' }}">
-  <input type="email" name="email" placeholder="Email" value="{{ form.email if form is defined and form else '' }}">
+  <input type="text" name="name" placeholder="Name" value="{{ form?.name ?? '' }}">
+  <input type="email" name="email" placeholder="Email" value="{{ form?.email ?? '' }}">
   <button type="submit">Add</button>
 </form>
-{% if errors is defined and errors %}
-<ul class="errors">
-  {% for field, msgs in errors.items() %}
-    {% for msg in msgs %}
-    <li>{{ field }}: {{ msg }}</li>
-    {% endfor %}
-  {% endfor %}
-</ul>
-{% endif %}
+{% for field, msgs in (errors ?? {}).items() %}
+  {% for msg in msgs %}
+  <ul class="errors"><li>{{ field }}: {{ msg }}</li></ul>
+  {% end %}
+{% end %}
 {% endblock %}
 </div>
 
@@ -73,10 +69,10 @@
         <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
       </td>
     </tr>
-    {% endfor %}
-    {% if not contacts %}
+    {% end %}
+    {% unless contacts %}
     <tr><td colspan="3" class="empty">No contacts found.</td></tr>
-    {% endif %}
+    {% end %}
   </tbody>
 </table>
 {% endblock %}
@@ -91,7 +87,7 @@
     <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
   </td>
 </tr>
-{% endif %}
+{% end %}
 {% endblock %}
 
 {% block edit_row %}
@@ -99,15 +95,15 @@
 <tr id="contact-{{ contact.id }}">
   <td>
     <input type="text" name="name" value="{{ contact.name }}" form="edit-{{ contact.id }}">
-    {% if errors is defined and errors.name is defined %}
-    <ul class="errors">{% for msg in errors.name %}<li>{{ msg }}</li>{% endfor %}</ul>
-    {% endif %}
+    {% for msg in (errors ?? {}).get("name", []) %}
+    <ul class="errors"><li>{{ msg }}</li></ul>
+    {% end %}
   </td>
   <td>
     <input type="email" name="email" value="{{ contact.email }}" form="edit-{{ contact.id }}">
-    {% if errors is defined and errors.email is defined %}
-    <ul class="errors">{% for msg in errors.email %}<li>{{ msg }}</li>{% endfor %}</ul>
-    {% endif %}
+    {% for msg in (errors ?? {}).get("email", []) %}
+    <ul class="errors"><li>{{ msg }}</li></ul>
+    {% end %}
   </td>
   <td class="actions">
     <form id="edit-{{ contact.id }}" hx-put="/contacts/{{ contact.id }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML"
@@ -117,7 +113,7 @@
     <button hx-get="/" hx-target="#contact-table" hx-swap="outerHTML">cancel</button>
   </td>
 </tr>
-{% endif %}
+{% end %}
 {% endblock %}
 
 <div id="toast" class="toast"></div>

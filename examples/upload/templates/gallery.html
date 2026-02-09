@@ -11,32 +11,26 @@
 
   <label for="title">Title</label>
   <input type="text" id="title" name="title"
-         value="{{ form.title if form is defined and form else '' }}"
-         class="{{ 'error' if errors is defined and errors and 'title' in errors else '' }}"
+         value="{{ form?.title ?? '' }}"
+         class="{{ 'error' if 'title' in (errors ?? {}) else '' }}"
          placeholder="A name for your photo">
-  {% if errors is defined and errors and 'title' in errors %}
-    {% for msg in errors['title'] %}
+  {% for msg in (errors ?? {}).get("title", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
 
   <label for="description">Description <span class="hint">(optional)</span></label>
   <textarea id="description" name="description"
-            class="{{ 'error' if errors is defined and errors and 'description' in errors else '' }}"
-            placeholder="Tell us about this photo">{{ form.description if form is defined and form else '' }}</textarea>
-  {% if errors is defined and errors and 'description' in errors %}
-    {% for msg in errors['description'] %}
+            class="{{ 'error' if 'description' in (errors ?? {}) else '' }}"
+            placeholder="Tell us about this photo">{{ form?.description ?? '' }}</textarea>
+  {% for msg in (errors ?? {}).get("description", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
 
   <label for="photo">Photo</label>
   <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/gif,image/webp">
-  {% if errors is defined and errors and 'photo' in errors %}
-    {% for msg in errors['photo'] %}
+  {% for msg in (errors ?? {}).get("photo", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
   <p class="hint">JPEG, PNG, GIF, or WebP. Max 5 MB.</p>
 
   <button type="submit" style="margin-top: 1rem;">Upload photo</button>
@@ -45,19 +39,19 @@
 
 <hr>
 
-{% if photos %}
+{% unless photos %}
+<p class="empty">No photos yet. Upload one above!</p>
+{% else %}
 <div class="grid">
   {% for photo in photos %}
   <a href="/photos/{{ photo.id }}" class="card" style="text-decoration: none; color: inherit;">
     <img src="/uploads/{{ photo.filename }}" alt="{{ photo.title }}">
     <div class="card-body">
       <h3>{{ photo.title }}</h3>
-      <p>{{ photo.size | filesize }}</p>
+      <p>{{ photo.size | filesizeformat }}</p>
     </div>
   </a>
-  {% endfor %}
+  {% end %}
 </div>
-{% else %}
-<p class="empty">No photos yet. Upload one above!</p>
-{% endif %}
+{% end %}
 {% endblock %}

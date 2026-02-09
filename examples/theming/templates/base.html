@@ -178,11 +178,12 @@
   {% block content %}{% endblock %}
 
   {# --- Theme toggle logic --- #}
+  {% set theme_labels = {"system": "System", "light": "Light", "dark": "Dark"} %}
   <script>
     (function() {
       // Cycle: system → light → dark → system
       var states = ["system", "light", "dark"];
-      var labels = { system: "System", light: "Light", dark: "Dark" };
+      var labels = {{ theme_labels | tojson }};
       var btn = document.getElementById("theme-toggle");
 
       function current() {

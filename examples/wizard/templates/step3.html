@@ -11,10 +11,10 @@
   <dd>{{ form.first_name }} {{ form.last_name }}</dd>
   <dt>Email</dt>
   <dd>{{ form.email }}</dd>
-  {% if form.phone %}
+  {% with form.phone as phone %}
   <dt>Phone</dt>
-  <dd>{{ form.phone }}</dd>
-  {% endif %}
+  <dd>{{ phone }}</dd>
+  {% end %}
 </dl>
 
 <hr>

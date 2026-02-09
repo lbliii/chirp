@@ -128,19 +128,7 @@ def _unique_filename(original: str) -> str:
     return f"{stem}_{timestamp}{suffix}"
 
 
-def _format_size(size: int) -> str:
-    """Human-readable file size."""
-    if size < 1024:
-        return f"{size} B"
-    if size < 1024 * 1024:
-        return f"{size / 1024:.1f} KB"
-    return f"{size / (1024 * 1024):.1f} MB"
-
-
-# Register template filter
-@app.template_filter("filesize")
-def filesize_filter(size: int) -> str:
-    return _format_size(size)
+# No custom filesize filter needed — Kida ships ``filesizeformat`` built-in.
 
 
 # ---------------------------------------------------------------------------

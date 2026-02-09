@@ -11,46 +11,38 @@
 
   <label for="username">Username</label>
   <input type="text" id="username" name="username"
-         value="{{ form.username if form is defined and form else '' }}"
-         class="{{ 'error' if errors is defined and errors and 'username' in errors else '' }}"
+         value="{{ form?.username ?? '' }}"
+         class="{{ 'error' if 'username' in (errors ?? {}) else '' }}"
          placeholder="janedoe">
-  {% if errors is defined and errors and 'username' in errors %}
-    {% for msg in errors['username'] %}
+  {% for msg in (errors ?? {}).get("username", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
   <p class="hint">3–30 characters. Letters, numbers, underscores.</p>
 
   <label for="email">Email</label>
   <input type="email" id="email" name="email"
-         value="{{ form.email if form is defined and form else '' }}"
-         class="{{ 'error' if errors is defined and errors and 'email' in errors else '' }}"
+         value="{{ form?.email ?? '' }}"
+         class="{{ 'error' if 'email' in (errors ?? {}) else '' }}"
          placeholder="jane@example.com">
-  {% if errors is defined and errors and 'email' in errors %}
-    {% for msg in errors['email'] %}
+  {% for msg in (errors ?? {}).get("email", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
 
   <label for="password">Password</label>
   <input type="password" id="password" name="password"
-         class="{{ 'error' if errors is defined and errors and 'password' in errors else '' }}"
+         class="{{ 'error' if 'password' in (errors ?? {}) else '' }}"
          placeholder="At least 8 characters">
-  {% if errors is defined and errors and 'password' in errors %}
-    {% for msg in errors['password'] %}
+  {% for msg in (errors ?? {}).get("password", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
 
   <label for="confirm_password">Confirm password</label>
   <input type="password" id="confirm_password" name="confirm_password"
-         class="{{ 'error' if errors is defined and errors and 'confirm_password' in errors else '' }}"
+         class="{{ 'error' if 'confirm_password' in (errors ?? {}) else '' }}"
          placeholder="Type your password again">
-  {% if errors is defined and errors and 'confirm_password' in errors %}
-    {% for msg in errors['confirm_password'] %}
+  {% for msg in (errors ?? {}).get("confirm_password", []) %}
     <p class="field-error">{{ msg }}</p>
-    {% endfor %}
-  {% endif %}
+  {% end %}
 
   <button type="submit">Create account</button>
 </form>

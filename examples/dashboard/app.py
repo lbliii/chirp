@@ -110,10 +110,7 @@ def max_wind(readings: dict[str, SensorReading]) -> str:
     return f"{peak:.1f}"
 
 
-@app.template_filter("sensor_count")
-def sensor_count(readings: dict[str, SensorReading]) -> str:
-    """Number of active sensors."""
-    return str(len(readings))
+# No custom sensor_count filter needed — using built-in ``| length`` in template.
 
 
 # ---------------------------------------------------------------------------

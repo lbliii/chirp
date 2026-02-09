@@ -15,8 +15,11 @@ Free-threading safety:
     - All public methods are async — no sync I/O on the calling thread
 """
 
+import sys
 import threading
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, overload
@@ -29,8 +32,40 @@ from chirp.data.errors import (
     QueryError,
 )
 
-# Per-task connection tracking (free-threading safe via ContextVar)
+# Per-task connection tracking (free-threading safe via ContextVar).
+# Set inside transaction() — query methods check this to reuse the
+# transaction's connection instead of acquiring a new one from the pool.
 _current_conn: ContextVar[Any] = ContextVar("chirp_db_conn")
+
+# App-level database accessor (set by App during lifespan startup).
+_db_var: ContextVar["Database"] = ContextVar("chirp_db")
+
+
+def get_db() -> "Database":
+    """Return the app-level database instance.
+
+    Available when a ``Database`` is configured on the ``App``::
+
+        app = App(db="sqlite:///app.db")
+
+        @app.route("/users")
+        async def users():
+            db = get_db()
+            return await db.fetch(User, "SELECT * FROM users")
+
+    Raises ``LookupError`` if no database is configured or the app
+    has not started yet.
+    """
+    return _db_var.get()
+
+
+def _in_transaction() -> bool:
+    """Check if the current task is inside a managed transaction."""
+    try:
+        _current_conn.get()
+        return True
+    except LookupError:
+        return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,9 +113,14 @@ class Database:
 
         # Raw scalar
         count = await db.fetch_val("SELECT COUNT(*) FROM users")
+
+        # Transaction (atomic multi-statement)
+        async with db.transaction():
+            await db.execute("INSERT INTO users ...", name, email)
+            await db.execute("INSERT INTO profiles ...", user_id)
     """
 
-    __slots__ = ("_config", "_driver", "_lock", "_pool", "_initialized")
+    __slots__ = ("_config", "_driver", "_initialized", "_lock", "_pool")
 
     def __init__(self, url: str, /, *, pool_size: int = 5, echo: bool = False) -> None:
         self._config = DatabaseConfig(url=url, pool_size=pool_size, echo=echo)
@@ -88,6 +128,105 @@ class Database:
         self._lock = threading.Lock()
         self._pool: Any = None
         self._initialized = False
+
+    # -- Connection management --
+
+    @asynccontextmanager
+    async def _connection(self) -> AsyncIterator[Any]:
+        """Acquire a connection, release when done.
+
+        If inside a ``transaction()`` block, reuses the transaction's
+        connection (no acquire/release — the transaction owns it).
+        Otherwise acquires from the pool and releases on exit.
+        """
+        if not self._initialized:
+            await self.connect()
+
+        # Inside a transaction — reuse its connection
+        try:
+            conn = _current_conn.get()
+            yield conn
+            return
+        except LookupError:
+            pass
+
+        # Acquire fresh connection from pool
+        if self._driver == "sqlite":
+            yield self._pool  # SQLite: pool IS the connection
+        else:
+            conn = await self._pool.acquire()
+            try:
+                yield conn
+            finally:
+                await self._pool.release(conn)
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        """Execute multiple statements atomically.
+
+        Auto-commits on clean exit, rolls back on exception.
+        Calls to ``execute``, ``fetch``, etc. inside the block reuse
+        the transaction's connection automatically via ContextVar.
+
+        Nesting is transparent — if already inside a transaction,
+        the inner ``transaction()`` joins the outer one (no-op).
+
+        Usage::
+
+            async with db.transaction():
+                await db.execute("INSERT INTO users ...", name, email)
+                await db.execute("INSERT INTO profiles ...", user_id)
+                # auto-commits here
+
+            async with db.transaction():
+                await db.execute("INSERT INTO users ...", name, email)
+                raise ValueError("oops")
+                # auto-rollback on exception
+        """
+        if not self._initialized:
+            await self.connect()
+
+        # Nested transaction — join the existing one (no-op)
+        if _in_transaction():
+            yield
+            return
+
+        # Top-level transaction — acquire a dedicated connection
+        if self._driver == "sqlite":
+            conn = self._pool
+        else:
+            conn = await self._pool.acquire()
+
+        token = _current_conn.set(conn)
+        try:
+            if self._driver == "sqlite":
+                yield
+                await conn.commit()
+            else:
+                tr = conn.transaction()
+                await tr.start()
+                yield
+                await tr.commit()
+        except BaseException:
+            if self._driver == "sqlite":
+                await conn.rollback()
+            else:
+                await tr.rollback()
+            raise
+        finally:
+            _current_conn.reset(token)
+            if self._driver != "sqlite":
+                await self._pool.release(conn)
+
+    # -- Echo / query logging --
+
+    def _log_query(self, sql: str, params: tuple[Any, ...] | Sequence[Any], elapsed: float) -> None:
+        """Log a query to stderr when echo is enabled."""
+        if not self._config.echo:
+            return
+        ms = elapsed * 1000
+        param_str = f"  params={params!r}" if params else ""
+        print(f"[chirp.data] {ms:6.1f}ms  {sql}{param_str}", file=sys.stderr)  # noqa: T201
 
     # -- Public query API --
 
@@ -98,12 +237,15 @@ class Database:
 
             users = await db.fetch(User, "SELECT * FROM users WHERE active = ?", True)
         """
-        conn = await self._get_connection()
-        try:
-            rows = await _execute_fetch_all(self._driver, conn, sql, params)
-            return map_rows(cls, rows)
-        except Exception as exc:
-            raise QueryError(str(exc)) from exc
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                rows = await _execute_fetch_all(self._driver, conn, sql, params)
+                return map_rows(cls, rows)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
 
     async def fetch_one[T](self, cls: type[T], sql: str, /, *params: Any) -> T | None:
         """Execute a query and return the first row, or ``None``.
@@ -112,14 +254,17 @@ class Database:
 
             user = await db.fetch_one(User, "SELECT * FROM users WHERE id = ?", 42)
         """
-        conn = await self._get_connection()
-        try:
-            row = await _execute_fetch_one(self._driver, conn, sql, params)
-            if row is None:
-                return None
-            return map_row(cls, row)
-        except Exception as exc:
-            raise QueryError(str(exc)) from exc
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                row = await _execute_fetch_one(self._driver, conn, sql, params)
+                if row is None:
+                    return None
+                return map_row(cls, row)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
 
     async def stream[T](
         self, cls: type[T], sql: str, /, *params: Any, batch_size: int = 100
@@ -134,12 +279,17 @@ class Database:
             async for entry in db.stream(LogEntry, "SELECT * FROM logs"):
                 process(entry)
         """
-        conn = await self._get_connection()
-        try:
-            async for row in _execute_stream(self._driver, conn, sql, params, batch_size):
-                yield map_row(cls, row)
-        except Exception as exc:
-            raise QueryError(str(exc)) from exc
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                async for row in _execute_stream(
+                    self._driver, conn, sql, params, batch_size
+                ):
+                    yield map_row(cls, row)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
 
     async def execute(self, sql: str, /, *params: Any) -> int:
         """Execute a statement (INSERT/UPDATE/DELETE) and return rows affected.
@@ -151,11 +301,40 @@ class Database:
                 "Alice", "alice@example.com",
             )
         """
-        conn = await self._get_connection()
-        try:
-            return await _execute_statement(self._driver, conn, sql, params)
-        except Exception as exc:
-            raise QueryError(str(exc)) from exc
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                return await _execute_statement(self._driver, conn, sql, params)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
+
+    async def execute_many(
+        self,
+        sql: str,
+        params_seq: Sequence[tuple[Any, ...]],
+        /,
+    ) -> int:
+        """Execute a statement for each parameter set (batch INSERT/UPDATE).
+
+        Returns the total number of rows affected.
+
+        Usage::
+
+            await db.execute_many(
+                "INSERT INTO users (name, email) VALUES (?, ?)",
+                [("Alice", "a@b.com"), ("Bob", "b@b.com")],
+            )
+        """
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                return await _execute_many(self._driver, conn, sql, params_seq)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params_seq, time.perf_counter() - t0)
 
     @overload
     async def fetch_val(self, sql: str, /, *params: Any) -> Any: ...
@@ -173,18 +352,21 @@ class Database:
 
             count = await db.fetch_val("SELECT COUNT(*) FROM users")
         """
-        conn = await self._get_connection()
-        try:
-            row = await _execute_fetch_one(self._driver, conn, sql, params)
-            if row is None:
-                return None
-            # Row is a dict — return the first value
-            first_value = next(iter(row.values()))
-            if as_type is not None:
-                return as_type(first_value)
-            return first_value
-        except Exception as exc:
-            raise QueryError(str(exc)) from exc
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                row = await _execute_fetch_one(self._driver, conn, sql, params)
+                if row is None:
+                    return None
+                # Row is a dict — return the first value
+                first_value = next(iter(row.values()))
+                if as_type is not None:
+                    return as_type(first_value)
+                return first_value
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
 
     # -- Lifecycle --
 
@@ -212,12 +394,6 @@ class Database:
             await _close_pool(self._driver, self._pool)
             self._pool = None
             self._initialized = False
-
-    async def _get_connection(self) -> Any:
-        """Get a connection from the pool (lazy-initializes on first call)."""
-        if not self._initialized:
-            await self.connect()
-        return await _acquire(self._driver, self._pool)
 
     # -- Context manager --
 
@@ -318,17 +494,6 @@ async def _close_pool(driver: str, pool: Any) -> None:
         await pool.close()
 
 
-# -- Connection acquisition --
-
-
-async def _acquire(driver: str, pool: Any) -> Any:
-    if driver == "sqlite":
-        # SQLite: the pool IS the connection (single writer)
-        return pool
-    # PostgreSQL: acquire from asyncpg pool
-    return await pool.acquire()
-
-
 # -- Query execution --
 
 
@@ -388,12 +553,32 @@ async def _execute_stream(
             yield dict(row)
 
 
+async def _execute_many(
+    driver: str,
+    conn: Any,
+    sql: str,
+    params_seq: Sequence[tuple[Any, ...]],
+) -> int:
+    if driver == "sqlite":
+        cursor = await conn.executemany(sql, params_seq)
+        if not _in_transaction():
+            await conn.commit()
+        return cursor.rowcount
+
+    # PostgreSQL — asyncpg's executemany returns None, count manually
+    await conn.executemany(sql, params_seq)
+    return len(params_seq)
+
+
 async def _execute_statement(
     driver: str, conn: Any, sql: str, params: tuple[Any, ...]
 ) -> int:
     if driver == "sqlite":
         cursor = await conn.execute(sql, params)
-        await conn.commit()
+        # Only auto-commit outside managed transactions.
+        # Inside a transaction(), commit is handled by the context manager.
+        if not _in_transaction():
+            await conn.commit()
         return cursor.rowcount
 
     # PostgreSQL

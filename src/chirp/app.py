@@ -4,11 +4,13 @@ Mutable during setup (route registration, middleware, filters, tools).
 Frozen at runtime when app.run() or __call__() is first invoked.
 """
 
+from __future__ import annotations
+
 import inspect
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
@@ -22,6 +24,9 @@ from chirp.server.handler import handle_request
 from chirp.templating.integration import create_environment
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry, compile_tools
+
+if TYPE_CHECKING:
+    from chirp.data.database import Database
 
 
 @dataclass(slots=True)
@@ -58,6 +63,7 @@ class App:
     """
 
     __slots__ = (
+        "_db",
         "_error_handlers",
         "_freeze_lock",
         "_frozen",
@@ -81,7 +87,12 @@ class App:
         "config",
     )
 
-    def __init__(self, config: AppConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: AppConfig | None = None,
+        *,
+        db: Database | str | None = None,
+    ) -> None:
         self.config: AppConfig = config or AppConfig()
         self._pending_routes: list[_PendingRoute] = []
         self._pending_tools: list[_PendingTool] = []
@@ -95,6 +106,15 @@ class App:
         self._worker_shutdown_hooks: list[Callable[..., Any]] = []
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
+
+        # Database — accepts a Database instance or connection URL string.
+        # When set, lifecycle hooks are auto-registered for connect/disconnect.
+        if isinstance(db, str):
+            from chirp.data.database import Database as _Database
+
+            self._db: Database | None = _Database(db)
+        else:
+            self._db = db
 
         # Tool event bus — created eagerly so subscribers can register
         # before freeze. The bus itself is thread-safe.
@@ -154,6 +174,28 @@ class App:
             return func
 
         return decorator
+
+    @property
+    def db(self) -> Database:
+        """The database instance, if configured.
+
+        Raises ``RuntimeError`` if no database was configured on this app.
+
+        Usage::
+
+            app = App(db="sqlite:///app.db")
+
+            @app.route("/users")
+            async def users():
+                return await app.db.fetch(User, "SELECT * FROM users")
+        """
+        if self._db is None:
+            msg = (
+                "No database configured. Pass db= to App() or use "
+                "Database directly: from chirp.data import Database"
+            )
+            raise RuntimeError(msg)
+        return self._db
 
     @property
     def tool_events(self) -> ToolEventBus:
@@ -389,6 +431,12 @@ class App:
 
             if msg_type == "lifespan.startup":
                 try:
+                    # Auto-connect database if configured
+                    if self._db is not None:
+                        await self._db.connect()
+                        from chirp.data.database import _db_var
+                        _db_var.set(self._db)
+
                     for hook in self._startup_hooks:
                         result = hook()
                         if inspect.isawaitable(result):
@@ -406,6 +454,11 @@ class App:
                     result = hook()
                     if inspect.isawaitable(result):
                         await result
+
+                # Auto-disconnect database if configured
+                if self._db is not None:
+                    await self._db.disconnect()
+
                 # Close tool event bus so SSE subscribers disconnect cleanly
                 self._tool_events.close()
                 await send({"type": "lifespan.shutdown.complete"})

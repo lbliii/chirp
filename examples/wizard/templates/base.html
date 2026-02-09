@@ -36,11 +36,20 @@
   </style>
 </head>
 <body>
+  {# --- Step indicators: showcases ??, tuple unpacking, {% end %} --- #}
+  {% set current = step ?? 0 %}
   <div class="steps">
-    <div class="step-indicator {{ 'active' if step is defined and step == 1 else ('done' if step is defined and step > 1 else '') }}">1. Personal Info</div>
-    <div class="step-indicator {{ 'active' if step is defined and step == 2 else ('done' if step is defined and step > 2 else '') }}">2. Shipping</div>
-    <div class="step-indicator {{ 'active' if step is defined and step == 3 else '' }}">3. Review</div>
+    {% for num, label in [(1, "Personal Info"), (2, "Shipping"), (3, "Review")] %}
+      {% if current == num %}
+        <div class="step-indicator active">{{ num }}. {{ label }}</div>
+      {% elif current > num %}
+        <div class="step-indicator done">{{ num }}. {{ label }}</div>
+      {% else %}
+        <div class="step-indicator">{{ num }}. {{ label }}</div>
+      {% end %}
+    {% end %}
   </div>
+
   {% block content %}{% endblock %}
 </body>
 </html>

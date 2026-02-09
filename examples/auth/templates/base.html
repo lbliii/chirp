@@ -14,16 +14,18 @@
   </style>
 </head>
 <body>
+  {# --- {% set %} + {% if %} avoids calling current_user() twice --- #}
+  {% set user = current_user() %}
   <nav>
     <a href="/">Home</a>
-    {% if current_user().is_authenticated %}
+    {% if user.is_authenticated %}
       <a href="/dashboard">Dashboard</a>
       <form method="post" action="/logout" style="margin:0">
         <button type="submit">Logout</button>
       </form>
     {% else %}
       <a href="/login">Login</a>
-    {% endif %}
+    {% end %}
   </nav>
   {% block content %}{% endblock %}
 </body>

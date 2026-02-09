@@ -53,16 +53,8 @@ def _delete_todo(todo_id: int) -> None:
         _todos[:] = [t for t in _todos if t["id"] != todo_id]
 
 
-# ---------------------------------------------------------------------------
-# Template filter
-# ---------------------------------------------------------------------------
-
-
-@app.template_filter("completed_class")
-def completed_class(todo: dict) -> str:
-    """Return a CSS class name based on completion state."""
-    return "done" if todo.get("done") else ""
-
+# No custom filter needed — using inline ternary in the template instead:
+#   class="{{ 'done' if todo.done else '' }}"
 
 # ---------------------------------------------------------------------------
 # Routes

@@ -33,7 +33,7 @@
       hx-get="/" hx-target="#results" hx-swap="outerHTML"
       hx-push-url="true" hx-trigger="submit">
   <div class="search-row">
-    <input type="text" name="q" value="{{ query }}"
+    <input type="text" name="q" value="{{ query ?? '' }}"
            placeholder="Search by title or author..."
            hx-get="/" hx-target="#results" hx-swap="outerHTML"
            hx-push-url="true" hx-trigger="input changed delay:300ms"
@@ -46,7 +46,7 @@
             hx-include="closest form">
       {% for key, label in genres %}
       <option value="{{ key }}" {{ 'selected' if genre == key else '' }}>{{ label }}</option>
-      {% endfor %}
+      {% end %}
     </select>
     <select name="sort"
             hx-get="/" hx-target="#results" hx-swap="outerHTML"
@@ -54,7 +54,7 @@
             hx-include="closest form">
       {% for key, label in sort_options %}
       <option value="{{ key }}" {{ 'selected' if sort == key else '' }}>{{ label }}</option>
-      {% endfor %}
+      {% end %}
     </select>
   </div>
 </form>
@@ -63,7 +63,9 @@
 <div id="results">
   <p class="meta">{{ result_count }} book{{ 's' if result_count != 1 else '' }} found</p>
 
-  {% if books %}
+  {% unless books %}
+  <p class="empty">No books match your search. Try different keywords or filters.</p>
+  {% else %}
   <ul class="book-list">
     {% for book in books %}
     <li class="book">
@@ -75,11 +77,9 @@
         <span><span class="star">&#9733;</span> {{ book.rating }}</span>
       </div>
     </li>
-    {% endfor %}
+    {% end %}
   </ul>
-  {% else %}
-  <p class="empty">No books match your search. Try different keywords or filters.</p>
-  {% endif %}
+  {% end %}
 </div>
 {% endblock %}
 

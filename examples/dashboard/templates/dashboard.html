@@ -50,7 +50,7 @@
 
   {% block summary_bar %}
   <div id="summary" class="summary-bar" hx-swap-oob="outerHTML">
-    <span>Sensors: <strong>{{ readings | sensor_count }}</strong></span>
+    <span>Sensors: <strong>{{ readings | length }}</strong></span>
     <span>Avg temp: <strong>{{ readings | avg_temp }}&deg;C</strong></span>
     <span>Max wind: <strong>{{ readings | max_wind }} kph</strong></span>
   </div>

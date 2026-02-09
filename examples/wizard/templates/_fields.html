@@ -1,0 +1,16 @@
+{# Reusable form field macro — imported via {% from "_fields.html" import field %}.
+   Showcases: {% def %}, optional chaining (?.),  null coalescing (??), {% end %}. #}
+
+{% def field(name, label, type="text", placeholder="", hint="", maxlength="") %}
+  <label for="{{ name }}">{{ label }}
+    {% if hint %}<span class="hint">({{ hint }})</span>{% end %}
+  </label>
+  <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
+         value="{{ form?.get(name) ?? '' }}"
+         class="{{ 'error' if name in (errors ?? {}) else '' }}"
+         placeholder="{{ placeholder }}"
+         {{ 'maxlength=' ~ maxlength if maxlength else '' }}>
+  {% for msg in (errors ?? {}).get(name, []) %}
+    <p class="field-error">{{ msg }}</p>
+  {% end %}
+{% end %}

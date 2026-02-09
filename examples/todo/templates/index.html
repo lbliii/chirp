@@ -22,10 +22,10 @@
 <ul id="todo-list">
   {% if error is defined and error %}
   <li class="error" style="color: #dc2626; font-size: 0.85rem;">{{ error }}</li>
-  {% endif %}
+  {% end %}
   {% for todo in todos %}
   <li>
-    <span class="{{ todo | completed_class }}">{{ todo.text }}</span>
+    <span class="{{ 'done' if todo.done else '' }}">{{ todo.text }}</span>
     <button hx-post="/todos/{{ todo.id }}/toggle" hx-target="#todo-list" hx-swap="outerHTML">
       {{ "done" if todo.done else "todo" }}
     </button>
@@ -33,7 +33,7 @@
       remove
     </button>
   </li>
-  {% endfor %}
+  {% end %}
 </ul>
 {% endblock %}
 </body>

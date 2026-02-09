@@ -11,11 +11,11 @@
      style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 8px; margin-top: 1rem; background: #f1f5f9;">
 
 <div style="margin-top: 1rem;">
-  {% if photo.description %}
-  <p>{{ photo.description }}</p>
-  {% endif %}
+  {% with photo.description as desc %}
+  <p>{{ desc }}</p>
+  {% end %}
   <p class="hint" style="margin-top: 0.5rem;">
-    {{ photo.content_type }} &middot; {{ photo.size | filesize }}
+    {{ photo.content_type }} &middot; {{ photo.size | filesizeformat }}
   </p>
 </div>
 
