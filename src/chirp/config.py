@@ -22,12 +22,18 @@ class AppConfig:
     port: int = 8000
     debug: bool = False
 
+    # Reload (development mode — requires debug=True)
+    reload_include: tuple[str, ...] = ()  # Extra extensions to watch (e.g. ".html", ".css")
+    reload_dirs: tuple[str, ...] = ()  # Extra directories to watch alongside cwd
+
     # Security
     secret_key: str = ""
 
     # Templates
     template_dir: str | Path = "templates"
     autoescape: bool = True
+    trim_blocks: bool = True
+    lstrip_blocks: bool = True
 
     # Static files
     static_dir: str | Path | None = "static"

@@ -18,6 +18,8 @@ def run_dev_server(
     port: int,
     *,
     reload: bool = True,
+    reload_include: tuple[str, ...] = (),
+    reload_dirs: tuple[str, ...] = (),
     app_path: str | None = None,
     lifecycle_collector: object | None = None,
 ) -> None:
@@ -32,6 +34,9 @@ def run_dev_server(
         host: Bind host address.
         port: Bind port number.
         reload: Enable auto-reload on file changes (default True).
+        reload_include: Extra file extensions to watch when reload is
+            active (e.g. ``(".html", ".css", ".md")``).
+        reload_dirs: Extra directories to watch alongside cwd.
         app_path: Optional ``"module:attribute"`` import string.  When
             provided, pounce reimports the app on each reload cycle so
             that code changes on disk take effect immediately.
@@ -46,6 +51,8 @@ def run_dev_server(
         port=port,
         workers=1,
         reload=reload,
+        reload_include=reload_include,
+        reload_dirs=reload_dirs,
     )
     server = Server(
         config, app, app_path=app_path, lifecycle_collector=lifecycle_collector,

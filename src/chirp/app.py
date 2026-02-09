@@ -327,6 +327,8 @@ class App:
         run_dev_server(
             self, _host, _port,
             reload=self.config.debug,
+            reload_include=self.config.reload_include,
+            reload_dirs=self.config.reload_dirs,
             lifecycle_collector=lifecycle_collector,
         )
 
