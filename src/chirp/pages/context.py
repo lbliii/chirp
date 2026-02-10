@@ -73,7 +73,7 @@ def _call_provider(
         def context() -> dict:
             ...  # receives nothing
     """
-    sig = inspect.signature(func)
+    sig = inspect.signature(func, eval_str=True)
     kwargs: dict[str, Any] = {}
 
     for name, param in sig.parameters.items():

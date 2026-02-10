@@ -186,7 +186,7 @@ def _build_handler_kwargs(
     """
     from chirp.extraction import extract_dataclass, is_extractable_dataclass
 
-    sig = inspect.signature(handler)
+    sig = inspect.signature(handler, eval_str=True)
     kwargs: dict[str, Any] = {}
 
     for name, param in sig.parameters.items():
@@ -235,7 +235,7 @@ async def _read_body_if_needed(
 
     from chirp.extraction import is_extractable_dataclass
 
-    sig = inspect.signature(handler)
+    sig = inspect.signature(handler, eval_str=True)
     needs_extraction = any(
         param.annotation is not inspect.Parameter.empty
         and is_extractable_dataclass(param.annotation)

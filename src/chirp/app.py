@@ -272,7 +272,7 @@ class App:
             # Pre-read body for typed extraction (non-GET only)
             body_data: dict[str, Any] | None = None
             if request.method not in ("GET", "HEAD"):
-                sig_check = inspect.signature(_handler)
+                sig_check = inspect.signature(_handler, eval_str=True)
                 needs_body = any(
                     p.annotation is not inspect.Parameter.empty
                     and is_extractable_dataclass(p.annotation)
@@ -286,7 +286,7 @@ class App:
                         body_data = dict(await request.form())
 
             # Build handler kwargs
-            sig = inspect.signature(_handler)
+            sig = inspect.signature(_handler, eval_str=True)
             kwargs: dict[str, Any] = {}
             for name, param in sig.parameters.items():
                 if name == "request" or param.annotation is Request:
