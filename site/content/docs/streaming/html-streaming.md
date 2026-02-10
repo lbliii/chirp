@@ -98,14 +98,57 @@ return Stream("dashboard.html", data=data)
 
 Middleware can add headers to streaming responses the same way as regular responses.
 
-## When to Use Streaming
+## Suspense: Instant First Paint with Deferred Blocks
+
+`Suspense` takes streaming further. Instead of waiting for all data before rendering anything, it sends the page shell immediately with skeleton content, then fills in blocks independently as their async data resolves:
+
+```python
+from chirp import Suspense
+
+@app.route("/dashboard")
+async def dashboard():
+    return Suspense("dashboard.html",
+        header=site_header(),          # sync -- in the shell
+        stats=load_stats(),            # awaitable -- shows skeleton first
+        feed=load_feed(),              # awaitable -- shows skeleton first
+    )
+```
+
+The template uses normal conditional rendering for skeletons:
+
+```html
+{% block stats %}
+  {% if stats %}
+    {% for s in stats %}<div class="stat">{{ s.label }}: {{ s.value }}</div>{% end %}
+  {% else %}
+    <div class="skeleton">Loading stats...</div>
+  {% end %}
+{% end %}
+```
+
+How it works:
+
+1. Sync context values render in the shell; awaitable values are set to `None` (triggering the `{% else %}` skeleton)
+2. The shell is sent immediately as the first chunk (instant first paint)
+3. Awaitables resolve concurrently in the background
+4. Each affected block is re-rendered with real data and sent as an out-of-band swap
+5. For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<template>` + inline `<script>` pairs
+
+No client-side framework needed. The browser renders the shell, and blocks fill in as data arrives.
+
+## When to Use Each
+
+Use `Suspense` when:
+
+- A page has independent data sources with different load times
+- You want instant first paint with skeleton/loading states
+- Some sections load fast (navigation, layout) while others are slow (analytics, feeds)
 
 Use `Stream` when:
 
 - A page has multiple independent data sources with varying load times
-- You want to show the page layout immediately
+- You want top-to-bottom progressive rendering
 - Time-to-first-byte matters more than total render time
-- You are building dashboards, feeds, or data-heavy pages
 
 Use `Template` when:
 

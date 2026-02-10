@@ -759,6 +759,26 @@ class App:
                 HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True)
             )
 
+        #    View Transitions: meta tag + CSS defaults + htmx global config.
+        #    Opt-in (default False) — changes visual behavior.
+        if self.config.view_transitions:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.view_transitions import (
+                VIEW_TRANSITIONS_HEAD_SNIPPET,
+                VIEW_TRANSITIONS_SCRIPT_SNIPPET,
+            )
+
+            middleware_list.append(
+                HTMLInject(
+                    VIEW_TRANSITIONS_HEAD_SNIPPET,
+                    before="</head>",
+                    full_page_only=True,
+                )
+            )
+            middleware_list.append(
+                HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True)
+            )
+
         #    Debug overlays (htmx error toasts, etc.) — debug mode only.
         if self.config.debug:
             from chirp.middleware.inject import HTMLInject

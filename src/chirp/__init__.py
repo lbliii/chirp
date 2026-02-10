@@ -42,6 +42,7 @@ __all__ = [
     "ChirpError",
     "ConfigurationError",
     "EventStream",
+    "FormAction",
     "FormBindingError",
     "Fragment",
     "HTTPError",
@@ -57,6 +58,7 @@ __all__ = [
     "Response",
     "SSEEvent",
     "Stream",
+    "Suspense",
     "Template",
     "ToolCallEvent",
     "ValidationError",
@@ -69,6 +71,7 @@ __all__ = [
     "login",
     "is_safe_url",
     "login_required",
+    "MarkdownRenderer",
     "logout",
     "requires",
 ]
@@ -101,7 +104,7 @@ def __getattr__(name: str) -> object:
 
     if name in (
         "Template", "InlineTemplate", "Fragment", "Page", "LayoutPage", "Action",
-        "Stream", "ValidationError", "OOB",
+        "FormAction", "Stream", "Suspense", "ValidationError", "OOB",
     ):
         from chirp.templating import returns as _tmpl
 
@@ -151,6 +154,11 @@ def __getattr__(name: str) -> object:
         from chirp.tools.events import ToolCallEvent
 
         return ToolCallEvent
+
+    if name == "MarkdownRenderer":
+        from chirp.markdown.renderer import MarkdownRenderer
+
+        return MarkdownRenderer
 
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

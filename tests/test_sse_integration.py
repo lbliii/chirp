@@ -471,3 +471,156 @@ class TestSSEGeneratorError:
         # Debug mode includes the traceback with "RuntimeError" and the message
         assert "RuntimeError" in error_events[0].data
         assert "debug sse error" in error_events[0].data
+
+
+# ---------------------------------------------------------------------------
+# Per-event error boundary (block-level fault isolation)
+# ---------------------------------------------------------------------------
+
+
+class TestSSEPerEventErrorBoundary:
+    """A single Fragment render failure should not kill the stream."""
+
+    async def test_bad_fragment_skipped_in_production(self) -> None:
+        """In production mode, a bad Fragment is silently skipped."""
+        app = _app(debug=False)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "before"
+                # Fragment with nonexistent template → render_fragment raises
+                yield Fragment("nonexistent.html", "missing", target="broken")
+                yield "after"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=3, disconnect_after=2.0)
+
+        data_values = [e.data for e in result.events]
+        assert "before" in data_values
+        assert "after" in data_values
+        # No error event sent — the bad fragment was silently skipped
+        error_events = [e for e in result.events if e.event == "error"]
+        assert error_events == []
+
+    async def test_bad_fragment_sends_targeted_error_in_debug(self) -> None:
+        """In debug mode, error HTML replaces the specific block."""
+        app = _app(debug=True)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "before"
+                yield Fragment("nonexistent.html", "missing", target="broken-block")
+                yield "after"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=3, disconnect_after=2.0)
+
+        data_values = [e.data for e in result.events]
+        assert "before" in data_values
+        assert "after" in data_values
+
+        # The error event targets the specific block
+        targeted_errors = [e for e in result.events if e.event == "broken-block"]
+        assert len(targeted_errors) == 1
+        assert "chirp-block-error" in targeted_errors[0].data
+
+    async def test_stream_continues_after_bad_fragment(self) -> None:
+        """Multiple good events after a bad fragment all arrive."""
+        app = _app(debug=False)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "ok-1"
+                yield Fragment("nonexistent.html", "bad", target="x")
+                yield "ok-2"
+                yield "ok-3"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=4, disconnect_after=2.0)
+
+        data_values = [e.data for e in result.events]
+        assert "ok-1" in data_values
+        assert "ok-2" in data_values
+        assert "ok-3" in data_values
+
+    async def test_bad_fragment_is_logged(self, caplog) -> None:
+        """Per-event rendering errors are logged."""
+        app = _app(debug=False)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment("nonexistent.html", "bad", target="x")
+                yield "done"
+
+            return EventStream(gen())
+
+        with caplog.at_level("ERROR"):
+            async with TestClient(app) as client:
+                await client.sse("/events", max_events=2, disconnect_after=2.0)
+
+        # log_error() should have been called for the rendering failure
+        assert any("nonexistent" in r.message.lower() for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# _format_error_event unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormatErrorEvent:
+    """Unit tests for the _format_error_event helper."""
+
+    def test_fragment_with_target_produces_targeted_event(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        frag = Fragment("tpl.html", "sidebar", target="sidebar-update")
+        exc = ValueError("bad data")
+
+        result = _format_error_event(frag, exc)
+
+        assert "event: sidebar-update" in result
+        assert "chirp-block-error" in result
+        assert "ValueError" in result
+        assert "bad data" in result
+
+    def test_non_fragment_produces_generic_error_event(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        exc = RuntimeError("something broke")
+
+        result = _format_error_event("not-a-fragment", exc)
+
+        assert "event: error" in result
+        assert "RuntimeError" in result
+        assert "something broke" in result
+
+    def test_fragment_without_target_produces_generic_error_event(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        frag = Fragment("tpl.html", "block")  # No target
+        exc = TypeError("missing arg")
+
+        result = _format_error_event(frag, exc)
+
+        assert "event: error" in result
+
+    def test_error_html_escapes_exception_message(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        frag = Fragment("tpl.html", "block", target="x")
+        exc = ValueError('<script>alert("xss")</script>')
+
+        result = _format_error_event(frag, exc)
+
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result

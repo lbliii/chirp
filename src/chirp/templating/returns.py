@@ -4,8 +4,13 @@ Frozen dataclasses that handlers return. The content negotiation layer
 inspects these to dispatch to the kida renderer.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from chirp.pages.types import ContextProvider, LayoutChain
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +157,46 @@ class Action:
     refresh: bool = False
 
 
+class FormAction:
+    """Form success result with progressive enhancement.
+
+    Auto-negotiates htmx vs non-htmx responses:
+
+    - **htmx + fragments**: renders fragments (OOB-style) + optional
+      ``HX-Trigger`` header.  No redirect.
+    - **htmx + no fragments**: ``HX-Redirect`` to ``redirect`` URL
+      (client-side full redirect).
+    - **non-htmx**: 303 redirect to ``redirect`` URL.
+
+    Usage::
+
+        return FormAction("/contacts")
+
+    With fragments for htmx (non-htmx still gets a redirect)::
+
+        return FormAction(
+            "/contacts",
+            Fragment("contacts.html", "table", contacts=contacts),
+            Fragment("contacts.html", "count", target="count", count=len(contacts)),
+            trigger="contactAdded",
+        )
+    """
+
+    __slots__ = ("redirect", "fragments", "trigger", "status")
+
+    def __init__(
+        self,
+        redirect: str,
+        *fragments: Fragment,
+        trigger: str | None = None,
+        status: int = 303,
+    ) -> None:
+        self.redirect = redirect
+        self.fragments = fragments
+        self.trigger = trigger
+        self.status = status
+
+
 @dataclass(frozen=True, slots=True)
 class ValidationError:
     """Return a form fragment with 422 status for htmx validation.
@@ -224,6 +269,60 @@ class Stream:
 
 
 @dataclass(frozen=True, slots=True)
+class Suspense:
+    """Render a page shell immediately, then fill in deferred blocks via OOB.
+
+    Like React's ``<Suspense>`` but server-rendered.  Context values that
+    are awaitables are **deferred**: the shell renders with those keys
+    set to ``None`` (showing skeleton/fallback content), then each block
+    is re-rendered with real data and streamed as an OOB swap chunk.
+
+    For htmx navigations, blocks arrive as ``hx-swap-oob`` elements.
+    For initial page loads, ``<template>`` + inline ``<script>`` pairs
+    handle the swap without any framework.
+
+    Usage::
+
+        return Suspense("dashboard.html",
+            header=site_header(),          # sync — in the shell
+            stats=load_stats(),            # awaitable — deferred
+            feed=load_feed(),              # awaitable — deferred
+        )
+
+    Template (uses normal conditional rendering for skeletons)::
+
+        {% block stats %}
+          {% if stats %}
+            {% for s in stats %}...{% end %}
+          {% else %}
+            <div class="skeleton">Loading stats...</div>
+          {% end %}
+        {% end %}
+
+    Block-to-DOM mapping defaults to block name = element ID.
+    Override with *defer_map*::
+
+        Suspense("page.html", defer_map={"stats": "stats-panel"}, ...)
+    """
+
+    template_name: str
+    context: dict[str, Any] = field(default_factory=dict)
+    defer_map: dict[str, str] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        template_name: str,
+        /,
+        *,
+        defer_map: dict[str, str] | None = None,
+        **context: Any,
+    ) -> None:
+        object.__setattr__(self, "template_name", template_name)
+        object.__setattr__(self, "context", context)
+        object.__setattr__(self, "defer_map", defer_map or {})
+
+
+@dataclass(frozen=True, slots=True)
 class LayoutPage:
     """Render a page within a filesystem-based layout chain.
 
@@ -249,8 +348,8 @@ class LayoutPage:
 
     name: str
     block_name: str
-    layout_chain: Any = None  # LayoutChain — Any to avoid circular import
-    context_providers: tuple[Any, ...] = ()
+    layout_chain: LayoutChain | None = None
+    context_providers: tuple[ContextProvider, ...] = ()
     context: dict[str, Any] = field(default_factory=dict)
 
     def __init__(
@@ -259,8 +358,8 @@ class LayoutPage:
         block_name: str,
         /,
         *,
-        layout_chain: Any = None,
-        context_providers: tuple[Any, ...] = (),
+        layout_chain: LayoutChain | None = None,
+        context_providers: tuple[ContextProvider, ...] = (),
         **context: Any,
     ) -> None:
         object.__setattr__(self, "name", name)

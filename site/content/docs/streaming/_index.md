@@ -18,11 +18,11 @@ cascade:
 :columns: 2
 :gap: medium
 
-:::{card} Streaming HTML
+:::{card} Streaming HTML & Suspense
 :icon: monitor
 :link: ./html-streaming
 :description: Progressive page rendering
-Send the shell immediately, fill in content as data arrives.
+Send the shell immediately, fill in content as data arrives. Suspense streams deferred blocks via OOB swaps.
 :::{/card}
 
 :::{card} Server-Sent Events

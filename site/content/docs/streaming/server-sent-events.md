@@ -140,6 +140,26 @@ async def live_stats():
 
 > **Tip**: Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element to prevent layout-level `hx-target` from bleeding into SSE swap targets. Without this, SSE fragments can accidentally replace the wrong region.
 
+## Error Boundaries
+
+Chirp isolates rendering failures per-event so one bad block doesn't crash the entire stream.
+
+If a `Fragment` fails to render:
+
+- **Production** (`debug=False`): the event is silently skipped, the stream continues
+- **Debug** (`debug=True`): an error event targets the specific block, replacing it with inline error HTML
+
+```html
+<!-- In debug mode, a failed "presence" block becomes: -->
+<div class="chirp-block-error" data-block="presence_list">
+  <strong>UndefinedError</strong>: &#x27;users&#x27; is undefined
+</div>
+```
+
+All other blocks on the page keep updating normally. The next change event that touches the broken block will attempt to re-render it -- natural recovery without retries.
+
+For reactive streams, if the `context_builder()` function itself raises (e.g., a deleted record), the entire event is skipped and the stream waits for the next change. See [[docs/reference/errors|Error Reference]] for the full error hierarchy.
+
 ## Connection Lifecycle
 
 Chirp manages the SSE connection lifecycle automatically:
@@ -147,8 +167,6 @@ Chirp manages the SSE connection lifecycle automatically:
 1. **Event producer** -- consumes the generator, formats events, sends as ASGI body chunks
 2. **Disconnect monitor** -- watches for `http.disconnect`, cancels the producer
 3. **Heartbeat** -- sends `: heartbeat` comments on idle to keep the connection alive
-
-The heartbeat uses `asyncio.shield` to avoid cancelling the pending generator coroutine when sending keep-alive comments.
 
 ## Testing SSE
 

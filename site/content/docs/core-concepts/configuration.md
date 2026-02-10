@@ -41,6 +41,12 @@ app = App(config=config)
 | `template_dir` | `str` | `"templates"` | Directory for kida templates |
 | `static_dir` | `str \| None` | `None` | Directory for static files (if using StaticFiles middleware) |
 | `static_url` | `str` | `"/static"` | URL prefix for static files |
+| `safe_target` | `bool` | `True` | Auto-add `hx-target="this"` to event-driven elements |
+| `sse_lifecycle` | `bool` | `True` | Inject SSE connection status (`data-sse-state`) and custom events |
+| `view_transitions` | `bool` | `False` | Auto-inject View Transitions API meta tag, CSS defaults, and htmx config |
+| `sse_heartbeat_interval` | `float` | `15.0` | Seconds between SSE heartbeat comments |
+| `sse_retry_ms` | `int \| None` | `None` | SSE reconnection interval sent to client |
+| `max_content_length` | `int` | `16777216` | Maximum request body size in bytes (16 MB) |
 
 ## Debug Mode
 

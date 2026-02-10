@@ -236,8 +236,28 @@ With htmx, you can target the error block specifically:
 </form>
 ```
 
+## FormAction for Success
+
+`FormAction` handles the success path of form submissions with progressive enhancement. It pairs with `ValidationError` (which handles the error path):
+
+```python
+@app.route("/register", methods=["POST"])
+async def register(form: RegisterForm):
+    result = validate(form, rules)
+    if not result:
+        return ValidationError("register.html", "form_errors", errors=result.errors)
+
+    create_user(form)
+    return FormAction("/welcome")
+```
+
+- **Non-htmx**: redirects to `/welcome`
+- **htmx**: sends `HX-Redirect` (or renders fragments if you provide them)
+
+See [[docs/core-concepts/return-values|Return Values]] for the full `FormAction` API.
+
 ## Next Steps
 
 - [[docs/data/database|Database]] -- Async database access
 - [[docs/templates/fragments|Fragments]] -- Fragment rendering for forms
-- [[docs/core-concepts/return-values|Return Values]] -- ValidationError and other types
+- [[docs/core-concepts/return-values|Return Values]] -- ValidationError, FormAction, and other types

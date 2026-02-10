@@ -115,11 +115,28 @@ document.body.addEventListener("chirpError", (event) => {
 });
 ```
 
-## SSE Error Events
+## SSE Error Boundaries
 
-When an SSE event generator raises an exception:
+Chirp uses two levels of error isolation so that a single rendering failure doesn't kill the entire SSE stream.
 
-1. The exception is logged to the console (`logger.exception()`)
+### Per-Event Boundary
+
+If a single `Fragment` fails to render (e.g., a variable is `None`, a block has a template error), chirp catches the exception **per-event**:
+
+- **Production**: the failed event is silently skipped; the stream continues delivering other blocks
+- **Debug**: an error event is sent targeting the specific block, replacing it with a `<div class="chirp-block-error">` that shows the exception type and message inline
+
+Other blocks on the same page keep updating normally — only the broken block is affected.
+
+### Context Builder Boundary
+
+In reactive streams (`reactive_stream()`), the `context_builder()` function runs before rendering any blocks for a given change event. If it raises (e.g., the document was deleted mid-render), the entire event is skipped and the stream waits for the next change. The failure is logged with a full traceback.
+
+### Catastrophic Errors
+
+If something truly unexpected happens (ASGI transport failure, unrecoverable state), the outer error handler still kicks in:
+
+1. The exception is logged to the console
 2. An `event: error` SSE event is sent to the client
 3. The stream is closed
 
@@ -137,16 +154,34 @@ source.addEventListener("error", (event) => {
 });
 ```
 
+### Styling Block Errors (Debug Mode)
+
+In debug mode, failed blocks are replaced with `<div class="chirp-block-error">`. Style them in your app's CSS:
+
+```css
+.chirp-block-error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #991b1b;
+}
+```
+
 ## Error Logging
 
 Chirp uses the `chirp.server` logger (stdlib `logging`). When running under pounce, this logger is automatically configured with the same level and format as pounce's logger.
 
-| Error Type | Log Level | When |
-|-----------|-----------|------|
-| 500 (unhandled exception) | `ERROR` | Always — includes full traceback |
-| 4xx (HTTP errors) | `DEBUG` | Visible when `log_level=debug` |
-| Streaming error | `ERROR` | Mid-stream exception in chunked response |
-| SSE generator error | `ERROR` | Exception in SSE event generator |
+| Error Type | Log Level | Logger | When |
+|-----------|-----------|--------|------|
+| 500 (unhandled exception) | `ERROR` | `chirp.server` | Always — includes full traceback |
+| 4xx (HTTP errors) | `DEBUG` | `chirp.server` | Visible when `log_level=debug` |
+| Streaming error | `ERROR` | `chirp.server` | Mid-stream exception in chunked response |
+| SSE per-event render error | `ERROR` | `chirp.server` | Fragment fails to render; stream continues |
+| SSE context builder error | `ERROR` | `chirp.reactive` | `context_builder()` raises; event skipped |
+| SSE catastrophic error | `ERROR` | `chirp.server` | Unrecoverable error; stream terminates |
 
 ## Custom Error Handlers
 

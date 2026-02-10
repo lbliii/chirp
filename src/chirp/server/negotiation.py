@@ -17,15 +17,18 @@ from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import (
     OOB,
     Action,
+    FormAction,
     Fragment,
     InlineTemplate,
     LayoutPage,
     Page,
     Stream,
+    Suspense,
     Template,
     ValidationError,
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
+from chirp.templating.suspense import render_suspense
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
@@ -61,15 +64,18 @@ def negotiate(
 
     1. ``Response``         -> pass through
     2. ``Redirect``         -> 302 with Location header
-    3. ``Template``         -> render via kida -> Response
-    4. ``Fragment``         -> render block via kida -> Response
-    5. ``Page``             -> Template or Fragment based on request headers
-    6. ``Action``           -> empty Response + optional HX headers
-    7. ``ValidationError``  -> Fragment + 422 + optional HX-Retarget
-    8. ``OOB``              -> primary + hx-swap-oob fragments
-    9. ``Stream``           -> kida render_stream() -> StreamingResponse
+    3. ``FormAction``       -> htmx: fragments or HX-Redirect; non-htmx: 303
+    4. ``Template``         -> render via kida -> Response
+    5. ``Fragment``         -> render block via kida -> Response
+    6. ``Page``             -> Template or Fragment based on request headers
+    7. ``Action``           -> empty Response + optional HX headers
+    8. ``ValidationError``  -> Fragment + 422 + optional HX-Retarget
+    9. ``OOB``              -> primary + hx-swap-oob fragments
+    10. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    10. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    11. ``Suspense``         -> shell + deferred OOB blocks -> StreamingResponse
+                               (first paint instant, blocks fill in)
+    12. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
     11. ``str``             -> 200, text/html
     12. ``bytes``           -> 200, application/octet-stream
     13. ``dict`` / ``list`` -> 200, application/json
@@ -86,6 +92,26 @@ def negotiate(
                 .with_header("Location", value.url)
                 .with_headers(dict(value.headers))
             )
+        case FormAction():
+            if request.is_fragment:
+                if value.fragments:
+                    parts = [
+                        render_fragment(kida_env, frag)
+                        for frag in value.fragments
+                    ]
+                    html = "\n".join(parts)
+                    response = _html_response(html, intent="fragment")
+                    if value.trigger:
+                        response = response.with_hx_trigger(value.trigger)
+                    return response
+                else:
+                    return Response(body="").with_hx_redirect(value.redirect)
+            else:
+                return (
+                    Response(body="")
+                    .with_status(value.status)
+                    .with_header("Location", value.redirect)
+                )
         case Template():
             if kida_env is None:
                 msg = (
@@ -202,6 +228,19 @@ def negotiate(
             # All context values are resolved — use sync streaming
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream(value.context)
+            return StreamingResponse(
+                chunks=chunks,
+                content_type="text/html; charset=utf-8",
+            )
+        case Suspense():
+            if kida_env is None:
+                msg = (
+                    "Suspense return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            is_htmx = request is not None and request.is_fragment
+            chunks = render_suspense(kida_env, value, is_htmx=is_htmx)
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",

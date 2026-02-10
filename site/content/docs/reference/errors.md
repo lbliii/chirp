@@ -178,7 +178,13 @@ CHIRP_TRACEBACK=minimal chirp run
 
 ### Streaming and SSE Errors
 
-Errors during chunked streaming or SSE connections use the same formatting pipeline. In debug mode, streaming errors render as a visible `<div class="chirp-error">` element in the page, and SSE errors are sent as an `event: error` message the client can handle.
+Errors during chunked streaming or SSE connections use the same formatting pipeline. In debug mode, streaming errors render as a visible `<div class="chirp-error">` element in the page.
+
+SSE streams have **per-event error boundaries**: if a single `Fragment` fails to render, the error is caught and the stream continues. In debug mode, the failed block is replaced with a `<div class="chirp-block-error">` element showing the exception inline. In production, the event is silently skipped.
+
+If the `context_builder()` in a reactive stream raises, the entire event is skipped (logged via `chirp.reactive` logger) and the stream waits for the next change.
+
+Catastrophic errors (ASGI failures, unrecoverable state) still terminate the stream with an `event: error` message the client can handle.
 
 ## Debug Pages
 

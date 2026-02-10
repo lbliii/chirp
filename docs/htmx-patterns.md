@@ -171,6 +171,62 @@ async def register(request: Request):
 
 ---
 
+## 4b. Form Actions — `FormAction`
+
+Handle the form **success** path with progressive enhancement.
+`FormAction` auto-negotiates: htmx requests get rendered fragments,
+non-htmx requests get a redirect. One return, no branching.
+
+**Before (manual branching):**
+
+```python
+@app.route("/contacts", methods=["POST"])
+async def add_contact(request: Request, form: ContactForm):
+    _add_contact(form.name, form.email)
+    contacts = _get_contacts()
+
+    if request.is_fragment:
+        return OOB(
+            Fragment("contacts.html", "table", contacts=contacts),
+            Fragment("contacts.html", "count", target="count", count=len(contacts)),
+        )
+    return Redirect("/contacts")
+```
+
+**After (FormAction):**
+
+```python
+from chirp import FormAction, Fragment
+
+@app.route("/contacts", methods=["POST"])
+async def add_contact(form: ContactForm):
+    _add_contact(form.name, form.email)
+    contacts = _get_contacts()
+
+    return FormAction(
+        "/contacts",
+        Fragment("contacts.html", "table", contacts=contacts),
+        Fragment("contacts.html", "count", target="count", count=len(contacts)),
+        trigger="contactAdded",
+    )
+```
+
+**Behavior:**
+
+- **Non-htmx** (standard form submit): 303 redirect to `/contacts`
+- **htmx + fragments**: renders the fragments, adds `HX-Trigger: contactAdded`
+- **htmx + no fragments**: sends `HX-Redirect` header (client-side redirect)
+
+**Simple redirect (both htmx and non-htmx):**
+
+```python
+return FormAction("/dashboard")
+```
+
+**Chirp example:** `examples/contacts/app.py`, `examples/kanban/app.py`
+
+---
+
 ## 5. URL Management — Attribute vs Response Header
 
 **Attribute (compile-time, static):**
@@ -237,30 +293,35 @@ is more flexible (server doesn't need to know about the htmx swap).
 
 Smooth animations between page states using the View Transitions API.
 
-**Per-element opt-in:**
+**Automatic (recommended):**
+
+```python
+app = App(config=AppConfig(view_transitions=True))
+```
+
+One flag. Chirp auto-injects:
+- `<meta name="view-transition" content="same-origin">` — browser-native MPA transitions
+- `@view-transition { navigation: auto; }` — CSS at-rule
+- Default crossfade keyframes (`chirp-vt-out` / `chirp-vt-in`) on `root`
+- `htmx.config.globalViewTransitions = true` — every htmx swap uses transitions
+
+Falls back gracefully in browsers without the View Transitions API.
+No `transition:true` needed on individual elements when this is enabled.
+
+**Custom per-element transitions:**
+
+For fine-grained control, add `view-transition-name` in your CSS and
+`transition:true` on specific swap targets:
 
 ```html
 <div hx-swap="innerHTML transition:true">...</div>
 ```
 
-**Global:**
-
-```javascript
-htmx.config.globalViewTransitions = true;
-```
-
-**CSS customization:**
-
 ```css
-::view-transition-old(root) {
-  animation: fade-out 0.15s ease-out;
-}
-::view-transition-new(root) {
-  animation: fade-in 0.2s ease-in;
-}
+#main { view-transition-name: page-content; }
+::view-transition-old(page-content) { animation: slide-out 0.2s; }
+::view-transition-new(page-content) { animation: slide-in 0.2s; }
 ```
-
-Falls back gracefully in browsers without the View Transitions API.
 
 **htmx ref:** [View Transitions](https://htmx.org/docs/#view-transitions)
 

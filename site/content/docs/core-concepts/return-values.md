@@ -151,6 +151,36 @@ def old_page():
     return Redirect("/new-page")  # 302 by default
 ```
 
+## FormAction
+
+Progressive enhancement for form submissions. Auto-negotiates htmx vs non-htmx: htmx requests get rendered fragments, non-htmx requests get a redirect.
+
+```python
+from chirp import FormAction, Fragment
+
+@app.route("/contacts", methods=["POST"])
+async def add_contact(form: ContactForm):
+    _add_contact(form.name, form.email)
+    contacts = _get_contacts()
+
+    return FormAction(
+        "/contacts",
+        Fragment("contacts.html", "table", contacts=contacts),
+        Fragment("contacts.html", "count", target="count", count=len(contacts)),
+        trigger="contactAdded",
+    )
+```
+
+- **Non-htmx**: 303 redirect to the URL (fragments are ignored)
+- **htmx + fragments**: renders the fragments, adds `HX-Trigger` if set
+- **htmx + no fragments**: sends `HX-Redirect` header
+
+Simple redirect for both modes:
+
+```python
+return FormAction("/dashboard")
+```
+
 ## Strings and Dicts
 
 Plain strings are returned as `text/html`. Dicts are serialized as JSON:

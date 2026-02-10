@@ -1,0 +1,23 @@
+<html>
+<body>
+<h1>{{ title }}</h1>
+<div id="stats">
+{% block stats %}
+  {% if stats %}
+    <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
+  {% else %}
+    <div class="skeleton">Loading stats...</div>
+  {% end %}
+{% end %}
+</div>
+<div id="feed">
+{% block feed %}
+  {% if feed %}
+    <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
+  {% else %}
+    <div class="skeleton">Loading feed...</div>
+  {% end %}
+{% end %}
+</div>
+</body>
+</html>

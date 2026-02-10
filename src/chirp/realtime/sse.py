@@ -124,11 +124,23 @@ async def handle_sse(
                 except StopAsyncIteration:
                     break
 
-                sse_text = _format_event(
-                    value,
-                    default_event=event_stream.event_type,
-                    kida_env=kida_env,
-                )
+                # Error boundary: per-event isolation.  A rendering failure
+                # in one block should not kill the entire stream.
+                try:
+                    sse_text = _format_event(
+                        value,
+                        default_event=event_stream.event_type,
+                        kida_env=kida_env,
+                    )
+                except Exception as render_exc:
+                    from chirp.server.terminal_errors import log_error
+
+                    log_error(render_exc)
+                    if debug:
+                        sse_text = _format_error_event(value, render_exc)
+                    else:
+                        continue  # Skip this event, keep stream alive
+
                 if sse_text:
                     try:
                         await send({
@@ -244,3 +256,32 @@ def _format_event(
     # Unknown type: convert to string
     event = SSEEvent(data=str(value), event=default_event)
     return event.encode()
+
+
+def _format_error_event(value: Any, exc: Exception) -> str:
+    """Format an error as an SSE event for a failed render.
+
+    For ``Fragment`` values, uses the fragment's target as the SSE event
+    name so the error replaces the specific block in the DOM.  This lets
+    the developer see exactly which block broke, inline where it should be.
+
+    For other value types, sends a generic ``error`` event.
+    """
+    from html import escape
+
+    from chirp.server.terminal_errors import _is_kida_error
+
+    if _is_kida_error(exc) and hasattr(exc, "format_compact"):
+        detail = exc.format_compact()
+    else:
+        detail = f"{type(exc).__name__}: {exc}"
+
+    if isinstance(value, Fragment) and value.target:
+        html = (
+            f'<div class="chirp-block-error" data-block="{escape(value.block_name)}">'
+            f'<strong>{escape(type(exc).__name__)}</strong>: {escape(str(exc))}'
+            f"</div>"
+        )
+        return SSEEvent(data=html, event=value.target).encode()
+
+    return SSEEvent(data=detail, event="error").encode()

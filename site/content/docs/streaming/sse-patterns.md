@@ -73,10 +73,16 @@ async def post(doc_id: str, request: Request) -> dict:
 
 ```python
 # Dependency index: editor block is NOT registered
-index._path_to_blocks["doc.version"] = [status_block]  # display-only
-index._path_to_blocks["doc.title"] = [title_block]      # display-only
-# doc.content is NOT mapped -- editor is client-managed
+index.register_from_sse_swaps(env, "page.html", source,
+                              exclude_blocks={"editor_content"})
+
+# Derived paths: version always changes when content changes,
+# so version-dependent blocks update automatically even if the
+# store only emits {"doc.content"}.
+index.derive("doc.version", from_paths={"doc.content"})
 ```
+
+> **Derived paths** let you declare computed relationships between context paths. When a source path changes, all derived paths are automatically included in the affected set. Stores emit what actually mutated, and display blocks that depend on computed values update without extra wiring. See `DependencyIndex.derive()`.
 
 For multi-user collaboration, send OT/CRDT operations over SSE as JSON (via `SSEEvent`) and apply them client-side. Do not re-render HTML.
 

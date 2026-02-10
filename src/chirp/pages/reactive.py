@@ -10,11 +10,12 @@ Components:
 - ``ChangeEvent``: Emitted by stores after mutations.
 - ``ReactiveBus``: Broadcast channel for change events (per-scope).
 - ``DependencyIndex``: Maps context paths to block references.
+  Supports **derived paths** for automatic change propagation.
 - ``reactive_stream()``: SSE endpoint that auto-pushes affected blocks.
 
 Example::
 
-    # In the store
+    # In the store — only emit what actually mutated
     bus = ReactiveBus()
 
     def apply_edit(self, edit: Edit) -> Document | None:
@@ -26,13 +27,21 @@ Example::
             ))
         return updated
 
+    # Build the dependency index with derived paths
+    index = DependencyIndex()
+    index.register_template(env, "doc/{doc_id}/page.html")
+    index.derive("doc.word_count", from_paths={"doc.content"})
+    index.derive("doc.summary", from_paths={"doc.content", "doc.title"})
+    # Now changing "doc.content" automatically invalidates blocks that
+    # depend on "doc.word_count" or "doc.summary" — the store doesn't
+    # need to know about these derived relationships.
+
     # In the route
     @app.route("/doc/{doc_id}/live")
     def live(doc_id: str) -> EventStream:
         return reactive_stream(
             bus, scope=doc_id,
             index=dep_index,
-            kida_env=env,
             context_builder=lambda: build_context(doc_id),
         )
 """
@@ -41,6 +50,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import re
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -293,19 +303,30 @@ class DependencyIndex:
     Built at app startup from kida's ``BlockMetadata.depends_on`` sets.
     Thread-safe after construction (read-only).
 
-    Example::
+    Supports **derived paths** — computed relationships between context
+    paths.  When a source path changes, all paths derived from it are
+    automatically included in the affected set::
 
         index = DependencyIndex()
         index.register_template(env, "doc/{doc_id}/_layout.html")
-        affected = index.affected_blocks({"doc.version"})
-        # -> [BlockRef("doc/{doc_id}/_layout.html", "toolbar")]
+        index.derive("doc.word_count", from_paths={"doc.content"})
+
+        # Changing "doc.content" now also invalidates blocks that
+        # depend on "doc.word_count", without the store needing to
+        # know about derived paths.
+        affected = index.affected_blocks(frozenset({"doc.content"}))
+
+    Derivations are transitive: if A derives from B and B derives
+    from C, changing C invalidates both B and A.
     """
 
-    __slots__ = ("_path_to_blocks",)
+    __slots__ = ("_path_to_blocks", "_source_to_derived")
 
     def __init__(self) -> None:
         # context_path -> list of BlockRef
         self._path_to_blocks: dict[str, list[BlockRef]] = {}
+        # source_path -> list of derived paths that depend on it
+        self._source_to_derived: dict[str, list[str]] = {}
 
     def register_template(
         self,
@@ -406,19 +427,129 @@ class DependencyIndex:
 
         return len(block_to_dom_id)
 
+    # ------------------------------------------------------------------
+    # Derived Paths
+    # ------------------------------------------------------------------
+
+    def derive(
+        self,
+        path: str,
+        *,
+        from_paths: set[str] | frozenset[str],
+    ) -> None:
+        """Declare a derived path relationship.
+
+        When any path in *from_paths* changes, *path* is automatically
+        included in the expanded change set — so blocks that depend on
+        *path* are re-rendered without the store needing to emit it.
+
+        Multiple calls for the same *path* are **additive**: source
+        paths are merged, not replaced.
+
+        Derivations are **transitive**: if ``"a"`` derives from
+        ``"b"`` and ``"b"`` derives from ``"c"``, changing ``"c"``
+        expands to ``{"c", "b", "a"}``.
+
+        Args:
+            path: The derived context path (e.g., ``"doc.word_count"``).
+            from_paths: Source paths that *path* is computed from
+                (e.g., ``{"doc.content"}``).
+
+        Example::
+
+            index.derive("doc.word_count", from_paths={"doc.content"})
+            index.derive("doc.summary", from_paths={"doc.content", "doc.title"})
+        """
+        for source in from_paths:
+            self._source_to_derived.setdefault(source, []).append(path)
+
+    def _expand_paths(self, changed_paths: frozenset[str]) -> frozenset[str]:
+        """Expand changed paths through the derivation graph (BFS).
+
+        Follows ``_source_to_derived`` edges transitively.  Handles
+        cycles safely (each path is visited at most once).
+
+        Returns:
+            The original *changed_paths* plus all transitively derived paths.
+        """
+        expanded: set[str] = set(changed_paths)
+        frontier: set[str] = set(changed_paths)
+        while frontier:
+            next_frontier: set[str] = set()
+            for path in frontier:
+                for derived in self._source_to_derived.get(path, ()):
+                    if derived not in expanded:
+                        expanded.add(derived)
+                        next_frontier.add(derived)
+            frontier = next_frontier
+        return frozenset(expanded)
+
+    @property
+    def derivations(self) -> dict[str, frozenset[str]]:
+        """Return ``{derived_path: frozenset_of_source_paths}`` for inspection.
+
+        Inverts the internal ``_source_to_derived`` mapping so callers
+        can see which sources feed each derived path.
+        """
+        result: dict[str, set[str]] = {}
+        for source, derived_list in self._source_to_derived.items():
+            for derived in derived_list:
+                result.setdefault(derived, set()).add(source)
+        return {k: frozenset(v) for k, v in result.items()}
+
+    def explain_affected(
+        self,
+        changed_paths: frozenset[str],
+    ) -> dict[str, Any]:
+        """Debug helper: show the full expansion chain and affected blocks.
+
+        Returns a dict with ``original_paths``, ``expanded_paths``,
+        ``derived_paths`` (the difference), and ``affected_blocks``.
+        """
+        expanded = (
+            self._expand_paths(changed_paths)
+            if self._source_to_derived
+            else changed_paths
+        )
+        blocks = self.affected_blocks(changed_paths)
+        return {
+            "original_paths": changed_paths,
+            "expanded_paths": expanded,
+            "derived_paths": expanded - changed_paths,
+            "affected_blocks": [
+                {
+                    "template": ref.template_name,
+                    "block": ref.block_name,
+                    "target": ref.target_id,
+                }
+                for ref in blocks
+            ],
+        }
+
     def affected_blocks(self, changed_paths: frozenset[str]) -> list[BlockRef]:
         """Find all blocks affected by a set of changed context paths.
 
-        Also checks parent paths: if ``"doc.version"`` changed and a
-        block depends on ``"doc"``, it's considered affected.
+        First expands *changed_paths* through the derivation graph
+        (if any derivations are registered), then checks direct and
+        prefix matches against the block dependency index.
+
+        Prefix matching: if ``"doc.version"`` changed and a block
+        depends on ``"doc"``, it's considered affected (and vice versa).
 
         Returns:
             List of unique ``BlockRef`` objects.
         """
+        # Expand through derivation graph before lookup
+        effective = (
+            self._expand_paths(changed_paths)
+            if self._source_to_derived
+            else changed_paths
+        )
+
         seen: set[tuple[str, str]] = set()
         result: list[BlockRef] = []
 
-        for changed in changed_paths:
+        for changed in effective:
             # Direct match
             for ref in self._path_to_blocks.get(changed, []):
                 key = (ref.template_name, ref.block_name)
@@ -499,10 +630,18 @@ def reactive_stream(
             if not blocks:
                 continue
 
-            # Build fresh context
-            ctx = context_builder()
-            if inspect.isawaitable(ctx):
-                ctx = await ctx
+            # Error boundary: context failures skip this event,
+            # don't kill the stream.  The next ChangeEvent will
+            # retry with fresh data.
+            try:
+                ctx = context_builder()
+                if inspect.isawaitable(ctx):
+                    ctx = await ctx
+            except Exception:
+                logging.getLogger("chirp.reactive").exception(
+                    "context_builder failed for scope=%s", scope,
+                )
+                continue
 
             for ref in blocks:
                 yield Fragment(
