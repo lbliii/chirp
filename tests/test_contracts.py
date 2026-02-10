@@ -2,16 +2,23 @@
 
 from chirp.app import App
 from chirp.config import AppConfig
+from dataclasses import dataclass
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from chirp.contracts import (
     CheckResult,
     ContractIssue,
+    FormContract,
     FragmentContract,
     RouteContract,
     SSEContract,
     Severity,
     _attr_to_method,
     _check_accessibility,
+    _extract_form_field_names,
     _extract_targets_from_source,
+    _extract_template_references,
     _path_matches_route,
     check_hypermedia_surface,
     contract,
@@ -168,7 +175,7 @@ class TestCheckResult:
         summary = result.summary()
         assert "5 routes" in summary
         assert "3 templates" in summary
-        assert "No errors" in summary
+        assert "No issues found" in summary
 
     def test_summary_with_errors(self):
         result = CheckResult(
@@ -398,3 +405,466 @@ class TestCheckHypermediaSurface:
             i for i in result.warnings if i.category == "accessibility"
         ]
         assert len(a11y_warnings) == 0
+
+
+class TestExtractTemplateReferences:
+    """Extract template references from Jinja source."""
+
+    def test_extends(self):
+        source = '{% extends "base.html" %}'
+        assert _extract_template_references(source) == {"base.html"}
+
+    def test_include(self):
+        source = '{% include "partials/header.html" %}'
+        assert _extract_template_references(source) == {"partials/header.html"}
+
+    def test_from_import(self):
+        source = '{% from "macros/forms.html" import text_field %}'
+        assert _extract_template_references(source) == {"macros/forms.html"}
+
+    def test_import_as(self):
+        source = '{% import "macros/utils.html" as utils %}'
+        assert _extract_template_references(source) == {"macros/utils.html"}
+
+    def test_multiple_references(self):
+        source = (
+            '{% extends "base.html" %}\n'
+            '{% include "nav.html" %}\n'
+            '{% from "macros.html" import btn %}\n'
+        )
+        assert _extract_template_references(source) == {
+            "base.html", "nav.html", "macros.html",
+        }
+
+    def test_single_quotes(self):
+        source = "{% extends 'base.html' %}"
+        assert _extract_template_references(source) == {"base.html"}
+
+    def test_whitespace_trimming_tags(self):
+        source = '{%- extends "base.html" -%}'
+        assert _extract_template_references(source) == {"base.html"}
+
+    def test_no_references(self):
+        source = "<div>Hello</div>"
+        assert _extract_template_references(source) == set()
+
+    def test_ignores_dynamic_variable(self):
+        source = "{% include template_name %}"
+        assert _extract_template_references(source) == set()
+
+
+def _user_dead(result: CheckResult) -> list[ContractIssue]:
+    """Filter dead-template issues to only user templates (not built-in)."""
+    return [
+        i for i in result.issues
+        if i.category == "dead" and not (i.template or "").startswith("chirp/")
+    ]
+
+
+class TestDeadTemplateDetection:
+    """Integration tests for dead template detection in check_hypermedia_surface."""
+
+    def test_unreferenced_template_reported(self, tmp_path):
+        """An unused template should be reported as dead."""
+        (tmp_path / "index.html").write_text(
+            "{% block content %}<h1>Home</h1>{% endblock %}"
+        )
+        (tmp_path / "unused.html").write_text("<h1>Old page</h1>")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 1
+        assert "unused.html" in dead[0].message
+        assert dead[0].severity == Severity.INFO
+
+    def test_included_template_not_dead(self, tmp_path):
+        """A template referenced via include should not be reported."""
+        (tmp_path / "index.html").write_text(
+            '{% block content %}{% include "nav.html" %}{% endblock %}'
+        )
+        (tmp_path / "nav.html").write_text("<nav>links</nav>")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_extended_template_not_dead(self, tmp_path):
+        """A template referenced via extends should not be reported."""
+        (tmp_path / "base.html").write_text(
+            "{% block content %}{% endblock %}"
+        )
+        (tmp_path / "page.html").write_text(
+            '{% extends "base.html" %}{% block content %}hi{% endblock %}'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("page.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_partial_excluded_by_convention(self, tmp_path):
+        """Templates with _ prefix are partials and should be excluded."""
+        (tmp_path / "index.html").write_text(
+            "{% block content %}<h1>Home</h1>{% endblock %}"
+        )
+        (tmp_path / "_partial.html").write_text("<p>partial</p>")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_fragment_contract_template_not_dead(self, tmp_path):
+        """A template referenced by a FragmentContract should not be dead."""
+        (tmp_path / "search.html").write_text(
+            "{% block results %}results{% endblock %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/search")
+        @contract(returns=FragmentContract("search.html", "results"))
+        async def search():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+
+class TestSSEFragmentValidation:
+    """SSE fragment contract validation in check_hypermedia_surface."""
+
+    def test_valid_sse_fragments(self, tmp_path):
+        """SSE route with valid fragment declarations passes."""
+        (tmp_path / "chat.html").write_text(
+            "{% block message %}<p>msg</p>{% endblock %}"
+            "{% block status %}<p>ok</p>{% endblock %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/events")
+        @contract(returns=SSEContract(
+            event_types=frozenset({"message", "status"}),
+            fragments=(
+                FragmentContract("chat.html", "message"),
+                FragmentContract("chat.html", "status"),
+            ),
+        ))
+        async def events():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        sse_errors = [i for i in result.errors if i.category == "sse"]
+        assert len(sse_errors) == 0
+        assert result.sse_fragments_validated == 2
+
+    def test_missing_template(self, tmp_path):
+        """SSE route referencing a nonexistent template reports ERROR."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/events")
+        @contract(returns=SSEContract(
+            fragments=(FragmentContract("nonexistent.html", "body"),),
+        ))
+        async def events():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        sse_errors = [i for i in result.errors if i.category == "sse"]
+        assert len(sse_errors) == 1
+        assert "could not be loaded" in sse_errors[0].message
+
+    def test_missing_block(self, tmp_path):
+        """SSE route referencing a nonexistent block reports ERROR."""
+        (tmp_path / "chat.html").write_text(
+            "{% block message %}<p>msg</p>{% endblock %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/events")
+        @contract(returns=SSEContract(
+            fragments=(FragmentContract("chat.html", "wrong_block"),),
+        ))
+        async def events():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        sse_errors = [i for i in result.errors if i.category == "sse"]
+        assert len(sse_errors) == 1
+        assert "doesn't exist" in sse_errors[0].message
+
+    def test_empty_fragments_passes(self, tmp_path):
+        """SSE route with no fragment declarations passes silently."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/events")
+        @contract(returns=SSEContract(event_types=frozenset({"ping"})))
+        async def events():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        sse_errors = [i for i in result.errors if i.category == "sse"]
+        assert len(sse_errors) == 0
+        assert result.sse_fragments_validated == 0
+
+
+class TestExtractFormFieldNames:
+    """Unit tests for _extract_form_field_names."""
+
+    def test_input(self):
+        html = '<input name="title" type="text">'
+        assert _extract_form_field_names(html) == {"title"}
+
+    def test_select(self):
+        html = '<select name="status"><option>open</option></select>'
+        assert _extract_form_field_names(html) == {"status"}
+
+    def test_textarea(self):
+        html = '<textarea name="body"></textarea>'
+        assert _extract_form_field_names(html) == {"body"}
+
+    def test_multiple_fields(self):
+        html = (
+            '<input name="title" type="text">'
+            '<textarea name="body"></textarea>'
+            '<select name="priority"><option>P1</option></select>'
+        )
+        assert _extract_form_field_names(html) == {"title", "body", "priority"}
+
+    def test_excludes_csrf_token(self):
+        html = '<input name="_csrf_token" type="hidden"><input name="title">'
+        assert _extract_form_field_names(html) == {"title"}
+
+    def test_skips_template_expressions(self):
+        html = '<input name="{{ field_name }}">'
+        assert _extract_form_field_names(html) == set()
+
+    def test_empty_source(self):
+        assert _extract_form_field_names("") == set()
+
+
+class TestFormFieldValidation:
+    """Integration tests for form field validation in check_hypermedia_surface."""
+
+    def test_matching_fields_pass(self, tmp_path):
+        """Template fields match dataclass fields — no issues."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+            body: str
+
+        (tmp_path / "tasks.html").write_text(
+            '<form>'
+            '<input name="title" type="text">'
+            '<textarea name="body"></textarea>'
+            '</form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "tasks.html"))
+        async def add_task():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_issues = [i for i in result.issues if i.category == "form"]
+        assert len(form_issues) == 0
+        assert result.forms_validated == 1
+
+    def test_missing_field_reports_error(self, tmp_path):
+        """Dataclass field missing from template = ERROR."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+            body: str
+
+        (tmp_path / "tasks.html").write_text(
+            '<form><input name="title" type="text"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "tasks.html"))
+        async def add_task():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_errors = [i for i in result.errors if i.category == "form"]
+        assert len(form_errors) == 1
+        assert "body" in form_errors[0].message
+        assert "TaskForm.body" in form_errors[0].message
+
+    def test_extra_field_warns_with_suggestion(self, tmp_path):
+        """Extra template field with typo = WARNING with 'did you mean?'."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+
+        (tmp_path / "tasks.html").write_text(
+            '<form>'
+            '<input name="title" type="text">'
+            '<input name="titl" type="text">'
+            '</form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "tasks.html"))
+        async def add_task():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_warnings = [i for i in result.warnings if i.category == "form"]
+        assert len(form_warnings) == 1
+        assert "titl" in form_warnings[0].message
+        assert "Did you mean 'title'?" in form_warnings[0].message
+
+    def test_csrf_token_excluded(self, tmp_path):
+        """Hidden CSRF token field should not trigger a warning."""
+
+        @dataclass
+        class LoginForm:
+            username: str
+            password: str
+
+        (tmp_path / "login.html").write_text(
+            '<form>'
+            '<input name="_csrf_token" type="hidden">'
+            '<input name="username" type="text">'
+            '<input name="password" type="password">'
+            '</form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/login", methods=["POST"])
+        @contract(form=FormContract(LoginForm, "login.html"))
+        async def login():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_issues = [i for i in result.issues if i.category == "form"]
+        assert len(form_issues) == 0
+
+    def test_block_scoped_extraction(self, tmp_path):
+        """FormContract with block= restricts field scanning to that block."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+
+        (tmp_path / "page.html").write_text(
+            '{% block header %}<input name="search">{% endblock %}'
+            '{% block task_form %}'
+            '<form><input name="title" type="text"></form>'
+            '{% endblock %}'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "page.html", block="task_form"))
+        async def add_task():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_issues = [i for i in result.issues if i.category == "form"]
+        # "search" is in header block, not task_form — should not warn
+        assert len(form_issues) == 0
+
+
+class TestComponentCallValidation:
+    """Component call validation via kida_env.validate_calls()."""
+
+    def test_issues_surface_from_validate_calls(self, tmp_path):
+        """When kida exposes validate_calls(), issues are forwarded."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        # Prepare mock issues from kida
+        mock_issue = SimpleNamespace(
+            is_error=True,
+            message="card(titl='x') has no parameter 'titl'. Did you mean 'title'?",
+            template="board.html",
+        )
+
+        app._ensure_frozen()
+        kida_env = app._kida_env
+        # Temporarily add validate_calls to the environment
+        kida_env.validate_calls = lambda: [mock_issue]
+        try:
+            result = check_hypermedia_surface(app)
+        finally:
+            del kida_env.validate_calls
+
+        comp_issues = [i for i in result.issues if i.category == "component"]
+        assert len(comp_issues) == 1
+        assert comp_issues[0].severity == Severity.ERROR
+        assert "titl" in comp_issues[0].message
+        assert comp_issues[0].template == "board.html"
+        assert result.component_calls_validated == 1
+
+    def test_warning_severity_forwarded(self, tmp_path):
+        """Non-error issues from validate_calls come through as WARNING."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        mock_issue = SimpleNamespace(
+            is_error=False,
+            message="card() missing optional parameter 'footer'.",
+            template="board.html",
+        )
+
+        app._ensure_frozen()
+        kida_env = app._kida_env
+        kida_env.validate_calls = lambda: [mock_issue]
+        try:
+            result = check_hypermedia_surface(app)
+        finally:
+            del kida_env.validate_calls
+
+        comp_issues = [i for i in result.issues if i.category == "component"]
+        assert len(comp_issues) == 1
+        assert comp_issues[0].severity == Severity.WARNING
+
+    def test_graceful_noop_without_validate_calls(self, tmp_path):
+        """When kida doesn't have validate_calls, no component issues."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        comp_issues = [i for i in result.issues if i.category == "component"]
+        assert len(comp_issues) == 0
+        assert result.component_calls_validated == 0

@@ -23,6 +23,7 @@ Usage::
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -80,11 +81,29 @@ class FragmentContract:
 class SSEContract:
     """Declares the event types an SSE endpoint emits.
 
-    Used for documentation and validation.
+    Used for documentation and validation.  Optionally declares
+    fragments that the SSE stream yields, so ``app.check()`` can
+    verify the templates/blocks exist.
 
     """
 
     event_types: frozenset[str] = frozenset()
+    fragments: tuple[FragmentContract, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class FormContract:
+    """Declares which dataclass a route binds form data to.
+
+    Used by ``app.check()`` to verify that ``<input name="...">``,
+    ``<select name="...">``, and ``<textarea name="...">`` fields in the
+    template match the dataclass fields expected by the handler.
+
+    """
+
+    datacls: type
+    template: str
+    block: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +115,7 @@ class RouteContract:
     """
 
     returns: FragmentContract | SSEContract | None = None
+    form: FormContract | None = None
     description: str = ""
 
 
@@ -190,6 +210,75 @@ def _extract_static_ids(source: str) -> set[str]:
         if value and "{{" not in value and "{%" not in value:
             ids.add(value)
     return ids
+
+
+# ---------------------------------------------------------------------------
+# Template reference scanner — extract extends/include/from/import
+# ---------------------------------------------------------------------------
+
+# Regex: {% extends "..." %}, {% include "..." %}, {% from "..." import ... %},
+#        {% import "..." as ... %}
+_TEMPLATE_REF_PATTERN = re.compile(
+    r"""\{%-?\s*(?:extends|include|from|import)\s+["']([^"']+)["']""",
+)
+
+
+def _extract_template_references(source: str) -> set[str]:
+    """Extract template names referenced via Jinja tags.
+
+    Catches static references from ``{% extends %}``, ``{% include %}``,
+    ``{% from %}``, and ``{% import %}``.  Dynamic expressions
+    (e.g. ``{% include variable %}``) are not captured.
+    """
+    return {m.group(1) for m in _TEMPLATE_REF_PATTERN.finditer(source)}
+
+
+# ---------------------------------------------------------------------------
+# Form field scanner — extract <input>, <select>, <textarea> name attributes
+# ---------------------------------------------------------------------------
+
+# Regex: <input name="...">, <select name="...">, <textarea name="...">
+_FORM_FIELD_PATTERN = re.compile(
+    r"<(?:input|select|textarea)\b[^>]*?\bname\s*=\s*[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+
+# Field names to exclude from form validation (framework-injected, not user data)
+_FORM_EXCLUDED_FIELDS = frozenset({
+    "_csrf_token", "csrf_token", "_method",
+})
+
+
+def _extract_form_field_names(source: str) -> set[str]:
+    """Extract ``name`` attribute values from form fields in template HTML.
+
+    Scans for ``<input>``, ``<select>``, and ``<textarea>`` elements.
+    Skips template expressions and framework-injected fields like
+    CSRF tokens.
+    """
+    names: set[str] = set()
+    for match in _FORM_FIELD_PATTERN.finditer(source):
+        name = match.group(1).strip()
+        if not name or "{{" in name or "{%" in name:
+            continue
+        if name in _FORM_EXCLUDED_FIELDS:
+            continue
+        names.add(name)
+    return names
+
+
+def _closest_field(target: str, fields: set[str], *, max_dist: int = 2) -> str | None:
+    """Find the closest field name by edit distance, or ``None``."""
+    if not fields:
+        return None
+    best: str | None = None
+    best_dist = max_dist + 1
+    for candidate in sorted(fields):  # sorted for determinism
+        dist = _edit_distance(target, candidate)
+        if dist < best_dist:
+            best_dist = dist
+            best = candidate
+    return best if best_dist <= max_dist else None
 
 
 def _edit_distance(a: str, b: str) -> int:
@@ -396,6 +485,10 @@ class CheckResult:
     templates_scanned: int = 0
     targets_found: int = 0
     hx_targets_validated: int = 0
+    dead_templates_found: int = 0
+    sse_fragments_validated: int = 0
+    forms_validated: int = 0
+    component_calls_validated: int = 0
 
     @property
     def errors(self) -> list[ContractIssue]:
@@ -417,6 +510,21 @@ class CheckResult:
             f"found {self.targets_found} hypermedia targets, "
             f"validated {self.hx_targets_validated} hx-target selectors.",
         ]
+        # Optional counters — only include when non-zero
+        extras: list[str] = []
+        if self.dead_templates_found:
+            extras.append(f"{self.dead_templates_found} dead template(s)")
+        if self.sse_fragments_validated:
+            extras.append(f"{self.sse_fragments_validated} SSE fragment(s) validated")
+        if self.forms_validated:
+            extras.append(f"{self.forms_validated} form(s) validated")
+        if self.component_calls_validated:
+            extras.append(
+                f"{self.component_calls_validated} component call(s) validated"
+            )
+        if extras:
+            lines.append(", ".join(extras) + ".")
+
         if self.ok and not self.warnings:
             lines.append("No issues found.")
         elif self.ok:
@@ -438,18 +546,24 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     Checks:
     1. **Fragment references**: Every route with a FragmentContract
        references a template and block that exist.
-    2. **htmx URL targets**: Every ``hx-get``, ``hx-post``, etc. in
+    2. **SSE fragment references**: SSEContract fragments resolve to
+       valid templates and blocks.
+    3. **htmx URL targets**: Every ``hx-get``, ``hx-post``, etc. in
        template HTML resolves to a registered route with the correct method.
-    3. **Form actions**: Every ``action="/path"`` in template HTML
-       resolves to a registered route.
     4. **hx-target selectors**: Every ``hx-target="#id"`` in template HTML
        references an element ID that exists somewhere in the template tree
        (warning — IDs may come from dynamic expressions or JS).
     5. **Accessibility**: htmx URL attributes on non-interactive elements
        (``<div>``, ``<span>``, etc.) without ``role`` or ``tabindex``
        (warning, not error).
-    6. **Orphan routes**: Routes that are never referenced from templates
+    6. **Form field validation**: Routes with FormContract have template
+       fields that match the dataclass fields.
+    7. **Orphan routes**: Routes that are never referenced from templates
        (info, not error).
+    8. **Dead templates**: Templates not referenced by any route or other
+       template (info, not error).
+    9. **Component call validation**: ``{% call %}`` sites match
+       ``{% def %}`` signatures (requires kida typed def support).
 
     Args:
         app: A frozen Chirp application.
@@ -489,8 +603,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             if kida_env is not None:
                 try:
                     tmpl = kida_env.get_template(fc.template)
-                    # Check if block exists
-                    blocks = tmpl.blocks
+                    # block_metadata() returns {name: BlockMetadata}
+                    blocks = tmpl.block_metadata()
                     if fc.block not in blocks:
                         result.issues.append(ContractIssue(
                             severity=Severity.ERROR,
@@ -509,6 +623,37 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         category="fragment",
                         message=(
                             f"Route '{route.path}' references template "
+                            f"'{fc.template}' which could not be loaded."
+                        ),
+                        route=route.path,
+                        template=fc.template,
+                    ))
+
+        # 2a. Check SSE fragment contracts
+        elif isinstance(contract.returns, SSEContract) and kida_env is not None:
+            for fc in contract.returns.fragments:
+                result.sse_fragments_validated += 1
+                try:
+                    tmpl = kida_env.get_template(fc.template)
+                    blocks = tmpl.block_metadata()
+                    if fc.block not in blocks:
+                        result.issues.append(ContractIssue(
+                            severity=Severity.ERROR,
+                            category="sse",
+                            message=(
+                                f"SSE route '{route.path}' yields Fragment "
+                                f"'{fc.template}':'{fc.block}' but block "
+                                f"doesn't exist."
+                            ),
+                            route=route.path,
+                            template=fc.template,
+                        ))
+                except Exception:
+                    result.issues.append(ContractIssue(
+                        severity=Severity.ERROR,
+                        category="sse",
+                        message=(
+                            f"SSE route '{route.path}' yields Fragment "
                             f"'{fc.template}' which could not be loaded."
                         ),
                         route=route.path,
@@ -577,7 +722,90 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             a11y_issues = _check_accessibility(source, tmpl_name)
             result.issues.extend(a11y_issues)
 
-        # 6. Check for orphan routes (routes never referenced from templates)
+        # 6. Form field validation — compare dataclass fields against HTML
+        for route in router.routes:
+            rc = getattr(route.handler, "_chirp_contract", None)
+            if rc is None or rc.form is None:
+                continue
+            fc = rc.form
+            result.forms_validated += 1
+
+            # Load the template (or block) source
+            tmpl_source = template_sources.get(fc.template)
+            if tmpl_source is None:
+                result.issues.append(ContractIssue(
+                    severity=Severity.ERROR,
+                    category="form",
+                    message=(
+                        f"Route '{route.path}' FormContract references "
+                        f"template '{fc.template}' which is not found."
+                    ),
+                    route=route.path,
+                    template=fc.template,
+                ))
+                continue
+
+            # If block is specified, try to narrow to block source
+            if fc.block is not None:
+                block_match = re.search(
+                    rf"\{{% block {re.escape(fc.block)} %\}}(.*?)"
+                    rf"\{{% endblock",
+                    tmpl_source,
+                    re.DOTALL,
+                )
+                if block_match:
+                    tmpl_source = block_match.group(1)
+
+            html_fields = _extract_form_field_names(tmpl_source)
+            try:
+                dc_fields = {f.name for f in dataclasses.fields(fc.datacls)}
+            except TypeError:
+                result.issues.append(ContractIssue(
+                    severity=Severity.WARNING,
+                    category="form",
+                    message=(
+                        f"Route '{route.path}' FormContract datacls "
+                        f"'{fc.datacls}' is not a dataclass."
+                    ),
+                    route=route.path,
+                ))
+                continue
+
+            # Missing in template = ERROR (form submission will fail)
+            for field_name in sorted(dc_fields - html_fields):
+                result.issues.append(ContractIssue(
+                    severity=Severity.ERROR,
+                    category="form",
+                    message=(
+                        f"Route '{route.path}' (POST) expects field "
+                        f"'{field_name}' ({fc.datacls.__name__}.{field_name}) "
+                        f"but template '{fc.template}'"
+                        + (f" block '{fc.block}'" if fc.block else "")
+                        + f" has no <input name=\"{field_name}\">."
+                    ),
+                    route=route.path,
+                    template=fc.template,
+                ))
+
+            # Extra in template = WARNING (may be intentional)
+            for field_name in sorted(html_fields - dc_fields):
+                suggestion = _closest_field(field_name, dc_fields)
+                hint = f" Did you mean '{suggestion}'?" if suggestion else ""
+                result.issues.append(ContractIssue(
+                    severity=Severity.WARNING,
+                    category="form",
+                    message=(
+                        f"Template '{fc.template}'"
+                        + (f" block '{fc.block}'" if fc.block else "")
+                        + f" has <input name=\"{field_name}\"> which does "
+                        f"not match any field in "
+                        f"{fc.datacls.__name__}.{hint}"
+                    ),
+                    template=fc.template,
+                    route=route.path,
+                ))
+
+        # 7. Orphan routes (routes never referenced from templates)
         for route_path in route_paths:
             if route_path not in referenced_paths and route_path != "/":
                 result.issues.append(ContractIssue(
@@ -585,6 +813,59 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     category="orphan",
                     message=f"Route '{route_path}' is not referenced from any template.",
                     route=route_path,
+                ))
+
+        # 8. Dead template detection — templates never referenced by any
+        #    route or other template via extends/include/from/import.
+        all_template_names = set(template_sources)
+        referenced_templates: set[str] = set()
+
+        # From route FragmentContracts
+        for route in router.routes:
+            rc = getattr(route.handler, "_chirp_contract", None)
+            if rc is None:
+                continue
+            if isinstance(rc.returns, FragmentContract):
+                referenced_templates.add(rc.returns.template)
+            elif isinstance(rc.returns, SSEContract):
+                for fc in rc.returns.fragments:
+                    referenced_templates.add(fc.template)
+
+        # From template source (extends, include, from, import)
+        for source in template_sources.values():
+            referenced_templates.update(_extract_template_references(source))
+
+        dead = sorted(all_template_names - referenced_templates)
+        for tmpl_name in dead:
+            # Skip partials by convention (leading underscore in filename)
+            basename = tmpl_name.rsplit("/", 1)[-1]
+            if basename.startswith("_"):
+                continue
+            result.dead_templates_found += 1
+            result.issues.append(ContractIssue(
+                severity=Severity.INFO,
+                category="dead",
+                message=(
+                    f"Template '{tmpl_name}' is not referenced by any "
+                    f"route or template."
+                ),
+                template=tmpl_name,
+            ))
+
+    # 9. Component call validation (requires kida typed def support).
+    # Feature-gated: only runs when kida exposes a callable validate_calls().
+    if kida_env is not None:
+        validate_fn = getattr(kida_env, "validate_calls", None)
+        if callable(validate_fn):
+            for issue in validate_fn():
+                result.component_calls_validated += 1
+                result.issues.append(ContractIssue(
+                    severity=(
+                        Severity.ERROR if issue.is_error else Severity.WARNING
+                    ),
+                    category="component",
+                    message=issue.message,
+                    template=getattr(issue, "template", None),
                 ))
 
     return result
@@ -662,6 +943,7 @@ def _load_template_sources(kida_env: Any) -> dict[str, str]:
 def contract(
     returns: FragmentContract | SSEContract | None = None,
     *,
+    form: FormContract | None = None,
     description: str = "",
 ) -> Any:
     """Attach a contract to a route handler.
@@ -674,7 +956,7 @@ def contract(
             ...
 
     """
-    rc = RouteContract(returns=returns, description=description)
+    rc = RouteContract(returns=returns, form=form, description=description)
 
     def decorator(func: Any) -> Any:
         func._chirp_contract = rc
