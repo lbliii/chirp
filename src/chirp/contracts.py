@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -186,7 +185,7 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
         attr_name = match.group(1)
         url = match.group(2)
         # Skip template expressions ({{ ... }}) and anchors
-        if "{{" in url or url.startswith("#") or url.startswith("javascript:"):
+        if "{{" in url or url.startswith(("#", "javascript:")):
             continue
         targets.append((attr_name, url))
     return targets
@@ -488,6 +487,328 @@ def _check_hx_boost(
                     ),
                     template=tmpl_name,
                 ))
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# swap safety scanner — broad inherited targets + mutating requests
+# ---------------------------------------------------------------------------
+
+_TAG_WITH_TARGET_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bhx-target\s*=\s*[\"'](?P<target>#[^\"']+)[\"'][^>]*)>",
+    re.IGNORECASE,
+)
+
+_MUTATING_TAG_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\b(?:hx-(?:post|put|patch|delete)|action)\s*="
+    r"\s*[\"'][^\"']*[\"'][^>]*)>",
+    re.IGNORECASE,
+)
+
+_SSE_SWAP_TAG_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-swap\s*=\s*[\"'][^\"']+[\"'][^>]*)>",
+    re.IGNORECASE,
+)
+
+# Regex: elements with sse-connect (SSE connection sources)
+_SSE_CONNECT_TAG_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-connect\s*=\s*[\"'](?P<url>[^\"']+)[\"'][^>]*)>",
+    re.IGNORECASE,
+)
+
+# Regex: extract sse-swap value from an attribute string
+_SSE_SWAP_VALUE_PATTERN = re.compile(
+    r'\bsse-swap\s*=\s*["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+
+
+def _check_sse_self_swap(
+    template_sources: dict[str, str],
+) -> list[ContractIssue]:
+    """Error when ``sse-swap`` is on the same element as ``sse-connect``.
+
+    htmx's SSE extension uses ``querySelectorAll`` on the ``sse-connect``
+    element to find swap targets.  ``querySelectorAll`` never includes
+    the root element itself, so ``sse-swap`` on the same element is a
+    silent no-op — events arrive but nothing is swapped.
+
+    The fix is to move ``sse-swap`` to a child element.
+    """
+    issues: list[ContractIssue] = []
+    for tmpl_name, source in template_sources.items():
+        for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+            attrs_lower = match.group("attrs").lower()
+            if "sse-swap" not in attrs_lower:
+                continue
+            swap_match = _SSE_SWAP_VALUE_PATTERN.search(match.group("attrs"))
+            swap_value = swap_match.group(1) if swap_match else "?"
+            issues.append(ContractIssue(
+                severity=Severity.ERROR,
+                category="sse_self_swap",
+                message=(
+                    f'sse-swap="{swap_value}" on the same element as '
+                    f"sse-connect will never match. htmx uses "
+                    f"querySelectorAll which excludes the root element. "
+                    f"Move sse-swap to a child element."
+                ),
+                template=tmpl_name,
+            ))
+    return issues
+
+
+def _check_sse_connect_scope(
+    template_sources: dict[str, str],
+    broad_targets: set[str],
+) -> list[ContractIssue]:
+    """Warn when ``sse-connect`` is inside a broad ``hx-target`` scope.
+
+    If a layout sets ``hx-target="#app-content"`` and an SSE container
+    does not use ``hx-disinherit`` to break inheritance, every
+    ``sse-swap`` descendant inherits the broad target and SSE fragments
+    replace the wrong region.
+
+    The fix is ``hx-disinherit="hx-target hx-swap"`` on the
+    ``sse-connect`` element.
+    """
+    if not broad_targets:
+        return []
+
+    issues: list[ContractIssue] = []
+    targets_text = ", ".join(sorted(broad_targets))
+
+    for tmpl_name, source in template_sources.items():
+        for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+            attrs_lower = match.group("attrs").lower()
+            # Already has hx-disinherit — assume the author handled it
+            if "hx-disinherit" in attrs_lower:
+                continue
+            issues.append(ContractIssue(
+                severity=Severity.WARNING,
+                category="sse_scope",
+                message=(
+                    "sse-connect element is inside a broad hx-target scope "
+                    "without hx-disinherit. SSE swap targets will inherit "
+                    "the layout-level hx-target and fragments will replace "
+                    "the wrong region. Add "
+                    'hx-disinherit="hx-target hx-swap" on the sse-connect '
+                    "element to isolate SSE swaps."
+                ),
+                template=tmpl_name,
+                details=f"Inherited broad target(s): {targets_text}",
+            ))
+            # One warning per template is sufficient.
+            break
+
+    return issues
+
+
+def _collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
+    """Collect broad inherited ``hx-target`` values from layout-level elements.
+
+    Returns a set of ``"#target (template)"`` strings.  Broad targets
+    are those on ``<body>``, ``<main>``, or elements with
+    ``hx-boost="true"`` — scopes likely to be inherited by many
+    descendants.
+    """
+    broad_targets: set[str] = set()
+    for tmpl_name, source in template_sources.items():
+        for match in _TAG_WITH_TARGET_PATTERN.finditer(source):
+            tag_name = match.group("tag").lower()
+            attrs = match.group("attrs")
+            target = match.group("target")
+            if "{{" in target or "{%" in target:
+                continue
+
+            attrs_lower = attrs.lower()
+            has_boost = bool(
+                re.search(r'hx-boost\s*=\s*["\']true["\']', attrs_lower),
+            )
+            is_broad_scope = tag_name in {"body", "main"} or has_boost
+            if is_broad_scope:
+                broad_targets.add(f"{target} ({tmpl_name})")
+    return broad_targets
+
+
+def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
+    """Warn on mutation tags that may inherit broad container targets.
+
+    This catches a common htmx footgun:
+    - a layout-level element sets a broad ``hx-target="#app-content"``
+    - a mutating request does not set its own target
+    - a fragment response can replace the whole container accidentally.
+    """
+    issues: list[ContractIssue] = []
+    broad_targets = _collect_broad_targets(template_sources)
+
+    if not broad_targets:
+        return issues
+
+    targets_text = ", ".join(sorted(broad_targets))
+
+    # Step 2: detect mutating tags that rely on inherited targets.
+    for tmpl_name, source in template_sources.items():
+        for match in _MUTATING_TAG_PATTERN.finditer(source):
+            attrs = match.group("attrs")
+            attrs_lower = attrs.lower()
+            if "hx-target=" in attrs_lower:
+                continue
+            if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
+                continue
+            issues.append(ContractIssue(
+                severity=Severity.WARNING,
+                category="swap_safety",
+                message=(
+                    "Mutating htmx request has no explicit hx-target and may inherit "
+                    "a broad container target. This can replace large UI regions with "
+                    "partial responses. Consider Action() (204), hx-swap=\"none\", "
+                    "or an explicit local hx-target."
+                ),
+                template=tmpl_name,
+                details=f"Inherited broad target(s): {targets_text}",
+            ))
+            # One warning per template is enough signal.
+            break
+
+    # Step 3: detect SSE swap tags that rely on inherited broad targets.
+    for tmpl_name, source in template_sources.items():
+        for match in _SSE_SWAP_TAG_PATTERN.finditer(source):
+            attrs = match.group("attrs")
+            attrs_lower = attrs.lower()
+            if "hx-target=" in attrs_lower:
+                continue
+            issues.append(ContractIssue(
+                severity=Severity.WARNING,
+                category="swap_safety",
+                message=(
+                    "SSE swap element has no explicit hx-target and may inherit "
+                    "a broad container target. Streamed fragments can land in the "
+                    "wrong region. Set hx-target=\"this\" on the element, or add "
+                    "hx-disinherit=\"hx-target hx-swap\" on the sse-connect "
+                    "ancestor to isolate all SSE swaps."
+                ),
+                template=tmpl_name,
+                details=f"Inherited broad target(s): {targets_text}",
+            ))
+            # One warning per template is enough signal.
+            break
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# SSE event cross-reference — sse-swap values vs SSEContract.event_types
+# ---------------------------------------------------------------------------
+
+# Replace Jinja {{ ... }} expressions with a dummy segment so path
+# matching still works against parameterized route patterns.
+_JINJA_EXPR_PATTERN = re.compile(r"\{\{[^}]+\}\}")
+
+
+def _normalize_sse_url(url: str) -> str:
+    """Normalize a ``sse-connect`` URL for route matching.
+
+    Jinja template expressions like ``{{ doc.id }}`` are replaced with
+    ``__p__`` so that ``_path_matches_route`` treats them as concrete
+    segments that match ``{param}`` route patterns.
+    """
+    return _JINJA_EXPR_PATTERN.sub("__p__", url).strip()
+
+
+def _extract_sse_swap_values(source: str) -> set[str]:
+    """Extract all ``sse-swap`` event names from a template source."""
+    values: set[str] = set()
+    for match in _SSE_SWAP_VALUE_PATTERN.finditer(source):
+        values.add(match.group(1))
+    return values
+
+
+def _check_sse_event_crossref(
+    template_sources: dict[str, str],
+    router: Router,
+) -> list[ContractIssue]:
+    """Cross-reference ``sse-swap`` values against ``SSEContract.event_types``.
+
+    For each template with ``sse-connect``, match the URL to a route.
+    If the route declares ``SSEContract(event_types=...)``, verify that:
+
+    - Every ``sse-swap`` value in the template exists in ``event_types``
+      (template listens for events the stream never emits).
+    - Every ``event_types`` entry has a matching ``sse-swap`` in the
+      template (stream emits events no template listens for).
+    """
+    issues: list[ContractIssue] = []
+
+    # Build route → SSEContract mapping
+    sse_routes: dict[str, SSEContract] = {}
+    for route in router.routes:
+        contract = getattr(route.handler, "_chirp_contract", None)
+        if contract is not None and isinstance(contract.returns, SSEContract):
+            if contract.returns.event_types:
+                sse_routes[route.path] = contract.returns
+
+    if not sse_routes:
+        return issues
+
+    for tmpl_name, source in template_sources.items():
+        swap_values = _extract_sse_swap_values(source)
+        if not swap_values:
+            continue
+
+        for connect_match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+            raw_url = connect_match.group("url")
+            url = _normalize_sse_url(raw_url)
+
+            # Find matching route
+            matched_route: str | None = None
+            matched_contract: SSEContract | None = None
+            for route_path, sse_contract in sse_routes.items():
+                if _path_matches_route(url, route_path):
+                    matched_route = route_path
+                    matched_contract = sse_contract
+                    break
+
+            if matched_contract is None:
+                continue
+
+            declared = matched_contract.event_types
+
+            # sse-swap values not in declared event_types
+            undeclared = swap_values - declared
+            for event_name in sorted(undeclared):
+                issues.append(ContractIssue(
+                    severity=Severity.WARNING,
+                    category="sse_crossref",
+                    message=(
+                        f'sse-swap="{event_name}" listens for an event that '
+                        f"route '{matched_route}' does not declare in "
+                        f"SSEContract.event_types. Possible typo or missing "
+                        f"event_types entry."
+                    ),
+                    template=tmpl_name,
+                    route=matched_route,
+                    details=(
+                        f"Declared event_types: "
+                        f"{', '.join(sorted(declared))}"
+                    ),
+                ))
+
+            # Declared event_types with no matching sse-swap
+            unlistened = declared - swap_values
+            for event_name in sorted(unlistened):
+                issues.append(ContractIssue(
+                    severity=Severity.INFO,
+                    category="sse_crossref",
+                    message=(
+                        f"SSE route '{matched_route}' declares event type "
+                        f"'{event_name}' but no sse-swap in '{tmpl_name}' "
+                        f"listens for it. The event may be unused or "
+                        f"consumed elsewhere."
+                    ),
+                    template=tmpl_name,
+                    route=matched_route,
+                ))
+
     return issues
 
 
@@ -856,6 +1177,23 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # 4c. Check hx-boost values
         result.issues.extend(_check_hx_boost(template_sources))
+
+        # 4d. Check inherited broad-target swap safety
+        result.issues.extend(_check_swap_safety(template_sources))
+
+        # 4e. Check sse-swap on same element as sse-connect
+        result.issues.extend(_check_sse_self_swap(template_sources))
+
+        # 4f. Check sse-connect inside broad target scope without hx-disinherit
+        broad_targets = _collect_broad_targets(template_sources)
+        result.issues.extend(
+            _check_sse_connect_scope(template_sources, broad_targets)
+        )
+
+        # 4g. Cross-reference sse-swap values against SSEContract.event_types
+        result.issues.extend(
+            _check_sse_event_crossref(template_sources, router)
+        )
 
         # 5. Check accessibility — htmx on non-interactive elements
         for tmpl_name, source in template_sources.items():
