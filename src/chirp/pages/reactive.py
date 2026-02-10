@@ -209,11 +209,24 @@ _BLOCK_TAG_RE = re.compile(
 
 
 def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
-    """Extract elements with ``sse-swap`` and find their inner blocks.
+    """Extract elements with ``sse-swap`` and find their associated blocks.
 
     For each ``<tag ... sse-swap="event" ...>`` found, captures the swap
-    event name, element ``id``, and the first ``{% block NAME %}``
-    between the open tag and the next occurrence of ``</tag>``.
+    event name, element ``id``, and the associated ``{% block NAME %}``.
+
+    Handles two common patterns:
+
+    1. **Block inside element** (block is a child)::
+
+           <span id="status" sse-swap="status">
+               {% block toolbar_status %}v{{ doc.version }}{% endblock %}
+           </span>
+
+    2. **Block wraps element** (block is the parent)::
+
+           {% block toolbar_status %}
+           <span id="status" sse-swap="status">v{{ doc.version }}</span>
+           {% endblock %}
     """
     results: list[_SSESwapElement] = []
 
@@ -230,10 +243,11 @@ def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
         id_match = _ID_ATTR_RE.search(attrs)
         dom_id = id_match.group(1) if id_match else None
 
-        # Find the inner block: search from after the open tag to the
-        # close tag (</tag>).  This is a best-effort approximation.
+        inner_block: str | None = None
+
+        # Strategy 1: Look for {% block %} INSIDE the element.
         start = match.end()
-        close_tag = f"</{tag}"
+        close_tag = "</" + tag
         close_idx = source.lower().find(close_tag, start)
         if close_idx == -1:
             inner = source[start:]
@@ -241,7 +255,23 @@ def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
             inner = source[start:close_idx]
 
         block_match = _BLOCK_TAG_RE.search(inner)
-        inner_block = block_match.group(1) if block_match else None
+        if block_match:
+            inner_block = block_match.group(1)
+
+        # Strategy 2: Look for {% block %} BEFORE the element (wrapping).
+        # Search the ~200 chars preceding the element's open tag for
+        # the nearest {% block NAME %} that hasn't been closed yet.
+        if inner_block is None:
+            lookback = source[max(0, match.start() - 200):match.start()]
+            # Find the LAST {% block NAME %} in the lookback window.
+            # If there's a matching {% endblock %} after it, it's closed.
+            all_blocks = list(_BLOCK_TAG_RE.finditer(lookback))
+            if all_blocks:
+                candidate = all_blocks[-1]
+                # Verify the block isn't closed before our element
+                after_candidate = lookback[candidate.end():]
+                if "endblock" not in after_candidate:
+                    inner_block = candidate.group(1)
 
         results.append(_SSESwapElement(
             swap_event=swap_event,
