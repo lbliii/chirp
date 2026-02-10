@@ -69,7 +69,26 @@ import chirp
 print(chirp.__version__)
 ```
 
-Chirp has no CLI entry point -- it is a library. You create an `App` and call `app.run()` to start the development server.
+You should see the version printed. Now scaffold your first project:
+
+```bash
+chirp new myapp
+cd myapp
+python app.py
+```
+
+Open `http://127.0.0.1:8000` in your browser.
+
+## CLI Commands
+
+After installation, the `chirp` command is available:
+
+| Command | Description |
+|---------|-------------|
+| `chirp new <name>` | Scaffold a new project with templates, static assets, and tests |
+| `chirp new <name> --minimal` | Scaffold a minimal single-file project |
+| `chirp run <app>` | Start the dev server (e.g. `chirp run myapp:app`) |
+| `chirp check <app>` | Validate hypermedia contracts from the command line |
 
 ## Next Steps
 

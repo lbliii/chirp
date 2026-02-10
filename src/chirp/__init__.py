@@ -59,6 +59,8 @@ __all__ = [
     "ToolCallEvent",
     "ValidationError",
     "form_from",
+    "form_or_errors",
+    "form_values",
     "g",
     "get_request",
     "get_user",
@@ -138,7 +140,7 @@ def __getattr__(name: str) -> object:
 
         return getattr(_errors, name)
 
-    if name in ("form_from", "FormBindingError"):
+    if name in ("form_from", "form_or_errors", "form_values", "FormBindingError"):
         from chirp.http import forms as _forms
 
         return getattr(_forms, name)

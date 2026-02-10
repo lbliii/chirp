@@ -25,8 +25,12 @@ def create_environment(
     Called once during ``App._freeze()``. The returned environment
     is immutable for the lifetime of the app.
     """
+    loader = ChoiceLoader([
+        FileSystemLoader(str(config.template_dir)),
+        PackageLoader("chirp.templating", "macros"),
+    ])
     env = Environment(
-        loader=FileSystemLoader(str(config.template_dir)),
+        loader=loader,
         autoescape=config.autoescape,
         auto_reload=config.debug,
         trim_blocks=config.trim_blocks,

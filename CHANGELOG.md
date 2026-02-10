@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`chirp` CLI** — New console entry point with three subcommands:
+  - `chirp new <name> [--minimal]` — Scaffold a project with app, templates, static assets,
+    and tests. `--minimal` generates a single-file starter.
+  - `chirp run <app> [--host HOST] [--port PORT]` — Start the dev server from an import
+    string (e.g. `chirp run myapp:app`).
+  - `chirp check <app>` — Validate hypermedia contracts from the command line.
+- **`Template.inline()`** — Prototyping shortcut that renders a template from a string
+  instead of a file. Returns an `InlineTemplate` instance that works through content
+  negotiation without requiring a `template_dir`.
+- **`InlineTemplate`** — New return type for string-based template rendering. Separate
+  from `Template` so negotiation can distinguish it and `app.check()` can warn about
+  inline templates in production routes.
 - **Built-in template filters** — `field_errors` extracts validation messages for a single
   form field from an errors dict. `qs` builds URL query strings, automatically omitting
   falsy values. Both are auto-registered in the Kida environment at startup.

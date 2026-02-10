@@ -18,8 +18,8 @@
     {% end %}
     <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
            value="{{ value }}"
-           {{ "required" if required else "" }}
-           {{ 'placeholder="' ~ placeholder ~ '"' if placeholder else "" }}
+           {% if required %}required{% end %}
+           {% if placeholder %}placeholder="{{ placeholder }}"{% end %}
            {{ attrs }}>
     {% for msg in errors | field_errors(name) %}
         <span class="field-error">{{ msg }}</span>
@@ -35,8 +35,8 @@
         <label for="{{ name }}">{{ label }}</label>
     {% end %}
     <textarea id="{{ name }}" name="{{ name }}" rows="{{ rows }}"
-              {{ "required" if required else "" }}
-              {{ 'placeholder="' ~ placeholder ~ '"' if placeholder else "" }}>{{ value }}</textarea>
+              {% if required %}required{% end %}
+              {% if placeholder %}placeholder="{{ placeholder }}"{% end %}>{{ value }}</textarea>
     {% for msg in errors | field_errors(name) %}
         <span class="field-error">{{ msg }}</span>
     {% end %}
@@ -51,10 +51,10 @@
         <label for="{{ name }}">{{ label }}</label>
     {% end %}
     <select id="{{ name }}" name="{{ name }}"
-            {{ "required" if required else "" }}>
+            {% if required %}required{% end %}>
         {% for opt in options %}
             <option value="{{ opt.value }}"
-                    {{ "selected" if opt.value == selected else "" }}>
+                    {% if opt.value == selected %}selected{% end %}>
                 {{ opt.label }}
             </option>
         {% end %}
@@ -70,7 +70,7 @@
 <div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
     <label>
         <input type="checkbox" id="{{ name }}" name="{{ name }}"
-               {{ "checked" if checked else "" }}>
+               {% if checked %}checked{% end %}>
         {{ label ?? name }}
     </label>
     {% for msg in errors | field_errors(name) %}

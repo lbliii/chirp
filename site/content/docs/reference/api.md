@@ -27,6 +27,7 @@ from chirp import (
 
     # Template return types
     Template,
+    InlineTemplate,
     Fragment,
     Page,
     Stream,
@@ -98,6 +99,19 @@ app = App(config=AppConfig(...))
 | `app.run()` | Start the development server (freezes the app) |
 | `app.check()` | Validate hypermedia contracts |
 
+### CLI
+
+The `chirp` command is registered as a console script:
+
+| Command | Description |
+|---------|-------------|
+| `chirp new <name>` | Scaffold a new project |
+| `chirp new <name> --minimal` | Scaffold a minimal project |
+| `chirp run <app>` | Start the dev server (e.g. `chirp run myapp:app`) |
+| `chirp check <app>` | Validate hypermedia contracts |
+
+The `<app>` argument is an import string in `module:attribute` format. The attribute defaults to `app` when omitted (e.g. `chirp run myapp` resolves to `myapp:app`).
+
 ### AppConfig
 
 Frozen dataclass for application configuration. See [[docs/core-concepts/configuration|Configuration]].
@@ -129,6 +143,8 @@ Convenience for 302 redirects: `Redirect(url)`.
 | Type | Description |
 |------|-------------|
 | `Template(name, **ctx)` | Full template render |
+| `Template.inline(source, **ctx)` | Render from string (prototyping) |
+| `InlineTemplate(source, **ctx)` | String-based template (returned by `Template.inline()`) |
 | `Fragment(name, block, **ctx)` | Named block render |
 | `Page(name, block, **ctx)` | Auto-detect fragment vs full page |
 | `Stream(name, **ctx)` | Progressive streaming render |

@@ -1,6 +1,6 @@
 # RFC: CLI and Project Scaffolding
 
-**Status**: Draft  
+**Status**: Implemented  
 **Date**: 2026-02-10  
 **Scope**: New `chirp.cli` module, `Template.inline()`, `pyproject.toml` scripts  
 **Related**: Gap Analysis — Kida/Chirp Strategic Plan

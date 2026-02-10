@@ -10,9 +10,29 @@ keywords: [quickstart, hello world, first app, templates, fragments]
 category: onboarding
 ---
 
-## Hello World
+## Scaffold a Project
 
-Create a file called `app.py`:
+The fastest way to start is the `chirp new` command:
+
+```bash
+chirp new myapp
+cd myapp
+python app.py
+```
+
+Open `http://127.0.0.1:8000` in your browser. This generates an `app.py`, a `templates/` directory with `base.html` and `index.html`, a `static/` directory with `style.css`, and a `tests/` directory with a smoke test.
+
+For an even smaller starting point:
+
+```bash
+chirp new myapp --minimal
+```
+
+This generates only `app.py` and `templates/index.html`.
+
+## Hello World (Manual)
+
+You can also create a project by hand. Create a file called `app.py`:
 
 ```python
 from chirp import App

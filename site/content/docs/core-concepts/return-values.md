@@ -15,15 +15,34 @@ category: explanation
 Route functions return *values*. Chirp handles content negotiation based on the return type -- no `make_response()`, no `jsonify()`, no explicit content-type wiring.
 
 ```python
-return "Hello"                                   # -> 200, text/html
-return {"users": [...]}                          # -> 200, application/json
-return Template("page.html", title="Home")       # -> 200, rendered via kida
-return Fragment("page.html", "results", items=x) # -> 200, rendered block
-return Stream("dashboard.html", **async_ctx)     # -> 200, streamed HTML
-return EventStream(generator())                  # -> SSE stream
-return Response(body=b"...", status=201)          # -> explicit control
-return Redirect("/login")                        # -> 302
+return "Hello"                                       # -> 200, text/html
+return {"users": [...]}                              # -> 200, application/json
+return Template("page.html", title="Home")           # -> 200, rendered via kida
+return Template.inline("<h1>{{ t }}</h1>", t="Hi")   # -> 200, from string
+return Fragment("page.html", "results", items=x)     # -> 200, rendered block
+return Stream("dashboard.html", **async_ctx)         # -> 200, streamed HTML
+return EventStream(generator())                      # -> SSE stream
+return Response(body=b"...", status=201)              # -> explicit control
+return Redirect("/login")                            # -> 302
 ```
+
+## InlineTemplate (Prototyping)
+
+Renders a template from a string instead of a file. Useful for prototyping and scripts where you don't want to set up a `templates/` directory:
+
+```python
+from chirp import Template
+
+@app.route("/")
+def index():
+    return Template.inline("<h1>{{ greeting }}</h1>", greeting="Hello, world!")
+```
+
+`Template.inline()` returns an `InlineTemplate` instance. It works through content negotiation without requiring a `template_dir` to be configured.
+
+:::{note}
+`InlineTemplate` is a prototyping shortcut. `app.check()` will emit a warning for routes that return it. Replace with file-based `Template` before production.
+:::
 
 ## Template
 

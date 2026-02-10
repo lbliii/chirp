@@ -5,7 +5,16 @@ from dataclasses import dataclass
 import pytest
 
 from chirp.app import App
-from chirp.http.forms import FormBindingError, FormData, UploadFile, form_from, parse_form_data
+from chirp.templating.returns import ValidationError
+from chirp.http.forms import (
+    FormBindingError,
+    FormData,
+    UploadFile,
+    form_from,
+    form_or_errors,
+    form_values,
+    parse_form_data,
+)
 from chirp.http.request import Request
 from chirp.testing import TestClient
 
@@ -359,3 +368,184 @@ class TestFormFrom:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             assert response.text == "Alice|None"
+
+
+# ---------------------------------------------------------------------------
+# form_or_errors() — glue function
+# ---------------------------------------------------------------------------
+
+
+class TestFormOrErrors:
+    """Tests for form_or_errors() — bind or return ValidationError."""
+
+    async def test_success_returns_dataclass(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body"
+            )
+            if isinstance(result, ValidationError):
+                return "error"
+            return f"ok:{result.title}|{result.priority}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=Hello&priority=high",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "ok:Hello|high"
+
+    async def test_failure_returns_validation_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body"
+            )
+            if isinstance(result, ValidationError):
+                return f"errors:{sorted(result.context['errors'].keys())}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "title" in response.text
+
+    async def test_failure_includes_form_values(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body"
+            )
+            if isinstance(result, ValidationError):
+                return f"form:{result.context.get('form', {})}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "description" in response.text
+            assert "stuff" in response.text
+
+    async def test_extra_context_passed_through(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body",
+                columns=["todo", "done"],
+            )
+            if isinstance(result, ValidationError):
+                return f"columns:{result.context.get('columns')}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "todo" in response.text
+
+    async def test_retarget_passed_through(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body",
+                retarget="#errors",
+            )
+            if isinstance(result, ValidationError):
+                return f"retarget:{result.retarget}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "retarget:#errors"
+
+    async def test_template_and_block_name(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "tasks.html", "task_form"
+            )
+            if isinstance(result, ValidationError):
+                return f"{result.template_name}|{result.block_name}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "tasks.html|task_form"
+
+
+# ---------------------------------------------------------------------------
+# form_values() — dataclass/Mapping to dict[str, str]
+# ---------------------------------------------------------------------------
+
+
+class TestFormValues:
+    """Tests for form_values() — extract values for template re-population."""
+
+    def test_dataclass_input(self) -> None:
+        form = SimpleForm(title="Hello", description="World", priority="high")
+        result = form_values(form)
+        assert result == {"title": "Hello", "description": "World", "priority": "high"}
+
+    def test_dataclass_none_becomes_empty_string(self) -> None:
+        form = OptionalForm(name="Alice", nickname=None)
+        result = form_values(form)
+        assert result == {"name": "Alice", "nickname": ""}
+
+    def test_dataclass_int_to_string(self) -> None:
+        form = TypedForm(name="Bob", age=25, score=9.5, active=True)
+        result = form_values(form)
+        assert result == {
+            "name": "Bob",
+            "age": "25",
+            "score": "9.5",
+            "active": "True",
+        }
+
+    def test_mapping_input(self) -> None:
+        result = form_values({"title": "Hello", "count": 5})
+        assert result == {"title": "Hello", "count": "5"}
+
+    def test_unknown_type_returns_empty(self) -> None:
+        result = form_values("not a form")
+        assert result == {}
+
+    def test_empty_dataclass(self) -> None:
+        @dataclass(frozen=True, slots=True)
+        class EmptyForm:
+            pass
+
+        result = form_values(EmptyForm())
+        assert result == {}
+
+    def test_empty_mapping(self) -> None:
+        result = form_values({})
+        assert result == {}

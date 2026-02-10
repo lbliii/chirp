@@ -48,11 +48,19 @@ Requires Python 3.14+
 
 ## Quick Start
 
+```bash
+chirp new myapp && cd myapp && python app.py
+```
+
 | Function | Description |
 |----------|-------------|
+| `chirp new <name>` | Scaffold a new project |
+| `chirp run <app>` | Start the dev server from an import string |
+| `chirp check <app>` | Validate hypermedia contracts |
 | `App()` | Create an application |
 | `@app.route(path)` | Register a route handler |
 | `Template(name, **ctx)` | Render a full template |
+| `Template.inline(src, **ctx)` | Render from string (prototyping) |
 | `Fragment(name, block, **ctx)` | Render a named template block |
 | `Stream(name, **ctx)` | Stream HTML progressively |
 | `EventStream(gen)` | Server-Sent Events stream |

@@ -51,7 +51,7 @@ from chirp import (
     login_required,
     logout,
 )
-from chirp.http.forms import form_from
+from chirp.http.forms import form_from, form_or_errors, form_values
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
@@ -498,7 +498,13 @@ def index(request: Request):
 @login_required
 async def add_task(request: Request):
     """Add a task — returns OOB (column + stats) or ValidationError."""
-    f = await form_from(request, TaskForm)
+    result = await form_or_errors(
+        request, TaskForm, "board.html", "add_form", columns=COLUMNS,
+    )
+    if isinstance(result, ValidationError):
+        return result
+
+    f = result
     assignee = f.assignee or get_user().name
     tags = tuple(t.strip() for t in f.tags.split(",") if t.strip())
 
@@ -509,8 +515,7 @@ async def add_task(request: Request):
             "add_form",
             errors=errors,
             columns=COLUMNS,
-            form={"title": f.title, "description": f.description, "status": f.status,
-                  "priority": f.priority, "assignee": assignee, "tags": f.tags},
+            form=form_values(f),
         )
 
     _add_task(f.title, f.description, f.status, f.priority, assignee, tags)
@@ -535,13 +540,19 @@ def edit_task(task_id: int):
 @login_required
 async def save_task(request: Request, task_id: int):
     """Save an edited task — returns OOB (card + stats) or ValidationError."""
-    f = await form_from(request, EditTaskForm)
-    assignee = f.assignee or None
-    tags = tuple(t.strip() for t in f.tags.split(",") if t.strip())
-
     task = _get_task(task_id)
     if task is None:
         return ("Task not found", 404)
+
+    result = await form_or_errors(
+        request, EditTaskForm, "task_form.html", "edit_form", task=task,
+    )
+    if isinstance(result, ValidationError):
+        return result
+
+    f = result
+    assignee = f.assignee or None
+    tags = tuple(t.strip() for t in f.tags.split(",") if t.strip())
 
     errors = _validate_task(f.title, task.status, f.priority)
     if errors:
