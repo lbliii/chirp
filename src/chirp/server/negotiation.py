@@ -14,11 +14,28 @@ from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, Response, SSEResponse, StreamingResponse
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
-from chirp.templating.returns import Fragment, OOB, Page, Stream, Template, ValidationError
+from chirp.templating.returns import (
+    Fragment,
+    InlineTemplate,
+    OOB,
+    Page,
+    Stream,
+    Template,
+    ValidationError,
+)
 from chirp.templating.streaming import has_async_context, render_stream_async
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
+
+
+def _minimal_kida_env() -> Environment:
+    """Create a bare kida Environment for inline template rendering.
+
+    Used when no template_dir is configured but an InlineTemplate
+    needs to be rendered (prototyping without any file templates).
+    """
+    return Environment()
 
 
 def negotiate(
@@ -65,6 +82,11 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             html = render_template(kida_env, value)
+            return Response(body=html, content_type="text/html; charset=utf-8")
+        case InlineTemplate():
+            env = kida_env or _minimal_kida_env()
+            tmpl = env.from_string(value.source)
+            html = tmpl.render(value.context)
             return Response(body=html, content_type="text/html; charset=utf-8")
         case Fragment():
             if kida_env is None:
@@ -176,7 +198,7 @@ def negotiate(
         case _:
             msg = (
                 f"Cannot convert {type(value).__name__} to a response. "
-                f"Return str, dict, bytes, Template, Fragment, Stream, "
-                f"EventStream, Response, or Redirect."
+                f"Return str, dict, bytes, Template, InlineTemplate, Fragment, "
+                f"Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)

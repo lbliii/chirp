@@ -515,6 +515,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         template=fc.template,
                     ))
 
+    # 2b. Warn about routes with InlineTemplate return annotations
+    _check_inline_templates(router, result)
+
     # 3. Scan templates for htmx targets and form actions
     if kida_env is not None and kida_env.loader is not None:
         template_sources = _load_template_sources(kida_env)
@@ -585,6 +588,42 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 ))
 
     return result
+
+
+def _check_inline_templates(router: Router, result: CheckResult) -> None:
+    """Warn about routes whose return annotation includes InlineTemplate.
+
+    InlineTemplate is a prototyping shortcut and should be replaced with
+    file-based templates before shipping to production.
+    """
+    import inspect
+
+    from chirp.templating.returns import InlineTemplate
+
+    for route in router.routes:
+        hints = inspect.get_annotations(route.handler, eval_str=False)
+        return_hint = hints.get("return")
+        if return_hint is None:
+            continue
+
+        # Check if return annotation is or contains InlineTemplate
+        check_types = (return_hint,)
+        origin = getattr(return_hint, "__args__", None)
+        if origin is not None:
+            check_types = origin  # type: ignore[assignment]
+
+        for t in check_types:
+            if t is InlineTemplate or (isinstance(t, type) and issubclass(t, InlineTemplate)):
+                result.issues.append(ContractIssue(
+                    severity=Severity.WARNING,
+                    category="inline_template",
+                    message=(
+                        f"Route '{route.path}' returns InlineTemplate — "
+                        f"replace with a file-based Template before production."
+                    ),
+                    route=route.path,
+                ))
+                break
 
 
 def _load_template_sources(kida_env: Any) -> dict[str, str]:

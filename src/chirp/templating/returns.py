@@ -24,6 +24,34 @@ class Template:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "context", context)
 
+    @staticmethod
+    def inline(source: str, /, **context: Any) -> InlineTemplate:
+        """Create a template from a string.  For prototyping only.
+
+        Usage::
+
+            return Template.inline("<h1>{{ title }}</h1>", title="Hello")
+
+        """
+        return InlineTemplate(source, **context)
+
+
+@dataclass(frozen=True, slots=True)
+class InlineTemplate:
+    """A template rendered from a string source.  For prototyping.
+
+    Separate type so the content negotiation layer can distinguish it
+    from file-based templates, and ``app.check()`` can warn about
+    inline templates in production code.
+    """
+
+    source: str
+    context: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(self, source: str, /, **context: Any) -> None:
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "context", context)
+
 
 @dataclass(frozen=True, slots=True)
 class Fragment:

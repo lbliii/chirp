@@ -8,7 +8,7 @@ once during App._freeze() and passed through the request pipeline.
 from collections.abc import Callable
 from typing import Any
 
-from kida import Environment, FileSystemLoader
+from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
 from chirp.config import AppConfig
 from chirp.templating.filters import BUILTIN_FILTERS

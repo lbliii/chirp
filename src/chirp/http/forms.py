@@ -17,6 +17,8 @@ from dataclasses import dataclass, fields as dc_fields
 from pathlib import Path
 from typing import Any, get_type_hints
 
+from chirp.templating.returns import ValidationError
+
 
 @dataclass(frozen=True, slots=True)
 class UploadFile:
@@ -204,6 +206,79 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
         raise FormBindingError(errors)
 
     return datacls(**values)
+
+
+async def form_or_errors[T](
+    request: Any,
+    datacls: type[T],
+    template_name: str,
+    block_name: str,
+    /,
+    *,
+    retarget: str | None = None,
+    **extra_context: Any,
+) -> T | ValidationError:
+    """Bind form data or return a ValidationError for re-rendering.
+
+    Combines ``form_from()`` and ``ValidationError`` into a single call.
+    On success, returns the populated dataclass. On binding failure,
+    returns a ``ValidationError`` with the errors and the raw form values
+    for re-population.
+
+    Usage::
+
+        result = await form_or_errors(request, TaskForm, "tasks.html", "form")
+        if isinstance(result, ValidationError):
+            return result
+        # result is TaskForm — proceed with validated data
+
+    Args:
+        request: A Chirp Request object (anything with an async ``.form()`` method).
+        datacls: A dataclass class to bind form data into.
+        template_name: Template name for the error response.
+        block_name: Block name for the error response.
+        retarget: Optional ``HX-Retarget`` header value.
+        **extra_context: Additional template context passed to ``ValidationError``.
+
+    Returns:
+        An instance of ``datacls`` on success, or a ``ValidationError`` on failure.
+    """
+    try:
+        return await form_from(request, datacls)
+    except FormBindingError as e:
+        form_data = await request.form()
+        return ValidationError(
+            template_name,
+            block_name,
+            retarget=retarget,
+            errors=e.errors,
+            form=dict(form_data),
+            **extra_context,
+        )
+
+
+def form_values(form: Any) -> dict[str, str]:
+    """Extract form field values as strings for template re-population.
+
+    Accepts a dataclass instance or a ``Mapping``. Returns a flat
+    ``dict[str, str]`` suitable for passing as ``form=...`` context
+    to ``ValidationError``.
+
+    Args:
+        form: A dataclass instance or a ``Mapping``.
+
+    Returns:
+        A dict of field names to string values.
+    """
+    if hasattr(form, "__dataclass_fields__"):
+        return {
+            f.name: str(v) if v is not None else ""
+            for f in dc_fields(form)
+            for v in (getattr(form, f.name),)
+        }
+    if isinstance(form, Mapping):
+        return {k: str(v) for k, v in form.items()}
+    return {}
 
 
 def _unwrap_optional(hint: Any) -> type:

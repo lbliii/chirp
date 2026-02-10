@@ -1,0 +1,85 @@
+{#- Chirp form field macros — importable via {% from "chirp/forms" import ... %}
+
+   Each macro renders a labelled form field with inline error display.
+   Works with the ``field_errors`` filter and ``ValidationError``.
+
+   Usage:
+       {% from "chirp/forms" import text_field, textarea_field, select_field %}
+       {{ text_field("title", form.title ?? "", label="Title",
+                     errors=errors, required=true) }}
+-#}
+
+{# Text input with label and error display #}
+{% def text_field(name, value="", label=none, errors=none, type="text",
+                  required=false, placeholder="", attrs="") %}
+<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+    {% if label %}
+        <label for="{{ name }}">{{ label }}</label>
+    {% end %}
+    <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
+           value="{{ value }}"
+           {{ "required" if required else "" }}
+           {{ 'placeholder="' ~ placeholder ~ '"' if placeholder else "" }}
+           {{ attrs }}>
+    {% for msg in errors | field_errors(name) %}
+        <span class="field-error">{{ msg }}</span>
+    {% end %}
+</div>
+{% end %}
+
+{# Textarea with label and error display #}
+{% def textarea_field(name, value="", label=none, errors=none,
+                      rows=4, required=false, placeholder="") %}
+<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+    {% if label %}
+        <label for="{{ name }}">{{ label }}</label>
+    {% end %}
+    <textarea id="{{ name }}" name="{{ name }}" rows="{{ rows }}"
+              {{ "required" if required else "" }}
+              {{ 'placeholder="' ~ placeholder ~ '"' if placeholder else "" }}>{{ value }}</textarea>
+    {% for msg in errors | field_errors(name) %}
+        <span class="field-error">{{ msg }}</span>
+    {% end %}
+</div>
+{% end %}
+
+{# Select dropdown with label and error display #}
+{% def select_field(name, options, selected="", label=none, errors=none,
+                    required=false) %}
+<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+    {% if label %}
+        <label for="{{ name }}">{{ label }}</label>
+    {% end %}
+    <select id="{{ name }}" name="{{ name }}"
+            {{ "required" if required else "" }}>
+        {% for opt in options %}
+            <option value="{{ opt.value }}"
+                    {{ "selected" if opt.value == selected else "" }}>
+                {{ opt.label }}
+            </option>
+        {% end %}
+    </select>
+    {% for msg in errors | field_errors(name) %}
+        <span class="field-error">{{ msg }}</span>
+    {% end %}
+</div>
+{% end %}
+
+{# Checkbox #}
+{% def checkbox_field(name, checked=false, label=none, errors=none) %}
+<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+    <label>
+        <input type="checkbox" id="{{ name }}" name="{{ name }}"
+               {{ "checked" if checked else "" }}>
+        {{ label ?? name }}
+    </label>
+    {% for msg in errors | field_errors(name) %}
+        <span class="field-error">{{ msg }}</span>
+    {% end %}
+</div>
+{% end %}
+
+{# Hidden field #}
+{% def hidden_field(name, value="") %}
+<input type="hidden" name="{{ name }}" value="{{ value }}">
+{% end %}
