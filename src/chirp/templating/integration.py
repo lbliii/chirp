@@ -25,10 +25,20 @@ def create_environment(
     Called once during ``App._freeze()``. The returned environment
     is immutable for the lifetime of the app.
     """
-    loader = ChoiceLoader([
+    loaders = [
         FileSystemLoader(str(config.template_dir)),
         PackageLoader("chirp.templating", "macros"),
-    ])
+    ]
+
+    # Auto-detect chirp-ui if installed
+    try:
+        import chirp_ui  # noqa: F401
+
+        loaders.append(PackageLoader("chirp_ui", "templates"))
+    except ImportError:
+        pass
+
+    loader = ChoiceLoader(loaders)
     env = Environment(
         loader=loader,
         autoescape=config.autoescape,
