@@ -8,7 +8,7 @@
 {% block step_form %}
 {% from "_fields.html" import field with context %}
 
-<form method="post" action="/step/2">
+<form method="post" action="/step/2" hx-validate="true">
 
   {{ field("address", "Street address", placeholder="123 Main St, Apt 4") }}
   {{ field("city", "City", placeholder="San Francisco") }}

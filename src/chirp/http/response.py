@@ -125,6 +125,15 @@ class Response:
         """
         return self.with_header("HX-Reswap", strategy)
 
+    def with_hx_reselect(self, selector: str) -> Response:
+        """Override the hx-select for this response.
+
+        Sets the ``HX-Reselect`` response header to a CSS selector that
+        chooses which part of the response is used for swapping, overriding
+        any ``hx-select`` on the triggering element.
+        """
+        return self.with_header("HX-Reselect", selector)
+
     def with_hx_trigger(self, event: str | dict[str, Any]) -> Response:
         """Trigger a client-side event after the response is received.
 
@@ -332,6 +341,10 @@ class SSEResponse:
 
     def with_hx_reswap(self, strategy: str) -> SSEResponse:  # noqa: ARG002
         """No-op: SSE streams cannot set HX-Reswap."""
+        return self
+
+    def with_hx_reselect(self, selector: str = "") -> SSEResponse:  # noqa: ARG002
+        """No-op: SSE streams cannot set HX-Reselect."""
         return self
 
     def with_hx_trigger(self, event: str | dict[str, Any] = "") -> SSEResponse:  # noqa: ARG002

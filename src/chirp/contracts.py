@@ -128,6 +128,41 @@ _HTMX_URL_ATTRS = frozenset({
     "hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete",
 })
 
+# All valid htmx attributes (from https://htmx.org/reference/)
+_HTMX_ALL_ATTRS = frozenset({
+    # Core HTTP
+    "hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete",
+    # Triggering
+    "hx-trigger",
+    # Targeting & swapping
+    "hx-target", "hx-swap", "hx-swap-oob", "hx-select", "hx-select-oob",
+    # URL management
+    "hx-push-url", "hx-replace-url",
+    # Parameters & values
+    "hx-vals", "hx-headers", "hx-include", "hx-params", "hx-encoding",
+    # Progressive enhancement
+    "hx-boost",
+    # Loading UX
+    "hx-indicator", "hx-disabled-elt",
+    # Synchronization
+    "hx-sync",
+    # Validation
+    "hx-validate",
+    # Confirmation
+    "hx-confirm", "hx-prompt",
+    # Preservation
+    "hx-preserve",
+    # Extensions
+    "hx-ext",
+    # Inheritance control
+    "hx-disinherit", "hx-inherit",
+    # History
+    "hx-history", "hx-history-elt",
+    # Misc
+    "hx-request", "hx-disable",
+})
+# Note: hx-on::* (event handlers) use a wildcard prefix pattern, checked separately
+
 # Regex to extract htmx/form attributes from raw template HTML
 # Matches: hx-get="/path" or action="/path"
 _ATTR_PATTERN = re.compile(
@@ -363,6 +398,97 @@ def _check_hx_target_selectors(
                     ))
 
     return issues, validated
+
+
+# ---------------------------------------------------------------------------
+# hx-indicator selector scanner
+# ---------------------------------------------------------------------------
+
+# Regex: hx-indicator="..." values (CSS selectors)
+_HX_INDICATOR_PATTERN = re.compile(
+    r'hx-indicator\s*=\s*["\']([^"\']*)["\']',
+)
+
+
+def _check_hx_indicator_selectors(
+    template_sources: dict[str, str],
+    all_ids: set[str],
+) -> list[ContractIssue]:
+    """Validate ``hx-indicator`` selectors against the pool of static element IDs.
+
+    Only validates simple ``#id`` selectors.  Extended selectors (``closest``,
+    ``find``, ``inherit``) and comma-separated multiples are skipped.
+    """
+    issues: list[ContractIssue] = []
+
+    for tmpl_name, source in template_sources.items():
+        for match in _HX_INDICATOR_PATTERN.finditer(source):
+            value = match.group(1).strip()
+            if not value or "{{" in value or "{%" in value:
+                continue
+            # Skip extended/special selectors
+            first_word = value.split()[0] if value else ""
+            if first_word.lower() in {"closest", "find", "inherit"}:
+                continue
+            # Skip comma-separated multiples
+            if "," in value:
+                continue
+            # Validate #id selectors
+            if value.startswith("#"):
+                if " " in value:
+                    continue
+                target_id = value[1:]
+                if not target_id:
+                    continue
+                if target_id not in all_ids:
+                    suggestion = _closest_id(target_id, all_ids)
+                    hint = f' Did you mean "#{suggestion}"?' if suggestion else ""
+                    issues.append(ContractIssue(
+                        severity=Severity.WARNING,
+                        category="hx-indicator",
+                        message=(
+                            f'hx-indicator="#{target_id}" — no element with '
+                            f'id="{target_id}" found in any template.{hint}'
+                        ),
+                        template=tmpl_name,
+                    ))
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# hx-boost value scanner
+# ---------------------------------------------------------------------------
+
+_HX_BOOST_PATTERN = re.compile(r'hx-boost\s*=\s*["\']([^"\']*)["\']')
+
+
+def _check_hx_boost(
+    template_sources: dict[str, str],
+) -> list[ContractIssue]:
+    """Validate ``hx-boost`` values are ``"true"`` or ``"false"``.
+
+    htmx silently treats any non-``"true"`` value as false, which is
+    confusing.  Chirp catches this at compile time.
+    """
+    issues: list[ContractIssue] = []
+    for tmpl_name, source in template_sources.items():
+        for match in _HX_BOOST_PATTERN.finditer(source):
+            value = match.group(1).strip().lower()
+            # Skip template expressions
+            if "{{" in value or "{%" in value:
+                continue
+            if value not in ("true", "false"):
+                issues.append(ContractIssue(
+                    severity=Severity.WARNING,
+                    category="hx-boost",
+                    message=(
+                        f'hx-boost="{match.group(1)}" — '
+                        f'must be "true" or "false".'
+                    ),
+                    template=tmpl_name,
+                ))
+    return issues
 
 
 # ---------------------------------------------------------------------------
@@ -725,6 +851,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
 
+        # 4b. Check hx-indicator selectors against static element IDs
+        result.issues.extend(_check_hx_indicator_selectors(template_sources, all_ids))
+
+        # 4c. Check hx-boost values
+        result.issues.extend(_check_hx_boost(template_sources))
+
         # 5. Check accessibility — htmx on non-interactive elements
         for tmpl_name, source in template_sources.items():
             a11y_issues = _check_accessibility(source, tmpl_name)
@@ -813,15 +945,21 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     route=route.path,
                 ))
 
-        # 7. Orphan routes (routes never referenced from templates)
+        # 7. Orphan routes (routes never referenced from templates).
+        #    Page convention routes (from mount_pages()) are accessed via
+        #    browser navigation or JavaScript, not htmx attributes — skip them.
+        page_route_paths: set[str] = getattr(app, "_page_route_paths", set())
         for route_path in route_paths:
-            if route_path not in referenced_paths and route_path != "/":
-                result.issues.append(ContractIssue(
-                    severity=Severity.INFO,
-                    category="orphan",
-                    message=f"Route '{route_path}' is not referenced from any template.",
-                    route=route_path,
-                ))
+            if route_path in referenced_paths or route_path == "/":
+                continue
+            if route_path in page_route_paths:
+                continue
+            result.issues.append(ContractIssue(
+                severity=Severity.INFO,
+                category="orphan",
+                message=f"Route '{route_path}' is not referenced from any template.",
+                route=route_path,
+            ))
 
         # 8. Dead template detection — templates never referenced by any
         #    route or other template via extends/include/from/import.
@@ -843,11 +981,20 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         for source in template_sources.values():
             referenced_templates.update(_extract_template_references(source))
 
+        # From page convention (mount_pages) — page.py implicitly renders
+        # its sibling page.html, and _layout.html files are wired by the
+        # framework's layout chain.
+        page_templates: set[str] = getattr(app, "_page_templates", set())
+        referenced_templates.update(page_templates)
+
         dead = sorted(all_template_names - referenced_templates)
         for tmpl_name in dead:
             # Skip partials by convention (leading underscore in filename)
             basename = tmpl_name.rsplit("/", 1)[-1]
             if basename.startswith("_"):
+                continue
+            # Skip built-in chirp framework templates
+            if tmpl_name.startswith("chirp/"):
                 continue
             result.dead_templates_found += 1
             result.issues.append(ContractIssue(

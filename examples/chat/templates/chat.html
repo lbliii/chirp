@@ -59,9 +59,11 @@
 <form id="send-form"
       hx-post="/chat/send"
       hx-swap="none"
+      hx-sync="this:abort"
+      hx-disabled-elt="#send-btn"
       hx-on::after-request="this.reset()">
   <input type="text" name="message" placeholder="Type a message..." autocomplete="off" autofocus>
-  <button type="submit">Send</button>
+  <button id="send-btn" type="submit">Send</button>
 </form>
 
 <script>

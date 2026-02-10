@@ -234,6 +234,13 @@ def _process_route_file(
         # Default to GET for a bare handler
         found_handlers["GET"] = handler
 
+    # Check for sibling template (same stem, .html extension).
+    # Convention: page.py renders page.html in the same directory.
+    sibling_html = file.with_suffix(".html")
+    template_name: str | None = None
+    if sibling_html.is_file():
+        template_name = str(sibling_html.relative_to(root))
+
     # Register each handler
     for method, func in found_handlers.items():
         route = PageRoute(
@@ -242,6 +249,7 @@ def _process_route_file(
             methods=frozenset({method}),
             layout_chain=layout_chain,
             context_providers=context_providers,
+            template_name=template_name,
             name=None,
         )
         routes.append(route)

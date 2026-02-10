@@ -71,6 +71,9 @@ class App:
         "_middleware",
         "_middleware_list",
         "_migrations_dir",
+        # Page convention metadata (populated by mount_pages)
+        "_page_route_paths",
+        "_page_templates",
         "_pending_routes",
         "_pending_tools",
         # Compiled state (populated by _freeze)
@@ -106,6 +109,8 @@ class App:
         self._shutdown_hooks: list[Callable[..., Any]] = []
         self._worker_startup_hooks: list[Callable[..., Any]] = []
         self._worker_shutdown_hooks: list[Callable[..., Any]] = []
+        self._page_route_paths: set[str] = set()
+        self._page_templates: set[str] = set()
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
 
@@ -182,6 +187,17 @@ class App:
 
         pages_dir = pages_dir or "pages"
         page_routes = discover_pages(pages_dir)
+
+        # Record page convention metadata for contract checking.
+        # Page routes are navigated to directly (browser URL bar, JS fetch)
+        # and their sibling templates are rendered implicitly — the checker
+        # uses this to suppress false-positive orphan/dead warnings.
+        for page_route in page_routes:
+            self._page_route_paths.add(page_route.url_path)
+            if page_route.template_name:
+                self._page_templates.add(page_route.template_name)
+            for layout in page_route.layout_chain.layouts:
+                self._page_templates.add(layout.template_name)
 
         for page_route in page_routes:
             # Capture route metadata in closure

@@ -275,23 +275,24 @@ def reactive_stream(
     *,
     scope: str,
     index: DependencyIndex,
-    kida_env: Environment,
     context_builder: Callable[[], dict[str, Any] | Awaitable[dict[str, Any]]],
+    kida_env: Any = None,
 ) -> EventStream:
     """Create an SSE EventStream that auto-pushes re-rendered blocks.
 
     Subscribes to the ``ReactiveBus`` for the given scope.  When a
     ``ChangeEvent`` arrives, looks up affected blocks in the
-    ``DependencyIndex``, re-renders them via kida's ``render_block()``,
-    and yields them as ``Fragment`` objects for SSE delivery.
+    ``DependencyIndex`` and yields them as ``Fragment`` objects.
+    The chirp SSE layer handles rendering via the app's kida env.
 
     Args:
         bus: The reactive event bus to subscribe to.
         scope: Scope key (e.g., document ID).
         index: Dependency index mapping paths to blocks.
-        kida_env: Kida environment for template rendering.
         context_builder: Callable that returns the current context dict
             (called after each change to get fresh data).
+        kida_env: Deprecated — rendering is handled by the SSE response
+            layer.  Accepted for backwards compatibility.
 
     Returns:
         An ``EventStream`` ready to be returned from a route handler.
@@ -302,7 +303,6 @@ def reactive_stream(
         def live(doc_id: str) -> EventStream:
             return reactive_stream(
                 bus, scope=doc_id, index=dep_index,
-                kida_env=app.kida_env,
                 context_builder=lambda: {"doc": store.get(doc_id)},
             )
     """

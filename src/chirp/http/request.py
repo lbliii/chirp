@@ -60,6 +60,11 @@ class Request:
         return self.headers.get("hx-history-restore-request") == "true"
 
     @property
+    def is_boosted(self) -> bool:
+        """True if this request came from an hx-boost enhanced element."""
+        return self.headers.get("hx-boosted") == "true"
+
+    @property
     def htmx_target(self) -> str | None:
         """The target element ID from HX-Target header."""
         return self.headers.get("hx-target")
@@ -68,6 +73,11 @@ class Request:
     def htmx_trigger(self) -> str | None:
         """The trigger element ID from HX-Trigger header."""
         return self.headers.get("hx-trigger")
+
+    @property
+    def htmx_trigger_name(self) -> str | None:
+        """The name attribute of the trigger element (HX-Trigger-Name header)."""
+        return self.headers.get("hx-trigger-name")
 
     @property
     def content_type(self) -> str | None:

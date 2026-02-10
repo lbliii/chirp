@@ -45,6 +45,7 @@
      ================================================================ #}
   <header class="app-header">
     <h1>Kanban Board</h1>
+    <img id="board-spinner" class="htmx-indicator" src="/static/spinner.svg" alt="" style="width:1.2rem;height:1.2rem;">
     {% block header_stats %}
     <div id="board-stats" class="stats" hx-swap-oob="outerHTML">
       {% cache "board-stats", ttl=30 %}
@@ -142,7 +143,8 @@
 
     {# --- Quick-add form --- #}
     {% block add_form %}
-    <form class="add-form" hx-post="/tasks" hx-swap="none">
+    <form class="add-form" hx-post="/tasks" hx-swap="none"
+          hx-indicator="#board-spinner" hx-disabled-elt="find button">
       {{ field("title", "Task", placeholder="What needs doing?") }}
       <div class="form-field">
         <label for="field-status">Column</label>
@@ -186,8 +188,18 @@
   <div sse-swap="fragment" style="display:none;"></div>
 </div>
 
-{# Toast for delete notifications #}
+{# Toast for delete notifications — uses htmx.process() to activate any
+   hx-* attributes on dynamically inserted toast content (e.g. an "Undo" button). #}
 <div id="toast" class="toast"></div>
+
+{# Undo area — listens for taskDeleted event via hx-trigger (htmx-native bridging) #}
+<div id="undo-area"
+     hx-get="/tasks/last-deleted"
+     hx-trigger="taskDeleted from:body"
+     hx-target="this"
+     hx-swap="innerHTML">
+</div>
+
 <script>
   {# Send CSRF token with every htmx request via X-CSRF-Token header #}
   document.body.addEventListener("htmx:configRequest", function(event) {
@@ -200,7 +212,15 @@
     t.textContent = "Task deleted.";
     t.classList.add("show");
     setTimeout(function() { t.classList.remove("show"); }, 2000);
+
+    {# htmx.process() — activate htmx on any hx-* attributed elements
+       that were injected into the toast via innerHTML (outside htmx's swap). #}
+    htmx.process(t);
   });
+
+  {# htmx.trigger() — bridge JS events to htmx declarative listeners.
+     Instead of: document.dispatchEvent(new CustomEvent('taskDeleted', ...))
+     Use htmx native: htmx.trigger(document.body, 'taskDeleted', {}) #}
 </script>
 
 {# ==================================================================

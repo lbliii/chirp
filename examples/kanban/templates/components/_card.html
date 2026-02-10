@@ -39,20 +39,26 @@
       {% match task.status %}
         {% case "backlog" %}
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/in_progress"
-                  hx-swap="none" title="Move to In Progress">&rarr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move to In Progress">&rarr;</button>
         {% case "in_progress" %}
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/backlog"
-                  hx-swap="none" title="Move to Backlog">&larr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move to Backlog">&larr;</button>
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/review"
-                  hx-swap="none" title="Move to Review">&rarr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move to Review">&rarr;</button>
         {% case "review" %}
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/in_progress"
-                  hx-swap="none" title="Move back">&larr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move back">&larr;</button>
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/done"
-                  hx-swap="none" title="Move to Done">&rarr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move to Done">&rarr;</button>
         {% case "done" %}
           <button class="move-btn" hx-post="/tasks/{{ task.id }}/move/review"
-                  hx-swap="none" title="Move back">&larr;</button>
+                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-disabled-elt="this" title="Move back">&larr;</button>
       {% end %}
       <button class="move-btn danger" hx-delete="/tasks/{{ task.id }}"
               hx-swap="none" hx-confirm="Delete &quot;{{ task.title }}&quot;?"

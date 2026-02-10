@@ -132,6 +132,14 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_reswap("innerHTML")
         assert ("HX-Reswap", "innerHTML") in r.headers
 
+    def test_hx_reselect(self) -> None:
+        r = Response().with_hx_reselect("#content")
+        assert ("HX-Reselect", "#content") in r.headers
+
+    def test_hx_reselect_css_selector(self) -> None:
+        r = Response().with_hx_reselect(".results > .item")
+        assert ("HX-Reselect", ".results > .item") in r.headers
+
     def test_hx_trigger_string(self) -> None:
         r = Response().with_hx_trigger("closeModal")
         assert ("HX-Trigger", "closeModal") in r.headers
@@ -224,6 +232,7 @@ class TestSSEResponse:
         assert sse.with_hx_location("/url", target="#t", swap="innerHTML") is sse
         assert sse.with_hx_retarget("#sel") is sse
         assert sse.with_hx_reswap("outerHTML") is sse
+        assert sse.with_hx_reselect("#sel") is sse
         assert sse.with_hx_trigger("evt") is sse
         assert sse.with_hx_trigger({"a": 1}) is sse
         assert sse.with_hx_trigger_after_settle("evt") is sse

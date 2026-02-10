@@ -359,7 +359,7 @@
   </div>
   {% end %}
 
-  <div id="main" class="container">
+  <div id="main" class="container" hx-boost="true" hx-target="#main" hx-swap="innerHTML transition:true">
 
     {% if page == "list" %}
 
@@ -375,16 +375,15 @@
             <a class="story-title" href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>
             <span class="story-domain">({{ story.domain }})</span>
             {% else %}
-            <a class="story-title" href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main"
-              hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.title }}</a>
+            {# hx-boost on #main handles GET, push-url, target, and swap automatically #}
+            <a class="story-title" href="/story/{{ story.id }}">{{ story.title }}</a>
             {% end %}
           </div>
           <div class="story-meta-line" id="meta-{{ story.id }}">
             <span class="score">{{ story.score | pluralize("point") }}</span>
             <span>by {{ story.by }}</span>
             <span>{{ story.time | timeago }}</span>
-            <a href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main"
-              hx-swap="innerHTML transition:true" hx-push-url="true">{{ story.descendants | pluralize("comment") }}</a>
+            <a href="/story/{{ story.id }}">{{ story.descendants | pluralize("comment") }}</a>
           </div>
         </div>
       </li>
@@ -402,8 +401,7 @@
     {# ---- Story Detail ---- #}
     {% block story_detail %}
     <div class="story-detail">
-      <a class="back" href="/" hx-get="/" hx-target="#main" hx-swap="innerHTML transition:true"
-        hx-push-url="true">&larr; Back</a>
+      <a class="back" href="/">&larr; Back</a>
       <h2>
         {% if story.url %}
         <a href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>

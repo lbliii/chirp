@@ -120,6 +120,16 @@ class TestRequestProperties:
         req = Request.from_asgi(_make_scope(), _make_receive())
         assert req.is_fragment is False
 
+    def test_is_boosted_true(self) -> None:
+        scope = _make_scope(headers=[(b"hx-boosted", b"true")])
+        req = Request.from_asgi(scope, _make_receive())
+
+        assert req.is_boosted is True
+
+    def test_is_boosted_false(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.is_boosted is False
+
     def test_htmx_target(self) -> None:
         scope = _make_scope(headers=[(b"hx-target", b"#results")])
         req = Request.from_asgi(scope, _make_receive())
@@ -131,6 +141,16 @@ class TestRequestProperties:
         req = Request.from_asgi(scope, _make_receive())
 
         assert req.htmx_trigger == "search-input"
+
+    def test_htmx_trigger_name(self) -> None:
+        scope = _make_scope(headers=[(b"hx-trigger-name", b"search-field")])
+        req = Request.from_asgi(scope, _make_receive())
+
+        assert req.htmx_trigger_name == "search-field"
+
+    def test_htmx_trigger_name_missing(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.htmx_trigger_name is None
 
     def test_content_type(self) -> None:
         scope = _make_scope(headers=[(b"content-type", b"application/json")])

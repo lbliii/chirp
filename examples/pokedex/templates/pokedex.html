@@ -170,7 +170,8 @@
 {% end %}
 
 {% def pokemon_card(p) %}
-<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
+<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true"
+   hx-select="#main">
 <div class="card">
   <span class="card-id">#{{ p.id }}</span>
   <div class="card-name">
@@ -195,6 +196,14 @@
 
 <div class="header">
   <h1><span>Poke</span>dex</h1>
+  <div class="view-controls" style="display:flex;gap:0.4rem;margin-left:1rem;">
+    <button class="type-btn" style="background:#555;"
+            hx-get="/" hx-target="#main" hx-push-url="true"
+            hx-vals='{"view": "grid"}'>Grid View</button>
+    <button class="type-btn" style="background:#555;"
+            hx-get="/" hx-target="#main" hx-push-url="true"
+            hx-vals='{"view": "list"}'>List View</button>
+  </div>
   <span class="count">{{ total ?? "" }}{{ " Pokemon" if total is defined else "" }}</span>
 </div>
 
@@ -282,6 +291,19 @@
   {% let base = "" %}
   {% if current_type %}{% set base = "&type=" + current_type %}{% end %}
   {% if search %}{% set base = base + "&q=" + search %}{% end %}
+
+  {# Infinite scroll sentinel — loads next page when scrolled into view.
+     Uses hx-trigger="revealed" (htmx's native infinite scroll pattern).
+     Falls back to manual pagination buttons below for accessibility. #}
+  {% if page < total_pages %}
+  <div hx-get="/?page={{ page + 1 }}{{ base }}"
+       hx-trigger="revealed"
+       hx-target=".pokemon-grid"
+       hx-swap="beforeend"
+       hx-select=".pokemon-grid > *"
+       style="height:1px;"></div>
+  {% end %}
+
   <div class="pagination">
     <button class="page-btn"
             hx-get="/?page={{ page - 1 }}{{ base }}"
