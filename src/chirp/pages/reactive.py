@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
@@ -176,6 +177,81 @@ class BlockRef:
         return self.dom_id or self.block_name
 
 
+@dataclass(frozen=True, slots=True)
+class _SSESwapElement:
+    """Parsed info about an HTML element with ``sse-swap``."""
+
+    swap_event: str
+    dom_id: str | None
+    inner_block: str | None  # first {% block NAME %} inside element
+
+
+# Regex: element open tag with sse-swap attribute, capturing everything
+# up to the close of the tag.
+_SSE_SWAP_ELEM_RE = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*)>",
+    re.IGNORECASE,
+)
+
+_SSE_SWAP_ATTR_RE = re.compile(
+    r'\bsse-swap\s*=\s*["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+
+_ID_ATTR_RE = re.compile(
+    r'\bid\s*=\s*["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+
+_BLOCK_TAG_RE = re.compile(
+    r"\{%-?\s*block\s+(\w+)",
+)
+
+
+def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
+    """Extract elements with ``sse-swap`` and find their inner blocks.
+
+    For each ``<tag ... sse-swap="event" ...>`` found, captures the swap
+    event name, element ``id``, and the first ``{% block NAME %}``
+    between the open tag and the next occurrence of ``</tag>``.
+    """
+    results: list[_SSESwapElement] = []
+
+    for match in _SSE_SWAP_ELEM_RE.finditer(source):
+        attrs = match.group("attrs")
+        tag = match.group("tag").lower()
+
+        swap_match = _SSE_SWAP_ATTR_RE.search(attrs)
+        if not swap_match:
+            continue
+
+        swap_event = swap_match.group(1)
+
+        id_match = _ID_ATTR_RE.search(attrs)
+        dom_id = id_match.group(1) if id_match else None
+
+        # Find the inner block: search from after the open tag to the
+        # close tag (</tag>).  This is a best-effort approximation.
+        start = match.end()
+        close_tag = f"</{tag}"
+        close_idx = source.lower().find(close_tag, start)
+        if close_idx == -1:
+            inner = source[start:]
+        else:
+            inner = source[start:close_idx]
+
+        block_match = _BLOCK_TAG_RE.search(inner)
+        inner_block = block_match.group(1) if block_match else None
+
+        results.append(_SSESwapElement(
+            swap_event=swap_event,
+            dom_id=dom_id,
+            inner_block=inner_block,
+        ))
+
+    return results
+
+
 class DependencyIndex:
     """Maps context paths to the template blocks that depend on them.
 
@@ -230,6 +306,70 @@ class DependencyIndex:
             )
             for dep_path in block_meta.depends_on:
                 self._path_to_blocks.setdefault(dep_path, []).append(ref)
+
+    def register_from_sse_swaps(
+        self,
+        env: Environment,
+        template_name: str,
+        template_source: str,
+        *,
+        exclude_blocks: set[str] | None = None,
+    ) -> int:
+        """Auto-register blocks that have matching ``sse-swap`` elements.
+
+        Scans the raw template source for elements with both ``sse-swap``
+        and ``id`` attributes, finds the ``{% block %}`` inside each,
+        and registers only those blocks — with the correct ``dom_id``
+        mapping.
+
+        Blocks listed in *exclude_blocks* are skipped (e.g.,
+        client-managed ``contenteditable`` blocks that should never be
+        re-rendered via SSE).
+
+        Returns the number of blocks auto-registered.
+
+        Example::
+
+            index = DependencyIndex()
+            source = env.loader.get_source(env, "page.html")[0]
+            n = index.register_from_sse_swaps(env, "page.html", source)
+            # Registers only blocks inside sse-swap elements
+        """
+        exclude = exclude_blocks or set()
+
+        # 1. Find elements with sse-swap (and optionally id)
+        #    Pattern: <tag ... sse-swap="event" ... id="dom_id" ...>
+        #    or:      <tag ... id="dom_id" ... sse-swap="event" ...>
+        sse_swap_elements = _extract_sse_swap_elements(template_source)
+
+        if not sse_swap_elements:
+            return 0
+
+        # 2. For each sse-swap element, find the {% block %} inside it.
+        #    Convention: the block is a direct child of the element.
+        block_to_dom_id: dict[str, str] = {}
+        block_to_event: dict[str, str] = {}
+
+        for elem in sse_swap_elements:
+            block_name = elem.inner_block
+            if block_name is None or block_name in exclude:
+                continue
+            if elem.dom_id:
+                block_to_dom_id[block_name] = elem.dom_id
+            block_to_event[block_name] = elem.swap_event
+
+        if not block_to_dom_id:
+            return 0
+
+        # 3. Register via the standard method (uses kida static analysis)
+        self.register_template(
+            env,
+            template_name,
+            block_names=list(block_to_dom_id),
+            dom_id_map=block_to_dom_id,
+        )
+
+        return len(block_to_dom_id)
 
     def affected_blocks(self, changed_paths: frozenset[str]) -> list[BlockRef]:
         """Find all blocks affected by a set of changed context paths.
