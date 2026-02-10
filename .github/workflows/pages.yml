@@ -33,10 +33,13 @@ jobs:
           restore-keys: |
             uv-${{ runner.os }}-
 
+      - name: Checkout sibling editable dependencies
+        uses: ./.github/actions/checkout-editable-deps
+        with:
+          repository-owner: ${{ github.repository_owner }}
+
       - name: Install docs dependencies
-        run: |
-          uv venv
-          uv pip install 'bengal>=0.1.9' 'lunr>=0.7.0'
+        run: uv sync --group docs
         env:
           PYTHON_GIL: "0"
 
@@ -45,7 +48,7 @@ jobs:
       - name: Get cache hash
         id: cache
         working-directory: site
-        run: echo "hash=$(uv run --no-project bengal cache hash)" >> $GITHUB_OUTPUT
+        run: echo "hash=$(uv run bengal cache hash)" >> $GITHUB_OUTPUT
         env:
           PYTHON_GIL: "0"
 
@@ -58,7 +61,7 @@ jobs:
 
       - name: Build documentation site
         working-directory: site
-        run: uv run --no-project bengal site build --environment production
+        run: uv run bengal site build --environment production
         env:
           PYTHON_GIL: "0"
 
