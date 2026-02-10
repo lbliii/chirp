@@ -76,6 +76,8 @@ class App:
         "_page_templates",
         "_pending_routes",
         "_pending_tools",
+        # Service injection via providers
+        "_providers",
         # Compiled state (populated by _freeze)
         "_router",
         "_shutdown_hooks",
@@ -111,6 +113,7 @@ class App:
         self._worker_shutdown_hooks: list[Callable[..., Any]] = []
         self._page_route_paths: set[str] = set()
         self._page_templates: set[str] = set()
+        self._providers: dict[type, Callable[..., Any]] = {}
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
 
@@ -153,6 +156,28 @@ class App:
             return func
 
         return decorator
+
+    # -- Service injection --
+
+    def provide(self, annotation: type, factory: Callable[..., Any]) -> None:
+        """Register a provider factory for dependency injection.
+
+        When a handler parameter's type annotation matches *annotation*,
+        chirp calls *factory* (with no arguments) and injects the result.
+
+        Works for both ``@app.route`` and filesystem page handlers::
+
+            app.provide(DocumentStore, get_store)
+
+            # Any handler with ``store: DocumentStore`` gets it injected:
+            def get(store: DocumentStore) -> Page: ...
+
+        Args:
+            annotation: The type annotation to match against handler params.
+            factory: A zero-argument callable that returns the service instance.
+        """
+        self._check_not_frozen()
+        self._providers[annotation] = factory
 
     # -- Filesystem page routing --
 
@@ -234,6 +259,7 @@ class App:
         _handler = handler
         _chain = layout_chain
         _providers = context_providers
+        _service_providers = self._providers
 
         async def page_wrapper(request: Request) -> Any:
             """Wrapper that runs context cascade and upgrades Page → LayoutPage."""
@@ -259,6 +285,11 @@ class App:
                         kwargs[name] = value
                 elif name in cascade_ctx:
                     kwargs[name] = cascade_ctx[name]
+                elif (
+                    param.annotation is not inspect.Parameter.empty
+                    and param.annotation in _service_providers
+                ):
+                    kwargs[name] = _service_providers[param.annotation]()
 
             # Call the original handler
             result = await invoke(_handler, **kwargs)
@@ -545,8 +576,12 @@ class App:
             error_handlers=self._error_handlers,
             kida_env=self._kida_env,
             debug=self.config.debug,
+            providers=self._providers or None,
             tool_registry=self._tool_registry,
             mcp_path=self.config.mcp_path,
+            sse_heartbeat_interval=self.config.sse_heartbeat_interval,
+            sse_retry_ms=self.config.sse_retry_ms,
+            sse_close_event=self.config.sse_close_event,
         )
 
     async def _handle_lifespan(
@@ -678,9 +713,9 @@ class App:
         middleware_list = list(self._middleware_list)
         if self.config.debug:
             from chirp.middleware.inject import HTMLInject
-            from chirp.server.htmx_debug import HTMX_DEBUG_SCRIPT
+            from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
 
-            middleware_list.append(HTMLInject(HTMX_DEBUG_SCRIPT))
+            middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
         self._middleware = tuple(middleware_list)
 
         # 2b. Collect template globals from middleware

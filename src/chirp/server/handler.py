@@ -8,6 +8,7 @@ and sends Response back through ASGI send().
 import inspect
 from collections.abc import Callable
 from contextvars import Token
+from dataclasses import replace
 from typing import Any
 
 from kida import Environment
@@ -22,6 +23,7 @@ from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
+from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
 from chirp.server.negotiation import negotiate
 from chirp.server.sender import send_response, send_streaming_response
 from chirp.tools.registry import ToolRegistry
@@ -37,8 +39,12 @@ async def handle_request(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None = None,
     debug: bool,
+    providers: dict[type, Callable[..., Any]] | None = None,
     tool_registry: ToolRegistry | None = None,
     mcp_path: str = "/mcp",
+    sse_heartbeat_interval: float = 15.0,
+    sse_retry_ms: int | None = None,
+    sse_close_event: str | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -53,6 +59,14 @@ async def handle_request(
     try:
         # Build the innermost handler (router dispatch + MCP)
         async def dispatch(req: Request) -> AnyResponse:
+            # Built-in debug helper asset; loaded once per full page.
+            if debug and req.path == HTMX_DEBUG_BOOT_PATH:
+                return Response(
+                    body=HTMX_DEBUG_BOOT_JS,
+                    content_type="application/javascript; charset=utf-8",
+                    render_intent="full_page",
+                )
+
             # MCP endpoint — dispatched inside middleware so auth/CORS apply
             if (
                 tool_registry is not None
@@ -64,7 +78,9 @@ async def handle_request(
                 return await handle_mcp_request(req, tool_registry)
 
             match = router.match(req.method, req.path)
-            return await _invoke_handler(match, req, kida_env=kida_env)
+            return await _invoke_handler(
+                match, req, kida_env=kida_env, providers=providers,
+            )
 
         # Wrap middleware around the dispatch
         handler = dispatch
@@ -92,12 +108,18 @@ async def handle_request(
     if isinstance(response, SSEResponse):
         from chirp.realtime.sse import handle_sse
 
+        stream = response.event_stream
+        if stream.heartbeat_interval == 15.0:
+            stream = replace(stream, heartbeat_interval=sse_heartbeat_interval)
+
         await handle_sse(
-            response.event_stream,
+            stream,
             send,
             receive,
             kida_env=response.kida_env,
             debug=debug,
+            retry_ms=sse_retry_ms,
+            close_event=sse_close_event,
         )
     elif isinstance(response, StreamingResponse):
         await send_streaming_response(response, send, debug=debug)
@@ -110,6 +132,7 @@ async def _invoke_handler(
     request: Request,
     *,
     kida_env: Environment | None = None,
+    providers: dict[type, Callable[..., Any]] | None = None,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -131,7 +154,7 @@ async def _invoke_handler(
     )
 
     # Build kwargs from handler signature
-    kwargs = _build_handler_kwargs(handler, request, match.path_params)
+    kwargs = _build_handler_kwargs(handler, request, match.path_params, providers)
 
     # Call the handler (sync or async — invoke() handles both)
     result = await invoke(handler, **kwargs)
@@ -143,8 +166,15 @@ def _build_handler_kwargs(
     handler: Callable[..., Any],
     request: Request,
     path_params: dict[str, str],
+    providers: dict[type, Callable[..., Any]] | None = None,
 ) -> dict[str, Any]:
-    """Inspect handler signature and build kwargs from request + path params."""
+    """Inspect handler signature and build kwargs from request + path params.
+
+    Resolution order:
+    1. ``request`` parameter (by name or ``Request`` annotation)
+    2. Path parameters (by name, with type conversion)
+    3. Service providers (by type annotation via ``app.provide()``)
+    """
     sig = inspect.signature(handler)
     kwargs: dict[str, Any] = {}
 
@@ -161,5 +191,11 @@ def _build_handler_kwargs(
                     kwargs[name] = value
             else:
                 kwargs[name] = value
+        elif (
+            providers
+            and param.annotation is not inspect.Parameter.empty
+            and param.annotation in providers
+        ):
+            kwargs[name] = providers[param.annotation]()
 
     return kwargs
