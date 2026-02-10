@@ -201,9 +201,6 @@ class App:
             app = App(AppConfig(template_dir="pages"))
             app.mount_pages("pages")
         """
-        import inspect
-
-        from chirp.pages.context import build_cascade_context
         from chirp.pages.discovery import discover_pages
         from chirp.pages.types import ContextProvider, LayoutChain
 
@@ -248,12 +245,9 @@ class App:
         context_providers: tuple[Any, ...],
     ) -> None:
         """Register a single page handler with cascade context wrapper."""
-        import inspect
-
         from chirp._internal.invoke import invoke
-        from chirp.extraction import extract_dataclass, is_extractable_dataclass
         from chirp.pages.context import build_cascade_context
-        from chirp.templating.returns import LayoutPage, Page
+        from chirp.pages.resolve import resolve_kwargs, upgrade_result
 
         _handler = handler
         _chain = layout_chain
@@ -262,77 +256,14 @@ class App:
 
         async def page_wrapper(request: Request) -> Any:
             """Wrapper that runs context cascade and upgrades Page → LayoutPage."""
-            # Build cascade context from _context.py providers
             cascade_ctx = await build_cascade_context(
                 _providers, request.path_params
             )
-
-            # Pre-read body for typed extraction (non-GET only)
-            body_data: dict[str, Any] | None = None
-            if request.method not in ("GET", "HEAD"):
-                sig_check = inspect.signature(_handler, eval_str=True)
-                needs_body = any(
-                    p.annotation is not inspect.Parameter.empty
-                    and is_extractable_dataclass(p.annotation)
-                    for p in sig_check.parameters.values()
-                )
-                if needs_body:
-                    ct = request.content_type or ""
-                    if "json" in ct:
-                        body_data = await request.json()
-                    else:
-                        body_data = dict(await request.form())
-
-            # Build handler kwargs
-            sig = inspect.signature(_handler, eval_str=True)
-            kwargs: dict[str, Any] = {}
-            for name, param in sig.parameters.items():
-                if name == "request" or param.annotation is Request:
-                    kwargs[name] = request
-                elif name in request.path_params:
-                    value = request.path_params[name]
-                    if param.annotation is not inspect.Parameter.empty:
-                        try:
-                            kwargs[name] = param.annotation(value)
-                        except (ValueError, TypeError):
-                            kwargs[name] = value
-                    else:
-                        kwargs[name] = value
-                elif name in cascade_ctx:
-                    kwargs[name] = cascade_ctx[name]
-                elif (
-                    param.annotation is not inspect.Parameter.empty
-                    and param.annotation in _service_providers
-                ):
-                    kwargs[name] = _service_providers[param.annotation]()
-                elif (
-                    param.annotation is not inspect.Parameter.empty
-                    and is_extractable_dataclass(param.annotation)
-                ):
-                    if request.method in ("GET", "HEAD"):
-                        kwargs[name] = extract_dataclass(
-                            param.annotation, request.query,
-                        )
-                    elif body_data is not None:
-                        kwargs[name] = extract_dataclass(
-                            param.annotation, body_data,
-                        )
-
-            # Call the original handler
+            kwargs = await resolve_kwargs(
+                _handler, request, cascade_ctx, _service_providers
+            )
             result = await invoke(_handler, **kwargs)
-
-            # Upgrade Page to LayoutPage with layout chain
-            if isinstance(result, Page):
-                merged_ctx = {**cascade_ctx, **result.context}
-                return LayoutPage(
-                    result.name,
-                    result.block_name,
-                    layout_chain=_chain,
-                    context_providers=_providers,
-                    **merged_ctx,
-                )
-
-            return result
+            return upgrade_result(result, cascade_ctx, _chain, _providers)
 
         self._pending_routes.append(
             _PendingRoute(url_path, page_wrapper, methods, name=None)

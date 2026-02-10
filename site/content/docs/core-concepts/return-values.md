@@ -21,6 +21,7 @@ return Template("page.html", title="Home")           # -> 200, rendered via kida
 return Template.inline("<h1>{{ t }}</h1>", t="Hi")   # -> 200, from string
 return Fragment("page.html", "results", items=x)     # -> 200, rendered block
 return Stream("dashboard.html", **async_ctx)         # -> 200, streamed HTML
+return Suspense("dashboard.html", stats=get_stats()) # -> 200, shell + OOB swaps
 return EventStream(generator())                      # -> SSE stream
 return Response(body=b"...", status=201)              # -> explicit control
 return Redirect("/login")                            # -> 302
@@ -107,6 +108,26 @@ async def dashboard():
 ```
 
 See [[docs/streaming/html-streaming|Streaming HTML]] for details.
+
+## Suspense
+
+Instant first paint with deferred data. The browser receives the full page shell immediately (with skeleton placeholders), then the actual content streams in as OOB swaps once each data source resolves:
+
+```python
+from chirp import Suspense
+
+@app.route("/dashboard")
+async def dashboard():
+    return Suspense("dashboard.html",
+        stats=get_stats(),       # awaitable — deferred, shell shows skeleton
+        orders=get_orders(),     # awaitable — deferred, shell shows skeleton
+        title="Sales Dashboard", # plain value — available in the shell
+    )
+```
+
+The template uses `{% if stats %}...{% else %}skeleton{% end %}` inside named blocks. Chirp renders the shell with `None` for awaitable keys (triggering the skeleton branch), resolves the awaitables concurrently, then streams each block's real content as an OOB swap.
+
+See [[docs/streaming/html-streaming|Streaming HTML]] for the full story.
 
 ## EventStream
 

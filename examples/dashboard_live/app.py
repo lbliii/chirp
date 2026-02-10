@@ -4,7 +4,7 @@ Demonstrates the full chirp data pipeline:
 - App(db=..., migrations=...) — zero-boilerplate database setup
 - SQL in, frozen dataclasses out — no ORM
 - Transactions — atomic multi-statement operations
-- Streaming page load — shell first, data second
+- Suspense page load — shell with skeletons first, data blocks streamed in
 - SSE live updates — new orders push HTML fragments to the browser
 - Zero JavaScript — htmx handles everything
 
@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chirp import App, AppConfig, EventStream, Fragment, Template
+from chirp import App, AppConfig, EventStream, Fragment, Suspense, Template
 from chirp.data import Query
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -150,10 +150,13 @@ async def create_random_order() -> Order:
 
 @app.route("/")
 async def index():
-    """Full dashboard page — rendered from database."""
-    stats = await get_stats()
-    orders = await get_recent_orders()
-    return Template("dashboard.html", stats=stats, orders=orders)
+    """Full dashboard page — shell renders instantly, data streams in.
+
+    Suspense sends the page skeleton immediately (with "—" placeholders
+    and "Loading orders..." text), then resolves stats and orders from
+    the database concurrently and streams them as OOB block swaps.
+    """
+    return Suspense("dashboard.html", stats=get_stats(), orders=get_recent_orders())
 
 
 @app.route("/events")

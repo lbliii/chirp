@@ -1,4 +1,9 @@
-"""Tests for the dashboard_live example — chirp.data showcase."""
+"""Tests for the dashboard_live example — chirp.data showcase.
+
+The index route uses Suspense, so the initial shell streams immediately
+(with skeleton placeholders), then OOB swaps deliver the real data.
+The TestClient collects all streaming chunks into response.text.
+"""
 
 from chirp.testing import TestClient
 
@@ -19,7 +24,7 @@ class TestDashboardPage:
     async def test_index_renders_stats_bar(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")
-            assert 'id="stats"' in response.text
+            assert 'id="stats_bar"' in response.text
             assert "Total Orders" in response.text
             assert "Revenue" in response.text
             assert "Pending" in response.text
@@ -34,12 +39,12 @@ class TestDashboardPage:
             assert "<th>Product</th>" in response.text
 
     async def test_index_has_seeded_data(self, example_app) -> None:
-        """The on_startup hook seeds 12 orders into the database."""
+        """The on_startup hook seeds 12 orders — Suspense streams them via OOB."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             # Stats should show non-zero values from seeded data
             assert "Total Orders" in response.text
-            # The orders table should have rows (seeded data)
+            # The orders table should have rows (seeded data via OOB swap)
             assert '<td class="amount">' in response.text
 
     async def test_index_contains_sse_connection(self, example_app) -> None:
