@@ -34,6 +34,7 @@ from chirp import App, AppConfig, EventStream, Fragment, Template
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
+from chirp.markdown import register_markdown_filter
 
 # -- Types --
 
@@ -51,6 +52,7 @@ class Document:
 # -- Setup --
 
 app = App(AppConfig(template_dir="examples/rag_demo/templates", debug=True))
+register_markdown_filter(app)
 
 DB_URL = os.environ.get("DB_URL", "sqlite:///examples/rag_demo/docs.db")
 

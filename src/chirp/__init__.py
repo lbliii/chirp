@@ -77,88 +77,76 @@ __all__ = [
 ]
 
 
+# Registry of lazy imports: name -> (module_path, attribute_name).
+# Adding a new public name only requires a single line here.
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    # Application
+    "App": ("chirp.app", "App"),
+    "AppConfig": ("chirp.config", "AppConfig"),
+    # HTTP
+    "Request": ("chirp.http.request", "Request"),
+    "Response": ("chirp.http.response", "Response"),
+    "Redirect": ("chirp.http.response", "Redirect"),
+    # Return types
+    "Template": ("chirp.templating.returns", "Template"),
+    "InlineTemplate": ("chirp.templating.returns", "InlineTemplate"),
+    "Fragment": ("chirp.templating.returns", "Fragment"),
+    "Page": ("chirp.templating.returns", "Page"),
+    "LayoutPage": ("chirp.templating.returns", "LayoutPage"),
+    "Action": ("chirp.templating.returns", "Action"),
+    "FormAction": ("chirp.templating.returns", "FormAction"),
+    "Stream": ("chirp.templating.returns", "Stream"),
+    "Suspense": ("chirp.templating.returns", "Suspense"),
+    "ValidationError": ("chirp.templating.returns", "ValidationError"),
+    "OOB": ("chirp.templating.returns", "OOB"),
+    # Realtime
+    "EventStream": ("chirp.realtime.events", "EventStream"),
+    "SSEEvent": ("chirp.realtime.events", "SSEEvent"),
+    # Middleware
+    "AnyResponse": ("chirp.middleware.protocol", "AnyResponse"),
+    "Middleware": ("chirp.middleware.protocol", "Middleware"),
+    "Next": ("chirp.middleware.protocol", "Next"),
+    # Context
+    "g": ("chirp.context", "g"),
+    "get_request": ("chirp.context", "get_request"),
+    # Auth
+    "get_user": ("chirp.middleware.auth", "get_user"),
+    "login": ("chirp.middleware.auth", "login"),
+    "logout": ("chirp.middleware.auth", "logout"),
+    # Security
+    "is_safe_url": ("chirp.security.urls", "is_safe_url"),
+    "login_required": ("chirp.security.decorators", "login_required"),
+    "requires": ("chirp.security.decorators", "requires"),
+    # Errors
+    "ChirpError": ("chirp.errors", "ChirpError"),
+    "ConfigurationError": ("chirp.errors", "ConfigurationError"),
+    "HTTPError": ("chirp.errors", "HTTPError"),
+    "MethodNotAllowed": ("chirp.errors", "MethodNotAllowed"),
+    "NotFound": ("chirp.errors", "NotFound"),
+    # Forms
+    "form_from": ("chirp.http.forms", "form_from"),
+    "form_or_errors": ("chirp.http.forms", "form_or_errors"),
+    "form_values": ("chirp.http.forms", "form_values"),
+    "FormBindingError": ("chirp.http.forms", "FormBindingError"),
+    # Tools
+    "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
+    # Markdown
+    "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
+}
+
+
 def __getattr__(name: str) -> object:
     """Lazy imports for public API.
 
     Keeps ``import chirp`` fast while providing a clean top-level API.
+    New names only need a single entry in ``_LAZY_IMPORTS`` above.
     """
-    if name == "App":
-        from chirp.app import App
+    entry = _LAZY_IMPORTS.get(name)
+    if entry is not None:
+        module_path, attr = entry
+        import importlib
 
-        return App
-
-    if name == "AppConfig":
-        from chirp.config import AppConfig
-
-        return AppConfig
-
-    if name == "Request":
-        from chirp.http.request import Request
-
-        return Request
-
-    if name in ("Response", "Redirect"):
-        from chirp.http import response as _resp
-
-        return getattr(_resp, name)
-
-    if name in (
-        "Template", "InlineTemplate", "Fragment", "Page", "LayoutPage", "Action",
-        "FormAction", "Stream", "Suspense", "ValidationError", "OOB",
-    ):
-        from chirp.templating import returns as _tmpl
-
-        return getattr(_tmpl, name)
-
-    if name in ("EventStream", "SSEEvent"):
-        from chirp.realtime import events as _events
-
-        return getattr(_events, name)
-
-    if name in ("AnyResponse", "Middleware", "Next"):
-        from chirp.middleware import protocol as _mw
-
-        return getattr(_mw, name)
-
-    if name in ("g", "get_request"):
-        from chirp import context as _ctx
-
-        return getattr(_ctx, name)
-
-    if name in ("get_user", "login", "logout"):
-        from chirp.middleware import auth as _auth
-
-        return getattr(_auth, name)
-
-    if name == "is_safe_url":
-        from chirp.security.urls import is_safe_url
-
-        return is_safe_url
-
-    if name in ("login_required", "requires"):
-        from chirp.security import decorators as _decorators
-
-        return getattr(_decorators, name)
-
-    if name in ("ChirpError", "ConfigurationError", "HTTPError", "MethodNotAllowed", "NotFound"):
-        from chirp import errors as _errors
-
-        return getattr(_errors, name)
-
-    if name in ("form_from", "form_or_errors", "form_values", "FormBindingError"):
-        from chirp.http import forms as _forms
-
-        return getattr(_forms, name)
-
-    if name == "ToolCallEvent":
-        from chirp.tools.events import ToolCallEvent
-
-        return ToolCallEvent
-
-    if name == "MarkdownRenderer":
-        from chirp.markdown.renderer import MarkdownRenderer
-
-        return MarkdownRenderer
-
+        mod = importlib.import_module(module_path)
+        return getattr(mod, attr)
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

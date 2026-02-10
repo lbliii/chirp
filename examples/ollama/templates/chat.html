@@ -69,7 +69,6 @@
     .msg-assistant {
       align-self: flex-start; background: #1e293b; color: #e2e8f0;
       padding: 0.6rem 0.9rem; border-radius: 1rem 1rem 1rem 0.25rem;
-      white-space: pre-wrap;
     }
     .msg-tools {
       align-self: flex-start; font-size: 0.7rem; color: #a78bfa;
@@ -193,6 +192,34 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Prose — markdown rendered content in assistant bubbles */
+    .msg-assistant.prose p { margin-bottom: 0.5em; line-height: 1.5; }
+    .msg-assistant.prose p:last-child { margin-bottom: 0; }
+    .msg-assistant.prose h1, .msg-assistant.prose h2, .msg-assistant.prose h3 {
+      margin: 0.75em 0 0.3em; font-weight: 600; color: #f1f5f9;
+    }
+    .msg-assistant.prose h1 { font-size: 1.1rem; }
+    .msg-assistant.prose h2 { font-size: 1rem; }
+    .msg-assistant.prose h3 { font-size: 0.9rem; }
+    .msg-assistant.prose h1:first-child, .msg-assistant.prose h2:first-child,
+    .msg-assistant.prose h3:first-child { margin-top: 0; }
+    .msg-assistant.prose ul, .msg-assistant.prose ol { margin-bottom: 0.5em; padding-left: 1.25em; }
+    .msg-assistant.prose li { margin-bottom: 0.15em; }
+    .msg-assistant.prose code {
+      font-size: 0.85em; background: rgba(255,255,255,0.1); padding: 0.1em 0.3em; border-radius: 3px;
+    }
+    .msg-assistant.prose pre {
+      margin: 0.5em 0; padding: 0.6rem; background: rgba(0,0,0,0.3);
+      border-radius: 0.375rem; overflow-x: auto;
+    }
+    .msg-assistant.prose pre code { background: none; padding: 0; font-size: 0.8rem; }
+    .msg-assistant.prose blockquote {
+      margin: 0.5em 0; padding: 0.4rem 0.75rem;
+      border-left: 2px solid #8b5cf6; color: #94a3b8;
+    }
+    .msg-assistant.prose strong { font-weight: 600; color: #f1f5f9; }
+    .msg-assistant.prose a { color: #8b5cf6; text-decoration: underline; }
+
     footer {
       text-align: center; padding: 0.5rem; font-size: 0.65rem;
       color: #334155; background: #0f172a;
@@ -229,7 +256,7 @@
         {% if msg.role == "user" %}
         <div class="msg msg-user">{{ msg.content }}</div>
         {% elif msg.role == "assistant" and msg.content %}
-        <div class="msg msg-assistant">{{ msg.content }}</div>
+        <div class="msg msg-assistant prose">{{ msg.content | markdown }}</div>
         {% end %}
         {% endfor %}
 
@@ -274,7 +301,7 @@
   {% if user_content is defined %}
   <div class="msg msg-user">{{ user_content }}</div>
   {% if tools_used %}<div class="msg msg-tools">used: {{ tools_used | join(", ") }}</div>{% end %}
-  <div class="msg msg-assistant">{{ assistant_content }}</div>
+  <div class="msg msg-assistant prose">{{ assistant_content | markdown }}</div>
   {% end %}
   {% end %}
 

@@ -26,6 +26,7 @@ from typing import Any
 import httpx
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, Template
+from chirp.markdown import register_markdown_filter
 from chirp.realtime.events import SSEEvent
 from chirp.tools.registry import ToolRegistry
 
@@ -40,6 +41,7 @@ _model_lock = threading.Lock()
 
 config = AppConfig(template_dir=TEMPLATES_DIR)
 app = App(config=config)
+register_markdown_filter(app)
 
 
 def _get_model() -> str:

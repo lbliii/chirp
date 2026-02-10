@@ -10,5 +10,5 @@
 {% endblock %}
 
 {% block answer %}
-<div id="answer" class="answer{% if text %} streaming{% endif %}">{{ text }}</div>
+<div id="answer" class="answer prose{% if text %} streaming{% endif %}">{{ text | markdown }}</div>
 {% endblock %}
