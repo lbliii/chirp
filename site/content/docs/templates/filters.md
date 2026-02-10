@@ -26,20 +26,20 @@ Extract validation errors for a single form field from an errors dict. Returns a
 
 If the field has no errors, or `errors` is `None`, an empty list is returned — so the loop simply produces nothing.
 
-Typical usage with `form_from()`:
+Typical usage with `form_or_errors()`:
 
 ```python
 @app.route("/signup", methods=["POST"])
-async def signup(request: Request) -> Template | Fragment:
-    data, errors = await form_from(request, SignupForm)
-    if errors:
-        return Template("signup.html", errors=errors)
+async def signup(request: Request):
+    result = await form_or_errors(request, SignupForm, "signup.html", "form")
+    if isinstance(result, ValidationError):
+        return result  # errors and form values are included
     # ... process valid data
 ```
 
 ```html
 <label>Email</label>
-<input name="email" value="{{ data.email | default('') }}">
+<input name="email" value="{{ form.email ?? "" }}">
 {% for msg in errors | field_errors("email") %}
     <span class="field-error">{{ msg }}</span>
 {% end %}

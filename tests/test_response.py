@@ -104,7 +104,7 @@ class TestHtmxResponseHeaders:
 
     def test_hx_location_with_target(self) -> None:
         r = Response().with_hx_location("/page", target="#main")
-        header = dict(r.headers)["HX-Location"]
+        header = r.header("HX-Location")
         import json
         obj = json.loads(header)
         assert obj["path"] == "/page"
@@ -114,7 +114,7 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_location(
             "/page", target="#content", swap="innerHTML", source="#trigger"
         )
-        header = dict(r.headers)["HX-Location"]
+        header = r.header("HX-Location")
         import json
         obj = json.loads(header)
         assert obj == {
@@ -138,7 +138,7 @@ class TestHtmxResponseHeaders:
 
     def test_hx_trigger_dict(self) -> None:
         r = Response().with_hx_trigger({"showToast": {"message": "Saved!"}})
-        header = dict(r.headers)["HX-Trigger"]
+        header = r.header("HX-Trigger")
         import json
         obj = json.loads(header)
         assert obj == {"showToast": {"message": "Saved!"}}
@@ -149,7 +149,7 @@ class TestHtmxResponseHeaders:
 
     def test_hx_trigger_after_settle_dict(self) -> None:
         r = Response().with_hx_trigger_after_settle({"flash": {"level": "info"}})
-        header = dict(r.headers)["HX-Trigger-After-Settle"]
+        header = r.header("HX-Trigger-After-Settle")
         import json
         assert json.loads(header) == {"flash": {"level": "info"}}
 
@@ -159,7 +159,7 @@ class TestHtmxResponseHeaders:
 
     def test_hx_trigger_after_swap_dict(self) -> None:
         r = Response().with_hx_trigger_after_swap({"animate": True})
-        header = dict(r.headers)["HX-Trigger-After-Swap"]
+        header = r.header("HX-Trigger-After-Swap")
         import json
         assert json.loads(header) == {"animate": True}
 
@@ -196,10 +196,9 @@ class TestHtmxResponseHeaders:
             .with_hx_trigger("validationFailed")
         )
         assert r.status == 422
-        headers = dict(r.headers)
-        assert headers["HX-Retarget"] == "#form-errors"
-        assert headers["HX-Reswap"] == "innerHTML"
-        assert headers["HX-Trigger"] == "validationFailed"
+        assert r.header("HX-Retarget") == "#form-errors"
+        assert r.header("HX-Reswap") == "innerHTML"
+        assert r.header("HX-Trigger") == "validationFailed"
 
     def test_immutability_preserved(self) -> None:
         r1 = Response(body="ok")

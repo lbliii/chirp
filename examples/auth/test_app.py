@@ -31,11 +31,7 @@ class TestPublicRoutes:
         async with TestClient(example_app) as client:
             response = await client.get("/dashboard")
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert "/login" in location
+            assert "/login" in response.header("location", "")
 
 
 class TestLoginFlow:
@@ -49,11 +45,7 @@ class TestLoginFlow:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert "/dashboard" in location
+            assert "/dashboard" in response.header("location", "")
 
     async def test_invalid_credentials_show_error(self, example_app) -> None:
         async with TestClient(example_app) as client:

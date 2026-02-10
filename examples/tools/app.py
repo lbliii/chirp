@@ -18,7 +18,6 @@ Try the MCP endpoint with curl:
 """
 
 import threading
-from datetime import UTC, datetime
 from pathlib import Path
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, Template
@@ -79,12 +78,6 @@ def format_args(args: dict) -> str:
     for k, v in args.items():
         parts.append(f'{k}="{v}"' if isinstance(v, str) else f"{k}={v}")
     return ", ".join(parts)
-
-
-@app.template_filter("format_time")
-def format_time(ts: float) -> str:
-    """Format a unix timestamp as HH:MM:SS."""
-    return datetime.fromtimestamp(ts, UTC).strftime("%H:%M:%S")
 
 
 # ---------------------------------------------------------------------------

@@ -18,12 +18,6 @@ def _get_latest_cookie(response, prev_cookie: str, name: str = "chirp_session") 
     return new if new else prev_cookie
 
 
-def _location(response) -> str:
-    for hname, hvalue in response.headers:
-        if hname == "location":
-            return hvalue
-    return ""
-
 
 class TestStepNavigation:
     """Step guards redirect to the correct step."""
@@ -32,14 +26,14 @@ class TestStepNavigation:
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 302
-            assert "/step/1" in _location(response)
+            assert "/step/1" in response.header("location", "")
 
     async def test_step2_requires_step1(self, example_app) -> None:
         """Accessing step 2 without completing step 1 redirects back."""
         async with TestClient(example_app) as client:
             response = await client.get("/step/2")
             assert response.status == 302
-            assert "/step/1" in _location(response)
+            assert "/step/1" in response.header("location", "")
 
     async def test_step3_requires_step2(self, example_app) -> None:
         """Accessing step 3 without completing step 2 redirects back."""
@@ -61,7 +55,7 @@ class TestStepNavigation:
                 headers={"Cookie": f"chirp_session={cookie}"},
             )
             assert r3.status == 302
-            assert "/step/2" in _location(r3)
+            assert "/step/2" in r3.header("location", "")
 
 
 class TestStep1Validation:
@@ -104,7 +98,7 @@ class TestStep1Validation:
                 headers={**_FORM_CT, "Cookie": f"chirp_session={cookie}"},
             )
             assert response.status == 302
-            assert "/step/2" in _location(response)
+            assert "/step/2" in response.header("location", "")
 
 
 class TestStep2Validation:
@@ -156,7 +150,7 @@ class TestStep2Validation:
                 headers={**_FORM_CT, "Cookie": f"chirp_session={cookie}"},
             )
             assert response.status == 302
-            assert "/step/3" in _location(response)
+            assert "/step/3" in response.header("location", "")
 
 
 class TestReviewAndConfirm:
@@ -227,7 +221,7 @@ class TestReviewAndConfirm:
                 headers={"Cookie": f"chirp_session={cookie}"},
             )
             assert r2.status == 302
-            assert "/step/1" in _location(r2)
+            assert "/step/1" in r2.header("location", "")
 
     async def test_step1_preserves_data_on_back(self, example_app) -> None:
         """Going back to step 1 shows previously entered data."""

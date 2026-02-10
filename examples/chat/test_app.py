@@ -34,7 +34,7 @@ class TestLoginFlow:
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 302
-            assert "/login" in response.headers.get("location", "")
+            assert "/login" in response.header("location", "")
 
     async def test_login_page_renders(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -50,7 +50,7 @@ class TestLoginFlow:
                 headers=_FORM_CT,
             )
             assert response.status == 302
-            assert "/chat" in response.headers.get("location", "")
+            assert "/chat" in response.header("location", "")
             assert _extract_cookie(response) is not None
 
     async def test_empty_username_shows_error(self, example_app) -> None:
@@ -67,14 +67,14 @@ class TestLoginFlow:
         async with TestClient(example_app) as client:
             response = await client.get("/chat")
             assert response.status == 302
-            assert "/login" in response.headers.get("location", "")
+            assert "/login" in response.header("location", "")
 
     async def test_index_redirects_to_chat_when_logged_in(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
             response = await client.get("/", headers=auth)
             assert response.status == 302
-            assert "/chat" in response.headers.get("location", "")
+            assert "/chat" in response.header("location", "")
 
 
 class TestChatPage:

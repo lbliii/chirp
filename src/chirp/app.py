@@ -149,6 +149,121 @@ class App:
 
         return decorator
 
+    # -- Filesystem page routing --
+
+    def mount_pages(self, pages_dir: str | None = None) -> None:
+        """Mount a filesystem-based pages directory.
+
+        Walks the directory and registers routes for every ``page.py``
+        and handler ``.py`` file, with automatic layout nesting and
+        context cascade.
+
+        ``_layout.html`` files define shells with ``{% block content %}``
+        and ``{# target: element_id #}`` declarations.
+        ``_context.py`` files provide shared context that cascades
+        from parent directories to children.
+
+        Args:
+            pages_dir: Path to the pages directory.  Defaults to
+                ``"pages"`` relative to the working directory.
+
+        Example::
+
+            app = App(AppConfig(template_dir="pages"))
+            app.mount_pages("pages")
+        """
+        import inspect
+
+        from chirp.pages.context import build_cascade_context
+        from chirp.pages.discovery import discover_pages
+        from chirp.pages.types import ContextProvider, LayoutChain
+
+        self._check_not_frozen()
+
+        pages_dir = pages_dir or "pages"
+        page_routes = discover_pages(pages_dir)
+
+        for page_route in page_routes:
+            # Capture route metadata in closure
+            original_handler = page_route.handler
+            chain = page_route.layout_chain
+            providers = page_route.context_providers
+
+            # Wrap handler to inject cascade context and return LayoutPage
+            self._register_page_handler(
+                url_path=page_route.url_path,
+                handler=original_handler,
+                methods=list(page_route.methods),
+                layout_chain=chain,
+                context_providers=providers,
+            )
+
+    def _register_page_handler(
+        self,
+        *,
+        url_path: str,
+        handler: Callable[..., Any],
+        methods: list[str],
+        layout_chain: Any,
+        context_providers: tuple[Any, ...],
+    ) -> None:
+        """Register a single page handler with cascade context wrapper."""
+        import inspect
+
+        from chirp._internal.invoke import invoke
+        from chirp.http.request import Request
+        from chirp.pages.context import build_cascade_context
+        from chirp.templating.returns import LayoutPage, Page
+
+        _handler = handler
+        _chain = layout_chain
+        _providers = context_providers
+
+        async def page_wrapper(request: Request) -> Any:
+            """Wrapper that runs context cascade and upgrades Page → LayoutPage."""
+            # Build cascade context from _context.py providers
+            cascade_ctx = await build_cascade_context(
+                _providers, request.path_params
+            )
+
+            # Build handler kwargs
+            sig = inspect.signature(_handler)
+            kwargs: dict[str, Any] = {}
+            for name, param in sig.parameters.items():
+                if name == "request" or param.annotation is Request:
+                    kwargs[name] = request
+                elif name in request.path_params:
+                    value = request.path_params[name]
+                    if param.annotation is not inspect.Parameter.empty:
+                        try:
+                            kwargs[name] = param.annotation(value)
+                        except (ValueError, TypeError):
+                            kwargs[name] = value
+                    else:
+                        kwargs[name] = value
+                elif name in cascade_ctx:
+                    kwargs[name] = cascade_ctx[name]
+
+            # Call the original handler
+            result = await invoke(_handler, **kwargs)
+
+            # Upgrade Page to LayoutPage with layout chain
+            if isinstance(result, Page):
+                merged_ctx = {**cascade_ctx, **result.context}
+                return LayoutPage(
+                    result.name,
+                    result.block_name,
+                    layout_chain=_chain,
+                    context_providers=_providers,
+                    **merged_ctx,
+                )
+
+            return result
+
+        self._pending_routes.append(
+            _PendingRoute(url_path, page_wrapper, methods, name=None)
+        )
+
     # -- Tool registration --
 
     def tool(

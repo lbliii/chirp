@@ -193,6 +193,53 @@ class Stream:
 
 
 @dataclass(frozen=True, slots=True)
+class LayoutPage:
+    """Render a page within a filesystem-based layout chain.
+
+    Used by ``mount_pages()`` routes.  The negotiation layer composes
+    the layout chain at the correct depth based on ``HX-Target``:
+
+    * **Full page load**: render all layouts nested
+    * **Boosted navigation**: render from the targeted layout down
+    * **Fragment request**: render just the named block
+
+    The *layout_chain* and *context_providers* are set by the pages
+    discovery system — handlers never construct this directly.
+
+    Usage (internal — set by the pages framework)::
+
+        return LayoutPage(
+            "page.html", "content",
+            layout_chain=chain,
+            context_providers=providers,
+            title="Home",
+        )
+    """
+
+    name: str
+    block_name: str
+    layout_chain: Any = None  # LayoutChain — Any to avoid circular import
+    context_providers: tuple[Any, ...] = ()
+    context: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        name: str,
+        block_name: str,
+        /,
+        *,
+        layout_chain: Any = None,
+        context_providers: tuple[Any, ...] = (),
+        **context: Any,
+    ) -> None:
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "block_name", block_name)
+        object.__setattr__(self, "layout_chain", layout_chain)
+        object.__setattr__(self, "context_providers", context_providers)
+        object.__setattr__(self, "context", context)
+
+
+@dataclass(frozen=True, slots=True)
 class OOB:
     """Compose a primary response with out-of-band fragment swaps.
 

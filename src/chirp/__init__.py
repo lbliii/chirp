@@ -45,6 +45,7 @@ __all__ = [
     "Fragment",
     "HTTPError",
     "InlineTemplate",
+    "LayoutPage",
     "MethodNotAllowed",
     "Middleware",
     "Next",
@@ -98,7 +99,7 @@ def __getattr__(name: str) -> object:
         return getattr(_resp, name)
 
     if name in (
-        "Template", "InlineTemplate", "Fragment", "Page",
+        "Template", "InlineTemplate", "Fragment", "Page", "LayoutPage",
         "Stream", "ValidationError", "OOB",
     ):
         from chirp.templating import returns as _tmpl

@@ -58,14 +58,14 @@ class TestDashboardSSE:
     """Live order updates stream through SSE.
 
     The SSE generator sleeps 2-5 seconds between events, so we use
-    disconnect_after to bound the test duration rather than waiting
-    for a fixed max_events count.
+    timeout to bound the test duration rather than waiting for a
+    fixed max_events count.
     """
 
     async def test_receives_events(self, example_app) -> None:
         """Events arrive within the timeout window."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=2, disconnect_after=8.0)
+            result = await client.sse("/events", max_events=2, timeout=8.0)
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 1
@@ -73,7 +73,7 @@ class TestDashboardSSE:
     async def test_events_are_fragments(self, example_app) -> None:
         """SSE events are rendered HTML fragments, not raw templates."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=2, disconnect_after=8.0)
+            result = await client.sse("/events", max_events=2, timeout=8.0)
         fragment_events = [e for e in result.events if e.event == "fragment"]
         assert len(fragment_events) >= 1
         for evt in fragment_events:

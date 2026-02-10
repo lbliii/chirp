@@ -489,6 +489,7 @@ class CheckResult:
     sse_fragments_validated: int = 0
     forms_validated: int = 0
     component_calls_validated: int = 0
+    page_context_warnings: int = 0
 
     @property
     def errors(self) -> list[ContractIssue]:
@@ -521,6 +522,10 @@ class CheckResult:
         if self.component_calls_validated:
             extras.append(
                 f"{self.component_calls_validated} component call(s) validated"
+            )
+        if self.page_context_warnings:
+            extras.append(
+                f"{self.page_context_warnings} Page context warning(s)"
             )
         if extras:
             lines.append(", ".join(extras) + ".")
@@ -562,8 +567,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
        (info, not error).
     8. **Dead templates**: Templates not referenced by any route or other
        template (info, not error).
-    9. **Component call validation**: ``{% call %}`` sites match
-       ``{% def %}`` signatures (requires kida typed def support).
+    9. **Page context gaps**: Routes with FragmentContract where the full
+       template requires variables the target block does not — a sign
+       that full-page Page renders may crash at runtime (warning).
+    10. **Component call validation**: ``{% call %}`` sites match
+        ``{% def %}`` signatures (requires kida typed def support).
 
     Args:
         app: A frozen Chirp application.
@@ -852,7 +860,56 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 template=tmpl_name,
             ))
 
-    # 9. Component call validation (requires kida typed def support).
+    # 9. Page context gap detection — templates whose full-page render
+    #    requires variables that the declared fragment block does not use.
+    #    This catches bugs where Page("t.html", "block_a", x=1) renders
+    #    fine as a fragment but crashes on full-page navigation because
+    #    other blocks need variables not passed by the handler.
+    if kida_env is not None:
+        for route in router.routes:
+            rc = getattr(route.handler, "_chirp_contract", None)
+            if rc is None or not isinstance(rc.returns, FragmentContract):
+                continue
+            fc = rc.returns
+            try:
+                tmpl = kida_env.get_template(fc.template)
+                blocks = tmpl.block_metadata()
+                if fc.block not in blocks:
+                    continue  # Already reported in check 2
+
+                block_deps = blocks[fc.block].depends_on
+                full_deps = tmpl.depends_on()
+
+                # Compare top-level variable names
+                block_vars = {p.split(".")[0] for p in block_deps}
+                full_vars = {p.split(".")[0] for p in full_deps}
+                extra = sorted(full_vars - block_vars)
+
+                # Filter out env globals (loop, range, true, false, etc.)
+                # by only keeping names that look like user context variables.
+                # Kida globals are accessible without being passed, so they're
+                # not a concern for missing context.
+                env_globals = set(kida_env.globals) if hasattr(kida_env, "globals") else set()
+                extra = [v for v in extra if v not in env_globals]
+
+                if extra:
+                    result.page_context_warnings += 1
+                    result.issues.append(ContractIssue(
+                        severity=Severity.WARNING,
+                        category="page_context",
+                        message=(
+                            f"Route '{route.path}' uses block '{fc.block}' "
+                            f"but full-page render of '{fc.template}' also "
+                            f"needs: {', '.join(extra)}. Pass defaults in "
+                            f"your Page() call to avoid runtime errors."
+                        ),
+                        route=route.path,
+                        template=fc.template,
+                    ))
+            except Exception:
+                pass  # Template load errors already reported in check 2
+
+    # 10. Component call validation (requires kida typed def support).
     # Feature-gated: only runs when kida exposes a callable validate_calls().
     if kida_env is not None:
         validate_fn = getattr(kida_env, "validate_calls", None)

@@ -278,12 +278,6 @@ def format_args(args: dict) -> str:
     return ", ".join(parts)
 
 
-@app.template_filter("format_time")
-def format_time(ts: float) -> str:
-    """Format a unix timestamp as HH:MM:SS."""
-    return datetime.fromtimestamp(ts, UTC).strftime("%H:%M:%S")
-
-
 # ---------------------------------------------------------------------------
 # Shared: prepare registry + tools for the agent loop
 # ---------------------------------------------------------------------------

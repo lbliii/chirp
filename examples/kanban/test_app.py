@@ -85,11 +85,7 @@ class TestAuth:
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert "/login" in location
+            assert "/login" in response.header("location", "")
 
     async def test_login_page_renders(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -112,11 +108,7 @@ class TestAuth:
                 body += f"&_csrf_token={csrf}".encode()
             response = await client.post("/login", body=body, headers=headers)
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert location == "/"
+            assert response.header("location") == "/"
 
     async def test_invalid_login_shows_error(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -143,11 +135,7 @@ class TestAuth:
                 body=b"",
             )
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert "/login" in location
+            assert "/login" in response.header("location", "")
 
     async def test_all_demo_users_can_login(self, example_app) -> None:
         """Alice, Bob, and Carol can all log in."""

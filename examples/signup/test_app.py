@@ -192,11 +192,7 @@ class TestRegistrationFlow:
                 headers={**_FORM_CT, "Cookie": f"chirp_session={cookie}"},
             )
             assert response.status == 302
-            location = ""
-            for hname, hvalue in response.headers:
-                if hname == "location":
-                    location = hvalue
-            assert "/welcome" in location
+            assert "/welcome" in response.header("location", "")
 
     async def test_welcome_page_shows_username(self, example_app) -> None:
         async with TestClient(example_app) as client:

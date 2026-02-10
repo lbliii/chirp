@@ -501,6 +501,48 @@ class TestFormOrErrors:
             )
             assert response.text == "tasks.html|task_form"
 
+    async def test_type_coercion_error_returns_validation_error(self) -> None:
+        """FormBindingError from invalid type coercion, not just missing fields."""
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, TypedForm, "form.html", "form_body"
+            )
+            if isinstance(result, ValidationError):
+                return f"errors:{sorted(result.context['errors'].keys())}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"name=Alice&age=notanumber",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "age" in response.text
+
+    async def test_success_with_defaults(self) -> None:
+        """Defaults are applied when optional fields are omitted."""
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(
+                request, SimpleForm, "form.html", "form_body"
+            )
+            if isinstance(result, ValidationError):
+                return "error"
+            return f"{result.title}|{result.description}|{result.priority}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=Hello",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "Hello||medium"
+
 
 # ---------------------------------------------------------------------------
 # form_values() — dataclass/Mapping to dict[str, str]
@@ -549,3 +591,28 @@ class TestFormValues:
     def test_empty_mapping(self) -> None:
         result = form_values({})
         assert result == {}
+
+    def test_formdata_input(self) -> None:
+        """FormData is a Mapping — form_values should handle it."""
+        fd = FormData({"name": ["Alice"], "email": ["alice@test.com"]})
+        result = form_values(fd)
+        assert result == {"name": "Alice", "email": "alice@test.com"}
+
+
+# ---------------------------------------------------------------------------
+# Top-level import smoke test
+# ---------------------------------------------------------------------------
+
+
+class TestTopLevelImports:
+    """Verify form helpers are importable from the chirp top-level."""
+
+    def test_import_form_or_errors(self) -> None:
+        from chirp import form_or_errors as fn
+
+        assert callable(fn)
+
+    def test_import_form_values(self) -> None:
+        from chirp import form_values as fn
+
+        assert callable(fn)

@@ -288,7 +288,14 @@ async def pokemon_detail(pokemon_id: int, request: Request):
     return Page(
         "pokedex.html",
         "pokemon_detail",
-        pokemon=pokemon,
+        detail=pokemon,
+        pokemon=[],
+        all_types=[],
+        current_type="",
+        search="",
+        page=1,
+        total=0,
+        total_pages=0,
     )
 
 

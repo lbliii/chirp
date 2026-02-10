@@ -55,6 +55,12 @@ from chirp import (
     requires,
     is_safe_url,
 
+    # Forms
+    form_from,
+    form_or_errors,
+    form_values,
+    FormBindingError,
+
     # Errors
     ChirpError,
     ConfigurationError,
@@ -177,6 +183,15 @@ Convenience for 302 redirects: `Redirect(url)`.
 | `is_safe_url(url)` | Check whether a redirect URL is safe (relative, same origin) |
 
 See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
+
+## Forms
+
+| Export | Description |
+|--------|-------------|
+| `form_from(request, datacls)` | Bind form data to a frozen dataclass. Raises `FormBindingError` on failure. |
+| `form_or_errors(request, datacls, template, block, ...)` | Bind or return `ValidationError`. Returns `T \| ValidationError`. |
+| `form_values(form)` | Convert dataclass or mapping to `dict[str, str]` for template re-population. |
+| `FormBindingError` | Raised when form binding fails. `.errors` is `dict[str, list[str]]`. |
 
 ## Errors
 

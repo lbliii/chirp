@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Built-in template filters** — `field_errors` extracts validation messages for a single
   form field from an errors dict. `qs` builds URL query strings, automatically omitting
   falsy values. Both are auto-registered in the Kida environment at startup.
+- **`form_or_errors()`** — Glue function that combines `form_from()` and `ValidationError`
+  into a single call. Returns `T | ValidationError`, eliminating the try/except boilerplate
+  for form binding errors.
+- **`form_values()`** — Utility that converts a dataclass or mapping to `dict[str, str]` for
+  template re-population when validation fails.
+- **Form field macros** — Shipped in `chirp/forms.html`, importable via
+  `{% from "chirp/forms.html" import text_field %}`. Five macros (`text_field`,
+  `textarea_field`, `select_field`, `checkbox_field`, `hidden_field`) render labelled
+  fields with inline error display using the `field_errors` filter.
 
 ## [0.1.0] — 2026-02-09
 

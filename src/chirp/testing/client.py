@@ -156,14 +156,17 @@ class TestClient:
         headers: dict[str, str] | None = None,
         max_events: int = 10,
         disconnect_after: float | None = None,
+        timeout: float | None = None,
     ) -> SSETestResult:
         """Connect to an SSE endpoint and collect events.
 
         The connection stays open until one of:
 
         - ``max_events`` data events have been collected, or
-        - ``disconnect_after`` seconds have elapsed, or
+        - ``disconnect_after`` (or ``timeout``) seconds have elapsed, or
         - the server closes the stream (generator exhausted).
+
+        ``timeout`` is an alias for ``disconnect_after``.
 
         Returns an ``SSETestResult`` with parsed events and metadata.
 
@@ -173,6 +176,11 @@ class TestClient:
             assert len(result.events) == 3
             assert result.events[0].data == "hello"
         """
+        if timeout is not None and disconnect_after is not None:
+            msg = "Cannot specify both 'timeout' and 'disconnect_after'."
+            raise TypeError(msg)
+        if timeout is not None:
+            disconnect_after = timeout
         # Split path and query string
         if "?" in path:
             path_part, query_string = path.split("?", 1)

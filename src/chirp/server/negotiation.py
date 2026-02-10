@@ -17,6 +17,7 @@ from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import (
     Fragment,
     InlineTemplate,
+    LayoutPage,
     OOB,
     Page,
     Stream,
@@ -115,6 +116,15 @@ def negotiate(
                 tpl = Template(value.name, **value.context)
                 html = render_template(kida_env, tpl)
             return Response(body=html, content_type="text/html; charset=utf-8")
+        case LayoutPage():
+            if kida_env is None:
+                msg = (
+                    "LayoutPage return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            html = _render_layout_page(value, kida_env, request)
+            return Response(body=html, content_type="text/html; charset=utf-8")
         case ValidationError():
             if kida_env is None:
                 msg = (
@@ -202,3 +212,49 @@ def negotiate(
                 f"Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)
+
+
+def _render_layout_page(
+    value: LayoutPage,
+    kida_env: Environment,
+    request: Request | None,
+) -> str:
+    """Render a LayoutPage through its layout chain.
+
+    Decides rendering depth based on request headers:
+
+    - Fragment request (no history restore): render just the named block
+    - Full page / history restore: render page block, then wrap with layouts
+    - HX-Target present: render at the appropriate layout depth
+    """
+    from chirp.pages.renderer import render_with_layouts
+    from chirp.pages.types import LayoutChain
+
+    layout_chain: LayoutChain = value.layout_chain or LayoutChain()
+    htmx_target: str | None = None
+    is_fragment = False
+    is_history_restore = False
+
+    if request is not None:
+        htmx_target = request.htmx_target
+        is_fragment = request.is_fragment
+        is_history_restore = request.is_history_restore
+
+    # For pure fragment requests (no layouts involved), render just the block
+    if is_fragment and not is_history_restore and not htmx_target:
+        frag = Fragment(value.name, value.block_name, **value.context)
+        return render_fragment(kida_env, frag)
+
+    # Render the page's content block
+    page_template = kida_env.get_template(value.name)
+    page_html = page_template.render_block(value.block_name, value.context)
+
+    # Compose with layout chain at the appropriate depth
+    return render_with_layouts(
+        kida_env,
+        layout_chain=layout_chain,
+        page_html=page_html,
+        context=value.context,
+        htmx_target=htmx_target,
+        is_history_restore=is_history_restore,
+    )

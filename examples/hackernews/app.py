@@ -261,33 +261,6 @@ async def worker_shutdown() -> None:
 # ---------------------------------------------------------------------------
 
 
-@app.template_filter("timeago")
-def timeago(unix_ts: int) -> str:
-    """Convert a unix timestamp to a human-readable relative time."""
-    if not unix_ts:
-        return ""
-    delta = int(time.time()) - unix_ts
-    if delta < 60:
-        return "just now"
-    if delta < 3600:
-        m = delta // 60
-        return f"{m} minute{'s' if m != 1 else ''} ago"
-    if delta < 86400:
-        h = delta // 3600
-        return f"{h} hour{'s' if h != 1 else ''} ago"
-    d = delta // 86400
-    return f"{d} day{'s' if d != 1 else ''} ago"
-
-
-@app.template_filter("pluralize")
-def pluralize(count: int, singular: str, plural: str | None = None) -> str:
-    """Pluralize a word based on count. Usage: {{ n | pluralize('comment') }}"""
-    if plural is None:
-        plural = singular + "s"
-    word = singular if count == 1 else plural
-    return f"{count} {word}"
-
-
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------

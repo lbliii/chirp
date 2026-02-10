@@ -178,6 +178,16 @@ class Response:
         """
         return self.with_header("HX-Refresh", "true")
 
+    # -- Header lookup --
+
+    def header(self, name: str, default: str | None = None) -> str | None:
+        """Return the first header value matching *name* (case-insensitive)."""
+        target = name.lower()
+        for hname, hvalue in self.headers:
+            if hname.lower() == target:
+                return hvalue
+        return default
+
     # -- Body helpers --
 
     @property
@@ -193,6 +203,14 @@ class Response:
         if isinstance(self.body, bytes):
             return self.body.decode("utf-8")
         return self.body
+
+    @property
+    def json(self) -> Any:
+        """Body parsed as JSON.
+
+        Raises ``ValueError`` if the body is not valid JSON.
+        """
+        return json_module.loads(self.text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,6 +255,14 @@ class StreamingResponse:
     def with_content_type(self, content_type: str) -> StreamingResponse:
         """Return a new StreamingResponse with a different content type."""
         return replace(self, content_type=content_type)
+
+    def header(self, name: str, default: str | None = None) -> str | None:
+        """Return the first header value matching *name* (case-insensitive)."""
+        target = name.lower()
+        for hname, hvalue in self.headers:
+            if hname.lower() == target:
+                return hvalue
+        return default
 
 
 @dataclass(frozen=True, slots=True)

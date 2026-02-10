@@ -123,6 +123,30 @@ class TestFormOrErrorsIntegration:
             assert response.status == 422
 
 
+    async def test_retarget_sets_hx_header(self) -> None:
+        """HX-Retarget header appears on the 422 response."""
+        app = _app()
+
+        @app.route("/contact", methods=["POST"])
+        async def contact(request: Request):
+            result = await form_or_errors(
+                request, ContactForm, "form.html", "form_errors",
+                retarget="#error-banner",
+            )
+            if isinstance(result, ValidationError):
+                return result
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/contact",
+                body=b"message=Hello",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.status == 422
+            assert response.header("hx-retarget") == "#error-banner"
+
+
 class TestFormValuesIntegration:
     """Integration: form_values() used in a handler with ValidationError."""
 

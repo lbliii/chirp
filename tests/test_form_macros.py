@@ -118,6 +118,20 @@ class TestTextField:
         assert "Too short." in html
         assert "No spaces allowed." in html
 
+    def test_errors_for_different_field_no_error_class(self) -> None:
+        """Errors dict present but no errors for *this* field — no error styling."""
+        env = _make_env()
+        errors = {"email": ["Invalid email."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}'
+            '{{ text_field("name", errors=errors) }}',
+            errors=errors,
+        )
+        assert "field--error" not in html
+        assert "field-error" not in html
+        assert "Invalid email." not in html
+
 
 # ---------------------------------------------------------------------------
 # textarea_field

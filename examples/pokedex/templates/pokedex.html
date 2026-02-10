@@ -202,25 +202,25 @@
 {# ── Detail view ────────────────────────────────────────────────── #}
 
 {% block pokemon_detail %}
-{% if pokemon.name %}
+{% if detail is defined and detail %}
 <div class="grid-container" style="margin-top: 1.5rem;">
   <a href="/" class="back-link" hx-get="/" hx-target="#main" hx-push-url="true">&larr; Back to all</a>
   <div class="detail">
     <div class="detail-header">
-      <span class="detail-name">{{ pokemon.name | capitalize }}</span>
-      <span class="detail-id">#{{ pokemon.id }}</span>
-      {% if pokemon.legendary %}
+      <span class="detail-name">{{ detail.name | capitalize }}</span>
+      <span class="detail-id">#{{ detail.id }}</span>
+      {% if detail.legendary %}
       <span class="legendary-badge">Legendary</span>
       {% end %}
     </div>
     <div class="detail-types">
-      {% for t in pokemon.types.split(",") %}{{ type_badge(t) }}{% end %}
+      {% for t in detail.types.split(",") %}{{ type_badge(t) }}{% end %}
     </div>
-    {% for label, val in [("HP", pokemon.hp), ("Attack", pokemon.attack), ("Defense", pokemon.defense), ("Speed", pokemon.speed)] %}
+    {% for label, val in [("HP", detail.hp), ("Attack", detail.attack), ("Defense", detail.defense), ("Speed", detail.speed)] %}
     {{ stat_bar(label, val) }}
     {% end %}
     <div style="margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted);">
-      Generation {{ pokemon.generation }}
+      Generation {{ detail.generation }}
     </div>
   </div>
 </div>

@@ -6,7 +6,7 @@ weight: 20
 lang: en
 type: doc
 tags: [forms, validation, multipart]
-keywords: [forms, validation, multipart, file-upload, validation-result, rules]
+keywords: [forms, validation, multipart, file-upload, validation-result, rules, form-from, form-or-errors, form-values, form-macros, dataclass-binding]
 category: guide
 ---
 
@@ -40,6 +40,109 @@ async def upload(request: Request):
     filename = file.filename
     # ... save file
 ```
+
+## Dataclass Binding
+
+`form_from()` binds form data to a frozen dataclass. Define the shape, and Chirp handles type coercion for `str`, `int`, `float`, and `bool`:
+
+```python
+from dataclasses import dataclass
+from chirp import form_from, FormBindingError
+
+@dataclass(frozen=True, slots=True)
+class TaskForm:
+    title: str
+    description: str = ""
+    priority: str = "medium"
+
+@app.route("/tasks", methods=["POST"])
+async def add_task(request: Request):
+    try:
+        form = await form_from(request, TaskForm)
+    except FormBindingError as e:
+        # e.errors is dict[str, list[str]]
+        return ValidationError("tasks.html", "form", errors=e.errors)
+
+    # form.title, form.description, form.priority are populated
+```
+
+Fields without defaults are required — if missing, `FormBindingError` is raised with structured errors.
+
+## Bind or Error
+
+`form_or_errors()` combines `form_from()` and `ValidationError` into a single call, eliminating the try/except boilerplate:
+
+```python
+from chirp import form_or_errors, ValidationError
+
+@app.route("/tasks", methods=["POST"])
+async def add_task(request: Request):
+    result = await form_or_errors(request, TaskForm, "tasks.html", "task_form")
+    if isinstance(result, ValidationError):
+        return result
+
+    # result is TaskForm — proceed with business logic
+    save_task(result.title, result.description)
+```
+
+On binding failure, it returns a `ValidationError` pre-loaded with the errors and the raw form values for re-population. Extra template context is passed through:
+
+```python
+result = await form_or_errors(
+    request, TaskForm, "board.html", "add_form",
+    retarget="#errors",   # optional HX-Retarget header
+    columns=COLUMNS,      # extra template context
+)
+```
+
+## Re-populating Forms
+
+When validation fails, use `form_values()` to convert a dataclass back to a `dict[str, str]` for template re-population:
+
+```python
+from chirp import form_values
+
+# After binding succeeds but business validation fails:
+errors = validate_task(result)
+if errors:
+    return ValidationError(
+        "tasks.html", "task_form",
+        errors=errors,
+        form=form_values(result),  # {"title": "...", "description": "...", ...}
+    )
+```
+
+`form_values()` also accepts a `Mapping` (dict, `FormData`, etc.) and converts all values to strings. `None` becomes `""`.
+
+## Form Field Macros
+
+Chirp ships template macros for common form fields. Import them from `chirp/forms.html`:
+
+```html
+{% from "chirp/forms.html" import text_field, textarea_field, select_field %}
+
+<form hx-post="/tasks" hx-target="#task-form">
+    {{ text_field("title", form.title ?? "", label="Title",
+                  errors=errors, required=true) }}
+    {{ textarea_field("description", form.description ?? "",
+                      label="Description", errors=errors) }}
+    <button type="submit">Create</button>
+</form>
+```
+
+Each macro renders a labelled field with automatic error display. When `errors` contains messages for that field, a `field--error` CSS class is added and `<span class="field-error">` elements are rendered.
+
+Available macros:
+
+| Macro | Description |
+|-------|-------------|
+| `text_field(name, value, label, errors, type, required, placeholder, attrs)` | Text input (also works for `password`, `email`, etc. via `type`) |
+| `textarea_field(name, value, label, errors, rows, required, placeholder)` | Multi-line text |
+| `select_field(name, options, selected, label, errors, required)` | Dropdown (options need `.value` and `.label`) |
+| `checkbox_field(name, checked, label, errors)` | Checkbox with label |
+| `hidden_field(name, value)` | Hidden input |
+
+The macros work with the `field_errors` filter and the errors dict shape from `FormBindingError` and `ValidationResult`.
 
 ## Validation
 

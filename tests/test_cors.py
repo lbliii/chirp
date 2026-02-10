@@ -166,7 +166,7 @@ class TestCORSExposeHeaders:
                 "/api/data",
                 headers={"Origin": "https://example.com"},
             )
-            exposed = dict(response.headers).get("access-control-expose-headers", "")
+            exposed = response.header("access-control-expose-headers", "")
             assert "X-Request-Id" in exposed
             assert "X-Rate-Limit" in exposed
 

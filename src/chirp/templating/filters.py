@@ -5,6 +5,8 @@ kida Environment. They complement Kida's built-in filters with patterns
 common in server-rendered HTML + htmx apps.
 """
 
+import time as time_module
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -52,8 +54,56 @@ def qs(base: str, **params: Any) -> str:
     return f"{base}{sep}{encoded}"
 
 
+def timeago(unix_ts: int | float) -> str:
+    """Convert a unix timestamp to a human-readable relative time.
+
+    Example:
+        {{ message.timestamp | timeago }}  → "3 hours ago"
+
+    """
+    if not unix_ts:
+        return ""
+    delta = int(time_module.time() - unix_ts)
+    if delta < 60:
+        return "just now"
+    if delta < 3600:
+        m = delta // 60
+        return f"{m} minute{'s' if m != 1 else ''} ago"
+    if delta < 86400:
+        h = delta // 3600
+        return f"{h} hour{'s' if h != 1 else ''} ago"
+    d = delta // 86400
+    return f"{d} day{'s' if d != 1 else ''} ago"
+
+
+def pluralize(count: int, singular: str, plural: str | None = None) -> str:
+    """Pluralize a word based on count.
+
+    Example:
+        {{ comments | length | pluralize("comment") }}  → "5 comments"
+
+    """
+    if plural is None:
+        plural = singular + "s"
+    word = singular if count == 1 else plural
+    return f"{count} {word}"
+
+
+def format_time(unix_ts: float) -> str:
+    """Format a unix timestamp as ``HH:MM:SS`` (UTC).
+
+    Example:
+        {{ msg.created_at | format_time }}  → "14:32:07"
+
+    """
+    return datetime.fromtimestamp(unix_ts, UTC).strftime("%H:%M:%S")
+
+
 # All built-in chirp filters, registered automatically on every env.
 BUILTIN_FILTERS: dict[str, Any] = {
     "field_errors": field_errors,
     "qs": qs,
+    "timeago": timeago,
+    "pluralize": pluralize,
+    "format_time": format_time,
 }
