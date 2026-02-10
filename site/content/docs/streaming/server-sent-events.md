@@ -49,8 +49,10 @@ async def stream():
     # Dict -- JSON-serialized as SSE data
     yield {"count": 42, "status": "ok"}
 
-    # Fragment -- rendered via kida, sent as SSE data
-    yield Fragment("components/notification.html", message="New alert")
+    # Fragment -- rendered via kida, sent as named SSE event
+    # target= becomes the SSE event name (default: "fragment")
+    yield Fragment("components/notification.html", "alert",
+                   target="notification", message="New alert")
 
     # SSEEvent -- full control over event type, id, retry
     yield SSEEvent(data="custom", event="ping", id="1")
@@ -83,8 +85,8 @@ Server:
 async def notifications():
     async def stream():
         async for event in notification_bus.subscribe():
-            yield Fragment("components/notification.html",
-                event="notification",
+            yield Fragment("components/notification.html", "alert",
+                target="notification",
                 message=event.message,
                 time=event.timestamp,
             )
@@ -94,10 +96,14 @@ async def notifications():
 Client (using htmx SSE extension):
 
 ```html
-<div hx-ext="sse" sse-connect="/notifications" sse-swap="notification">
-  <!-- Fragments are swapped in here -->
+<div hx-ext="sse" sse-connect="/notifications">
+  <div sse-swap="notification" hx-swap="beforeend">
+    <!-- Fragments are swapped in here -->
+  </div>
 </div>
 ```
+
+> **Important**: `sse-swap` must be on a **child** of the `sse-connect` element, not the same element. htmx uses `querySelectorAll` internally, which does not include the root element itself.
 
 The server renders HTML, the browser swaps it in. Zero client-side JavaScript for the rendering logic.
 
@@ -111,16 +117,18 @@ async def live_stats():
     async def stream():
         while True:
             stats = await get_current_stats()
-            yield SSEEvent(
-                data=Fragment("dashboard.html", "stats_panel", stats=stats),
-                event="stats-update",
-            )
-            await asyncio.sleep(5)  # Update every 5 seconds
+            # Fragment.target becomes the SSE event name.
+            # No need to wrap in SSEEvent -- chirp handles it.
+            yield Fragment("dashboard.html", "stats_panel",
+                           target="stats-update", stats=stats)
+            await asyncio.sleep(5)
     return EventStream(stream())
 ```
 
 ```html
-<section hx-ext="sse" sse-connect="/dashboard/live">
+<section hx-ext="sse"
+         sse-connect="/dashboard/live"
+         hx-disinherit="hx-target hx-swap">
   <div id="stats" sse-swap="stats-update">
     {# Initial stats rendered server-side #}
     {% block stats_panel %}
@@ -129,6 +137,8 @@ async def live_stats():
   </div>
 </section>
 ```
+
+> **Tip**: Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element to prevent layout-level `hx-target` from bleeding into SSE swap targets. Without this, SSE fragments can accidentally replace the wrong region.
 
 ## Connection Lifecycle
 

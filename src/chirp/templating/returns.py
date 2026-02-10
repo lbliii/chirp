@@ -57,9 +57,14 @@ class InlineTemplate:
 class Fragment:
     """Render a named block from a kida template.
 
-    When used inside an ``OOB`` response, *target* specifies the DOM
-    element ID for the out-of-band swap.  If *target* is ``None``
-    (the default), the block name is used as the target ID.
+    The *target* field controls how the fragment is delivered:
+
+    - **OOB responses**: *target* specifies the DOM element ID for the
+      out-of-band swap.  If *target* is ``None`` (the default), the
+      block name is used as the target ID.
+    - **SSE streams**: *target* becomes the SSE event name.  Templates
+      use ``sse-swap="{target}"`` to receive the fragment.  If *target*
+      is ``None``, the event name defaults to ``"fragment"``.
 
     Usage::
 
@@ -68,6 +73,12 @@ class Fragment:
     With explicit OOB target::
 
         Fragment("cart.html", "counter", target="cart-counter", count=5)
+
+    With explicit SSE event name::
+
+        yield Fragment("dashboard.html", "stats_panel",
+                       target="stats-update", stats=stats)
+        # Client: <div sse-swap="stats-update">
     """
 
     template_name: str
@@ -119,6 +130,26 @@ class Page:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "context", context)
+
+
+@dataclass(frozen=True, slots=True)
+class Action:
+    """Represent a side-effect endpoint that should not swap response HTML.
+
+    Defaults to ``204 No Content`` so htmx receives a successful response
+    without replacing any target content. Optional htmx response headers can
+    be attached for client-side behavior.
+
+    Usage::
+
+        return Action()
+        return Action(trigger="saved")
+        return Action(refresh=True)
+    """
+
+    status: int = 204
+    trigger: str | dict[str, Any] | None = None
+    refresh: bool = False
 
 
 @dataclass(frozen=True, slots=True)
