@@ -25,14 +25,26 @@ Conventions:
 """
 
 from chirp.pages.discovery import discover_pages
+from chirp.pages.reactive import (
+    BlockRef,
+    ChangeEvent,
+    DependencyIndex,
+    ReactiveBus,
+    reactive_stream,
+)
 from chirp.pages.renderer import render_with_layouts
 from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo, PageRoute
 
 __all__ = [
+    "BlockRef",
+    "ChangeEvent",
     "ContextProvider",
+    "DependencyIndex",
     "LayoutChain",
     "LayoutInfo",
     "PageRoute",
+    "ReactiveBus",
     "discover_pages",
+    "reactive_stream",
     "render_with_layouts",
 ]
