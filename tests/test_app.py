@@ -210,6 +210,30 @@ class TestAppE2E:
             response = await client.get("/nonexistent")
             assert response.status == 404
 
+    async def test_not_found_raised_in_handler(self) -> None:
+        """NotFound raised inside a handler produces a 404 response.
+
+        This is the same mechanism that allows context providers to
+        raise NotFound and have chirp's error pipeline handle it.
+        """
+        from chirp.errors import NotFound
+
+        app = App()
+
+        @app.route("/items/{item_id}")
+        def item(item_id: str):
+            if item_id == "missing":
+                raise NotFound(f"Item {item_id} not found")
+            return f"Item: {item_id}"
+
+        async with TestClient(app) as client:
+            ok = await client.get("/items/abc")
+            assert ok.status == 200
+            assert ok.text == "Item: abc"
+
+            missing = await client.get("/items/missing")
+            assert missing.status == 404
+
     async def test_405_default(self) -> None:
         app = App()
 
@@ -244,6 +268,22 @@ class TestAppE2E:
             response = await client.get("/echo")
             assert "method=GET" in response.text
             assert "path=/echo" in response.text
+
+    async def test_debug_bootstrap_asset_is_served(self) -> None:
+        app = App(config=AppConfig(debug=True))
+
+        @app.route("/")
+        def index():
+            return "<html><body>ok</body></html>"
+
+        async with TestClient(app) as client:
+            page = await client.get("/")
+            assert "/__chirp/debug/htmx.js" in page.text
+
+            asset = await client.get("/__chirp/debug/htmx.js")
+            assert asset.status == 200
+            assert "application/javascript" in asset.content_type
+            assert "__chirpHtmxDebugBooted" in asset.text
 
     async def test_response_chaining(self) -> None:
         app = App()

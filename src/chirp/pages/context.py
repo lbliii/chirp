@@ -22,12 +22,31 @@ async def build_cascade_context(
     Each provider's output is merged into the accumulated context.
     Later providers (deeper in the filesystem) override earlier ones.
 
+    Providers may raise ``HTTPError`` subclasses (e.g. ``NotFound``)
+    to abort the cascade early.  The exception propagates to the
+    caller (``page_wrapper``), which is wrapped by ``handle_request``
+    — chirp's standard error pipeline renders the appropriate error
+    page automatically.  This eliminates the need for downstream
+    handlers to guard against missing resources::
+
+        # In _context.py:
+        from chirp import NotFound
+
+        def context(doc_id: str) -> dict:
+            doc = store.get(doc_id)
+            if doc is None:
+                raise NotFound(f"Document {doc_id} not found")
+            return {"doc": doc}
+
     Args:
         providers: Context providers ordered from root (depth=0) to leaf.
         path_params: Extracted path parameters from the URL match.
 
     Returns:
         Merged context dictionary.
+
+    Raises:
+        HTTPError: If a provider raises (e.g. ``NotFound``).
     """
     ctx: dict[str, Any] = {}
     for provider in providers:
