@@ -74,6 +74,9 @@ full = [
     "asyncpg>=0.30.0",
 ]
 
+[project.scripts]
+chirp = "chirp.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/lbliii/chirp"
 Documentation = "https://github.com/lbliii/chirp"
