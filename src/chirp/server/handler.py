@@ -153,8 +153,13 @@ async def _invoke_handler(
         _cache=request._cache,
     )
 
+    # Pre-read body data if any handler param needs typed extraction
+    body_data = await _read_body_if_needed(handler, request)
+
     # Build kwargs from handler signature
-    kwargs = _build_handler_kwargs(handler, request, match.path_params, providers)
+    kwargs = _build_handler_kwargs(
+        handler, request, match.path_params, providers, body_data=body_data,
+    )
 
     # Call the handler (sync or async — invoke() handles both)
     result = await invoke(handler, **kwargs)
@@ -167,14 +172,20 @@ def _build_handler_kwargs(
     request: Request,
     path_params: dict[str, str],
     providers: dict[type, Callable[..., Any]] | None = None,
+    *,
+    body_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Inspect handler signature and build kwargs from request + path params.
 
     Resolution order:
     1. ``request`` parameter (by name or ``Request`` annotation)
     2. Path parameters (by name, with type conversion)
-    3. Service providers (by type annotation via ``app.provide()``)
+    3. Context cascade values (page routes only — handled in page_wrapper)
+    4. Service providers (by type annotation via ``app.provide()``)
+    5. Typed extraction (dataclass annotation → query string or body)
     """
+    from chirp.extraction import extract_dataclass, is_extractable_dataclass
+
     sig = inspect.signature(handler)
     kwargs: dict[str, Any] = {}
 
@@ -197,5 +208,44 @@ def _build_handler_kwargs(
             and param.annotation in providers
         ):
             kwargs[name] = providers[param.annotation]()
+        elif (
+            param.annotation is not inspect.Parameter.empty
+            and is_extractable_dataclass(param.annotation)
+        ):
+            # Typed extraction: GET → query, POST/PUT/PATCH → body
+            if request.method in ("GET", "HEAD"):
+                kwargs[name] = extract_dataclass(param.annotation, request.query)
+            elif body_data is not None:
+                kwargs[name] = extract_dataclass(param.annotation, body_data)
 
     return kwargs
+
+
+async def _read_body_if_needed(
+    handler: Callable[..., Any],
+    request: Request,
+) -> dict[str, Any] | None:
+    """Pre-read form/JSON body if the handler has extractable dataclass params.
+
+    Only reads the body for non-GET methods.  Returns ``None`` if no
+    extraction is needed or the method is GET/HEAD.
+    """
+    if request.method in ("GET", "HEAD"):
+        return None
+
+    from chirp.extraction import is_extractable_dataclass
+
+    sig = inspect.signature(handler)
+    needs_extraction = any(
+        param.annotation is not inspect.Parameter.empty
+        and is_extractable_dataclass(param.annotation)
+        for param in sig.parameters.values()
+    )
+
+    if not needs_extraction:
+        return None
+
+    ct = request.content_type or ""
+    if "json" in ct:
+        return await request.json()
+    return dict(await request.form())

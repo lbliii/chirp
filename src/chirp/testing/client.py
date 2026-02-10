@@ -81,9 +81,18 @@ class TestClient:
         *,
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
+        data: dict[str, str] | None = None,
         json: dict[str, object] | None = None,
     ) -> Response:
-        """Send a POST request."""
+        """Send a POST request.
+
+        Args:
+            path: Request path.
+            headers: Optional extra headers.
+            body: Raw body bytes.
+            data: Form data dict (URL-encoded).
+            json: JSON body dict.
+        """
         extra_headers: dict[str, str] = {}
         request_body = body or b""
 
@@ -92,6 +101,11 @@ class TestClient:
 
             request_body = json_module.dumps(json).encode("utf-8")
             extra_headers["content-type"] = "application/json"
+        elif data is not None:
+            from urllib.parse import urlencode
+
+            request_body = urlencode(data).encode("utf-8")
+            extra_headers["content-type"] = "application/x-www-form-urlencoded"
 
         merged = {**extra_headers, **(headers or {})}
         return await self.request("POST", path, headers=merged, body=request_body)
