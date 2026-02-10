@@ -32,4 +32,11 @@ Send the shell immediately, fill in content as data arrives.
 Push kida-rendered fragments to the browser over SSE.
 :::{/card}
 
+:::{card} SSE Patterns
+:icon: layers
+:link: ./sse-patterns
+:description: Four update patterns
+Display-only, client-managed, streaming append, and one-shot mutations.
+:::{/card}
+
 :::{/cards}
