@@ -6,10 +6,11 @@ from pathlib import Path
 import pytest
 from kida import Environment, FileSystemLoader
 
+from chirp.http.request import Request
 from chirp.http.response import Redirect, Response
 from chirp.realtime.events import EventStream
 from chirp.server.negotiation import negotiate
-from chirp.templating.returns import Fragment, OOB, Stream, Template, ValidationError
+from chirp.templating.returns import OOB, Action, Fragment, Page, Stream, Template, ValidationError
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -42,6 +43,7 @@ class TestNegotiateTemplateTypes:
         assert "text/html" in result.content_type
         assert "<title>Home</title>" in result.text
         assert "<h1>Home</h1>" in result.text
+        assert result.render_intent == "full_page"
 
     def test_template_with_list(self, kida_env: Environment) -> None:
         result = negotiate(
@@ -64,6 +66,31 @@ class TestNegotiateTemplateTypes:
         assert "two" in result.text
         # Fragment should NOT include the full page wrapper
         assert "<form>" not in result.text
+        assert result.render_intent == "fragment"
+
+    def test_page_intent_tracks_fragment_request(self, kida_env: Environment) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [(b"hx-request", b"true")],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+        result = negotiate(
+            Page("search.html", "results_list", results=["one"]),
+            kida_env=kida_env,
+            request=request,
+        )
+        assert result.render_intent == "fragment"
 
     def test_template_without_env_raises(self) -> None:
         from chirp.errors import ConfigurationError
@@ -149,6 +176,25 @@ class TestNegotiateValidationError:
 
         with pytest.raises(ConfigurationError, match="requires kida integration"):
             negotiate(ValidationError("form.html", "form_body", errors={}))
+
+
+class TestNegotiateAction:
+    def test_action_defaults_to_204_no_content(self) -> None:
+        result = negotiate(Action())
+        assert result.status == 204
+        assert result.text == ""
+        assert "text/html" in result.content_type
+
+    def test_action_sets_hx_headers(self) -> None:
+        result = negotiate(Action(trigger="saved", refresh=True))
+        assert result.status == 204
+        assert ("HX-Trigger", "saved") in result.headers
+        assert ("HX-Refresh", "true") in result.headers
+
+    def test_action_trigger_payload_dict(self) -> None:
+        result = negotiate(Action(trigger={"saved": {"ok": True}}))
+        assert result.status == 204
+        assert ("HX-Trigger", json.dumps({"saved": {"ok": True}})) in result.headers
 
 
 class TestNegotiateOOB:

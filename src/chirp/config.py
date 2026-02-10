@@ -50,5 +50,8 @@ class AppConfig:
     # htmx safe target — auto-add hx-target="this" to event-driven elements
     safe_target: bool = True
 
+    # SSE lifecycle — data-sse-state attribute + chirp:sse:connected/disconnected events
+    sse_lifecycle: bool = True
+
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB

@@ -12,6 +12,12 @@ from chirp.http.response import Response, StreamingResponse
 logger = logging.getLogger("chirp.server")
 
 
+def _body_allowed(status: int) -> bool:
+    """Whether an HTTP status code permits a response body."""
+    # RFC: 1xx, 204, and 304 responses do not include a message body.
+    return not (100 <= status < 200 or status in {204, 304})
+
+
 async def send_response(response: Response, send: Send) -> None:
     """Translate a chirp Response into ASGI send() calls."""
     # Build raw headers
@@ -25,7 +31,7 @@ async def send_response(response: Response, send: Send) -> None:
         for cookie in response.cookies
     )
 
-    body = response.body_bytes
+    body = response.body_bytes if _body_allowed(response.status) else b""
 
     raw_headers.append((b"content-length", str(len(body)).encode("latin-1")))
 

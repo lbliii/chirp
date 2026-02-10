@@ -34,6 +34,7 @@ _Py_mod_gil = 0
 
 __version__ = "0.1.0"
 __all__ = [
+    "Action",
     "OOB",
     "AnyResponse",
     "App",
@@ -99,7 +100,7 @@ def __getattr__(name: str) -> object:
         return getattr(_resp, name)
 
     if name in (
-        "Template", "InlineTemplate", "Fragment", "Page", "LayoutPage",
+        "Template", "InlineTemplate", "Fragment", "Page", "LayoutPage", "Action",
         "Stream", "ValidationError", "OOB",
     ):
         from chirp.templating import returns as _tmpl

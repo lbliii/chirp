@@ -96,6 +96,41 @@ class TestBasicSSEStreaming:
         assert result.events[0].event == "update"
         assert result.events[0].data == "hello"
 
+    async def test_configured_retry_metadata_event(self) -> None:
+        app = App(config=AppConfig(sse_retry_ms=900))
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "payload"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=2)
+
+        assert len(result.events) == 2
+        assert result.events[0].event == "chirp:sse:meta"
+        assert result.events[0].retry == 900
+        assert result.events[1].data == "payload"
+
+    async def test_configured_close_event(self) -> None:
+        app = App(config=AppConfig(sse_close_event="done"))
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "payload"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=2)
+
+        assert len(result.events) == 2
+        assert result.events[0].data == "payload"
+        assert result.events[1].event == "done"
+
 
 # ---------------------------------------------------------------------------
 # SSEEvent passthrough

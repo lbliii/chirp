@@ -15,10 +15,11 @@ from chirp.http.response import Redirect, Response, SSEResponse, StreamingRespon
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import (
+    OOB,
+    Action,
     Fragment,
     InlineTemplate,
     LayoutPage,
-    OOB,
     Page,
     Stream,
     Template,
@@ -39,6 +40,15 @@ def _minimal_kida_env() -> Environment:
     return Environment()
 
 
+def _html_response(body: str, *, intent: str) -> Response:
+    """Build a text/html response with explicit render intent."""
+    return Response(
+        body=body,
+        content_type="text/html; charset=utf-8",
+        render_intent=intent,
+    )
+
+
 def negotiate(
     value: Any,
     *,
@@ -54,16 +64,17 @@ def negotiate(
     3. ``Template``         -> render via kida -> Response
     4. ``Fragment``         -> render block via kida -> Response
     5. ``Page``             -> Template or Fragment based on request headers
-    6. ``ValidationError``  -> Fragment + 422 + optional HX-Retarget
-    7. ``OOB``              -> primary + hx-swap-oob fragments
-    8. ``Stream``           -> kida render_stream() -> StreamingResponse
+    6. ``Action``           -> empty Response + optional HX headers
+    7. ``ValidationError``  -> Fragment + 422 + optional HX-Retarget
+    8. ``OOB``              -> primary + hx-swap-oob fragments
+    9. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    9. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
-    10. ``str``             -> 200, text/html
-    11. ``bytes``           -> 200, application/octet-stream
-    12. ``dict`` / ``list`` -> 200, application/json
-    13. ``(value, int)``    -> negotiate value, override status
-    14. ``(value, int, dict)`` -> negotiate value, override status + headers
+    10. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    11. ``str``             -> 200, text/html
+    12. ``bytes``           -> 200, application/octet-stream
+    13. ``dict`` / ``list`` -> 200, application/json
+    14. ``(value, int)``    -> negotiate value, override status
+    15. ``(value, int, dict)`` -> negotiate value, override status + headers
     """
     match value:
         case Response():
@@ -83,12 +94,12 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             html = render_template(kida_env, value)
-            return Response(body=html, content_type="text/html; charset=utf-8")
+            return _html_response(html, intent="full_page")
         case InlineTemplate():
             env = kida_env or _minimal_kida_env()
             tmpl = env.from_string(value.source)
             html = tmpl.render(value.context)
-            return Response(body=html, content_type="text/html; charset=utf-8")
+            return _html_response(html, intent="full_page")
         case Fragment():
             if kida_env is None:
                 msg = (
@@ -97,7 +108,7 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             html = render_fragment(kida_env, value)
-            return Response(body=html, content_type="text/html; charset=utf-8")
+            return _html_response(html, intent="fragment")
         case Page():
             if kida_env is None:
                 msg = (
@@ -112,10 +123,12 @@ def negotiate(
             ):
                 frag = Fragment(value.name, value.block_name, **value.context)
                 html = render_fragment(kida_env, frag)
+                intent = "fragment"
             else:
                 tpl = Template(value.name, **value.context)
                 html = render_template(kida_env, tpl)
-            return Response(body=html, content_type="text/html; charset=utf-8")
+                intent = "full_page"
+            return _html_response(html, intent=intent)
         case LayoutPage():
             if kida_env is None:
                 msg = (
@@ -124,7 +137,19 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             html = _render_layout_page(value, kida_env, request)
-            return Response(body=html, content_type="text/html; charset=utf-8")
+            render_intent = (
+                "fragment"
+                if request is not None and request.is_fragment and not request.is_history_restore
+                else "full_page"
+            )
+            return _html_response(html, intent=render_intent)
+        case Action():
+            response = Response(body="").with_status(value.status)
+            if value.trigger is not None:
+                response = response.with_hx_trigger(value.trigger)
+            if value.refresh:
+                response = response.with_hx_refresh()
+            return response
         case ValidationError():
             if kida_env is None:
                 msg = (
@@ -136,7 +161,7 @@ def negotiate(
             html = render_fragment(kida_env, frag)
             response = Response(
                 body=html, content_type="text/html; charset=utf-8"
-            ).with_status(422)
+            ).with_status(422).with_render_intent("fragment")
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
@@ -159,7 +184,7 @@ def negotiate(
                     f'<div id="{target_id}" hx-swap-oob="true">{html}</div>'
                 )
             body = "\n".join(parts)
-            return Response(body=body, content_type="text/html; charset=utf-8")
+            return _html_response(body, intent="fragment")
         case Stream():
             if kida_env is None:
                 msg = (
@@ -187,7 +212,7 @@ def negotiate(
                 kida_env=kida_env,
             )
         case str():
-            return Response(body=value, content_type="text/html; charset=utf-8")
+            return _html_response(value, intent="unknown")
         case bytes():
             return Response(body=value, content_type="application/octet-stream")
         case dict() | list():
@@ -196,12 +221,12 @@ def negotiate(
                 content_type="application/json; charset=utf-8",
             )
         case (inner, int() as status):
-            response = negotiate(inner, kida_env=kida_env)
+            response = negotiate(inner, kida_env=kida_env, request=request)
             if isinstance(response, Response):
                 return response.with_status(status)
             return response
         case (inner, int() as status, dict() as headers):
-            response = negotiate(inner, kida_env=kida_env)
+            response = negotiate(inner, kida_env=kida_env, request=request)
             if isinstance(response, Response):
                 return response.with_status(status).with_headers(headers)
             return response
@@ -209,7 +234,7 @@ def negotiate(
             msg = (
                 f"Cannot convert {type(value).__name__} to a response. "
                 f"Return str, dict, bytes, Template, InlineTemplate, Fragment, "
-                f"Stream, EventStream, Response, or Redirect."
+                f"Action, Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)
 

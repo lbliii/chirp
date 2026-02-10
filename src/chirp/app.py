@@ -4,8 +4,6 @@ Mutable during setup (route registration, middleware, filters, tools).
 Frozen at runtime when app.run() or __call__() is first invoked.
 """
 
-from __future__ import annotations
-
 import inspect
 import threading
 from collections.abc import Callable
@@ -17,6 +15,7 @@ from kida import Environment
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.config import AppConfig
+from chirp.http.request import Request
 from chirp.middleware.protocol import Middleware
 from chirp.routing.route import Route
 from chirp.routing.router import Router
@@ -253,7 +252,6 @@ class App:
 
         from chirp._internal.invoke import invoke
         from chirp.extraction import extract_dataclass, is_extractable_dataclass
-        from chirp.http.request import Request
         from chirp.pages.context import build_cascade_context
         from chirp.templating.returns import LayoutPage, Page
 
@@ -749,6 +747,16 @@ class App:
 
             middleware_list.append(
                 HTMLInject(SAFE_TARGET_SNIPPET, full_page_only=True)
+            )
+
+        #    SSE lifecycle: data-sse-state attribute + custom events on
+        #    [sse-connect] elements.  Enabled by default.
+        if self.config.sse_lifecycle:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.sse_lifecycle import SSE_LIFECYCLE_SNIPPET
+
+            middleware_list.append(
+                HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True)
             )
 
         #    Debug overlays (htmx error toasts, etc.) — debug mode only.

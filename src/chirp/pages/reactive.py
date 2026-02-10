@@ -66,10 +66,15 @@ class ChangeEvent:
             only receive events for their scope.
         changed_paths: The set of context paths that changed
             (e.g., ``{"doc.content", "doc.version"}``).
+        origin: Opaque identifier for who caused this change (e.g.,
+            user ID, session ID).  Used by ``reactive_stream`` to
+            skip events originating from the same connection.
+            ``None`` means system-initiated — always delivered.
     """
 
     scope: str
     changed_paths: frozenset[str]
+    origin: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +451,7 @@ def reactive_stream(
     scope: str,
     index: DependencyIndex,
     context_builder: Callable[[], dict[str, Any] | Awaitable[dict[str, Any]]],
+    origin: str | None = None,
     kida_env: Any = None,
 ) -> EventStream:
     """Create an SSE EventStream that auto-pushes re-rendered blocks.
@@ -461,6 +467,10 @@ def reactive_stream(
         index: Dependency index mapping paths to blocks.
         context_builder: Callable that returns the current context dict
             (called after each change to get fresh data).
+        origin: Identity of this connection (e.g., user/session ID).
+            Events whose ``origin`` matches are skipped — the client
+            that caused the change doesn't need to be notified of it.
+            ``None`` disables origin filtering.
         kida_env: Deprecated — rendering is handled by the SSE response
             layer.  Accepted for backwards compatibility.
 
@@ -474,12 +484,17 @@ def reactive_stream(
             return reactive_stream(
                 bus, scope=doc_id, index=dep_index,
                 context_builder=lambda: {"doc": store.get(doc_id)},
+                origin=session_id,
             )
     """
     import inspect
 
     async def generate() -> AsyncIterator[Fragment]:
         async for change in bus.subscribe(scope):
+            # Skip events we caused (both must be non-None and equal)
+            if origin is not None and change.origin == origin:
+                continue
+
             blocks = index.affected_blocks(change.changed_paths)
             if not blocks:
                 continue

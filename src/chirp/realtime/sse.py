@@ -27,6 +27,8 @@ async def handle_sse(
     *,
     kida_env: Environment | None = None,
     debug: bool = False,
+    retry_ms: int | None = None,
+    close_event: str | None = None,
 ) -> None:
     """Stream Server-Sent Events over an ASGI connection.
 
@@ -50,6 +52,14 @@ async def handle_sse(
             (b"access-control-allow-origin", b"*"),
         ],
     })
+
+    if retry_ms is not None:
+        retry_event = SSEEvent(data="sse-retry", event="chirp:sse:meta", retry=retry_ms)
+        await send({
+            "type": "http.response.body",
+            "body": retry_event.encode().encode("utf-8"),
+            "more_body": True,
+        })
 
     # Track disconnect
     disconnected = asyncio.Event()
@@ -177,6 +187,14 @@ async def handle_sse(
             with contextlib.suppress(asyncio.CancelledError):
                 await task
     finally:
+        if close_event:
+            with contextlib.suppress(Exception):
+                close_payload = SSEEvent(data="complete", event=close_event).encode()
+                await send({
+                    "type": "http.response.body",
+                    "body": close_payload.encode("utf-8"),
+                    "more_body": True,
+                })
         # Close the stream
         await send({
             "type": "http.response.body",

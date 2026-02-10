@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -173,7 +174,13 @@ def _load_context_provider(context_file: Path, depth: int) -> ContextProvider | 
         return None
 
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module_name = f"_context_{depth}"
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
 
     func = getattr(module, "context", None)
     if func is None or not callable(func):
@@ -208,7 +215,12 @@ def _process_route_file(
     if spec is None or spec.loader is None:
         return
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
 
     # Determine URL path
     if file.stem == "page":
