@@ -1,21 +1,24 @@
 """Tests for chirp.contracts — typed hypermedia contract validation."""
 
-from chirp.app import App
-from chirp.config import AppConfig
 from dataclasses import dataclass
 from types import SimpleNamespace
-from unittest.mock import patch
 
+from chirp.app import App
+from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
     ContractIssue,
     FormContract,
     FragmentContract,
     RouteContract,
-    SSEContract,
     Severity,
+    SSEContract,
     _attr_to_method,
     _check_accessibility,
+    _check_sse_connect_scope,
+    _check_sse_self_swap,
+    _check_swap_safety,
+    _collect_broad_targets,
     _extract_form_field_names,
     _extract_targets_from_source,
     _extract_template_references,
@@ -206,7 +209,7 @@ class TestCheckAccessibility:
         assert issues[0].severity == Severity.WARNING
         assert issues[0].category == "accessibility"
         assert "<div>" in issues[0].message
-        assert "test.html" == issues[0].template
+        assert issues[0].template == "test.html"
 
     def test_span_with_hx_post_warns(self):
         html = '<span class="btn" hx-post="/submit">go</span>'
@@ -280,6 +283,72 @@ class TestCheckAccessibility:
         issues = _check_accessibility(html, "table.html")
         assert len(issues) == 1
         assert "<tr>" in issues[0].message
+
+
+class TestSwapSafetyWarnings:
+    """Warnings for broad inherited hx-target plus mutating requests."""
+
+    def test_warns_for_mutation_without_local_target(self):
+        template_sources = {
+            "_layout.html": (
+                '<body hx-boost="true" hx-target="#app-content">'
+                "<main>{% block content %}{% endblock %}</main>"
+                "</body>"
+            ),
+            "docs.html": '<form hx-post="/docs/new"><button>Save</button></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "swap_safety"
+        assert "Action()" in issues[0].message
+
+    def test_no_warning_when_mutation_has_local_target(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "docs.html": (
+                '<form hx-post="/docs/new" hx-target="#editor">'
+                "<button>Save</button>"
+                "</form>"
+            ),
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
+
+    def test_no_warning_when_swap_none(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "docs.html": '<form hx-post="/docs/new" hx-swap="none"></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
+
+    def test_warns_for_sse_swap_without_local_target(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "chat.html": (
+                '<div hx-ext="sse" sse-connect="/chat/events">'
+                '<span sse-swap="fragment" hx-swap="beforeend"></span>'
+                "</div>"
+            ),
+        }
+        issues = _check_swap_safety(template_sources)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "swap_safety"
+        assert "SSE swap element has no explicit hx-target" in issues[0].message
+
+    def test_no_warning_for_sse_swap_with_local_target(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "chat.html": (
+                '<div hx-ext="sse" sse-connect="/chat/events">'
+                '<span sse-swap="fragment" hx-swap="beforeend" hx-target="this"></span>'
+                "</div>"
+            ),
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
 
 
 class TestCheckHypermediaSurface:
@@ -405,6 +474,29 @@ class TestCheckHypermediaSurface:
             i for i in result.warnings if i.category == "accessibility"
         ]
         assert len(a11y_warnings) == 0
+
+    def test_swap_safety_warning_surfaces(self, tmp_path):
+        """Broad hx-target + mutating request without local target warns."""
+        (tmp_path / "_layout.html").write_text(
+            '<body hx-boost="true" hx-target="#app-content">{% block content %}{% endblock %}</body>'
+        )
+        (tmp_path / "index.html").write_text(
+            "{% block content %}"
+            '<form hx-post="/docs/new"><button>Create</button></form>'
+            "{% endblock %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/docs/new", methods=["POST"])
+        async def create_doc():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        swap_warnings = [
+            issue for issue in result.warnings if issue.category == "swap_safety"
+        ]
+        assert len(swap_warnings) == 1
+        assert "Action()" in swap_warnings[0].message
 
 
 class TestExtractTemplateReferences:
@@ -947,3 +1039,197 @@ class TestPageContextGaps:
         result = check_hypermedia_surface(app)
         ctx_issues = [i for i in result.issues if i.category == "page_context"]
         assert len(ctx_issues) == 0
+
+
+# ---------------------------------------------------------------------------
+# SSE self-swap check — sse-swap on same element as sse-connect
+# ---------------------------------------------------------------------------
+
+
+class TestSSESelfSwap:
+    """ERROR when sse-swap is on the same element as sse-connect."""
+
+    def test_error_when_sse_swap_on_sse_connect(self):
+        template_sources = {
+            "chat.html": (
+                '<div hx-ext="sse" sse-connect="/chat/stream" '
+                'sse-swap="fragment" hx-swap="beforeend">'
+                "</div>"
+            ),
+        }
+        issues = _check_sse_self_swap(template_sources)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "sse_self_swap"
+        assert "querySelectorAll" in issues[0].message
+        assert 'sse-swap="fragment"' in issues[0].message
+
+    def test_no_error_when_sse_swap_on_child(self):
+        template_sources = {
+            "chat.html": (
+                '<div hx-ext="sse" sse-connect="/chat/stream">'
+                '<span sse-swap="fragment" hx-swap="beforeend"></span>'
+                "</div>"
+            ),
+        }
+        issues = _check_sse_self_swap(template_sources)
+        assert issues == []
+
+    def test_no_error_for_sse_connect_without_swap(self):
+        template_sources = {
+            "page.html": '<div hx-ext="sse" sse-connect="/events"></div>',
+        }
+        issues = _check_sse_self_swap(template_sources)
+        assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# SSE scope check — sse-connect inside broad hx-target without hx-disinherit
+# ---------------------------------------------------------------------------
+
+
+class TestSSEConnectScope:
+    """WARN when sse-connect is inside broad hx-target without hx-disinherit."""
+
+    def test_warns_without_disinherit(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "editor.html": (
+                '<div hx-ext="sse" sse-connect="/doc/123/stream">'
+                '<span id="status" sse-swap="status">ok</span>'
+                "</div>"
+            ),
+        }
+        broad = _collect_broad_targets(template_sources)
+        issues = _check_sse_connect_scope(template_sources, broad)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "sse_scope"
+        assert "hx-disinherit" in issues[0].message
+
+    def test_no_warning_with_disinherit(self):
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "editor.html": (
+                '<div hx-ext="sse" sse-connect="/doc/123/stream" '
+                'hx-disinherit="hx-target hx-swap">'
+                '<span id="status" sse-swap="status">ok</span>'
+                "</div>"
+            ),
+        }
+        broad = _collect_broad_targets(template_sources)
+        issues = _check_sse_connect_scope(template_sources, broad)
+        assert issues == []
+
+    def test_no_warning_when_no_broad_targets(self):
+        template_sources = {
+            "page.html": (
+                '<div hx-ext="sse" sse-connect="/events">'
+                '<span sse-swap="status"></span>'
+                "</div>"
+            ),
+        }
+        broad = _collect_broad_targets(template_sources)
+        assert broad == set()
+        issues = _check_sse_connect_scope(template_sources, broad)
+        assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# SSE event cross-reference — sse-swap vs SSEContract.event_types
+# ---------------------------------------------------------------------------
+
+
+class TestSSEEventCrossref:
+    """Cross-reference sse-swap values against SSEContract.event_types."""
+
+    def test_warns_for_undeclared_sse_swap(self, tmp_path):
+        """sse-swap listens for event not in SSEContract.event_types."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/stream">'
+            '<span sse-swap="status">ok</span>'
+            '<span sse-swap="typo_event">x</span>'
+            "</div>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream")
+        @contract(returns=SSEContract(
+            event_types=frozenset({"status", "presence"}),
+        ))
+        async def stream():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        crossref = [i for i in result.issues if i.category == "sse_crossref"]
+        # typo_event is undeclared (WARNING)
+        warnings = [i for i in crossref if i.severity == Severity.WARNING]
+        assert len(warnings) == 1
+        assert "typo_event" in warnings[0].message
+
+        # presence is declared but has no sse-swap (INFO)
+        infos = [i for i in crossref if i.severity == Severity.INFO]
+        assert len(infos) == 1
+        assert "presence" in infos[0].message
+
+    def test_no_issues_when_events_match(self, tmp_path):
+        """All sse-swap values match declared event_types."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/stream">'
+            '<span sse-swap="status">ok</span>'
+            '<span sse-swap="presence">0</span>'
+            "</div>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream")
+        @contract(returns=SSEContract(
+            event_types=frozenset({"status", "presence"}),
+        ))
+        async def stream():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        crossref = [i for i in result.issues if i.category == "sse_crossref"]
+        assert crossref == []
+
+    def test_skipped_when_no_event_types_declared(self, tmp_path):
+        """SSEContract without event_types -> no cross-reference."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/stream">'
+            '<span sse-swap="whatever">x</span>'
+            "</div>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream")
+        @contract(returns=SSEContract())
+        async def stream():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        crossref = [i for i in result.issues if i.category == "sse_crossref"]
+        assert crossref == []
+
+    def test_handles_jinja_urls(self, tmp_path):
+        """sse-connect with Jinja expressions should match parameterized routes."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/doc/{{ doc.id }}/stream">'
+            '<span sse-swap="status">ok</span>'
+            "</div>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/doc/{doc_id}/stream")
+        @contract(returns=SSEContract(
+            event_types=frozenset({"status", "title"}),
+        ))
+        async def stream(doc_id: str):
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        crossref = [i for i in result.issues if i.category == "sse_crossref"]
+        # title is declared but has no sse-swap (INFO)
+        infos = [i for i in crossref if i.severity == Severity.INFO]
+        assert len(infos) == 1
+        assert "title" in infos[0].message
