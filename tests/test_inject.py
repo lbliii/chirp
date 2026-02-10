@@ -1,9 +1,9 @@
 """Tests for HTML injection middleware."""
 
 from chirp.app import App
+from chirp.http.response import Response
 from chirp.middleware.inject import HTMLInject
 from chirp.testing import TestClient
-
 
 SCRIPT_TAG = '<script src="/__reload.js"></script>'
 
@@ -64,6 +64,35 @@ class TestHTMLInjectBasic:
 
 
 class TestHTMLInjectSkips:
+    async def test_skips_explicit_fragment_intent(self) -> None:
+        """Response render intent overrides request heuristics."""
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG))
+
+        @app.route("/")
+        def index():
+            return Response(body="<div>fragment</div>", render_intent="fragment")
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert SCRIPT_TAG not in response.text
+
+    async def test_skips_htmx_fragment_requests(self) -> None:
+        """HTMX requests should not receive global HTML injections."""
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG))
+
+        @app.route("/")
+        def index():
+            return "<div>fragment</div>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/", headers={"HX-Request": "true"})
+            assert response.status == 200
+            assert response.text == "<div>fragment</div>"
+            assert SCRIPT_TAG not in response.text
+
     async def test_skips_non_html_response(self) -> None:
         """CSS, JSON, etc. are not modified."""
         from chirp.http.response import Response as Resp
@@ -166,6 +195,35 @@ class TestHTMLInjectWithStaticFiles:
         async with TestClient(app) as client:
             response = await client.get("/style.css")
             assert response.status == 200
+            assert SCRIPT_TAG not in response.text
+
+
+class TestHTMLInjectFullPageOnly:
+    async def test_full_page_only_injects_when_target_present(self) -> None:
+        """full_page_only=True still injects when </body> is found."""
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG, full_page_only=True))
+
+        @app.route("/")
+        def index():
+            return "<html><body><h1>Hi</h1></body></html>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert SCRIPT_TAG + "</body>" in response.text
+
+    async def test_full_page_only_skips_when_target_absent(self) -> None:
+        """full_page_only=True does NOT append when </body> is absent."""
+        app = App()
+        app.add_middleware(HTMLInject(SCRIPT_TAG, full_page_only=True))
+
+        @app.route("/")
+        def index():
+            return "<h1>Fragment</h1>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.text == "<h1>Fragment</h1>"
             assert SCRIPT_TAG not in response.text
 
 

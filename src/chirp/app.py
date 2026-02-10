@@ -252,6 +252,7 @@ class App:
         import inspect
 
         from chirp._internal.invoke import invoke
+        from chirp.extraction import extract_dataclass, is_extractable_dataclass
         from chirp.http.request import Request
         from chirp.pages.context import build_cascade_context
         from chirp.templating.returns import LayoutPage, Page
@@ -267,6 +268,22 @@ class App:
             cascade_ctx = await build_cascade_context(
                 _providers, request.path_params
             )
+
+            # Pre-read body for typed extraction (non-GET only)
+            body_data: dict[str, Any] | None = None
+            if request.method not in ("GET", "HEAD"):
+                sig_check = inspect.signature(_handler)
+                needs_body = any(
+                    p.annotation is not inspect.Parameter.empty
+                    and is_extractable_dataclass(p.annotation)
+                    for p in sig_check.parameters.values()
+                )
+                if needs_body:
+                    ct = request.content_type or ""
+                    if "json" in ct:
+                        body_data = await request.json()
+                    else:
+                        body_data = dict(await request.form())
 
             # Build handler kwargs
             sig = inspect.signature(_handler)
@@ -290,6 +307,18 @@ class App:
                     and param.annotation in _service_providers
                 ):
                     kwargs[name] = _service_providers[param.annotation]()
+                elif (
+                    param.annotation is not inspect.Parameter.empty
+                    and is_extractable_dataclass(param.annotation)
+                ):
+                    if request.method in ("GET", "HEAD"):
+                        kwargs[name] = extract_dataclass(
+                            param.annotation, request.query,
+                        )
+                    elif body_data is not None:
+                        kwargs[name] = extract_dataclass(
+                            param.annotation, body_data,
+                        )
 
             # Call the original handler
             result = await invoke(_handler, **kwargs)
@@ -707,10 +736,22 @@ class App:
         router.compile()
         self._router = router
 
-        # 2. Capture middleware as immutable tuple — append debug
-        #    overlays automatically when debug=True so the developer
-        #    doesn't have to wire them up manually.
+        # 2. Capture middleware as immutable tuple — append auto-injected
+        #    snippets so the developer doesn't have to wire them up manually.
         middleware_list = list(self._middleware_list)
+
+        #    Safe target: auto-add hx-target="this" to event-driven elements
+        #    that would otherwise inherit the layout target.  Always-on by
+        #    default; disable with AppConfig(safe_target=False).
+        if self.config.safe_target:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET
+
+            middleware_list.append(
+                HTMLInject(SAFE_TARGET_SNIPPET, full_page_only=True)
+            )
+
+        #    Debug overlays (htmx error toasts, etc.) — debug mode only.
         if self.config.debug:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET

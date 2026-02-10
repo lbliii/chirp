@@ -41,9 +41,14 @@ class AppConfig:
 
     # SSE
     sse_heartbeat_interval: float = 15.0
+    sse_retry_ms: int | None = None
+    sse_close_event: str | None = None
 
     # MCP (Model Context Protocol)
     mcp_path: str = "/mcp"
+
+    # htmx safe target — auto-add hx-target="this" to event-driven elements
+    safe_target: bool = True
 
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB
