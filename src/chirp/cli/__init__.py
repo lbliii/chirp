@@ -28,13 +28,47 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # -- chirp run --------------------------------------------------------
-    run_parser = subparsers.add_parser("run", help="Start dev server")
+    run_parser = subparsers.add_parser("run", help="Start dev or production server")
     run_parser.add_argument(
         "app",
         help="Import string (e.g. myapp:app)",
     )
     run_parser.add_argument("--host", default=None, help="Bind host address")
     run_parser.add_argument("--port", type=int, default=None, help="Bind port number")
+
+    # Production mode flags
+    run_parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Run in production mode (multi-worker, all features enabled)",
+    )
+    run_parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker count (0=auto-detect, production only)",
+    )
+    run_parser.add_argument(
+        "--metrics",
+        action="store_true",
+        help="Enable Prometheus /metrics endpoint",
+    )
+    run_parser.add_argument(
+        "--rate-limit",
+        action="store_true",
+        help="Enable per-IP rate limiting",
+    )
+    run_parser.add_argument(
+        "--queue",
+        action="store_true",
+        help="Enable request queueing",
+    )
+    run_parser.add_argument(
+        "--sentry-dsn",
+        type=str,
+        default=None,
+        help="Sentry DSN for error tracking",
+    )
 
     # -- chirp check ------------------------------------------------------
     check_parser = subparsers.add_parser("check", help="Validate hypermedia contracts")

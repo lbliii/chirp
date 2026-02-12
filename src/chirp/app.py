@@ -62,6 +62,7 @@ class App:
     """
 
     __slots__ = (
+        "_custom_kida_env",
         "_db",
         "_error_handlers",
         "_freeze_lock",
@@ -98,6 +99,7 @@ class App:
         *,
         db: Database | str | None = None,
         migrations: str | None = None,
+        kida_env: Environment | None = None,
     ) -> None:
         self.config: AppConfig = config or AppConfig()
         self._pending_routes: list[_PendingRoute] = []
@@ -115,6 +117,7 @@ class App:
         self._providers: dict[type, Callable[..., Any]] = {}
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
+        self._custom_kida_env: Environment | None = kida_env  # User-provided kida environment
 
         # Database — accepts a Database instance or connection URL string.
         # When set, lifecycle hooks are auto-registered for connect/disconnect.
@@ -472,10 +475,13 @@ class App:
         *,
         lifecycle_collector: object | None = None,
     ) -> None:
-        """Start the development server via pounce.
+        """Start the server (dev or production based on config.debug).
 
         Compiles the app (freezing routes, middleware, templates)
-        and starts serving requests with auto-reload enabled.
+        and starts serving requests.
+
+        - **Development mode** (debug=True): Single worker with auto-reload
+        - **Production mode** (debug=False): Multi-worker with Phase 5 & 6 features
 
         Args:
             host: Override bind host.
@@ -489,17 +495,63 @@ class App:
         _host = host or self.config.host
         _port = port or self.config.port
 
-        from chirp.server.dev import run_dev_server
+        if self.config.debug:
+            # Development mode (existing behavior)
+            from chirp.server.dev import run_dev_server
 
-        run_dev_server(
-            self,
-            _host,
-            _port,
-            reload=self.config.debug,
-            reload_include=self.config.reload_include,
-            reload_dirs=self.config.reload_dirs,
-            lifecycle_collector=lifecycle_collector,
-        )
+            run_dev_server(
+                self,
+                _host,
+                _port,
+                reload=self.config.debug,
+                reload_include=self.config.reload_include,
+                reload_dirs=self.config.reload_dirs,
+                lifecycle_collector=lifecycle_collector,
+            )
+        else:
+            # Production mode (new!)
+            from chirp.server.production import run_production_server
+
+            run_production_server(
+                self,
+                host=_host,
+                port=_port,
+                workers=self.config.workers,
+                # Phase 6.1: Prometheus Metrics
+                metrics_enabled=self.config.metrics_enabled,
+                metrics_path=self.config.metrics_path,
+                # Phase 6.2: Rate Limiting
+                rate_limit_enabled=self.config.rate_limit_enabled,
+                rate_limit_requests_per_second=self.config.rate_limit_requests_per_second,
+                rate_limit_burst=self.config.rate_limit_burst,
+                # Phase 6.3: Request Queueing
+                request_queue_enabled=self.config.request_queue_enabled,
+                request_queue_max_depth=self.config.request_queue_max_depth,
+                # Phase 6.4: Sentry Error Tracking
+                sentry_dsn=self.config.sentry_dsn,
+                sentry_environment=self.config.sentry_environment,
+                sentry_release=self.config.sentry_release,
+                sentry_traces_sample_rate=self.config.sentry_traces_sample_rate,
+                # Phase 6.5: Hot Reload
+                reload_timeout=self.config.reload_timeout,
+                # Phase 5: OpenTelemetry
+                otel_endpoint=self.config.otel_endpoint,
+                otel_service_name=self.config.otel_service_name,
+                # Phase 5: WebSocket
+                websocket_compression=self.config.websocket_compression,
+                websocket_max_message_size=self.config.websocket_max_message_size,
+                # Production settings
+                lifecycle_logging=self.config.lifecycle_logging,
+                log_format=self.config.log_format,
+                log_level=self.config.log_level,
+                max_connections=self.config.max_connections,
+                backlog=self.config.backlog,
+                keep_alive_timeout=self.config.keep_alive_timeout,
+                request_timeout=self.config.request_timeout,
+                # TLS
+                ssl_certfile=self.config.ssl_certfile,
+                ssl_keyfile=self.config.ssl_keyfile,
+            )
 
     # -- ASGI interface --
 
@@ -728,11 +780,20 @@ class App:
                     self._template_globals.setdefault(name, func)
 
         # 3. Initialize kida environment
-        self._kida_env = create_environment(
-            self.config,
-            self._template_filters,
-            self._template_globals,
-        )
+        # Use custom environment if provided, otherwise create from config
+        if self._custom_kida_env is not None:
+            self._kida_env = self._custom_kida_env
+            # Apply user filters and globals to custom env
+            if self._template_filters:
+                self._kida_env.update_filters(self._template_filters)
+            for name, value in self._template_globals.items():
+                self._kida_env.add_global(name, value)
+        else:
+            self._kida_env = create_environment(
+                self.config,
+                self._template_filters,
+                self._template_globals,
+            )
 
         # 4. Compile tool registry (schema generation happens here so
         #    errors surface at startup, not at runtime)

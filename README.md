@@ -86,6 +86,71 @@ chirp new myapp && cd myapp && python app.py
 
 ---
 
+## Production Deployment
+
+Chirp apps run on **[pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with enterprise features built-in:
+
+### Automatic Features (Zero Configuration)
+- ✅ **WebSocket compression** — 60% bandwidth reduction
+- ✅ **HTTP/2 support** — Multiplexed streams, server push
+- ✅ **Graceful shutdown** — Finishes active requests on SIGTERM
+- ✅ **Zero-downtime reload** — `kill -SIGUSR1` for hot code updates
+- ✅ **Built-in health endpoint** — `/health` for Kubernetes probes
+
+### Production Features (Configurable)
+- 📊 **Prometheus metrics** — `/metrics` endpoint for monitoring
+- 🛡️ **Per-IP rate limiting** — Token bucket algorithm, configurable burst
+- 📦 **Request queueing** — Load shedding during traffic spikes
+- 🐛 **Sentry integration** — Automatic error tracking and reporting
+- 🔄 **Multi-worker mode** — CPU-based auto-scaling
+
+### Quick Start: Production Mode
+
+```python
+from chirp import App, AppConfig
+
+# Production configuration
+config = AppConfig(
+    debug=False,  # ← Enables production mode
+    workers=4,
+    metrics_enabled=True,
+    rate_limit_enabled=True,
+    sentry_dsn="https://...",
+)
+
+app = App(config=config)
+
+@app.route("/")
+def index():
+    return "Hello, Production!"
+
+app.run()  # ← Automatically uses production server
+```
+
+### CLI Production Mode
+
+```bash
+# Development (single worker, auto-reload)
+chirp run myapp:app
+
+# Production (multi-worker, all features)
+chirp run myapp:app --production --workers 4 --metrics --rate-limit
+```
+
+### Docker Deployment
+
+```dockerfile
+FROM python:3.14-slim
+WORKDIR /app
+COPY . .
+RUN pip install bengal-chirp
+CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
+```
+
+📦 **Full deployment guide**: [docs/deployment/production.md](docs/deployment/production.md)
+
+---
+
 ## Usage
 
 <details>
