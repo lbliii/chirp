@@ -46,4 +46,11 @@ When to use what, and why Chirp exists.
 How Chirp makes data races structurally impossible.
 :::{/card}
 
+:::{card} Ecosystem
+:icon: layers
+:link: ./ecosystem
+:description: The Bengal stack
+All seven projects in the reactive Python stack.
+:::{/card}
+
 :::{/cards}
