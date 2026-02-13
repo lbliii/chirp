@@ -24,11 +24,20 @@ def create_environment(
 
     Called once during ``App._freeze()``. The returned environment
     is immutable for the lifetime of the app.
+
+    Supports multiple template directories via ``config.component_dirs``
+    for component libraries, partials, and shared templates.
     """
     loaders = [
         FileSystemLoader(str(config.template_dir)),
-        PackageLoader("chirp.templating", "macros"),
     ]
+
+    # Add component directories (for components, partials, shared templates)
+    for component_dir in config.component_dirs:
+        loaders.append(FileSystemLoader(str(component_dir)))
+
+    # Add chirp's built-in macros
+    loaders.append(PackageLoader("chirp.templating", "macros"))
 
     # Auto-detect chirp-ui if installed
     try:
