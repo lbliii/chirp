@@ -98,5 +98,5 @@ Chirp deliberately does not:
 ## Next Steps
 
 - [[docs/about/architecture|Architecture]] -- How these principles manifest in code
-- [[docs/about/comparison|Comparison]] -- How Chirp compares to other frameworks
+- [[docs/about/comparison|When to Use Chirp]] — Chirp's approach and fit
 - [[docs/about/thread-safety|Thread Safety]] -- Free-threading patterns

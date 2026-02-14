@@ -44,7 +44,7 @@ app.run()
 
 ---
 
-## Why Chirp?
+## What's good about it
 
 :::{cards}
 :columns: 2
