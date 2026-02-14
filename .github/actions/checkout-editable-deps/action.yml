@@ -12,7 +12,7 @@ inputs:
   repos:
     description: Space-separated repo names to clone as siblings
     required: false
-    default: "pounce kida"
+    default: "pounce kida patitas"
 
 runs:
   using: composite
