@@ -21,18 +21,16 @@ app.run()
 
 ---
 
-## Why Chirp?
+## What is Chirp?
 
-Flask (2010) and FastAPI (2018) were designed for a different web. Flask assumes you render
-full HTML pages or bolt on extensions for everything. FastAPI assumes you serve JSON to a
-JavaScript frontend. Neither reflects where the web platform is in 2026:
+Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
 
-- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries — most of what required a JS framework is now native HTML and CSS
-- **HTML over the wire** — htmx proved that servers can send HTML fragments and the browser can swap them in — partial page updates with no custom JavaScript
-- **Streaming HTML** — Send the page shell immediately and fill in content as data becomes available. No loading spinners, no skeleton screens
-- **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure
+**What's good about it:**
 
-Chirp is designed from scratch for this reality.
+- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries. Most of what required a JS framework is now native HTML and CSS.
+- **HTML over the wire** — Serve full pages, template fragments, streaming HTML, and SSE. Built for htmx and the modern browser.
+- **Streaming HTML** — Send the page shell immediately and fill in content as data becomes available. No loading spinners, no skeleton screens.
+- **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure.
 
 ---
 
