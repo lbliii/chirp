@@ -40,6 +40,41 @@ class TestStoryList:
             response = await client.get("/")
             assert 'sse-connect="/events"' in response.text
 
+    async def test_sse_scope_is_outside_main(self, example_app) -> None:
+        """sse_scope renders outside #main so connection persists across navigation."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/")
+            html = response.text
+            main_pos = html.find('id="main"')
+            assert main_pos >= 0
+            main_close = _find_main_closing_div(html, main_pos)
+            assert main_close >= 0
+            sse_pos = html.find('sse-connect=')
+            assert sse_pos >= 0
+            sse_div_open = html.rfind("<div", 0, sse_pos)
+            assert sse_div_open >= 0
+            assert sse_div_open > main_close, "sse_scope must be outside #main"
+
+
+def _find_main_closing_div(html: str, main_pos: int) -> int:
+    """Find the </div> that closes the #main element (balanced bracket count)."""
+    depth = 1
+    i = main_pos + 1
+    while i < len(html):
+        next_open = html.find("<div", i)
+        next_close = html.find("</div>", i)
+        if next_close < 0:
+            return -1
+        if 0 <= next_open < next_close:
+            depth += 1
+            i = next_open + 1
+        else:
+            depth -= 1
+            if depth == 0:
+                return next_close
+            i = next_close + 1
+    return -1
+
     async def test_index_contains_view_transition_meta(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")

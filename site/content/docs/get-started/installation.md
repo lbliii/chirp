@@ -92,5 +92,7 @@ After installation, the `chirp` command is available:
 
 ## Next Steps
 
-- [[docs/get-started/quickstart|Quickstart]] -- Build your first app
-- [[docs/core-concepts/configuration|Configuration]] -- All AppConfig options
+:::{related}
+:limit: 3
+:section_title: Next Steps
+:::

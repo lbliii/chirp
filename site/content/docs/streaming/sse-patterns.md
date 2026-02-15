@@ -204,10 +204,29 @@ Most pages combine multiple patterns. The key principle: **establish scope bound
 
 Rules for mixing:
 
-1. **SSE containers get `hx-disinherit`** -- isolate SSE swaps from layout targets.
-2. **Navigation links restore `hx-target`** -- add `hx-target="#app-content"` on toolbar/nav containers inside the SSE scope.
-3. **Client-managed elements have no `sse-swap`** -- they are invisible to the reactive system.
-4. **Nested SSE connections** (like chat) put `sse-swap` on a child, never on the `sse-connect` element.
+:::{dropdown} SSE containers get `hx-disinherit`
+:icon: link
+
+Isolate SSE swaps from layout targets. Without `hx-disinherit`, fragments swap into the boost target instead of the sse-swap sink — wiping the whole content area.
+:::
+
+:::{dropdown} Navigation links restore `hx-target`
+:icon: link
+
+Add `hx-target="#app-content"` on toolbar/nav containers inside the SSE scope. When inheritance is broken, nav links need an explicit target so htmx knows where to swap.
+:::
+
+:::{dropdown} Client-managed elements have no `sse-swap`
+:icon: link
+
+Elements that you update via JavaScript (e.g. chat input, custom widgets) should not have `sse-swap`. They are invisible to the reactive system — put `sse-swap` only on elements that receive server-pushed fragments.
+:::
+
+:::{dropdown} Nested SSE connections put `sse-swap` on a child
+:icon: link
+
+For nested SSE (e.g. chat inside a dashboard), put `sse-swap` on a child element, never on the `sse-connect` element. The connect element establishes the connection; the swap element receives the fragments.
+:::
 
 ## Compile-Time Validation
 

@@ -1,23 +1,71 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Documentation</h1>
+<header class="page-header">
+  <div class="header-row">
+    <div>
+      <h1>Documentation</h1>
+      <p class="tagline">Ask anything — streaming AI answers with cited sources. Keyword search (not semantic).</p>
+    </div>
+    <button type="button" class="theme-toggle" aria-label="Toggle dark mode">☽</button>
+  </div>
+</header>
 
 <form class="search-form"
       hx-post="/ask"
-      hx-ext="sse"
-      sse-connect="/ask"
-      sse-swap="fragment"
-      hx-swap="innerHTML"
-      hx-target="#results">
-    <input type="text" name="question"
-           placeholder="Ask anything about the docs..."
-           autocomplete="off">
+      hx-target="#conversation"
+      hx-swap="afterbegin transition:true"
+      aria-label="Ask a question about the docs"
+      hx-on::before-request="var sw=this.querySelector('.compare-switch');if(sw&&sw.getAttribute('aria-checked')==='true'){this.querySelector('input[name=compare]').checked=true}"
+      hx-on::after-request="if(event.detail.successful){this.querySelector('[name=question]').value='';document.querySelector('#conversation .qa-card')?.scrollIntoView({behavior:'smooth',block:'start'})}">
+  <div class="form-row form-row-meta">
+    {% if models %}
+    <label for="model-select" class="visually-hidden">Model</label>
+    <select id="model-select" name="model" class="model-select" title="Ollama model" aria-label="Select model">
+      {% for m in models %}
+      <option value="{{ m }}" {% if m == default_model %}selected{% end %}>{{ m }}</option>
+      {% end %}
+    </select>
+    {% if models | length >= 2 %}
+    <div class="compare-switch-wrap">
+      <button type="button" class="compare-switch" role="switch" aria-checked="false" aria-label="Compare with another model">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Compare with</span>
+      </button>
+      <input type="checkbox" name="compare" value="on" hidden>
+      <label for="model-b-select" class="visually-hidden">Second model</label>
+      <select id="model-b-select" name="model_b" class="model-select" title="Second model for comparison" disabled aria-hidden="true">
+        {% for m in models %}
+        <option value="{{ m }}" {% if m == default_model %}disabled{% end %}>{{ m }}</option>
+        {% end %}
+      </select>
+    </div>
+    {% end %}
+    {% end %}
+  </div>
+  <div class="form-row question-row">
+    <div class="question-wrap">
+      <label for="question-input" class="visually-hidden">Your question</label>
+      <textarea id="question-input" name="question" rows="4"
+                placeholder="e.g. How do I get started? Paste multiple questions (one per line) for batch."
+                autocomplete="off"
+                required
+                aria-describedby="validation"
+                hx-on::keydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.closest('form').requestSubmit()}"></textarea>
+    </div>
     <button type="submit">Ask</button>
+  </div>
 </form>
 
-<div id="results">
-    <div id="sources"></div>
-    <div id="answer" class="answer"></div>
-</div>
-{% endblock %}
+<section id="results" aria-label="Questions and answers">
+  <div id="conversation">
+    <div class="conversation-placeholder">
+      Ask a question about the docs…
+    </div>
+  </div>
+  <div class="conversation-actions">
+    <a href="/">Start over</a>
+  </div>
+  <div id="validation" role="alert" aria-live="polite"></div>
+</section>
+{% end %}

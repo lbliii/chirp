@@ -207,8 +207,8 @@ class LLM:
                 self._config, messages,
                 max_tokens=max_tokens, temperature=temperature, system=system,
             )
-        if self._config.provider == "openai":
-            # OpenAI uses system message in messages array
+        if self._config.provider in ("openai", "ollama"):
+            # OpenAI and Ollama use system message in messages array
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
             return await openai_generate(
@@ -235,7 +235,7 @@ class LLM:
                 yield token
             return
 
-        if self._config.provider == "openai":
+        if self._config.provider in ("openai", "ollama"):
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
             async for token in openai_stream(

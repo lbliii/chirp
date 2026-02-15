@@ -22,23 +22,31 @@ These come from three specific mistakes. Fix all three and the pattern is stable
 
 ## Root Causes
 
-### 1. `hx-target` inheritance (whole tree wiped)
+These three mistakes cause the flicker and wipe issues. Fix all three and the pattern is stable.
+
+:::{steps}
+:::{step} Fix hx-target inheritance (whole tree wiped)
 
 When `sse-connect` (or any element that receives SSE/WebSocket fragments) is inside a container with `hx-target` (e.g. `#main` from hx-boost), it **inherits** that target. When a fragment arrives, htmx swaps it into `#main` instead of the sse-swap element. The entire `#main` innerHTML gets replaced by the fragment — one meta div replaces the whole list.
 
-**Fix:** Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element so the fragment goes to the sse-swap sink, not the layout target.
+Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element so the fragment goes to the sse-swap sink, not the layout target.
 
-### 2. `transition:true` on the container
+:::{/step}
+:::{step} Fix transition:true on the container
 
 When the swap target (e.g. `#main`) has `hx-swap="innerHTML transition:true"`, htmx wraps **every** swap into that target in the View Transitions API — including OOB swaps to its descendants. OOB updates then trigger a full-area transition: the browser captures the "old" state, applies the change, and animates. If the capture or timing is wrong, you get flicker or content disappearing.
 
-**Fix:** Put `transition:true` only on the **links/forms that trigger navigation**, not on the container.
+Put `transition:true` only on the **links/forms that trigger navigation**, not on the container.
 
-### 3. `view-transition-name` on a parent of OOB targets
+:::{/step}
+:::{step} Fix view-transition-name on parents of OOB targets
 
 When an element with `view-transition-name` contains (or is an ancestor of) elements that receive OOB swaps, each OOB update can trigger the View Transitions API for that named element. The browser treats the OOB change as a "transition" of the whole block — causing the full content to animate out and back in, or worse, to disappear.
 
-**Fix:** Scope `view-transition-name` to elements that change **only on full navigation**, never on parents of OOB targets.
+Scope `view-transition-name` to elements that change **only on full navigation**, never on parents of OOB targets.
+
+:::{/step}
+:::{/steps}
 
 ## The Stable Pattern
 

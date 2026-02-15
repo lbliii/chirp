@@ -1,6 +1,8 @@
 """Tests for chirp.cli._check — ``chirp check`` subcommand."""
 
+import importlib.util
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -43,3 +45,15 @@ class TestChirpCheck:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "Error:" in captured.err
+
+    def test_hackernews_app_passes_check(self) -> None:
+        """Hacker News example (boost layout + SSE) passes chirp check."""
+        app_path = Path(__file__).resolve().parent.parent / "examples" / "hackernews" / "app.py"
+        if not app_path.exists():
+            pytest.skip("examples/hackernews not found")
+        spec = importlib.util.spec_from_file_location("hackernews_app", app_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        app = module.app
+        app.check()  # raises SystemExit(1) on failure

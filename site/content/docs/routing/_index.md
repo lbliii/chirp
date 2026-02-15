@@ -25,6 +25,13 @@ cascade:
 Decorators, methods, typed parameters, and catch-all routes.
 :::{/card}
 
+:::{card} Filesystem Routing
+:icon: folder
+:link: ./filesystem-routing
+:description: Route discovery from the pages/ directory
+Layout nesting, context cascade, and co-located handlers.
+:::{/card}
+
 :::{card} Request & Response
 :icon: arrow-right-left
 :link: ./request-response

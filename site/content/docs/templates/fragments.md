@@ -32,9 +32,24 @@ def search(request: Request):
 ```
 
 Arguments:
-1. Template path
-2. Block name (must exist in the template)
-3. Keyword arguments become the rendering context
+
+:::{dropdown} Template path
+:icon: file
+
+Path to the template file (relative to `template_dir`).
+:::
+
+:::{dropdown} Block name
+:icon: layers
+
+The named block to render. Must exist in the template.
+:::
+
+:::{dropdown} Keyword arguments
+:icon: database
+
+Become the rendering context passed to the template.
+:::
 
 The template:
 

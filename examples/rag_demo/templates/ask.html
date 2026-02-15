@@ -1,14 +1,195 @@
-{# Blocks rendered independently as SSE fragments #}
+{# Blocks for RAG demo — sources, answer, ask_result, empty_question
+   Custom SSE structure (not sse_scope): we need two swap targets (sources + answer).
+   sse_scope macro only supports one. Uses hx-disinherit to isolate from boost layout. #}
 
 {% block sources %}
-<div id="sources" class="sources">
-    <h2>Sources</h2>
-    {% for doc in sources %}
-    <a href="{{ doc.url }}">{{ doc.title }}</a>
-    {% endfor %}
+<div class="sources" sse-swap="sources">
+  <h2 class="sources-heading">Sources used to draft this answer</h2>
+  {% if sources %}
+  <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
+  <div class="sources-list">
+  {% for doc in sources %}
+  <div class="source-item">
+    <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
+    <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+  </div>
+  {% end %}
+  </div>
+  {% else %}
+  <p class="sources-empty">No matching docs found.</p>
+  {% end %}
 </div>
-{% endblock %}
+{% end %}
 
 {% block answer %}
-<div id="answer" class="answer prose{% if text %} streaming{% endif %}">{{ text | markdown }}</div>
-{% endblock %}
+<div class="answer-body{% if streaming %} streaming{% end %}"{% if not streaming %} data-copy-text="{{ text | e }}"{% end %}>
+  {% if streaming %}
+  {% if rendered_html is defined %}
+  <div class="answer-content prose">{{ rendered_html | safe }}</div>
+  {% if in_progress %}<span class="streaming-raw">{{ in_progress | e }}</span>{% end %}
+  {% else %}
+  <pre class="streaming-text">{{ text | e }}</pre>
+  {% end %}
+  <span class="streaming-cursor"></span>
+  {% else %}
+  <div class="answer-content prose">{{ text | markdown | cite(sources) | safe(reason="patitas output") }}</div>
+  <button type="button" class="copy-btn" title="Copy answer">Copy</button>
+  {% end %}
+</div>
+{% end %}
+
+{% block ask_result %}
+<article class="results-wrapper qa-card"
+         hx-ext="sse"
+         sse-connect="{{ stream_url }}"
+         sse-close="done"
+         hx-disinherit="hx-target hx-swap"
+         aria-label="Question and answer">
+  <div class="question-block">
+    <span class="question-label">Question</span>
+    <p class="question-text">{{ question }}</p>
+    <button type="button" class="refine-btn" title="Refine this question"
+            hx-on::click="var q=this.closest('.qa-card').querySelector('.question-text');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
+      Refine
+    </button>
+  </div>
+  {% block sources %}{% end %}
+  <div class="answer-section">
+    <span class="answer-label">Answer</span>
+    <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+      <span class="thinking">Searching docs and generating answer…</span>
+      <span class="streaming-cursor" aria-hidden="true"></span>
+    </div>
+    <div class="share-link-wrap" sse-swap="share_link"></div>
+  </div>
+</article>
+{% end %}
+
+{% block share_link %}
+{% if share_id and share_url %}
+<a href="{{ share_url }}" target="_blank" rel="noopener" class="share-link">Share this Q&A</a>
+{% end %}
+{% end %}
+
+{% block ask_compare_result %}
+<div class="compare-grid">
+  <article class="results-wrapper qa-card compare-card"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_a }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Question and answer ({{ model_a }})">
+    <div class="question-block">
+      <span class="question-label">Question</span>
+      <p class="question-text">{{ question }}</p>
+    </div>
+    <div class="sources" sse-swap="sources">
+      <h2 class="sources-heading">Sources</h2>
+      {% if sources %}
+      <div class="sources-list">
+      {% for doc in sources %}
+      <div class="source-item">
+        <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
+        <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+      </div>
+      {% end %}
+      </div>
+      {% else %}
+      <p class="sources-empty">No matching docs found.</p>
+      {% end %}
+    </div>
+    <div class="answer-section">
+      <span class="answer-label">{{ model_a }}</span>
+      <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+        <span class="thinking">Generating…</span>
+        <span class="streaming-cursor" aria-hidden="true"></span>
+      </div>
+      <div class="share-link-wrap" sse-swap="share_link"></div>
+    </div>
+  </article>
+  <article class="results-wrapper qa-card compare-card"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_b }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Question and answer ({{ model_b }})">
+    <div class="question-block">
+      <span class="question-label">Question</span>
+      <p class="question-text">{{ question }}</p>
+    </div>
+    <div class="sources" sse-swap="sources">
+      <h2 class="sources-heading">Sources</h2>
+      {% if sources %}
+      <div class="sources-list">
+      {% for doc in sources %}
+      <div class="source-item">
+        <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
+        <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+      </div>
+      {% end %}
+      </div>
+      {% else %}
+      <p class="sources-empty">No matching docs found.</p>
+      {% end %}
+    </div>
+    <div class="answer-section">
+      <span class="answer-label">{{ model_b }}</span>
+      <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+        <span class="thinking">Generating…</span>
+        <span class="streaming-cursor" aria-hidden="true"></span>
+      </div>
+      <div class="share-link-wrap" sse-swap="share_link"></div>
+    </div>
+  </article>
+</div>
+{% end %}
+
+{% block ask_batch_result %}
+{% for question, sources, stream_url in items %}
+<article class="results-wrapper qa-card"
+         hx-ext="sse"
+         sse-connect="{{ stream_url }}"
+         sse-close="done"
+         hx-disinherit="hx-target hx-swap"
+         aria-label="Question and answer">
+  <div class="question-block">
+    <span class="question-label">Question</span>
+    <p class="question-text">{{ question }}</p>
+    <button type="button" class="refine-btn" title="Refine this question"
+            hx-on::click="var q=this.closest('.qa-card').querySelector('.question-text');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
+      Refine
+    </button>
+  </div>
+  <div class="sources" sse-swap="sources">
+    <h2 class="sources-heading">Sources used to draft this answer</h2>
+    {% if sources %}
+    <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
+    <div class="sources-list">
+    {% for doc in sources %}
+    <div class="source-item">
+      <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
+      <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+    </div>
+    {% end %}
+    </div>
+    {% else %}
+    <p class="sources-empty">No matching docs found.</p>
+    {% end %}
+  </div>
+  <div class="answer-section">
+    <span class="answer-label">Answer</span>
+    <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+      <span class="thinking">Searching docs and generating answer…</span>
+      <span class="streaming-cursor" aria-hidden="true"></span>
+    </div>
+    <div class="share-link-wrap" sse-swap="share_link"></div>
+  </div>
+</article>
+{% end %}
+{% end %}
+
+{% block empty_question %}
+<div id="validation" hx-swap-oob="true">
+  <p class="validation-msg">Please enter a question.</p>
+</div>
+{% end %}

@@ -14,8 +14,18 @@ category: explanation
 
 A Chirp `App` has two distinct phases:
 
-1. **Setup** -- mutable. Register routes, middleware, filters, error handlers.
-2. **Runtime** -- frozen. The app compiles its route table, creates the kida environment, and becomes effectively immutable.
+:::{steps}
+:::{step} Setup (mutable)
+
+Register routes, middleware, filters, error handlers. The app is mutable during this phase.
+
+:::{/step}
+:::{step} Runtime (frozen)
+
+The app compiles its route table, creates the kida environment, and becomes effectively immutable. All shared state is read-only.
+
+:::{/step}
+:::{/steps}
 
 ```python
 from chirp import App

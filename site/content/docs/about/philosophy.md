@@ -14,7 +14,8 @@ category: explanation
 
 These are distilled from building bengal, kida, patitas, and rosettes -- not as rigid rules, but as consistent instincts that shape every decision.
 
-### 1. The obvious thing should be the easy thing
+:::{steps}
+:::{step} The obvious thing should be the easy thing
 
 ```python
 app = App()
@@ -30,7 +31,8 @@ You never make someone understand the system to use the system. The simple call 
 
 Five lines to hello world. Return a string, get a response. Return a `Template`, get rendered HTML. Return a `Fragment`, get a block. The type *is* the intent.
 
-### 2. Data should be honest about what it is
+:::{/step}
+:::{step} Data should be honest about what it is
 
 If something doesn't change after creation, it shouldn't pretend it might. If something is built incrementally, it should be honest about that too.
 
@@ -41,7 +43,8 @@ If something doesn't change after creation, it shouldn't pretend it might. If so
 
 Don't force immutability where the shape of the problem is mutable -- match the tool to the truth. `g` is mutable because per-request state *is* mutable.
 
-### 3. Extension should be structural, not ceremonial
+:::{/step}
+:::{step} Extension should be structural, not ceremonial
 
 Never make someone inherit from a base class just to participate. If a thing quacks like a middleware, it *is* a middleware.
 
@@ -60,7 +63,8 @@ class RateLimiter:
 
 The system discovers capability from shape, not from lineage. The `Middleware` protocol accepts either.
 
-### 4. The system should be transparent
+:::{/step}
+:::{step} The system should be transparent
 
 No proxies hiding `type: ignore`. No magic globals. No "it works but don't look at how."
 
@@ -75,7 +79,8 @@ If someone reads the code, the flow is traceable from entry to exit:
 
 No hidden context, no implicit behavior, no action-at-a-distance.
 
-### 5. Own what matters, delegate what doesn't
+:::{/step}
+:::{step} Own what matters, delegate what doesn't
 
 Own the interface, own the developer experience, own the hot path. Delegate the commodity infrastructure.
 
@@ -83,6 +88,9 @@ Own the interface, own the developer experience, own the hot path. Delegate the 
 - **Delegate**: Async runtime (anyio), form parsing (python-multipart), session signing (itsdangerous), password hashing (argon2)
 
 Write the template engine because templates are the thing. Use anyio for the async runtime because writing your own is insane.
+
+:::{/step}
+:::{/steps}
 
 ## Non-Goals
 

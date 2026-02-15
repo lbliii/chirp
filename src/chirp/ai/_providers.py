@@ -6,10 +6,12 @@ streaming. Both use raw HTTP via httpx — no provider SDKs required.
 Supported providers:
     - ``anthropic`` — Claude models (Messages API)
     - ``openai`` — GPT models (Chat Completions API)
+    - ``ollama`` — Local models via Ollama (OpenAI-compatible API)
 
 Provider string format: ``provider:model``
     - ``anthropic:claude-sonnet-4-20250514``
     - ``openai:gpt-4o``
+    - ``ollama:llama3.2`` (uses OLLAMA_BASE env, default http://localhost:11434)
 """
 
 import json
@@ -67,7 +69,16 @@ def parse_provider(provider_string: str, /, *, api_key: str | None = None) -> Pr
             base_url="https://api.openai.com",
         )
 
-    msg = f"Unsupported provider: {provider!r}. Supported: anthropic, openai"
+    if provider == "ollama":
+        base = os.environ.get("OLLAMA_BASE", "http://localhost:11434").rstrip("/")
+        return ProviderConfig(
+            provider="ollama",
+            model=model,
+            api_key=api_key or "ollama",  # Required by API but ignored
+            base_url=base,
+        )
+
+    msg = f"Unsupported provider: {provider!r}. Supported: anthropic, openai, ollama"
     raise ValueError(msg)
 
 

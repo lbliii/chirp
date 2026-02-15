@@ -168,6 +168,7 @@ The compiled route table is immutable. Under free-threading, all worker threads 
 
 ## Next Steps
 
+- [[docs/routing/filesystem-routing|Filesystem Routing]] -- Discover routes from a pages/ directory
 - [[docs/routing/request-response|Request & Response]] -- The immutable request and chainable response
 - [[docs/middleware/overview|Middleware]] -- Intercept requests before they reach handlers
 - [[docs/templates/fragments|Fragments]] -- Return fragments from route handlers

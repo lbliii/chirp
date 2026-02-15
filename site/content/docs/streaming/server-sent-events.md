@@ -164,9 +164,23 @@ For reactive streams, if the `context_builder()` function itself raises (e.g., a
 
 Chirp manages the SSE connection lifecycle automatically:
 
-1. **Event producer** -- consumes the generator, formats events, sends as ASGI body chunks
-2. **Disconnect monitor** -- watches for `http.disconnect`, cancels the producer
-3. **Heartbeat** -- sends `: heartbeat` comments on idle to keep the connection alive
+:::{steps}
+:::{step} Event producer
+
+Consumes the generator, formats events, sends as ASGI body chunks.
+
+:::{/step}
+:::{step} Disconnect monitor
+
+Watches for `http.disconnect`, cancels the producer when the client disconnects.
+
+:::{/step}
+:::{step} Heartbeat
+
+Sends `: heartbeat` comments on idle to keep the connection alive.
+
+:::{/step}
+:::{/steps}
 
 ## Testing SSE
 

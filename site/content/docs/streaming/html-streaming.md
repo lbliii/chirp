@@ -34,11 +34,33 @@ The HTTP response uses chunked transfer encoding. The browser renders progressiv
 
 ## How It Works
 
-1. Kida's compiler generates a streaming renderer alongside the standard renderer (same compilation pass, no performance impact)
-2. When `Stream` is returned, Chirp sends the response with `Transfer-Encoding: chunked`
-3. Kida's `render_stream()` yields HTML chunks as template sections complete
-4. Each chunk is sent to the client immediately via ASGI body messages
-5. The browser renders each chunk as it arrives
+:::{steps}
+:::{step} Compile streaming renderer
+
+Kida's compiler generates a streaming renderer alongside the standard renderer (same compilation pass, no performance impact).
+
+:::{/step}
+:::{step} Send chunked response
+
+When `Stream` is returned, Chirp sends the response with `Transfer-Encoding: chunked`.
+
+:::{/step}
+:::{step} Yield HTML chunks
+
+Kida's `render_stream()` yields HTML chunks as template sections complete.
+
+:::{/step}
+:::{step} Stream to client
+
+Each chunk is sent to the client immediately via ASGI body messages.
+
+:::{/step}
+:::{step} Progressive render
+
+The browser renders each chunk as it arrives.
+
+:::{/step}
+:::{/steps}
 
 ```
 Template:  <html> ... {% block header %} ... {% block stats %} ... {% block activity %}
@@ -128,11 +150,33 @@ The template uses normal conditional rendering for skeletons:
 
 How it works:
 
-1. Sync context values render in the shell; awaitable values are set to `None` (triggering the `{% else %}` skeleton)
-2. The shell is sent immediately as the first chunk (instant first paint)
-3. Awaitables resolve concurrently in the background
-4. Each affected block is re-rendered with real data and sent as an out-of-band swap
-5. For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<template>` + inline `<script>` pairs
+:::{steps}
+:::{step} Render shell with skeletons
+
+Sync context values render in the shell; awaitable values are set to `None` (triggering the `{% else %}` skeleton).
+
+:::{/step}
+:::{step} Send first chunk
+
+The shell is sent immediately as the first chunk (instant first paint).
+
+:::{/step}
+:::{step} Resolve awaitables
+
+Awaitables resolve concurrently in the background.
+
+:::{/step}
+:::{step} Stream OOB swaps
+
+Each affected block is re-rendered with real data and sent as an out-of-band swap.
+
+:::{/step}
+:::{step} Client receives updates
+
+For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<template>` + inline `<script>` pairs.
+
+:::{/step}
+:::{/steps}
 
 No client-side framework needed. The browser renders the shell, and blocks fill in as data arrives.
 

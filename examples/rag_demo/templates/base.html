@@ -1,91 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ title | default("Docs") }}</title>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            line-height: 1.6;
-            color: #1a1a2e;
-            background: #fafafa;
-            max-width: 48rem;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        h1 { font-size: 1.75rem; margin-bottom: 1rem; }
-        h2 { font-size: 1.25rem; margin-bottom: 0.5rem; color: #16213e; }
-        .search-form {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
-        }
-        .search-form input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid #ddd;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-        }
-        .search-form button {
-            padding: 0.75rem 1.5rem;
-            background: #0f3460;
-            color: white;
-            border: none;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        .search-form button:hover { background: #16213e; }
-        .sources {
-            background: #f0f4ff;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        .sources a {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background: white;
-            border-radius: 0.25rem;
-            color: #0f3460;
-            text-decoration: none;
-            margin: 0.25rem;
-            font-size: 0.875rem;
-            border: 1px solid #ddd;
-        }
-        .answer {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            border: 1px solid #eee;
-            min-height: 4rem;
-        }
-        .answer:empty::after {
-            content: "Ask a question about the docs...";
-            color: #999;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .streaming { animation: pulse 1.5s ease-in-out infinite; }
-        /* Prose — markdown rendered content */
-        .prose h1, .prose h2, .prose h3 { margin: 1em 0 0.5em; font-weight: 600; }
-        .prose h1 { font-size: 1.5rem; } .prose h2 { font-size: 1.25rem; } .prose h3 { font-size: 1.1rem; }
-        .prose h1:first-child, .prose h2:first-child, .prose h3:first-child { margin-top: 0; }
-        .prose p { margin-bottom: 0.75em; line-height: 1.7; }
-        .prose ul, .prose ol { margin-bottom: 0.75em; padding-left: 1.5em; }
-        .prose li { margin-bottom: 0.2em; }
-        .prose code { font-size: 0.875em; background: #f3f4f6; padding: 0.15em 0.35em; border-radius: 3px; }
-        .prose pre { margin-bottom: 0.75em; padding: 0.75rem; background: #f8f9fa; border: 1px solid #eee; border-radius: 0.375rem; overflow-x: auto; }
-        .prose pre code { background: none; padding: 0; font-size: 0.8125rem; }
-        .prose blockquote { margin-bottom: 0.75em; padding: 0.5rem 1rem; border-left: 3px solid #0f3460; color: #4b5563; }
-        .prose strong { font-weight: 600; }
-    </style>
-</head>
-<body>
-    {% block content %}{% endblock %}
-</body>
-</html>
+{% extends "chirp/layouts/boost.html" %}
+{% block title %}{{ title ?? "Docs" }}{% end %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/rag.css">
+{% end %}
+{% block body_after %}
+<script>
+(function(){
+  function applyTheme(){
+    var t=localStorage.getItem('theme');
+    if(t) document.documentElement.dataset.theme=t;
+  }
+  function updateButtons(){
+    var dark=document.documentElement.dataset.theme==='dark'||
+      (!document.documentElement.dataset.theme&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent=dark?'☀':'☽'; });
+  }
+  function toggleTheme(){
+    var html=document.documentElement;
+    var next=html.dataset.theme==='dark'?'light':'dark';
+    html.dataset.theme=next;
+    localStorage.setItem('theme',next);
+    updateButtons();
+  }
+  document.addEventListener('click',function(e){
+    if(e.target.closest('.theme-toggle')){ e.preventDefault(); toggleTheme(); }
+  });
+  document.addEventListener('DOMContentLoaded',function(){ applyTheme(); updateButtons(); });
+  document.addEventListener('htmx:afterSettle',function(){ updateButtons(); });
+  if(document.readyState!=='loading'){ applyTheme(); updateButtons(); }
+})();
+</script>
+<script>
+(function(){
+  function handleCompareSwitch(btn){
+    if(!btn||btn.getAttribute('role')!=='switch')return;
+    var wasOn=btn.getAttribute('aria-checked')==='true';
+    btn.setAttribute('aria-checked',wasOn?'false':'true');
+    var form=btn.closest('form');
+    if(!form)return;
+    var cb=form.querySelector('input[name=compare]');
+    var sel=form.querySelector('select[name=model_b]');
+    if(cb)cb.checked=!wasOn;
+    if(sel){sel.disabled=wasOn;sel.setAttribute('aria-hidden',wasOn);}
+  }
+  document.addEventListener('click',function(e){
+    var btn=e.target.closest('.compare-switch');
+    if(btn){e.preventDefault();e.stopPropagation();handleCompareSwitch(btn);return;}
+    var copyBtn=e.target.closest('.copy-btn');
+    if(copyBtn){
+      var wrap=copyBtn.closest('[data-copy-text]');
+      if(wrap){
+        var text=wrap.dataset.copyText||'';
+        navigator.clipboard.writeText(text).then(function(){
+          copyBtn.textContent='Copied!';
+          setTimeout(function(){copyBtn.textContent='Copy';},1500);
+        });
+      }
+    }
+  });
+})();
+</script>
+{% end %}

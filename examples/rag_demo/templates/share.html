@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="page-header">
+  <h1>Shared Q&A</h1>
+  <p class="tagline">Read-only view of a previous question and answer.</p>
+</header>
+
+<article class="qa-card">
+  <div class="question-block">
+    <span class="question-label">Question</span>
+    <p class="question-text">{{ question }}</p>
+  </div>
+  <div class="sources">
+    <h2 class="sources-heading">Sources</h2>
+    {% if sources %}
+    <div class="sources-list">
+    {% for doc in sources %}
+    <div class="source-item">
+      <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
+      <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+    </div>
+    {% end %}
+    </div>
+    {% else %}
+    <p class="sources-empty">No sources.</p>
+    {% end %}
+  </div>
+  <div class="answer-section">
+    <span class="answer-label">Answer</span>
+    <div class="answer">
+      <div class="answer-content prose">{{ answer | markdown | cite(sources) | safe(reason="patitas output") }}</div>
+    </div>
+  </div>
+</article>
+
+<div class="conversation-actions">
+  <a href="/">Ask a new question</a>
+</div>
+{% end %}

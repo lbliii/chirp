@@ -592,7 +592,7 @@ def _check_sse_connect_scope(
                     "sse-connect element is inside a broad hx-target scope "
                     "without hx-disinherit. Fragments will swap into the "
                     "layout target and wipe the whole page. Use "
-                    '{% from "chirp/sse" import sse_scope %} {{ sse_scope(url) }} '
+                    '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }} '
                     'or add hx-disinherit="hx-target hx-swap" on sse-connect.'
                 ),
                 template=tmpl_name,

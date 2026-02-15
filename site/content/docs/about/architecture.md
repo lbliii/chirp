@@ -91,14 +91,48 @@ chirp/
 
 A request flows through the system like this:
 
-1. **ASGI handler** receives raw scope and messages
-2. **Request construction** -- frozen dataclass created from ASGI scope
-3. **Middleware pipeline** -- each middleware wraps the next
-4. **Router** -- trie lookup matches path to handler
-5. **Handler invocation** -- signature introspection injects Request + params
-6. **Return value** -- handler returns a value (Template, Fragment, etc.)
-7. **Content negotiation** -- return type determines how to render the response
-8. **Response sending** -- ASGI messages sent back to the server
+:::{steps}
+:::{step} ASGI handler receives scope and messages
+
+Raw ASGI scope and message stream enter the engine layer.
+
+:::{/step}
+:::{step} Request construction
+
+Frozen dataclass created from ASGI scope.
+
+:::{/step}
+:::{step} Middleware pipeline
+
+Each middleware wraps the next; request passes through the stack.
+
+:::{/step}
+:::{step} Router matches path
+
+Trie lookup matches path to handler.
+
+:::{/step}
+:::{step} Handler invocation
+
+Signature introspection injects Request + path params.
+
+:::{/step}
+:::{step} Return value
+
+Handler returns a value (Template, Fragment, etc.).
+
+:::{/step}
+:::{step} Content negotiation
+
+Return type determines how to render the response.
+
+:::{/step}
+:::{step} Response sending
+
+ASGI messages sent back to the server.
+
+:::{/step}
+:::{/steps}
 
 ## Dependencies
 

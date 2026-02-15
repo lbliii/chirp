@@ -10,6 +10,14 @@ keywords: [quickstart, hello world, first app, templates, fragments]
 category: onboarding
 ---
 
+## Prerequisites
+
+:::{checklist} Before You Start
+:show-progress:
+- [ ] [[docs/get-started/installation|Chirp installed]]
+- [ ] Python 3.14+ available
+:::{/checklist}
+
 ## Scaffold a Project
 
 The fastest way to start is the `chirp new` command:
@@ -169,9 +177,15 @@ Now the search input sends requests to `/search` via htmx, and Chirp responds wi
 
 Add real-time updates with SSE and view transitions:
 
-1. **Install Chirp** (if not already): `pip install bengal-chirp`
+:::{steps}
+:::{step} Install Chirp
 
-2. **Extend the boost layout** in your template:
+If not already installed: `pip install bengal-chirp`
+
+:::{/step}
+:::{step} Extend the boost layout
+
+Add the layout and SSE scope to your template:
 
 ```html
 {% extends "chirp/layouts/boost.html" %}
@@ -188,7 +202,8 @@ Add real-time updates with SSE and view transitions:
 {% endblock %}
 ```
 
-3. **Stream fragments** from your route:
+:::{/step}
+:::{step} Stream fragments from your route
 
 ```python
 from chirp import EventStream, Fragment
@@ -200,7 +215,13 @@ def events():
     return EventStream(stream)
 ```
 
-4. **Run `chirp check`** to catch SSE scope violations before opening the browser.
+:::{/step}
+:::{step} Run chirp check
+
+Run `chirp check` to catch SSE scope violations before opening the browser.
+
+:::{/step}
+:::{/steps}
 
 See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full pattern.
 
