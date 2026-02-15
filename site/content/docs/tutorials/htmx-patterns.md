@@ -272,7 +272,7 @@ document.addEventListener('click', function(e) {
 </script>
 ```
 
-The same pattern works for toggles, compare switches, and any interactive element inside SSE or fragment-swapped content. See the RAG demo `examples/rag_demo/templates/base.html` for a full example (compare-switch and copy-btn handlers).
+The same pattern works for toggles, compare switches, and any interactive element inside SSE or fragment-swapped content. The RAG demo uses `AppConfig(delegation=True)` for copy-btn and compare-switch; see [[docs/examples/rag-demo|RAG demo]].
 
 ## Next Steps
 

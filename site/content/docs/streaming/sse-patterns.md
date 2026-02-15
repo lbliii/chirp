@@ -62,7 +62,7 @@ async def stream():
 <div hx-ext="sse"
      sse-connect="/stream"
      hx-disinherit="hx-target hx-swap">
-  <span id="status" sse-swap="status">
+  <span id="status" sse-swap="status" hx-target="this">
     {% block status_block %}v{{ stats.version }}{% endblock %}
   </span>
 </div>
@@ -73,8 +73,9 @@ Key rules:
 - `Fragment.target` becomes the SSE event name.
 - `sse-swap` must be on a **child** of `sse-connect`, never the same element.
 - Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element to prevent layout-level `hx-target` from bleeding into SSE swaps.
+- Add `hx-target="this"` on each `sse-swap` element so htmx correctly targets the swap when inheritance is broken.
 
-`chirp check` validates all three rules at compile time.
+`chirp check` validates all four rules at compile time.
 
 ## Pattern 2: Client-Managed Surfaces
 
@@ -205,8 +206,8 @@ Most pages combine multiple patterns. The key principle: **establish scope bound
          hx-disinherit="hx-target hx-swap">
 
       <!-- Pattern 1: display-only reactive -->
-      <span id="status" sse-swap="status">v{{ doc.version }}</span>
-      <span id="title" sse-swap="title">{{ doc.title }}</span>
+          <span id="status" sse-swap="status" hx-target="this">v{{ doc.version }}</span>
+      <span id="title" sse-swap="title" hx-target="this">{{ doc.title }}</span>
 
       <!-- Pattern 2: client-managed (no sse-swap) -->
       <div id="editor" contenteditable="true">{{ doc.content }}</div>
@@ -257,6 +258,32 @@ Elements that you update via JavaScript (e.g. chat input, custom widgets) should
 For nested SSE (e.g. chat inside a dashboard), put `sse-swap` on a child element, never on the `sse-connect` element. The connect element establishes the connection; the swap element receives the fragments.
 :::
 
+## Multi-swap (RAG-style)
+
+When one SSE stream updates multiple regions (e.g. sources, answer, share link), use multiple `sse-swap` elements inside a single `sse-connect`. The RAG demo exemplifies this:
+
+```html
+<article hx-ext="sse"
+         sse-connect="{{ stream_url }}"
+         sse-close="done"
+         hx-disinherit="hx-target hx-swap">
+  <div class="question-block">...</div>
+  <div class="sources" sse-swap="sources" hx-target="this">...</div>
+  <div class="answer-section">
+    <span class="answer-label">Answer</span>
+    <div class="answer" sse-swap="answer" hx-target="this">...</div>
+    <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
+  </div>
+</article>
+```
+
+Key rules:
+
+- `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element isolates all swaps from layout inheritance.
+- `hx-target="this"` on each `sse-swap` element ensures htmx correctly targets the swap when inheritance is broken.
+
+See [[docs/examples/rag-demo|RAG demo]] for the full implementation.
+
 ## Compile-Time Validation
 
 `chirp check` catches common SSE mistakes:
@@ -266,5 +293,6 @@ For nested SSE (e.g. chat inside a dashboard), put `sse-swap` on a child element
 | `sse_self_swap` | ERROR | `sse-swap` on the same element as `sse-connect` |
 | `sse_scope` | WARNING | `sse-connect` inside broad `hx-target` without `hx-disinherit` |
 | `swap_safety` | WARNING | `sse-swap` element inheriting a broad `hx-target` |
+| `swap_safety` | INFO | `sse-swap` without `hx-target="this"` (suggests adding it for robustness) |
 
 Run `chirp check` during development to catch these before they become runtime mysteries.

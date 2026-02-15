@@ -87,6 +87,34 @@ Output an HTML attribute when the value is truthy, else nothing. Shorthand for o
 
 Useful for optional `class`, `data-*`, `hx-*`, and other attributes. Values are HTML-escaped.
 
+### url
+
+Safelist a URL for `href` attributes. Validates the scheme (blocks `javascript:`, `data:` etc.) and returns the URL or a fallback if unsafe. Use when building links from user or external data.
+
+```html
+<a href="{{ user_link | url }}">User link</a>
+<a href="{{ external_url | url(fallback='/') }}">External</a>
+```
+
+### Security Filters (from Kida)
+
+Chirp uses Kida's template engine, which provides escape and safe filters. These are critical for preventing XSS.
+
+**`e` / `escape`** — HTML-escape a value. When `AppConfig(autoescape=True)` (the default), `{{ x }}` is escaped automatically. Use `| e` explicitly when chaining filters that might strip escaping (e.g. `{{ user_input | upper | e }}`).
+
+**`safe(reason="...")`** — Mark output as trusted HTML so it is not escaped. **Only use for content that is sanitized or from trusted sources** (e.g. Patitas markdown output, CMS blocks, server-generated HTML). Never use on raw user input — that enables XSS.
+
+```html
+{{ content | markdown | safe(reason="patitas output") }}
+{{ cms_block | safe(reason="admin-only CMS") }}
+```
+
+The `reason` argument is for code review and audit; it is not used at runtime.
+
+**URL attributes** — When building `href` from user data, use the `url` filter or Kida's `url_is_safe()` / `safe_url()` in a custom filter. See [Kida security docs](https://lbliii.github.io/kida/docs/advanced/security/) for context-specific escaping (JavaScript, CSS).
+
+**HTML validation** — Validate markup with [whatwg.org/validator](https://whatwg.org/validator/) to catch conformance errors. Chirp's `app.check()` validates hypermedia contracts; use both for full coverage.
+
 ---
 
 ## Custom Filters

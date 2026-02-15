@@ -97,10 +97,11 @@ with cited sources. Demonstrates per-worker lifecycle hooks — global `on_start
 schema migration, `on_worker_startup` / `on_worker_shutdown` for per-worker database
 connections via `ContextVar`. Multi-worker Pounce for free-threading. Uses
 `AppConfig(delegation=True)` for copy-btn and compare-switch on SSE-swapped content,
-and `referenced=True` on dynamic routes (`/share/{slug}`, `/ask/stream`).
+and `referenced=True` on dynamic routes (`/share/{slug}`, `/ask/stream`). Includes
+`SessionMiddleware` + `CSRFMiddleware` for form protection.
 
 ```bash
-pip install chirp[ai,data]
+pip install chirp[ai,data,sessions]
 export ANTHROPIC_API_KEY="sk-..."
 cd examples/rag_demo && python app.py
 ```
@@ -370,7 +371,7 @@ pytest examples/hello/
 | `StaticFiles` (root prefix) | | | | | | | | | x | | | | | x | | | | | |
 | `HTMLInject` | | | | | | | | | x | | | | | | | | | | |
 | Custom 404 page | | | | | | | | | x | | | | | | | | | | |
-| `SessionMiddleware` | | | | | | | | | | x | | | x | | | x | | x | |
+| `SessionMiddleware` | | | | | | | x | | | x | | | x | | | x | | x | |
 | `AuthMiddleware` | | | | | | | | | | x | | | | | | | | | |
 | `@login_required` | | | | | | | | | | x | | | | | | | | | |
 | `login()` / `logout()` | | | | | | | | | | x | | | | | | | | | |
@@ -379,7 +380,7 @@ pytest examples/hello/
 | `is_safe_url()` | | | | | | | | | | x | | | | | | | | | |
 | `Redirect` | | | | | | | | | | x | | | x | x | | x | | x | |
 | `validate()` + built-in rules | | | | | | | | | | | | | x | x | x | x | | | |
-| `CSRFMiddleware` + `csrf_field()` | | | | | | | | | | | | | x | x | | | | | |
+| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | | | x | x | | | | | |
 | `UploadFile` / multipart | | | | | | | | | | | | | | x | | | | | |
 | `form.files` / `file.save()` | | | | | | | | | | | | | | x | | | | | |
 | `form.get_list()` (multi-value) | | | | | | | | | | | | | | | x | | | | |

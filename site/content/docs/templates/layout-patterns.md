@@ -47,8 +47,8 @@ For SSE swap targets and fragment structure:
 - **Inner element** — The fragment block content. No duplicate padding or border.
 
 ```html
-<!-- Outer: swap target, has padding/border -->
-<div class="answer" sse-swap="answer">
+<!-- Outer: swap target, has padding/border; hx-target="this" when sse-connect has hx-disinherit -->
+<div class="answer" sse-swap="answer" hx-target="this">
   <!-- Inner: fragment renders this; no extra padding -->
   <div class="answer-body" data-copy-text="...">
     <div class="answer-content prose">...</div>
@@ -57,7 +57,7 @@ For SSE swap targets and fragment structure:
 </div>
 ```
 
-Avoid nesting two elements with the same padding/border — it causes double spacing.
+Avoid nesting two elements with the same padding/border — it causes double spacing. Keep `.copy-btn` in normal flow (no `position: absolute`) so it stays with its answer.
 
 ## When to Use Each Construct
 

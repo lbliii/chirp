@@ -52,7 +52,7 @@ so those stay in `on_startup`.
 
 ```bash
 # Install dependencies
-pip install chirp[ai,data]
+pip install chirp[ai,data,sessions]
 
 # Default: Ollama (no API key). Start Ollama first:
 ollama pull llama3
@@ -81,14 +81,19 @@ Open http://127.0.0.1:8000 and ask a question.
 
 ## Zero JavaScript
 
-The entire client-side behavior is two HTML attributes:
+The form uses htmx attributes for POST and SSE; fragments swap into multiple targets:
 
 ```html
-<form hx-post="/ask" hx-ext="sse" sse-connect="/ask" sse-swap="fragment">
+<article sse-connect="{{ stream_url }}" hx-disinherit="hx-target hx-swap">
+  <div sse-swap="sources" hx-target="this">...</div>
+  <div sse-swap="answer" hx-target="this">...</div>
+  <div sse-swap="share_link" hx-target="this"></div>
+</article>
 ```
 
-- `hx-post="/ask"` — POST the form to /ask
-- `sse-connect="/ask"` — connect to the SSE endpoint
-- `sse-swap="fragment"` — swap incoming fragments into the DOM
+- `hx-disinherit="hx-target hx-swap"` on `sse-connect` — isolates swaps from layout inheritance
+- `hx-target="this"` on each `sse-swap` — ensures htmx targets the correct element
+
+Copy buttons use event delegation (`AppConfig(delegation=True)`). Keep `.copy-btn` in normal flow — avoid `position: absolute` so each button stays with its answer.
 
 No React. No npm. No webpack. No build step. Just HTML attributes.

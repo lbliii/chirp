@@ -412,17 +412,16 @@ h2 { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-trans
 @keyframes blink { 50% { opacity: 0; } }
 
 .answer-body {
-  display: grid;
-  grid-template-areas: "content";
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   min-width: 0;
   overflow: hidden;
 }
-.answer-body > .answer-content { grid-area: content; }
+.answer-body > .answer-content { flex: 1; min-width: 0; }
 .answer-body > .copy-btn {
-  grid-area: content;
-  justify-self: end;
-  align-self: start;
-  margin: 0.35rem;
+  align-self: flex-start;
+  margin-top: 0.25rem;
 }
 .copy-btn {
   padding: 0.25rem 0.5rem;

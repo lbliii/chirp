@@ -37,6 +37,7 @@ class _PendingRoute:
     methods: list[str] | None
     name: str | None
     referenced: bool = False
+    template: str | None = None
 
 
 @dataclass(slots=True)
@@ -151,6 +152,7 @@ class App:
         methods: list[str] | None = None,
         name: str | None = None,
         referenced: bool = False,
+        template: str | None = None,
     ) -> Callable[[Handler], Handler]:
         """Register a route handler via decorator.
 
@@ -161,12 +163,16 @@ class App:
             referenced: If True, ``chirp check`` will not flag this route as
                 orphan when it is not referenced from templates. Use for
                 dynamic routes (e.g. ``/share/{slug}``, ``/ask/stream``).
+            template: Template name this route renders (e.g. ``"index.html"``).
+                Used by ``chirp check`` to avoid false-positive dead-template
+                warnings for routes that return ``Template(...)`` without
+                ``@contract``.
         """
 
         def decorator(func: Handler) -> Handler:
             self._check_not_frozen()
             self._pending_routes.append(
-                _PendingRoute(path, func, methods, name, referenced)
+                _PendingRoute(path, func, methods, name, referenced, template)
             )
             return func
 
@@ -726,6 +732,7 @@ class App:
                 methods=methods,
                 name=pending.name,
                 referenced=pending.referenced,
+                template=pending.template,
             )
             router.add(route)
         router.compile()

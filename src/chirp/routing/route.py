@@ -32,6 +32,7 @@ class Route:
     methods: frozenset[str]
     name: str | None = None
     referenced: bool = False
+    template: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

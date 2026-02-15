@@ -8,6 +8,7 @@ Built-in middleware:
     CORSMiddleware -- Cross-Origin Resource Sharing
     CSRFMiddleware -- CSRF token protection (requires SessionMiddleware)
     HTMLInject -- Inject snippets into HTML responses
+    SecurityHeadersMiddleware -- X-Frame-Options, X-Content-Type-Options, Referrer-Policy
     SessionMiddleware -- Signed cookie sessions (requires itsdangerous)
     StaticFiles -- Serve static files from a directory
 """
@@ -17,6 +18,10 @@ from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.inject import HTMLInject
 from chirp.middleware.protocol import Middleware, Next
+from chirp.middleware.security_headers import (
+    SecurityHeadersConfig,
+    SecurityHeadersMiddleware,
+)
 from chirp.middleware.static import StaticFiles
 
 __all__ = [
@@ -29,5 +34,7 @@ __all__ = [
     "HTMLInject",
     "Middleware",
     "Next",
+    "SecurityHeadersConfig",
+    "SecurityHeadersMiddleware",
     "StaticFiles",
 ]

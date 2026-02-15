@@ -3,7 +3,7 @@
    sse_scope macro only supports one. Uses hx-disinherit to isolate from boost layout. #}
 
 {% block sources %}
-<div class="sources" sse-swap="sources">
+<div class="sources" sse-swap="sources" hx-target="this">
   <h2 class="sources-heading">Sources used to draft this answer</h2>
   {% if sources %}
   <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
@@ -56,11 +56,11 @@
   {% block sources %}{% end %}
   <div class="answer-section">
     <span class="answer-label">Answer</span>
-    <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+    <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
       <span class="thinking">Searching docs and generating answer…</span>
       <span class="streaming-cursor" aria-hidden="true"></span>
     </div>
-    <div class="share-link-wrap" sse-swap="share_link"></div>
+    <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
   </div>
 </article>
 {% end %}
@@ -83,7 +83,7 @@
       <span class="question-label">Question</span>
       <p class="question-text">{{ question }}</p>
     </div>
-    <div class="sources" sse-swap="sources">
+    <div class="sources" sse-swap="sources" hx-target="this">
       <h2 class="sources-heading">Sources</h2>
       {% if sources %}
       <div class="sources-list">
@@ -100,11 +100,11 @@
     </div>
     <div class="answer-section">
       <span class="answer-label">{{ model_a }}</span>
-      <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+      <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="thinking">Generating…</span>
         <span class="streaming-cursor" aria-hidden="true"></span>
       </div>
-      <div class="share-link-wrap" sse-swap="share_link"></div>
+      <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
     </div>
   </article>
   <article class="results-wrapper qa-card compare-card"
@@ -117,7 +117,7 @@
       <span class="question-label">Question</span>
       <p class="question-text">{{ question }}</p>
     </div>
-    <div class="sources" sse-swap="sources">
+    <div class="sources" sse-swap="sources" hx-target="this">
       <h2 class="sources-heading">Sources</h2>
       {% if sources %}
       <div class="sources-list">
@@ -134,11 +134,11 @@
     </div>
     <div class="answer-section">
       <span class="answer-label">{{ model_b }}</span>
-      <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+      <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="thinking">Generating…</span>
         <span class="streaming-cursor" aria-hidden="true"></span>
       </div>
-      <div class="share-link-wrap" sse-swap="share_link"></div>
+      <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
     </div>
   </article>
 </div>
@@ -160,7 +160,7 @@
       Refine
     </button>
   </div>
-  <div class="sources" sse-swap="sources">
+  <div class="sources" sse-swap="sources" hx-target="this">
     <h2 class="sources-heading">Sources used to draft this answer</h2>
     {% if sources %}
     <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
@@ -178,11 +178,11 @@
   </div>
   <div class="answer-section">
     <span class="answer-label">Answer</span>
-    <div class="answer" sse-swap="answer" aria-live="polite" aria-atomic="true">
+    <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
       <span class="thinking">Searching docs and generating answer…</span>
       <span class="streaming-cursor" aria-hidden="true"></span>
     </div>
-    <div class="share-link-wrap" sse-swap="share_link"></div>
+    <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
   </div>
 </article>
 {% end %}

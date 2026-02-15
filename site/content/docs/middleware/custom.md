@@ -131,6 +131,11 @@ async def auth_required(request: Request, next: Next) -> Response:
 Modify responses after the handler:
 
 ```python
+# Prefer SecurityHeadersMiddleware for standard headers
+from chirp.middleware import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware())
+
+# Or add custom headers manually:
 async def add_security_headers(request: Request, next: Next) -> Response:
     response = await next(request)
     return (

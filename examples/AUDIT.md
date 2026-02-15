@@ -3,6 +3,16 @@
 Analysis of all examples for similar issues and outdated patterns (Feb 2025).
 Based on fixes applied to the hackernews example.
 
+## HTML Spec Alignment (Feb 2025)
+
+Security and accessibility updates:
+
+| Change | Example(s) |
+|--------|------------|
+| `SessionMiddleware` + `CSRFMiddleware` + `csrf_field()` | rag_demo |
+| `chirp[ai,data,sessions]` install | rag_demo |
+| `url` filter, `safe(reason=...)`, SecurityHeadersMiddleware | Library (see docs) |
+
 ## Upgrade Round (Feb 2025) — {% imports %}, sse_scope, dark theme
 
 All examples upgraded for consistency and S-tier DX:

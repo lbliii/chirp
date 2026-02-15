@@ -577,6 +577,9 @@ rate(http_requests_total{status=~"5.."}[5m])
 
 - [ ] Set `debug=False` in production
 - [ ] Use strong `secret_key` (generate with `secrets.token_urlsafe()`)
+- [ ] Add `SecurityHeadersMiddleware` (or equivalent headers via custom middleware)
+- [ ] Add `CSRFMiddleware` for apps with POST/PUT/DELETE forms
+- [ ] Never use `| safe` on user input without sanitization
 - [ ] Enable TLS with valid certificates
 - [ ] Enable rate limiting
 - [ ] Set appropriate CORS policies

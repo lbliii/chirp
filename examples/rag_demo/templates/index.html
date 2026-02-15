@@ -18,6 +18,7 @@
       aria-label="Ask a question about the docs"
       hx-on::before-request="var sw=this.querySelector('.compare-switch');if(sw&&sw.getAttribute('aria-checked')==='true'){this.querySelector('input[name=compare]').checked=true}"
       hx-on::after-request="if(event.detail.successful){this.querySelector('[name=question]').value='';document.querySelector('#conversation .qa-card')?.scrollIntoView({behavior:'smooth',block:'start'})}">
+  {{ csrf_field() }}
   <div class="form-row form-row-meta">
     {% if models %}
     <label for="model-select" class="visually-hidden">Model</label>

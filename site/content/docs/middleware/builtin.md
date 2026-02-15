@@ -280,6 +280,37 @@ Validates a CSRF token on `POST`, `PUT`, `PATCH`, and `DELETE` requests. The tok
 Requires `AppConfig(secret_key="...")` to be set.
 :::
 
+## SecurityHeadersMiddleware
+
+Add security headers to HTML responses per HTML Living Standard recommendations:
+
+```python
+from chirp.middleware import SecurityHeadersMiddleware
+
+app.add_middleware(SecurityHeadersMiddleware())
+```
+
+Headers applied (only to `text/html` responses):
+
+- **X-Frame-Options** — prevents clickjacking (default: `DENY`)
+- **X-Content-Type-Options** — prevents MIME sniffing (default: `nosniff`)
+- **Referrer-Policy** — controls referrer leakage (default: `strict-origin-when-cross-origin`)
+
+Skipped for JSON, SSE, static files, and other non-HTML content types.
+
+Custom config::
+
+```python
+from chirp.middleware.security_headers import (
+    SecurityHeadersConfig,
+    SecurityHeadersMiddleware,
+)
+
+app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
+    x_frame_options="SAMEORIGIN",
+)))
+```
+
 ## HTMLInject
 
 Inject a snippet into every HTML response before `</body>`:

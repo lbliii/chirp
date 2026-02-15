@@ -679,6 +679,30 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
     for tmpl_name, source in template_sources.items():
         if tmpl_name.startswith("chirp/"):
             continue  # Built-in macros are correct by design
+        has_sse_connect_with_disinherit = any(
+            "hx-disinherit" in m.group("attrs").lower()
+            for m in _SSE_CONNECT_TAG_PATTERN.finditer(source)
+        )
+        if has_sse_connect_with_disinherit:
+            # Skip WARNING (author isolated with hx-disinherit), but suggest
+            # hx-target="this" when missing for robustness (INFO).
+            if broad_targets:
+                for match in _SSE_SWAP_TAG_PATTERN.finditer(source):
+                    attrs = match.group("attrs")
+                    attrs_lower = attrs.lower()
+                    if "hx-target=" in attrs_lower:
+                        continue
+                    issues.append(ContractIssue(
+                        severity=Severity.INFO,
+                        category="swap_safety",
+                        message=(
+                            "Consider adding hx-target=\"this\" on sse-swap "
+                            "elements for robustness when using hx-disinherit."
+                        ),
+                        template=tmpl_name,
+                    ))
+                    break
+            continue
         for match in _SSE_SWAP_TAG_PATTERN.finditer(source):
             attrs = match.group("attrs")
             attrs_lower = attrs.lower()
@@ -1334,8 +1358,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         all_template_names = set(template_sources)
         referenced_templates: set[str] = set()
 
-        # From route FragmentContracts
+        # From route FragmentContracts, SSEContracts, and route.template
         for route in router.routes:
+            if getattr(route, "template", None):
+                referenced_templates.add(route.template)
             rc = getattr(route.handler, "_chirp_contract", None)
             if rc is None:
                 continue

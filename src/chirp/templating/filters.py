@@ -118,12 +118,29 @@ def format_time(unix_ts: float) -> str:
     return datetime.fromtimestamp(unix_ts, UTC).strftime("%H:%M:%S")
 
 
+def url(value: str, fallback: str = "#") -> str:
+    """Safelist URL for href attributes. Uses Kida's url_is_safe.
+
+    Returns the URL if the scheme is safe (http, https, relative), otherwise
+    returns fallback. Use when building href from user or external data.
+
+    Example:
+        <a href="{{ user_link | url }}">Link</a>
+        <a href="{{ external_url | url(fallback='/') }}">External</a>
+
+    """
+    from kida.utils.html import safe_url
+
+    return safe_url(str(value), fallback=fallback)
+
+
 # All built-in chirp filters, registered automatically on every env.
 BUILTIN_FILTERS: dict[str, Any] = {
     "attr": attr,
     "field_errors": field_errors,
+    "format_time": format_time,
+    "pluralize": pluralize,
     "qs": qs,
     "timeago": timeago,
-    "pluralize": pluralize,
-    "format_time": format_time,
+    "url": url,
 }

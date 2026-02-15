@@ -98,6 +98,12 @@ Architecture, philosophy, comparisons, and thread safety.
 Step-by-step guides for common patterns and migrations.
 :::{/card}
 
+:::{card} Guides
+:icon: book
+:link: ./guides/
+Accessibility, best practices, and patterns.
+:::{/card}
+
 :::{card} Examples
 :icon: box
 :link: ./examples/

@@ -350,6 +350,36 @@ class TestSwapSafetyWarnings:
         issues = _check_swap_safety(template_sources)
         assert issues == []
 
+    def test_no_warning_for_sse_swap_when_connect_has_disinherit(self):
+        """sse-connect with hx-disinherit skips WARNING; INFO suggests hx-target."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#main"></body>',
+            "ask.html": (
+                '<article hx-ext="sse" sse-connect="{{ stream_url }}" '
+                'hx-disinherit="hx-target hx-swap">'
+                '<div class="answer" sse-swap="answer">...</div>'
+                "</article>"
+            ),
+        }
+        issues = _check_swap_safety(template_sources)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.INFO
+        assert "hx-target" in issues[0].message
+
+    def test_no_info_when_sse_swap_has_hx_target_this(self):
+        """sse-swap with hx-target='this' gets no INFO suggestion."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#main"></body>',
+            "ask.html": (
+                '<article hx-ext="sse" sse-connect="{{ stream_url }}" '
+                'hx-disinherit="hx-target hx-swap">'
+                '<div class="answer" sse-swap="answer" hx-target="this">...</div>'
+                "</article>"
+            ),
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
+
 
 class TestCheckHypermediaSurface:
     """Integration test for the full hypermedia check."""

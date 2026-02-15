@@ -32,13 +32,19 @@ The RAG (Retrieval Augmented Generation) demo is Chirp's most comprehensive exam
 
 ### SSE Swap Target Structure
 
-- **Outer** `.answer` — `sse-swap="answer"` target; has padding and border
+- **Outer** `.answer` — `sse-swap="answer"` target with `hx-target="this"`; has padding and border
 - **Inner** `.answer-body` — `data-copy-text`; no extra padding (avoids double borders)
 - **Content** `.answer-content.prose` — markdown-rendered answer
 
+Use `hx-disinherit="hx-target hx-swap"` on `sse-connect` and `hx-target="this"` on each `sse-swap` element. See [[docs/streaming/sse-patterns|SSE patterns]] for the multi-swap layout.
+
+### Copy Button
+
+Keep `.copy-btn` in normal flow — avoid `position: absolute` in your CSS so each button stays anchored to its answer. In compare mode, each card has its own copy button.
+
 ### Event Delegation
 
-`hx-on::click` does not work on content swapped by htmx. The RAG demo uses event delegation in `base.html`:
+`hx-on::click` does not work on content swapped by htmx. The RAG demo uses `AppConfig(delegation=True)`, which injects a document-level listener for `.copy-btn` and `.compare-switch`:
 
 ```javascript
 document.addEventListener('click', function(e) {
@@ -77,6 +83,7 @@ The RAG demo uses custom logic for streaming states; the macro suits the final "
 
 ## Next Steps
 
-- [[docs/streaming/server-sent-events|Server-Sent Events]] — SSE patterns in depth
+- [[docs/streaming/sse-patterns|SSE patterns]] — Multi-swap layout, hx-target, compile-time checks
+- [[docs/streaming/server-sent-events|Server-Sent Events]] — SSE in depth
 - [[docs/templates/fragments|Fragments]] — Block-level rendering
 - [[docs/tutorials/htmx-patterns|htmx Patterns]] — Event delegation and more

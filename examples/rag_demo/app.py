@@ -6,7 +6,7 @@ AI-generated answers with cited sources. The entire application is
 
 Run::
 
-    pip install chirp[ai,data]
+    pip install chirp[ai,data,sessions]
     ollama pull llama3.2    # if using Ollama (default)
     ollama serve            # in another terminal
     python examples/rag_demo/app.py
@@ -53,6 +53,8 @@ from sync import sync_from_sources
 from urllib.parse import quote
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.middleware.static import StaticFiles
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
@@ -137,19 +139,29 @@ app = App(
     AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True)
 )
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
+_secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
+app.add_middleware(CSRFMiddleware(CSRFConfig()))
 _md_renderer = register_markdown_filter(app)
 
 
 def _cite_filter(html: str, sources: list[Document] | None) -> str:
-    """Replace [1], [2], etc. in HTML with links to sources."""
+    """Replace [1], [2], etc. in HTML with links to sources.
+
+    Uses url_is_safe to validate doc.url before embedding in href (defense-in-depth).
+    """
     if not sources:
         return html
+
+    from html import escape as html_escape
+    from kida.utils.html import safe_url
 
     def repl(match: re.Match[str]) -> str:
         idx = int(match.group(1))
         if 1 <= idx <= len(sources):
             doc = sources[idx - 1]
-            return f'<a href="{doc.url}" target="_blank" rel="noopener" class="citation">[{idx}]</a>'
+            safe_href = safe_url(doc.url)
+            return f'<a href="{html_escape(safe_href)}" target="_blank" rel="noopener" class="citation">[{idx}]</a>'
         return match.group(0)
 
     return re.sub(r"\[(\d+)\]", repl, html)
@@ -195,7 +207,7 @@ async def _ollama_list_models() -> list[str]:
 # -- Routes --
 
 
-@app.route("/")
+@app.route("/", template="index.html")
 async def index() -> Template:
     """Render the docs homepage with search and model selector (when using Ollama)."""
     models: list[str] = []
@@ -212,7 +224,7 @@ async def index() -> Template:
     )
 
 
-@app.route("/share/{slug}", referenced=True)
+@app.route("/share/{slug}", referenced=True, template="share.html")
 async def share(slug: str) -> Template:
     """Render a read-only shared Q&A by slug."""
     db = _db_var.get()
@@ -241,7 +253,7 @@ async def share(slug: str) -> Template:
     )
 
 
-@app.route("/ask", methods=["POST"])
+@app.route("/ask", methods=["POST"], template="ask.html")
 async def ask(request: Request):
     """Handle form submit: return sources + scaffolding with sse-connect.
 
@@ -298,7 +310,7 @@ async def ask(request: Request):
     return Fragment("ask.html", "ask_batch_result", items=items)
 
 
-@app.route("/ask/stream", referenced=True)
+@app.route("/ask/stream", referenced=True, template="ask.html")
 async def ask_stream(request: Request) -> EventStream:
     """SSE endpoint: stream AI answer token-by-token (Ollama pattern)."""
 
