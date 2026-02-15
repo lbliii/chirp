@@ -1,0 +1,102 @@
+{#- Chirp Alpine.js macros — importable via {% from "chirp/alpine.html" import ... %}
+
+   Requires AppConfig(alpine=True) for script injection.
+   Use for local UI state: dropdowns, modals, tabs.
+   htmx handles server round-trips; Alpine handles client-only state.
+
+   Usage:
+       {% from "chirp/alpine.html" import dropdown, modal, tabs %}
+       {% call dropdown("Menu") %}
+         <a href="/a">Link A</a>
+         <a href="/b">Link B</a>
+       {% end %}
+       {% call modal("confirm-dialog") %}
+         <p>Are you sure?</p>
+         <button @click="open = false">Yes</button>
+       {% end %}
+       {% call tabs(["Overview", "Details", "Settings"], default="Overview") %}
+         <div x-show="active === 'Overview'">Overview content</div>
+         <div x-show="active === 'Details'">Details content</div>
+         <div x-show="active === 'Settings'">Settings content</div>
+       {% end %}
+-#}
+
+{# Dropdown — toggle panel with click-outside and escape key #}
+{% def dropdown(trigger="Menu", wrapper_class="", panel_class="") %}
+<div class="chirp-dropdown{{ " " + wrapper_class if wrapper_class else "" }}"
+     x-data="{ open: false }"
+     @keydown.escape.window="open = false">
+  <button type="button"
+          @click="open = !open"
+          @click.outside="open = false"
+          :aria-expanded="open"
+          aria-haspopup="true"
+          class="chirp-dropdown-trigger">
+    {{ trigger }}
+  </button>
+  <div x-show="open"
+       x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="chirp-dropdown-panel{{ " " + panel_class if panel_class else "" }}"
+       role="menu">
+    {% slot %}
+  </div>
+</div>
+{% end %}
+
+{# Modal — dialog with escape to close.
+   managed=true: self-contained (default). managed=false: use parent's open variable. #}
+{% def modal(id="chirp-modal", title="", wrapper_class="", content_class="", managed=true) %}
+<div id="{{ id }}"
+     class="chirp-modal{{ " " + wrapper_class if wrapper_class else "" }}"
+     {{ 'x-data="{ open: false }"' if managed else "" }}
+     @keydown.escape.window="open = false"
+     role="dialog"
+     aria-modal="true"
+     :aria-hidden="!open"
+     x-show="open"
+     x-cloak
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     style="display: none;">
+  <div class="chirp-modal-backdrop" @click="open = false"></div>
+  <div class="chirp-modal-content{{ " " + content_class if content_class else "" }}"
+       role="document"
+       @click.stop>
+    {% if title %}
+    <h2 class="chirp-modal-title">{{ title }}</h2>
+    {% end %}
+    {% slot %}
+  </div>
+</div>
+{% end %}
+
+{# Tabs — tab list + panel slot; caller provides panel content with x-show per tab #}
+{% def tabs(tab_names, default=none, tab_list_class="", panel_class="") %}
+{% let default_tab = default ?? tab_names[0] if tab_names else "" %}
+<div class="chirp-tabs"
+     x-data="{ active: '{{ default_tab }}' }">
+  <div role="tablist" class="chirp-tab-list{{ " " + tab_list_class if tab_list_class else "" }}">
+    {% for name in tab_names %}
+    <button type="button"
+            role="tab"
+            :aria-selected="active === '{{ name }}'"
+            @click="active = '{{ name }}'"
+            class="chirp-tab">
+      {{ name }}
+    </button>
+    {% end %}
+  </div>
+  <div class="chirp-tab-panels{{ " " + panel_class if panel_class else "" }}">
+    {% slot %}
+  </div>
+</div>
+{% end %}

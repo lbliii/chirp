@@ -60,3 +60,21 @@ class TestAppConfig:
     def test_reload_dirs_custom(self) -> None:
         cfg = AppConfig(reload_dirs=("./templates", "./static"))
         assert cfg.reload_dirs == ("./templates", "./static")
+
+    def test_alpine_defaults(self) -> None:
+        cfg = AppConfig()
+        assert cfg.alpine is False
+        assert cfg.alpine_version == "3.15.8"
+        assert cfg.alpine_csp is False
+
+    def test_alpine_enabled(self) -> None:
+        cfg = AppConfig(alpine=True)
+        assert cfg.alpine is True
+
+    def test_alpine_version_override(self) -> None:
+        cfg = AppConfig(alpine=True, alpine_version="3.14.0")
+        assert cfg.alpine_version == "3.14.0"
+
+    def test_alpine_csp(self) -> None:
+        cfg = AppConfig(alpine=True, alpine_csp=True)
+        assert cfg.alpine_csp is True

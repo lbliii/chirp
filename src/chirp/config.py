@@ -60,6 +60,11 @@ class AppConfig:
     # Event delegation — copy-btn and compare-switch for SSE-swapped content
     delegation: bool = False
 
+    # Alpine.js — local UI state (dropdowns, modals, tabs)
+    alpine: bool = False
+    alpine_version: str = "3.15.8"  # Pinned for reproducibility
+    alpine_csp: bool = False  # Use CSP-safe build when True
+
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB
 

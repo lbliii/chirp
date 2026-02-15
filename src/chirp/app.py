@@ -772,6 +772,21 @@ class App:
                 HTMLInject(DELEGATION_SNIPPET, full_page_only=True)
             )
 
+        #    Alpine.js — local UI state (dropdowns, modals, tabs)
+        if self.config.alpine:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.alpine import alpine_snippet
+
+            middleware_list.append(
+                HTMLInject(
+                    alpine_snippet(
+                        self.config.alpine_version,
+                        self.config.alpine_csp,
+                    ),
+                    full_page_only=True,
+                )
+            )
+
         #    View Transitions: meta tag + CSS defaults + htmx global config.
         #    Opt-in (default False) — changes visual behavior.
         if self.config.view_transitions:
