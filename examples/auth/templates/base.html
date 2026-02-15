@@ -1,16 +1,36 @@
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Auth Demo{% endblock %}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 2rem auto; padding: 0 1rem; }
-    nav { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; }
-    nav a { text-decoration: none; color: #333; }
-    nav a:hover { color: #000; }
-    .error { color: #c00; margin-bottom: 1rem; }
-    label { display: block; margin-top: 0.75rem; font-weight: 600; }
-    input { display: block; width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; }
-    button { padding: 0.5rem 1rem; cursor: pointer; margin-top: 1rem; }
-    small { color: #888; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 500px; margin: 0 auto; padding: 2rem 1rem;
+    }
+    nav {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;
+    }
+    nav a { text-decoration: none; color: #94a3b8; }
+    nav a:hover { color: #f8fafc; }
+    nav form { margin-left: auto; }
+    .error { color: #f87171; margin-bottom: 1rem; font-size: 0.9rem; }
+    label { display: block; margin-top: 0.75rem; font-weight: 600; color: #f8fafc; }
+    input {
+      display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
+      color: #e2e8f0;
+    }
+    input:focus { outline: none; border-color: #3b82f6; }
+    button {
+      padding: 0.5rem 1rem; cursor: pointer; margin-top: 1rem;
+      background: #3b82f6; color: #fff; border: none; border-radius: 0.5rem;
+    }
+    button:hover { background: #2563eb; }
+    small { color: #64748b; }
   </style>
 </head>
 <body>

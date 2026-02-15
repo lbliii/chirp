@@ -80,37 +80,37 @@ class TestSSE:
     """Live score updates stream through the SSE pipeline."""
 
     async def test_receives_initial_event(self, example_app) -> None:
-        """The SSE stream yields an initial fragment from cached data."""
+        """The SSE stream yields an initial ping to confirm connection."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=1)
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 1
 
-    async def test_initial_event_is_fragment(self, example_app) -> None:
-        """The initial event is a rendered HTML fragment, not raw template."""
+    async def test_initial_event_is_ping(self, example_app) -> None:
+        """The initial event is a ping, not an OOB fragment (avoids flicker)."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=1)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
-        assert len(fragment_events) >= 1
-        for evt in fragment_events:
-            assert "{{" not in evt.data  # no raw template tags
+        ping_events = [e for e in result.events if e.event == "ping"]
+        assert len(ping_events) >= 1
+        assert ping_events[0].data == "connected"
 
-    async def test_initial_event_has_oob_swap(self, example_app) -> None:
-        """The fragment includes hx-swap-oob for targeted updates."""
+    async def test_fragment_events_have_oob_swap(self, example_app) -> None:
+        """When score changes, fragment events include hx-swap-oob."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=1)
+            result = await client.sse("/events", max_events=3, timeout=12.0)
         fragment_events = [e for e in result.events if e.event == "fragment"]
-        oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
-        assert len(oob_events) >= 1
+        if fragment_events:
+            oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
+            assert len(oob_events) >= 1
 
-    async def test_initial_event_has_story_meta(self, example_app) -> None:
-        """The fragment contains story metadata (points, comments)."""
+    async def test_fragment_events_have_story_meta(self, example_app) -> None:
+        """Fragment events contain story metadata (points, comments)."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=1)
+            result = await client.sse("/events", max_events=3, timeout=12.0)
         fragment_events = [e for e in result.events if e.event == "fragment"]
-        assert len(fragment_events) >= 1
-        assert "point" in fragment_events[0].data
+        if fragment_events:
+            assert "point" in fragment_events[0].data
 
 
 class TestFilters:

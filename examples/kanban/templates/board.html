@@ -18,10 +18,8 @@
     - loop.index, is odd    — alternating card tints
 -#}
 
-{# Shared imports — available during both render() and render_block().
-   This eliminates the need to duplicate {% from...import %} inside
-   every block/fragment that renders in isolation for OOB swaps. #}
-{% globals %}
+{# Fragment-safe imports — available during both render() and render_block(). #}
+{% imports %}
   {% from "components/_card.html" import task_card %}
   {% from "components/_column.html" import column %}
   {% from "components/_field.html" import field %}

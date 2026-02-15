@@ -25,9 +25,8 @@ from typing import Any
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, Template
+from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
 from chirp.markdown import register_markdown_filter
-from chirp.realtime.events import SSEEvent
 from chirp.tools.registry import ToolRegistry
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"

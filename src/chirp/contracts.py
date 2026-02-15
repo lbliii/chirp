@@ -578,21 +578,22 @@ def _check_sse_connect_scope(
     targets_text = ", ".join(sorted(broad_targets))
 
     for tmpl_name, source in template_sources.items():
+        if tmpl_name.startswith("chirp/"):
+            continue  # Built-in macros are correct by design
         for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
             attrs_lower = match.group("attrs").lower()
             # Already has hx-disinherit — assume the author handled it
             if "hx-disinherit" in attrs_lower:
                 continue
             issues.append(ContractIssue(
-                severity=Severity.WARNING,
+                severity=Severity.ERROR,
                 category="sse_scope",
                 message=(
                     "sse-connect element is inside a broad hx-target scope "
-                    "without hx-disinherit. SSE swap targets will inherit "
-                    "the layout-level hx-target and fragments will replace "
-                    "the wrong region. Add "
-                    'hx-disinherit="hx-target hx-swap" on the sse-connect '
-                    "element to isolate SSE swaps."
+                    "without hx-disinherit. Fragments will swap into the "
+                    "layout target and wipe the whole page. Use "
+                    '{% from "chirp/sse" import sse_scope %} {{ sse_scope(url) }} '
+                    'or add hx-disinherit="hx-target hx-swap" on sse-connect.'
                 ),
                 template=tmpl_name,
                 details=f"Inherited broad target(s): {targets_text}",
@@ -648,6 +649,8 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
 
     # Step 2: detect mutating tags that rely on inherited targets.
     for tmpl_name, source in template_sources.items():
+        if tmpl_name.startswith("chirp/"):
+            continue  # Built-in macros are correct by design
         for match in _MUTATING_TAG_PATTERN.finditer(source):
             attrs = match.group("attrs")
             attrs_lower = attrs.lower()
@@ -672,6 +675,8 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
 
     # Step 3: detect SSE swap tags that rely on inherited broad targets.
     for tmpl_name, source in template_sources.items():
+        if tmpl_name.startswith("chirp/"):
+            continue  # Built-in macros are correct by design
         for match in _SSE_SWAP_TAG_PATTERN.finditer(source):
             attrs = match.group("attrs")
             attrs_lower = attrs.lower()

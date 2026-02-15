@@ -1,0 +1,54 @@
+---
+description: Stable pattern for View Transitions + OOB/SSE — avoid flicker and whole-tree wipe
+globs: "**/*.html"
+alwaysApply: false
+---
+
+# View Transitions + OOB — Stable Pattern
+
+When a page mixes **htmx-boost** (AJAX nav), **View Transitions**, and **OOB/SSE** (live updates), three mistakes cause problems:
+
+## Rule 0: hx-disinherit on sse-connect (CRITICAL — whole tree wiped without it)
+
+```html
+<!-- BAD: inherits hx-target="#main" → fragment swaps into #main, wipes entire list -->
+<div hx-ext="sse" sse-connect="/events">
+
+<!-- GOOD -->
+<div hx-ext="sse" sse-connect="/events" hx-disinherit="hx-target hx-swap">
+```
+
+## Rule 1: No `transition:true` on the container
+
+```html
+<!-- BAD: OOB swaps trigger view transitions → whole area flickers -->
+<div id="main" hx-swap="innerHTML transition:true">
+
+<!-- GOOD: Put transition on nav links only -->
+<div id="main" hx-swap="innerHTML">
+<a href="/page" hx-swap="innerHTML transition:true">Link</a>
+```
+
+## Rule 2: No `view-transition-name` on parents of OOB targets
+
+```css
+/* BAD: #main contains OOB targets (meta-lines, etc.) */
+#main { view-transition-name: page-content; }
+
+/* GOOD: Only nav-only content */
+#main > .story-detail { view-transition-name: page-content; }
+```
+
+## Rule 3: OOB fragments must include nav link attributes
+
+When OOB-swapping an element that has nav links, those links need `hx-swap="innerHTML transition:true"` so they behave the same after the swap.
+
+## Checklist
+
+- [ ] `sse-connect` has `hx-disinherit="hx-target hx-swap"`
+- [ ] Container has `hx-swap="innerHTML"` without `transition:true`
+- [ ] Every nav link has `hx-swap="innerHTML transition:true"`
+- [ ] `view-transition-name` only on elements that change on full nav, never on parents of OOB targets
+- [ ] OOB fragments with nav links include `hx-swap="innerHTML transition:true"` on those links
+
+Full guide: `site/content/docs/tutorials/view-transitions-oob.md`

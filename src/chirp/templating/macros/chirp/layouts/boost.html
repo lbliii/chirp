@@ -1,0 +1,52 @@
+{#- Chirp boost layout — stable base for htmx-boost + SSE + view transitions
+
+   Extend this layout for apps that use:
+   - htmx-boost (AJAX navigation)
+   - SSE live updates with OOB swaps
+   - View Transitions API
+
+   Structure is correct by default: no transition on #main, nav links
+   get transition via nav_link macro. Override sse_scope block for live updates.
+
+   Usage:
+       {% extends "chirp/layouts/boost.html" %}
+       {% block content %}
+         <ol>...</ol>
+       {% end %}
+       {% block sse_scope %}
+         {% from "chirp/sse.html" import sse_scope %}
+         {{ sse_scope("/events") }}
+       {% end %}
+
+   Important: sse_scope is OUTSIDE #main so the connection persists across
+   navigations. If placed inside content, it gets replaced and live updates stop.
+-#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="view-transition" content="same-origin">
+  <title>{% block title %}Chirp{% end %}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    @view-transition { navigation: auto; }
+    ::view-transition-old(page-content) { animation: fade-out 0.15s ease-out forwards; }
+    ::view-transition-new(page-content) { animation: fade-in 0.2s ease-in forwards; }
+    @keyframes fade-out { to { opacity: 0; } }
+    @keyframes fade-in { from { opacity: 0; } }
+    .sse-sink { display: none; }
+    {% block head_style %}{% end %}
+  </style>
+  {% block head %}{% end %}
+</head>
+<body>
+  {% block body_before %}{% end %}
+  <div id="main" hx-boost="true" hx-target="#main" hx-swap="innerHTML">
+    {% block content %}{% end %}
+  </div>
+  {% block sse_scope %}{% end %}
+  {% block body_after %}{% end %}
+</body>
+</html>

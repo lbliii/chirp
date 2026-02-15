@@ -818,7 +818,9 @@ class App:
 
         Uses the rich terminal formatter so output matches the pounce
         startup banner's visual language.  Printed even when there are
-        no issues (confirms checks ran).
+        no issues (confirms checks ran).  Exits with non-zero if any
+        Severity.ERROR issues exist, so developers fix sse_scope
+        violations before opening the browser.
         """
         import sys
 
@@ -827,6 +829,8 @@ class App:
 
         result = check_hypermedia_surface(self)
         sys.stderr.write(format_check_result(result))
+        if not result.ok:
+            sys.exit(1)
 
     def check(self) -> None:
         """Validate the hypermedia surface and print results.

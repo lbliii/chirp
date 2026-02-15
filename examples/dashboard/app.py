@@ -159,7 +159,7 @@ def events():
 
 if __name__ == "__main__":
     try:
-        from pounce.config import ServerConfig
+        from pounce import ServerConfig
         from pounce.server import Server
 
         app._ensure_frozen()

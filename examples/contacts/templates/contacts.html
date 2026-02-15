@@ -1,27 +1,40 @@
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Contacts</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; color: #1e293b; }
-    h1 { display: flex; align-items: center; gap: 0.75rem; }
-    .count { font-size: 0.85rem; background: #e2e8f0; color: #475569; padding: 0.15rem 0.5rem; border-radius: 999px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 700px; margin: 0 auto; padding: 1.5rem;
+    }
+    h1 { display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem; color: #f8fafc; }
+    .count { font-size: 0.85rem; background: #1e293b; color: #94a3b8; padding: 0.15rem 0.5rem; border-radius: 999px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-    th { text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; padding: 0.5rem; border-bottom: 2px solid #e2e8f0; }
-    td { padding: 0.5rem; border-bottom: 1px solid #f1f5f9; }
+    th { text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; padding: 0.5rem; border-bottom: 2px solid #334155; }
+    td { padding: 0.5rem; border-bottom: 1px solid #1e293b; }
     .actions { display: flex; gap: 0.25rem; }
-    button { padding: 0.25rem 0.5rem; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-size: 0.8rem; }
-    button:hover { background: #e2e8f0; }
-    button.danger { color: #dc2626; border-color: #fca5a5; }
-    button.danger:hover { background: #fee2e2; }
-    input[type="text"], input[type="email"] { padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
+    button {
+      padding: 0.25rem 0.5rem; cursor: pointer; border: 1px solid #334155;
+      border-radius: 0.375rem; background: #1e293b; font-size: 0.8rem; color: #e2e8f0;
+    }
+    button:hover { background: #334155; }
+    button.danger { color: #f87171; border-color: #7f1d1d; }
+    button.danger:hover { background: #450a0a; }
+    input[type="text"], input[type="email"] {
+      padding: 0.35rem 0.5rem; border: 1px solid #334155; border-radius: 0.375rem;
+      font-size: 0.85rem; background: #1e293b; color: #e2e8f0;
+    }
     form.add-form { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 1.5rem; }
     form.add-form input { flex: 1; }
-    .errors { color: #dc2626; font-size: 0.8rem; margin: 0.25rem 0; list-style: none; padding: 0; }
+    .errors { color: #f87171; font-size: 0.8rem; margin: 0.25rem 0; list-style: none; padding: 0; }
     .errors li { margin: 0.15rem 0; }
     .search { margin-bottom: 1rem; }
-    .search input { width: 100%; padding: 0.5rem; }
-    .empty { color: #94a3b8; font-style: italic; padding: 1rem 0.5rem; }
+    .search input { width: 100%; padding: 0.5rem 0.75rem; }
+    .empty { color: #64748b; font-style: italic; padding: 1rem 0.5rem; }
     .toast { position: fixed; bottom: 1rem; right: 1rem; background: #1e293b; color: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; }
     .toast.show { opacity: 1; }
   </style>

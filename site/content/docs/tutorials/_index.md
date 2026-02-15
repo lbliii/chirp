@@ -18,6 +18,13 @@ cascade:
 :columns: 2
 :gap: medium
 
+:::{card} View Transitions + OOB
+:icon: zap
+:link: ./view-transitions-oob
+:description: Stable pattern for htmx-boost, View Transitions, and live OOB/SSE updates
+Avoid flicker and content disappearing when mixing navigation with live updates.
+:::{/card}
+
 :::{card} Coming from Flask
 :icon: arrow-right
 :link: ./coming-from-flask

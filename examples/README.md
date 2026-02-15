@@ -289,6 +289,22 @@ browser warning and breaks the transition animation.
 #main { view-transition-name: page-content; }
 ```
 
+**OOB + View Transitions**: If `#main` (or similar) is a parent of elements
+that receive OOB swaps (e.g. `hx-swap-oob`), three things can go wrong:
+
+1. **`hx-target` inheritance** — `sse-connect` inside `#main` inherits
+   `hx-target="#main"`. Fragments then swap into `#main`, wiping the whole
+   list. Add `hx-disinherit="hx-target hx-swap"` on `sse-connect`.
+
+2. **`view-transition-name` on the parent** — triggers full-page transition
+   when OOB updates arrive. Scope it to elements that change only on full
+   navigation (e.g. `.story-detail`), not on parents of OOB targets.
+
+3. **`transition:true` on the swap target** — htmx wraps swaps in the View
+   Transitions API. OOB swaps to children can trigger this and cause the
+   whole content area to flicker/disappear. Put `transition:true` only on
+   the links that trigger full navigation, not on the container (`#main`).
+
 ID-based targeting is faster for the browser, unambiguous for htmx, and
 compatible with the CSS view-transition-name uniqueness requirement.
 

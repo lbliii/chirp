@@ -4,9 +4,11 @@ Consumes the free HN Firebase API. Stories load on the initial page,
 scores and comment counts update in real-time via SSE, and comment
 trees render recursively using kida's ``{% def %}``.
 
-Run:
-    pip install httpx  # (or pip install chirp[all])
-    python app.py
+Run (from b-stack workspace root):
+    uv run python chirp/examples/hackernews/app.py
+
+Or from this directory:
+    uv run python app.py
 """
 
 import asyncio
@@ -19,7 +21,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Page, Template
+from chirp import App, AppConfig, EventStream, Fragment, Page, SSEEvent, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -304,12 +306,11 @@ def events():
     """
 
     async def generate():
-        # Yield the first cached story immediately so the SSE pipeline
-        # is testable without network access (and the browser sees a
-        # quick confirmation that the connection is alive).
-        stories = _get_stories(1)
-        if stories:
-            yield Fragment("hackernews.html", "story_meta", story=stories[0])
+        # Send a ping so the browser sees the connection is alive. Do NOT send
+        # an OOB fragment here — the page already has that content from the
+        # initial render. Sending it would trigger an unnecessary swap and
+        # cause visible flicker.
+        yield SSEEvent(event="ping", data="connected")
 
         while True:
             with _lock:
@@ -351,7 +352,7 @@ def events():
 
 if __name__ == "__main__":
     try:
-        from pounce.config import ServerConfig
+        from pounce import ServerConfig
         from pounce.server import Server
 
         app._ensure_frozen()

@@ -1,0 +1,15 @@
+{#- Chirp nav link macro — importable via {% from "chirp/nav.html" import nav_link %}
+
+   Renders an <a> with hx-swap="innerHTML transition:true" for htmx-boost
+   navigation. Use for links that perform full-page-style navigation
+   inside #main. OOB swaps must not trigger transitions; only nav links do.
+
+   Usage:
+       {% from "chirp/nav.html" import nav_link %}
+       {{ nav_link("/story/123", "Story title") }}
+       {{ nav_link("/", "← Back", class="back") }}
+-#}
+
+{% def nav_link(href, text, class="", push_url=false) %}
+<a href="{{ href }}"{% if class %} class="{{ class }}"{% end %} hx-swap="innerHTML transition:true"{% if push_url %} hx-push-url="true"{% end %}>{{ text }}</a>
+{% end %}

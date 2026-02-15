@@ -103,6 +103,8 @@ form is submitted.
 Convert standard links and forms into AJAX-powered navigation with a
 single attribute.
 
+**Simple case (no OOB/SSE live updates):**
+
 ```html
 <body hx-boost="true"
       hx-target="#content"
@@ -112,6 +114,11 @@ single attribute.
   <main id="content">{% block content %}{% endblock %}</main>
 </body>
 ```
+
+**With OOB/SSE (live updates on the same page):** Do NOT put `transition:true`
+on the container — it causes flicker when OOB swaps arrive. Put
+`hx-swap="innerHTML transition:true"` on each nav link instead. See
+[[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full pattern.
 
 **Behavior:**
 - **Links:** AJAX GET, push URL to history, target body, innerHTML swap
@@ -311,16 +318,28 @@ No `transition:true` needed on individual elements when this is enabled.
 **Custom per-element transitions:**
 
 For fine-grained control, add `view-transition-name` in your CSS and
-`transition:true` on specific swap targets:
+`transition:true` on specific swap targets.
+
+**⚠️ OOB/SSE caveat:** If the page has OOB swaps (live score updates, SSE
+fragments, multi-fragment form responses), do NOT put `transition:true` or
+`view-transition-name` on the container — it causes flicker and content
+disappearing. Put `transition:true` on nav links and scope
+`view-transition-name` to elements that change only on full navigation.
+See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the
+stable pattern.
 
 ```html
-<div hx-swap="innerHTML transition:true">...</div>
+<!-- No OOB: container can have transition -->
+<div id="main" hx-swap="innerHTML transition:true">...</div>
+
+<!-- With OOB: container has no transition, nav links do -->
+<div id="main" hx-swap="innerHTML">...</div>
+<a href="/page" hx-swap="innerHTML transition:true">Link</a>
 ```
 
 ```css
-#main { view-transition-name: page-content; }
-::view-transition-old(page-content) { animation: slide-out 0.2s; }
-::view-transition-new(page-content) { animation: slide-in 0.2s; }
+/* Scope to nav-only content, never parents of OOB targets */
+#main > .detail-view { view-transition-name: page-content; }
 ```
 
 **htmx ref:** [View Transitions](https://htmx.org/docs/#view-transitions)

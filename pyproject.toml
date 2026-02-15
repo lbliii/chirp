@@ -34,7 +34,7 @@ classifiers = [
 dependencies = [
     "kida-templates>=0.2.0",  # Template engine (same ecosystem, same author)
     "anyio>=4.0",             # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.1.0",   # ASGI server (same ecosystem, powers app.run())
+    "bengal-pounce>=0.2.0",   # ASGI server (same ecosystem, powers app.run())
 ]
 
 [project.optional-dependencies]
@@ -57,7 +57,7 @@ data-pg = ["asyncpg>=0.30.0"]
 ai = ["httpx>=0.27.0"]
 
 # Markdown rendering (patitas — same ecosystem)
-markdown = ["patitas>=0.1.0"]
+markdown = ["patitas>=0.3.0"]
 
 # All optional features
 all = [
@@ -66,7 +66,7 @@ all = [
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
     "asyncpg>=0.30.0",
-    "patitas>=0.1.0",
+    "patitas>=0.3.0",
 ]
 
 # Full stack: framework + data + AI
@@ -76,7 +76,7 @@ full = [
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
     "asyncpg>=0.30.0",
-    "patitas>=0.1.0",
+    "patitas>=0.3.0",
 ]
 
 [project.scripts]
@@ -89,21 +89,17 @@ Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 # =============================================================================
-# uv — Local source overrides for unpublished ecosystem packages
+# uv — Workspace sources
 # =============================================================================
-# pounce is a sibling repo in the same workspace; not yet on PyPI.
-# kida-templates IS on PyPI but we often iterate locally.
-
-[tool.uv.sources]
-bengal-pounce = { path = "../pounce", editable = true }
-kida-templates = { path = "../kida", editable = true }
-patitas = { path = "../patitas", editable = true }
+# When chirp is used inside the b-stack workspace, the root pyproject.toml
+# provides workspace sources for kida-templates, bengal-pounce, patitas.
+# Standalone (PyPI) installs use published versions.
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-chirp = ["py.typed"]
+chirp = ["py.typed", "templating/macros/**/*.html"]
 
 # =============================================================================
 # Ruff — Linter & Formatter

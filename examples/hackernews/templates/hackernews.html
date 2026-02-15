@@ -1,3 +1,7 @@
+{% imports %}
+{% from "chirp/sse.html" import sse_scope %}
+{% from "chirp/nav.html" import nav_link %}
+{% end %}
 <html>
 
 <head>
@@ -301,7 +305,10 @@
       }
     }
 
-    /* View Transitions */
+    /* View Transitions — scoped to full navigations only.
+       Do NOT put view-transition-name on #main: OOB swaps update children of #main,
+       and the browser would treat each meta-line swap as a full-page transition,
+       causing the whole content to flash/erase. Use transition only for list↔detail. */
     @view-transition {
       navigation: auto;
     }
@@ -328,7 +335,10 @@
       }
     }
 
-    #main {
+    /* Only the detail view gets the transition. The list view contains meta divs
+       that are OOB-swapped on score updates — if the list had view-transition-name,
+       each swap would trigger a full-list transition and erase the page. */
+    #main > .story-detail {
       view-transition-name: page-content;
     }
 
@@ -359,7 +369,9 @@
   </div>
   {% end %}
 
-  <div id="main" class="container" hx-boost="true" hx-target="#main" hx-swap="innerHTML transition:true">
+  {# No transition:true on #main — OOB swaps (score updates) would trigger view transitions
+     and cause the whole list to flicker/disappear. Use transition only on nav links. #}
+  <div id="main" class="container" hx-boost="true" hx-target="#main" hx-swap="innerHTML">
 
     {% if page == "list" %}
 
@@ -375,25 +387,19 @@
             <a class="story-title" href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>
             <span class="story-domain">({{ story.domain }})</span>
             {% else %}
-            {# hx-boost on #main handles GET, push-url, target, and swap automatically #}
-            <a class="story-title" href="/story/{{ story.id }}">{{ story.title }}</a>
+            {{ nav_link("/story/" ~ story.id, story.title, class="story-title") }}
             {% end %}
           </div>
           <div class="story-meta-line" id="meta-{{ story.id }}">
             <span class="score">{{ story.score | pluralize("point") }}</span>
             <span>by {{ story.by }}</span>
             <span>{{ story.time | timeago }}</span>
-            <a href="/story/{{ story.id }}">{{ story.descendants | pluralize("comment") }}</a>
+            {{ nav_link("/story/" ~ story.id, story.descendants | pluralize("comment")) }}
           </div>
         </div>
       </li>
       {% endfor %}
     </ol>
-
-    {# SSE connection for live score updates #}
-    <div hx-ext="sse" sse-connect="/events">
-      <div sse-swap="fragment" class="sse-sink"></div>
-    </div>
     {% end %}
 
     {% elif page == "detail" %}
@@ -401,7 +407,7 @@
     {# ---- Story Detail ---- #}
     {% block story_detail %}
     <div class="story-detail">
-      <a class="back" href="/">&larr; Back</a>
+      {{ nav_link("/", "← Back", class="back") }}
       <h2>
         {% if story.url %}
         <a href="{{ story.url }}" target="_blank" rel="noopener">{{ story.title }}</a>
@@ -452,6 +458,10 @@
 
   </div>
 
+  {# SSE connection — outside #main so it persists across list/detail navigation.
+     OOB targets (meta-N) only exist on list view; swaps no-op on detail. #}
+  {{ sse_scope("/events") }}
+
   {# OOB fragment for SSE score updates — rendered independently, swapped by ID.
   Must include the same htmx attributes as the story list so that
   OOB-swapped meta lines preserve htmx navigation behavior. #}
@@ -461,8 +471,7 @@
     <span class="score">{{ story.score | pluralize("point") }}</span>
     <span>by {{ story.by }}</span>
     <span>{{ story.time | timeago }}</span>
-    <a href="/story/{{ story.id }}" hx-get="/story/{{ story.id }}" hx-target="#main" hx-swap="innerHTML transition:true"
-      hx-push-url="true">{{ story.descendants | pluralize("comment") }}</a>
+    {{ nav_link("/story/" ~ story.id, story.descendants | pluralize("comment"), push_url=true) }}
   </div>
   {% end %}
   {% end %}

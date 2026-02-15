@@ -1,19 +1,29 @@
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Signup Demo{% endblock %}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
-    h1 { margin-bottom: 1.5rem; font-size: 1.5rem; }
-    label { display: block; margin-top: 1rem; font-weight: 600; font-size: 0.875rem; }
-    input { display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
-    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
-    input.error { border-color: #dc2626; }
-    button { display: block; width: 100%; padding: 0.6rem; margin-top: 1.5rem; background: #1e293b; color: #f8fafc; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
-    button:hover { background: #334155; }
-    .field-error { color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 480px; margin: 0 auto; padding: 2rem 1rem;
+    }
+    h1 { margin-bottom: 1.5rem; font-size: 1.5rem; color: #f8fafc; }
+    label { display: block; margin-top: 1rem; font-weight: 600; font-size: 0.875rem; color: #f8fafc; }
+    input {
+      display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
+      font-size: 0.9rem; color: #e2e8f0;
+    }
+    input:focus { outline: none; border-color: #3b82f6; }
+    input.error { border-color: #f87171; }
+    button { display: block; width: 100%; padding: 0.6rem; margin-top: 1.5rem; background: #3b82f6; color: #fff; border: none; border-radius: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+    button:hover { background: #2563eb; }
+    .field-error { color: #f87171; font-size: 0.8rem; margin-top: 0.25rem; }
     .hint { color: #64748b; font-size: 0.8rem; margin-top: 0.2rem; }
-    a { color: #3b82f6; text-decoration: none; }
+    a { color: #60a5fa; text-decoration: none; }
     a:hover { text-decoration: underline; }
   </style>
 </head>

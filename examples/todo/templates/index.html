@@ -1,15 +1,33 @@
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Todo App</title>
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
-    .done { text-decoration: line-through; opacity: 0.6; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 600px; margin: 0 auto; padding: 1.5rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; color: #f8fafc; }
+    .done { text-decoration: line-through; opacity: 0.6; color: #64748b; }
     ul { list-style: none; padding: 0; }
-    li { padding: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
-    input[type="text"] { flex: 1; padding: 0.5rem; }
-    button { padding: 0.25rem 0.5rem; cursor: pointer; }
+    li { padding: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #1e293b; }
+    input[type="text"] {
+      flex: 1; padding: 0.5rem 0.75rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
+      color: #e2e8f0;
+    }
+    input[type="text"]::placeholder { color: #64748b; }
+    button {
+      padding: 0.25rem 0.5rem; cursor: pointer;
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.375rem;
+      color: #e2e8f0; font-size: 0.85rem;
+    }
+    button:hover { background: #334155; }
     form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
   </style>
 </head>

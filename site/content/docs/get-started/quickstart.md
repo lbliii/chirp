@@ -165,6 +165,45 @@ To make the fragment rendering work, include htmx in your `base.html`:
 
 Now the search input sends requests to `/search` via htmx, and Chirp responds with just the `results` block -- no full page reload, no separate partials directory, no JavaScript.
 
+## Live Updates in 5 Minutes
+
+Add real-time updates with SSE and view transitions:
+
+1. **Install Chirp** (if not already): `pip install bengal-chirp`
+
+2. **Extend the boost layout** in your template:
+
+```html
+{% extends "chirp/layouts/boost.html" %}
+{% block content %}
+  <ol>
+    {% for item in items %}
+    <li>{{ item.title }}</li>
+    {% endfor %}
+  </ol>
+{% endblock %}
+{% block sse_scope %}
+  {% from "chirp/sse.html" import sse_scope %}
+  {{ sse_scope("/events") }}
+{% endblock %}
+```
+
+3. **Stream fragments** from your route:
+
+```python
+from chirp import EventStream, Fragment
+
+@app.route("/events")
+def events():
+    def stream():
+        yield Fragment("my_template.html", "live_block", items=...)
+    return EventStream(stream)
+```
+
+4. **Run `chirp check`** to catch SSE scope violations before opening the browser.
+
+See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full pattern.
+
 ## Next Steps
 
 - [[docs/core-concepts/return-values|Return Values]] -- All the types you can return

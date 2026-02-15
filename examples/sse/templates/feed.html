@@ -4,9 +4,21 @@
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
-    .notification { padding: 0.75rem; margin: 0.5rem 0; border-left: 3px solid #3b82f6; background: #f8fafc; }
-    .notification strong { display: block; margin-bottom: 0.25rem; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 600px; margin: 0 auto; padding: 1.5rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; color: #f8fafc; }
+    .notification {
+      padding: 0.75rem; margin: 0.5rem 0;
+      border-left: 3px solid #3b82f6; background: #1e293b;
+      border-radius: 0.375rem; color: #e2e8f0;
+    }
+    .notification strong { display: block; margin-bottom: 0.25rem; color: #f8fafc; }
+    .notification p { font-size: 0.9rem; color: #94a3b8; }
+    #placeholder { color: #64748b; font-style: italic; }
   </style>
 </head>
 <body>

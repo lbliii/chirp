@@ -1103,9 +1103,9 @@ class TestSSEConnectScope:
         broad = _collect_broad_targets(template_sources)
         issues = _check_sse_connect_scope(template_sources, broad)
         assert len(issues) == 1
-        assert issues[0].severity == Severity.WARNING
+        assert issues[0].severity == Severity.ERROR
         assert issues[0].category == "sse_scope"
-        assert "hx-disinherit" in issues[0].message
+        assert "hx-disinherit" in issues[0].message or "sse_scope" in issues[0].message
 
     def test_no_warning_with_disinherit(self):
         template_sources = {

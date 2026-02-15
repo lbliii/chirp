@@ -1,0 +1,19 @@
+{#- Chirp SSE scope macro — importable via {% from "chirp/sse.html" import sse_scope %}
+
+   Renders an SSE connection wrapper with hx-disinherit so fragments
+   don't inherit hx-target from layout ancestors. Without this, SSE
+   fragments swap into #main and wipe the whole page.
+
+   Usage:
+       {% from "chirp/sse.html" import sse_scope %}
+       {{ sse_scope("/events") }}
+
+   Or with options:
+       {{ sse_scope("/events", swap="status", wrapper_class="my-sse") }}
+-#}
+
+{% def sse_scope(url, swap="fragment", wrapper_class="", sink_class="sse-sink") %}
+<div hx-ext="sse" sse-connect="{{ url }}" hx-disinherit="hx-target hx-swap"{% if wrapper_class %} class="{{ wrapper_class }}"{% end %}>
+  <div sse-swap="{{ swap }}" hx-target="this" class="{{ sink_class }}"></div>
+</div>
+{% end %}
