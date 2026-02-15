@@ -91,6 +91,10 @@ def search(request: Request):
 
 `Page` is sugar over the `if request.is_fragment` pattern. If the request comes from htmx, it renders the block. Otherwise, it renders the full template.
 
+:::{note}
+**LayoutPage** is the internal type used when filesystem routing renders through layout chains. Handlers return `Page`; Chirp upgrades it to `LayoutPage` when layouts are involved. You typically don't construct `LayoutPage` directly.
+:::
+
 ## Stream
 
 Progressive HTML rendering. The browser receives the page shell immediately and content fills in as data becomes available:

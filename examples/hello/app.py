@@ -24,7 +24,7 @@ def greet(name: str):
 
 @app.route("/api/status")
 def status():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.1.1"}
 
 
 @app.route("/custom")

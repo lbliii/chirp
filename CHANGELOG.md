@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-02-15
+
 ### Added
 
 - **`chirp` CLI** — New console entry point with three subcommands:
@@ -33,6 +35,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `{% from "chirp/forms.html" import text_field %}`. Five macros (`text_field`,
   `textarea_field`, `select_field`, `checkbox_field`, `hidden_field`) render labelled
   fields with inline error display using the `field_errors` filter.
+- **Filesystem-based page routing** — Layout-nested page discovery from directory structure.
+- **`app.provide()`** — Dependency injection for request-scoped context providers.
+- **Reactive block pipeline** — Structured reactive templates with derived state.
+- **SSE safety checks** — Contract validation for event streams and event cross-reference.
+- **Safe target** — `hx-target` safety for event-driven htmx elements.
+- **Security headers middleware** — HSTS, X-Content-Type-Options, etc.
+- **View transitions** — OOB swap support for View Transitions API.
+- **Production deployment** — Pounce Phase 5 & 6 support, deployment documentation.
+- **Typed extraction** — Query/form/JSON extraction via dataclasses in handler signatures.
+
+### Dependencies
+
+- `kida-templates>=0.2.1` — Template engine
+- `bengal-pounce>=0.2.0` — ASGI server
+
+[0.1.1]: https://github.com/lbliii/chirp/releases/tag/v0.1.1
 
 ## [0.1.0] — 2026-02-09
 

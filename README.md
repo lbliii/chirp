@@ -37,7 +37,11 @@ Chirp is a Python web framework built for the modern web platform: browser-nativ
 ## Installation
 
 ```bash
+# pip
 pip install bengal-chirp
+
+# uv
+uv add bengal-chirp
 ```
 
 Requires Python 3.14+
@@ -59,8 +63,10 @@ chirp new myapp && cd myapp && python app.py
 | `@app.route(path)` | Register a route handler |
 | `Template(name, **ctx)` | Render a full template |
 | `Template.inline(src, **ctx)` | Render from string (prototyping) |
+| `Page(name, block, **ctx)` | Auto Fragment or Template based on request |
 | `Fragment(name, block, **ctx)` | Render a named template block |
 | `Stream(name, **ctx)` | Stream HTML progressively |
+| `Suspense(name, **ctx)` | Shell first, OOB swaps for deferred data |
 | `EventStream(gen)` | Server-Sent Events stream |
 | `app.run()` | Start the development server |
 
@@ -71,11 +77,13 @@ chirp new myapp && cd myapp && python app.py
 | Feature | Description | Docs |
 |---------|-------------|------|
 | **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
+| **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/routing/filesystem-routing/) |
 | **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
 | **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
+| **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
 | **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/streaming/) |
 | **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/streaming/server-sent-events/) |
-| **Middleware** | CORS, sessions, static files, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
+| **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
 | **Contracts** | Compile-time validation of hypermedia surface | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
 | **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/testing/) |
 | **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/data/) |
@@ -160,8 +168,10 @@ Route functions return *values*. The framework handles content negotiation based
 return "Hello"                                  # -> 200, text/html
 return {"users": [...]}                         # -> 200, application/json
 return Template("page.html", title="Home")      # -> 200, rendered via Kida
+return Page("search.html", "results", items=x)  # -> Fragment or Template (auto)
 return Fragment("page.html", "results", items=x) # -> 200, rendered block
 return Stream("dashboard.html", **async_ctx)    # -> 200, streamed HTML
+return Suspense("dashboard.html", stats=...)    # -> shell + OOB swaps
 return EventStream(generator())                 # -> SSE stream
 return Response(body=b"...", status=201)         # -> explicit control
 return Redirect("/login")                       # -> 302
@@ -258,7 +268,7 @@ async def timing(request: Request, next: Next) -> Response:
 app.add_middleware(timing)
 ```
 
-Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions.
+Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions, SecurityHeaders.
 
 </details>
 
@@ -293,7 +303,7 @@ template blocks. Broken references become compile-time errors, not runtime 404s.
   structures, ContextVar isolation.
 - **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
   startup.
-- **Minimal dependencies.** `kida` + `anyio`. Everything else is optional.
+- **Minimal dependencies.** `kida-templates` + `anyio` + `bengal-pounce`. Everything else is optional.
 
 ---
 
@@ -305,13 +315,15 @@ template blocks. Broken references become compile-time errors, not runtime 404s.
 |---------|-------------|
 | [Get Started](https://lbliii.github.io/chirp/docs/get-started/) | Installation and quickstart |
 | [Core Concepts](https://lbliii.github.io/chirp/docs/core-concepts/) | App lifecycle, return values, configuration |
-| [Routing](https://lbliii.github.io/chirp/docs/routing/) | Routes, requests, responses |
+| [Routing](https://lbliii.github.io/chirp/docs/routing/) | Routes, filesystem routing, requests |
 | [Templates](https://lbliii.github.io/chirp/docs/templates/) | Rendering, fragments, filters |
 | [Streaming](https://lbliii.github.io/chirp/docs/streaming/) | HTML streaming and Server-Sent Events |
 | [Middleware](https://lbliii.github.io/chirp/docs/middleware/) | Built-in and custom middleware |
 | [Data](https://lbliii.github.io/chirp/docs/data/) | Database integration and forms |
 | [Testing](https://lbliii.github.io/chirp/docs/testing/) | Test client and assertions |
+| [Deployment](https://lbliii.github.io/chirp/docs/deployment/) | Production deployment with Pounce |
 | [Tutorials](https://lbliii.github.io/chirp/docs/tutorials/) | Flask migration, htmx patterns |
+| [Examples](https://lbliii.github.io/chirp/docs/examples/) | RAG demo, production stack, API |
 | [Reference](https://lbliii.github.io/chirp/docs/reference/) | API documentation |
 
 ---

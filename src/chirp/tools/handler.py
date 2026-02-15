@@ -25,7 +25,7 @@ _MCP_VERSION = "2024-11-05"
 # Server capabilities (tools only in v1)
 _SERVER_INFO = {
     "name": "chirp",
-    "version": "0.1.0",
+    "version": "0.1.1",
 }
 
 _SERVER_CAPABILITIES = {

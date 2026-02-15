@@ -76,6 +76,12 @@ Database access, form parsing, and validation.
 TestClient, fragment assertions, SSE testing.
 :::{/card}
 
+:::{card} Deployment
+:icon: server
+:link: ./deployment/
+Production deployment with Pounce Phase 5 & 6.
+:::{/card}
+
 :::{/cards}
 
 ---

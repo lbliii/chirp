@@ -119,9 +119,28 @@ def user(id: int):
 @app.route("/users/{id:int}/posts/{slug}")
 def user_post(request: Request, id: int, slug: str):
     return Template("post.html", post=get_post(id, slug))
+
+# Extractable dataclasses — from query (GET), form (POST), or JSON body
+@app.route("/search")
+def search(form: SearchForm):
+    return Template("search.html", q=form.q, page=form.page)
+
+# Dependency injection via app.provide()
+@app.provide()
+def get_store() -> DocumentStore:
+    return DocumentStore()
+
+@app.route("/documents/{id}")
+def document(id: str, store: DocumentStore):
+    return Template("doc.html", doc=store.get(id))
 ```
 
-If the first parameter is typed as `Request`, Chirp injects the request. Path parameters are matched by name.
+Argument resolution (first match wins):
+
+- **Request** — Parameter named `request` or typed as `Request`
+- **Path parameters** — From URL match, with type coercion
+- **Extractable dataclasses** — Query string (GET), form body (POST), or JSON body. Dataclass fields are populated from request data.
+- **Service providers** — Registered via `app.provide()`. When a parameter's type matches a registered factory, Chirp injects the result.
 
 ## Async Handlers
 
