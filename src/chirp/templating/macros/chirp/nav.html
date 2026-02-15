@@ -11,5 +11,5 @@
 -#}
 
 {% def nav_link(href, text, class="", push_url=false) %}
-<a href="{{ href }}"{% if class %} class="{{ class }}"{% end %} hx-swap="innerHTML transition:true"{% if push_url %} hx-push-url="true"{% end %}>{{ text }}</a>
+<a href="{{ href }}"{{ class | attr("class") }} hx-swap="innerHTML transition:true"{{ ("true" if push_url else "") | attr("hx-push-url") }}>{{ text }}</a>
 {% end %}

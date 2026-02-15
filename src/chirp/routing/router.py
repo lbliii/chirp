@@ -7,9 +7,28 @@ lookup structure when the app freezes.
 import re
 from dataclasses import dataclass
 
-from chirp.errors import MethodNotAllowed, NotFound
+from chirp.errors import ConfigurationError, MethodNotAllowed, NotFound
 from chirp.routing.params import CONVERTERS
 from chirp.routing.route import PathSegment, Route, RouteMatch
+
+
+def _route_path_has_flask_syntax(path: str) -> bool:
+    """Return True if path uses ``<param>`` instead of ``{param}``."""
+    for part in path.strip("/").split("/"):
+        if not part:
+            continue
+        if part.startswith("<") and part.endswith(">"):
+            return True
+    return False
+
+
+def validate_route_path(path: str) -> None:
+    """Raise if path uses invalid ``<param>`` syntax. Chirp expects ``{param}``."""
+    if _route_path_has_flask_syntax(path):
+        raise ConfigurationError(
+            f"Route path uses '<param>' but Chirp expects '{{param}}'. "
+            f"Got: {path!r}. See docs/routing/routes.md"
+        )
 
 
 def parse_path(path: str) -> list[PathSegment]:
@@ -22,6 +41,7 @@ def parse_path(path: str) -> list[PathSegment]:
         "/users/{id:int}" -> [PathSegment("{id:int}", is_param=True, param_type="int")]
         "/files/{path:path}" -> [PathSegment("{path:path}", is_param=True, param_type="path")]
     """
+    validate_route_path(path)
     segments: list[PathSegment] = []
     for part in path.strip("/").split("/"):
         if not part:

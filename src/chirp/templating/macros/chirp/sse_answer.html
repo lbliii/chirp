@@ -1,0 +1,25 @@
+{#- Chirp SSE answer macro — importable via {% from "chirp/sse_answer.html" import sse_answer %}
+
+   Renders the standard SSE answer structure: outer answer-body (data-copy-text),
+   inner answer-content.prose, and copy button. Use inside a fragment block
+   that targets an element with sse-swap="answer".
+
+   Structure:
+     - .answer-body — wrapper with data-copy-text for clipboard
+     - .answer-content.prose — the rendered content
+     - .copy-btn — copy button (works with AppConfig(delegation=True) or event delegation)
+
+   Usage:
+       {% from "chirp/sse_answer.html" import sse_answer %}
+       {{ sse_answer(text, text | markdown | cite(sources) | safe(reason="patitas")) }}
+
+   Or with custom content:
+       {{ sse_answer(raw_text, rendered_html) }}
+-#}
+
+{% def sse_answer(text, content) %}
+<div class="answer-body" data-copy-text="{{ text | e }}">
+  <div class="answer-content prose">{{ content }}</div>
+  <button type="button" class="copy-btn" title="Copy answer">Copy</button>
+</div>
+{% end %}

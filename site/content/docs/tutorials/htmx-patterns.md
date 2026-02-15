@@ -250,6 +250,30 @@ async def add_to_cart(request: Request):
 
 The first fragment is the main swap target. Additional fragments use `hx-swap-oob` to update other parts of the page.
 
+## Event Delegation for Dynamic Content
+
+`hx-on::click` and similar attributes are bound when the DOM is parsed. Content that arrives later via htmx swaps (SSE, OOB, fragments) does **not** get new handlers. Clicks on swapped-in elements will not trigger `hx-on` handlers.
+
+**Use event delegation** instead: attach a single listener to `document` or a stable parent, and check whether the event target matches your selector:
+
+```html
+<script>
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.copy-btn');
+  if (btn) {
+    var wrap = btn.closest('[data-copy-text]');
+    if (wrap) {
+      navigator.clipboard.writeText(wrap.dataset.copyText || '');
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+    }
+  }
+});
+</script>
+```
+
+The same pattern works for toggles, compare switches, and any interactive element inside SSE or fragment-swapped content. See the RAG demo `examples/rag_demo/templates/base.html` for a full example (compare-switch and copy-btn handlers).
+
 ## Next Steps
 
 - [[docs/templates/fragments|Fragments]] -- Fragment rendering in depth

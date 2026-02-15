@@ -5,10 +5,29 @@ kida Environment. They complement Kida's built-in filters with patterns
 common in server-rendered HTML + htmx apps.
 """
 
+import html
 import time as time_module
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlencode
+
+from kida.template import Markup
+
+
+def attr(value: Any, name: str) -> str | Markup:
+    """Output an HTML attribute when value is truthy, else empty string.
+
+    Shorthand for optional attributes without ``{% if %}`` blocks.
+
+    Example:
+        <a href="{{ href }}"{{ class | attr("class") }}>{{ text }}</a>
+        → <a href="/foo" class="active">Foo</a>   (when class is "active")
+        → <a href="/foo">Foo</a>                  (when class is None or "")
+
+    """
+    if not value:
+        return ""
+    return Markup(f' {name}="{html.escape(str(value))}"')
 
 
 def field_errors(errors: Any, field_name: str) -> list[str]:
@@ -101,6 +120,7 @@ def format_time(unix_ts: float) -> str:
 
 # All built-in chirp filters, registered automatically on every env.
 BUILTIN_FILTERS: dict[str, Any] = {
+    "attr": attr,
     "field_errors": field_errors,
     "qs": qs,
     "timeago": timeago,

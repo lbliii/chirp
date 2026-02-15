@@ -32,6 +32,13 @@ How Template works with kida under the hood.
 Render named blocks independently for htmx.
 :::{/card}
 
+:::{card} Layout Patterns
+:icon: layout
+:link: ./layout-patterns
+:description: Block-heavy layouts, boost pattern, outer vs inner
+When to use block, include, and call.
+:::{/card}
+
 :::{card} Filters
 :icon: filter
 :link: ./filters

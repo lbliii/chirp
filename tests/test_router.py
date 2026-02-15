@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.errors import MethodNotAllowed, NotFound
+from chirp.errors import ConfigurationError, MethodNotAllowed, NotFound
 from chirp.routing.route import Route
 from chirp.routing.router import Router, parse_path
 
@@ -46,6 +46,14 @@ class TestParsePath:
     def test_root(self) -> None:
         segments = parse_path("/")
         assert segments == []
+
+    def test_rejects_flask_style_param(self) -> None:
+        """Chirp expects {param}, not <param>."""
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_path("/share/<slug>")
+        assert "<param>" in str(exc_info.value)
+        assert "{param}" in str(exc_info.value)
+        assert "/share/<slug>" in str(exc_info.value)
 
 
 class TestRouterStaticRoutes:
@@ -198,3 +206,8 @@ class TestRouterErrors:
 
         with pytest.raises(RuntimeError, match="Cannot add routes after compilation"):
             r.add(_route("/users"))
+
+    def test_add_rejects_flask_style_param(self) -> None:
+        r = Router()
+        with pytest.raises(ConfigurationError, match="<param>.*\\{param\\}"):
+            r.add(_route("/share/<slug>"))

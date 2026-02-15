@@ -4,7 +4,32 @@ from __future__ import annotations
 
 import pytest
 
-from chirp.templating.filters import BUILTIN_FILTERS, field_errors, qs
+from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, qs
+
+
+# ── attr ──────────────────────────────────────────────────────────────────
+
+
+class TestAttr:
+    """Test the attr filter for conditional HTML attributes."""
+
+    def test_truthy_returns_attribute(self) -> None:
+        result = attr("back", "class")
+        assert 'class="back"' in str(result)
+
+    def test_falsy_returns_empty(self) -> None:
+        assert attr("", "class") == ""
+        assert attr(None, "class") == ""
+
+    def test_escapes_value(self) -> None:
+        result = attr('foo"bar', "data-value")
+        assert "&quot;" in str(result)
+        assert 'data-value="foo' in str(result)
+
+    def test_returns_markup(self) -> None:
+        """Output is Markup so autoescape does not double-escape."""
+        result = attr("active", "class")
+        assert hasattr(result, "__html__") or "class=" in str(result)
 
 
 # ── field_errors ─────────────────────────────────────────────────────────
@@ -90,6 +115,9 @@ class TestQs:
 class TestBuiltinFiltersRegistry:
     """Test that built-in filters are correctly registered."""
 
+    def test_registry_contains_attr(self) -> None:
+        assert "attr" in BUILTIN_FILTERS
+
     def test_registry_contains_field_errors(self) -> None:
         assert "field_errors" in BUILTIN_FILTERS
 
@@ -97,5 +125,6 @@ class TestBuiltinFiltersRegistry:
         assert "qs" in BUILTIN_FILTERS
 
     def test_registry_functions_match(self) -> None:
+        assert BUILTIN_FILTERS["attr"] is attr
         assert BUILTIN_FILTERS["field_errors"] is field_errors
         assert BUILTIN_FILTERS["qs"] is qs

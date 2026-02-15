@@ -57,6 +57,9 @@ class AppConfig:
     # View Transitions — auto-inject meta tag, default CSS, and htmx global config
     view_transitions: bool = False
 
+    # Event delegation — copy-btn and compare-switch for SSE-swapped content
+    delegation: bool = False
+
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB
 

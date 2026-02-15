@@ -153,6 +153,48 @@ Only blocks that the template explicitly defines or overrides are available for 
 {# unless child.html explicitly overrides it #}
 ```
 
+## Block-Heavy Layouts
+
+Templates with many blocks (extends, nested blocks, fragments) benefit from a clear structure. Use the **extension block pattern** so child templates can add content without replacing parent layout.
+
+### Boost Layout Pattern
+
+Extend `chirp/layouts/boost.html` for htmx-boost + SSE apps. The layout defines stable blocks:
+
+| Block | Purpose |
+|-------|---------|
+| `title` | Page title |
+| `head` | Extra head content (styles, meta) |
+| `head_style` | Inline CSS (e.g. view-transition overrides) |
+| `body_before` | Content before `#main` |
+| `content` | Main content (inside `#main`, swapped on navigation) |
+| `sse_scope` | SSE connection (outside `#main` so it persists) |
+| `body_after` | Scripts (event delegation, theme toggle) |
+
+`content` is swapped on navigation; `sse_scope` and `body_after` stay in place. Put event delegation and other scripts in `body_after` so they run once and work for dynamically swapped content.
+
+### Extension Blocks
+
+Since Kida doesn't support `super()`, use explicit extension blocks in your base template:
+
+```html
+{% block head %}
+<link rel="stylesheet" href="/css/base.css">
+{% block extra_head %}{% end %}
+{% end %}
+
+{% block body_after %}
+<script src="/js/main.js"></script>
+{% block extra_scripts %}{% end %}
+{% end %}
+```
+
+Child templates override `extra_head` or `extra_scripts` to add content without replacing the base.
+
+### Nesting for Fragments
+
+Define fragment blocks inside the block that gets swapped. For example, if `content` is the target, put `results_list` inside it so the fragment target (`#results`) exists in the DOM.
+
 ## Next Steps
 
 - [[docs/core-concepts/return-values|Return Values]] -- All return types

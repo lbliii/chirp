@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from chirp.routing.router import _route_path_has_flask_syntax
+
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.routing.router import Router
@@ -1052,6 +1054,21 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     route_paths = _collect_route_paths(router)
     result.routes_checked = len(route_paths)
 
+    # 1b. Check route path syntax (reject Flask-style <param>)
+    for route in router.routes:
+        if _route_path_has_flask_syntax(route.path):
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="routing",
+                    message=(
+                        f"Route path uses '<param>' but Chirp expects '{{param}}'. "
+                        f"Got: {route.path!r}. See docs/routing/routes.md"
+                    ),
+                    route=route.path,
+                )
+            )
+
     # 2. Check Fragment contracts
     for route in router.routes:
         contract = getattr(route.handler, "_chirp_contract", None)
@@ -1202,6 +1219,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # 5. Check accessibility — htmx on non-interactive elements
         for tmpl_name, source in template_sources.items():
+            if tmpl_name.startswith("chirp/") or tmpl_name.startswith("chirpui/"):
+                continue
             a11y_issues = _check_accessibility(source, tmpl_name)
             result.issues.extend(a11y_issues)
 
@@ -1291,11 +1310,17 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         # 7. Orphan routes (routes never referenced from templates).
         #    Page convention routes (from mount_pages()) are accessed via
         #    browser navigation or JavaScript, not htmx attributes — skip them.
+        #    Routes with referenced=True are dynamic (e.g. /share/{slug}) — skip.
         page_route_paths: set[str] = getattr(app, "_page_route_paths", set())
+        referenced_route_paths: set[str] = {
+            r.path for r in router.routes if getattr(r, "referenced", False)
+        }
         for route_path in route_paths:
             if route_path in referenced_paths or route_path == "/":
                 continue
             if route_path in page_route_paths:
+                continue
+            if route_path in referenced_route_paths:
                 continue
             result.issues.append(ContractIssue(
                 severity=Severity.INFO,
@@ -1336,8 +1361,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             basename = tmpl_name.rsplit("/", 1)[-1]
             if basename.startswith("_"):
                 continue
-            # Skip built-in chirp framework templates
-            if tmpl_name.startswith("chirp/"):
+            # Skip built-in chirp and chirpui framework templates
+            if (
+                tmpl_name.startswith("chirp/")
+                or tmpl_name.startswith("chirpui")
+                or tmpl_name.startswith("themes/")
+            ):
                 continue
             result.dead_templates_found += 1
             result.issues.append(ContractIssue(

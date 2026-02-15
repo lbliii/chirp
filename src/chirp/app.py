@@ -36,6 +36,7 @@ class _PendingRoute:
     handler: Handler
     methods: list[str] | None
     name: str | None
+    referenced: bool = False
 
 
 @dataclass(slots=True)
@@ -149,12 +150,24 @@ class App:
         *,
         methods: list[str] | None = None,
         name: str | None = None,
+        referenced: bool = False,
     ) -> Callable[[Handler], Handler]:
-        """Register a route handler via decorator."""
+        """Register a route handler via decorator.
+
+        Args:
+            path: URL path pattern. Use ``{param}`` for path parameters.
+            methods: HTTP methods. Defaults to ``["GET"]``.
+            name: Optional route name for URL generation.
+            referenced: If True, ``chirp check`` will not flag this route as
+                orphan when it is not referenced from templates. Use for
+                dynamic routes (e.g. ``/share/{slug}``, ``/ask/stream``).
+        """
 
         def decorator(func: Handler) -> Handler:
             self._check_not_frozen()
-            self._pending_routes.append(_PendingRoute(path, func, methods, name))
+            self._pending_routes.append(
+                _PendingRoute(path, func, methods, name, referenced)
+            )
             return func
 
         return decorator
@@ -269,7 +282,7 @@ class App:
             return upgrade_result(result, cascade_ctx, _chain, _providers)
 
         self._pending_routes.append(
-            _PendingRoute(url_path, page_wrapper, methods, name=None)
+            _PendingRoute(url_path, page_wrapper, methods, name=None, referenced=False)
         )
 
     # -- Tool registration --
@@ -712,6 +725,7 @@ class App:
                 handler=pending.handler,
                 methods=methods,
                 name=pending.name,
+                referenced=pending.referenced,
             )
             router.add(route)
         router.compile()
@@ -740,6 +754,15 @@ class App:
 
             middleware_list.append(
                 HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True)
+            )
+
+        #    Event delegation: copy-btn, compare-switch for SSE-swapped content.
+        if self.config.delegation:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.delegation import DELEGATION_SNIPPET
+
+            middleware_list.append(
+                HTMLInject(DELEGATION_SNIPPET, full_page_only=True)
             )
 
         #    View Transitions: meta tag + CSS defaults + htmx global config.

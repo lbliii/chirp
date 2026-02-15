@@ -13,7 +13,7 @@
 -#}
 
 {% def sse_scope(url, swap="fragment", wrapper_class="", sink_class="sse-sink") %}
-<div hx-ext="sse" sse-connect="{{ url }}" hx-disinherit="hx-target hx-swap"{% if wrapper_class %} class="{{ wrapper_class }}"{% end %}>
+<div hx-ext="sse" sse-connect="{{ url }}" hx-disinherit="hx-target hx-swap"{{ wrapper_class | attr("class") }}>
   <div sse-swap="{{ swap }}" hx-target="this" class="{{ sink_class }}"></div>
 </div>
 {% end %}

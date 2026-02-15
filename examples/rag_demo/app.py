@@ -210,7 +210,7 @@ async def index() -> Template:
     )
 
 
-@app.route("/share/{slug}")
+@app.route("/share/{slug}", referenced=True)
 async def share(slug: str) -> Template:
     """Render a read-only shared Q&A by slug."""
     db = _db_var.get()
@@ -296,7 +296,7 @@ async def ask(request: Request):
     return Fragment("ask.html", "ask_batch_result", items=items)
 
 
-@app.route("/ask/stream")
+@app.route("/ask/stream", referenced=True)
 async def ask_stream(request: Request) -> EventStream:
     """SSE endpoint: stream AI answer token-by-token (Ollama pattern)."""
 

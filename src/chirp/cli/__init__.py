@@ -26,6 +26,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Generate a minimal single-file project",
     )
+    new_parser.add_argument(
+        "--sse",
+        action="store_true",
+        help="Include SSE boilerplate (EventStream, sse_scope)",
+    )
 
     # -- chirp run --------------------------------------------------------
     run_parser = subparsers.add_parser("run", help="Start dev or production server")
@@ -77,6 +82,13 @@ def main(argv: list[str] | None = None) -> None:
         help="Import string (e.g. myapp:app)",
     )
 
+    # -- chirp routes -----------------------------------------------------
+    routes_parser = subparsers.add_parser("routes", help="List registered routes")
+    routes_parser.add_argument(
+        "app",
+        help="Import string (e.g. myapp:app)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -95,3 +107,7 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._check import run_check
 
         run_check(args)
+    elif args.command == "routes":
+        from chirp.cli._routes import run_routes
+
+        run_routes(args)

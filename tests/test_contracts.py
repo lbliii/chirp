@@ -359,6 +359,28 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert result.routes_checked == 0
 
+    def test_detects_flask_style_route_path(self, tmp_path, monkeypatch):
+        """Contract check reports route path using <param> instead of {param}."""
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        # Simulate a route with Flask-style path (normally caught at freeze)
+        def fake_has_flask_syntax(path: str) -> bool:
+            return path == "/api/items"
+
+        monkeypatch.setattr(
+            "chirp.contracts._route_path_has_flask_syntax", fake_has_flask_syntax
+        )
+        result = check_hypermedia_surface(app)
+        assert not result.ok
+        routing_errors = [i for i in result.issues if i.category == "routing"]
+        assert len(routing_errors) == 1
+        assert "<param>" in routing_errors[0].message
+        assert "{param}" in routing_errors[0].message
+
     def test_app_with_matching_routes(self, tmp_path):
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -547,9 +569,18 @@ class TestExtractTemplateReferences:
 
 def _user_dead(result: CheckResult) -> list[ContractIssue]:
     """Filter dead-template issues to only user templates (not built-in)."""
+    def is_builtin(tmpl: str | None) -> bool:
+        if not tmpl:
+            return True
+        return (
+            tmpl.startswith("chirp/")
+            or tmpl.startswith("chirpui")
+            or tmpl.startswith("themes/")
+        )
+
     return [
         i for i in result.issues
-        if i.category == "dead" and not (i.template or "").startswith("chirp/")
+        if i.category == "dead" and not is_builtin(i.template)
     ]
 
 

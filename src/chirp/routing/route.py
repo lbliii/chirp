@@ -31,6 +31,7 @@ class Route:
     handler: Callable[..., Any]
     methods: frozenset[str]
     name: str | None = None
+    referenced: bool = False
 
 
 @dataclass(frozen=True, slots=True)

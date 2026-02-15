@@ -75,6 +75,18 @@ Special characters are URL-encoded:
 {# Output: /search?q=hello%20world #}
 ```
 
+### attr
+
+Output an HTML attribute when the value is truthy, else nothing. Shorthand for optional attributes without `{% if %}` blocks.
+
+```html
+<a href="{{ href }}"{{ class | attr("class") }}>{{ text }}</a>
+{# When class is "active": <a href="/foo" class="active">Foo</a> #}
+{# When class is "" or None: <a href="/foo">Foo</a> #}
+```
+
+Useful for optional `class`, `data-*`, `hx-*`, and other attributes. Values are HTML-escaped.
+
 ---
 
 ## Custom Filters

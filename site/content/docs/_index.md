@@ -98,6 +98,12 @@ Architecture, philosophy, comparisons, and thread safety.
 Step-by-step guides for common patterns and migrations.
 :::{/card}
 
+:::{card} Examples
+:icon: box
+:link: ./examples/
+Full-featured apps: RAG demo with streaming AI, fragments, and SSE.
+:::{/card}
+
 :::{card} Reference
 :icon: file-text
 :link: ./reference/

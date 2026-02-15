@@ -32,4 +32,11 @@ Get Chirp running in your environment.
 From hello world to fragment rendering.
 :::{/card}
 
+:::{card} Project Layout
+:icon: folder
+:link: ./project-layout
+:description: Recommended directory structure
+Conventions used by chirp new.
+:::{/card}
+
 :::{/cards}

@@ -16,6 +16,35 @@ Real-time applications mix different update strategies on the same page. A colla
 
 This guide covers the four patterns and when to use each.
 
+## SSE Swap Target Structure
+
+Get the DOM structure right to avoid redundant wrappers and layout overflow:
+
+**Outer element** (layout container): Holds padding, border, and flex/grid layout. This element stays in place; it is not swapped.
+
+**Inner element** (swap target): Has the `id` that matches `sse-swap`. This is where fragments are swapped in. The fragment block should render **only** the inner content, not duplicate the outer wrapper.
+
+```html
+<!-- Outer: layout container (padding, border) -->
+<div class="answer">
+  <!-- Inner: swap target — fragment content goes here -->
+  <div id="answer-body" class="answer-body" sse-swap="answer_body">
+    {% block answer_body %}
+    <div class="answer-content prose">{{ content }}</div>
+    {% endblock %}
+  </div>
+</div>
+```
+
+Avoid nested elements with the same class (e.g. `.answer-with-copy` inside `.answer`) — that causes double padding and border.
+
+**Layout overflow**: For flex or grid children that contain long content (code blocks, wide tables), add `min-width: 0` and `overflow-x: auto` so the container doesn't force horizontal page overflow:
+
+```css
+.answer-body { min-width: 0; overflow: hidden; }
+.answer-content pre { overflow-x: auto; }
+```
+
 ## Pattern 1: Display-Only Reactive
 
 **Use for**: status badges, counters, presence lists, dashboards -- any element where the server is the sole rendering authority and the client is a passive display.
