@@ -95,7 +95,9 @@ cd examples/dashboard_live && python app.py
 A documentation site with AI-powered Q&A. SQLite stores docs, Claude streams answers
 with cited sources. Demonstrates per-worker lifecycle hooks — global `on_startup` for
 schema migration, `on_worker_startup` / `on_worker_shutdown` for per-worker database
-connections via `ContextVar`. Multi-worker Pounce for free-threading.
+connections via `ContextVar`. Multi-worker Pounce for free-threading. Uses
+`AppConfig(delegation=True)` for copy-btn and compare-switch on SSE-swapped content,
+and `referenced=True` on dynamic routes (`/share/{slug}`, `/ask/stream`).
 
 ```bash
 pip install chirp[ai,data]

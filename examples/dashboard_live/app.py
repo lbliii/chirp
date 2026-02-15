@@ -159,7 +159,7 @@ async def index():
     return Suspense("dashboard.html", stats=get_stats(), orders=get_recent_orders())
 
 
-@app.route("/events")
+@app.route("/events", referenced=True)
 def events():
     """Live order feed via Server-Sent Events.
 

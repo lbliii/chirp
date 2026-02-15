@@ -133,7 +133,9 @@ class SharedQA:
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
-app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True))
+app = App(
+    AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True)
+)
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 _md_renderer = register_markdown_filter(app)
 

@@ -181,7 +181,7 @@ async def send_message(request: Request):
     return ("", 204)
 
 
-@app.route("/chat/events")
+@app.route("/chat/events", referenced=True)
 def chat_events():
     """SSE endpoint — stream new messages as rendered HTML fragments."""
 

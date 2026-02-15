@@ -461,7 +461,7 @@ async def post_chat(request: Request):
     )
 
 
-@app.route("/chat/stream")
+@app.route("/chat/stream", referenced=True)
 def chat_stream():
     """SSE endpoint: run the agent loop and stream the final answer.
 
@@ -528,7 +528,7 @@ def chat_stream():
     return EventStream(generate())
 
 
-@app.route("/feed")
+@app.route("/feed", referenced=True)
 def feed():
     """Stream tool call events via SSE for the live activity panel."""
 

@@ -29,7 +29,7 @@ app = App()
 _reload_event = asyncio.Event()
 
 
-@app.route("/__reload__")
+@app.route("/__reload__", referenced=True)
 def reload_events():
     """Stream reload events over SSE.
 

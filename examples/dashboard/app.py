@@ -125,7 +125,7 @@ def index():
     return Template("dashboard.html", readings=readings)
 
 
-@app.route("/events")
+@app.route("/events", referenced=True)
 def events():
     """Live sensor updates via Server-Sent Events.
 

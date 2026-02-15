@@ -102,7 +102,7 @@ async def post_note(request: Request):
     return Fragment("notes.html", "note_list", notes=list_notes())
 
 
-@app.route("/feed")
+@app.route("/feed", referenced=True)
 def feed():
     """Stream tool call events via SSE for the live activity feed."""
 

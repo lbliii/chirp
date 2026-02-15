@@ -40,7 +40,7 @@ def index():
     return Template("feed.html")
 
 
-@app.route("/events")
+@app.route("/events", referenced=True)
 def events():
     """Stream a mix of event types over SSE.
 

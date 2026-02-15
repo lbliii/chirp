@@ -33,34 +33,4 @@
   if(document.readyState!=='loading'){ applyTheme(); updateButtons(); }
 })();
 </script>
-<script>
-(function(){
-  function handleCompareSwitch(btn){
-    if(!btn||btn.getAttribute('role')!=='switch')return;
-    var wasOn=btn.getAttribute('aria-checked')==='true';
-    btn.setAttribute('aria-checked',wasOn?'false':'true');
-    var form=btn.closest('form');
-    if(!form)return;
-    var cb=form.querySelector('input[name=compare]');
-    var sel=form.querySelector('select[name=model_b]');
-    if(cb)cb.checked=!wasOn;
-    if(sel){sel.disabled=wasOn;sel.setAttribute('aria-hidden',wasOn);}
-  }
-  document.addEventListener('click',function(e){
-    var btn=e.target.closest('.compare-switch');
-    if(btn){e.preventDefault();e.stopPropagation();handleCompareSwitch(btn);return;}
-    var copyBtn=e.target.closest('.copy-btn');
-    if(copyBtn){
-      var wrap=copyBtn.closest('[data-copy-text]');
-      if(wrap){
-        var text=wrap.dataset.copyText||'';
-        navigator.clipboard.writeText(text).then(function(){
-          copyBtn.textContent='Copied!';
-          setTimeout(function(){copyBtn.textContent='Copy';},1500);
-        });
-      }
-    }
-  });
-})();
-</script>
 {% end %}

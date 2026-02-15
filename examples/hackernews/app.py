@@ -297,7 +297,7 @@ async def story_detail(story_id: int):
     )
 
 
-@app.route("/events")
+@app.route("/events", referenced=True)
 def events():
     """Live score and comment-count updates via Server-Sent Events.
 

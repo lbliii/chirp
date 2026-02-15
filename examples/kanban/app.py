@@ -660,7 +660,7 @@ def filter_board(request: Request):
     )
 
 
-@app.route("/events")
+@app.route("/events", referenced=True)
 @login_required
 def events():
     """SSE endpoint — simulates live task movement from other users.
