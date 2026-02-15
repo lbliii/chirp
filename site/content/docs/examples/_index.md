@@ -25,4 +25,18 @@ cascade:
 The flagship Chirp example: fragments, SSE, event delegation, and free-threading.
 :::{/card}
 
+:::{card} Production Stack
+:icon: shield
+:link: ../../examples/production/
+:description: SecurityHeadersMiddleware, SessionMiddleware, CSRFMiddleware, contact form
+Production-ready security stack with CSRF protection and security header tests.
+:::{/card}
+
+:::{card} API
+:icon: code
+:link: ../../examples/api/
+:description: Pure JSON REST API — dict returns, path params, request.json(), CORS
+API-only Chirp app with CRUD, no HTML.
+:::{/card}
+
 :::{/cards}

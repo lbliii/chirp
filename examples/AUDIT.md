@@ -3,6 +3,18 @@
 Analysis of all examples for similar issues and outdated patterns (Feb 2025).
 Based on fixes applied to the hackernews example.
 
+## Examples Expansion (Feb 2025)
+
+Documentation and new examples added:
+
+| Change | Details |
+|--------|---------|
+| **kanban**, **theming** | Documented in README (were missing from examples list) |
+| **production** | SecurityHeadersMiddleware + SessionMiddleware + CSRFMiddleware, contact form, security header tests |
+| **custom_middleware** | Function-based timing middleware, class-based rate limiter, `Response.with_header()` |
+| **accessibility** | Semantic HTML, skip link, ARIA, focus styles, `ValidationError` form |
+| **api** | Pure JSON CRUD, `dict`/`list` returns, path params, `request.json()`, CORSMiddleware |
+
 ## HTML Spec Alignment (Feb 2025)
 
 Security and accessibility updates:

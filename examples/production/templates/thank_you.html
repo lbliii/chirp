@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thank you — Production Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 480px; margin: 0 auto; padding: 2rem 1rem;
+    }
+    h1 { margin-bottom: 1rem; font-size: 1.5rem; color: #f8fafc; }
+    p { margin-bottom: 1rem; line-height: 1.6; }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Thank you, {{ name }}!</h1>
+    <p>We received your message and will get back to you soon.</p>
+    {% if website %}
+    <p>Your website: <a href="{{ website | url(fallback='#') }}">{{ website }}</a></p>
+    {% end %}
+    <p><a href="/">Send another message</a></p>
+  </main>
+</body>
+</html>

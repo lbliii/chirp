@@ -117,6 +117,16 @@ how chirp can replace a traditional dev server for static site generators.
 cd examples/static_site && python app.py
 ```
 
+### `theming/` — Dark/Light Mode with CSS Custom Properties
+
+Theme switching using only the web platform: CSS custom properties, `prefers-color-scheme`
+media query (automatic OS preference), and a `data-theme` attribute override with
+`localStorage` persistence. Anti-FOUC inline script in `<head>`. No framework magic.
+
+```bash
+cd examples/theming && python app.py
+```
+
 ### `auth/` — Session Auth with Protected Routes
 
 The most basic authentication example. A login form, a protected dashboard, and logout.
@@ -127,6 +137,18 @@ helpers (both regenerate the session automatically), `current_user()` in templat
 
 ```bash
 cd examples/auth && python app.py
+```
+
+### `kanban/` — Kanban Board with Auth and Live Updates
+
+A full-featured task board with Session + Auth + CSRF. Three demo accounts (Alice, Bob, Carol)
+share a single board — the logged-in user's cards are highlighted. OOB multi-fragment swaps
+update source column, dest column, and stats in one response. SSE simulates live activity from
+other users. Kida patterns: `{% match %}`, `{% embed %}`, optional chaining (`?.`), null
+coalescing (`??`), component imports, fragment caching.
+
+```bash
+cd examples/kanban && python app.py
 ```
 
 ### `ollama/` — Local LLM Chat with Ollama
@@ -235,6 +257,52 @@ pip install chirp[data]
 cd examples/pokedex && python app.py
 ```
 
+### `production/` — Production-Ready Security Stack
+
+A minimal contact form app demonstrating the full security stack: `SecurityHeadersMiddleware`,
+`SessionMiddleware`, and `CSRFMiddleware`. Shows `csrf_field()` in templates, `get_session()`
+for flash messages, and the `url` filter for user-supplied links (`| url(fallback="#")`).
+Tests assert security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`)
+and CSRF protection.
+
+```bash
+cd examples/production && python app.py
+```
+
+### `custom_middleware/` — Custom Middleware Patterns
+
+Runnable version of the custom middleware docs. Two middlewares: a function-based timing
+middleware that adds `X-Response-Time`, and a class-based per-IP rate limiter (5 req/min)
+returning 429 when exceeded. Uses `threading.Lock` for thread safety. Routes include
+`/slow` to verify the timing header.
+
+```bash
+cd examples/custom_middleware && python app.py
+```
+
+### `accessibility/` — Accessible Form Patterns
+
+Demonstrates accessibility guide patterns in a real feedback form: semantic HTML
+(`header`, `main`, `nav`, `footer`), skip link, `label` + `for`/`id`, `aria-describedby`
+for validation messages, `aria-invalid` when errors, `aria-live="polite"` on success
+region, and visible focus styles. Uses `validate()` and `ValidationError` for form
+validation.
+
+```bash
+cd examples/accessibility && python app.py
+```
+
+### `api/` — Pure JSON REST API
+
+API-only Chirp app — no HTML. CRUD for a simple "items" resource with in-memory
+storage. Demonstrates `dict`/`list` returns as JSON, path parameters, `request.json()`
+for POST/PUT, `(dict, status)` for 404/400/201, and `CORSMiddleware` for cross-origin
+consumers.
+
+```bash
+cd examples/api && python app.py
+```
+
 ## Patterns
 
 Lessons from building these examples — things that aren't bugs but require
@@ -326,73 +394,76 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | dashboard_live | hackernews | rag_demo | static_site | auth | ollama | tools | signup | upload | survey | wizard | search | chat | pokedex |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
-| Path parameters | x | x | x | | | | x | | | | | | | x | | x | | | x |
-| String returns | x | | | | | | | | | | | | | | | | | | |
-| Dict/JSON returns | x | | | | | | | | | | | | | | | | | | x |
-| `Response` chaining | x | | | | | | | | | | | | | | | | | | |
-| `@app.error()` | x | | | | | | | | | | | | | | | | | | x |
-| `Template` | | x | | x | | x | x | x | | x | x | x | x | x | x | x | | x | x |
-| `Fragment` | | x | x | x | x | x | x | x | | | | x | | | | | | x | |
-| `Page` | | | x | | | | x | | | | | | | | | | x | | x |
-| `ValidationError` | | x | x | | | | | | | | | | x | x | x | x | | | |
-| `OOB` | | | x | | | | | | | | | | | | | | | | |
-| `Stream` | | | | | x | | | | | | | | | | | | | | |
-| `request.is_fragment` | | x | | | | | x | | | | | | | | | | | | |
-| `request.query` | | | | | | | | | | | | | | | | | x | | x |
-| `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | | x | |
-| `@app.template_filter()` | | x | | | x | | x | | | | | x | | x | | | | | x |
-| `EventStream` | | | | x | x | x | x | x | x | | x | x | | | | | | x | |
-| `SSEEvent` | | | | x | | | | | | | | | | | | | | | |
-| `{% cache %}` | | | | | x | | x | | | | | | | | | | | | |
-| `hx-swap-oob` | | | x | | x | x | x | | | | | | | | | | | | |
-| `with_hx_*()` headers | | | x | | | | | | | | | | | | | | | | |
-| `assert_hx_*` test helpers | | | x | | | | | | | | | | | | | | | | |
-| Multi-worker Pounce | | | | | x | | x | x | | | | | | | | | | | |
-| `TestClient.fragment()` | | x | | | | | x | | | | | | | | | | x | | x |
-| `TestClient.sse()` | | | | x | x | x | x | | x | | | | | | | | | x | |
-| `@app.on_startup` | | | | | | x | x | x | | | | | | | | | | | |
-| `@app.on_worker_startup` | | | | | | | x | x | | | | | | | | | | | |
-| `@app.on_worker_shutdown` | | | | | | | x | x | | | | | | | | | | | |
-| `httpx` (real API) | | | | | | | x | | | | | | | | | | | | |
-| `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | | | x |
-| `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | | | x |
-| `Query` builder | | x | | | | x | | | | | | | | | | | | | x |
-| `db.transaction()` | | | | | | x | | | | | | | | | | | | | |
-| `db.execute_many()` | | | | | | x | | | | | | | | | | | | | |
-| `db.fetch_val()` | | | | | | x | | | | | | | | | | | | | x |
-| `migrate()` (auto-migration) | | | | | | x | | | | | | | | | | | | | x |
-| `chirp.ai` (LLM streaming) | | | | | | | | x | | | x | | | | | | | | |
-| `ContextVar` per-worker | | | | | | | x | x | | | | | | | | | | | |
-| Recursive `{% def %}` | | | | | | | x | | | | | | | | | | | | |
-| View Transitions | | | | | | | x | | | | | | | | | | | | |
-| `StaticFiles` (root prefix) | | | | | | | | | x | | | | | x | | | | | |
-| `HTMLInject` | | | | | | | | | x | | | | | | | | | | |
-| Custom 404 page | | | | | | | | | x | | | | | | | | | | |
-| `SessionMiddleware` | | | | | | | x | | | x | | | x | | | x | | x | |
-| `AuthMiddleware` | | | | | | | | | | x | | | | | | | | | |
-| `@login_required` | | | | | | | | | | x | | | | | | | | | |
-| `login()` / `logout()` | | | | | | | | | | x | | | | | | | | | |
-| `current_user()` template global | | | | | | | | | | x | | | | | | | | | |
-| `hash_password` / `verify_password` | | | | | | | | | | x | | | | | | | | | |
-| `is_safe_url()` | | | | | | | | | | x | | | | | | | | | |
-| `Redirect` | | | | | | | | | | x | | | x | x | | x | | x | |
-| `validate()` + built-in rules | | | | | | | | | | | | | x | x | x | x | | | |
-| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | | | x | x | | | | | |
-| `UploadFile` / multipart | | | | | | | | | | | | | | x | | | | | |
-| `form.files` / `file.save()` | | | | | | | | | | | | | | x | | | | | |
-| `form.get_list()` (multi-value) | | | | | | | | | | | | | | | x | | | | |
-| `one_of` validator | | | | | | | | | | | | | | | x | | | | |
-| `integer` / `number` validator | | | | | | | | | | | | | | | x | | | | |
-| `matches` validator | | | | | | | | | | | | x | | | x | | | |
-| Session-persisted form flow | | | | | | | | | | | | | | | | x | | | |
-| `get_session()` | | | | | | | | | | | | | x | | | x | | x | |
-| GET query-param forms | | | | | | | | | | | | | | | | | x | | |
-| `hx-push-url` search | | | | | | | | | | | | | | | | | x | | |
-| `@app.tool()` (MCP tools) | | | | | | | | | | | | x | | | | | | | |
-| `app.tool_events.subscribe()` | | | | | | | | | | | | x | | | | | | | |
-| `CORSMiddleware` | | | | | | | | | | | | | | | | | | | x |
-| Custom API key middleware | | | | | | | | | | | | | | | | | | | x |
-| Pub-sub broadcast (ChatBus) | | | | | | | | | | | | | | | | | | x | |
+| Feature | hello | todo | contacts | sse | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | | x | | | | | | | | | x | | x | | | x | | | | x |
+| String returns | x | | | | | | | | | | | | | | | | | | | | | | | |
+| Dict/JSON returns | x | | | | | | | | | | | | | | | | | | | x | | | | x |
+| `Response` chaining | x | | | | | | | | | | | | | | | | | | | | | | | |
+| `@app.error()` | x | | | | | | | | | | | | | | | | | | | x | | | | x |
+| `Template` | | x | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | |
+| `Fragment` | | x | x | x | x | x | x | x | | | | | x | x | | | | | | x | | | | | |
+| `Page` | | | x | | | | x | | | | | x | | | | | | x | | x | | | | |
+| `ValidationError` | | x | x | | | | | | | | | x | | x | x | x | x | | | | | x | |
+| `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | |
+| `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | |
+| `request.is_fragment` | | x | | | | | x | | | | | | | | | | | | | | | | | |
+| `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x |
+| `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | | x | | x | | | |
+| `request.json()` | | | | | | | | | | | | | | | | | | | | | | | | x |
+| `@app.template_filter()` | | x | | | x | | x | | | | | | x | | x | | | | | x | | | | |
+| `EventStream` | | | | x | x | x | x | x | x | | x | x | x | | | | | | x | | | | | |
+| `SSEEvent` | | | | x | | | | | | | | | | | | | | | | | | | | |
+| `{% cache %}` | | | | | x | | x | | | | | | | | | | | | | | | | | |
+| `hx-swap-oob` | | | x | | x | x | x | | | | x | | | | | | | | | | | | | |
+| `with_hx_*()` headers | | | x | | | | | | | | | | | | | | | | | | | | | |
+| `assert_hx_*` test helpers | | | x | | | | | | | | | | | | | | | | | | | | | |
+| Multi-worker Pounce | | | | | x | | x | x | | | | | | | | | | | | | | | | |
+| `TestClient.fragment()` | | x | | | | | x | | | | | | x | | | | | x | | x | | | | |
+| `TestClient.sse()` | | | | x | x | x | x | | x | | | | | | | | | | x | | | | | |
+| `@app.on_startup` | | | | | | x | x | x | | | | | | | | | | | | | | | | |
+| `@app.on_worker_startup` | | | | | | | x | x | | | | | | | | | | | | | | | | |
+| `@app.on_worker_shutdown` | | | | | | | x | x | | | | | | | | | | | | | | | | |
+| `httpx` (real API) | | | | | | | x | | | | | | | | | | | | | | | | | |
+| `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | | | x | | | | |
+| `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | | | x | | | | |
+| `Query` builder | | x | | | | x | | | | | | | | | | | | | x | | | | |
+| `db.transaction()` | | | | | | x | | | | | | | | | | | | | | | | | | |
+| `db.execute_many()` | | | | | | x | | | | | | | | | | | | | | | | | | |
+| `db.fetch_val()` | | | | | | x | | | | | | | | | | | | | x | | | | |
+| `migrate()` (auto-migration) | | | | | | x | | | | | | | | | | | | | x | | | | |
+| `chirp.ai` (LLM streaming) | | | | | | | | x | | | x | | | | | | | | | | | | | |
+| `ContextVar` per-worker | | | | | | | x | x | | | | | | | | | | | | | | | | |
+| Recursive `{% def %}` | | | | | | | x | | | | | | | | | | | | | | | | | |
+| View Transitions | | | | | | | x | | | | | | | | | | | | | | | | | |
+| `StaticFiles` (root prefix) | | | | | | | | | x | | | | | | x | | | | | | | | | |
+| `HTMLInject` | | | | | | | | | x | | | | | | | | | | | | | | | |
+| Custom 404 page | | | | | | | | | x | | | | | | | | | | | | | | | |
+| `SecurityHeadersMiddleware` | | | | | | | | | | | | | | | | | | | | | x | | | |
+| `SessionMiddleware` | | | | | | | x | | | x | x | | x | | | x | | x | | x | | | |
+| `AuthMiddleware` | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `@login_required` | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `login()` / `logout()` | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `current_user()` template global | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `hash_password` / `verify_password` | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `is_safe_url()` | | | | | | | | | | x | x | | | | | | | | | | | | | |
+| `Redirect` | | | | | | | | | | x | x | | x | x | | x | | x | | x | | | |
+| `validate()` + built-in rules | | | | | | | | | | | | | x | x | x | x | | | | | x | |
+| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | x | | x | x | | | | | | x | | | |
+| `UploadFile` / multipart | | | | | | | | | | | | | | | x | | | | | | | | | |
+| `form.files` / `file.save()` | | | | | | | | | | | | | | | x | | | | | | | | | |
+| `form.get_list()` (multi-value) | | | | | | | | | | | | | | | | x | | | | | | | | |
+| `one_of` validator | | | | | | | | | | | | | | | | x | | | | | | | | |
+| `integer` / `number` validator | | | | | | | | | | | | | | | | x | | | | | | | | |
+| `matches` validator | | | | | | | | | | | | x | | | x | | | | | | | |
+| Session-persisted form flow | | | | | | | | | | | | | | | | | x | | | | | | | |
+| `get_session()` | | | | | | | | | | | | | x | | | x | | x | | x | | | |
+| GET query-param forms | | | | | | | | | | | | | | | | | | x | | | | | | |
+| `hx-push-url` search | | | | | | | | | | | | | | | | | | x | | | | | | |
+| `@app.tool()` (MCP tools) | | | | | | | | | | | | | x | | | | | | | | | | | |
+| `app.tool_events.subscribe()` | | | | | | | | | | | | | x | | | | | | | | | | | |
+| `CORSMiddleware` | | | | | | | | | | | | | | | | | | | x | | | | x |
+| Custom API key middleware | | | | | | | | | | | | | | | | | | | x | | | | |
+| Custom middleware (function + class) | | | | | | | | | | | | | | | | | | | | | x | | | |
+| Pub-sub broadcast (ChatBus) | | | | | | | | | | | | | | | | | | | x | | | | |

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feedback — Accessibility Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; line-height: 1.6;
+    }
+    .skip-link {
+      position: absolute;
+      top: -3rem;
+      left: 1rem;
+      padding: 0.5rem 1rem;
+      background: #3b82f6;
+      color: #fff;
+      border-radius: 0.5rem;
+      text-decoration: none;
+      z-index: 100;
+      transition: top 0.2s;
+    }
+    .skip-link:focus {
+      top: 1rem;
+      outline: 2px solid #60a5fa;
+      outline-offset: 2px;
+    }
+    header {
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #334155;
+    }
+    nav[aria-label="Main navigation"] a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    nav[aria-label="Main navigation"] a:hover,
+    nav[aria-label="Main navigation"] a:focus {
+      text-decoration: underline;
+    }
+    main {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    main:focus {
+      outline: none;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
+    label { display: block; margin-top: 1rem; font-weight: 600; font-size: 0.875rem; }
+    input, textarea {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.25rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      color: #e2e8f0;
+    }
+    input:focus, textarea:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 0;
+    }
+    input[aria-invalid="true"], textarea[aria-invalid="true"] {
+      border-color: #f87171;
+    }
+    textarea { min-height: 6rem; resize: vertical; }
+    button {
+      margin-top: 1.5rem;
+      padding: 0.6rem 1.2rem;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    button:hover { background: #2563eb; }
+    button:focus {
+      outline: 2px solid #60a5fa;
+      outline-offset: 2px;
+    }
+    [role="alert"] { color: #f87171; font-size: 0.875rem; margin-top: 0.25rem; }
+    [aria-live="polite"] { margin-top: 1rem; padding: 1rem; background: #14532d; border-radius: 0.5rem; }
+    footer {
+      padding: 1rem 2rem;
+      border-top: 1px solid #334155;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header>
+    <nav aria-label="Main navigation">
+      <a href="/">Home</a>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <article aria-label="Feedback form">
+      <h1>Send feedback</h1>
+
+      <div aria-live="polite" aria-atomic="true">
+        {% if success %}
+        <p>Thank you, {{ name }}! We received your feedback.</p>
+        {% else %}
+        {% block feedback_form %}
+        <form method="post" action="/feedback">
+          <label for="name-input">Your name</label>
+          <input
+            type="text"
+            id="name-input"
+            name="name"
+            value="{{ form?.name ?? '' }}"
+            aria-describedby="name-validation"
+            aria-invalid="{{ 'true' if 'name' in (errors ?? {}) else 'false' }}"
+          >
+          <div id="name-validation" role="alert" aria-live="polite">
+            {% for msg in (errors ?? {}).get("name", []) %}
+            {{ msg }}
+            {% end %}
+          </div>
+
+          <label for="message-input">Message</label>
+          <textarea
+            id="message-input"
+            name="message"
+            aria-describedby="message-validation"
+            aria-invalid="{{ 'true' if 'message' in (errors ?? {}) else 'false' }}"
+          >{{ form?.message ?? '' }}</textarea>
+          <div id="message-validation" role="alert" aria-live="polite">
+            {% for msg in (errors ?? {}).get("message", []) %}
+            {{ msg }}
+            {% end %}
+          </div>
+
+          <button type="submit">Send feedback</button>
+        </form>
+        {% endblock %}
+        {% end %}
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <p>Accessibility example — semantic HTML, ARIA, focus styles</p>
+  </footer>
+</body>
+</html>

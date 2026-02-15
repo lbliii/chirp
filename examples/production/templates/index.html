@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact — Production Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 480px; margin: 0 auto; padding: 2rem 1rem;
+    }
+    h1 { margin-bottom: 1.5rem; font-size: 1.5rem; color: #f8fafc; }
+    label { display: block; margin-top: 1rem; font-weight: 600; font-size: 0.875rem; }
+    input, textarea {
+      display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
+      font-size: 0.9rem; color: #e2e8f0;
+    }
+    textarea { min-height: 6rem; resize: vertical; }
+    input:focus, textarea:focus { outline: none; border-color: #3b82f6; }
+    button {
+      display: block; width: 100%; padding: 0.6rem; margin-top: 1.5rem;
+      background: #3b82f6; color: #fff; border: none; border-radius: 0.5rem;
+      font-size: 0.9rem; cursor: pointer;
+    }
+    button:hover { background: #2563eb; }
+    .error { color: #f87171; font-size: 0.9rem; margin-bottom: 1rem; }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Contact us</h1>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% end %}
+    <form method="post" action="/contact">
+      {{ csrf_field() }}
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" value="{{ name ?? '' }}" required>
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="{{ email ?? '' }}" required>
+      <label for="website">Website (optional)</label>
+      <input type="url" id="website" name="website" value="{{ website ?? '' }}" placeholder="https://example.com">
+      <label for="message">Message</label>
+      <textarea id="message" name="message" required>{{ message ?? '' }}</textarea>
+      <button type="submit">Send</button>
+    </form>
+  </main>
+</body>
+</html>
