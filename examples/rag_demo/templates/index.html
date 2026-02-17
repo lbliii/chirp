@@ -1,7 +1,10 @@
 {% extends "base.html" %}
+{% from "chirpui/layout.html" import container, stack %}
 
 {% block content %}
-<header class="page-header">
+{% call container() %}
+{% call stack() %}
+<header class="chirpui-stack chirpui-stack--sm">
   <div class="header-row">
     <div>
       <h1>Documentation</h1>
@@ -17,7 +20,7 @@
       hx-swap="afterbegin transition:true"
       aria-label="Ask a question about the docs"
       hx-on::before-request="var sw=this.querySelector('.compare-switch');if(sw&&sw.getAttribute('aria-checked')==='true'){this.querySelector('input[name=compare]').checked=true}"
-      hx-on::after-request="if(event.detail.successful){this.querySelector('[name=question]').value='';document.querySelector('#conversation .qa-card')?.scrollIntoView({behavior:'smooth',block:'start'})}">
+      hx-on::after-request="if(event.detail.successful){this.querySelector('[name=question]').value='';document.querySelector('#conversation .chirpui-card')?.scrollIntoView({behavior:'smooth',block:'start'})}">
   {{ csrf_field() }}
   <div class="form-row form-row-meta">
     {% if models %}
@@ -69,4 +72,6 @@
   </div>
   <div id="validation" role="alert" aria-live="polite"></div>
 </section>
+{% end %}
+{% end %}
 {% end %}

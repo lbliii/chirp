@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from "chirpui/layout.html" import container, grid, stack %}
+
+{% call container() %}
+{% call stack() %}
+<header class="chirpui-stack chirpui-stack--sm">
+  <h1>LLM Playground</h1>
+  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
+    Compare 2 models side-by-side with streaming responses. Zero JavaScript.
+  </p>
+</header>
+
+<form class="chirpui-stack chirpui-stack--lg"
+      hx-post="/ask"
+      hx-target="#results"
+      hx-swap="innerHTML"
+      aria-label="Compare models">
+  <div class="chirpui-grid chirpui-grid--cols-2" style="gap: var(--chirpui-spacing);">
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="model_a">Model A</label>
+      <select class="chirpui-field__input" id="model_a" name="model_a" required>
+        {% for m in models %}
+        <option value="{{ m }}" {% if m == default_model %}selected{% end %}>{{ m }}</option>
+        {% end %}
+      </select>
+    </div>
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="model_b">Model B</label>
+      <select class="chirpui-field__input" id="model_b" name="model_b" required>
+        {% for m in models %}
+        <option value="{{ m }}"
+                {% if m == default_model %}disabled{% end %}
+                {% if m == default_model_b and m != default_model %}selected{% end %}>{{ m }}</option>
+        {% end %}
+      </select>
+    </div>
+  </div>
+  <div class="chirpui-field">
+    <label class="chirpui-field__label" for="prompt">Prompt</label>
+    <textarea class="chirpui-field__input" id="prompt" name="prompt" rows="4"
+              placeholder="e.g. Explain recursion in one sentence." required></textarea>
+  </div>
+  <button type="submit">Compare</button>
+</form>
+
+<section id="results" aria-label="Model comparison">
+  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
+    Enter a prompt and click Compare to see both models respond in parallel.
+  </p>
+</section>
+{% end %}
+{% end %}
+{% end %}
