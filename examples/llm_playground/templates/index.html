@@ -2,13 +2,17 @@
 
 {% block content %}
 {% from "chirpui/layout.html" import container, grid, stack %}
+{% from "chirpui/empty.html" import empty_state %}
 
 {% call container() %}
 {% call stack() %}
 <header class="chirpui-stack chirpui-stack--sm">
   <h1>LLM Playground</h1>
   <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
-    Compare 2 models side-by-side with streaming responses. Zero JavaScript.
+    Two models. One prompt. Zero JavaScript.
+  </p>
+  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">
+    Streaming responses side-by-side. Built with chirp-ui — HTML over the wire, CSS without apology.
   </p>
 </header>
 
@@ -40,15 +44,15 @@
   <div class="chirpui-field">
     <label class="chirpui-field__label" for="prompt">Prompt</label>
     <textarea class="chirpui-field__input" id="prompt" name="prompt" rows="4"
-              placeholder="e.g. Explain recursion in one sentence." required></textarea>
+              placeholder="Ask anything. Both models will race to answer." required></textarea>
   </div>
   <button type="submit">Compare</button>
 </form>
 
 <section id="results" aria-label="Model comparison">
-  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
-    Enter a prompt and click Compare to see both models respond in parallel.
-  </p>
+  {% call empty_state(icon="◇", title="Ready to compare") %}
+  <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
+  {% end %}
 </section>
 {% end %}
 {% end %}

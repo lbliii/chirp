@@ -7,6 +7,9 @@ answers with cited sources. The entire app is ~50 lines of Python.
 URLs at startup. By default uses bengal, chirp, pounce, kida,
 patitas, rosettes. Override with `RAG_DOC_SOURCES`.
 
+LLM context is sanitized by default (strips HTML, dangerous URLs, Trojan Source
+unicode) before sending to the model. Set `RAG_SANITIZE_CONTEXT=0` to disable.
+
 ## What it demonstrates
 
 - **chirp.data** — SQLite database with typed frozen dataclasses
@@ -52,7 +55,7 @@ so those stay in `on_startup`.
 
 ```bash
 # Install dependencies
-pip install chirp[ai,data,sessions]
+pip install chirp[ai,data,sessions] chirp-ui
 
 # Default: Ollama (no API key). Start Ollama first:
 ollama pull llama3

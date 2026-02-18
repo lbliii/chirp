@@ -10,17 +10,18 @@ from urllib.parse import quote
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
+from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_to_fragments
 from chirp.middleware.static import StaticFiles
 from chirp.markdown import register_markdown_filter
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
+PLAYGROUND_STATIC = Path(__file__).parent / "static" / "playground"
 
 app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True))
-app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
+app.add_middleware(StaticFiles(directory=str(PLAYGROUND_STATIC), prefix="/static/playground"))
+use_chirp_ui(app)
 register_markdown_filter(app)
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE", "http://localhost:11434")

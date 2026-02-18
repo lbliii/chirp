@@ -6,19 +6,19 @@
 
 {% block sources %}
 <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
-  <h2 class="chirpui-font-lg" style="font-size: var(--chirpui-font-lg);">Sources used to draft this answer</h2>
+  <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
   {% if sources %}
-  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">Similar articles retrieved and passed to the model:</p>
+  <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
   <div class="sources-list chirpui-stack chirpui-stack--sm">
   {% for doc in sources %}
   <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
     <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-    <p class="source-snippet chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">{{ doc.content | truncate(150) }}</p>
+    <p class="source-snippet chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
   </div>
   {% end %}
   </div>
   {% else %}
-  <p class="sources-empty chirpui-text-muted" style="color: var(--chirpui-text-muted);">No matching docs found.</p>
+  <p class="sources-empty chirpui-text-muted">No matching docs found.</p>
   {% end %}
 </div>
 {% end %}
@@ -51,8 +51,8 @@
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
   <header class="chirpui-card__header">
-    <span class="chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">Question</span>
-    <p class="chirpui-font-lg" style="font-size: var(--chirpui-font-lg); margin: 0;">{{ question }}</p>
+    <span class="chirpui-text-muted chirpui-font-sm">Question</span>
+    <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
     <button type="button" class="chirpui-copy-btn" title="Refine this question"
             hx-on::click="var q=this.closest('.chirpui-card').querySelector('p');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
       Refine
@@ -61,7 +61,7 @@
   <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
     {% block sources %}{% end %}
     <div>
-      <span class="chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">Answer</span>
+      <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
       <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Searching docs and generating answer…</span>
         <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
@@ -89,18 +89,18 @@
            hx-disinherit="hx-target hx-swap"
            aria-label="Question and answer ({{ model_a }})">
     <header class="chirpui-card__header chirpui-model-card__header">
-      <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">Question</span>
+      <span class="chirpui-text-muted chirpui-font-sm">Question</span>
       <p class="chirpui-model-card__title" style="margin: 0;">{{ question }}</p>
     </header>
     <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
       <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
-        <h2 class="chirpui-font-lg" style="font-size: var(--chirpui-font-lg);">Sources</h2>
+        <h2 class="chirpui-font-lg">Sources</h2>
         {% if sources %}
         <div class="sources-list chirpui-stack chirpui-stack--sm">
         {% for doc in sources %}
         <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
           <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
-          <p class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">{{ doc.content | truncate(150) }}</p>
+          <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
         </div>
         {% end %}
         </div>
@@ -109,7 +109,7 @@
         {% end %}
       </div>
       <div>
-        <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">{{ model_a }}</span>
+        <span class="chirpui-text-muted chirpui-font-sm">{{ model_a }}</span>
         <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
           <span class="chirpui-text-muted">Generating…</span>
           <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
@@ -125,18 +125,18 @@
            hx-disinherit="hx-target hx-swap"
            aria-label="Question and answer ({{ model_b }})">
     <header class="chirpui-card__header chirpui-model-card__header">
-      <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">Question</span>
+      <span class="chirpui-text-muted chirpui-font-sm">Question</span>
       <p class="chirpui-model-card__title" style="margin: 0;">{{ question }}</p>
     </header>
     <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
       <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
-        <h2 class="chirpui-font-lg" style="font-size: var(--chirpui-font-lg);">Sources</h2>
+        <h2 class="chirpui-font-lg">Sources</h2>
         {% if sources %}
         <div class="sources-list chirpui-stack chirpui-stack--sm">
         {% for doc in sources %}
         <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
           <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
-          <p class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">{{ doc.content | truncate(150) }}</p>
+          <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
         </div>
         {% end %}
         </div>
@@ -145,7 +145,7 @@
         {% end %}
       </div>
       <div>
-        <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">{{ model_b }}</span>
+        <span class="chirpui-text-muted chirpui-font-sm">{{ model_b }}</span>
         <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
           <span class="chirpui-text-muted">Generating…</span>
           <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
@@ -169,7 +169,7 @@
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
   <header class="chirpui-card__header">
-    <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">Question</span>
+    <span class="chirpui-text-muted chirpui-font-sm">Question</span>
     <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
     <button type="button" class="chirpui-copy-btn" title="Refine this question"
             hx-on::click="var q=this.closest('.chirpui-card').querySelector('p');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
@@ -178,14 +178,14 @@
   </header>
   <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
     <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
-      <h2 class="chirpui-font-lg" style="font-size: var(--chirpui-font-lg);">Sources used to draft this answer</h2>
+      <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
       {% if sources %}
       <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
       <div class="sources-list chirpui-stack chirpui-stack--sm">
       {% for doc in sources %}
       <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
         <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
-        <p class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">{{ doc.content | truncate(150) }}</p>
+        <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
       </div>
       {% end %}
       </div>
@@ -194,7 +194,7 @@
       {% end %}
     </div>
     <div>
-      <span class="chirpui-text-muted" style="font-size: var(--chirpui-font-sm);">Answer</span>
+      <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
       <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Searching docs and generating answer…</span>
         <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>

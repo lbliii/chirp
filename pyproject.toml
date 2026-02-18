@@ -59,6 +59,9 @@ ai = ["httpx>=0.27.0"]
 # Markdown rendering (patitas — same ecosystem)
 markdown = ["patitas>=0.3.1"]
 
+# chirp-ui component library (CSS, themes, layout macros)
+ui = ["chirp-ui>=1.0.0"]
+
 # All optional features
 all = [
     "python-multipart>=0.0.18",
@@ -158,6 +161,7 @@ unused-ignore-comment = "warn"  # Flag stale type: ignore for cleanup
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "examples"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]

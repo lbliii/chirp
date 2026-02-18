@@ -1,6 +1,6 @@
 # LLM Playground — Model Comparison
 
-Compare 2–4 LLM models side-by-side with streaming responses. Built with chirp-ui for responsive layout.
+Compare 2 models side-by-side with streaming responses. Built with chirp-ui — holy-light theme, empty_state, model cards with badges.
 
 ## Run
 
@@ -17,6 +17,7 @@ Open http://127.0.0.1:8000
 ## Features
 
 - **Side-by-side comparison** — 2 models stream in parallel
-- **chirp-ui layout** — container, grid, model_card, streaming_block
+- **chirp-ui showcase** — holy-light theme, container, grid, model_card, streaming_block, empty_state
 - **Responsive** — 2 cols desktop, 1 col mobile
 - **Zero JavaScript** — htmx + SSE
+- **Assets from package** — chirpui.css and themes served from chirp-ui

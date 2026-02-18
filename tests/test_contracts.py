@@ -121,6 +121,17 @@ class TestPathMatchesRoute:
     def test_root_path(self):
         assert _path_matches_route("/", "/")
 
+    def test_query_string_stripped(self):
+        """URLs with query params match route path (htmx hx-get with ?page=1 etc)."""
+        assert _path_matches_route("/data/table?page=1&sort=name", "/data/table")
+        assert _path_matches_route("/layout/dir?dir=ltr", "/layout/dir")
+        assert _path_matches_route("/layout/dir?dir=rtl", "/layout/dir")
+        assert _path_matches_route("/api/items?filter=active", "/api/items")
+
+    def test_query_string_with_param_route(self):
+        """Query string stripped before matching param routes."""
+        assert _path_matches_route("/api/items/42?expand=details", "/api/items/{id}")
+
 
 class TestContractDecorator:
     """The @contract decorator attaches metadata to handlers."""
@@ -478,6 +489,47 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert result.ok
         assert result.targets_found == 2
+
+    def test_hx_get_with_query_params_matches_route(self, tmp_path):
+        """hx-get URLs with query params match routes (component-showcase-like setup).
+
+        Regression: chirp check must not report false 'has no matching route'
+        for URLs like /data/table?page=1&sort=name when /data/table exists.
+        _path_matches_route strips query strings before matching.
+        """
+        (tmp_path / "showcase").mkdir()
+        (tmp_path / "showcase" / "data.html").write_text(
+            '<div hx-get="/data/table?page=1&sort=name" hx-trigger="load">Loading</div>'
+        )
+        (tmp_path / "showcase" / "layout.html").write_text(
+            '<div hx-get="/layout/dir?dir=ltr">Toggle</div>'
+        )
+        app = App(
+            AppConfig(
+                template_dir=str(tmp_path),
+                component_dirs=(str(tmp_path / "components"),),
+            )
+        )
+        (tmp_path / "components").mkdir()
+        (tmp_path / "components" / "_partial.html").write_text("<span></span>")
+
+        @app.route("/data/table", methods=["GET"])
+        async def data_table():
+            return "ok"
+
+        @app.route("/layout/dir", methods=["GET"])
+        async def layout_dir():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        route_errors = [
+            i for i in result.errors if "no matching route" in i.message
+        ]
+        assert not route_errors, (
+            f"Expected no 'has no matching route' errors for URLs with query params, "
+            f"got: {[e.message for e in route_errors]}"
+        )
+        assert result.targets_found >= 2
 
     def test_accessibility_warnings_in_surface_check(self, tmp_path):
         """Accessibility warnings surface through the full check."""

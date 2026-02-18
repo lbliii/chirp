@@ -52,7 +52,7 @@ from sync import sync_from_sources
 
 from urllib.parse import quote
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
+from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.middleware.static import StaticFiles
@@ -60,8 +60,21 @@ from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
 from chirp.markdown import register_markdown_filter
+from patitas import parse, render_llm, sanitize
+from patitas.sanitize import llm_safe
 
 # -- Helpers --
+
+
+def _llm_safe_content(markdown: str) -> str:
+    """Sanitize and render markdown for LLM context.
+
+    Strips HTML, dangerous URLs (javascript:, data:), zero-width unicode.
+    Outputs structured plain text. Set RAG_SANITIZE_CONTEXT=0 to disable.
+    """
+    doc = parse(markdown)
+    clean = sanitize(doc, policy=llm_safe)
+    return render_llm(clean, source=markdown)
 
 
 def _search_tokens(question: str) -> list[str]:
@@ -134,11 +147,12 @@ class SharedQA:
 # -- Setup --
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
+RAG_STATIC = Path(__file__).parent / "static"
 app = App(
     AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True)
 )
-app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
+app.add_middleware(StaticFiles(directory=str(RAG_STATIC), prefix="/static/rag"))
+use_chirp_ui(app)
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
@@ -326,8 +340,15 @@ async def ask_stream(request: Request) -> EventStream:
 
         db = _db_var.get()
         sources = await _retrieve_docs(db, question)
+        sanitize_context = os.environ.get("RAG_SANITIZE_CONTEXT", "1") in (
+            "1",
+            "true",
+            "yes",
+        )
         context = "\n\n".join(
-            f"# {d.title}\nSource URL: {d.url}\n{d.content}" for d in sources
+            f"# {d.title}\nSource URL: {d.url}\n"
+            f"{_llm_safe_content(d.content) if sanitize_context else d.content}"
+            for d in sources
         )
         prompt = (
             f"You are a helpful documentation assistant. "

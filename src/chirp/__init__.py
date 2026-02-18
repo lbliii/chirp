@@ -74,6 +74,7 @@ __all__ = [
     "MarkdownRenderer",
     "logout",
     "requires",
+    "use_chirp_ui",
 ]
 
 
@@ -132,6 +133,8 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
+    # Extensions
+    "use_chirp_ui": ("chirp.ext.chirp_ui", "use_chirp_ui"),
 }
 
 
