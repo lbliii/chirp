@@ -787,6 +787,18 @@ class App:
                 )
             )
 
+        #    Islands runtime — framework-agnostic mount lifecycle events.
+        if self.config.islands:
+            from chirp.middleware.inject import HTMLInject
+            from chirp.server.islands import islands_snippet
+
+            middleware_list.append(
+                HTMLInject(
+                    islands_snippet(self.config.islands_version),
+                    full_page_only=True,
+                )
+            )
+
         #    View Transitions: meta tag + CSS defaults + htmx global config.
         #    Opt-in (default False) — changes visual behavior.
         if self.config.view_transitions:

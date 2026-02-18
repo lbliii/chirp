@@ -96,6 +96,25 @@ Safelist a URL for `href` attributes. Validates the scheme (blocks `javascript:`
 <a href="{{ external_url | url(fallback='/') }}">External</a>
 ```
 
+### island_props
+
+Serialize JSON props safely for island mount attributes:
+
+```html
+<div data-island="editor"
+     data-island-props="{{ state | island_props }}">
+  Fallback editor UI.
+</div>
+```
+
+Use with the `island_attrs(...)` global for convenience:
+
+```html
+<div{{ island_attrs("editor", props=state, mount_id="editor-root") }}>
+  Fallback editor UI.
+</div>
+```
+
 ### Security Filters (from Kida)
 
 Chirp uses Kida's template engine, which provides escape and safe filters. These are critical for preventing XSS.

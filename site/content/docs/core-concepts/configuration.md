@@ -47,6 +47,9 @@ app = App(config=config)
 | `alpine` | `bool` | `False` | Enable Alpine.js script injection for local UI state |
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (unpkg CDN) |
 | `alpine_csp` | `bool` | `False` | Use CSP-safe Alpine build for strict Content-Security-Policy |
+| `islands` | `bool` | `False` | Inject framework-agnostic islands runtime lifecycle hooks |
+| `islands_version` | `str` | `"1"` | Version tag exposed in `data-island-version` and runtime events |
+| `islands_contract_strict` | `bool` | `False` | Warn on missing stable island mount IDs during `app.check()` |
 | `sse_heartbeat_interval` | `float` | `15.0` | Seconds between SSE heartbeat comments |
 | `sse_retry_ms` | `int \| None` | `None` | SSE reconnection interval sent to client |
 | `max_content_length` | `int` | `16777216` | Maximum request body size in bytes (16 MB) |

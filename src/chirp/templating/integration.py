@@ -11,7 +11,7 @@ from typing import Any
 from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
 from chirp.config import AppConfig
-from chirp.templating.filters import BUILTIN_FILTERS
+from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
 from chirp.templating.returns import Fragment, Template
 
 
@@ -62,6 +62,10 @@ def create_environment(
     # Register user-defined filters (may override built-ins)
     if filters:
         env.update_filters(filters)
+
+    # Register user-defined globals
+    for name, value in BUILTIN_GLOBALS.items():
+        env.add_global(name, value)
 
     # Register user-defined globals
     for name, value in globals_.items():
