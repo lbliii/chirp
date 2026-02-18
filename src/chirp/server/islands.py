@@ -17,24 +17,48 @@ def islands_snippet(version: str) -> str:
 
   function parseProps(el) {{
     const raw = el.getAttribute("data-island-props");
-    if (!raw) return null;
+    if (!raw) return {{ ok: true, value: null }};
     try {{
-      return JSON.parse(raw);
-    }} catch (_err) {{
-      return null;
+      return {{ ok: true, value: JSON.parse(raw) }};
+    }} catch (err) {{
+      return {{ ok: false, value: null, error: String(err && err.message || err) }};
     }}
   }}
 
   function payloadFor(el) {{
     const name = el.getAttribute("data-island");
     if (!name) return null;
-    return {{
+    const versionAttr = el.getAttribute("data-island-version") || "1";
+    const src = el.getAttribute("data-island-src");
+    const parsed = parseProps(el);
+    const base = {{
       name,
       id: el.id || null,
-      version: el.getAttribute("data-island-version") || "1",
-      src: el.getAttribute("data-island-src"),
-      props: parseProps(el),
+      version: versionAttr,
+      src: src,
+      props: parsed.value,
       element: el,
+    }};
+
+    if (name.trim().length === 0) {{
+      return {{ ...base, error: "missing_name", reason: "empty data-island value" }};
+    }}
+    if (src && /^javascript:/i.test(src)) {{
+      return {{ ...base, error: "unsafe_src", reason: "data-island-src must not use javascript:" }};
+    }}
+    if (!parsed.ok) {{
+      return {{ ...base, error: "props_parse", reason: parsed.error || "invalid props JSON" }};
+    }}
+    if (versionAttr !== VERSION) {{
+      return {{
+        ...base,
+        warning: "version_mismatch",
+        reason: `mount version ${{versionAttr}} differs from runtime ${{VERSION}}`,
+      }};
+    }}
+
+    return {{
+      ...base,
     }};
   }}
 
@@ -49,6 +73,14 @@ def islands_snippet(version: str) -> str:
     if (registry.has(el)) return;
     const payload = payloadFor(el);
     if (!payload) return;
+    if (payload.error) {{
+      el.setAttribute("data-island-state", "error");
+      emit("chirp:island:error", payload);
+      return;
+    }}
+    if (payload.warning) {{
+      emit("chirp:island:error", payload);
+    }}
     registry.set(el, payload);
     el.setAttribute("data-island-state", "mounted");
     emit("chirp:island:mount", payload);
