@@ -5,6 +5,10 @@ every ``hx-get``, ``hx-post``, ``action`` attribute in templates
 resolves to a registered route, and every Fragment/SSE return type
 references a valid template and block.
 
+URL matching: htmx URLs with query params (e.g. ``hx-get="/data/table?page=1"``)
+are validated against route paths; query strings are stripped before matching,
+so ``/data/table?page=1&sort=name`` matches route ``/data/table``.
+
 This gives Chirp something React/Next.js doesn't have: compile-time
 validation of the full server-client boundary without JavaScript.
 
@@ -186,8 +190,8 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
     ):
         attr_name = match.group(1)
         url = match.group(2)
-        # Skip template expressions ({{ ... }}) and anchors
-        if "{{" in url or url.startswith(("#", "javascript:")):
+        # Skip template expressions ({{ ... }}), Jinja concatenation (~), anchors
+        if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
             continue
         targets.append((attr_name, url))
     return targets
@@ -651,8 +655,8 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
 
     # Step 2: detect mutating tags that rely on inherited targets.
     for tmpl_name, source in template_sources.items():
-        if tmpl_name.startswith("chirp/"):
-            continue  # Built-in macros are correct by design
+        if tmpl_name.startswith(("chirp/", "chirpui/")):
+            continue  # Built-in and library macros are correct by design
         for match in _MUTATING_TAG_PATTERN.finditer(source):
             attrs = match.group("attrs")
             attrs_lower = attrs.lower()
@@ -677,8 +681,8 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
 
     # Step 3: detect SSE swap tags that rely on inherited broad targets.
     for tmpl_name, source in template_sources.items():
-        if tmpl_name.startswith("chirp/"):
-            continue  # Built-in macros are correct by design
+        if tmpl_name.startswith(("chirp/", "chirpui/")):
+            continue  # Built-in and library macros are correct by design
         has_sse_connect_with_disinherit = any(
             "hx-disinherit" in m.group("attrs").lower()
             for m in _SSE_CONNECT_TAG_PATTERN.finditer(source)
@@ -930,9 +934,11 @@ def _path_matches_route(url: str, route_path: str) -> bool:
 
     Handles static paths exactly and parameterized paths approximately
     (any path segment can match a ``{param}`` segment).
+    Strips query strings before matching (e.g. /data/table?page=1 → /data/table).
 
     """
-    url_parts = url.strip("/").split("/")
+    path_only = url.split("?")[0] if "?" in url else url
+    url_parts = path_only.strip("/").split("/")
     route_parts = route_path.strip("/").split("/")
 
     if len(url_parts) != len(route_parts):
@@ -1172,6 +1178,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         referenced_paths: set[str] = set()
 
         for tmpl_name, source in template_sources.items():
+            # Skip chirp-ui library templates — they use placeholder URLs
+            # (e.g. /send, /draft) that apps override when calling components.
+            if tmpl_name.startswith("chirpui/"):
+                continue
             targets = _extract_targets_from_source(source)
             result.targets_found += len(targets)
 
@@ -1243,7 +1253,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # 5. Check accessibility — htmx on non-interactive elements
         for tmpl_name, source in template_sources.items():
-            if tmpl_name.startswith("chirp/") or tmpl_name.startswith("chirpui/"):
+            if tmpl_name.startswith(("chirp/", "chirpui/")):
                 continue
             a11y_issues = _check_accessibility(source, tmpl_name)
             result.issues.extend(a11y_issues)
@@ -1388,11 +1398,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             if basename.startswith("_"):
                 continue
             # Skip built-in chirp and chirpui framework templates
-            if (
-                tmpl_name.startswith("chirp/")
-                or tmpl_name.startswith("chirpui")
-                or tmpl_name.startswith("themes/")
-            ):
+            if tmpl_name.startswith(("chirp/", "chirpui/", "themes/")):
                 continue
             result.dead_templates_found += 1
             result.issues.append(ContractIssue(

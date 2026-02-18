@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from "chirpui/layout.html" import container, grid, stack %}
+{% from "chirpui/empty.html" import empty_state %}
+
+{% call container() %}
+{% call stack() %}
+<header class="chirpui-stack chirpui-stack--sm">
+  <h1>LLM Playground</h1>
+  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
+    Two models. One prompt. Zero JavaScript.
+  </p>
+  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">
+    Streaming responses side-by-side. Built with chirp-ui — HTML over the wire, CSS without apology.
+  </p>
+</header>
+
+<form class="chirpui-stack chirpui-stack--lg"
+      hx-post="/ask"
+      hx-target="#results"
+      hx-swap="innerHTML"
+      aria-label="Compare models">
+  <div class="chirpui-grid chirpui-grid--cols-2" style="gap: var(--chirpui-spacing);">
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="model_a">Model A</label>
+      <select class="chirpui-field__input" id="model_a" name="model_a" required>
+        {% for m in models %}
+        <option value="{{ m }}" {% if m == default_model %}selected{% end %}>{{ m }}</option>
+        {% end %}
+      </select>
+    </div>
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="model_b">Model B</label>
+      <select class="chirpui-field__input" id="model_b" name="model_b" required>
+        {% for m in models %}
+        <option value="{{ m }}"
+                {% if m == default_model %}disabled{% end %}
+                {% if m == default_model_b and m != default_model %}selected{% end %}>{{ m }}</option>
+        {% end %}
+      </select>
+    </div>
+  </div>
+  <div class="chirpui-field">
+    <label class="chirpui-field__label" for="prompt">Prompt</label>
+    <textarea class="chirpui-field__input" id="prompt" name="prompt" rows="4"
+              placeholder="Ask anything. Both models will race to answer." required></textarea>
+  </div>
+  <button type="submit">Compare</button>
+</form>
+
+<section id="results" aria-label="Model comparison">
+  {% call empty_state(icon="◇", title="Ready to compare") %}
+  <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
+  {% end %}
+</section>
+{% end %}
+{% end %}
+{% end %}

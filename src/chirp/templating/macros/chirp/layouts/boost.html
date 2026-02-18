@@ -20,6 +20,10 @@
 
    Important: sse_scope is OUTSIDE #main so the connection persists across
    navigations. If placed inside content, it gets replaced and live updates stop.
+
+   The hx-disinherit wrapper prevents content from inheriting hx-target/hx-swap
+   from #main, so fragment swaps (e.g. data tables, pagination) target correctly
+   instead of accidentally replacing the whole page.
 -#}
 <!DOCTYPE html>
 <html lang="{% block lang %}en{% end %}">
@@ -44,7 +48,9 @@
 <body>
   {% block body_before %}{% end %}
   <div id="main" hx-boost="true" hx-target="#main" hx-swap="innerHTML">
-    {% block content %}{% end %}
+    <div hx-disinherit="hx-target hx-swap">
+      {% block content %}{% end %}
+    </div>
   </div>
   {% block sse_scope %}{% end %}
   {% block body_after %}{% end %}

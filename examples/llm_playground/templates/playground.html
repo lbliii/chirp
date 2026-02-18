@@ -1,0 +1,25 @@
+{#- LLM Playground fragments — compare_result, response, empty #}
+{% from "chirpui/layout.html" import container, grid %}
+{% from "chirpui/streaming.html" import model_card %}
+{% from "chirpui/empty.html" import empty_state %}
+
+{% block compare_result %}
+{% call container() %}
+<div class="chirpui-grid chirpui-grid--cols-2">
+  {% call model_card(model_a, badge="A", cls="chirpui-model-card--a", sse_connect=stream_url_a, sse_streaming=true) %}
+  {% end %}
+  {% call model_card(model_b, badge="B", cls="chirpui-model-card--b", sse_connect=stream_url_b, sse_streaming=true) %}
+  {% end %}
+</div>
+{% end %}
+{% end %}
+
+{% block response %}
+<div class="chirpui-prose">{{ text | markdown | safe }}</div>
+{% end %}
+
+{% block empty %}
+{% call empty_state(icon="◇", title="Please enter a prompt") %}
+<p>Type something above and hit Compare to see both models respond.</p>
+{% end %}
+{% end %}

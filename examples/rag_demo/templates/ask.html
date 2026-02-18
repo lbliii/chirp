@@ -1,68 +1,76 @@
 {# Blocks for RAG demo — sources, answer, ask_result, empty_question
-   Custom SSE structure (not sse_scope): we need two swap targets (sources + answer).
-   sse_scope macro only supports one. Uses hx-disinherit to isolate from boost layout. #}
+   Uses chirp-ui container, grid, card, streaming_block.
+   Custom SSE: sources + answer + share_link swap targets. hx-disinherit isolates from boost. #}
+{% from "chirpui/layout.html" import container, grid %}
+{% from "chirpui/streaming.html" import copy_btn %}
 
 {% block sources %}
-<div class="sources" sse-swap="sources" hx-target="this">
-  <h2 class="sources-heading">Sources used to draft this answer</h2>
+<div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
+  <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
   {% if sources %}
-  <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
-  <div class="sources-list">
+  <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
+  <div class="sources-list chirpui-stack chirpui-stack--sm">
   {% for doc in sources %}
-  <div class="source-item">
+  <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
     <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-    <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+    <p class="source-snippet chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
   </div>
   {% end %}
   </div>
   {% else %}
-  <p class="sources-empty">No matching docs found.</p>
+  <p class="sources-empty chirpui-text-muted">No matching docs found.</p>
   {% end %}
 </div>
 {% end %}
 
 {% block answer %}
-<div class="answer-body{% if streaming %} streaming{% end %}"{% if not streaming %} data-copy-text="{{ text | e }}"{% end %}>
+<div class="answer-body chirpui-streaming-block{% if streaming %} chirpui-streaming-block--active{% end %}"
+     {% if not streaming %}data-copy-text="{{ text | e }}"{% end %}
+     aria-live="polite" aria-atomic="true">
   {% if streaming %}
   {% if rendered_html is defined %}
-  <div class="answer-content prose">{{ rendered_html | safe }}</div>
+  <div class="chirpui-prose">{{ rendered_html | safe }}</div>
   {% if in_progress %}<span class="streaming-raw">{{ in_progress | e }}</span>{% end %}
   {% else %}
   <pre class="streaming-text">{{ text | e }}</pre>
   {% end %}
-  <span class="streaming-cursor"></span>
+  <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
   {% else %}
-  <div class="answer-content prose">{{ text | markdown | cite(sources) | safe(reason="patitas output") }}</div>
-  <button type="button" class="copy-btn" title="Copy answer">Copy</button>
+  <div class="chirpui-prose">{{ text | markdown | cite(sources) | safe(reason="patitas output") }}</div>
+  {{ copy_btn(label="Copy", copy_text=text) }}
   {% end %}
 </div>
 {% end %}
 
 {% block ask_result %}
-<article class="results-wrapper qa-card"
+{% call container() %}
+<article class="chirpui-card"
          hx-ext="sse"
          sse-connect="{{ stream_url }}"
          sse-close="done"
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
-  <div class="question-block">
-    <span class="question-label">Question</span>
-    <p class="question-text">{{ question }}</p>
-    <button type="button" class="refine-btn" title="Refine this question"
-            hx-on::click="var q=this.closest('.qa-card').querySelector('.question-text');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
+  <header class="chirpui-card__header">
+    <span class="chirpui-text-muted chirpui-font-sm">Question</span>
+    <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
+    <button type="button" class="chirpui-copy-btn" title="Refine this question"
+            hx-on::click="var q=this.closest('.chirpui-card').querySelector('p');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
       Refine
     </button>
-  </div>
-  {% block sources %}{% end %}
-  <div class="answer-section">
-    <span class="answer-label">Answer</span>
-    <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
-      <span class="thinking">Searching docs and generating answer…</span>
-      <span class="streaming-cursor" aria-hidden="true"></span>
+  </header>
+  <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
+    {% block sources %}{% end %}
+    <div>
+      <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
+      <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Searching docs and generating answer…</span>
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+      <div sse-swap="share_link" hx-target="this"></div>
     </div>
-    <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
   </div>
 </article>
+{% end %}
 {% end %}
 
 {% block share_link %}
@@ -72,119 +80,131 @@
 {% end %}
 
 {% block ask_compare_result %}
-<div class="compare-grid">
-  <article class="results-wrapper qa-card compare-card"
+{% call container() %}
+<div class="chirpui-grid chirpui-grid--cols-2">
+  <article class="chirpui-card chirpui-model-card"
            hx-ext="sse"
            sse-connect="{{ stream_url_a }}"
            sse-close="done"
            hx-disinherit="hx-target hx-swap"
            aria-label="Question and answer ({{ model_a }})">
-    <div class="question-block">
-      <span class="question-label">Question</span>
-      <p class="question-text">{{ question }}</p>
-    </div>
-    <div class="sources" sse-swap="sources" hx-target="this">
-      <h2 class="sources-heading">Sources</h2>
-      {% if sources %}
-      <div class="sources-list">
-      {% for doc in sources %}
-      <div class="source-item">
-        <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-        <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+    <header class="chirpui-card__header chirpui-model-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">Question</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ question }}</p>
+    </header>
+    <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
+      <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
+        <h2 class="chirpui-font-lg">Sources</h2>
+        {% if sources %}
+        <div class="sources-list chirpui-stack chirpui-stack--sm">
+        {% for doc in sources %}
+        <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
+          <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
+          <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
+        </div>
+        {% end %}
+        </div>
+        {% else %}
+        <p class="chirpui-text-muted">No matching docs found.</p>
+        {% end %}
       </div>
-      {% end %}
+      <div>
+        <span class="chirpui-text-muted chirpui-font-sm">{{ model_a }}</span>
+        <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
+          <span class="chirpui-text-muted">Generating…</span>
+          <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+        </div>
+        <div sse-swap="share_link" hx-target="this"></div>
       </div>
-      {% else %}
-      <p class="sources-empty">No matching docs found.</p>
-      {% end %}
-    </div>
-    <div class="answer-section">
-      <span class="answer-label">{{ model_a }}</span>
-      <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
-        <span class="thinking">Generating…</span>
-        <span class="streaming-cursor" aria-hidden="true"></span>
-      </div>
-      <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
     </div>
   </article>
-  <article class="results-wrapper qa-card compare-card"
+  <article class="chirpui-card chirpui-model-card"
            hx-ext="sse"
            sse-connect="{{ stream_url_b }}"
            sse-close="done"
            hx-disinherit="hx-target hx-swap"
            aria-label="Question and answer ({{ model_b }})">
-    <div class="question-block">
-      <span class="question-label">Question</span>
-      <p class="question-text">{{ question }}</p>
-    </div>
-    <div class="sources" sse-swap="sources" hx-target="this">
-      <h2 class="sources-heading">Sources</h2>
-      {% if sources %}
-      <div class="sources-list">
-      {% for doc in sources %}
-      <div class="source-item">
-        <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-        <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+    <header class="chirpui-card__header chirpui-model-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">Question</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ question }}</p>
+    </header>
+    <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
+      <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
+        <h2 class="chirpui-font-lg">Sources</h2>
+        {% if sources %}
+        <div class="sources-list chirpui-stack chirpui-stack--sm">
+        {% for doc in sources %}
+        <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
+          <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
+          <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
+        </div>
+        {% end %}
+        </div>
+        {% else %}
+        <p class="chirpui-text-muted">No matching docs found.</p>
+        {% end %}
       </div>
-      {% end %}
+      <div>
+        <span class="chirpui-text-muted chirpui-font-sm">{{ model_b }}</span>
+        <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
+          <span class="chirpui-text-muted">Generating…</span>
+          <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+        </div>
+        <div sse-swap="share_link" hx-target="this"></div>
       </div>
-      {% else %}
-      <p class="sources-empty">No matching docs found.</p>
-      {% end %}
-    </div>
-    <div class="answer-section">
-      <span class="answer-label">{{ model_b }}</span>
-      <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
-        <span class="thinking">Generating…</span>
-        <span class="streaming-cursor" aria-hidden="true"></span>
-      </div>
-      <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
     </div>
   </article>
 </div>
 {% end %}
+{% end %}
 
 {% block ask_batch_result %}
+{% call container() %}
+<div class="chirpui-stack chirpui-stack--lg">
 {% for question, sources, stream_url in items %}
-<article class="results-wrapper qa-card"
+<article class="chirpui-card"
          hx-ext="sse"
          sse-connect="{{ stream_url }}"
          sse-close="done"
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
-  <div class="question-block">
-    <span class="question-label">Question</span>
-    <p class="question-text">{{ question }}</p>
-    <button type="button" class="refine-btn" title="Refine this question"
-            hx-on::click="var q=this.closest('.qa-card').querySelector('.question-text');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
+  <header class="chirpui-card__header">
+    <span class="chirpui-text-muted chirpui-font-sm">Question</span>
+    <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
+    <button type="button" class="chirpui-copy-btn" title="Refine this question"
+            hx-on::click="var q=this.closest('.chirpui-card').querySelector('p');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
       Refine
     </button>
-  </div>
-  <div class="sources" sse-swap="sources" hx-target="this">
-    <h2 class="sources-heading">Sources used to draft this answer</h2>
-    {% if sources %}
-    <p class="sources-hint">Similar articles retrieved and passed to the model:</p>
-    <div class="sources-list">
-    {% for doc in sources %}
-    <div class="source-item">
-      <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-      <p class="source-snippet">{{ doc.content | truncate(150) }}</p>
+  </header>
+  <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
+    <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
+      <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
+      {% if sources %}
+      <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
+      <div class="sources-list chirpui-stack chirpui-stack--sm">
+      {% for doc in sources %}
+      <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
+        <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a>
+        <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
+      </div>
+      {% end %}
+      </div>
+      {% else %}
+      <p class="chirpui-text-muted">No matching docs found.</p>
+      {% end %}
     </div>
-    {% end %}
+    <div>
+      <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
+      <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Searching docs and generating answer…</span>
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+      <div sse-swap="share_link" hx-target="this"></div>
     </div>
-    {% else %}
-    <p class="sources-empty">No matching docs found.</p>
-    {% end %}
-  </div>
-  <div class="answer-section">
-    <span class="answer-label">Answer</span>
-    <div class="answer" sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
-      <span class="thinking">Searching docs and generating answer…</span>
-      <span class="streaming-cursor" aria-hidden="true"></span>
-    </div>
-    <div class="share-link-wrap" sse-swap="share_link" hx-target="this"></div>
   </div>
 </article>
+{% end %}
+</div>
 {% end %}
 {% end %}
 

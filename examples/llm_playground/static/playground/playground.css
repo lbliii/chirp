@@ -1,0 +1,77 @@
+/* LLM Playground — chirp-ui showcase overrides
+ * Typography, atmosphere, primary button, model accents, fade-in.
+ */
+
+/* Typography — DM Sans for body/headings, JetBrains Mono for model names */
+body {
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+.chirpui-model-card__title {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Atmosphere — subtle gold gradient over holy-light dark bg */
+body {
+  background-image: radial-gradient(
+    ellipse at top,
+    rgba(201, 162, 39, 0.08) 0%,
+    transparent 50%
+  );
+  background-attachment: fixed;
+}
+
+/* Primary button — gold gradient CTA */
+button[type="submit"] {
+  padding: var(--chirpui-spacing-sm) var(--chirpui-spacing-lg);
+  background: linear-gradient(
+    135deg,
+    var(--chirpui-color-gold),
+    var(--chirpui-color-radiant)
+  );
+  color: var(--chirpui-bg);
+  border: none;
+  border-radius: var(--chirpui-radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: box-shadow var(--chirpui-transition), transform var(--chirpui-transition);
+}
+
+button[type="submit"]:hover {
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+/* Model card accents — A = gold, B = void-indigo */
+.chirpui-model-card--a .chirpui-card__header {
+  border-left: 3px solid var(--chirpui-color-gold);
+}
+
+.chirpui-model-card--b .chirpui-card__header {
+  border-left: 3px solid var(--chirpui-color-void-indigo);
+}
+
+/* Results fade-in */
+#results .chirpui-grid {
+  animation: playground-fade-in 0.3s ease-out;
+}
+
+@keyframes playground-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #results .chirpui-grid {
+    animation: none;
+  }
+}

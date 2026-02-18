@@ -14,6 +14,23 @@ from urllib.parse import quote, urlencode
 from kida.template import Markup
 
 
+def bem(block: str, variant: str = "", modifier: str = "", cls: str = "") -> str:
+    """Build chirpui BEM class string: chirpui-{block} chirpui-{block}--{variant} etc.
+
+    Example:
+        class="{{ "alert" | bem(variant=variant, cls=cls) }}"
+        → "chirpui-alert chirpui-alert--success my-class"
+    """
+    parts = [f"chirpui-{block}"]
+    if variant:
+        parts.append(f"chirpui-{block}--{variant}")
+    if modifier:
+        parts.append(f"chirpui-{block}--{modifier}")
+    if cls:
+        parts.append(cls)
+    return " ".join(parts)
+
+
 def attr(value: Any, name: str) -> str | Markup:
     """Output an HTML attribute when value is truthy, else empty string.
 
@@ -137,6 +154,7 @@ def url(value: str, fallback: str = "#") -> str:
 # All built-in chirp filters, registered automatically on every env.
 BUILTIN_FILTERS: dict[str, Any] = {
     "attr": attr,
+    "bem": bem,
     "field_errors": field_errors,
     "format_time": format_time,
     "pluralize": pluralize,
