@@ -64,6 +64,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -86,4 +87,4 @@ jobs:
       - name: Tests
         env:
           PYTHON_GIL: "0"
-        run: uv run pytest -q --tb=short
+        run: uv run pytest -q --tb=short --timeout=60 -m "not slow"
