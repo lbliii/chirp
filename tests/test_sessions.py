@@ -4,7 +4,12 @@ import pytest
 
 from chirp.app import App
 from chirp.errors import ConfigurationError
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session, regenerate_session
+from chirp.middleware.sessions import (
+    SessionConfig,
+    SessionMiddleware,
+    get_session,
+    regenerate_session,
+)
 from chirp.testing import TestClient
 
 
@@ -356,7 +361,7 @@ class TestSessionRegenerationOnAuth:
     """Integration: login/logout regenerate the session to prevent fixation."""
 
     async def test_login_regenerates_session(self) -> None:
-        from chirp.middleware.auth import AuthConfig, AuthMiddleware, get_user, login
+        from chirp.middleware.auth import AuthConfig, AuthMiddleware, login
 
         async def _load(uid: str):
             return type("U", (), {"id": uid, "is_authenticated": True})()
@@ -441,6 +446,58 @@ class TestSessionRegenerationOnAuth:
                 headers={"Cookie": f"chirp_session={new_cookie}"},
             )
             assert r3.text == "keys=[]"
+
+
+class TestSessionTimeouts:
+    async def test_idle_timeout_expires_session(self) -> None:
+        app = App()
+        app.add_middleware(
+            SessionMiddleware(
+                SessionConfig(secret_key="test-secret", idle_timeout_seconds=0)
+            )
+        )
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["k"] = "v"
+            return "ok"
+
+        @app.route("/check")
+        def check():
+            session = get_session()
+            return f"k={session.get('k', 'none')}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+            r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
+            assert r2.text == "k=none"
+
+    async def test_absolute_timeout_expires_session(self) -> None:
+        app = App()
+        app.add_middleware(
+            SessionMiddleware(
+                SessionConfig(secret_key="test-secret", absolute_timeout_seconds=0)
+            )
+        )
+
+        @app.route("/set")
+        def set_session():
+            session = get_session()
+            session["k"] = "v"
+            return "ok"
+
+        @app.route("/check")
+        def check():
+            session = get_session()
+            return f"k={session.get('k', 'none')}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/set")
+            cookie = _extract_session_cookie(r1, "chirp_session")
+            r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
+            assert r2.text == "k=none"
 
 
 # -- Helpers --

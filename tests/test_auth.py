@@ -539,3 +539,43 @@ class TestAuthRequiresSession:
             )
             assert response.status == 200
             assert response.text == "id=1,auth=True"
+
+
+class TestSessionVersioning:
+    async def test_session_version_mismatch_logs_out_user(self) -> None:
+        versions: dict[str, str] = {"1": "v1"}
+
+        def _session_version(user: FakeUser) -> str | None:
+            return versions.get(user.id)
+
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(
+            AuthMiddleware(
+                AuthConfig(load_user=_load_user, session_version=_session_version)
+            )
+        )
+
+        @app.route("/do-login")
+        def do_login():
+            login(_USERS["1"])
+            return "ok"
+
+        @app.route("/whoami")
+        def whoami():
+            user = get_user()
+            return f"auth={user.is_authenticated}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/do-login")
+            cookie = _extract_cookie(r1, "chirp_session")
+            assert cookie is not None
+
+            # Session initially valid.
+            r2 = await client.get("/whoami", headers={"Cookie": f"chirp_session={cookie}"})
+            assert r2.text == "auth=True"
+
+            # Rotate server-side session version => stale session should be rejected.
+            versions["1"] = "v2"
+            r3 = await client.get("/whoami", headers={"Cookie": f"chirp_session={cookie}"})
+            assert r3.text == "auth=False"

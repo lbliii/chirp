@@ -100,6 +100,8 @@ def count():
 | `httponly` | `True` | Prevent JavaScript access |
 | `samesite` | `"lax"` | SameSite policy |
 | `secure` | `False` | HTTPS-only (set `True` in production) |
+| `idle_timeout_seconds` | `None` | Optional idle timeout before session expires |
+| `absolute_timeout_seconds` | `None` | Optional absolute max lifetime for a session |
 
 ## AuthMiddleware
 
@@ -192,6 +194,18 @@ def admin_panel():
     return Template("admin.html")
 ```
 
+For object-level authorization, pass a `policy=` callback:
+
+```python
+def owner_policy(user, request):
+    return request.query.get("owner_id") == user.id
+
+@app.route("/docs/{doc_id}")
+@requires("editor", policy=owner_policy)
+def edit_doc(doc_id: str):
+    ...
+```
+
 Content-negotiated responses: browser requests redirect to `login_url`, API requests get 401/403 JSON errors.
 
 ### Safe Redirects
@@ -250,6 +264,8 @@ For argon2id, install the `auth` extra: `pip install bengal-chirp[auth]`. Withou
 | `session_key` | `"user_id"` | Session dict key for the user ID |
 | `token_header` | `"Authorization"` | Header for bearer tokens |
 | `token_scheme` | `"Bearer"` | Expected scheme prefix |
+| `session_version` | `None` | Optional callback `user -> version` for session invalidation |
+| `session_version_key` | `"_session_version"` | Session key used by `session_version` |
 | `exclude_paths` | `frozenset()` | Paths that skip auth entirely |
 
 :::{tip}
@@ -270,15 +286,32 @@ Validates a CSRF token on `POST`, `PUT`, `PATCH`, and `DELETE` requests. The tok
 
 ```html
 <form method="post" action="/submit">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {{ csrf_field() }}
   <!-- form fields -->
   <button type="submit">Submit</button>
 </form>
 ```
 
 :::{note}
-Requires `AppConfig(secret_key="...")` to be set.
+Requires `SessionMiddleware` to be active before `CSRFMiddleware`.
 :::
+
+## AuthRateLimitMiddleware
+
+Auth-focused in-memory limiter for login/signup/reset endpoints:
+
+```python
+from chirp.middleware import AuthRateLimitConfig, AuthRateLimitMiddleware
+
+app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
+    requests=10,
+    window_seconds=60,
+    block_seconds=300,
+    paths=("/login", "/password-reset"),
+)))
+```
+
+Returns `429 Too Many Requests` with `Retry-After` when the threshold is exceeded.
 
 ## SecurityHeadersMiddleware
 
@@ -295,6 +328,8 @@ Headers applied (only to `text/html` responses):
 - **X-Frame-Options** — prevents clickjacking (default: `DENY`)
 - **X-Content-Type-Options** — prevents MIME sniffing (default: `nosniff`)
 - **Referrer-Policy** — controls referrer leakage (default: `strict-origin-when-cross-origin`)
+- **Content-Security-Policy** — script/style/resource policy (default: strict self-hosted baseline)
+- **Strict-Transport-Security** — optional HSTS when configured
 
 Skipped for JSON, SSE, static files, and other non-HTML content types.
 

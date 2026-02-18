@@ -28,7 +28,26 @@ cd myapp
 python app.py
 ```
 
-Open `http://127.0.0.1:8000` in your browser. This generates an `app.py`, a `templates/` directory with `base.html` and `index.html`, a `static/` directory with `style.css`, and a `tests/` directory with a smoke test.
+Open `http://127.0.0.1:8000` in your browser.
+
+`chirp new myapp` now generates an auth-ready v2 layout:
+
+- `app.py` with sessions, auth, CSRF, and security headers middleware
+- `models.py` with a demo user model + password hashing
+- `pages/` filesystem routes (`/`, `/login`, `/dashboard`)
+- `static/style.css`
+- `tests/` with auth flow tests
+
+The scaffold runs in development mode by default and reads `CHIRP_SECRET_KEY`.
+Before production, set a strong secret and run with production settings.
+
+```bash
+export CHIRP_SECRET_KEY="$(python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+)"
+```
 
 For an even smaller starting point:
 

@@ -16,22 +16,32 @@ Chirp does not enforce a specific layout. This is the convention used by `chirp 
 
 ```
 myapp/
-  app.py              # App instance, routes, entry point
-  templates/
-    base.html         # Base layout (or extend chirp/layouts/boost.html)
-    index.html        # Page templates
+  app.py              # App instance, middleware, auth routes, entry point
+  models.py           # User model + password verification helpers
+  pages/
+    _layout.html      # Shared page layout
+    page.py           # Home route handler
+    page.html         # Home template
+    login/
+      page.py         # Login page handler
+      page.html       # Login template
+    dashboard/
+      page.py         # Protected dashboard handler
+      page.html       # Dashboard template
   static/
     style.css         # CSS, JS, images
   tests/
-    test_app.py       # TestClient tests
+    conftest.py       # Test import setup
+    test_app.py       # Auth flow + smoke tests
 ```
 
 ## Key Directories
 
 | Directory | Purpose |
 |-----------|---------|
-| `app.py` | App creation, route registration, `if __name__ == "__main__": app.run()` |
-| `templates/` | Kida templates. Paths are relative to `AppConfig(template_dir="templates")`. |
+| `app.py` | App creation, middleware setup, auth routes, `if __name__ == "__main__": app.run()` |
+| `models.py` | User model and credential verification helpers for scaffolded auth |
+| `pages/` | Filesystem routes. Paths are relative to `AppConfig(template_dir="pages")`. |
 | `static/` | CSS, JS, images. Served at `/static` by default. |
 | `tests/` | Pytest tests. Use `TestClient(app)` for requests. |
 

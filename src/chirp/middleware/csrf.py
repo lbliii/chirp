@@ -34,6 +34,7 @@ from typing import Any, ClassVar
 from chirp.errors import ConfigurationError, HTTPError
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.security.audit import emit_security_event
 
 # -- CSRF token ContextVar (accessible from template globals) --
 
@@ -187,7 +188,9 @@ async def _validate_token(request: Request, expected: str, config: CSRFConfig) -
             submitted = form.get(config.field_name)
 
     if submitted is None:
+        emit_security_event("csrf.reject.missing", request=request)
         raise HTTPError(status=403, detail="CSRF token missing")
 
     if not secrets.compare_digest(submitted, expected):
+        emit_security_event("csrf.reject.invalid", request=request)
         raise HTTPError(status=403, detail="CSRF token invalid")

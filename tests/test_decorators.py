@@ -114,6 +114,15 @@ def _make_app() -> App:
         user = get_user()
         return f"both:id={user.id}"
 
+    def _owner_policy(user, request) -> bool:
+        return request.query.get("owner") == user.id
+
+    @app.route("/owner")
+    @requires("editor", policy=_owner_policy)
+    def owner_only():
+        user = get_user()
+        return f"owner:id={user.id}"
+
     return app
 
 
@@ -254,6 +263,25 @@ class TestRequiresPermission:
             location = _get_header(response, "location")
             assert location is not None
             assert "/login" in location
+
+    async def test_policy_hook_allows_authorized_resource(self) -> None:
+        app = _make_app()
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/owner?owner=3",
+                headers={"Authorization": "Bearer tok_carol"},
+            )
+            assert response.status == 200
+            assert response.text == "owner:id=3"
+
+    async def test_policy_hook_denies_unauthorized_resource(self) -> None:
+        app = _make_app()
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/owner?owner=2",
+                headers={"Authorization": "Bearer tok_carol"},
+            )
+            assert response.status == 403
 
 
 # ---------------------------------------------------------------------------

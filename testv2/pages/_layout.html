@@ -1,0 +1,34 @@
+{# target: body #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}App{% endblock %}</title>
+    <link rel="stylesheet" href="/static/chirpui.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% set user = current_user() %}
+    {% from "chirpui/layout.html" import container, stack, block %}
+    {% call container() %}
+    <nav class="chirpui-navbar" style="margin-bottom:1rem">
+        <a class="chirpui-navbar__brand" href="/">App</a>
+        <div class="chirpui-navbar__links chirpui-navbar__links--end">
+        {% if user.is_authenticated %}
+        <a href="/dashboard" class="chirpui-navbar__link">Dashboard</a>
+        <form method="post" action="/logout" style="margin:0;display:inline">
+            {{ csrf_field() }}
+            <button type="submit" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm">Logout</button>
+        </form>
+        {% else %}
+        <a href="/login" class="chirpui-navbar__link">Login</a>
+        {% end %}
+        </div>
+    </nav>
+    {% call stack() %}
+    {% block content %}{% endblock %}
+    {% end %}
+    {% end %}
+</body>
+</html>

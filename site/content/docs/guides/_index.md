@@ -46,4 +46,11 @@ Mount isolated high-state widgets while keeping pages server-rendered.
 Use islands + static ES modules for complex UI state while staying server-first.
 :::{/card}
 
+:::{card} Auth Hardening
+:icon: shield
+:link: ./auth-hardening
+:description: Production checklist for auth and authz
+Harden sessions, CSRF, abuse limits, security headers, and audit events.
+:::{/card}
+
 :::{/cards}

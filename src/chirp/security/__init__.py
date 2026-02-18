@@ -22,12 +22,19 @@ Password hashing (``pip install chirp[auth]``)::
     ok = verify_password("my-password", hashed)
 """
 
+from chirp.security.audit import SecurityEvent, emit_security_event, set_security_event_sink
 from chirp.security.decorators import login_required, requires
+from chirp.security.lockout import LockoutConfig, LoginLockout
 from chirp.security.passwords import hash_password, verify_password
 
 __all__ = [
+    "LockoutConfig",
+    "LoginLockout",
+    "SecurityEvent",
+    "emit_security_event",
     "hash_password",
     "login_required",
     "requires",
+    "set_security_event_sink",
     "verify_password",
 ]

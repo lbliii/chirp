@@ -10,6 +10,7 @@ The session object is stored in a ContextVar, accessible via
 
 from contextvars import ContextVar
 from dataclasses import dataclass
+from time import time
 from typing import Any
 
 from chirp.errors import ConfigurationError
@@ -78,6 +79,10 @@ class SessionConfig:
     secure: bool = False
     httponly: bool = True
     samesite: str = "lax"
+    idle_timeout_seconds: int | None = None
+    absolute_timeout_seconds: int | None = None
+    created_at_key: str = "__created_at"
+    last_seen_at_key: str = "__last_seen_at"
 
 
 # -- Middleware --
@@ -140,6 +145,25 @@ class SessionMiddleware:
 
         if not isinstance(data, dict):
             return {}
+
+        cfg = self._config
+        if cfg.idle_timeout_seconds is not None or cfg.absolute_timeout_seconds is not None:
+            now = time()
+            created_at = data.get(cfg.created_at_key, now)
+            last_seen_at = data.get(cfg.last_seen_at_key, now)
+            try:
+                created_ts = float(created_at)
+                last_seen_ts = float(last_seen_at)
+            except (TypeError, ValueError):
+                return {}
+
+            if (
+                cfg.absolute_timeout_seconds is not None
+                and now - created_ts > cfg.absolute_timeout_seconds
+            ):
+                return {}
+            if cfg.idle_timeout_seconds is not None and now - last_seen_ts > cfg.idle_timeout_seconds:
+                return {}
         return data
 
     def _save_session(self, response: Response, session: dict[str, Any]) -> Response:
@@ -160,6 +184,13 @@ class SessionMiddleware:
     async def __call__(self, request: Request, next: Next) -> Response:
         """Load session, dispatch, then save session to response."""
         session = self._load_session(request)
+        if (
+            self._config.idle_timeout_seconds is not None
+            or self._config.absolute_timeout_seconds is not None
+        ):
+            now = time()
+            session.setdefault(self._config.created_at_key, now)
+            session[self._config.last_seen_at_key] = now
         token = _session_var.set(session)
 
         try:

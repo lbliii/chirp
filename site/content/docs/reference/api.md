@@ -179,7 +179,7 @@ Convenience for 302 redirects: `Redirect(url)`.
 | `login(user)` | Regenerate session and set the authenticated user |
 | `logout()` | Regenerate session and clear the authenticated user |
 | `@login_required` | Decorator: require authentication |
-| `@requires(*permissions)` | Decorator: require specific permissions |
+| `@requires(*permissions, policy=None)` | Decorator: require permissions plus optional object-level policy callback |
 | `is_safe_url(url)` | Check whether a redirect URL is safe (relative, same origin) |
 
 See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
