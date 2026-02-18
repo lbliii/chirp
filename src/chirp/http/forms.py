@@ -16,7 +16,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, cast, get_type_hints
+from typing import Any, get_type_hints
 
 from chirp.templating.returns import ValidationError
 
@@ -345,7 +345,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
     from chirp.errors import ConfigurationError
 
     try:
-        from multipart.multipart import parse_options_header
+        from python_multipart.multipart import parse_options_header
     except ImportError:
         msg = (
             "Multipart form parsing requires the 'python-multipart' package. "
@@ -361,7 +361,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         raise ValueError(msg)
 
     # Use multipart parser
-    from multipart.multipart import MultipartParser
+    from python_multipart.multipart import MultipartParser
 
     data: dict[str, list[str]] = {}
     files: dict[str, UploadFile] = {}
@@ -430,11 +430,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         "on_header_value": on_header_value,
     }
 
-    from multipart.multipart import MultipartCallbacks
-
-    # MultipartParser accepts our callback dict at runtime; type stub expects
-    # MultipartCallbacks. Cast is required at library boundary.
-    parser = MultipartParser(boundary, cast(MultipartCallbacks, callbacks))
+    parser = MultipartParser(boundary, callbacks)
     parser.write(body)
     parser.finalize()
 
