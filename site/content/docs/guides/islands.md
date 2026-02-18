@@ -38,20 +38,20 @@ Supported attributes:
 - `data-island` (required): logical island name used by your client adapter.
 - `data-island-version` (recommended): contract/runtime version (default `"1"`).
 - `data-island-props` (optional): JSON payload for initial state.
-- `data-island-src` (optional): adapter/runtime hint for lazy loaders.
+- `data-island-src` (optional): adapter/runtime hint for lazy loaders (never use `javascript:`).
 - `id` (recommended): stable mount id for deterministic remount targeting.
 
 ## Props Rules
 
-- Props must be JSON-serializable (`dict`, `list`, string, number, bool, null).
-- Chirp helper APIs serialize and escape props for HTML attributes.
+- Props must be JSON-serializable (`dict`, `list`, string, number, boolean, null).
+- Chirp helpers serialize and escape props for HTML attributes.
 - Avoid hand-writing JSON in templates; use helpers:
   - `{{ state | island_props }}`
   - `{{ island_attrs("editor", props=state, mount_id="editor-root") }}`
 
 ## Lifecycle Events
 
-When `AppConfig(islands=True)` is enabled, Chirp injects a small runtime that:
+With `AppConfig(islands=True)`, Chirp injects a small runtime that:
 
 - scans for `[data-island]` on page load
 - unmounts islands before htmx swaps
@@ -62,6 +62,7 @@ Browser events emitted:
 - `chirp:island:mount`
 - `chirp:island:unmount`
 - `chirp:island:remount`
+- `chirp:island:error`
 - `chirp:islands:ready`
 
 Each event `detail` includes:
@@ -84,10 +85,21 @@ app = App(
 
 ## Validation
 
-`app.check()` / `chirp check` validate islands metadata:
+`app.check()` / `chirp check` check islands metadata:
 
 - malformed `data-island-props` JSON -> error
+- invalid `data-island-version` format -> error
+- unsafe `data-island-src` (`javascript:`) -> error
 - optional strict mode warning when island roots omit `id`
+- optional strict mode warning when templates omit `data-island-version`
+
+## Diagnostics
+
+The runtime emits `chirp:island:error` for mount-level issues:
+
+- malformed `data-island-props` (runtime parse failure)
+- unsafe `data-island-src`
+- mount/runtime version mismatch (warning-level event)
 
 ## Graceful Degradation
 

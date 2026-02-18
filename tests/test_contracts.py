@@ -103,12 +103,14 @@ class TestIslandMountExtraction:
     def test_extract_mount_with_props_and_src(self):
         html = (
             '<div data-island="chart" id="sales-chart" '
+            'data-island-version="1" '
             'data-island-src="/static/chart.js" data-island-props="{&quot;series&quot;:[1,2]}"></div>'
         )
         mounts = _extract_island_mounts(html)
         assert len(mounts) == 1
         assert mounts[0]["name"] == "chart"
         assert mounts[0]["mount_id"] == "sales-chart"
+        assert mounts[0]["version"] == "1"
         assert mounts[0]["src"] == "/static/chart.js"
 
     def test_empty_when_no_mounts(self):
@@ -124,7 +126,12 @@ class TestIslandMountValidation:
         assert issues[0].category == "islands"
 
     def test_missing_id_warns_in_strict_mode(self):
-        sources = {"index.html": '<div data-island="editor" data-island-props="{&quot;a&quot;:1}"></div>'}
+        sources = {
+            "index.html": (
+                '<div data-island="editor" data-island-version="1" '
+                'data-island-props="{&quot;a&quot;:1}"></div>'
+            )
+        }
         issues = _check_island_mounts(sources, strict=True)
         assert len(issues) == 1
         assert issues[0].severity == Severity.WARNING
@@ -134,11 +141,42 @@ class TestIslandMountValidation:
         sources = {
             "index.html": (
                 '<div data-island="editor" id="editor-root" '
+                'data-island-version="1" '
                 'data-island-props="{&quot;a&quot;:1}"></div>'
             )
         }
         issues = _check_island_mounts(sources, strict=True)
         assert issues == []
+
+    def test_missing_version_warns_in_strict_mode(self):
+        sources = {
+            "index.html": (
+                '<div data-island="editor" id="editor-root" '
+                'data-island-props="{&quot;a&quot;:1}"></div>'
+            )
+        }
+        issues = _check_island_mounts(sources, strict=True)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert "data-island-version" in issues[0].message
+
+    def test_invalid_version_errors(self):
+        sources = {
+            "index.html": '<div data-island="editor" data-island-version="1 beta"></div>'
+        }
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "invalid data-island-version" in issues[0].message
+
+    def test_unsafe_src_errors(self):
+        sources = {
+            "index.html": '<div data-island="editor" data-island-src="javascript:alert(1)"></div>'
+        }
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "unsafe data-island-src" in issues[0].message
 
 
 class TestPathMatchesRoute:

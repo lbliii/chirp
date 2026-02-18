@@ -303,10 +303,15 @@ _ISLAND_PROPS_PATTERN = re.compile(
     r"\bdata-island-props\s*=\s*[\"']([^\"']*)[\"']",
     re.IGNORECASE,
 )
+_ISLAND_VERSION_PATTERN = re.compile(
+    r"\bdata-island-version\s*=\s*[\"']([^\"']*)[\"']",
+    re.IGNORECASE,
+)
 _ISLAND_SRC_PATTERN = re.compile(
     r"\bdata-island-src\s*=\s*[\"']([^\"']*)[\"']",
     re.IGNORECASE,
 )
+_ISLAND_VERSION_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def _extract_form_field_names(source: str) -> set[str]:
@@ -339,12 +344,14 @@ def _extract_island_mounts(source: str) -> list[dict[str, str | None]]:
 
         id_match = _ID_PATTERN.search(attrs)
         props_match = _ISLAND_PROPS_PATTERN.search(attrs)
+        version_match = _ISLAND_VERSION_PATTERN.search(attrs)
         src_match = _ISLAND_SRC_PATTERN.search(attrs)
         mounts.append(
             {
                 "name": name or None,
                 "mount_id": id_match.group(1).strip() if id_match else None,
                 "props_raw": props_match.group(1) if props_match else None,
+                "version": version_match.group(1).strip() if version_match else None,
                 "src": src_match.group(1).strip() if src_match else None,
             }
         )
@@ -413,6 +420,46 @@ def _check_island_mounts(
                         message=(
                             f"Island '{name}' has no stable mount id. "
                             "Add id=... for deterministic remount targeting."
+                        ),
+                        template=tmpl_name,
+                    )
+                )
+
+            version = mount["version"]
+            if strict and not version:
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="islands",
+                        message=(
+                            f"Island '{name}' has no data-island-version. "
+                            "Add a version to keep mount/runtime compatibility explicit."
+                        ),
+                        template=tmpl_name,
+                    )
+                )
+            if version and not _ISLAND_VERSION_VALUE_PATTERN.match(version):
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="islands",
+                        message=(
+                            f"Island '{name}' uses invalid data-island-version '{version}'. "
+                            "Use only letters, digits, dot, underscore, or dash."
+                        ),
+                        template=tmpl_name,
+                    )
+                )
+
+            src = mount["src"]
+            if src and src.lower().startswith("javascript:"):
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="islands",
+                        message=(
+                            f"Island '{name}' uses unsafe data-island-src '{src}'. "
+                            "Use an http(s) or relative URL."
                         ),
                         template=tmpl_name,
                     )

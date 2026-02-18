@@ -24,6 +24,7 @@ class TestIslandsSnippet:
         assert "chirp:island:mount" in s
         assert "chirp:island:unmount" in s
         assert "chirp:island:remount" in s
+        assert "chirp:island:error" in s
 
 
 class TestIslandsInjection:
