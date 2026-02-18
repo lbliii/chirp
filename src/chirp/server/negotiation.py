@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from kida import Environment
 
 from chirp.errors import ConfigurationError
-from chirp.http.response import Redirect, Response, SSEResponse, StreamingResponse
+from chirp.http.response import Redirect, RenderIntent, Response, SSEResponse, StreamingResponse
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import (
@@ -43,7 +43,7 @@ def _minimal_kida_env() -> Environment:
     return Environment()
 
 
-def _html_response(body: str, *, intent: str) -> Response:
+def _html_response(body: str, *, intent: RenderIntent) -> Response:
     """Build a text/html response with explicit render intent."""
     return Response(
         body=body,
@@ -93,8 +93,8 @@ def negotiate(
                 .with_headers(dict(value.headers))
             )
         case FormAction():
-            if request.is_fragment:
-                if value.fragments:
+            if request is not None and request.is_fragment:
+                if value.fragments and kida_env is not None:
                     parts = [render_fragment(kida_env, frag) for frag in value.fragments]
                     html = "\n".join(parts)
                     response = _html_response(html, intent="fragment")

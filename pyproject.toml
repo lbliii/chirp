@@ -147,6 +147,10 @@ ignore = [
 [tool.ty.environment]
 python-version = "3.14"
 
+[tool.ty.analysis]
+# chirp-ui is optional; allow when not installed
+allowed-unresolved-imports = ["chirp_ui"]
+
 [tool.ty.src]
 exclude = ["dist/", "build/", "tests/"]
 

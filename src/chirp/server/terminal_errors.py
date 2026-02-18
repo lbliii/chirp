@@ -78,10 +78,7 @@ def format_template_error(exc: BaseException, request: Request | None = None) ->
     parts.append(f"-- Template Error {'-' * (_BANNER_WIDTH - 18)}")
 
     # Compact error from Kida
-    if hasattr(exc, "format_compact"):
-        parts.append(exc.format_compact())
-    else:
-        parts.append(str(exc))
+    parts.append(getattr(exc, "format_compact", lambda: str(exc))())
 
     # Request context (when available)
     if request is not None:

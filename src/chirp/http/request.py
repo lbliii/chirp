@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from chirp._internal.asgi import Receive
+from chirp._internal.asgi import Receive, Scope
 from chirp.http.cookies import parse_cookies
 from chirp.http.headers import Headers
 from chirp.http.query import QueryParams
@@ -176,7 +176,7 @@ class Request:
     @classmethod
     def from_asgi(
         cls,
-        scope: dict[str, Any],
+        scope: Scope,
         receive: Receive,
         path_params: dict[str, str] | None = None,
     ) -> Request:

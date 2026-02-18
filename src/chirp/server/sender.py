@@ -77,6 +77,9 @@ async def send_streaming_response(
         }
     )
 
+    def _encode_chunk(chunk: str | bytes) -> bytes:
+        return chunk.encode("utf-8") if isinstance(chunk, str) else chunk
+
     try:
         if isinstance(response.chunks, AsyncIterator):
             async for chunk in response.chunks:
@@ -84,7 +87,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": chunk.encode("utf-8"),
+                            "body": _encode_chunk(chunk),
                             "more_body": True,
                         }
                     )
@@ -94,7 +97,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": chunk.encode("utf-8"),
+                            "body": _encode_chunk(chunk),
                             "more_body": True,
                         }
                     )
@@ -108,12 +111,13 @@ async def send_streaming_response(
 
         if debug:
             # Visible error div instead of invisible HTML comment
-            if _is_kida_error(exc) and hasattr(exc, "format_compact"):
-                error_msg = exc.format_compact()
-            else:
-                import traceback
+            import traceback
 
-                error_msg = traceback.format_exc()
+            error_msg = (
+                getattr(exc, "format_compact", lambda: str(exc))()
+                if _is_kida_error(exc)
+                else traceback.format_exc()
+            )
             # Escape HTML in the error message
             escaped = error_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             error_chunk = (

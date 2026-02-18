@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass
+    from pounce.server import LifecycleCollector
 
 
 def run_dev_server(
@@ -21,7 +21,7 @@ def run_dev_server(
     reload_include: tuple[str, ...] = (),
     reload_dirs: tuple[str, ...] = (),
     app_path: str | None = None,
-    lifecycle_collector: object | None = None,
+    lifecycle_collector: LifecycleCollector | None = None,
 ) -> None:
     """Start a pounce dev server with the given chirp App.
 

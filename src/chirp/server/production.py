@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from chirp import App
+    from chirp.app import App
 
 
 def run_production_server(
