@@ -1,0 +1,58 @@
+{#- LLM Playground fragments — compare_result, response, empty #}
+{% from "chirpui/layout.html" import container, grid, block %}
+{% from "chirpui/streaming.html" import model_card, streaming_block %}
+
+{% block compare_result %}
+{% call container() %}
+<div class="chirpui-grid chirpui-grid--cols-2">
+  <article class="chirpui-model-card chirpui-card"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_a }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model {{ model_a }} response">
+    <header class="chirpui-card__header chirpui-model-card__header">
+      <span class="chirpui-model-card__title">{{ model_a }}</span>
+    </header>
+    <div class="chirpui-card__body chirpui-model-card__body">
+      <div class="chirpui-streaming-block chirpui-streaming-block--active"
+           sse-swap="fragment"
+           hx-target="this"
+           aria-live="polite"
+           aria-atomic="true">
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+    </div>
+  </article>
+  <article class="chirpui-model-card chirpui-card"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_b }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model {{ model_b }} response">
+    <header class="chirpui-card__header chirpui-model-card__header">
+      <span class="chirpui-model-card__title">{{ model_b }}</span>
+    </header>
+    <div class="chirpui-card__body chirpui-model-card__body">
+      <div class="chirpui-streaming-block chirpui-streaming-block--active"
+           sse-swap="fragment"
+           hx-target="this"
+           aria-live="polite"
+           aria-atomic="true">
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+    </div>
+  </article>
+</div>
+{% end %}
+{% end %}
+
+{% block response %}
+<div class="chirpui-prose">{{ text | markdown | safe }}</div>
+{% end %}
+
+{% block empty %}
+<p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
+  Please enter a prompt.
+</p>
+{% end %}

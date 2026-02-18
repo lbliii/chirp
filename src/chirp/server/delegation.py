@@ -31,7 +31,7 @@ DELEGATION_JS = """\
   document.body.addEventListener("click",function(e){
     var btn=e.target.closest(".compare-switch");
     if(btn){e.preventDefault();e.stopPropagation();handleCompareSwitch(btn);return;}
-    var copyBtn=e.target.closest(".copy-btn");
+    var copyBtn=e.target.closest(".copy-btn, .chirpui-copy-btn");
     if(copyBtn){
       var wrap=copyBtn.closest("[data-copy-text]");
       if(wrap){
