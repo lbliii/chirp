@@ -5,6 +5,7 @@ A middleware is any callable matching:
 
 Built-in middleware:
     AuthMiddleware -- Dual-mode authentication (session + token)
+    AuthRateLimitMiddleware -- Auth endpoint rate limiting
     CORSMiddleware -- Cross-Origin Resource Sharing
     CSRFMiddleware -- CSRF token protection (requires SessionMiddleware)
     HTMLInject -- Inject snippets into HTML responses
@@ -14,6 +15,7 @@ Built-in middleware:
 """
 
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
+from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.inject import HTMLInject
@@ -27,6 +29,8 @@ from chirp.middleware.static import StaticFiles
 __all__ = [
     "AuthConfig",
     "AuthMiddleware",
+    "AuthRateLimitConfig",
+    "AuthRateLimitMiddleware",
     "CORSConfig",
     "CORSMiddleware",
     "CSRFConfig",

@@ -1,0 +1,57 @@
+{% extends "_layout.html" %}
+
+{% block content %}
+{% from "chirpui/layout.html" import container, stack, block, page_header %}
+{% from "chirpui/card.html" import card %}
+{% from "chirpui/state_primitives.html" import draft_store, grid_state %}
+{% call page_header("Dashboard", subtitle="Welcome, " ~ user.name) %}
+{% end %}
+{% call stack() %}
+{% call block() %}
+{% call card(title="Welcome") %}
+<p>Signed in as <strong>{{ user.name }}</strong>.</p>
+<form method="post" action="/logout">
+    {{ csrf_field() }}
+    <button type="submit" class="chirpui-btn chirpui-btn--secondary">Logout</button>
+</form>
+{% end %}
+{% end %}
+{% call block() %}
+{% call card(title="Notes") %}
+{% call draft_store("dashboard_notes", mount_id="notes-root", cls="chirpui-card") %}
+<label>Notes</label>
+<textarea name="notes" data-draft-field rows="4" style="width:100%;"></textarea>
+<p class="chirpui-text-muted">Last saved: <span data-draft-saved-at>never</span></p>
+{% end %}
+{% end %}
+{% end %}
+{% call block() %}
+{% call card(title="Sample Data") %}
+{% call grid_state("demo_grid", cols, mount_id="grid-root", cls="chirpui-card") %}
+<input data-grid-filter type="text" placeholder="Filter..." style="width:100%;">
+<button type="button" data-grid-sort class="chirpui-btn chirpui-btn--secondary chirpui-btn--sm">Sort</button>
+<table>
+    <tbody data-grid-body>
+    <tr data-grid-row data-grid-id="1"><td data-grid-select><input type="checkbox"></td><td>Alice</td><td>Admin</td></tr>
+    <tr data-grid-row data-grid-id="2"><td data-grid-select><input type="checkbox"></td><td>Bob</td><td>User</td></tr>
+    <tr data-grid-row data-grid-id="3"><td data-grid-select><input type="checkbox"></td><td>Carol</td><td>Editor</td></tr>
+    </tbody>
+</table>
+{% end %}
+{% end %}
+{% end %}
+{% call block() %}
+{% call card(title="Live Clock") %}
+<div hx-ext="sse" sse-connect="/time" hx-disinherit="hx-target hx-swap">
+    <div sse-swap="time_block" hx-target="this">
+        <span>Connecting...</span>
+    </div>
+</div>
+{% end %}
+{% end %}
+{% end %}
+{% endblock %}
+
+{% block time_block %}
+<span>{{ now }}</span>
+{% endblock %}

@@ -1,6 +1,5 @@
 """Tests for chirp.cli._new — ``chirp new`` subcommand."""
 
-import os
 from pathlib import Path
 
 import pytest
@@ -8,40 +7,54 @@ import pytest
 from chirp.cli import main
 
 
-class TestChirpNewDefault:
-    def test_creates_expected_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Default scaffold creates app.py, templates/, static/, tests/."""
+class TestChirpNewDefaultV2:
+    def test_creates_expected_v2_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Default scaffold (v2) creates pages/, static/, tests/, models.py."""
         monkeypatch.chdir(tmp_path)
         main(["new", "myapp"])
 
         project = tmp_path / "myapp"
         assert (project / "app.py").is_file()
-        assert (project / "templates" / "base.html").is_file()
-        assert (project / "templates" / "index.html").is_file()
+        assert (project / "models.py").is_file()
+        assert (project / "pages" / "_layout.html").is_file()
+        assert (project / "pages" / "page.py").is_file()
+        assert (project / "pages" / "page.html").is_file()
+        assert (project / "pages" / "login" / "page.py").is_file()
+        assert (project / "pages" / "login" / "page.html").is_file()
+        assert (project / "pages" / "dashboard" / "page.py").is_file()
+        assert (project / "pages" / "dashboard" / "page.html").is_file()
         assert (project / "static" / "style.css").is_file()
+        assert (project / "tests" / "conftest.py").is_file()
         assert (project / "tests" / "test_app.py").is_file()
 
-    def test_app_py_is_valid_python(
+    def test_generated_v2_app_contains_security_defaults(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Generated app.py is syntactically valid Python."""
         monkeypatch.chdir(tmp_path)
         main(["new", "myapp"])
 
         source = (tmp_path / "myapp" / "app.py").read_text()
-        compile(source, "app.py", "exec")  # Raises SyntaxError if invalid
+        assert "CHIRP_SECRET_KEY" in source
+        assert "Refusing to start in production with default secret key" in source
+        assert "secure=not config.debug" in source
+        assert "CSRFMiddleware(CSRFConfig())" in source
+        assert "SecurityHeadersMiddleware()" in source
 
-    def test_test_app_is_valid_python(
+    def test_generated_v2_files_are_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Generated test_app.py is syntactically valid Python."""
         monkeypatch.chdir(tmp_path)
         main(["new", "myapp"])
 
-        source = (tmp_path / "myapp" / "tests" / "test_app.py").read_text()
-        compile(source, "test_app.py", "exec")
+        app_source = (tmp_path / "myapp" / "app.py").read_text()
+        models_source = (tmp_path / "myapp" / "models.py").read_text()
+        test_source = (tmp_path / "myapp" / "tests" / "test_app.py").read_text()
 
-    def test_prints_success_message(
+        compile(app_source, "app.py", "exec")
+        compile(models_source, "models.py", "exec")
+        compile(test_source, "test_app.py", "exec")
+
+    def test_prints_success_message_and_login_hint(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -52,12 +65,11 @@ class TestChirpNewDefault:
 
         captured = capsys.readouterr()
         assert "Created project 'myapp'" in captured.out
+        assert "Login: admin / password" in captured.out
 
 
 class TestChirpNewMinimal:
-    def test_creates_minimal_tree(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_creates_minimal_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """--minimal creates only app.py and templates/index.html."""
         monkeypatch.chdir(tmp_path)
         main(["new", "myapp", "--minimal"])
@@ -65,8 +77,7 @@ class TestChirpNewMinimal:
         project = tmp_path / "myapp"
         assert (project / "app.py").is_file()
         assert (project / "templates" / "index.html").is_file()
-        # These should NOT exist in minimal mode
-        assert not (project / "templates" / "base.html").exists()
+        assert not (project / "pages").exists()
         assert not (project / "static").exists()
         assert not (project / "tests").exists()
 
@@ -78,6 +89,18 @@ class TestChirpNewMinimal:
 
         source = (tmp_path / "myapp" / "app.py").read_text()
         compile(source, "app.py", "exec")
+
+
+class TestChirpNewSSE:
+    def test_creates_sse_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--sse"])
+
+        project = tmp_path / "myapp"
+        assert (project / "app.py").is_file()
+        assert (project / "templates" / "index.html").is_file()
+        assert (project / "static" / "style.css").is_file()
+        assert (project / "tests" / "test_app.py").is_file()
 
 
 class TestChirpNewGuards:

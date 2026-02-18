@@ -24,13 +24,15 @@ Usage::
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from functools import wraps
+from inspect import isawaitable
 from typing import Any
 from urllib.parse import quote
 
 from chirp._internal.invoke import invoke
 from chirp.errors import HTTPError
+from chirp.security.audit import emit_security_event
 
 _log = logging.getLogger("chirp.security")
 
@@ -76,6 +78,7 @@ def login_required(handler: Callable) -> Callable:
         if not user.is_authenticated:
             request = get_request()
             if _is_api_request(request):
+                emit_security_event("auth.require.unauthenticated", request=request)
                 raise HTTPError(status=401, detail="Authentication required")
 
             config = _active_config.get()
@@ -89,6 +92,7 @@ def login_required(handler: Callable) -> Callable:
                     detail="Login required",
                     headers=(("Location", redirect_url),),
                 )
+            emit_security_event("auth.require.unauthenticated", request=request)
             raise HTTPError(status=401, detail="Authentication required")
 
         return await invoke(handler, *args, **kwargs)
@@ -96,7 +100,10 @@ def login_required(handler: Callable) -> Callable:
     return wrapper
 
 
-def requires(*permissions: str) -> Callable:
+def requires(
+    *permissions: str,
+    policy: Callable[[Any, Any], bool | Awaitable[bool]] | None = None,
+) -> Callable:
     """Require specific permissions to access this route.
 
     Returns 401 if not authenticated, 403 if missing permissions.
@@ -124,6 +131,7 @@ def requires(*permissions: str) -> Callable:
             if not user.is_authenticated:
                 request = get_request()
                 if _is_api_request(request):
+                    emit_security_event("auth.require.unauthenticated", request=request)
                     raise HTTPError(status=401, detail="Authentication required")
 
                 config = _active_config.get()
@@ -137,6 +145,7 @@ def requires(*permissions: str) -> Callable:
                         detail="Login required",
                         headers=(("Location", redirect_url),),
                     )
+                emit_security_event("auth.require.unauthenticated", request=request)
                 raise HTTPError(status=401, detail="Authentication required")
 
             # Check permissions
@@ -144,6 +153,11 @@ def requires(*permissions: str) -> Callable:
                 _log.warning(
                     "User %s model does not implement permissions protocol",
                     user.id,
+                )
+                emit_security_event(
+                    "authz.permission.denied",
+                    user_id=user.id,
+                    details={"reason": "missing_permissions_protocol"},
                 )
                 raise HTTPError(status=403, detail="Forbidden")
 
@@ -155,7 +169,26 @@ def requires(*permissions: str) -> Callable:
                     user.id,
                     ", ".join(sorted(missing)),
                 )
+                emit_security_event(
+                    "authz.permission.denied",
+                    user_id=user.id,
+                    details={"missing": sorted(missing)},
+                )
                 raise HTTPError(status=403, detail="Forbidden")
+
+            if policy is not None:
+                request = get_request()
+                allowed = policy(user, request)
+                if isawaitable(allowed):
+                    allowed = await allowed
+                if not allowed:
+                    emit_security_event(
+                        "authz.policy.denied",
+                        request=request,
+                        user_id=user.id,
+                        details={"policy": getattr(policy, "__name__", "custom_policy")},
+                    )
+                    raise HTTPError(status=403, detail="Forbidden")
 
             return await invoke(handler, *args, **kwargs)
 

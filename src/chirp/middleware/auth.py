@@ -36,6 +36,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.security.audit import emit_security_event
 
 # ---------------------------------------------------------------------------
 # User protocols
@@ -143,7 +144,12 @@ def login(user: User) -> None:
 
     session = regenerate_session()
     session[config.session_key] = user.id
+    if config.session_version is not None:
+        version = config.session_version(user)
+        if version is not None:
+            session[config.session_version_key] = str(version)
     _user_var.set(user)
+    emit_security_event("auth.login.success", user_id=user.id)
 
 
 def logout() -> None:
@@ -166,6 +172,7 @@ def logout() -> None:
 
     regenerate_session()
     _user_var.set(_ANONYMOUS)
+    emit_security_event("auth.logout.success")
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +200,8 @@ class AuthConfig:
     token_scheme: str = "Bearer"
     load_user: Callable[[str], Awaitable[User | None]] | None = None
     verify_token: Callable[[str], Awaitable[User | None]] | None = None
+    session_version: Callable[[User], str | int | None] | None = None
+    session_version_key: str = "_session_version"
     login_url: str | None = "/login"
     exclude_paths: frozenset[str] = frozenset()
 
@@ -277,12 +286,11 @@ class AuthMiddleware:
         token = header[len(prefix) :].strip()
         return token if token else None
 
-    async def _authenticate_token(self, request: Request) -> User | None:
+    async def _authenticate_token(self, token: str | None) -> User | None:
         """Try token-based authentication."""
         if self._config.verify_token is None:
             return None
 
-        token = self._extract_token(request)
         if token is None:
             return None
 
@@ -309,7 +317,23 @@ class AuthMiddleware:
         if not user_id:
             return None
 
-        return await self._config.load_user(str(user_id))
+        user = await self._config.load_user(str(user_id))
+        if user is None:
+            return None
+
+        version_fn = self._config.session_version
+        if version_fn is not None:
+            expected = version_fn(user)
+            if expected is not None:
+                stored = session.get(self._config.session_version_key)
+                if str(expected) != str(stored):
+                    emit_security_event(
+                        "auth.session.version_mismatch",
+                        user_id=user.id,
+                        details={"stored": str(stored), "expected": str(expected)},
+                    )
+                    return None
+        return user
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Authenticate the request, then dispatch."""
@@ -326,7 +350,14 @@ class AuthMiddleware:
                 _active_config.reset(config_token)
 
         # Try token auth first (stateless, for API clients)
-        user = await self._authenticate_token(request)
+        raw_token = self._extract_token(request)
+        user = await self._authenticate_token(raw_token)
+        if raw_token is not None and user is None:
+            emit_security_event(
+                "auth.token.invalid",
+                request=request,
+                details={"scheme": cfg.token_scheme},
+            )
 
         # Fall back to session auth (stateful, for browsers)
         if user is None:

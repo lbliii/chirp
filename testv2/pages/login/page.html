@@ -1,0 +1,24 @@
+{% extends "_layout.html" %}
+
+{% block content %}
+{% from "chirpui/layout.html" import page_header, stack, block %}
+{% from "chirpui/forms.html" import text_field %}
+{% call page_header("Login", subtitle="Sign in to continue") %}
+{% end %}
+{% if error %}
+<p class="chirpui-alert chirpui-alert--error">{{ error }}</p>
+{% end %}
+{% call stack() %}
+<form method="post" action="/login">
+    {{ csrf_field() }}
+    {% call block() %}
+    {% call text_field("username", label="Username", required=true) %}
+    {% end %}
+    {% call text_field("password", label="Password", type="password", required=true) %}
+    {% end %}
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Sign in</button>
+</form>
+{% end %}
+<p class="chirpui-text-muted">Hint: admin / password</p>
+{% end %}
+{% endblock %}

@@ -24,6 +24,10 @@ class SecurityHeadersConfig:
     x_frame_options: str = "DENY"
     x_content_type_options: str = "nosniff"
     referrer_policy: str = "strict-origin-when-cross-origin"
+    content_security_policy: str | None = (
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+    )
+    strict_transport_security: str | None = None
 
 
 def _is_html_response(response: AnyResponse) -> bool:
@@ -36,11 +40,18 @@ def _is_html_response(response: AnyResponse) -> bool:
 
 def _add_headers(response: Response | StreamingResponse, config: SecurityHeadersConfig) -> AnyResponse:
     """Add security headers to a Response or StreamingResponse."""
-    return (
+    secured = (
         response.with_header("X-Frame-Options", config.x_frame_options)
         .with_header("X-Content-Type-Options", config.x_content_type_options)
         .with_header("Referrer-Policy", config.referrer_policy)
     )
+    if config.content_security_policy:
+        secured = secured.with_header("Content-Security-Policy", config.content_security_policy)
+    if config.strict_transport_security:
+        secured = secured.with_header(
+            "Strict-Transport-Security", config.strict_transport_security
+        )
+    return secured
 
 
 class SecurityHeadersMiddleware:

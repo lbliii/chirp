@@ -10,6 +10,13 @@ from chirp.middleware.security_headers import (
 from chirp.testing import TestClient
 
 
+def _header(response, name: str) -> str | None:
+    for hname, hvalue in response.headers:
+        if hname == name:
+            return hvalue
+    return None
+
+
 def _make_app() -> App:
     app = App()
     app.add_middleware(SecurityHeadersMiddleware())
@@ -31,9 +38,11 @@ async def test_html_response_gets_headers() -> None:
     async with TestClient(app) as client:
         response = await client.get("/")
     assert response.status == 200
-    assert response.headers.get("x-frame-options") == "DENY"
-    assert response.headers.get("x-content-type-options") == "nosniff"
-    assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+    assert _header(response, "x-frame-options") == "DENY"
+    assert _header(response, "x-content-type-options") == "nosniff"
+    assert _header(response, "referrer-policy") == "strict-origin-when-cross-origin"
+    assert _header(response, "content-security-policy") is not None
+    assert _header(response, "strict-transport-security") is None
 
 
 @pytest.mark.anyio
@@ -42,7 +51,7 @@ async def test_json_response_skipped() -> None:
     async with TestClient(app) as client:
         response = await client.get("/json")
     assert response.status == 200
-    assert response.headers.get("x-frame-options") is None
+    assert _header(response, "x-frame-options") is None
 
 
 @pytest.mark.anyio
@@ -50,7 +59,11 @@ async def test_custom_config() -> None:
     app = App()
     app.add_middleware(
         SecurityHeadersMiddleware(
-            SecurityHeadersConfig(x_frame_options="SAMEORIGIN")
+            SecurityHeadersConfig(
+                x_frame_options="SAMEORIGIN",
+                content_security_policy="default-src 'self'",
+                strict_transport_security="max-age=63072000; includeSubDomains",
+            )
         )
     )
 
@@ -60,4 +73,9 @@ async def test_custom_config() -> None:
 
     async with TestClient(app) as client:
         response = await client.get("/")
-    assert response.headers.get("x-frame-options") == "SAMEORIGIN"
+    assert _header(response, "x-frame-options") == "SAMEORIGIN"
+    assert _header(response, "content-security-policy") == "default-src 'self'"
+    assert (
+        _header(response, "strict-transport-security")
+        == "max-age=63072000; includeSubDomains"
+    )

@@ -85,7 +85,7 @@ After installation, the `chirp` command is available:
 
 | Command | Description |
 |---------|-------------|
-| `chirp new <name>` | Scaffold a new project with templates, static assets, and tests |
+| `chirp new <name>` | Scaffold an auth-ready v2 project with filesystem pages, static assets, and tests |
 | `chirp new <name> --minimal` | Scaffold a minimal single-file project |
 | `chirp run <app>` | Start the dev server (e.g. `chirp run myapp:app`) |
 | `chirp check <app>` | Validate hypermedia contracts from the command line |
