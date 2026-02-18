@@ -17,6 +17,9 @@ isolated high-state widgets where needed (editors, canvases, complex grids).
 The contract is framework-agnostic: React/Svelte/Vue adapters can all target
 the same mount metadata and lifecycle events.
 
+Chirp also supports a no-build primitive style, where islands load plain ES
+modules served from static assets (`/static/islands/*.js`).
+
 ## Mount Root Contract
 
 An island mount root is any element with `data-island`:
@@ -40,6 +43,7 @@ Supported attributes:
 - `data-island-props` (optional): JSON payload for initial state.
 - `data-island-src` (optional): adapter/runtime hint for lazy loaders (never use `javascript:`).
 - `id` (recommended): stable mount id for deterministic remount targeting.
+- `data-island-primitive` (optional): explicit primitive type tag for contract checks.
 
 ## Props Rules
 
@@ -64,6 +68,8 @@ Browser events emitted:
 - `chirp:island:remount`
 - `chirp:island:error`
 - `chirp:islands:ready`
+- `chirp:island:state` (state channel)
+- `chirp:island:action` (action channel)
 
 Each event `detail` includes:
 
@@ -92,6 +98,16 @@ app = App(
 - unsafe `data-island-src` (`javascript:`) -> error
 - optional strict mode warning when island roots omit `id`
 - optional strict mode warning when templates omit `data-island-version`
+- primitive schema checks for known no-build primitives
+
+Known primitive contracts:
+
+- `state_sync` -> `stateKey`
+- `action_queue` -> `actionId`
+- `draft_store` -> `draftKey`
+- `grid_state` -> `stateKey`, `columns`
+- `wizard_state` -> `stateKey`, `steps`
+- `upload_state` -> `stateKey`, `endpoint`
 
 ## Diagnostics
 
@@ -100,6 +116,13 @@ The runtime emits `chirp:island:error` for mount-level issues:
 - malformed `data-island-props` (runtime parse failure)
 - unsafe `data-island-src`
 - mount/runtime version mismatch (warning-level event)
+
+The runtime also exposes a small channel API:
+
+- `window.chirpIslands.register(name, adapter)`
+- `window.chirpIslands.emitState(payload, state)`
+- `window.chirpIslands.emitAction(payload, action, status, extra)`
+- `window.chirpIslands.channels` (`state`, `action`, `error`)
 
 ## Graceful Degradation
 

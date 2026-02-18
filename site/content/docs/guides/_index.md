@@ -39,4 +39,11 @@ Complement htmx with Alpine for client-only interactivity.
 Mount isolated high-state widgets while keeping pages server-rendered.
 :::{/card}
 
+:::{card} No-Build High-State
+:icon: bolt
+:link: ./no-build-high-state
+:description: State primitives without bundlers
+Use islands + static ES modules for complex UI state while staying server-first.
+:::{/card}
+
 :::{/cards}

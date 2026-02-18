@@ -25,6 +25,10 @@ class TestIslandsSnippet:
         assert "chirp:island:unmount" in s
         assert "chirp:island:remount" in s
         assert "chirp:island:error" in s
+        assert "chirp:island:state" in s
+        assert "chirp:island:action" in s
+        assert "register: register" in s
+        assert "import(payload.src)" in s
 
 
 class TestIslandsInjection:
@@ -83,3 +87,13 @@ class TestIslandHelpers:
         assert 'id="editor-root"' in rendered
         assert 'data-island-src="/static/editor.js"' in rendered
         assert "data-island-props=" in rendered
+
+    def test_primitive_attrs_global_renders_primitive_metadata(self) -> None:
+        env = _make_env()
+        tpl = env.from_string(
+            '<div{{ primitive_attrs("wizard_state", props=payload, mount_id="wizard-root") }}></div>'
+        )
+        rendered = tpl.render({"payload": {"stateKey": "signup", "steps": ["account"]}})
+        assert 'data-island="wizard_state"' in rendered
+        assert 'data-island-primitive="wizard_state"' in rendered
+        assert 'id="wizard-root"' in rendered

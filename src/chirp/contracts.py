@@ -311,7 +311,21 @@ _ISLAND_SRC_PATTERN = re.compile(
     r"\bdata-island-src\s*=\s*[\"']([^\"']*)[\"']",
     re.IGNORECASE,
 )
+_ISLAND_PRIMITIVE_PATTERN = re.compile(
+    r"\bdata-island-primitive\s*=\s*[\"']([^\"']*)[\"']",
+    re.IGNORECASE,
+)
 _ISLAND_VERSION_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+_ISLAND_PRIMITIVE_REQUIRED_KEYS: dict[str, frozenset[str]] = {
+    "state_sync": frozenset({"stateKey"}),
+    "action_queue": frozenset({"actionId"}),
+    "draft_store": frozenset({"draftKey"}),
+    "error_boundary": frozenset(),
+    "grid_state": frozenset({"stateKey", "columns"}),
+    "wizard_state": frozenset({"stateKey", "steps"}),
+    "upload_state": frozenset({"stateKey", "endpoint"}),
+}
+_TEMPLATE_SOURCE_SUFFIXES = (".html", ".htm", ".jinja", ".j2")
 
 
 def _extract_form_field_names(source: str) -> set[str]:
@@ -346,6 +360,7 @@ def _extract_island_mounts(source: str) -> list[dict[str, str | None]]:
         props_match = _ISLAND_PROPS_PATTERN.search(attrs)
         version_match = _ISLAND_VERSION_PATTERN.search(attrs)
         src_match = _ISLAND_SRC_PATTERN.search(attrs)
+        primitive_match = _ISLAND_PRIMITIVE_PATTERN.search(attrs)
         mounts.append(
             {
                 "name": name or None,
@@ -353,6 +368,7 @@ def _extract_island_mounts(source: str) -> list[dict[str, str | None]]:
                 "props_raw": props_match.group(1) if props_match else None,
                 "version": version_match.group(1).strip() if version_match else None,
                 "src": src_match.group(1).strip() if src_match else None,
+                "primitive": primitive_match.group(1).strip() if primitive_match else None,
             }
         )
     return mounts
@@ -411,6 +427,36 @@ def _check_island_mounts(
                                 template=tmpl_name,
                             )
                         )
+                    else:
+                        primitive_name = mount["primitive"] or name
+                        required = _ISLAND_PRIMITIVE_REQUIRED_KEYS.get(primitive_name)
+                        if required is not None:
+                            if not isinstance(parsed, dict):
+                                issues.append(
+                                    ContractIssue(
+                                        severity=Severity.ERROR,
+                                        category="islands",
+                                        message=(
+                                            f"Island '{name}' primitive '{primitive_name}' expects "
+                                            "object-like props."
+                                        ),
+                                        template=tmpl_name,
+                                    )
+                                )
+                            else:
+                                missing = sorted(required - set(parsed))
+                                if missing:
+                                    issues.append(
+                                        ContractIssue(
+                                            severity=Severity.ERROR,
+                                            category="islands",
+                                            message=(
+                                                f"Island '{name}' primitive '{primitive_name}' is missing "
+                                                f"required props: {', '.join(missing)}."
+                                            ),
+                                            template=tmpl_name,
+                                        )
+                                    )
 
             if strict and not mount["mount_id"]:
                 issues.append(
@@ -460,6 +506,22 @@ def _check_island_mounts(
                         message=(
                             f"Island '{name}' uses unsafe data-island-src '{src}'. "
                             "Use an http(s) or relative URL."
+                        ),
+                        template=tmpl_name,
+                    )
+                )
+
+            primitive_name = mount["primitive"] or name
+            required = _ISLAND_PRIMITIVE_REQUIRED_KEYS.get(primitive_name)
+            if required and mount["props_raw"] is None:
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="islands",
+                        message=(
+                            f"Island '{name}' primitive '{primitive_name}' must define "
+                            "data-island-props with required keys: "
+                            f"{', '.join(sorted(required))}."
                         ),
                         template=tmpl_name,
                     )
@@ -938,9 +1000,12 @@ def _check_sse_event_crossref(
     sse_routes: dict[str, SSEContract] = {}
     for route in router.routes:
         contract = getattr(route.handler, "_chirp_contract", None)
-        if contract is not None and isinstance(contract.returns, SSEContract):
-            if contract.returns.event_types:
-                sse_routes[route.path] = contract.returns
+        if (
+            contract is not None
+            and isinstance(contract.returns, SSEContract)
+            and contract.returns.event_types
+        ):
+            sse_routes[route.path] = contract.returns
 
     if not sse_routes:
         return issues
@@ -970,8 +1035,8 @@ def _check_sse_event_crossref(
 
             # sse-swap values not in declared event_types
             undeclared = swap_values - declared
-            for event_name in sorted(undeclared):
-                issues.append(ContractIssue(
+            issues.extend(
+                ContractIssue(
                     severity=Severity.WARNING,
                     category="sse_crossref",
                     message=(
@@ -982,16 +1047,15 @@ def _check_sse_event_crossref(
                     ),
                     template=tmpl_name,
                     route=matched_route,
-                    details=(
-                        f"Declared event_types: "
-                        f"{', '.join(sorted(declared))}"
-                    ),
-                ))
+                    details=f"Declared event_types: {', '.join(sorted(declared))}",
+                )
+                for event_name in sorted(undeclared)
+            )
 
             # Declared event_types with no matching sse-swap
             unlistened = declared - swap_values
-            for event_name in sorted(unlistened):
-                issues.append(ContractIssue(
+            issues.extend(
+                ContractIssue(
                     severity=Severity.INFO,
                     category="sse_crossref",
                     message=(
@@ -1002,7 +1066,9 @@ def _check_sse_event_crossref(
                     ),
                     template=tmpl_name,
                     route=matched_route,
-                ))
+                )
+                for event_name in sorted(unlistened)
+            )
 
     return issues
 
@@ -1702,6 +1768,8 @@ def _load_template_sources(kida_env: Any) -> dict[str, str]:
         try:
             names = list_fn()
             for name in names:
+                if not name.endswith(_TEMPLATE_SOURCE_SUFFIXES):
+                    continue
                 try:
                     source, _ = loader.get_source(name)
                     sources[name] = source

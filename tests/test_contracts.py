@@ -112,6 +112,13 @@ class TestIslandMountExtraction:
         assert mounts[0]["mount_id"] == "sales-chart"
         assert mounts[0]["version"] == "1"
         assert mounts[0]["src"] == "/static/chart.js"
+        assert mounts[0]["primitive"] is None
+
+    def test_extract_mount_with_primitive(self):
+        html = '<div data-island="grid_state" data-island-primitive="grid_state"></div>'
+        mounts = _extract_island_mounts(html)
+        assert len(mounts) == 1
+        assert mounts[0]["primitive"] == "grid_state"
 
     def test_empty_when_no_mounts(self):
         assert _extract_island_mounts("<div>No island</div>") == []
@@ -177,6 +184,39 @@ class TestIslandMountValidation:
         assert len(issues) == 1
         assert issues[0].severity == Severity.ERROR
         assert "unsafe data-island-src" in issues[0].message
+
+    def test_primitive_required_props_error(self):
+        sources = {
+            "index.html": (
+                '<div data-island="grid_state" data-island-primitive="grid_state" '
+                'data-island-props="{&quot;stateKey&quot;:&quot;grid&quot;}"></div>'
+            )
+        }
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "required props: columns" in issues[0].message
+
+    def test_primitive_object_props_required(self):
+        sources = {
+            "index.html": (
+                '<div data-island="wizard_state" data-island-primitive="wizard_state" '
+                'data-island-props="[1,2,3]"></div>'
+            )
+        }
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "expects object-like props" in issues[0].message
+
+    def test_primitive_missing_props_errors(self):
+        sources = {
+            "index.html": '<div data-island="upload_state" data-island-primitive="upload_state"></div>'
+        }
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "must define data-island-props" in issues[0].message
 
 
 class TestPathMatchesRoute:
@@ -736,11 +776,7 @@ def _user_dead(result: CheckResult) -> list[ContractIssue]:
     def is_builtin(tmpl: str | None) -> bool:
         if not tmpl:
             return True
-        return (
-            tmpl.startswith("chirp/")
-            or tmpl.startswith("chirpui")
-            or tmpl.startswith("themes/")
-        )
+        return tmpl.startswith(("chirp/", "chirpui", "themes/"))
 
     return [
         i for i in result.issues
