@@ -16,7 +16,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, get_type_hints
+from typing import Any, cast, get_type_hints
 
 from chirp.templating.returns import ValidationError
 
@@ -430,7 +430,8 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         "on_header_value": on_header_value,
     }
 
-    parser = MultipartParser(boundary, callbacks)
+    # MultipartCallbacks is TypedDict under TYPE_CHECKING only — not importable at runtime.
+    parser = MultipartParser(boundary, cast(Any, callbacks))
     parser.write(body)
     parser.finalize()
 
