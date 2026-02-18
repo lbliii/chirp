@@ -85,7 +85,7 @@ class CORSMiddleware:
 
         return response
 
-    def _preflight_response(self, origin: str, request_method: str | None) -> Response:
+    def _preflight_response(self, origin: str, request_method: str | None) -> AnyResponse:
         """Build a preflight response with all CORS headers."""
         cfg = self.config
         response = Response(body="", status=204)

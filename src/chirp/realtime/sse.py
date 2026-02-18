@@ -98,7 +98,11 @@ async def handle_sse(
             while not disconnected.is_set():
                 # Get or create the task for the next value
                 if pending_next is None:
-                    pending_next = asyncio.create_task(gen_iter.__anext__())
+
+                    async def _next() -> Any:
+                        return await gen_iter.__anext__()
+
+                    pending_next = asyncio.create_task(_next())
 
                 # Wait with timeout — asyncio.wait does NOT cancel the
                 # task on timeout, so __anext__() survives across

@@ -631,6 +631,12 @@ def reactive_stream(
                 ctx = context_builder()
                 if inspect.isawaitable(ctx):
                     ctx = await ctx
+                if not isinstance(ctx, dict):
+                    logging.getLogger("chirp.reactive").warning(
+                        "context_builder must return dict, got %s; skipping event",
+                        type(ctx).__name__,
+                    )
+                    continue
             except Exception:
                 logging.getLogger("chirp.reactive").exception(
                     "context_builder failed for scope=%s",

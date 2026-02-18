@@ -15,7 +15,6 @@ from typing import Any
 
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
-from chirp.http.response import Response
 from chirp.middleware.protocol import AnyResponse, Next
 
 # -- Session ContextVar --
@@ -184,7 +183,7 @@ class SessionMiddleware:
             samesite=cfg.samesite,
         )
 
-    async def __call__(self, request: Request, next: Next) -> Response:
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Load session, dispatch, then save session to response."""
         session = self._load_session(request)
         if (

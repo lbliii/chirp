@@ -10,9 +10,16 @@ from urllib.parse import parse_qs
 class QueryParams(Mapping[str, str]):
     """Immutable query string parameters.
 
+    Attributes:
+        _data: Parsed query string as field name -> list of values.
+        _raw: Raw query string bytes.
+
     ``__getitem__`` returns the first value for a key.
     ``get_list`` returns all values for a key.
     """
+
+    _data: dict[str, list[str]]
+    _raw: bytes
 
     __slots__ = ("_data", "_raw")
 

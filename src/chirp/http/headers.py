@@ -10,9 +10,14 @@ from collections.abc import Iterator, Mapping
 class Headers(Mapping[str, str]):
     """Immutable, case-insensitive HTTP headers.
 
+    Attributes:
+        _raw: Raw (name, value) byte pairs from ASGI scope.
+
     ``__getitem__`` returns the first matching value.
     ``get_list`` returns all values for a header (e.g. multiple ``Set-Cookie``).
     """
+
+    _raw: tuple[tuple[bytes, bytes], ...]
 
     __slots__ = ("_raw",)
 

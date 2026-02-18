@@ -15,10 +15,15 @@ Free-threading note (3.14t):
 """
 
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import anyio
+
+
+def _run_sync(func: Callable[..., Any], *args: Any) -> Any:
+    """Run blocking call in anyio worker thread. Wrapper for ty compatibility."""
+    return anyio.to_thread.run_sync(func, *args)  # type: ignore[union-attr]
 
 
 class AsyncCursor:
@@ -38,13 +43,13 @@ class AsyncCursor:
         return self._cursor.rowcount
 
     async def fetchall(self) -> list[Any]:
-        return await anyio.to_thread.run_sync(self._cursor.fetchall)
+        return await _run_sync(self._cursor.fetchall)
 
     async def fetchone(self) -> Any:
-        return await anyio.to_thread.run_sync(self._cursor.fetchone)
+        return await _run_sync(self._cursor.fetchone)
 
     async def fetchmany(self, size: int = 100) -> list[Any]:
-        return await anyio.to_thread.run_sync(lambda: self._cursor.fetchmany(size))
+        return await _run_sync(lambda: self._cursor.fetchmany(size))
 
 
 class AsyncConnection:
@@ -65,18 +70,18 @@ class AsyncConnection:
 
     @property
     def autocommit(self) -> bool:
-        return self._conn.autocommit
+        return bool(self._conn.autocommit)
 
     @autocommit.setter
     def autocommit(self, value: bool) -> None:
         self._conn.autocommit = value
 
     async def execute(self, sql: str, params: Sequence[Any] = ()) -> AsyncCursor:
-        cursor = await anyio.to_thread.run_sync(lambda: self._conn.execute(sql, params))
+        cursor = await _run_sync(lambda: self._conn.execute(sql, params))
         return AsyncCursor(cursor)
 
     async def executemany(self, sql: str, params_seq: Sequence[Sequence[Any]]) -> AsyncCursor:
-        cursor = await anyio.to_thread.run_sync(lambda: self._conn.executemany(sql, params_seq))
+        cursor = await _run_sync(lambda: self._conn.executemany(sql, params_seq))
         return AsyncCursor(cursor)
 
     async def executescript(self, sql: str) -> None:
@@ -86,16 +91,16 @@ class AsyncConnection:
         Note: ``executescript`` implicitly commits any pending transaction
         before running, and does not honor ``autocommit`` mode.
         """
-        await anyio.to_thread.run_sync(lambda: self._conn.executescript(sql))
+        await _run_sync(lambda: self._conn.executescript(sql))
 
     async def commit(self) -> None:
-        await anyio.to_thread.run_sync(self._conn.commit)
+        await _run_sync(self._conn.commit)
 
     async def rollback(self) -> None:
-        await anyio.to_thread.run_sync(self._conn.rollback)
+        await _run_sync(self._conn.rollback)
 
     async def close(self) -> None:
-        await anyio.to_thread.run_sync(self._conn.close)
+        await _run_sync(self._conn.close)
 
 
 async def connect(path: str) -> AsyncConnection:
@@ -104,7 +109,5 @@ async def connect(path: str) -> AsyncConnection:
     Uses ``autocommit=True`` so individual statements commit immediately.
     Uses ``check_same_thread=False`` for safe use with anyio's thread pool.
     """
-    conn = await anyio.to_thread.run_sync(
-        lambda: sqlite3.connect(path, autocommit=True, check_same_thread=False)
-    )
+    conn = await _run_sync(lambda: sqlite3.connect(path, autocommit=True, check_same_thread=False))
     return AsyncConnection(conn)

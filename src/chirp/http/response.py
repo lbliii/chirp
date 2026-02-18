@@ -280,6 +280,31 @@ class StreamingResponse:
                 return hvalue
         return default
 
+    def with_cookie(
+        self,
+        name: str,
+        value: str,
+        *,
+        max_age: int | None = None,
+        path: str = "/",
+        domain: str | None = None,
+        secure: bool = False,
+        httponly: bool = True,
+        samesite: str = "lax",
+    ) -> StreamingResponse:
+        """Return a new StreamingResponse with a Set-Cookie header."""
+        cookie = SetCookie(
+            name=name,
+            value=value,
+            max_age=max_age,
+            path=path,
+            domain=domain,
+            secure=secure,
+            httponly=httponly,
+            samesite=samesite,
+        )
+        return self.with_header("Set-Cookie", cookie.to_header_value())
+
 
 @dataclass(frozen=True, slots=True)
 class SSEResponse:

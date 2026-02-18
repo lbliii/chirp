@@ -36,7 +36,10 @@ def _build_coercion_map(cls: type) -> dict[str, type | None]:
         if origin is types.UnionType:
             args = [a for a in get_args(annotation) if a is not type(None)]
             annotation = args[0] if len(args) == 1 else None
-        result[f.name] = annotation if annotation in _COERCIBLE else None
+        if isinstance(annotation, type) and annotation in _COERCIBLE:
+            result[f.name] = annotation
+        else:
+            result[f.name] = None
     return result
 
 

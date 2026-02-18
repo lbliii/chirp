@@ -16,7 +16,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, get_type_hints
+from typing import Any, cast, get_type_hints
 
 from chirp.templating.returns import ValidationError
 
@@ -70,6 +70,8 @@ class FormData(Mapping[str, str]):
     """
 
     __slots__ = ("_data", "_files")
+    _data: dict[str, list[str]]
+    _files: dict[str, UploadFile]
 
     def __init__(
         self,
@@ -428,7 +430,11 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         "on_header_value": on_header_value,
     }
 
-    parser = MultipartParser(boundary, callbacks)
+    from multipart.multipart import MultipartCallbacks
+
+    # MultipartParser accepts our callback dict at runtime; type stub expects
+    # MultipartCallbacks. Cast is required at library boundary.
+    parser = MultipartParser(boundary, cast(MultipartCallbacks, callbacks))
     parser.write(body)
     parser.finalize()
 
