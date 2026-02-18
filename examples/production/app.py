@@ -47,7 +47,14 @@ app.template_global("csrf_field")(csrf_field)
 @app.route("/")
 def index():
     """Show the contact form."""
-    return Template("index.html")
+    return Template(
+        "index.html",
+        error="",
+        name="",
+        email="",
+        message="",
+        website="",
+    )
 
 
 @app.route("/contact", methods=["POST"])

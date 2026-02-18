@@ -41,7 +41,7 @@ class Item:
 
 _items: dict[int, Item] = {}
 _next_id = 1
-_lock = threading.Lock()
+_lock = threading.RLock()  # Reentrant: create_item holds lock while calling _get_next_id
 
 
 def _get_next_id() -> int:
