@@ -199,7 +199,7 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
 
         try:
             values[f.name] = coerce(raw)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             errors.setdefault(f.name, []).append(
                 f"Invalid value for {f.name}: expected {base_type.__name__}."
             )

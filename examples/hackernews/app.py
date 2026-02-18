@@ -183,7 +183,7 @@ async def _fetch_item(item_id: int) -> dict | None:
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, dict) else None
-    except httpx.HTTPError, ValueError:
+    except (httpx.HTTPError, ValueError):
         return None
 
 
@@ -196,7 +196,7 @@ async def _fetch_stories(count: int = 30) -> list[Story]:
         resp = await client.get("topstories.json")
         resp.raise_for_status()
         ids = resp.json()
-    except httpx.HTTPError, ValueError:
+    except (httpx.HTTPError, ValueError):
         return []
 
     ids = ids[:count]

@@ -5,7 +5,6 @@ Handles both standard single-body responses and chunked streaming responses.
 
 import logging
 from collections.abc import AsyncIterator
-from typing import cast
 
 from chirp._internal.asgi import Send
 from chirp.http.response import Response, StreamingResponse
@@ -88,7 +87,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": _encode_chunk(cast(str, chunk)),
+                            "body": _encode_chunk(chunk),
                             "more_body": True,
                         }
                     )
@@ -98,7 +97,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": _encode_chunk(cast(str, chunk)),
+                            "body": _encode_chunk(chunk),
                             "more_body": True,
                         }
                     )
@@ -114,11 +113,10 @@ async def send_streaming_response(
             # Visible error div instead of invisible HTML comment
             import traceback
 
-            error_msg = (
-                (lambda e: getattr(e, "format_compact", lambda: str(e))())(exc)
-                if _is_kida_error(exc)
-                else traceback.format_exc()
-            )
+            if _is_kida_error(exc):
+                error_msg = exc.format_compact() if hasattr(exc, "format_compact") else str(exc)
+            else:
+                error_msg = traceback.format_exc()
             # Escape HTML in the error message
             escaped = error_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             error_chunk = (

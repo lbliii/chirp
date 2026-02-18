@@ -79,13 +79,13 @@ def _convert(value: Any, target_type: Any) -> Any:
     if target_type is int:
         try:
             return int(value)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return value
 
     if target_type is float:
         try:
             return float(value)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return value
 
     if target_type is bool:
