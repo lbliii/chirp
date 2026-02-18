@@ -25,6 +25,8 @@ from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry, compile_tools
 
 if TYPE_CHECKING:
+    from pounce.server import LifecycleCollector
+
     from chirp.data.database import Database
 
 
@@ -386,7 +388,7 @@ class App:
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._check_not_frozen()
-            filter_name = name or func.__name__
+            filter_name = name or getattr(func, "__name__", "unknown")
             self._template_filters[filter_name] = func
             return func
 
@@ -400,7 +402,7 @@ class App:
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._check_not_frozen()
-            global_name = name or func.__name__
+            global_name = name or getattr(func, "__name__", "unknown")
             self._template_globals[global_name] = func
             return func
 
@@ -487,7 +489,7 @@ class App:
         host: str | None = None,
         port: int | None = None,
         *,
-        lifecycle_collector: object | None = None,
+        lifecycle_collector: LifecycleCollector | None = None,
     ) -> None:
         """Start the server (dev or production based on config.debug).
 

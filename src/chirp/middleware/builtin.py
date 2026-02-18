@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from chirp.http.request import Request
 from chirp.http.response import Response
-from chirp.middleware.protocol import Next
+from chirp.middleware.protocol import AnyResponse, Next
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +61,7 @@ class CORSMiddleware:
             return True
         return origin in self.config.allow_origins
 
-    def _add_cors_headers(self, response: Response, origin: str) -> Response:
+    def _add_cors_headers(self, response: AnyResponse, origin: str) -> AnyResponse:
         """Add CORS headers to a response."""
         cfg = self.config
 
@@ -108,7 +108,7 @@ class CORSMiddleware:
 
         return response
 
-    async def __call__(self, request: Request, next: Next) -> Response:
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Process the request with CORS handling."""
         origin = request.headers.get("origin")
 

@@ -193,6 +193,6 @@ class Request:
             http_version=scope.get("http_version", "1.1"),
             server=tuple(server) if server else None,
             client=tuple(client) if client else None,
-            cookies=parse_cookies(headers.get("cookie", "")),
+            cookies=parse_cookies(headers.get("cookie") or ""),
             _receive=receive,
         )

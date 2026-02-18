@@ -16,7 +16,7 @@ from typing import Any
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
 from chirp.http.response import Response
-from chirp.middleware.protocol import Next
+from chirp.middleware.protocol import AnyResponse, Next
 
 # -- Session ContextVar --
 
@@ -169,7 +169,7 @@ class SessionMiddleware:
                 return {}
         return data
 
-    def _save_session(self, response: Response, session: dict[str, Any]) -> Response:
+    def _save_session(self, response: AnyResponse, session: dict[str, Any]) -> AnyResponse:
         """Serialize the session dict and set the cookie on the response."""
         cfg = self._config
         value = self._serializer.dumps(session)

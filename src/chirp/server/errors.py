@@ -85,8 +85,9 @@ async def handle_http_error(
     if handler is not None:
         response = await call_error_handler(handler, request, exc, kida_env)
         # Preserve the HTTP status from the exception unless the handler
-        # explicitly returned a Response with its own status
-        if response.status == 200:
+        # explicitly returned a Response/StreamingResponse with its own status.
+        # SSEResponse has no status attr; its with_status is a no-op.
+        if isinstance(response, (Response, StreamingResponse)) and response.status == 200:
             response = response.with_status(exc.status)
         return response
 

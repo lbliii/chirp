@@ -148,8 +148,8 @@ ignore = [
 python-version = "3.14"
 
 [tool.ty.analysis]
-# chirp-ui is optional; allow when not installed
-allowed-unresolved-imports = ["chirp_ui"]
+# Optional deps; allow when not installed
+allowed-unresolved-imports = ["chirp_ui", "asyncpg", "patitas", "argon2"]
 
 [tool.ty.src]
 exclude = ["dist/", "build/", "tests/"]

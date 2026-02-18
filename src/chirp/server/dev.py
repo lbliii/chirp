@@ -6,9 +6,10 @@ Uses single-worker mode with reload enabled for development.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from pounce import ASGIApp
     from pounce.server import LifecycleCollector
 
 
@@ -56,7 +57,7 @@ def run_dev_server(
     )
     server = Server(
         config,
-        app,
+        cast(ASGIApp, app),
         app_path=app_path,
         lifecycle_collector=lifecycle_collector,
     )

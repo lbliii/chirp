@@ -184,8 +184,8 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
             # Field missing from form data entirely
             if f.default is not MISSING:
                 values[f.name] = f.default
-            elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
-                values[f.name] = f.default_factory()  # type: ignore[attr-defined]
+            elif f.default_factory is not MISSING:
+                values[f.name] = f.default_factory()
             else:
                 errors.setdefault(f.name, []).append(f"{f.name} is required.")
             continue

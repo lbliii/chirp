@@ -152,7 +152,7 @@ class LLM:
     @overload
     def stream[T](self, cls: type[T], /, *, prompt: str, **kwargs: Any) -> AsyncIterator[str]: ...
 
-    async def stream(  # type: ignore[misc]
+    async def stream(
         self,
         prompt_or_cls: str | type,
         /,
