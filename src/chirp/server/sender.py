@@ -114,7 +114,7 @@ async def send_streaming_response(
             import traceback
 
             error_msg = (
-                getattr(exc, "format_compact", lambda: str(exc))()
+                (lambda e: getattr(e, "format_compact", lambda: str(e))())(exc)
                 if _is_kida_error(exc)
                 else traceback.format_exc()
             )
