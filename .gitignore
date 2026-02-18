@@ -65,6 +65,8 @@ Thumbs.db
 
 # Project specific
 *.log
+*.db-shm
+*.db-wal
 
 # uv
 uv.lock
