@@ -337,6 +337,10 @@ class SSEResponse:
         """No-op: SSE content type is always text/event-stream."""
         return self
 
+    def with_render_intent(self, render_intent: RenderIntent) -> SSEResponse:
+        """No-op: SSE streams bypass normal response metadata."""
+        return self
+
     def with_cookie(
         self,
         name: str = "",

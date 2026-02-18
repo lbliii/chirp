@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Page, SSEEvent, Template
+from chirp import App, AppConfig, EventStream, Fragment, Page, SSEEvent
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 

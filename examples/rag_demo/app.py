@@ -54,7 +54,17 @@ from patitas import parse, render_llm, sanitize
 from patitas.sanitize import llm_safe
 from sync import sync_from_sources
 
-from chirp import App, AppConfig, EventStream, Fragment, Page, Request, SSEEvent, Template, use_chirp_ui
+from chirp import (
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    Page,
+    Request,
+    SSEEvent,
+    Template,
+    use_chirp_ui,
+)
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
