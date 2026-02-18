@@ -1682,8 +1682,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # From route FragmentContracts, SSEContracts, and route.template
         for route in router.routes:
-            if getattr(route, "template", None):
-                referenced_templates.add(route.template)
+            template = getattr(route, "template", None)
+            if template is not None:
+                referenced_templates.add(template)
             rc = getattr(route.handler, "_chirp_contract", None)
             if rc is None:
                 continue
@@ -1812,7 +1813,7 @@ def _check_inline_templates(router: Router, result: CheckResult) -> None:
         check_types = (return_hint,)
         origin = getattr(return_hint, "__args__", None)
         if origin is not None:
-            check_types = origin  # type: ignore[assignment]
+            check_types = origin
 
         for t in check_types:
             if t is InlineTemplate or (isinstance(t, type) and issubclass(t, InlineTemplate)):

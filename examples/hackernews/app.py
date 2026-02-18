@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from chirp import App, AppConfig, EventStream, Fragment, Page, SSEEvent, Template
+from chirp import App, AppConfig, EventStream, Fragment, Page, SSEEvent
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -298,7 +298,7 @@ async def story_detail(story_id: int):
     # Fetch fresh story data
     data = await _fetch_item(story_id)
     if data is None:
-        return Template("hackernews.html", stories=[], page="list")
+        return Page("hackernews.html", "story_list", stories=[], page="list")
 
     story = _parse_story(data)
 

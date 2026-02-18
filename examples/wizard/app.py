@@ -19,7 +19,7 @@ Run:
 import os
 from pathlib import Path
 
-from chirp import App, AppConfig, Redirect, Request, Template, ValidationError
+from chirp import App, AppConfig, Page, Redirect, Request, Template, ValidationError
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session
 from chirp.validation import email, matches, max_length, min_length, required, validate
 
@@ -74,7 +74,7 @@ def index():
 def step1():
     """Show personal info form (step 1)."""
     data = _get_wizard_data()
-    return Template("step1.html", form=data, step=1)
+    return Page("step1.html", "content", form=data, step=1)
 
 
 @app.route("/step/1", methods=["POST"])
@@ -127,7 +127,7 @@ def step2():
     # Require step 1 to be completed
     if not data.get("first_name"):
         return Redirect("/step/1")
-    return Template("step2.html", form=data, step=2)
+    return Page("step2.html", "content", form=data, step=2)
 
 
 @app.route("/step/2", methods=["POST"])
@@ -181,7 +181,7 @@ def step3():
         return Redirect("/step/1")
     if not data.get("address"):
         return Redirect("/step/2")
-    return Template("step3.html", form=data, step=3)
+    return Page("step3.html", "content", form=data, step=3)
 
 
 @app.route("/confirm", methods=["POST"])

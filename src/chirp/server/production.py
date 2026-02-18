@@ -6,10 +6,12 @@ request queueing, error tracking, and zero-downtime hot reload.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from chirp import App
+    from pounce import ASGIApp
+
+    from chirp.app import App
 
 
 def run_production_server(
@@ -164,5 +166,5 @@ def run_production_server(
     )
 
     # Create and run server
-    server = Server(config, app)
+    server = Server(config, cast(ASGIApp, app))
     server.run()

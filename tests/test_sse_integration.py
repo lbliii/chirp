@@ -506,6 +506,10 @@ class TestSSEPerEventErrorBoundary:
         """In debug mode, error HTML replaces the specific block."""
         app = _app(debug=True)
 
+        @app.route("/submit", methods=["POST"])
+        def submit():
+            return "ok"
+
         @app.route("/events")
         def events():
             async def gen():

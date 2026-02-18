@@ -55,7 +55,7 @@ import re
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from kida import Environment
 
@@ -631,6 +631,13 @@ def reactive_stream(
                 ctx = context_builder()
                 if inspect.isawaitable(ctx):
                     ctx = await ctx
+                if not isinstance(ctx, dict):
+                    logging.getLogger("chirp.reactive").warning(
+                        "context_builder must return dict, got %s; skipping event",
+                        type(ctx).__name__,
+                    )
+                    continue
+                ctx_dict = cast(dict[str, Any], ctx)
             except Exception:
                 logging.getLogger("chirp.reactive").exception(
                     "context_builder failed for scope=%s",
@@ -643,7 +650,7 @@ def reactive_stream(
                     ref.template_name,
                     ref.block_name,
                     target=ref.target_id,
-                    **ctx,
+                    **ctx_dict,
                 )
 
     return EventStream(generate())

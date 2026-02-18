@@ -54,7 +54,17 @@ from patitas import parse, render_llm, sanitize
 from patitas.sanitize import llm_safe
 from sync import sync_from_sources
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
+from chirp import (
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    Page,
+    Request,
+    SSEEvent,
+    Template,
+    use_chirp_ui,
+)
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
@@ -219,7 +229,7 @@ async def _ollama_list_models() -> list[str]:
 
 
 @app.route("/", template="index.html")
-async def index() -> Template:
+async def index() -> Template | Page:
     """Render the docs homepage with search and model selector (when using Ollama)."""
     models: list[str] = []
     default_model = llm.model
@@ -227,8 +237,9 @@ async def index() -> Template:
         models = await _ollama_list_models()
         if models and default_model not in models:
             default_model = models[0]
-    return Template(
+    return Page(
         "index.html",
+        "content",
         title="Docs",
         models=models,
         default_model=default_model,

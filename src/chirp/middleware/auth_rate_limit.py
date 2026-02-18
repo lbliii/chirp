@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from chirp.http.request import Request
 from chirp.http.response import Response
-from chirp.middleware.protocol import Next
+from chirp.middleware.protocol import AnyResponse, Next
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +72,7 @@ class AuthRateLimitMiddleware:
             self._state[key] = (count, window_start, 0.0)
             return True, 0
 
-    async def __call__(self, request: Request, next: Next) -> Response:
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
         cfg = self._config
         if request.method not in cfg.methods or not self._path_matches(request.path):
             return await next(request)

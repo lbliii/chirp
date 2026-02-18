@@ -1,6 +1,6 @@
 # Pre-commit hooks for Chirp
-# Install: uv run pre-commit install
-# Run manually: uv run pre-commit run --all-files
+# Install: uv run prek install  (or: poe hooks-install)
+# Run manually: uv run prek run --all-files  (or: poe hooks)
 #
 # Chirp requires Python 3.14+ (free-threading, modern syntax)
 
@@ -9,7 +9,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.11
+    rev: v0.15.1
     hooks:
       # Run the linter
       - id: ruff-check

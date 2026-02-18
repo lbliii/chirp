@@ -16,7 +16,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, get_type_hints
+from typing import Any, cast, get_type_hints
 
 from chirp.templating.returns import ValidationError
 
@@ -70,6 +70,8 @@ class FormData(Mapping[str, str]):
     """
 
     __slots__ = ("_data", "_files")
+    _data: dict[str, list[str]]
+    _files: dict[str, UploadFile]
 
     def __init__(
         self,
@@ -184,8 +186,8 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
             # Field missing from form data entirely
             if f.default is not MISSING:
                 values[f.name] = f.default
-            elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
-                values[f.name] = f.default_factory()  # type: ignore[attr-defined]
+            elif f.default_factory is not MISSING:
+                values[f.name] = f.default_factory()
             else:
                 errors.setdefault(f.name, []).append(f"{f.name} is required.")
             continue
@@ -343,7 +345,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
     from chirp.errors import ConfigurationError
 
     try:
-        from multipart.multipart import parse_options_header
+        from python_multipart.multipart import parse_options_header
     except ImportError:
         msg = (
             "Multipart form parsing requires the 'python-multipart' package. "
@@ -359,7 +361,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         raise ValueError(msg)
 
     # Use multipart parser
-    from multipart.multipart import MultipartParser
+    from python_multipart.multipart import MultipartParser
 
     data: dict[str, list[str]] = {}
     files: dict[str, UploadFile] = {}
@@ -428,7 +430,8 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
         "on_header_value": on_header_value,
     }
 
-    parser = MultipartParser(boundary, callbacks)
+    # MultipartCallbacks is TypedDict under TYPE_CHECKING only — not importable at runtime.
+    parser = MultipartParser(boundary, cast(Any, callbacks))
     parser.write(body)
     parser.finalize()
 

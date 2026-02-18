@@ -13,7 +13,7 @@ from kida import Environment
 
 from chirp.errors import HTTPError
 from chirp.http.request import Request
-from chirp.http.response import Response
+from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.server.negotiation import negotiate
 
 logger = logging.getLogger("chirp.server")
@@ -46,7 +46,7 @@ async def call_error_handler(
     request: Request,
     exc: Exception,
     kida_env: Environment | None,
-) -> Response:
+) -> Response | StreamingResponse | SSEResponse:
     """Invoke a user-registered error handler with introspected arguments.
 
     Error handlers may accept zero, one (request), or two (request, exc) args.
@@ -76,7 +76,7 @@ async def handle_http_error(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
-) -> Response:
+) -> Response | StreamingResponse | SSEResponse:
     """Map an HTTPError to a Response using registered error handlers."""
     logger.debug("%d %s %s — %s", exc.status, request.method, request.path, exc.detail)
 
@@ -85,8 +85,9 @@ async def handle_http_error(
     if handler is not None:
         response = await call_error_handler(handler, request, exc, kida_env)
         # Preserve the HTTP status from the exception unless the handler
-        # explicitly returned a Response with its own status
-        if response.status == 200:
+        # explicitly returned a Response/StreamingResponse with its own status.
+        # SSEResponse has no status attr; its with_status is a no-op.
+        if isinstance(response, (Response, StreamingResponse)) and response.status == 200:
             response = response.with_status(exc.status)
         return response
 
@@ -110,7 +111,7 @@ async def handle_internal_error(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
-) -> Response:
+) -> Response | StreamingResponse | SSEResponse:
     """Handle unexpected exceptions as 500 errors."""
     from chirp.server.terminal_errors import log_error
 

@@ -7,6 +7,7 @@ No wrapper translation layer.
 import asyncio
 import contextlib
 import inspect
+from collections.abc import MutableMapping
 from typing import Any
 
 from chirp.app import App
@@ -244,7 +245,7 @@ class TestClient:
         body_buffer: list[bytes] = []
         event_count = 0
 
-        async def send(message: dict[str, Any]) -> None:
+        async def send(message: MutableMapping[str, Any]) -> None:
             nonlocal response_status, event_count
             if message["type"] == "http.response.start":
                 response_status = message["status"]
@@ -368,7 +369,7 @@ class TestClient:
         response_headers: list[tuple[bytes, bytes]] = []
         response_body_parts: list[bytes] = []
 
-        async def send(message: dict[str, Any]) -> None:
+        async def send(message: MutableMapping[str, Any]) -> None:
             nonlocal response_started, response_status, response_headers
             if message["type"] == "http.response.start":
                 response_started = True
