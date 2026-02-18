@@ -38,7 +38,9 @@ def _is_html_response(response: AnyResponse) -> bool:
     return ct.startswith("text/html")
 
 
-def _add_headers(response: Response | StreamingResponse, config: SecurityHeadersConfig) -> AnyResponse:
+def _add_headers(
+    response: Response | StreamingResponse, config: SecurityHeadersConfig
+) -> AnyResponse:
     """Add security headers to a Response or StreamingResponse."""
     secured = (
         response.with_header("X-Frame-Options", config.x_frame_options)
@@ -48,9 +50,7 @@ def _add_headers(response: Response | StreamingResponse, config: SecurityHeaders
     if config.content_security_policy:
         secured = secured.with_header("Content-Security-Policy", config.content_security_policy)
     if config.strict_transport_security:
-        secured = secured.with_header(
-            "Strict-Transport-Security", config.strict_transport_security
-        )
+        secured = secured.with_header("Strict-Transport-Security", config.strict_transport_security)
     return secured
 
 

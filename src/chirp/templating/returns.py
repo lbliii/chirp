@@ -182,7 +182,7 @@ class FormAction:
         )
     """
 
-    __slots__ = ("redirect", "fragments", "trigger", "status")
+    __slots__ = ("fragments", "redirect", "status", "trigger")
 
     def __init__(
         self,

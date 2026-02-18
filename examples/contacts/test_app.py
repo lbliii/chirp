@@ -86,8 +86,8 @@ class TestAddContact:
                 headers=_FORM_CT,
             )
             assert response.status == 200
-            assert 'hx-swap-oob' in response.text
-            assert 'contact-count' in response.text
+            assert "hx-swap-oob" in response.text
+            assert "contact-count" in response.text
 
 
 class TestEditContact:
@@ -117,7 +117,7 @@ class TestEditContact:
             )
             assert response.status == 200
             assert "Alice Updated" in response.text
-            assert 'hx-swap-oob' in response.text
+            assert "hx-swap-oob" in response.text
 
     async def test_save_invalid(self, example_app) -> None:
         """PUT /contacts/1 with bad data returns 422."""

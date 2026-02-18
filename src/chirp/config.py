@@ -31,7 +31,9 @@ class AppConfig:
 
     # Templates
     template_dir: str | Path = "templates"
-    component_dirs: tuple[str | Path, ...] = ()  # Additional template directories (e.g. components, partials)
+    component_dirs: tuple[
+        str | Path, ...
+    ] = ()  # Additional template directories (e.g. components, partials)
     autoescape: bool = True
     trim_blocks: bool = True
     lstrip_blocks: bool = True

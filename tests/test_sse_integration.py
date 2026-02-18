@@ -258,7 +258,8 @@ class TestSSEDisconnect:
     """Client disconnect terminates the stream cleanly."""
 
     async def test_disconnect_during_pending_anext_no_warnings(
-        self, recwarn,
+        self,
+        recwarn,
     ) -> None:
         """Disconnect while __anext__ is pending must not leak StopAsyncIteration.
 
@@ -291,12 +292,8 @@ class TestSSEDisconnect:
         assert result.events[0].data == "first"
 
         # No StopAsyncIteration warnings should have been logged
-        stop_warnings = [
-            w for w in caught if "StopAsyncIteration" in str(w.message)
-        ]
-        assert stop_warnings == [], (
-            f"Unexpected StopAsyncIteration warnings: {stop_warnings}"
-        )
+        stop_warnings = [w for w in caught if "StopAsyncIteration" in str(w.message)]
+        assert stop_warnings == [], f"Unexpected StopAsyncIteration warnings: {stop_warnings}"
 
     async def test_disconnect_after_n_events(self) -> None:
         """Infinite generator, but client disconnects after 3 events."""

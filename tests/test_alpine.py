@@ -118,63 +118,65 @@ class TestAlpineInjection:
 class TestAlpineMacros:
     def test_dropdown_renders_x_data_and_x_show(self) -> None:
         env = _make_env()
-        source = '''
+        source = """
 {% from "chirp/alpine.html" import dropdown %}
 {% call dropdown("Menu") %}
   <a href="/a">Link A</a>
 {% end %}
-'''
+"""
         tpl = env.from_string(source)
         html = tpl.render().strip()
         assert 'x-data="{ open: false }"' in html
-        assert "x-show=\"open\"" in html
+        assert 'x-show="open"' in html
         assert "Menu" in html
         assert "Link A" in html
         assert "chirp-dropdown" in html
 
     def test_modal_renders_managed_by_default(self) -> None:
         env = _make_env()
-        source = '''
+        source = """
 {% from "chirp/alpine.html" import modal %}
 {% call modal("my-modal", title="Confirm") %}
   <p>Are you sure?</p>
 {% end %}
-'''
+"""
         tpl = env.from_string(source)
         html = tpl.render().strip()
-        assert "x-data" in html and "open: false" in html
-        assert "x-show" in html and "open" in html
+        assert "x-data" in html
+        assert "open: false" in html
+        assert "x-show" in html
+        assert "open" in html
         assert 'id="my-modal"' in html
         assert "Confirm" in html
         assert "Are you sure?" in html
-        assert "role=\"dialog\"" in html
+        assert 'role="dialog"' in html
 
     def test_modal_managed_false_omits_x_data(self) -> None:
         env = _make_env()
-        source = '''
+        source = """
 {% from "chirp/alpine.html" import modal %}
 {% call modal("my-modal", managed=false) %}
   <p>Content</p>
 {% end %}
-'''
+"""
         tpl = env.from_string(source)
         html = tpl.render().strip()
-        assert "x-show=\"open\"" in html
+        assert 'x-show="open"' in html
         assert 'x-data="{ open: false }"' not in html
 
     def test_tabs_renders_tab_list_and_x_data(self) -> None:
         env = _make_env()
-        source = '''
+        source = """
 {% from "chirp/alpine.html" import tabs %}
 {% call tabs(["Overview", "Details"], "Overview") %}
   <div x-show="active === 'Overview'">Overview content</div>
   <div x-show="active === 'Details'">Details content</div>
 {% end %}
-'''
+"""
         tpl = env.from_string(source)
         html = tpl.render().strip()
         assert "active" in html
         assert "Overview" in html
         assert "Details" in html
-        assert "role=\"tablist\"" in html
+        assert 'role="tablist"' in html
         assert "chirp-tabs" in html

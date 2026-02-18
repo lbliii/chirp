@@ -121,7 +121,8 @@ class TestFormActionHtmx:
 
         async with TestClient(app) as client:
             response = await client.post(
-                "/submit", headers={"HX-Request": "true"},
+                "/submit",
+                headers={"HX-Request": "true"},
             )
 
         assert response.status == 200
@@ -140,7 +141,8 @@ class TestFormActionHtmx:
 
         async with TestClient(app) as client:
             response = await client.post(
-                "/submit", headers={"HX-Request": "true"},
+                "/submit",
+                headers={"HX-Request": "true"},
             )
 
         assert response.status == 200
@@ -163,7 +165,8 @@ class TestFormActionHtmx:
 
         async with TestClient(app) as client:
             response = await client.post(
-                "/submit", headers={"HX-Request": "true"},
+                "/submit",
+                headers={"HX-Request": "true"},
             )
 
         assert _header(response, "hx-trigger") == "contactAdded"
@@ -181,7 +184,8 @@ class TestFormActionHtmx:
 
         async with TestClient(app) as client:
             response = await client.post(
-                "/submit", headers={"HX-Request": "true"},
+                "/submit",
+                headers={"HX-Request": "true"},
             )
 
         assert _header(response, "hx-trigger") is None
@@ -200,7 +204,8 @@ class TestFormActionHtmx:
 
         async with TestClient(app) as client:
             response = await client.post(
-                "/submit", headers={"HX-Request": "true"},
+                "/submit",
+                headers={"HX-Request": "true"},
             )
 
         assert response.status == 200

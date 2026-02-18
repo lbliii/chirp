@@ -1,7 +1,5 @@
 """Tests for chirp.__init__ — lazy import registry covers all public names."""
 
-import importlib
-
 import pytest
 
 import chirp

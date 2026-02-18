@@ -162,11 +162,7 @@ def log_error(exc: BaseException, request: Request | None = None) -> None:
             streaming/SSE contexts where a request may not be available).
     """
     # Build a prefix for log messages
-    prefix = (
-        f"500 {request.method} {request.path}"
-        if request is not None
-        else "Server error"
-    )
+    prefix = f"500 {request.method} {request.path}" if request is not None else "Server error"
 
     if _is_kida_error(exc):
         # Template errors get the clean format

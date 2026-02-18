@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from chirp._internal.asgi import Receive, Scope, Send
+    pass
 
 
 def run_dev_server(
@@ -55,6 +55,9 @@ def run_dev_server(
         reload_dirs=reload_dirs,
     )
     server = Server(
-        config, app, app_path=app_path, lifecycle_collector=lifecycle_collector,
+        config,
+        app,
+        app_path=app_path,
+        lifecycle_collector=lifecycle_collector,
     )
     server.run()

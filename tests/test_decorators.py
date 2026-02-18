@@ -75,10 +75,14 @@ def _make_app() -> App:
     """Create a test app with session + auth + protected routes."""
     app = App()
     app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
-    app.add_middleware(AuthMiddleware(AuthConfig(
-        load_user=_load_user,
-        verify_token=_verify_token,
-    )))
+    app.add_middleware(
+        AuthMiddleware(
+            AuthConfig(
+                load_user=_load_user,
+                verify_token=_verify_token,
+            )
+        )
+    )
 
     @app.route("/do-login/{user_id}")
     def do_login(user_id: str):

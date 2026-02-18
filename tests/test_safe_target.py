@@ -5,7 +5,6 @@ from chirp.config import AppConfig
 from chirp.server.htmx_safe_target import SAFE_TARGET_JS, SAFE_TARGET_SNIPPET
 from chirp.testing import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Unit tests — JS constants
 # ---------------------------------------------------------------------------

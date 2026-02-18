@@ -2,12 +2,9 @@
 
 from dataclasses import dataclass
 
-import pytest
-
 from chirp.http.request import Request
 from chirp.pages.resolve import resolve_kwargs, upgrade_result
 from chirp.templating.returns import LayoutPage, Page
-
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -159,7 +156,10 @@ class TestResolveKwargsCascadeContext:
 
         req = _make_request(path_params={"doc_id": "from-path"})
         kwargs = await resolve_kwargs(
-            handler, req, {"doc_id": "from-context"}, {},
+            handler,
+            req,
+            {"doc_id": "from-context"},
+            {},
         )
         assert kwargs["doc_id"] == "from-path"
 
@@ -178,7 +178,10 @@ class TestResolveKwargsProviders:
 
         req = _make_request()
         kwargs = await resolve_kwargs(
-            handler, req, {}, {Store: lambda: store_instance},
+            handler,
+            req,
+            {},
+            {Store: lambda: store_instance},
         )
         assert kwargs["store"] is store_instance
 
@@ -197,8 +200,6 @@ class TestResolveKwargsExtraction:
         assert kwargs["params"].offset == 5
 
     async def test_post_extracts_from_form_body(self) -> None:
-        import json
-
         def handler(data: FormData):
             pass
 
@@ -241,7 +242,10 @@ class TestResolveKwargsCombined:
 
         req = _make_request(path_params={"doc_id": "abc"})
         kwargs = await resolve_kwargs(
-            handler, req, {"doc": {"title": "Test"}}, {},
+            handler,
+            req,
+            {"doc": {"title": "Test"}},
+            {},
         )
         assert kwargs["request"] is req
         assert kwargs["doc_id"] == "abc"
@@ -285,7 +289,10 @@ class TestUpgradeResult:
         sentinel = object()  # stand-in for LayoutChain
 
         upgraded = upgrade_result(
-            result, {}, layout_chain=sentinel, context_providers=(),
+            result,
+            {},
+            layout_chain=sentinel,
+            context_providers=(),
         )
 
         assert isinstance(upgraded, LayoutPage)

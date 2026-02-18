@@ -51,8 +51,7 @@ class TestTextField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import text_field %}'
-            '{{ text_field("email") }}',
+            '{% from "chirp/forms.html" import text_field %}{{ text_field("email") }}',
         )
         assert "<label" not in html
 
@@ -91,8 +90,7 @@ class TestTextField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import text_field %}'
-            '{{ text_field("title") }}',
+            '{% from "chirp/forms.html" import text_field %}{{ text_field("title") }}',
         )
         assert "field--error" not in html
         assert "field-error" not in html
@@ -272,8 +270,7 @@ class TestCheckboxField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import checkbox_field %}'
-            '{{ checkbox_field("newsletter") }}',
+            '{% from "chirp/forms.html" import checkbox_field %}{{ checkbox_field("newsletter") }}',
         )
         assert "newsletter" in html
 
@@ -299,8 +296,7 @@ class TestHiddenField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import hidden_field %}'
-            '{{ hidden_field("id") }}',
+            '{% from "chirp/forms.html" import hidden_field %}{{ hidden_field("id") }}',
         )
         assert 'name="id"' in html
         assert 'value=""' in html

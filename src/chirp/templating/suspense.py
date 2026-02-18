@@ -36,7 +36,6 @@ from collections.abc import AsyncIterator, Awaitable
 from typing import Any
 
 import anyio
-
 from kida import Environment
 
 from chirp.templating.returns import Suspense
@@ -47,6 +46,7 @@ logger = logging.getLogger("chirp.suspense")
 # ---------------------------------------------------------------------------
 # OOB formatters
 # ---------------------------------------------------------------------------
+
 
 def format_oob_htmx(block_html: str, target_id: str) -> str:
     """Wrap rendered block HTML as an htmx OOB swap element.
@@ -80,6 +80,7 @@ def format_oob_script(block_html: str, target_id: str) -> str:
 # ---------------------------------------------------------------------------
 # Core renderer
 # ---------------------------------------------------------------------------
+
 
 def _find_deferred_blocks(
     env: Environment,
@@ -150,7 +151,7 @@ async def render_suspense(
         return
 
     # -- Phase 2: Render shell with None for deferred keys --
-    shell_ctx = {**sync_ctx, **{k: None for k in pending}}
+    shell_ctx = {**sync_ctx, **dict.fromkeys(pending)}
     template = env.get_template(template_name)
     yield template.render(shell_ctx)
 
@@ -166,7 +167,8 @@ async def render_suspense(
                 tg.start_soon(_resolve, key, awaitable)
     except BaseException:
         logger.exception(
-            "Suspense: error resolving deferred context for %s", template_name,
+            "Suspense: error resolving deferred context for %s",
+            template_name,
         )
         # Shell is already sent; yield an error comment and stop
         yield "\n<!-- chirp:suspense error resolving deferred data -->\n"
@@ -194,6 +196,7 @@ async def render_suspense(
         except Exception:
             logger.exception(
                 "Suspense: error rendering deferred block %r for %s",
-                block_name, template_name,
+                block_name,
+                template_name,
             )
             yield f"\n<!-- chirp:suspense error in block {block_name} -->\n"

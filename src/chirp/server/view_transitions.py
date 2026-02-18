@@ -35,9 +35,7 @@ VIEW_TRANSITIONS_CSS = """\
 
 VIEW_TRANSITIONS_HEAD_SNIPPET = (
     '<meta name="view-transition" content="same-origin">'
-    '<style data-chirp="view-transitions">'
-    + VIEW_TRANSITIONS_CSS
-    + "</style>"
+    '<style data-chirp="view-transitions">' + VIEW_TRANSITIONS_CSS + "</style>"
 )
 
 VIEW_TRANSITIONS_JS = """\

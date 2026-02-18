@@ -25,7 +25,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Page, Request
+from chirp import App, AppConfig, Page, Request
 from chirp.data import Query
 from chirp.http.request import Request as RequestType
 from chirp.http.response import Response
@@ -163,7 +163,7 @@ class APIKeyMiddleware:
     explicitly excluded paths (e.g. health check).
     """
 
-    __slots__ = ("_key", "_protect", "_exclude")
+    __slots__ = ("_exclude", "_key", "_protect")
 
     def __init__(
         self,
@@ -210,17 +210,23 @@ app = App(
     migrations=str(MIGRATIONS_DIR),
 )
 
-app.add_middleware(CORSMiddleware(CORSConfig(
-    allow_origins=("*",),
-    allow_methods=("GET", "HEAD", "OPTIONS"),
-    allow_headers=("Authorization", "Content-Type"),
-)))
+app.add_middleware(
+    CORSMiddleware(
+        CORSConfig(
+            allow_origins=("*",),
+            allow_methods=("GET", "HEAD", "OPTIONS"),
+            allow_headers=("Authorization", "Content-Type"),
+        )
+    )
+)
 
-app.add_middleware(APIKeyMiddleware(
-    key=_api_key,
-    protect="/api/",
-    exclude=("/api/health",),
-))
+app.add_middleware(
+    APIKeyMiddleware(
+        key=_api_key,
+        protect="/api/",
+        exclude=("/api/health",),
+    )
+)
 
 # ---------------------------------------------------------------------------
 # Template filter — type badge color
@@ -261,7 +267,10 @@ async def index(request: Request):
     search = (request.query.get("q") or "").strip().lower()
 
     results, total, total_pages = await _query_pokemon(
-        page=page, per_page=12, type_filter=type_filter, search=search,
+        page=page,
+        per_page=12,
+        type_filter=type_filter,
+        search=search,
     )
     all_types = await _get_all_types()
 
@@ -319,7 +328,10 @@ async def api_list_pokemon(request: Request):
     search = (request.query.get("q") or "").strip().lower()
 
     results, total, total_pages = await _query_pokemon(
-        page=page, per_page=per_page, type_filter=type_filter, search=search,
+        page=page,
+        per_page=per_page,
+        type_filter=type_filter,
+        search=search,
     )
 
     return {
@@ -356,9 +368,7 @@ async def api_stats():
     avg_attack = await app.db.fetch_val("SELECT ROUND(AVG(attack), 1) FROM pokemon") or 0
     avg_defense = await app.db.fetch_val("SELECT ROUND(AVG(defense), 1) FROM pokemon") or 0
     avg_speed = await app.db.fetch_val("SELECT ROUND(AVG(speed), 1) FROM pokemon") or 0
-    legendary_count = (
-        await Query(Pokemon, "pokemon").where("legendary = ?", 1).count(app.db)
-    )
+    legendary_count = await Query(Pokemon, "pokemon").where("legendary = ?", 1).count(app.db)
 
     rows = await app.db.fetch(_TypeRow, "SELECT DISTINCT types FROM pokemon")
     type_counts: dict[str, int] = {}
@@ -394,6 +404,8 @@ if __name__ == "__main__":
     print("  API docs: http://127.0.0.1:8000/api/health")
     print()
     print(f"  API Key: {_api_key}")
-    print('  Usage:   curl -H "Authorization: Bearer demo-key-change-me" localhost:8000/api/pokemon')
+    print(
+        '  Usage:   curl -H "Authorization: Bearer demo-key-change-me" localhost:8000/api/pokemon'
+    )
     print()
     app.run()

@@ -157,10 +157,13 @@ async def upload_photo(request: Request):
     }
 
     # Validate text fields
-    result = validate(form, {
-        "title": [required, max_length(100)],
-        "description": [max_length(500)],
-    })
+    result = validate(
+        form,
+        {
+            "title": [required, max_length(100)],
+            "description": [max_length(500)],
+        },
+    )
 
     errors = dict(result.errors) if not result else {}
 
@@ -175,7 +178,8 @@ async def upload_photo(request: Request):
 
     if errors:
         return ValidationError(
-            "gallery.html", "upload_form",
+            "gallery.html",
+            "upload_form",
             errors=errors,
             form=form_values,
             photos=_get_photos(),

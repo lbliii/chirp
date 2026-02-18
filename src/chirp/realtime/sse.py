@@ -41,25 +41,29 @@ async def handle_sse(
     3. Sends periodic heartbeat comments (``:``) on idle.
     """
     # Send SSE headers
-    await send({
-        "type": "http.response.start",
-        "status": 200,
-        "headers": [
-            (b"content-type", b"text/event-stream"),
-            (b"cache-control", b"no-cache"),
-            (b"connection", b"keep-alive"),
-            (b"x-accel-buffering", b"no"),
-            (b"access-control-allow-origin", b"*"),
-        ],
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [
+                (b"content-type", b"text/event-stream"),
+                (b"cache-control", b"no-cache"),
+                (b"connection", b"keep-alive"),
+                (b"x-accel-buffering", b"no"),
+                (b"access-control-allow-origin", b"*"),
+            ],
+        }
+    )
 
     if retry_ms is not None:
         retry_event = SSEEvent(data="sse-retry", event="chirp:sse:meta", retry=retry_ms)
-        await send({
-            "type": "http.response.body",
-            "body": retry_event.encode().encode("utf-8"),
-            "more_body": True,
-        })
+        await send(
+            {
+                "type": "http.response.body",
+                "body": retry_event.encode().encode("utf-8"),
+                "more_body": True,
+            }
+        )
 
     # Track disconnect
     disconnected = asyncio.Event()
@@ -100,7 +104,8 @@ async def handle_sse(
                 # task on timeout, so __anext__() survives across
                 # heartbeat intervals without needing asyncio.shield.
                 done, _ = await asyncio.wait(
-                    {pending_next}, timeout=heartbeat_interval,
+                    {pending_next},
+                    timeout=heartbeat_interval,
                 )
 
                 if not done:
@@ -108,11 +113,13 @@ async def handle_sse(
                     if disconnected.is_set():
                         break
                     try:
-                        await send({
-                            "type": "http.response.body",
-                            "body": b": heartbeat\n\n",
-                            "more_body": True,
-                        })
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": b": heartbeat\n\n",
+                                "more_body": True,
+                            }
+                        )
                     except RuntimeError:
                         break  # Response already closed (client disconnected)
                     continue
@@ -143,11 +150,13 @@ async def handle_sse(
 
                 if sse_text:
                     try:
-                        await send({
-                            "type": "http.response.body",
-                            "body": sse_text.encode("utf-8"),
-                            "more_body": True,
-                        })
+                        await send(
+                            {
+                                "type": "http.response.body",
+                                "body": sse_text.encode("utf-8"),
+                                "more_body": True,
+                            }
+                        )
                     except RuntimeError:
                         break  # Response already closed (client disconnected)
         except asyncio.CancelledError:
@@ -170,11 +179,13 @@ async def handle_sse(
                 detail = "Internal server error"
             error_event = SSEEvent(data=detail, event="error")
             with contextlib.suppress(Exception):
-                await send({
-                    "type": "http.response.body",
-                    "body": error_event.encode().encode("utf-8"),
-                    "more_body": True,
-                })
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": error_event.encode().encode("utf-8"),
+                        "more_body": True,
+                    }
+                )
         finally:
             # Always clean up pending __anext__ task — whether we exited
             # normally, via CancelledError (disconnect), or via exception.
@@ -202,17 +213,21 @@ async def handle_sse(
         if close_event:
             with contextlib.suppress(Exception):
                 close_payload = SSEEvent(data="complete", event=close_event).encode()
-                await send({
-                    "type": "http.response.body",
-                    "body": close_payload.encode("utf-8"),
-                    "more_body": True,
-                })
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": close_payload.encode("utf-8"),
+                        "more_body": True,
+                    }
+                )
         # Close the stream
-        await send({
-            "type": "http.response.body",
-            "body": b"",
-            "more_body": False,
-        })
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b"",
+                "more_body": False,
+            }
+        )
 
 
 def _format_event(
@@ -279,7 +294,7 @@ def _format_error_event(value: Any, exc: Exception) -> str:
     if isinstance(value, Fragment) and value.target:
         html = (
             f'<div class="chirp-block-error" data-block="{escape(value.block_name)}">'
-            f'<strong>{escape(type(exc).__name__)}</strong>: {escape(str(exc))}'
+            f"<strong>{escape(type(exc).__name__)}</strong>: {escape(str(exc))}"
             f"</div>"
         )
         return SSEEvent(data=html, event=value.target).encode()

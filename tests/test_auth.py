@@ -551,9 +551,7 @@ class TestSessionVersioning:
         app = App()
         app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
         app.add_middleware(
-            AuthMiddleware(
-                AuthConfig(load_user=_load_user, session_version=_session_version)
-            )
+            AuthMiddleware(AuthConfig(load_user=_load_user, session_version=_session_version))
         )
 
         @app.route("/do-login")

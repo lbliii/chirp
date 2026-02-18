@@ -52,8 +52,7 @@ class TestNavLink:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/nav.html" import nav_link %}'
-            '{{ nav_link("/home", "Home") }}',
+            '{% from "chirp/nav.html" import nav_link %}{{ nav_link("/home", "Home") }}',
         )
         assert 'href="/home"' in html
         assert 'class=""' not in html

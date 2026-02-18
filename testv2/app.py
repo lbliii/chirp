@@ -1,3 +1,6 @@
+import chirp_ui
+from models import load_user, verify_user
+
 from chirp import (
     App,
     AppConfig,
@@ -5,7 +8,6 @@ from chirp import (
     Fragment,
     Redirect,
     Request,
-    get_user,
     is_safe_url,
     login,
     logout,
@@ -15,9 +17,6 @@ from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-
-import chirp_ui
-from models import load_user, verify_user
 
 config = AppConfig(
     secret_key="change-me-before-deploying",

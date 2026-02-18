@@ -17,7 +17,6 @@ build on. Application code rarely imports from here directly.
 from collections.abc import AsyncIterator, Awaitable
 from typing import Protocol, runtime_checkable
 
-
 # -- Type aliases for source results --
 
 # A value that will resolve to T (already resolved or awaitable)

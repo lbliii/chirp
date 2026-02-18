@@ -13,7 +13,6 @@ import dataclasses
 import types
 from typing import Any, get_args, get_origin
 
-
 # Scalar types we know how to coerce from database driver values.
 _COERCIBLE: dict[type, Any] = {
     int: lambda v: int(v) if v != "" else 0,
@@ -65,11 +64,7 @@ def map_row[T](cls: type[T], row: dict[str, Any]) -> T:
         raise TypeError(msg)
 
     coercion = _build_coercion_map(cls)
-    filtered = {
-        k: _coerce(v, coercion.get(k))
-        for k, v in row.items()
-        if k in coercion
-    }
+    filtered = {k: _coerce(v, coercion.get(k)) for k, v in row.items() if k in coercion}
     return cls(**filtered)
 
 

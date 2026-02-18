@@ -75,7 +75,4 @@ async def test_custom_config() -> None:
         response = await client.get("/")
     assert _header(response, "x-frame-options") == "SAMEORIGIN"
     assert _header(response, "content-security-policy") == "default-src 'self'"
-    assert (
-        _header(response, "strict-transport-security")
-        == "max-age=63072000; includeSubDomains"
-    )
+    assert _header(response, "strict-transport-security") == "max-age=63072000; includeSubDomains"

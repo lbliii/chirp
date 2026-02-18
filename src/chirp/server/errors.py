@@ -35,8 +35,7 @@ def _with_htmx_error_headers(response: Response, request: Request) -> Response:
     if not request.is_fragment:
         return response
     return (
-        response
-        .with_header("HX-Retarget", "#chirp-error")
+        response.with_header("HX-Retarget", "#chirp-error")
         .with_header("HX-Reswap", "innerHTML")
         .with_header("HX-Trigger", "chirpError")
     )

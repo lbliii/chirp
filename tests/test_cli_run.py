@@ -22,9 +22,7 @@ def fake_app(monkeypatch: pytest.MonkeyPatch) -> App:
 
 class TestChirpRun:
     @patch("chirp.server.dev.run_dev_server")
-    def test_default_host_and_port(
-        self, mock_server: MagicMock, fake_app: App
-    ) -> None:
+    def test_default_host_and_port(self, mock_server: MagicMock, fake_app: App) -> None:
         """run uses app config defaults when --host/--port are omitted."""
         main(["run", "_run_test_app:app"])
         mock_server.assert_called_once()

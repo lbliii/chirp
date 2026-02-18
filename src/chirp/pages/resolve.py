@@ -54,8 +54,7 @@ async def resolve_kwargs(
     if request.method not in ("GET", "HEAD"):
         sig_check = inspect.signature(handler, eval_str=True)
         needs_body = any(
-            p.annotation is not inspect.Parameter.empty
-            and is_extractable_dataclass(p.annotation)
+            p.annotation is not inspect.Parameter.empty and is_extractable_dataclass(p.annotation)
             for p in sig_check.parameters.values()
         )
         if needs_body:
@@ -88,17 +87,18 @@ async def resolve_kwargs(
             and param.annotation in service_providers
         ):
             kwargs[name] = service_providers[param.annotation]()
-        elif (
-            param.annotation is not inspect.Parameter.empty
-            and is_extractable_dataclass(param.annotation)
+        elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
+            param.annotation
         ):
             if request.method in ("GET", "HEAD"):
                 kwargs[name] = extract_dataclass(
-                    param.annotation, request.query,
+                    param.annotation,
+                    request.query,
                 )
             elif body_data is not None:
                 kwargs[name] = extract_dataclass(
-                    param.annotation, body_data,
+                    param.annotation,
+                    body_data,
                 )
 
     return kwargs

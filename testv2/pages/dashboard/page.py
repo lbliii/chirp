@@ -1,6 +1,5 @@
 from chirp import Template, get_user, login_required
 
-
 _GRID_COLUMNS = [{"key": "name", "label": "Name"}, {"key": "role", "label": "Role"}]
 
 

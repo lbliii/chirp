@@ -64,9 +64,7 @@ class TestRequestFromASGI:
         assert req.path_params == {}
 
     def test_headers_parsed(self) -> None:
-        scope = _make_scope(
-            headers=[(b"content-type", b"application/json"), (b"accept", b"*/*")]
-        )
+        scope = _make_scope(headers=[(b"content-type", b"application/json"), (b"accept", b"*/*")])
         req = Request.from_asgi(scope, _make_receive())
 
         assert req.headers["content-type"] == "application/json"
@@ -91,9 +89,7 @@ class TestRequestFromASGI:
 
 class TestRequestCookies:
     def test_cookies_parsed_at_creation(self) -> None:
-        scope = _make_scope(
-            headers=[(b"cookie", b"session=abc123; theme=dark")]
-        )
+        scope = _make_scope(headers=[(b"cookie", b"session=abc123; theme=dark")])
         req = Request.from_asgi(scope, _make_receive())
 
         assert req.cookies == {"session": "abc123", "theme": "dark"}

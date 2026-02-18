@@ -2,8 +2,6 @@
 
 from dataclasses import dataclass
 
-import pytest
-
 from chirp.app import App
 from chirp.http.request import Request
 from chirp.testing import TestClient

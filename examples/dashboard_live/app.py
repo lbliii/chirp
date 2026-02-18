@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chirp import App, AppConfig, EventStream, Fragment, Suspense, Template
+from chirp import App, AppConfig, EventStream, Fragment, Suspense
 from chirp.data import Query
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -84,7 +84,7 @@ async def seed_data():
 
     now = datetime.now(UTC)
     rows = []
-    for i in range(12):
+    for _i in range(12):
         customer = random.choice(CUSTOMERS)
         product, price = random.choice(PRODUCTS)
         status = random.choice(["pending", "shipped", "delivered"])

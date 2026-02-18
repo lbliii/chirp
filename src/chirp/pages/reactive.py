@@ -54,7 +54,7 @@ import logging
 import re
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from kida import Environment
@@ -62,10 +62,10 @@ from kida import Environment
 from chirp.realtime.events import EventStream
 from chirp.templating.returns import Fragment
 
-
 # ---------------------------------------------------------------------------
 # Change Events
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class ChangeEvent:
@@ -90,6 +90,7 @@ class ChangeEvent:
 # ---------------------------------------------------------------------------
 # Reactive Event Bus
 # ---------------------------------------------------------------------------
+
 
 class ReactiveBus:
     """Broadcast channel for data change events.
@@ -170,6 +171,7 @@ class ReactiveBus:
 # ---------------------------------------------------------------------------
 # Dependency Index
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class BlockRef:
@@ -264,10 +266,7 @@ def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
         start = match.end()
         close_tag = "</" + tag
         close_idx = source.lower().find(close_tag, start)
-        if close_idx == -1:
-            inner = source[start:]
-        else:
-            inner = source[start:close_idx]
+        inner = source[start:] if close_idx == -1 else source[start:close_idx]
 
         block_match = _BLOCK_TAG_RE.search(inner)
         if block_match:
@@ -277,22 +276,24 @@ def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
         # Search the ~200 chars preceding the element's open tag for
         # the nearest {% block NAME %} that hasn't been closed yet.
         if inner_block is None:
-            lookback = source[max(0, match.start() - 200):match.start()]
+            lookback = source[max(0, match.start() - 200) : match.start()]
             # Find the LAST {% block NAME %} in the lookback window.
             # If there's a matching {% endblock %} after it, it's closed.
             all_blocks = list(_BLOCK_TAG_RE.finditer(lookback))
             if all_blocks:
                 candidate = all_blocks[-1]
                 # Verify the block isn't closed before our element
-                after_candidate = lookback[candidate.end():]
+                after_candidate = lookback[candidate.end() :]
                 if "endblock" not in after_candidate:
                     inner_block = candidate.group(1)
 
-        results.append(_SSESwapElement(
-            swap_event=swap_event,
-            dom_id=dom_id,
-            inner_block=inner_block,
-        ))
+        results.append(
+            _SSESwapElement(
+                swap_event=swap_event,
+                dom_id=dom_id,
+                inner_block=inner_block,
+            )
+        )
 
     return results
 
@@ -506,11 +507,7 @@ class DependencyIndex:
         Returns a dict with ``original_paths``, ``expanded_paths``,
         ``derived_paths`` (the difference), and ``affected_blocks``.
         """
-        expanded = (
-            self._expand_paths(changed_paths)
-            if self._source_to_derived
-            else changed_paths
-        )
+        expanded = self._expand_paths(changed_paths) if self._source_to_derived else changed_paths
         blocks = self.affected_blocks(changed_paths)
         return {
             "original_paths": changed_paths,
@@ -540,11 +537,7 @@ class DependencyIndex:
             List of unique ``BlockRef`` objects.
         """
         # Expand through derivation graph before lookup
-        effective = (
-            self._expand_paths(changed_paths)
-            if self._source_to_derived
-            else changed_paths
-        )
+        effective = self._expand_paths(changed_paths) if self._source_to_derived else changed_paths
 
         seen: set[tuple[str, str]] = set()
         result: list[BlockRef] = []
@@ -575,6 +568,7 @@ class DependencyIndex:
 # ---------------------------------------------------------------------------
 # Reactive SSE Stream
 # ---------------------------------------------------------------------------
+
 
 def reactive_stream(
     bus: ReactiveBus,
@@ -639,7 +633,8 @@ def reactive_stream(
                     ctx = await ctx
             except Exception:
                 logging.getLogger("chirp.reactive").exception(
-                    "context_builder failed for scope=%s", scope,
+                    "context_builder failed for scope=%s",
+                    scope,
                 )
                 continue
 

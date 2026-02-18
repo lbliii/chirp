@@ -45,38 +45,50 @@ async def handle_mcp_request(
     """
     # MCP Streamable HTTP: only POST carries JSON-RPC
     if request.method != "POST":
-        return _json_response(405, {
-            "jsonrpc": "2.0",
-            "error": {"code": -32600, "message": "Method not allowed. Use POST."},
-            "id": None,
-        })
+        return _json_response(
+            405,
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32600, "message": "Method not allowed. Use POST."},
+                "id": None,
+            },
+        )
 
     # Read request body
     body = await request.body()
     if not body:
-        return _json_response(400, {
-            "jsonrpc": "2.0",
-            "error": {"code": -32700, "message": "Empty request body"},
-            "id": None,
-        })
+        return _json_response(
+            400,
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": "Empty request body"},
+                "id": None,
+            },
+        )
 
     # Parse JSON-RPC
     try:
         rpc_request = json_module.loads(body)
     except json_module.JSONDecodeError:
-        return _json_response(400, {
-            "jsonrpc": "2.0",
-            "error": {"code": -32700, "message": "Parse error"},
-            "id": None,
-        })
+        return _json_response(
+            400,
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": "Parse error"},
+                "id": None,
+            },
+        )
 
     # Validate JSON-RPC structure
     if not isinstance(rpc_request, dict):
-        return _json_response(400, {
-            "jsonrpc": "2.0",
-            "error": {"code": -32600, "message": "Invalid request — expected object"},
-            "id": None,
-        })
+        return _json_response(
+            400,
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32600, "message": "Invalid request — expected object"},
+                "id": None,
+            },
+        )
 
     rpc_method = rpc_request.get("method")
     rpc_id = rpc_request.get("id")
@@ -87,11 +99,14 @@ async def handle_mcp_request(
     is_notification = "id" not in rpc_request
 
     if not rpc_method:
-        return _json_response(400, {
-            "jsonrpc": "2.0",
-            "error": {"code": -32600, "message": "Missing 'method' field"},
-            "id": rpc_id,
-        })
+        return _json_response(
+            400,
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32600, "message": "Missing 'method' field"},
+                "id": rpc_id,
+            },
+        )
 
     # Handle notifications (no response expected)
     if is_notification:
@@ -101,17 +116,23 @@ async def handle_mcp_request(
     result = await _dispatch(rpc_method, params, registry=registry)
 
     if isinstance(result, dict) and "error" in result:
-        return _json_response(200, {
-            "jsonrpc": "2.0",
-            "error": result["error"],
-            "id": rpc_id,
-        })
+        return _json_response(
+            200,
+            {
+                "jsonrpc": "2.0",
+                "error": result["error"],
+                "id": rpc_id,
+            },
+        )
 
-    return _json_response(200, {
-        "jsonrpc": "2.0",
-        "result": result,
-        "id": rpc_id,
-    })
+    return _json_response(
+        200,
+        {
+            "jsonrpc": "2.0",
+            "result": result,
+            "id": rpc_id,
+        },
+    )
 
 
 def _handle_notification(method: str) -> Response:

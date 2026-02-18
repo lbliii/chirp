@@ -90,16 +90,20 @@ async def step1_submit(request: Request):
         "phone": form.get("phone", ""),
     }
 
-    result = validate(form, {
-        "first_name": [required, max_length(50)],
-        "last_name": [required, max_length(50)],
-        "email": [required, email],
-        "phone": [max_length(20)],
-    })
+    result = validate(
+        form,
+        {
+            "first_name": [required, max_length(50)],
+            "last_name": [required, max_length(50)],
+            "email": [required, email],
+            "phone": [max_length(20)],
+        },
+    )
 
     if not result:
         return ValidationError(
-            "step1.html", "step_form",
+            "step1.html",
+            "step_form",
             errors=result.errors,
             form={**data, **form_values},
             step=1,
@@ -139,16 +143,20 @@ async def step2_submit(request: Request):
         "zip_code": form.get("zip_code", ""),
     }
 
-    result = validate(form, {
-        "address": [required, max_length(200)],
-        "city": [required, max_length(100)],
-        "state": [required, min_length(2), max_length(2)],
-        "zip_code": [required, _US_ZIP],
-    })
+    result = validate(
+        form,
+        {
+            "address": [required, max_length(200)],
+            "city": [required, max_length(100)],
+            "state": [required, min_length(2), max_length(2)],
+            "zip_code": [required, _US_ZIP],
+        },
+    )
 
     if not result:
         return ValidationError(
-            "step2.html", "step_form",
+            "step2.html",
+            "step_form",
             errors=result.errors,
             form={**data, **form_values},
             step=2,

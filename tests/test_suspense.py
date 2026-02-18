@@ -13,8 +13,8 @@ Covers:
 """
 
 import asyncio
-from pathlib import Path
 
+import pytest
 from kida import DictLoader, Environment
 
 from chirp.templating.returns import Suspense
@@ -23,7 +23,6 @@ from chirp.templating.suspense import (
     format_oob_script,
     render_suspense,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test fixtures
@@ -68,10 +67,14 @@ _SIMPLE_TEMPLATE = """\
 
 def _env() -> Environment:
     """Build a kida Environment with in-memory test templates."""
-    return Environment(loader=DictLoader({
-        "dashboard.html": _DASHBOARD_TEMPLATE,
-        "simple.html": _SIMPLE_TEMPLATE,
-    }))
+    return Environment(
+        loader=DictLoader(
+            {
+                "dashboard.html": _DASHBOARD_TEMPLATE,
+                "simple.html": _SIMPLE_TEMPLATE,
+            }
+        )
+    )
 
 
 async def _collect_chunks(
@@ -81,10 +84,7 @@ async def _collect_chunks(
     is_htmx: bool = False,
 ) -> list[str]:
     """Collect all chunks from render_suspense into a list."""
-    chunks: list[str] = []
-    async for chunk in render_suspense(env, suspense, is_htmx=is_htmx):
-        chunks.append(chunk)
-    return chunks
+    return [c async for c in render_suspense(env, suspense, is_htmx=is_htmx)]
 
 
 async def _delayed_value(value: object, delay: float = 0.01) -> object:
@@ -116,7 +116,7 @@ class TestSuspenseDataclass:
         s = Suspense("page.html", title="Home")
         try:
             s.template_name = "other.html"
-            assert False, "Should have raised"
+            pytest.fail("Should have raised")
         except AttributeError:
             pass
 
@@ -134,7 +134,7 @@ class TestFormatOOBHtmx:
         assert html == '<div id="stats" hx-swap-oob="true"><p>Hello</p></div>'
 
     def test_preserves_inner_html(self):
-        inner = '<ul><li>a</li><li>b</li></ul>'
+        inner = "<ul><li>a</li><li>b</li></ul>"
         html = format_oob_htmx(inner, "feed")
         assert inner in html
         assert 'id="feed"' in html
@@ -265,8 +265,8 @@ class TestMixedSyncAsync:
         s = Suspense(
             "dashboard.html",
             title="Dashboard",
-            stats=["sync-stat"],                    # sync
-            feed=_delayed_value(["async-item"]),     # async
+            stats=["sync-stat"],  # sync
+            feed=_delayed_value(["async-item"]),  # async
         )
         chunks = await _collect_chunks(env, s)
 
@@ -281,8 +281,8 @@ class TestMixedSyncAsync:
         s = Suspense(
             "dashboard.html",
             title="Dashboard",
-            stats=["sync-stat"],                    # sync
-            feed=_delayed_value(["async-item"]),     # async
+            stats=["sync-stat"],  # sync
+            feed=_delayed_value(["async-item"]),  # async
         )
         chunks = await _collect_chunks(env, s, is_htmx=True)
 

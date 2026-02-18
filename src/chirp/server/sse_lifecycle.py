@@ -45,6 +45,4 @@ SSE_LIFECYCLE_JS = """\
 })();
 """
 
-SSE_LIFECYCLE_SNIPPET = (
-    '<script data-chirp="sse-lifecycle">' + SSE_LIFECYCLE_JS + "</script>"
-)
+SSE_LIFECYCLE_SNIPPET = '<script data-chirp="sse-lifecycle">' + SSE_LIFECYCLE_JS + "</script>"

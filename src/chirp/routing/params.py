@@ -3,7 +3,6 @@
 Built-in converters for route path segments like ``{id:int}``.
 """
 
-
 # (regex_pattern, python_type) for each supported converter
 CONVERTERS: dict[str, tuple[str, type]] = {
     "str": (r"[^/]+", str),

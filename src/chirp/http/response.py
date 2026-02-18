@@ -358,15 +358,11 @@ class SSEResponse:
         """No-op: SSE streams cannot set HX-Trigger."""
         return self
 
-    def with_hx_trigger_after_settle(
-        self, event: str | dict[str, Any] = ""
-    ) -> SSEResponse:
+    def with_hx_trigger_after_settle(self, event: str | dict[str, Any] = "") -> SSEResponse:
         """No-op: SSE streams cannot set HX-Trigger-After-Settle."""
         return self
 
-    def with_hx_trigger_after_swap(
-        self, event: str | dict[str, Any] = ""
-    ) -> SSEResponse:
+    def with_hx_trigger_after_swap(self, event: str | dict[str, Any] = "") -> SSEResponse:
         """No-op: SSE streams cannot set HX-Trigger-After-Swap."""
         return self
 

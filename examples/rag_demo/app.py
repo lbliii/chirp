@@ -48,20 +48,20 @@ import httpx
 # Allow importing sync when run as script (python app.py)
 sys.path.insert(0, str(Path(__file__).parent))
 
-from sync import sync_from_sources
-
 from urllib.parse import quote
 
+from patitas import parse, render_llm, sanitize
+from patitas.sanitize import llm_safe
+from sync import sync_from_sources
+
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-from chirp.middleware.static import StaticFiles
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
 from chirp.markdown import register_markdown_filter
-from patitas import parse, render_llm, sanitize
-from patitas.sanitize import llm_safe
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.static import StaticFiles
 
 # -- Helpers --
 
@@ -100,12 +100,9 @@ async def _retrieve_docs(db: Database | None, question: str) -> list[Document]:
             pattern,
         )
     # Token-based: match any token in content or title, order by match count
-    conditions = " OR ".join(
-        "(content LIKE ? OR title LIKE ?)" for _ in tokens
-    )
+    conditions = " OR ".join("(content LIKE ? OR title LIKE ?)" for _ in tokens)
     order = " + ".join(
-        f"(CASE WHEN content LIKE ? OR title LIKE ? THEN 1 ELSE 0 END)"
-        for _ in tokens
+        "(CASE WHEN content LIKE ? OR title LIKE ? THEN 1 ELSE 0 END)" for _ in tokens
     )
     params: list[str] = []
     for t in tokens:
@@ -148,9 +145,7 @@ class SharedQA:
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 RAG_STATIC = Path(__file__).parent / "static"
-app = App(
-    AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True)
-)
+app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True))
 app.add_middleware(StaticFiles(directory=str(RAG_STATIC), prefix="/static/rag"))
 use_chirp_ui(app)
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
@@ -168,6 +163,7 @@ def _cite_filter(html: str, sources: list[Document] | None) -> str:
         return html
 
     from html import escape as html_escape
+
     from kida.utils.html import safe_url
 
     def repl(match: re.Match[str]) -> str:
@@ -185,6 +181,7 @@ def _cite_filter(html: str, sources: list[Document] | None) -> str:
 def cite_filter(html: str, sources: list[Document] | None = None) -> str:
     """Replace [1], [2], etc. with links to sources. Use: {{ text | markdown | cite(sources) }}."""
     return _cite_filter(html, sources)
+
 
 DB_PATH = Path(__file__).parent / "docs.db"
 DB_URL = os.environ.get("DB_URL", f"sqlite:///{DB_PATH}")
@@ -257,7 +254,9 @@ async def share(slug: str) -> Template:
             sources=[],
         )
     raw = json.loads(row.sources_json)
-    sources = [SimpleNamespace(title=d["title"], url=d["url"], content=d.get("content", "")) for d in raw]
+    sources = [
+        SimpleNamespace(title=d["title"], url=d["url"], content=d.get("content", "")) for d in raw
+    ]
     return Template(
         "share.html",
         title=f"Shared: {row.question[:50]}…",
@@ -358,7 +357,9 @@ async def ask_stream(request: Request) -> EventStream:
             f"where [1] = first doc, [2] = second, etc. Use only these numbers when citing."
         )
 
-        async def save_share(accumulated: str, srcs: list[Document], ctx: dict[str, Any]) -> str | None:
+        async def save_share(
+            accumulated: str, srcs: list[Document], ctx: dict[str, Any]
+        ) -> str | None:
             db = _db_var.get()
             if not db:
                 return None

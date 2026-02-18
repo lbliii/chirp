@@ -46,6 +46,4 @@ DELEGATION_JS = """\
 })();
 """
 
-DELEGATION_SNIPPET = (
-    '<script data-chirp="delegation">' + DELEGATION_JS + "</script>"
-)
+DELEGATION_SNIPPET = '<script data-chirp="delegation">' + DELEGATION_JS + "</script>"

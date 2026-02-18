@@ -1,4 +1,5 @@
 """Pytest conftest — add project root to path for app import."""
+
 import sys
 from pathlib import Path
 

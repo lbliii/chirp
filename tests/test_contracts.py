@@ -72,16 +72,16 @@ class TestExtractTargets:
         assert targets[0] == ("action", "/login")
 
     def test_multiple_targets(self):
-        html = '''
+        html = """
         <div hx-get="/api/items"></div>
         <button hx-post="/api/items" hx-target="#list"></button>
         <form action="/search"></form>
-        '''
+        """
         targets = _extract_targets_from_source(html)
         assert len(targets) == 3
 
     def test_ignores_template_expressions(self):
-        html = '<div hx-get="{{ url_for(\'search\') }}"></div>'
+        html = "<div hx-get=\"{{ url_for('search') }}\"></div>"
         targets = _extract_targets_from_source(html)
         assert len(targets) == 0
 
@@ -168,9 +168,7 @@ class TestIslandMountValidation:
         assert "data-island-version" in issues[0].message
 
     def test_invalid_version_errors(self):
-        sources = {
-            "index.html": '<div data-island="editor" data-island-version="1 beta"></div>'
-        }
+        sources = {"index.html": '<div data-island="editor" data-island-version="1 beta"></div>'}
         issues = _check_island_mounts(sources, strict=False)
         assert len(issues) == 1
         assert issues[0].severity == Severity.ERROR
@@ -295,15 +293,19 @@ class TestCheckResult:
         assert result.ok
 
     def test_not_ok_with_errors(self):
-        result = CheckResult(issues=[
-            ContractIssue(severity=Severity.ERROR, category="test", message="fail"),
-        ])
+        result = CheckResult(
+            issues=[
+                ContractIssue(severity=Severity.ERROR, category="test", message="fail"),
+            ]
+        )
         assert not result.ok
 
     def test_ok_with_warnings_only(self):
-        result = CheckResult(issues=[
-            ContractIssue(severity=Severity.WARNING, category="test", message="warn"),
-        ])
+        result = CheckResult(
+            issues=[
+                ContractIssue(severity=Severity.WARNING, category="test", message="warn"),
+            ]
+        )
         assert result.ok
 
     def test_summary_no_issues(self):
@@ -440,9 +442,7 @@ class TestSwapSafetyWarnings:
         template_sources = {
             "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
             "docs.html": (
-                '<form hx-post="/docs/new" hx-target="#editor">'
-                "<button>Save</button>"
-                "</form>"
+                '<form hx-post="/docs/new" hx-target="#editor"><button>Save</button></form>'
             ),
         }
         issues = _check_swap_safety(template_sources)
@@ -534,9 +534,7 @@ class TestCheckHypermediaSurface:
         def fake_has_flask_syntax(path: str) -> bool:
             return path == "/api/items"
 
-        monkeypatch.setattr(
-            "chirp.contracts._route_path_has_flask_syntax", fake_has_flask_syntax
-        )
+        monkeypatch.setattr("chirp.contracts._route_path_has_flask_syntax", fake_has_flask_syntax)
         result = check_hypermedia_surface(app)
         assert not result.ok
         routing_errors = [i for i in result.issues if i.category == "routing"]
@@ -564,9 +562,7 @@ class TestCheckHypermediaSurface:
     def test_detects_unmatched_hx_target(self, tmp_path):
         """Template references a route that doesn't exist."""
         # Write a template with an htmx target
-        (tmp_path / "index.html").write_text(
-            '<div hx-get="/api/missing">load</div>'
-        )
+        (tmp_path / "index.html").write_text('<div hx-get="/api/missing">load</div>')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
@@ -579,9 +575,7 @@ class TestCheckHypermediaSurface:
 
     def test_detects_method_mismatch(self, tmp_path):
         """Template uses hx-post but route only allows GET."""
-        (tmp_path / "index.html").write_text(
-            '<button hx-post="/api/items">submit</button>'
-        )
+        (tmp_path / "index.html").write_text('<button hx-post="/api/items">submit</button>')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/api/items")  # GET only
@@ -595,8 +589,7 @@ class TestCheckHypermediaSurface:
     def test_valid_hx_targets(self, tmp_path):
         """All htmx targets match registered routes."""
         (tmp_path / "index.html").write_text(
-            '<div hx-get="/api/items">load</div>'
-            '<button hx-post="/api/items">add</button>'
+            '<div hx-get="/api/items">load</div><button hx-post="/api/items">add</button>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -644,9 +637,7 @@ class TestCheckHypermediaSurface:
             return "ok"
 
         result = check_hypermedia_surface(app)
-        route_errors = [
-            i for i in result.errors if "no matching route" in i.message
-        ]
+        route_errors = [i for i in result.errors if "no matching route" in i.message]
         assert not route_errors, (
             f"Expected no 'has no matching route' errors for URLs with query params, "
             f"got: {[e.message for e in route_errors]}"
@@ -656,8 +647,7 @@ class TestCheckHypermediaSurface:
     def test_accessibility_warnings_in_surface_check(self, tmp_path):
         """Accessibility warnings surface through the full check."""
         (tmp_path / "index.html").write_text(
-            '<div hx-get="/api/items">load</div>'
-            '<button hx-post="/api/items">add</button>'
+            '<div hx-get="/api/items">load</div><button hx-post="/api/items">add</button>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -672,17 +662,14 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         # Routes match, so no errors — but div triggers a11y warning
         assert result.ok
-        a11y_warnings = [
-            i for i in result.warnings if i.category == "accessibility"
-        ]
+        a11y_warnings = [i for i in result.warnings if i.category == "accessibility"]
         assert len(a11y_warnings) == 1
         assert "<div>" in a11y_warnings[0].message
 
     def test_no_accessibility_warnings_when_all_interactive(self, tmp_path):
         """No a11y warnings when all htmx attrs are on interactive elements."""
         (tmp_path / "index.html").write_text(
-            '<a hx-get="/api/items">load</a>'
-            '<button hx-post="/api/items">add</button>'
+            '<a hx-get="/api/items">load</a><button hx-post="/api/items">add</button>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -696,9 +683,7 @@ class TestCheckHypermediaSurface:
 
         result = check_hypermedia_surface(app)
         assert result.ok
-        a11y_warnings = [
-            i for i in result.warnings if i.category == "accessibility"
-        ]
+        a11y_warnings = [i for i in result.warnings if i.category == "accessibility"]
         assert len(a11y_warnings) == 0
 
     def test_swap_safety_warning_surfaces(self, tmp_path):
@@ -718,9 +703,7 @@ class TestCheckHypermediaSurface:
             return "ok"
 
         result = check_hypermedia_surface(app)
-        swap_warnings = [
-            issue for issue in result.warnings if issue.category == "swap_safety"
-        ]
+        swap_warnings = [issue for issue in result.warnings if issue.category == "swap_safety"]
         assert len(swap_warnings) == 1
         assert "Action()" in swap_warnings[0].message
 
@@ -751,7 +734,9 @@ class TestExtractTemplateReferences:
             '{% from "macros.html" import btn %}\n'
         )
         assert _extract_template_references(source) == {
-            "base.html", "nav.html", "macros.html",
+            "base.html",
+            "nav.html",
+            "macros.html",
         }
 
     def test_single_quotes(self):
@@ -773,15 +758,13 @@ class TestExtractTemplateReferences:
 
 def _user_dead(result: CheckResult) -> list[ContractIssue]:
     """Filter dead-template issues to only user templates (not built-in)."""
+
     def is_builtin(tmpl: str | None) -> bool:
         if not tmpl:
             return True
         return tmpl.startswith(("chirp/", "chirpui", "themes/"))
 
-    return [
-        i for i in result.issues
-        if i.category == "dead" and not is_builtin(i.template)
-    ]
+    return [i for i in result.issues if i.category == "dead" and not is_builtin(i.template)]
 
 
 class TestDeadTemplateDetection:
@@ -789,9 +772,7 @@ class TestDeadTemplateDetection:
 
     def test_unreferenced_template_reported(self, tmp_path):
         """An unused template should be reported as dead."""
-        (tmp_path / "index.html").write_text(
-            "{% block content %}<h1>Home</h1>{% endblock %}"
-        )
+        (tmp_path / "index.html").write_text("{% block content %}<h1>Home</h1>{% endblock %}")
         (tmp_path / "unused.html").write_text("<h1>Old page</h1>")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -825,9 +806,7 @@ class TestDeadTemplateDetection:
 
     def test_extended_template_not_dead(self, tmp_path):
         """A template referenced via extends should not be reported."""
-        (tmp_path / "base.html").write_text(
-            "{% block content %}{% endblock %}"
-        )
+        (tmp_path / "base.html").write_text("{% block content %}{% endblock %}")
         (tmp_path / "page.html").write_text(
             '{% extends "base.html" %}{% block content %}hi{% endblock %}'
         )
@@ -844,9 +823,7 @@ class TestDeadTemplateDetection:
 
     def test_partial_excluded_by_convention(self, tmp_path):
         """Templates with _ prefix are partials and should be excluded."""
-        (tmp_path / "index.html").write_text(
-            "{% block content %}<h1>Home</h1>{% endblock %}"
-        )
+        (tmp_path / "index.html").write_text("{% block content %}<h1>Home</h1>{% endblock %}")
         (tmp_path / "_partial.html").write_text("<p>partial</p>")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -861,9 +838,7 @@ class TestDeadTemplateDetection:
 
     def test_fragment_contract_template_not_dead(self, tmp_path):
         """A template referenced by a FragmentContract should not be dead."""
-        (tmp_path / "search.html").write_text(
-            "{% block results %}results{% endblock %}"
-        )
+        (tmp_path / "search.html").write_text("{% block results %}results{% endblock %}")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/search")
@@ -882,19 +857,20 @@ class TestSSEFragmentValidation:
     def test_valid_sse_fragments(self, tmp_path):
         """SSE route with valid fragment declarations passes."""
         (tmp_path / "chat.html").write_text(
-            "{% block message %}<p>msg</p>{% endblock %}"
-            "{% block status %}<p>ok</p>{% endblock %}"
+            "{% block message %}<p>msg</p>{% endblock %}{% block status %}<p>ok</p>{% endblock %}"
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/events")
-        @contract(returns=SSEContract(
-            event_types=frozenset({"message", "status"}),
-            fragments=(
-                FragmentContract("chat.html", "message"),
-                FragmentContract("chat.html", "status"),
-            ),
-        ))
+        @contract(
+            returns=SSEContract(
+                event_types=frozenset({"message", "status"}),
+                fragments=(
+                    FragmentContract("chat.html", "message"),
+                    FragmentContract("chat.html", "status"),
+                ),
+            )
+        )
         async def events():
             return "ok"
 
@@ -908,9 +884,11 @@ class TestSSEFragmentValidation:
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/events")
-        @contract(returns=SSEContract(
-            fragments=(FragmentContract("nonexistent.html", "body"),),
-        ))
+        @contract(
+            returns=SSEContract(
+                fragments=(FragmentContract("nonexistent.html", "body"),),
+            )
+        )
         async def events():
             return "ok"
 
@@ -921,15 +899,15 @@ class TestSSEFragmentValidation:
 
     def test_missing_block(self, tmp_path):
         """SSE route referencing a nonexistent block reports ERROR."""
-        (tmp_path / "chat.html").write_text(
-            "{% block message %}<p>msg</p>{% endblock %}"
-        )
+        (tmp_path / "chat.html").write_text("{% block message %}<p>msg</p>{% endblock %}")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/events")
-        @contract(returns=SSEContract(
-            fragments=(FragmentContract("chat.html", "wrong_block"),),
-        ))
+        @contract(
+            returns=SSEContract(
+                fragments=(FragmentContract("chat.html", "wrong_block"),),
+            )
+        )
         async def events():
             return "ok"
 
@@ -1000,10 +978,7 @@ class TestFormFieldValidation:
             body: str
 
         (tmp_path / "tasks.html").write_text(
-            '<form>'
-            '<input name="title" type="text">'
-            '<textarea name="body"></textarea>'
-            '</form>'
+            '<form><input name="title" type="text"><textarea name="body"></textarea></form>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1025,9 +1000,7 @@ class TestFormFieldValidation:
             title: str
             body: str
 
-        (tmp_path / "tasks.html").write_text(
-            '<form><input name="title" type="text"></form>'
-        )
+        (tmp_path / "tasks.html").write_text('<form><input name="title" type="text"></form>')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/tasks", methods=["POST"])
@@ -1049,10 +1022,7 @@ class TestFormFieldValidation:
             title: str
 
         (tmp_path / "tasks.html").write_text(
-            '<form>'
-            '<input name="title" type="text">'
-            '<input name="titl" type="text">'
-            '</form>'
+            '<form><input name="title" type="text"><input name="titl" type="text"></form>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1076,11 +1046,11 @@ class TestFormFieldValidation:
             password: str
 
         (tmp_path / "login.html").write_text(
-            '<form>'
+            "<form>"
             '<input name="_csrf_token" type="hidden">'
             '<input name="username" type="text">'
             '<input name="password" type="password">'
-            '</form>'
+            "</form>"
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1102,9 +1072,9 @@ class TestFormFieldValidation:
 
         (tmp_path / "page.html").write_text(
             '{% block header %}<input name="search">{% endblock %}'
-            '{% block task_form %}'
+            "{% block task_form %}"
             '<form><input name="title" type="text"></form>'
-            '{% endblock %}'
+            "{% endblock %}"
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1241,9 +1211,7 @@ class TestPageContextGaps:
 
     def test_no_gap_for_single_block_templates(self, tmp_path):
         """Template with just one block — no gap possible."""
-        (tmp_path / "simple.html").write_text(
-            "{% block main %}<h1>{{ title }}</h1>{% endblock %}"
-        )
+        (tmp_path / "simple.html").write_text("{% block main %}<h1>{{ title }}</h1>{% endblock %}")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
@@ -1258,8 +1226,7 @@ class TestPageContextGaps:
     def test_route_without_fragment_contract_skipped(self, tmp_path):
         """Routes without FragmentContract should not trigger this check."""
         (tmp_path / "page.html").write_text(
-            "{% block a %}{{ x }}{% endblock %}"
-            "{% block b %}{{ y }}{% endblock %}"
+            "{% block a %}{{ x }}{% endblock %}{% block b %}{{ y }}{% endblock %}"
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1355,9 +1322,7 @@ class TestSSEConnectScope:
     def test_no_warning_when_no_broad_targets(self):
         template_sources = {
             "page.html": (
-                '<div hx-ext="sse" sse-connect="/events">'
-                '<span sse-swap="status"></span>'
-                "</div>"
+                '<div hx-ext="sse" sse-connect="/events"><span sse-swap="status"></span></div>'
             ),
         }
         broad = _collect_broad_targets(template_sources)
@@ -1385,9 +1350,11 @@ class TestSSEEventCrossref:
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/stream")
-        @contract(returns=SSEContract(
-            event_types=frozenset({"status", "presence"}),
-        ))
+        @contract(
+            returns=SSEContract(
+                event_types=frozenset({"status", "presence"}),
+            )
+        )
         async def stream():
             return "ok"
 
@@ -1414,9 +1381,11 @@ class TestSSEEventCrossref:
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/stream")
-        @contract(returns=SSEContract(
-            event_types=frozenset({"status", "presence"}),
-        ))
+        @contract(
+            returns=SSEContract(
+                event_types=frozenset({"status", "presence"}),
+            )
+        )
         async def stream():
             return "ok"
 
@@ -1427,9 +1396,7 @@ class TestSSEEventCrossref:
     def test_skipped_when_no_event_types_declared(self, tmp_path):
         """SSEContract without event_types -> no cross-reference."""
         (tmp_path / "page.html").write_text(
-            '<div hx-ext="sse" sse-connect="/stream">'
-            '<span sse-swap="whatever">x</span>'
-            "</div>"
+            '<div hx-ext="sse" sse-connect="/stream"><span sse-swap="whatever">x</span></div>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -1452,9 +1419,11 @@ class TestSSEEventCrossref:
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/doc/{doc_id}/stream")
-        @contract(returns=SSEContract(
-            event_types=frozenset({"status", "title"}),
-        ))
+        @contract(
+            returns=SSEContract(
+                event_types=frozenset({"status", "title"}),
+            )
+        )
         async def stream(doc_id: str):
             return "ok"
 

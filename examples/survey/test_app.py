@@ -26,8 +26,7 @@ def _build_survey_body(
         ("name", name),
         ("age", age),
     ]
-    for interest in interests:
-        pairs.append(("interests", interest))
+    pairs.extend(("interests", interest) for interest in interests)
     pairs.append(("experience", experience))
     pairs.append(("country", country))
     pairs.append(("comments", comments))

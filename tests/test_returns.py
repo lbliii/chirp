@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.templating.returns import Fragment, OOB, Page, Stream, Template, ValidationError
+from chirp.templating.returns import OOB, Fragment, Page, Stream, Template, ValidationError
 
 
 class TestTemplate:
@@ -71,7 +71,8 @@ class TestValidationError:
 
     def test_multiple_context_kwargs(self) -> None:
         ve = ValidationError(
-            "form.html", "form_body",
+            "form.html",
+            "form_body",
             errors={"name": ["Too short"]},
             form={"name": "x"},
         )

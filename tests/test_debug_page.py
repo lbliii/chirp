@@ -7,8 +7,6 @@ masking, editor URL generation, and both full-page and fragment output.
 import os
 import types
 
-import pytest
-
 from chirp.server.debug_page import (
     _editor_url,
     _extract_frames,
@@ -17,7 +15,6 @@ from chirp.server.debug_page import (
     _is_app_frame,
     render_debug_page,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -109,12 +106,12 @@ class TestExtractFrames:
     """Traceback frame extraction with source and locals."""
 
     def test_extracts_at_least_one_frame(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         assert len(frames) >= 1
 
     def test_frame_has_required_keys(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         assert "filename" in frame
@@ -125,12 +122,12 @@ class TestExtractFrames:
         assert "is_app" in frame
 
     def test_frame_filename_matches_this_file(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         assert any("test_debug_page" in f["filename"] for f in frames)
 
     def test_frame_has_source_context(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         assert len(frame["source_lines"]) > 0
@@ -140,7 +137,7 @@ class TestExtractFrames:
         assert isinstance(code, str)
 
     def test_dunder_locals_are_filtered(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         for name in frame["locals"]:
@@ -230,12 +227,14 @@ class TestExtractRequestContext:
         assert ctx["path"] == "/api/items"
 
     def test_sensitive_headers_masked(self) -> None:
-        req = _make_request(headers=[
-            ("content-type", "text/html"),
-            ("authorization", "Bearer secret-token"),
-            ("cookie", "session=abc123"),
-            ("x-api-key", "my-key"),
-        ])
+        req = _make_request(
+            headers=[
+                ("content-type", "text/html"),
+                ("authorization", "Bearer secret-token"),
+                ("cookie", "session=abc123"),
+                ("x-api-key", "my-key"),
+            ]
+        )
         ctx = _extract_request_context(req)
         header_dict = dict(ctx["headers"])
         assert header_dict["content-type"] == "text/html"
@@ -382,8 +381,8 @@ class TestRenderDebugPageFragment:
     def test_has_chirp_error_class(self) -> None:
         exc, _ = _raise_and_capture()
         html = render_debug_page(exc, _make_request(), is_fragment=True)
-        assert 'chirp-error' in html
-        assert 'chirp-error-fragment' in html
+        assert "chirp-error" in html
+        assert "chirp-error-fragment" in html
 
     def test_has_data_status(self) -> None:
         exc, _ = _raise_and_capture()
@@ -436,7 +435,11 @@ class TestRenderDebugPageTemplateErrors:
             template_name="post.html",
         )
         html = render_debug_page(exc, _make_request())
-        assert "Use | default(&#x27;&#x27;)" in html or "default(&#39;&#39;)" in html or "default(" in html
+        assert (
+            "Use | default(&#x27;&#x27;)" in html
+            or "default(&#39;&#39;)" in html
+            or "default(" in html
+        )
 
 
 # ---------------------------------------------------------------------------

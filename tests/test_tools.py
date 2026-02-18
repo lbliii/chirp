@@ -79,6 +79,7 @@ class TestFunctionToSchema:
 
     def test_request_param_excluded(self) -> None:
         """Parameters named 'request' or annotated as Request are excluded."""
+
         def func(request: Request, query: str) -> None:
             pass
 
@@ -492,12 +493,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call(self) -> None:
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "id": 4,
-            "params": {"name": "greet", "arguments": {"name": "World"}},
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 4,
+                "params": {"name": "greet", "arguments": {"name": "World"}},
+            }
+        )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
@@ -510,12 +513,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call_async(self) -> None:
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "id": 5,
-            "params": {"name": "search", "arguments": {"query": "test"}},
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 5,
+                "params": {"name": "search", "arguments": {"query": "test"}},
+            }
+        )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
@@ -526,12 +531,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_tools_call_not_found(self) -> None:
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "id": 6,
-            "params": {"name": "missing", "arguments": {}},
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 6,
+                "params": {"name": "missing", "arguments": {}},
+            }
+        )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
@@ -541,9 +548,14 @@ class TestMCPHandler:
     @pytest.mark.asyncio
     async def test_method_not_found(self) -> None:
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0", "method": "unknown/method", "id": 7, "params": {},
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "unknown/method",
+                "id": 7,
+                "params": {},
+            }
+        )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
@@ -588,11 +600,13 @@ class TestMCPHandler:
     async def test_notifications_initialized(self) -> None:
         """notifications/initialized has no id — server returns 204."""
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-            # No "id" — this is a JSON-RPC notification
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                # No "id" — this is a JSON-RPC notification
+            }
+        )
         response = await handle_mcp_request(request, registry)
         assert response.status == 204
 
@@ -600,10 +614,12 @@ class TestMCPHandler:
     async def test_notification_unknown_method(self) -> None:
         """Any notification (no id) gets 204, even for unknown methods."""
         registry = self._make_registry()
-        request = _make_request(body={
-            "jsonrpc": "2.0",
-            "method": "notifications/something_else",
-        })
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "notifications/something_else",
+            }
+        )
         response = await handle_mcp_request(request, registry)
         assert response.status == 204
 
@@ -613,13 +629,11 @@ class TestMCPHandler:
 # =============================================================================
 
 
-def _make_asgi_harness() -> (
-    tuple[
-        Any,  # receive
-        Any,  # send
-        dict,  # result container {status, body}
-    ]
-):
+def _make_asgi_harness() -> tuple[
+    Any,  # receive
+    Any,  # send
+    dict,  # result container {status, body}
+]:
     """Build ASGI receive/send for app integration tests."""
     result: dict[str, Any] = {"status": 0, "body": b""}
 
@@ -696,12 +710,14 @@ class TestAppToolIntegration:
             return f"echo: {message}"
 
         # Build ASGI request to /mcp
-        body = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "id": 1,
-            "params": {"name": "echo", "arguments": {"message": "test"}},
-        }).encode("utf-8")
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 1,
+                "params": {"name": "echo", "arguments": {"message": "test"}},
+            }
+        ).encode("utf-8")
 
         body_sent = False
 
@@ -801,12 +817,14 @@ class TestAppToolIntegration:
         def echo(message: str) -> str:
             return message
 
-        body = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": 1,
-            "params": {},
-        }).encode("utf-8")
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {},
+            }
+        ).encode("utf-8")
 
         body_sent = False
 
@@ -859,12 +877,14 @@ class TestAppToolIntegration:
         def echo(message: str) -> str:
             return message
 
-        body = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": 1,
-            "params": {},
-        }).encode("utf-8")
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {},
+            }
+        ).encode("utf-8")
 
         body_sent = False
 
@@ -926,10 +946,12 @@ class TestAppToolIntegration:
         await asyncio.sleep(0.01)
 
         # Simulate lifespan startup + shutdown
-        messages = iter([
-            {"type": "lifespan.startup"},
-            {"type": "lifespan.shutdown"},
-        ])
+        messages = iter(
+            [
+                {"type": "lifespan.startup"},
+                {"type": "lifespan.shutdown"},
+            ]
+        )
 
         async def receive():
             return next(messages)

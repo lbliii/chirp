@@ -597,7 +597,7 @@ class TestLifespanProtocol:
         def sync_teardown():
             events.append("sync_shutdown")
 
-        sent, ok = await _lifespan_exchange(app)
+        _sent, ok = await _lifespan_exchange(app)
 
         assert ok is True
         assert events == ["sync_startup", "sync_shutdown"]
@@ -623,7 +623,7 @@ class TestLifespanProtocol:
         async def third():
             order.append(3)
 
-        sent, ok = await _lifespan_exchange(app)
+        _sent, ok = await _lifespan_exchange(app)
 
         assert ok is True
         assert order == [1, 2, 3]
@@ -637,7 +637,7 @@ class TestLifespanProtocol:
             return "ok"
 
         assert app._frozen is False
-        sent, ok = await _lifespan_exchange(app)
+        _sent, ok = await _lifespan_exchange(app)
         assert ok is True
         assert app._frozen is True
 
@@ -1027,6 +1027,7 @@ class TestServiceInjection:
 
 
 # Minimal receive/send for testing worker lifecycle scopes
+
 
 async def _dummy_receive() -> dict[str, Any]:
     return {"type": "http.disconnect"}

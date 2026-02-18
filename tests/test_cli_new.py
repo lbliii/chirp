@@ -8,7 +8,9 @@ from chirp.cli import main
 
 
 class TestChirpNewDefaultV2:
-    def test_creates_expected_v2_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_creates_expected_v2_tree(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Default scaffold (v2) creates pages/, static/, tests/, models.py."""
         monkeypatch.chdir(tmp_path)
         main(["new", "myapp"])

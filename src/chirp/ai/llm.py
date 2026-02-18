@@ -17,7 +17,6 @@ from collections.abc import AsyncIterator
 from typing import Any, overload
 
 from chirp.ai._providers import (
-    ProviderConfig,
     anthropic_generate,
     anthropic_stream,
     openai_generate,
@@ -119,7 +118,9 @@ class LLM:
         if isinstance(prompt_or_cls, str):
             # Text mode
             messages = [{"role": "user", "content": prompt_or_cls}]
-            return await self._generate_raw(messages, system=system, max_tokens=max_t, temperature=temp)
+            return await self._generate_raw(
+                messages, system=system, max_tokens=max_t, temperature=temp
+            )
 
         # Structured mode
         cls = prompt_or_cls
@@ -128,7 +129,9 @@ class LLM:
             raise AIError(msg)
 
         if not dataclasses.is_dataclass(cls):
-            msg = f"{cls.__name__} is not a dataclass — structured output requires frozen dataclasses"
+            msg = (
+                f"{cls.__name__} is not a dataclass — structured output requires frozen dataclasses"
+            )
             raise TypeError(msg)
 
         schema = dataclass_to_schema(cls)
@@ -139,9 +142,7 @@ class LLM:
             f"Return ONLY the JSON object, no other text."
         )
         messages = [{"role": "user", "content": structured_prompt}]
-        text = await self._generate_raw(
-            messages, system=system, max_tokens=max_t, temperature=temp
-        )
+        text = await self._generate_raw(messages, system=system, max_tokens=max_t, temperature=temp)
         return parse_structured(cls, text)
 
     # -- Stream (incremental response) --
@@ -204,16 +205,21 @@ class LLM:
         """Dispatch to provider-specific generation."""
         if self._config.provider == "anthropic":
             return await anthropic_generate(
-                self._config, messages,
-                max_tokens=max_tokens, temperature=temperature, system=system,
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system,
             )
         if self._config.provider in ("openai", "ollama"):
             # OpenAI and Ollama use system message in messages array
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
             return await openai_generate(
-                self._config, messages,
-                max_tokens=max_tokens, temperature=temperature,
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
         msg = f"Unsupported provider: {self._config.provider}"
         raise AIError(msg)
@@ -229,8 +235,11 @@ class LLM:
         """Dispatch to provider-specific streaming."""
         if self._config.provider == "anthropic":
             async for token in anthropic_stream(
-                self._config, messages,
-                max_tokens=max_tokens, temperature=temperature, system=system,
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system,
             ):
                 yield token
             return
@@ -239,8 +248,10 @@ class LLM:
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
             async for token in openai_stream(
-                self._config, messages,
-                max_tokens=max_tokens, temperature=temperature,
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
             ):
                 yield token
             return

@@ -12,9 +12,9 @@ Or from this directory:
 """
 
 import asyncio
+import contextlib
 import contextvars
 import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -54,7 +54,7 @@ class Comment:
     by: str
     time: int
     kids: tuple[int, ...]
-    replies: tuple["Comment", ...]
+    replies: tuple[Comment, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,8 @@ _lock = threading.Lock()
 # Per-worker httpx client.  Each pounce worker thread runs its own asyncio
 # event loop, so each worker creates its own client via on_worker_startup.
 _client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.ContextVar(
-    "hn_client", default=None,
+    "hn_client",
+    default=None,
 )
 
 
@@ -78,19 +79,34 @@ _client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.Cont
 
 _SEED_STORIES = [
     Story(
-        id=1, title="Show HN: Chirp – A Python web framework for the modern web",
-        url="https://github.com/example/chirp", score=142, by="builder",
-        time=0, descendants=37, domain="github.com",
+        id=1,
+        title="Show HN: Chirp - A Python web framework for the modern web",
+        url="https://github.com/example/chirp",
+        score=142,
+        by="builder",
+        time=0,
+        descendants=37,
+        domain="github.com",
     ),
     Story(
-        id=2, title="Free-threading lands in Python 3.14",
-        url="https://docs.python.org/3.14/whatsnew/3.14.html", score=89,
-        by="pythonista", time=0, descendants=23, domain="docs.python.org",
+        id=2,
+        title="Free-threading lands in Python 3.14",
+        url="https://docs.python.org/3.14/whatsnew/3.14.html",
+        score=89,
+        by="pythonista",
+        time=0,
+        descendants=23,
+        domain="docs.python.org",
     ),
     Story(
-        id=3, title="HTML Over the Wire: A Modern Approach",
-        url="https://htmx.org/essays/hypermedia-systems/", score=67,
-        by="webdev", time=0, descendants=15, domain="htmx.org",
+        id=3,
+        title="HTML Over the Wire: A Modern Approach",
+        url="https://htmx.org/essays/hypermedia-systems/",
+        score=67,
+        by="webdev",
+        time=0,
+        descendants=15,
+        domain="htmx.org",
     ),
 ]
 
@@ -103,8 +119,13 @@ def _seed() -> None:
     with _lock:
         for i, s in enumerate(_SEED_STORIES):
             story = Story(
-                id=s.id, title=s.title, url=s.url, score=s.score,
-                by=s.by, time=now - (i * 3600), descendants=s.descendants,
+                id=s.id,
+                title=s.title,
+                url=s.url,
+                score=s.score,
+                by=s.by,
+                time=now - (i * 3600),
+                descendants=s.descendants,
                 domain=s.domain,
             )
             _stories[story.id] = story
@@ -183,9 +204,7 @@ async def _fetch_stories(count: int = 30) -> list[Story]:
     # Fetch stories concurrently in batches
     tasks = [_fetch_item(sid) for sid in ids]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    for data in results:
-        if isinstance(data, dict) and data.get("type") == "story":
-            stories.append(_parse_story(data))
+    stories = [_parse_story(d) for d in results if isinstance(d, dict) and d.get("type") == "story"]
     return stories
 
 
@@ -243,10 +262,8 @@ async def worker_startup() -> None:
     # Pre-populate the story cache on the first worker that runs.
     # Seed data from module load is already available, so a network
     # failure here is non-fatal.
-    try:
+    with contextlib.suppress(Exception):
         await _refresh_stories()
-    except Exception:
-        pass  # seed data is already loaded
 
 
 @app.on_worker_shutdown
@@ -292,8 +309,11 @@ async def story_detail(story_id: int):
     comments = [r for r in results if isinstance(r, Comment)]
 
     return Page(
-        "hackernews.html", "story_detail",
-        story=story, comments=comments, page="detail",
+        "hackernews.html",
+        "story_detail",
+        story=story,
+        comments=comments,
+        page="detail",
     )
 
 
@@ -338,9 +358,7 @@ def events():
                     )
                     with _lock:
                         _stories[story_id] = updated
-                    yield Fragment(
-                        "hackernews.html", "story_meta", story=updated
-                    )
+                    yield Fragment("hackernews.html", "story_meta", story=updated)
             await asyncio.sleep(5)
 
     return EventStream(generate())

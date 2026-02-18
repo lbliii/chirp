@@ -13,7 +13,8 @@ URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 """
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, fields as dc_fields
+from dataclasses import dataclass
+from dataclasses import fields as dc_fields
 from pathlib import Path
 from typing import Any, get_type_hints
 
@@ -178,7 +179,6 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
 
     for f in field_defs:
         raw = form.get(f.name)
-        has_default = f.default is not MISSING or f.default_factory is not MISSING  # type: ignore[attr-defined]
 
         if raw is None:
             # Field missing from form data entirely

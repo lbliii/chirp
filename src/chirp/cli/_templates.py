@@ -346,7 +346,7 @@ if __name__ == "__main__":
     app.run()
 """
 
-V2_MODELS_PY = '''\
+V2_MODELS_PY = """\
 from dataclasses import dataclass
 
 from chirp.security.passwords import hash_password, verify_password
@@ -376,7 +376,7 @@ def verify_user(username: str, password: str) -> User | None:
     if user and verify_password(password, user.password_hash):
         return user
     return None
-'''
+"""
 
 V2_LAYOUT_HTML = """\
 {# target: body #}
@@ -527,7 +527,7 @@ V2_LOGIN_CHIRPUI_HTML = """\
 {% endblock %}
 """
 
-V2_DASHBOARD_PAGE_PY = '''\
+V2_DASHBOARD_PAGE_PY = """\
 from chirp import Template, get_user, login_required
 
 
@@ -537,7 +537,7 @@ _GRID_COLUMNS = [{"key": "name", "label": "Name"}, {"key": "role", "label": "Rol
 @login_required
 async def handler():
     return Template("dashboard/page.html", user=get_user(), cols=_GRID_COLUMNS)
-'''
+"""
 
 V2_DASHBOARD_HTML = """\
 {% extends "_layout.html" %}

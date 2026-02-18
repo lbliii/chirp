@@ -131,43 +131,69 @@ class RouteContract:
 # ---------------------------------------------------------------------------
 
 # htmx attributes that reference server URLs
-_HTMX_URL_ATTRS = frozenset({
-    "hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete",
-})
+_HTMX_URL_ATTRS = frozenset(
+    {
+        "hx-get",
+        "hx-post",
+        "hx-put",
+        "hx-patch",
+        "hx-delete",
+    }
+)
 
 # All valid htmx attributes (from https://htmx.org/reference/)
-_HTMX_ALL_ATTRS = frozenset({
-    # Core HTTP
-    "hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete",
-    # Triggering
-    "hx-trigger",
-    # Targeting & swapping
-    "hx-target", "hx-swap", "hx-swap-oob", "hx-select", "hx-select-oob",
-    # URL management
-    "hx-push-url", "hx-replace-url",
-    # Parameters & values
-    "hx-vals", "hx-headers", "hx-include", "hx-params", "hx-encoding",
-    # Progressive enhancement
-    "hx-boost",
-    # Loading UX
-    "hx-indicator", "hx-disabled-elt",
-    # Synchronization
-    "hx-sync",
-    # Validation
-    "hx-validate",
-    # Confirmation
-    "hx-confirm", "hx-prompt",
-    # Preservation
-    "hx-preserve",
-    # Extensions
-    "hx-ext",
-    # Inheritance control
-    "hx-disinherit", "hx-inherit",
-    # History
-    "hx-history", "hx-history-elt",
-    # Misc
-    "hx-request", "hx-disable",
-})
+_HTMX_ALL_ATTRS = frozenset(
+    {
+        # Core HTTP
+        "hx-get",
+        "hx-post",
+        "hx-put",
+        "hx-patch",
+        "hx-delete",
+        # Triggering
+        "hx-trigger",
+        # Targeting & swapping
+        "hx-target",
+        "hx-swap",
+        "hx-swap-oob",
+        "hx-select",
+        "hx-select-oob",
+        # URL management
+        "hx-push-url",
+        "hx-replace-url",
+        # Parameters & values
+        "hx-vals",
+        "hx-headers",
+        "hx-include",
+        "hx-params",
+        "hx-encoding",
+        # Progressive enhancement
+        "hx-boost",
+        # Loading UX
+        "hx-indicator",
+        "hx-disabled-elt",
+        # Synchronization
+        "hx-sync",
+        # Validation
+        "hx-validate",
+        # Confirmation
+        "hx-confirm",
+        "hx-prompt",
+        # Preservation
+        "hx-preserve",
+        # Extensions
+        "hx-ext",
+        # Inheritance control
+        "hx-disinherit",
+        "hx-inherit",
+        # History
+        "hx-history",
+        "hx-history-elt",
+        # Misc
+        "hx-request",
+        "hx-disable",
+    }
+)
 # Note: hx-on::* (event handlers) use a wildcard prefix pattern, checked separately
 
 # Regex to extract htmx/form attributes from raw template HTML
@@ -214,14 +240,24 @@ _ID_PATTERN = re.compile(
 )
 
 # htmx extended CSS selectors — traversal-based, not validatable statically
-_HTMX_EXTENDED_PREFIXES = frozenset({
-    "closest", "find", "next", "previous",
-})
+_HTMX_EXTENDED_PREFIXES = frozenset(
+    {
+        "closest",
+        "find",
+        "next",
+        "previous",
+    }
+)
 
 # htmx special target keywords that don't reference a DOM element by ID
-_HTMX_SPECIAL_TARGETS = frozenset({
-    "this", "body", "window", "document",
-})
+_HTMX_SPECIAL_TARGETS = frozenset(
+    {
+        "this",
+        "body",
+        "window",
+        "document",
+    }
+)
 
 
 def _extract_hx_target_selectors(source: str) -> list[str]:
@@ -286,9 +322,13 @@ _FORM_FIELD_PATTERN = re.compile(
 )
 
 # Field names to exclude from form validation (framework-injected, not user data)
-_FORM_EXCLUDED_FIELDS = frozenset({
-    "_csrf_token", "csrf_token", "_method",
-})
+_FORM_EXCLUDED_FIELDS = frozenset(
+    {
+        "_csrf_token",
+        "csrf_token",
+        "_method",
+    }
+)
 
 # Regex: generic HTML tag scanner for island metadata checks.
 _ISLAND_TAG_PATTERN = re.compile(
@@ -408,9 +448,7 @@ def _check_island_mounts(
                         ContractIssue(
                             severity=Severity.ERROR,
                             category="islands",
-                            message=(
-                                f"Island '{name}' has malformed data-island-props JSON."
-                            ),
+                            message=(f"Island '{name}' has malformed data-island-props JSON."),
                             template=tmpl_name,
                             details=f"raw={props_raw!r}",
                         )
@@ -421,9 +459,7 @@ def _check_island_mounts(
                             ContractIssue(
                                 severity=Severity.ERROR,
                                 category="islands",
-                                message=(
-                                    f"Island '{name}' uses unsupported props JSON type."
-                                ),
+                                message=(f"Island '{name}' uses unsupported props JSON type."),
                                 template=tmpl_name,
                             )
                         )
@@ -612,17 +648,20 @@ def _check_hx_target_selectors(
                 if target_id not in all_ids:
                     suggestion = _closest_id(target_id, all_ids)
                     hint = f' Did you mean "#{suggestion}"?' if suggestion else ""
-                    issues.append(ContractIssue(
-                        severity=Severity.WARNING,
-                        category="hx-target",
-                        message=(
-                            f'hx-target="#{target_id}" — no element with '
-                            f'id="{target_id}" found in any template.{hint}'
-                        ),
-                        template=tmpl_name,
-                        details=f'Available IDs: {", ".join(sorted(all_ids)[:10])}'
-                        if all_ids else None,
-                    ))
+                    issues.append(
+                        ContractIssue(
+                            severity=Severity.WARNING,
+                            category="hx-target",
+                            message=(
+                                f'hx-target="#{target_id}" — no element with '
+                                f'id="{target_id}" found in any template.{hint}'
+                            ),
+                            template=tmpl_name,
+                            details=f"Available IDs: {', '.join(sorted(all_ids)[:10])}"
+                            if all_ids
+                            else None,
+                        )
+                    )
 
     return issues, validated
 
@@ -670,15 +709,17 @@ def _check_hx_indicator_selectors(
                 if target_id not in all_ids:
                     suggestion = _closest_id(target_id, all_ids)
                     hint = f' Did you mean "#{suggestion}"?' if suggestion else ""
-                    issues.append(ContractIssue(
-                        severity=Severity.WARNING,
-                        category="hx-indicator",
-                        message=(
-                            f'hx-indicator="#{target_id}" — no element with '
-                            f'id="{target_id}" found in any template.{hint}'
-                        ),
-                        template=tmpl_name,
-                    ))
+                    issues.append(
+                        ContractIssue(
+                            severity=Severity.WARNING,
+                            category="hx-indicator",
+                            message=(
+                                f'hx-indicator="#{target_id}" — no element with '
+                                f'id="{target_id}" found in any template.{hint}'
+                            ),
+                            template=tmpl_name,
+                        )
+                    )
 
     return issues
 
@@ -706,15 +747,14 @@ def _check_hx_boost(
             if "{{" in value or "{%" in value:
                 continue
             if value not in ("true", "false"):
-                issues.append(ContractIssue(
-                    severity=Severity.WARNING,
-                    category="hx-boost",
-                    message=(
-                        f'hx-boost="{match.group(1)}" — '
-                        f'must be "true" or "false".'
-                    ),
-                    template=tmpl_name,
-                ))
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="hx-boost",
+                        message=(f'hx-boost="{match.group(1)}" — must be "true" or "false".'),
+                        template=tmpl_name,
+                    )
+                )
     return issues
 
 
@@ -771,17 +811,19 @@ def _check_sse_self_swap(
                 continue
             swap_match = _SSE_SWAP_VALUE_PATTERN.search(match.group("attrs"))
             swap_value = swap_match.group(1) if swap_match else "?"
-            issues.append(ContractIssue(
-                severity=Severity.ERROR,
-                category="sse_self_swap",
-                message=(
-                    f'sse-swap="{swap_value}" on the same element as '
-                    f"sse-connect will never match. htmx uses "
-                    f"querySelectorAll which excludes the root element. "
-                    f"Move sse-swap to a child element."
-                ),
-                template=tmpl_name,
-            ))
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="sse_self_swap",
+                    message=(
+                        f'sse-swap="{swap_value}" on the same element as '
+                        f"sse-connect will never match. htmx uses "
+                        f"querySelectorAll which excludes the root element. "
+                        f"Move sse-swap to a child element."
+                    ),
+                    template=tmpl_name,
+                )
+            )
     return issues
 
 
@@ -813,19 +855,21 @@ def _check_sse_connect_scope(
             # Already has hx-disinherit — assume the author handled it
             if "hx-disinherit" in attrs_lower:
                 continue
-            issues.append(ContractIssue(
-                severity=Severity.ERROR,
-                category="sse_scope",
-                message=(
-                    "sse-connect element is inside a broad hx-target scope "
-                    "without hx-disinherit. Fragments will swap into the "
-                    "layout target and wipe the whole page. Use "
-                    '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }} '
-                    'or add hx-disinherit="hx-target hx-swap" on sse-connect.'
-                ),
-                template=tmpl_name,
-                details=f"Inherited broad target(s): {targets_text}",
-            ))
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="sse_scope",
+                    message=(
+                        "sse-connect element is inside a broad hx-target scope "
+                        "without hx-disinherit. Fragments will swap into the "
+                        "layout target and wipe the whole page. Use "
+                        '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }} '
+                        'or add hx-disinherit="hx-target hx-swap" on sse-connect.'
+                    ),
+                    template=tmpl_name,
+                    details=f"Inherited broad target(s): {targets_text}",
+                )
+            )
             # One warning per template is sufficient.
             break
 
@@ -886,18 +930,20 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
                 continue
             if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
                 continue
-            issues.append(ContractIssue(
-                severity=Severity.WARNING,
-                category="swap_safety",
-                message=(
-                    "Mutating htmx request has no explicit hx-target and may inherit "
-                    "a broad container target. This can replace large UI regions with "
-                    "partial responses. Consider Action() (204), hx-swap=\"none\", "
-                    "or an explicit local hx-target."
-                ),
-                template=tmpl_name,
-                details=f"Inherited broad target(s): {targets_text}",
-            ))
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="swap_safety",
+                    message=(
+                        "Mutating htmx request has no explicit hx-target and may inherit "
+                        "a broad container target. This can replace large UI regions with "
+                        'partial responses. Consider Action() (204), hx-swap="none", '
+                        "or an explicit local hx-target."
+                    ),
+                    template=tmpl_name,
+                    details=f"Inherited broad target(s): {targets_text}",
+                )
+            )
             # One warning per template is enough signal.
             break
 
@@ -918,15 +964,17 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
                     attrs_lower = attrs.lower()
                     if "hx-target=" in attrs_lower:
                         continue
-                    issues.append(ContractIssue(
-                        severity=Severity.INFO,
-                        category="swap_safety",
-                        message=(
-                            "Consider adding hx-target=\"this\" on sse-swap "
-                            "elements for robustness when using hx-disinherit."
-                        ),
-                        template=tmpl_name,
-                    ))
+                    issues.append(
+                        ContractIssue(
+                            severity=Severity.INFO,
+                            category="swap_safety",
+                            message=(
+                                'Consider adding hx-target="this" on sse-swap '
+                                "elements for robustness when using hx-disinherit."
+                            ),
+                            template=tmpl_name,
+                        )
+                    )
                     break
             continue
         for match in _SSE_SWAP_TAG_PATTERN.finditer(source):
@@ -934,19 +982,21 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
             attrs_lower = attrs.lower()
             if "hx-target=" in attrs_lower:
                 continue
-            issues.append(ContractIssue(
-                severity=Severity.WARNING,
-                category="swap_safety",
-                message=(
-                    "SSE swap element has no explicit hx-target and may inherit "
-                    "a broad container target. Streamed fragments can land in the "
-                    "wrong region. Set hx-target=\"this\" on the element, or add "
-                    "hx-disinherit=\"hx-target hx-swap\" on the sse-connect "
-                    "ancestor to isolate all SSE swaps."
-                ),
-                template=tmpl_name,
-                details=f"Inherited broad target(s): {targets_text}",
-            ))
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="swap_safety",
+                    message=(
+                        "SSE swap element has no explicit hx-target and may inherit "
+                        "a broad container target. Streamed fragments can land in the "
+                        'wrong region. Set hx-target="this" on the element, or add '
+                        'hx-disinherit="hx-target hx-swap" on the sse-connect '
+                        "ancestor to isolate all SSE swaps."
+                    ),
+                    template=tmpl_name,
+                    details=f"Inherited broad target(s): {targets_text}",
+                )
+            )
             # One warning per template is enough signal.
             break
 
@@ -1078,9 +1128,18 @@ def _check_sse_event_crossref(
 # ---------------------------------------------------------------------------
 
 # Elements that are natively interactive (keyboard-focusable, have roles)
-_INTERACTIVE_ELEMENTS = frozenset({
-    "a", "button", "input", "select", "textarea", "form", "details", "summary",
-})
+_INTERACTIVE_ELEMENTS = frozenset(
+    {
+        "a",
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "form",
+        "details",
+        "summary",
+    }
+)
 
 # Regex: capture the opening tag surrounding an hx-* URL attribute.
 # Matches e.g. <div class="card" hx-get="/items" hx-target="#main">
@@ -1106,7 +1165,7 @@ def _check_accessibility(source: str, template_name: str) -> list[ContractIssue]
         # Check the preceding attributes in this tag for role or tabindex
         preceding_attrs = match.group(2)
         full_tag_end = source.find(">", match.end())
-        trailing_attrs = source[match.end():full_tag_end] if full_tag_end != -1 else ""
+        trailing_attrs = source[match.end() : full_tag_end] if full_tag_end != -1 else ""
         all_attrs = preceding_attrs + " " + trailing_attrs
         has_role = "role=" in all_attrs.lower()
         has_tabindex = "tabindex=" in all_attrs.lower()
@@ -1114,15 +1173,17 @@ def _check_accessibility(source: str, template_name: str) -> list[ContractIssue]
             # Find which hx- attribute triggered this
             hx_match = re.search(r"hx-(?:get|post|put|patch|delete)", all_attrs)
             hx_attr = hx_match.group(0) if hx_match else "hx-*"
-            issues.append(ContractIssue(
-                severity=Severity.WARNING,
-                category="accessibility",
-                message=(
-                    f"{hx_attr} on <{tag_name}> — use <button> or <a>, "
-                    f"or add role=\"button\" tabindex=\"0\" for accessibility."
-                ),
-                template=template_name,
-            ))
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="accessibility",
+                    message=(
+                        f"{hx_attr} on <{tag_name}> — use <button> or <a>, "
+                        f'or add role="button" tabindex="0" for accessibility.'
+                    ),
+                    template=template_name,
+                )
+            )
     return issues
 
 
@@ -1230,13 +1291,9 @@ class CheckResult:
         if self.forms_validated:
             extras.append(f"{self.forms_validated} form(s) validated")
         if self.component_calls_validated:
-            extras.append(
-                f"{self.component_calls_validated} component call(s) validated"
-            )
+            extras.append(f"{self.component_calls_validated} component call(s) validated")
         if self.page_context_warnings:
-            extras.append(
-                f"{self.page_context_warnings} Page context warning(s)"
-            )
+            extras.append(f"{self.page_context_warnings} Page context warning(s)")
         if extras:
             lines.append(", ".join(extras) + ".")
 
@@ -1301,11 +1358,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     kida_env = app._kida_env
 
     if router is None:
-        result.issues.append(ContractIssue(
-            severity=Severity.ERROR,
-            category="setup",
-            message="No router available — app may not have routes.",
-        ))
+        result.issues.append(
+            ContractIssue(
+                severity=Severity.ERROR,
+                category="setup",
+                message="No router available — app may not have routes.",
+            )
+        )
         return result
 
     # 1. Collect registered routes
@@ -1341,28 +1400,32 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     # block_metadata() returns {name: BlockMetadata}
                     blocks = tmpl.block_metadata()
                     if fc.block not in blocks:
-                        result.issues.append(ContractIssue(
+                        result.issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="fragment",
+                                message=(
+                                    f"Route '{route.path}' declares fragment "
+                                    f"block '{fc.block}' but template "
+                                    f"'{fc.template}' has no such block."
+                                ),
+                                route=route.path,
+                                template=fc.template,
+                            )
+                        )
+                except Exception:
+                    result.issues.append(
+                        ContractIssue(
                             severity=Severity.ERROR,
                             category="fragment",
                             message=(
-                                f"Route '{route.path}' declares fragment "
-                                f"block '{fc.block}' but template "
-                                f"'{fc.template}' has no such block."
+                                f"Route '{route.path}' references template "
+                                f"'{fc.template}' which could not be loaded."
                             ),
                             route=route.path,
                             template=fc.template,
-                        ))
-                except Exception:
-                    result.issues.append(ContractIssue(
-                        severity=Severity.ERROR,
-                        category="fragment",
-                        message=(
-                            f"Route '{route.path}' references template "
-                            f"'{fc.template}' which could not be loaded."
-                        ),
-                        route=route.path,
-                        template=fc.template,
-                    ))
+                        )
+                    )
 
         # 2a. Check SSE fragment contracts
         elif isinstance(contract.returns, SSEContract) and kida_env is not None:
@@ -1372,28 +1435,32 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     tmpl = kida_env.get_template(fc.template)
                     blocks = tmpl.block_metadata()
                     if fc.block not in blocks:
-                        result.issues.append(ContractIssue(
+                        result.issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="sse",
+                                message=(
+                                    f"SSE route '{route.path}' yields Fragment "
+                                    f"'{fc.template}':'{fc.block}' but block "
+                                    f"doesn't exist."
+                                ),
+                                route=route.path,
+                                template=fc.template,
+                            )
+                        )
+                except Exception:
+                    result.issues.append(
+                        ContractIssue(
                             severity=Severity.ERROR,
                             category="sse",
                             message=(
                                 f"SSE route '{route.path}' yields Fragment "
-                                f"'{fc.template}':'{fc.block}' but block "
-                                f"doesn't exist."
+                                f"'{fc.template}' which could not be loaded."
                             ),
                             route=route.path,
                             template=fc.template,
-                        ))
-                except Exception:
-                    result.issues.append(ContractIssue(
-                        severity=Severity.ERROR,
-                        category="sse",
-                        message=(
-                            f"SSE route '{route.path}' yields Fragment "
-                            f"'{fc.template}' which could not be loaded."
-                        ),
-                        route=route.path,
-                        template=fc.template,
-                    ))
+                        )
+                    )
 
     # 2b. Warn about routes with InlineTemplate return annotations
     _check_inline_templates(router, result)
@@ -1422,36 +1489,39 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     if _path_matches_route(url, route_path):
                         referenced_paths.add(route_path)
                         if method not in methods:
-                            result.issues.append(ContractIssue(
-                                severity=Severity.ERROR,
-                                category="method",
-                                message=(
-                                    f"'{attr_name}=\"{url}\"' uses {method} "
-                                    f"but route '{route_path}' only allows "
-                                    f"{', '.join(sorted(methods))}."
-                                ),
-                                template=tmpl_name,
-                                route=route_path,
-                            ))
+                            result.issues.append(
+                                ContractIssue(
+                                    severity=Severity.ERROR,
+                                    category="method",
+                                    message=(
+                                        f"'{attr_name}=\"{url}\"' uses {method} "
+                                        f"but route '{route_path}' only allows "
+                                        f"{', '.join(sorted(methods))}."
+                                    ),
+                                    template=tmpl_name,
+                                    route=route_path,
+                                )
+                            )
                         matched = True
                         break
 
                 if not matched:
-                    result.issues.append(ContractIssue(
-                        severity=Severity.ERROR,
-                        category="target",
-                        message=(
-                            f"'{attr_name}=\"{url}\"' has no matching route."
-                        ),
-                        template=tmpl_name,
-                    ))
+                    result.issues.append(
+                        ContractIssue(
+                            severity=Severity.ERROR,
+                            category="target",
+                            message=(f"'{attr_name}=\"{url}\"' has no matching route."),
+                            template=tmpl_name,
+                        )
+                    )
 
         # 4. Check hx-target selectors against static element IDs
         all_ids: set[str] = set()
         for source in template_sources.values():
             all_ids.update(_extract_static_ids(source))
         hx_target_issues, hx_validated = _check_hx_target_selectors(
-            template_sources, all_ids,
+            template_sources,
+            all_ids,
         )
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
@@ -1470,14 +1540,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # 4f. Check sse-connect inside broad target scope without hx-disinherit
         broad_targets = _collect_broad_targets(template_sources)
-        result.issues.extend(
-            _check_sse_connect_scope(template_sources, broad_targets)
-        )
+        result.issues.extend(_check_sse_connect_scope(template_sources, broad_targets))
 
         # 4g. Cross-reference sse-swap values against SSEContract.event_types
-        result.issues.extend(
-            _check_sse_event_crossref(template_sources, router)
-        )
+        result.issues.extend(_check_sse_event_crossref(template_sources, router))
 
         # 4h. Validate framework-agnostic island mounts.
         result.issues.extend(
@@ -1505,16 +1571,18 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             # Load the template (or block) source
             tmpl_source = template_sources.get(fc.template)
             if tmpl_source is None:
-                result.issues.append(ContractIssue(
-                    severity=Severity.ERROR,
-                    category="form",
-                    message=(
-                        f"Route '{route.path}' FormContract references "
-                        f"template '{fc.template}' which is not found."
-                    ),
-                    route=route.path,
-                    template=fc.template,
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="form",
+                        message=(
+                            f"Route '{route.path}' FormContract references "
+                            f"template '{fc.template}' which is not found."
+                        ),
+                        route=route.path,
+                        template=fc.template,
+                    )
+                )
                 continue
 
             # If block is specified, try to narrow to block source
@@ -1532,50 +1600,56 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             try:
                 dc_fields = {f.name for f in dataclasses.fields(fc.datacls)}
             except TypeError:
-                result.issues.append(ContractIssue(
-                    severity=Severity.WARNING,
-                    category="form",
-                    message=(
-                        f"Route '{route.path}' FormContract datacls "
-                        f"'{fc.datacls}' is not a dataclass."
-                    ),
-                    route=route.path,
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="form",
+                        message=(
+                            f"Route '{route.path}' FormContract datacls "
+                            f"'{fc.datacls}' is not a dataclass."
+                        ),
+                        route=route.path,
+                    )
+                )
                 continue
 
             # Missing in template = ERROR (form submission will fail)
             for field_name in sorted(dc_fields - html_fields):
-                result.issues.append(ContractIssue(
-                    severity=Severity.ERROR,
-                    category="form",
-                    message=(
-                        f"Route '{route.path}' (POST) expects field "
-                        f"'{field_name}' ({fc.datacls.__name__}.{field_name}) "
-                        f"but template '{fc.template}'"
-                        + (f" block '{fc.block}'" if fc.block else "")
-                        + f" has no <input name=\"{field_name}\">."
-                    ),
-                    route=route.path,
-                    template=fc.template,
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="form",
+                        message=(
+                            f"Route '{route.path}' (POST) expects field "
+                            f"'{field_name}' ({fc.datacls.__name__}.{field_name}) "
+                            f"but template '{fc.template}'"
+                            + (f" block '{fc.block}'" if fc.block else "")
+                            + f' has no <input name="{field_name}">.'
+                        ),
+                        route=route.path,
+                        template=fc.template,
+                    )
+                )
 
             # Extra in template = WARNING (may be intentional)
             for field_name in sorted(html_fields - dc_fields):
                 suggestion = _closest_field(field_name, dc_fields)
                 hint = f" Did you mean '{suggestion}'?" if suggestion else ""
-                result.issues.append(ContractIssue(
-                    severity=Severity.WARNING,
-                    category="form",
-                    message=(
-                        f"Template '{fc.template}'"
-                        + (f" block '{fc.block}'" if fc.block else "")
-                        + f" has <input name=\"{field_name}\"> which does "
-                        f"not match any field in "
-                        f"{fc.datacls.__name__}.{hint}"
-                    ),
-                    template=fc.template,
-                    route=route.path,
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="form",
+                        message=(
+                            f"Template '{fc.template}'"
+                            + (f" block '{fc.block}'" if fc.block else "")
+                            + f' has <input name="{field_name}"> which does '
+                            f"not match any field in "
+                            f"{fc.datacls.__name__}.{hint}"
+                        ),
+                        template=fc.template,
+                        route=route.path,
+                    )
+                )
 
         # 7. Orphan routes (routes never referenced from templates).
         #    Page convention routes (from mount_pages()) are accessed via
@@ -1592,12 +1666,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 continue
             if route_path in referenced_route_paths:
                 continue
-            result.issues.append(ContractIssue(
-                severity=Severity.INFO,
-                category="orphan",
-                message=f"Route '{route_path}' is not referenced from any template.",
-                route=route_path,
-            ))
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="orphan",
+                    message=f"Route '{route_path}' is not referenced from any template.",
+                    route=route_path,
+                )
+            )
 
         # 8. Dead template detection — templates never referenced by any
         #    route or other template via extends/include/from/import.
@@ -1637,15 +1713,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             if tmpl_name.startswith(("chirp/", "chirpui/", "themes/")):
                 continue
             result.dead_templates_found += 1
-            result.issues.append(ContractIssue(
-                severity=Severity.INFO,
-                category="dead",
-                message=(
-                    f"Template '{tmpl_name}' is not referenced by any "
-                    f"route or template."
-                ),
-                template=tmpl_name,
-            ))
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="dead",
+                    message=(f"Template '{tmpl_name}' is not referenced by any route or template."),
+                    template=tmpl_name,
+                )
+            )
 
     # 9. Page context gap detection — templates whose full-page render
     #    requires variables that the declared fragment block does not use.
@@ -1681,18 +1756,20 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
                 if extra:
                     result.page_context_warnings += 1
-                    result.issues.append(ContractIssue(
-                        severity=Severity.WARNING,
-                        category="page_context",
-                        message=(
-                            f"Route '{route.path}' uses block '{fc.block}' "
-                            f"but full-page render of '{fc.template}' also "
-                            f"needs: {', '.join(extra)}. Pass defaults in "
-                            f"your Page() call to avoid runtime errors."
-                        ),
-                        route=route.path,
-                        template=fc.template,
-                    ))
+                    result.issues.append(
+                        ContractIssue(
+                            severity=Severity.WARNING,
+                            category="page_context",
+                            message=(
+                                f"Route '{route.path}' uses block '{fc.block}' "
+                                f"but full-page render of '{fc.template}' also "
+                                f"needs: {', '.join(extra)}. Pass defaults in "
+                                f"your Page() call to avoid runtime errors."
+                            ),
+                            route=route.path,
+                            template=fc.template,
+                        )
+                    )
             except Exception:
                 pass  # Template load errors already reported in check 2
 
@@ -1703,14 +1780,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         if callable(validate_fn):
             for issue in validate_fn():
                 result.component_calls_validated += 1
-                result.issues.append(ContractIssue(
-                    severity=(
-                        Severity.ERROR if issue.is_error else Severity.WARNING
-                    ),
-                    category="component",
-                    message=issue.message,
-                    template=getattr(issue, "template", None),
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=(Severity.ERROR if issue.is_error else Severity.WARNING),
+                        category="component",
+                        message=issue.message,
+                        template=getattr(issue, "template", None),
+                    )
+                )
 
     return result
 
@@ -1739,15 +1816,17 @@ def _check_inline_templates(router: Router, result: CheckResult) -> None:
 
         for t in check_types:
             if t is InlineTemplate or (isinstance(t, type) and issubclass(t, InlineTemplate)):
-                result.issues.append(ContractIssue(
-                    severity=Severity.WARNING,
-                    category="inline_template",
-                    message=(
-                        f"Route '{route.path}' returns InlineTemplate — "
-                        f"replace with a file-based Template before production."
-                    ),
-                    route=route.path,
-                ))
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="inline_template",
+                        message=(
+                            f"Route '{route.path}' returns InlineTemplate — "
+                            f"replace with a file-based Template before production."
+                        ),
+                        route=route.path,
+                    )
+                )
                 break
 
 

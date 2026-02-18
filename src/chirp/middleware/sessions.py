@@ -162,7 +162,10 @@ class SessionMiddleware:
                 and now - created_ts > cfg.absolute_timeout_seconds
             ):
                 return {}
-            if cfg.idle_timeout_seconds is not None and now - last_seen_ts > cfg.idle_timeout_seconds:
+            if (
+                cfg.idle_timeout_seconds is not None
+                and now - last_seen_ts > cfg.idle_timeout_seconds
+            ):
                 return {}
         return data
 

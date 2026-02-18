@@ -16,11 +16,15 @@ from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 
 app = App()
 
-app.add_middleware(CORSMiddleware(CORSConfig(
-    allow_origins=("*",),
-    allow_methods=("GET", "POST", "PUT", "DELETE", "OPTIONS"),
-    allow_headers=("Content-Type",),
-)))
+app.add_middleware(
+    CORSMiddleware(
+        CORSConfig(
+            allow_origins=("*",),
+            allow_methods=("GET", "POST", "PUT", "DELETE", "OPTIONS"),
+            allow_headers=("Content-Type",),
+        )
+    )
+)
 
 
 # ---------------------------------------------------------------------------
