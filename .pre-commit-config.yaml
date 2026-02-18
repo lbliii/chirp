@@ -1,6 +1,6 @@
 # Pre-commit hooks for Chirp
-# Install: uv run pre-commit install
-# Run manually: uv run pre-commit run --all-files
+# Install: uv run prek install  (or: poe hooks-install)
+# Run manually: uv run prek run --all-files  (or: poe hooks)
 #
 # Chirp requires Python 3.14+ (free-threading, modern syntax)
 

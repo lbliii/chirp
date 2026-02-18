@@ -218,8 +218,8 @@ dev = [
     "ty>=0.0.11",
     # Linting & Formatting
     "ruff>=0.15.1",  # Require ruff>=0.15.1 for correct handling of newer Python syntax
-    # Pre-commit
-    "pre-commit>=4.0.0",
+    # Pre-commit (prek = Rust-based drop-in, reads .pre-commit-config.yaml)
+    "prek>=0.3.2",
     # Test utilities (optional deps needed for full test suite)
     "httpx>=0.27.0",
     "python-multipart>=0.0.18",
@@ -247,6 +247,10 @@ lint = { cmd = "ruff check .", help = "Run ruff linter" }
 lint-fix = { cmd = "ruff check . --fix", help = "Run ruff linter with auto-fix" }
 format = { cmd = "ruff format .", help = "Format code with ruff" }
 format-check = { cmd = "ruff format . --check", help = "Check formatting" }
+
+# Pre-commit
+hooks = { cmd = "prek run --all-files", help = "Run all pre-commit hooks" }
+hooks-install = { cmd = "prek install", help = "Install pre-commit hooks" }
 
 # CI Pipeline
 ci = { sequence = ["lint", "format-check", "ty", "test"], help = "Full CI check" }
