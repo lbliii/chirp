@@ -12,7 +12,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, OOB, Page, Request, ValidationError
+from chirp import OOB, App, AppConfig, Fragment, Page, Request, ValidationError
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 

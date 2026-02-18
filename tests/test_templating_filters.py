@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
 from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, qs
-
 
 # ── attr ──────────────────────────────────────────────────────────────────
 

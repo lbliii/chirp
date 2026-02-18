@@ -49,5 +49,5 @@ class TestResolveApp:
             resolve_app("_fake_chirp_app:does_not_exist")
 
     def test_wrong_type(self) -> None:
-        with pytest.raises(TypeError, match="not a chirp.App instance"):
+        with pytest.raises(TypeError, match=r"not a chirp\.App instance"):
             resolve_app("_fake_chirp_app:not_an_app")

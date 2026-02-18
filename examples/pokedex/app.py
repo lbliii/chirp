@@ -25,7 +25,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Page, Request
+from chirp import App, AppConfig, Page, Request
 from chirp.data import Query
 from chirp.http.request import Request as RequestType
 from chirp.http.response import Response
@@ -163,7 +163,7 @@ class APIKeyMiddleware:
     explicitly excluded paths (e.g. health check).
     """
 
-    __slots__ = ("_key", "_protect", "_exclude")
+    __slots__ = ("_exclude", "_key", "_protect")
 
     def __init__(
         self,

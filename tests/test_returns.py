@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.templating.returns import Fragment, OOB, Page, Stream, Template, ValidationError
+from chirp.templating.returns import OOB, Fragment, Page, Stream, Template, ValidationError
 
 
 class TestTemplate:

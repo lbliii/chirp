@@ -2,12 +2,9 @@
 
 from dataclasses import dataclass
 
-import pytest
-
 from chirp.http.request import Request
 from chirp.pages.resolve import resolve_kwargs, upgrade_result
 from chirp.templating.returns import LayoutPage, Page
-
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -197,7 +194,6 @@ class TestResolveKwargsExtraction:
         assert kwargs["params"].offset == 5
 
     async def test_post_extracts_from_form_body(self) -> None:
-        import json
 
         def handler(data: FormData):
             pass

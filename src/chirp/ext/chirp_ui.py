@@ -31,6 +31,7 @@ def use_chirp_ui(app: App, prefix: str = "/static") -> None:
     Raises ImportError if chirp-ui is not installed.
     """
     import chirp_ui
+
     from chirp.middleware.static import StaticFiles
 
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))

@@ -17,7 +17,6 @@ from collections.abc import AsyncIterator
 from typing import Any, overload
 
 from chirp.ai._providers import (
-    ProviderConfig,
     anthropic_generate,
     anthropic_stream,
     openai_generate,

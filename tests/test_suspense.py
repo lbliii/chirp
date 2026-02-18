@@ -13,8 +13,8 @@ Covers:
 """
 
 import asyncio
-from pathlib import Path
 
+import pytest
 from kida import DictLoader, Environment
 
 from chirp.templating.returns import Suspense
@@ -23,7 +23,6 @@ from chirp.templating.suspense import (
     format_oob_script,
     render_suspense,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test fixtures
@@ -81,10 +80,7 @@ async def _collect_chunks(
     is_htmx: bool = False,
 ) -> list[str]:
     """Collect all chunks from render_suspense into a list."""
-    chunks: list[str] = []
-    async for chunk in render_suspense(env, suspense, is_htmx=is_htmx):
-        chunks.append(chunk)
-    return chunks
+    return [c async for c in render_suspense(env, suspense, is_htmx=is_htmx)]
 
 
 async def _delayed_value(value: object, delay: float = 0.01) -> object:
@@ -116,7 +112,7 @@ class TestSuspenseDataclass:
         s = Suspense("page.html", title="Home")
         try:
             s.template_name = "other.html"
-            assert False, "Should have raised"
+            pytest.fail("Should have raised")
         except AttributeError:
             pass
 

@@ -209,5 +209,5 @@ class TestRouterErrors:
 
     def test_add_rejects_flask_style_param(self) -> None:
         r = Router()
-        with pytest.raises(ConfigurationError, match="<param>.*\\{param\\}"):
+        with pytest.raises(ConfigurationError, match=r"<param>.*\{param\}"):
             r.add(_route("/share/<slug>"))

@@ -45,6 +45,4 @@ def is_safe_url(url: str) -> bool:
         return False
     if url.startswith("//"):
         return False
-    if "://" in url:
-        return False
-    return True
+    return "://" not in url

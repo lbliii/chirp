@@ -10,7 +10,6 @@ from chirp.server.view_transitions import (
 )
 from chirp.testing import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Unit tests — snippet constants
 # ---------------------------------------------------------------------------

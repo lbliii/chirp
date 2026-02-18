@@ -12,9 +12,9 @@ Or from this directory:
 """
 
 import asyncio
+import contextlib
 import contextvars
 import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -54,7 +54,7 @@ class Comment:
     by: str
     time: int
     kids: tuple[int, ...]
-    replies: tuple["Comment", ...]
+    replies: tuple[Comment, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ _client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.Cont
 
 _SEED_STORIES = [
     Story(
-        id=1, title="Show HN: Chirp – A Python web framework for the modern web",
+        id=1, title="Show HN: Chirp - A Python web framework for the modern web",
         url="https://github.com/example/chirp", score=142, by="builder",
         time=0, descendants=37, domain="github.com",
     ),
@@ -183,9 +183,10 @@ async def _fetch_stories(count: int = 30) -> list[Story]:
     # Fetch stories concurrently in batches
     tasks = [_fetch_item(sid) for sid in ids]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    for data in results:
-        if isinstance(data, dict) and data.get("type") == "story":
-            stories.append(_parse_story(data))
+    stories = [
+        _parse_story(d) for d in results
+        if isinstance(d, dict) and d.get("type") == "story"
+    ]
     return stories
 
 
@@ -243,10 +244,8 @@ async def worker_startup() -> None:
     # Pre-populate the story cache on the first worker that runs.
     # Seed data from module load is already available, so a network
     # failure here is non-fatal.
-    try:
+    with contextlib.suppress(Exception):
         await _refresh_stories()
-    except Exception:
-        pass  # seed data is already loaded
 
 
 @app.on_worker_shutdown

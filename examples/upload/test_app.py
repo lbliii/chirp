@@ -1,6 +1,5 @@
 """Tests for the upload example — multipart file uploads, validation, gallery."""
 
-import shutil
 from pathlib import Path
 
 import pytest

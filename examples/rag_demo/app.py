@@ -48,20 +48,20 @@ import httpx
 # Allow importing sync when run as script (python app.py)
 sys.path.insert(0, str(Path(__file__).parent))
 
-from sync import sync_from_sources
-
 from urllib.parse import quote
 
+from patitas import parse, render_llm, sanitize
+from patitas.sanitize import llm_safe
+from sync import sync_from_sources
+
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-from chirp.middleware.static import StaticFiles
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_with_sources
 from chirp.data import Database
 from chirp.markdown import register_markdown_filter
-from patitas import parse, render_llm, sanitize
-from patitas.sanitize import llm_safe
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.static import StaticFiles
 
 # -- Helpers --
 
@@ -104,7 +104,7 @@ async def _retrieve_docs(db: Database | None, question: str) -> list[Document]:
         "(content LIKE ? OR title LIKE ?)" for _ in tokens
     )
     order = " + ".join(
-        f"(CASE WHEN content LIKE ? OR title LIKE ? THEN 1 ELSE 0 END)"
+        "(CASE WHEN content LIKE ? OR title LIKE ? THEN 1 ELSE 0 END)"
         for _ in tokens
     )
     params: list[str] = []
@@ -168,6 +168,7 @@ def _cite_filter(html: str, sources: list[Document] | None) -> str:
         return html
 
     from html import escape as html_escape
+
     from kida.utils.html import safe_url
 
     def repl(match: re.Match[str]) -> str:

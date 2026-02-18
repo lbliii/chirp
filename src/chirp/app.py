@@ -224,7 +224,6 @@ class App:
             app.mount_pages("pages")
         """
         from chirp.pages.discovery import discover_pages
-        from chirp.pages.types import ContextProvider, LayoutChain
 
         self._check_not_frozen()
 

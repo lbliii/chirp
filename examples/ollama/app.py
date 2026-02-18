@@ -257,7 +257,7 @@ def calculate(expression: str) -> str:
     if not all(c in allowed for c in expression):
         return "Error: only numbers and +, -, *, / operators allowed"
     try:
-        result = eval(expression, {"__builtins__": {}}, {})  # noqa: S307
+        result = eval(expression, {"__builtins__": {}}, {})
     except Exception as exc:
         return f"Error: {exc}"
     return str(result)

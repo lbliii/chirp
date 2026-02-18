@@ -54,8 +54,15 @@ class _Palette:
     """ANSI escape sequences — empty strings when color is disabled."""
 
     __slots__ = (
-        "reset", "bold", "dim",
-        "red", "green", "yellow", "blue", "cyan", "magenta",
+        "blue",
+        "bold",
+        "cyan",
+        "dim",
+        "green",
+        "magenta",
+        "red",
+        "reset",
+        "yellow",
     )
 
     def __init__(self, *, enabled: bool) -> None:
@@ -88,14 +95,14 @@ class _Palette:
 
 def _severity_icon(severity: Severity, c: _Palette) -> str:
     """Colored icon for an issue severity."""
-    from chirp.contracts import Severity as S
+    from chirp.contracts import Severity
 
     match severity:
-        case S.ERROR:
+        case Severity.ERROR:
             return f"{c.red}{c.bold}\u2717{c.reset}"   # ✗
-        case S.WARNING:
+        case Severity.WARNING:
             return f"{c.yellow}\u25b2{c.reset}"         # ▲
-        case S.INFO:
+        case Severity.INFO:
             return f"{c.dim}\u00b7{c.reset}"            # ·
 
 

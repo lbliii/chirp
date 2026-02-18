@@ -33,8 +33,7 @@ def create_environment(
     ]
 
     # Add component directories (for components, partials, shared templates)
-    for component_dir in config.component_dirs:
-        loaders.append(FileSystemLoader(str(component_dir)))
+    loaders.extend(FileSystemLoader(str(d)) for d in config.component_dirs)
 
     # Add chirp's built-in macros
     loaders.append(PackageLoader("chirp.templating", "macros"))

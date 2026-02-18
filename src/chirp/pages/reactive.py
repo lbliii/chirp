@@ -54,14 +54,13 @@ import logging
 import re
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from kida import Environment
 
 from chirp.realtime.events import EventStream
 from chirp.templating.returns import Fragment
-
 
 # ---------------------------------------------------------------------------
 # Change Events
@@ -264,10 +263,7 @@ def _extract_sse_swap_elements(source: str) -> list[_SSESwapElement]:
         start = match.end()
         close_tag = "</" + tag
         close_idx = source.lower().find(close_tag, start)
-        if close_idx == -1:
-            inner = source[start:]
-        else:
-            inner = source[start:close_idx]
+        inner = source[start:] if close_idx == -1 else source[start:close_idx]
 
         block_match = _BLOCK_TAG_RE.search(inner)
         if block_match:

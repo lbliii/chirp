@@ -7,8 +7,6 @@ masking, editor URL generation, and both full-page and fragment output.
 import os
 import types
 
-import pytest
-
 from chirp.server.debug_page import (
     _editor_url,
     _extract_frames,
@@ -17,7 +15,6 @@ from chirp.server.debug_page import (
     _is_app_frame,
     render_debug_page,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -109,12 +106,12 @@ class TestExtractFrames:
     """Traceback frame extraction with source and locals."""
 
     def test_extracts_at_least_one_frame(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         assert len(frames) >= 1
 
     def test_frame_has_required_keys(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         assert "filename" in frame
@@ -125,12 +122,12 @@ class TestExtractFrames:
         assert "is_app" in frame
 
     def test_frame_filename_matches_this_file(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         assert any("test_debug_page" in f["filename"] for f in frames)
 
     def test_frame_has_source_context(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         assert len(frame["source_lines"]) > 0
@@ -140,7 +137,7 @@ class TestExtractFrames:
         assert isinstance(code, str)
 
     def test_dunder_locals_are_filtered(self) -> None:
-        exc, tb = _raise_and_capture()
+        _exc, tb = _raise_and_capture()
         frames = _extract_frames(tb)
         frame = frames[-1]
         for name in frame["locals"]:

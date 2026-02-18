@@ -36,7 +36,6 @@ from collections.abc import AsyncIterator, Awaitable
 from typing import Any
 
 import anyio
-
 from kida import Environment
 
 from chirp.templating.returns import Suspense
@@ -150,7 +149,7 @@ async def render_suspense(
         return
 
     # -- Phase 2: Render shell with None for deferred keys --
-    shell_ctx = {**sync_ctx, **{k: None for k in pending}}
+    shell_ctx = {**sync_ctx, **dict.fromkeys(pending)}
     template = env.get_template(template_name)
     yield template.render(shell_ctx)
 

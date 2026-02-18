@@ -132,10 +132,7 @@ def _walk_directory(
 
         # Check if directory name is a path parameter {param}
         param_match = _PARAM_DIR_RE.match(item.name)
-        if param_match:
-            segment = "{" + param_match.group(1) + "}"
-        else:
-            segment = item.name
+        segment = "{" + param_match.group(1) + "}" if param_match else item.name
 
         _walk_directory(
             item,

@@ -28,8 +28,8 @@ from chirp.ai.llm import LLM
 from chirp.ai.streaming import stream_to_fragments, stream_with_sources
 
 __all__ = [
-    "AIError",
     "LLM",
+    "AIError",
     "ProviderError",
     "ProviderNotInstalledError",
     "stream_to_fragments",

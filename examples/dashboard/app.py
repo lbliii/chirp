@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Stream, Template
+from chirp import App, AppConfig, EventStream, Fragment, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 

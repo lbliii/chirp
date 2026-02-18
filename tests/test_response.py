@@ -252,13 +252,13 @@ class TestSSEResponse:
         response_methods = {
             name
             for name in dir(Response)
-            if (name.startswith("with_") or name.startswith("without_"))
+            if (name.startswith(("with_", "without_")))
             and callable(getattr(Response, name))
         }
         sse_methods = {
             name
             for name in dir(SSEResponse)
-            if (name.startswith("with_") or name.startswith("without_"))
+            if (name.startswith(("with_", "without_")))
             and callable(getattr(SSEResponse, name))
         }
         missing = response_methods - sse_methods

@@ -142,8 +142,10 @@ class TestAlpineMacros:
 '''
         tpl = env.from_string(source)
         html = tpl.render().strip()
-        assert "x-data" in html and "open: false" in html
-        assert "x-show" in html and "open" in html
+        assert "x-data" in html
+        assert "open: false" in html
+        assert "x-show" in html
+        assert "open" in html
         assert 'id="my-modal"' in html
         assert "Confirm" in html
         assert "Are you sure?" in html

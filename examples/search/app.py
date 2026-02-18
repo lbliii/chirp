@@ -58,7 +58,7 @@ GENRES = [
 
 SORT_OPTIONS = [
     ("relevance", "Relevance"),
-    ("title", "Title (A–Z)"),
+    ("title", "Title (A-Z)"),
     ("year-desc", "Newest first"),
     ("year-asc", "Oldest first"),
     ("rating", "Highest rated"),

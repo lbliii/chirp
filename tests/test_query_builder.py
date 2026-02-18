@@ -6,7 +6,6 @@ import pytest
 
 from chirp.data import Database, Query
 
-
 # -- Test models --
 
 
@@ -354,21 +353,19 @@ class TestStream:
     """Test query execution via stream()."""
 
     async def test_stream_all(self, seeded_db) -> None:
-        todos = []
-        async for todo in Query(Todo, "todos").order_by("id").stream(seeded_db):
-            todos.append(todo)
+        todos = [t async for t in Query(Todo, "todos").order_by("id").stream(seeded_db)]
         assert len(todos) == 5
         assert todos[0].id == 1
 
     async def test_stream_with_where(self, seeded_db) -> None:
-        todos = []
-        async for todo in Query(Todo, "todos").where("done = ?", False).stream(seeded_db):
-            todos.append(todo)
+        todos = [
+            t async for t in Query(Todo, "todos").where("done = ?", False).stream(seeded_db)
+        ]
         assert len(todos) == 3
         assert all(not t.done for t in todos)
 
     async def test_stream_empty_result(self, seeded_db) -> None:
-        todos = []
-        async for todo in Query(Todo, "todos").where("id = ?", 9999).stream(seeded_db):
-            todos.append(todo)
+        todos = [
+            t async for t in Query(Todo, "todos").where("id = ?", 9999).stream(seeded_db)
+        ]
         assert todos == []

@@ -22,13 +22,11 @@ Pipeline::
     4. Yield HTML chunks via chunked transfer encoding
 """
 
-import asyncio
 import inspect
 from collections.abc import AsyncIterator, Awaitable, Iterator
 from typing import Any
 
 import anyio
-
 from kida import Environment
 
 from chirp.templating.returns import Stream

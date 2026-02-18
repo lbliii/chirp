@@ -99,7 +99,7 @@ def _extract_json(text: str) -> str:
     stripped = text.strip()
 
     # Try direct parse first
-    if stripped.startswith("{") or stripped.startswith("["):
+    if stripped.startswith(("{", "[")):
         return stripped
 
     # Handle ```json ... ``` fences

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import pytest
 
 from chirp.app import App
-from chirp.templating.returns import ValidationError
 from chirp.http.forms import (
     FormBindingError,
     FormData,
@@ -16,6 +15,7 @@ from chirp.http.forms import (
     parse_form_data,
 )
 from chirp.http.request import Request
+from chirp.templating.returns import ValidationError
 from chirp.testing import TestClient
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ class TestFormFrom:
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
             try:
-                form = await form_from(request, TypedForm)
+                await form_from(request, TypedForm)
                 return "ok"
             except FormBindingError as e:
                 return f"error: {sorted(e.errors.keys())}"

@@ -35,11 +35,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from chirp import (
+    OOB,
     App,
     AppConfig,
     EventStream,
     Fragment,
-    OOB,
     Page,
     Redirect,
     Request,
@@ -51,7 +51,7 @@ from chirp import (
     login_required,
     logout,
 )
-from chirp.http.forms import form_from, form_or_errors, form_values
+from chirp.http.forms import form_or_errors, form_values
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware

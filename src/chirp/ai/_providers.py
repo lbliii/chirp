@@ -161,38 +161,37 @@ async def anthropic_stream(
     if system:
         body["system"] = system
 
-    async with httpx.AsyncClient() as client:
-        async with client.stream(
-            "POST",
-            f"{config.base_url}/v1/messages",
-            json=body,
-            headers={
-                "x-api-key": config.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            timeout=120.0,
-        ) as response:
-            if response.status_code != 200:
-                text = await response.aread()
-                raise ProviderError("anthropic", response.status_code, text.decode())
+    async with httpx.AsyncClient() as client, client.stream(
+        "POST",
+        f"{config.base_url}/v1/messages",
+        json=body,
+        headers={
+            "x-api-key": config.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        timeout=120.0,
+    ) as response:
+        if response.status_code != 200:
+            text = await response.aread()
+            raise ProviderError("anthropic", response.status_code, text.decode())
 
-            async for line in response.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                payload = line[6:]
-                if payload.strip() == "[DONE]":
-                    break
-                try:
-                    event = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
+        async for line in response.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload.strip() == "[DONE]":
+                break
+            try:
+                event = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
 
-                if event.get("type") == "content_block_delta":
-                    delta = event.get("delta", {})
-                    text = delta.get("text", "")
-                    if text:
-                        yield text
+            if event.get("type") == "content_block_delta":
+                delta = event.get("delta", {})
+                text = delta.get("text", "")
+                if text:
+                    yield text
 
 
 # =============================================================================
@@ -253,35 +252,34 @@ async def openai_stream(
         "stream": True,
     }
 
-    async with httpx.AsyncClient() as client:
-        async with client.stream(
-            "POST",
-            f"{config.base_url}/v1/chat/completions",
-            json=body,
-            headers={
-                "Authorization": f"Bearer {config.api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=120.0,
-        ) as response:
-            if response.status_code != 200:
-                text = await response.aread()
-                raise ProviderError("openai", response.status_code, text.decode())
+    async with httpx.AsyncClient() as client, client.stream(
+        "POST",
+        f"{config.base_url}/v1/chat/completions",
+        json=body,
+        headers={
+            "Authorization": f"Bearer {config.api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout=120.0,
+    ) as response:
+        if response.status_code != 200:
+            text = await response.aread()
+            raise ProviderError("openai", response.status_code, text.decode())
 
-            async for line in response.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                payload = line[6:]
-                if payload.strip() == "[DONE]":
-                    break
-                try:
-                    event = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
+        async for line in response.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload.strip() == "[DONE]":
+                break
+            try:
+                event = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
 
-                choices = event.get("choices", [])
-                if choices:
-                    delta = choices[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        yield content
+            choices = event.get("choices", [])
+            if choices:
+                delta = choices[0].get("delta", {})
+                content = delta.get("content", "")
+                if content:
+                    yield content

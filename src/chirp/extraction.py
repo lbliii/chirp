@@ -34,10 +34,7 @@ def is_extractable_dataclass(annotation: Any) -> bool:
 
     # Exclude chirp's internal dataclass types by module prefix
     module = getattr(annotation, "__module__", "") or ""
-    if module.startswith("chirp."):
-        return False
-
-    return True
+    return not module.startswith("chirp.")
 
 
 def extract_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:
@@ -104,10 +101,10 @@ def _convert(value: Any, target_type: Any) -> Any:
 
 def _resolve_type(name: str) -> type | str:
     """Resolve common type names from string annotations."""
-    _BUILTINS: dict[str, type] = {
+    _builtins: dict[str, type] = {
         "str": str,
         "int": int,
         "float": float,
         "bool": bool,
     }
-    return _BUILTINS.get(name, name)
+    return _builtins.get(name, name)

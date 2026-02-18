@@ -31,7 +31,8 @@ async def test_login_success():
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
         cookie = _extract_cookie(r1)
-        assert csrf and cookie
+        assert csrf
+        assert cookie
         r = await client.post(
             "/login",
             body=f"username=admin&password=password&_csrf_token={csrf}".encode(),
@@ -50,7 +51,8 @@ async def test_login_failure():
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
         cookie = _extract_cookie(r1)
-        assert csrf and cookie
+        assert csrf
+        assert cookie
         r = await client.post(
             "/login",
             body=f"username=admin&password=wrong&_csrf_token={csrf}".encode(),
@@ -69,7 +71,8 @@ async def test_dashboard_authenticated():
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
         cookie1 = _extract_cookie(r1)
-        assert csrf and cookie1
+        assert csrf
+        assert cookie1
         r2 = await client.post(
             "/login",
             body=f"username=admin&password=password&_csrf_token={csrf}".encode(),
@@ -91,7 +94,8 @@ async def test_logout():
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
         cookie1 = _extract_cookie(r1)
-        assert csrf and cookie1
+        assert csrf
+        assert cookie1
         r2 = await client.post(
             "/login",
             body=f"username=admin&password=password&_csrf_token={csrf}".encode(),

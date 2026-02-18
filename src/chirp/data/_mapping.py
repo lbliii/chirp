@@ -13,7 +13,6 @@ import dataclasses
 import types
 from typing import Any, get_args, get_origin
 
-
 # Scalar types we know how to coerce from database driver values.
 _COERCIBLE: dict[type, Any] = {
     int: lambda v: int(v) if v != "" else 0,

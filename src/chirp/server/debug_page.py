@@ -20,7 +20,6 @@ import html
 import linecache
 import os
 import sys
-import traceback
 import types
 from typing import Any
 
@@ -68,9 +67,7 @@ def _is_app_frame(filename: str) -> bool:
         return False
     # stdlib check — anything inside the Python install
     stdlib_prefix = os.path.dirname(os.__file__)
-    if filename.startswith(stdlib_prefix):
-        return False
-    return True
+    return not filename.startswith(stdlib_prefix)
 
 
 def _extract_frames(
@@ -497,7 +494,7 @@ def _render_request_panel(request: Any) -> str:
     # Query params
     query = ctx.get("query")
     if query:
-        parts.append(f'<div class="request-line"><span class="label">Query</span><span class="val">')
+        parts.append('<div class="request-line"><span class="label">Query</span><span class="val">')
         for k, v in query:
             parts.append(f"{_esc(k)}={_esc(v)} ")
         parts.append("</span></div>")
@@ -578,8 +575,7 @@ def render_debug_page(
     # Traceback
     if frames:
         sections.append("<h2>Traceback</h2>")
-        for frame in frames:
-            sections.append(_render_frame(frame))
+        sections.extend(_render_frame(f) for f in frames)
 
     # Request context
     sections.append("<h2>Request</h2>")

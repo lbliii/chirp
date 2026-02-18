@@ -13,8 +13,8 @@ import httpx
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
 from chirp.ai import LLM
 from chirp.ai.streaming import stream_to_fragments
-from chirp.middleware.static import StaticFiles
 from chirp.markdown import register_markdown_filter
+from chirp.middleware.static import StaticFiles
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 PLAYGROUND_STATIC = Path(__file__).parent / "static" / "playground"
