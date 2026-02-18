@@ -27,6 +27,7 @@ The RAG (Retrieval Augmented Generation) demo is Chirp's most comprehensive exam
 | **chirp.data** | SQLite with typed frozen dataclasses for document storage |
 | **chirp.ai** | Streaming LLM via Ollama (default) or Anthropic |
 | **referenced routes** | `/share/{slug}` and `/ask/stream` use `referenced=True` so `chirp check` does not flag them as orphan |
+| **chirp-ui** | Layout macros, cards, badges, alert; `use_chirp_ui(app)` + `chirp_ui.register_filters(app)` |
 
 ## Key Patterns
 

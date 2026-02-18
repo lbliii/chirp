@@ -32,6 +32,13 @@ Build inclusive apps with Chirp.
 Complement htmx with Alpine for client-only interactivity.
 :::{/card}
 
+:::{card} chirp-ui
+:icon: palette
+:link: ./chirp-ui
+:description: Component library — layout, cards, forms, badges
+Kida macros with CSS and themes. htmx-native, gorgeous by default.
+:::{/card}
+
 :::{card} Islands Contract
 :icon: puzzle
 :link: ./islands
