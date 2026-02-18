@@ -25,4 +25,11 @@ cascade:
 Build inclusive apps with Chirp.
 :::{/card}
 
+:::{card} Alpine.js
+:icon: layers
+:link: ./alpine
+:description: Local UI state — dropdowns, modals, tabs
+Complement htmx with Alpine for client-only interactivity.
+:::{/card}
+
 :::{/cards}
