@@ -217,7 +217,7 @@ dev = [
     # Type Checking
     "ty>=0.0.11",
     # Linting & Formatting
-    "ruff>=0.14.0",
+    "ruff>=0.15.1",  # 0.15.1+ fixes except-parenthesis bug (PEP 758 + as clause)
     # Pre-commit
     "pre-commit>=4.0.0",
     # Test utilities (optional deps needed for full test suite)
