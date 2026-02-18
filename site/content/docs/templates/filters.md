@@ -115,6 +115,14 @@ Use with the `island_attrs(...)` global for convenience:
 </div>
 ```
 
+Use `primitive_attrs(...)` when you want stricter primitive metadata:
+
+```html
+<div{{ primitive_attrs("grid_state", props={"stateKey": "team", "columns": ["name", "role"]}) }}>
+  ...
+</div>
+```
+
 ### Security Filters (from Kida)
 
 Chirp uses Kida's template engine, which provides escape and safe filters. These are critical for preventing XSS.

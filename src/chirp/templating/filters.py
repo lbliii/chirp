@@ -196,8 +196,33 @@ def island_attrs(
     return Markup("".join(attrs))
 
 
+def primitive_attrs(
+    primitive: str,
+    props: dict[str, Any] | None = None,
+    *,
+    mount_id: str | None = None,
+    version: str = "1",
+    src: str | None = None,
+    cls: str = "",
+) -> Markup:
+    """Build island attributes with primitive metadata conventions."""
+    primitive_props = dict(props or {})
+    if "primitive" not in primitive_props:
+        primitive_props["primitive"] = primitive
+    attrs = island_attrs(
+        primitive,
+        props=primitive_props,
+        mount_id=mount_id,
+        version=version,
+        src=src,
+        cls=cls,
+    )
+    return Markup(f'{attrs} data-island-primitive="{html.escape(primitive, quote=True)}"')
+
+
 BUILTIN_GLOBALS: dict[str, Any] = {
     "island_attrs": island_attrs,
+    "primitive_attrs": primitive_attrs,
 }
 
 

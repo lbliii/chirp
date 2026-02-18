@@ -12,8 +12,45 @@ def islands_snippet(version: str) -> str:
 <script data-chirp="islands">
 (function() {{
   if (window.__chirpIslands) return;
-  const registry = new WeakMap();
+  const mounts = new WeakMap();
+  const cleanupByMount = new WeakMap();
+  const adapters = new Map();
+  const adapterLoads = new Map();
   const VERSION = "{version}";
+  const STATE_EVENT = "chirp:island:state";
+  const ACTION_EVENT = "chirp:island:action";
+  const ERROR_EVENT = "chirp:island:error";
+
+  function emit(eventName, payload) {{
+    const detail = payload || {{}};
+    document.dispatchEvent(new CustomEvent(eventName, {{ detail }}));
+    window.dispatchEvent(new CustomEvent(eventName, {{ detail }}));
+  }}
+
+  function emitState(payload, state) {{
+    emit(STATE_EVENT, {{
+      name: payload.name,
+      id: payload.id,
+      version: payload.version,
+      state: state,
+    }});
+  }}
+
+  function emitAction(payload, action, status, extra) {{
+    const detail = {{
+      name: payload.name,
+      id: payload.id,
+      version: payload.version,
+      action: action,
+      status: status,
+    }};
+    if (extra && typeof extra === "object") {{
+      Object.keys(extra).forEach((key) => {{
+        detail[key] = extra[key];
+      }});
+    }}
+    emit(ACTION_EVENT, detail);
+  }}
 
   function parseProps(el) {{
     const raw = el.getAttribute("data-island-props");
@@ -62,59 +99,168 @@ def islands_snippet(version: str) -> str:
     }};
   }}
 
-  function emit(eventName, payload) {{
-    const detail = payload || {{}};
-    document.dispatchEvent(new CustomEvent(eventName, {{ detail }}));
-    window.dispatchEvent(new CustomEvent(eventName, {{ detail }}));
+  function adapterApi(payload) {{
+    return {{
+      emitState: function(state) {{ emitState(payload, state); }},
+      emitAction: function(action, status, extra) {{
+        emitAction(payload, action, status, extra);
+      }},
+      emitError: function(reason, extra) {{
+        const detail = {{
+          ...payload,
+          error: "adapter_error",
+          reason: reason || "adapter error",
+        }};
+        if (extra && typeof extra === "object") {{
+          Object.keys(extra).forEach((key) => {{
+            detail[key] = extra[key];
+          }});
+        }}
+        emit(ERROR_EVENT, detail);
+      }},
+    }};
   }}
 
-  function mount(el) {{
+  function normalizeAdapter(mod) {{
+    if (!mod) return null;
+    if (typeof mod.mount === "function" || typeof mod.unmount === "function") {{
+      return mod;
+    }}
+    if (mod.default && (typeof mod.default.mount === "function" || typeof mod.default.unmount === "function")) {{
+      return mod.default;
+    }}
+    return null;
+  }}
+
+  function register(name, adapter) {{
+    if (!name || !adapter) return;
+    adapters.set(name, adapter);
+  }}
+
+  async function ensureAdapter(payload) {{
+    const existing = adapters.get(payload.name);
+    if (existing) return existing;
+    if (!payload.src) return null;
+
+    const loadKey = payload.name + "::" + payload.src;
+    if (!adapterLoads.has(loadKey)) {{
+      adapterLoads.set(
+        loadKey,
+        import(payload.src)
+          .then((mod) => {{
+            const adapter = normalizeAdapter(mod);
+            if (adapter) {{
+              adapters.set(payload.name, adapter);
+            }}
+            return adapter;
+          }})
+          .catch((err) => {{
+            emit(ERROR_EVENT, {{
+              ...payload,
+              error: "adapter_load",
+              reason: String(err && err.message || err),
+            }});
+            return null;
+          }})
+      );
+    }}
+    return adapterLoads.get(loadKey);
+  }}
+
+  async function mount(el) {{
     if (!(el instanceof Element)) return;
-    if (registry.has(el)) return;
+    if (mounts.has(el)) return;
     const payload = payloadFor(el);
     if (!payload) return;
     if (payload.error) {{
       el.setAttribute("data-island-state", "error");
-      emit("chirp:island:error", payload);
+      emit(ERROR_EVENT, payload);
       return;
     }}
     if (payload.warning) {{
-      emit("chirp:island:error", payload);
+      emit(ERROR_EVENT, payload);
     }}
-    registry.set(el, payload);
+    mounts.set(el, payload);
     el.setAttribute("data-island-state", "mounted");
     emit("chirp:island:mount", payload);
+
+    const adapter = await ensureAdapter(payload);
+    if (!adapter || typeof adapter.mount !== "function") {{
+      return;
+    }}
+
+    try {{
+      const cleanup = adapter.mount(payload, adapterApi(payload));
+      if (typeof cleanup === "function") {{
+        cleanupByMount.set(el, cleanup);
+      }}
+    }} catch (err) {{
+      el.setAttribute("data-island-state", "error");
+      emit(ERROR_EVENT, {{
+        ...payload,
+        error: "adapter_mount",
+        reason: String(err && err.message || err),
+      }});
+    }}
   }}
 
   function unmount(el) {{
     if (!(el instanceof Element)) return;
-    if (!registry.has(el)) return;
-    const payload = registry.get(el);
-    registry.delete(el);
+    if (!mounts.has(el)) return;
+    const payload = mounts.get(el);
+    mounts.delete(el);
+
+    const cleanup = cleanupByMount.get(el);
+    if (cleanup) {{
+      cleanupByMount.delete(el);
+      try {{
+        cleanup();
+      }} catch (err) {{
+        emit(ERROR_EVENT, {{
+          ...payload,
+          error: "adapter_cleanup",
+          reason: String(err && err.message || err),
+        }});
+      }}
+    }}
+
+    const adapter = adapters.get(payload.name);
+    if (adapter && typeof adapter.unmount === "function") {{
+      try {{
+        adapter.unmount(payload, adapterApi(payload));
+      }} catch (err) {{
+        emit(ERROR_EVENT, {{
+          ...payload,
+          error: "adapter_unmount",
+          reason: String(err && err.message || err),
+        }});
+      }}
+    }}
+
     el.setAttribute("data-island-state", "unmounted");
     emit("chirp:island:unmount", payload);
   }}
 
-  function remount(el) {{
+  async function remount(el) {{
     if (!(el instanceof Element)) return;
-    if (registry.has(el)) {{
+    if (mounts.has(el)) {{
       unmount(el);
     }}
-    mount(el);
-    const payload = registry.get(el);
+    await mount(el);
+    const payload = mounts.get(el);
     if (payload) {{
       emit("chirp:island:remount", payload);
     }}
   }}
 
-  function scan(root) {{
+  async function scan(root) {{
     const scope = root instanceof Element || root instanceof Document ? root : document;
     const found = [];
     if (scope instanceof Element && scope.matches("[data-island]")) {{
       found.push(scope);
     }}
     scope.querySelectorAll("[data-island]").forEach((el) => found.push(el));
-    found.forEach((el) => mount(el));
+    await Promise.all(found.map((el) => mount(el)));
   }}
 
   function unmountWithin(root) {{
@@ -127,7 +273,7 @@ def islands_snippet(version: str) -> str:
   }}
 
   document.addEventListener("DOMContentLoaded", function() {{
-    scan(document);
+    void scan(document);
   }});
 
   document.addEventListener("htmx:beforeSwap", function(event) {{
@@ -138,18 +284,28 @@ def islands_snippet(version: str) -> str:
 
   document.addEventListener("htmx:afterSwap", function(event) {{
     if (event && event.target instanceof Element) {{
-      scan(event.target);
+      void scan(event.target);
     }} else {{
-      scan(document);
+      void scan(document);
     }}
   }});
 
+  const channels = {{
+    state: STATE_EVENT,
+    action: ACTION_EVENT,
+    error: ERROR_EVENT,
+  }};
+
   window.chirpIslands = {{
     version: VERSION,
+    channels: channels,
+    register: register,
     scan: scan,
     mount: mount,
     unmount: unmount,
     remount: remount,
+    emitState: emitState,
+    emitAction: emitAction,
   }};
   window.__chirpIslands = true;
   emit("chirp:islands:ready", {{ version: VERSION }});
