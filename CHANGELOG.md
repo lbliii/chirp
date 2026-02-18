@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-02-18
+
+### Added
+
+- **Islands (V1)** — Framework-agnostic contract for isolated high-state UI widgets:
+  - Mount metadata: `data-island`, `data-island-props`, `data-island-src`, `data-island-version`, `data-island-primitive`
+  - `app.check()` validates island mounts and primitive contracts
+  - No-build primitive style: plain ES modules from `/static/islands/*.js` without a bundler
+  - Runtime diagnostics and safety checks for props, version, and cross-reference
+- **chirp-ui integration** — `chirp.ext.chirp_ui.use_chirp_ui(app)` registers chirp-ui static files (CSS, themes).
+  Template loader auto-detects chirp-ui when installed. Optional `ui` extra: `pip install bengal-chirp[ui]`
+- **Auth hardening** — Production-ready authentication and abuse protection:
+  - `AuthRateLimitMiddleware` — Rate limit login/reset endpoints
+  - `LoginLockout` — Lockout and backoff for repeated failures
+  - `SecurityAudit` — Audit events for failures, lockouts, and blocked attempts
+- **Alpine.js support** — `chirp/alpine.html` macros for `x-data`, `x-init`, reactive bindings.
+  Server-side Alpine integration and `app.check()` validation for Alpine islands
+- **LLM playground example** — New example app demonstrating streaming LLM chat with htmx
+- **Documentation** — Guides for islands, auth hardening, Alpine + htmx, and no-build high-state
+
+### Changed
+
+- **Dependencies** — `kida-templates>=0.2.2` (was 0.2.1)
+- **CI** — Ruff linting, prek pre-commit, GitHub Actions workflow
+- **RAG demo** — Updated with chirp-ui integration
+
+### Fixed
+
+- Various test and type fixes across examples and core modules
+
+[0.1.2]: https://github.com/lbliii/chirp/releases/tag/v0.1.2
+
 ## [0.1.1] — 2026-02-15
 
 ### Added

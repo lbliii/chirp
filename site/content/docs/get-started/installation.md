@@ -55,6 +55,7 @@ Chirp ships with two core dependencies: `kida` (template engine) and `anyio` (as
 | `data` | SQLite access via aiosqlite | `pip install bengal-chirp[data]` |
 | `data-pg` | PostgreSQL access via asyncpg | `pip install bengal-chirp[data-pg]` |
 | `ai` | LLM streaming via httpx | `pip install bengal-chirp[ai]` |
+| `ui` | chirp-ui component library (CSS, themes, macros) | `pip install bengal-chirp[ui]` |
 | `all` | Everything above | `pip install bengal-chirp[all]` |
 
 ```bash
