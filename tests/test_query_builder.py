@@ -245,20 +245,13 @@ class TestFetch:
         assert all(not t.done for t in todos)
 
     async def test_fetch_with_order_and_limit(self, seeded_db) -> None:
-        todos = await (
-            Query(Todo, "todos")
-            .order_by("id DESC")
-            .take(2)
-            .fetch(seeded_db)
-        )
+        todos = await Query(Todo, "todos").order_by("id DESC").take(2).fetch(seeded_db)
         assert len(todos) == 2
         assert todos[0].id > todos[1].id
 
     async def test_fetch_with_offset(self, seeded_db) -> None:
         all_todos = await Query(Todo, "todos").order_by("id").fetch(seeded_db)
-        skipped = await (
-            Query(Todo, "todos").order_by("id").take(100).skip(2).fetch(seeded_db)
-        )
+        skipped = await Query(Todo, "todos").order_by("id").take(100).skip(2).fetch(seeded_db)
         assert skipped == all_todos[2:]
 
     async def test_fetch_empty_result(self, seeded_db) -> None:
@@ -316,11 +309,7 @@ class TestCount:
         assert n == 2
 
     async def test_count_with_where_if(self, seeded_db) -> None:
-        n = await (
-            Query(Todo, "todos")
-            .where_if("Buy", "text LIKE ?", "%Buy%")
-            .count(seeded_db)
-        )
+        n = await Query(Todo, "todos").where_if("Buy", "text LIKE ?", "%Buy%").count(seeded_db)
         assert n == 2
 
     async def test_count_empty_table(self, db) -> None:
@@ -358,14 +347,10 @@ class TestStream:
         assert todos[0].id == 1
 
     async def test_stream_with_where(self, seeded_db) -> None:
-        todos = [
-            t async for t in Query(Todo, "todos").where("done = ?", False).stream(seeded_db)
-        ]
+        todos = [t async for t in Query(Todo, "todos").where("done = ?", False).stream(seeded_db)]
         assert len(todos) == 3
         assert all(not t.done for t in todos)
 
     async def test_stream_empty_result(self, seeded_db) -> None:
-        todos = [
-            t async for t in Query(Todo, "todos").where("id = ?", 9999).stream(seeded_db)
-        ]
+        todos = [t async for t in Query(Todo, "todos").where("id = ?", 9999).stream(seeded_db)]
         assert todos == []

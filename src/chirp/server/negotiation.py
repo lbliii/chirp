@@ -95,10 +95,7 @@ def negotiate(
         case FormAction():
             if request.is_fragment:
                 if value.fragments:
-                    parts = [
-                        render_fragment(kida_env, frag)
-                        for frag in value.fragments
-                    ]
+                    parts = [render_fragment(kida_env, frag) for frag in value.fragments]
                     html = "\n".join(parts)
                     response = _html_response(html, intent="fragment")
                     if value.trigger:
@@ -142,11 +139,7 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            if (
-                request is not None
-                and request.is_fragment
-                and not request.is_history_restore
-            ):
+            if request is not None and request.is_fragment and not request.is_history_restore:
                 frag = Fragment(value.name, value.block_name, **value.context)
                 html = render_fragment(kida_env, frag)
                 intent = "fragment"
@@ -185,9 +178,11 @@ def negotiate(
                 raise ConfigurationError(msg)
             frag = Fragment(value.template_name, value.block_name, **value.context)
             html = render_fragment(kida_env, frag)
-            response = Response(
-                body=html, content_type="text/html; charset=utf-8"
-            ).with_status(422).with_render_intent("fragment")
+            response = (
+                Response(body=html, content_type="text/html; charset=utf-8")
+                .with_status(422)
+                .with_render_intent("fragment")
+            )
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
@@ -200,15 +195,12 @@ def negotiate(
                 raise ConfigurationError(msg)
             # Render the primary fragment/template
             main_response = negotiate(value.main, kida_env=kida_env, request=request)
-            parts: list[str] = [main_response.text if isinstance(main_response, Response)
-                                else ""]
+            parts: list[str] = [main_response.text if isinstance(main_response, Response) else ""]
             # Render each OOB fragment and wrap with hx-swap-oob
             for frag in value.oob_fragments:
                 html = render_fragment(kida_env, frag)
                 target_id = frag.target if frag.target is not None else frag.block_name
-                parts.append(
-                    f'<div id="{target_id}" hx-swap-oob="true">{html}</div>'
-                )
+                parts.append(f'<div id="{target_id}" hx-swap-oob="true">{html}</div>')
             body = "\n".join(parts)
             return _html_response(body, intent="fragment")
         case Stream():

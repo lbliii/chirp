@@ -28,10 +28,12 @@ class TestAccessibilityApp:
 
     async def test_valid_submission_shows_success(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            body = urlencode({
-                "name": "Alice",
-                "message": "Great app!",
-            }).encode()
+            body = urlencode(
+                {
+                    "name": "Alice",
+                    "message": "Great app!",
+                }
+            ).encode()
             response = await client.post("/feedback", body=body, headers=_FORM_CT)
             assert response.status == 200
             assert "Thank you" in response.text

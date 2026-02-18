@@ -37,9 +37,7 @@ class TestViewTransitionsConstants:
         assert "::view-transition-new(root)" in VIEW_TRANSITIONS_CSS
 
     def test_script_snippet_wraps_js_in_script_tag(self) -> None:
-        assert VIEW_TRANSITIONS_SCRIPT_SNIPPET.startswith(
-            '<script data-chirp="view-transitions">'
-        )
+        assert VIEW_TRANSITIONS_SCRIPT_SNIPPET.startswith('<script data-chirp="view-transitions">')
         assert VIEW_TRANSITIONS_SCRIPT_SNIPPET.endswith("</script>")
 
     def test_js_contains_idempotent_guard(self) -> None:
@@ -57,7 +55,7 @@ class TestViewTransitionsConstants:
 # Integration tests — injection via App._freeze()
 # ---------------------------------------------------------------------------
 
-FULL_PAGE = '<html><head><title>T</title></head><body><h1>Hi</h1></body></html>'
+FULL_PAGE = "<html><head><title>T</title></head><body><h1>Hi</h1></body></html>"
 
 
 class TestViewTransitionsInjection:
@@ -169,11 +167,13 @@ class TestViewTransitionsInjection:
 
     async def test_coexists_with_other_snippets(self) -> None:
         """View transitions, SSE lifecycle, and safe target all coexist."""
-        app = App(config=AppConfig(
-            view_transitions=True,
-            sse_lifecycle=True,
-            safe_target=True,
-        ))
+        app = App(
+            config=AppConfig(
+                view_transitions=True,
+                sse_lifecycle=True,
+                safe_target=True,
+            )
+        )
 
         @app.route("/")
         def index():

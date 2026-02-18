@@ -49,7 +49,7 @@ class TestStoryList:
             assert main_pos >= 0
             main_close = _find_main_closing_div(html, main_pos)
             assert main_close >= 0
-            sse_pos = html.find('sse-connect=')
+            sse_pos = html.find("sse-connect=")
             assert sse_pos >= 0
             sse_div_open = html.rfind("<div", 0, sse_pos)
             assert sse_div_open >= 0

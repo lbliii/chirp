@@ -138,7 +138,8 @@ async def add_contact(request: Request):
     errors = _validate(name, email)
     if errors:
         return ValidationError(
-            "contacts.html", "contact_form",
+            "contacts.html",
+            "contact_form",
             retarget="#form-section",
             errors=errors,
             form={"name": name, "email": email},
@@ -186,7 +187,8 @@ async def save_contact(request: Request, contact_id: int):
     if errors:
         contact = _get_contact(contact_id)
         return ValidationError(
-            "contacts.html", "edit_row",
+            "contacts.html",
+            "edit_row",
             errors=errors,
             contact=contact or Contact(id=contact_id, name=name, email=email),
         )

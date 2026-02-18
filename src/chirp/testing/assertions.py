@@ -17,9 +17,7 @@ def assert_is_fragment(response: Response, *, status: int = 200) -> None:
     Checks that the response has the expected status and does **not**
     contain ``<html>`` / ``</html>`` tags that indicate a full page.
     """
-    assert response.status == status, (
-        f"Expected status {status}, got {response.status}"
-    )
+    assert response.status == status, f"Expected status {status}, got {response.status}"
     lower = response.text.lower()
     assert "<html>" not in lower, "Response contains full page <html> wrapper"
     assert "</html>" not in lower, "Response contains full page </html> wrapper"
@@ -29,16 +27,14 @@ def assert_is_fragment(response: Response, *, status: int = 200) -> None:
 def assert_fragment_contains(response: Response, text: str) -> None:
     """Assert the fragment response body contains the given text."""
     assert text in response.text, (
-        f"Fragment does not contain {text!r}.\n"
-        f"Response body: {response.text[:500]}"
+        f"Fragment does not contain {text!r}.\nResponse body: {response.text[:500]}"
     )
 
 
 def assert_fragment_not_contains(response: Response, text: str) -> None:
     """Assert the fragment response body does **not** contain the given text."""
     assert text not in response.text, (
-        f"Fragment unexpectedly contains {text!r}.\n"
-        f"Response body: {response.text[:500]}"
+        f"Fragment unexpectedly contains {text!r}.\nResponse body: {response.text[:500]}"
     )
 
 
@@ -56,12 +52,9 @@ def assert_is_error_fragment(response: Response, *, status: int | None = None) -
         f"Response body: {response.text[:500]}"
     )
     if status is not None:
-        assert response.status == status, (
-            f"Expected status {status}, got {response.status}"
-        )
+        assert response.status == status, f"Expected status {status}, got {response.status}"
         assert f'data-status="{status}"' in response.text, (
-            f"Error fragment missing data-status=\"{status}\".\n"
-            f"Response body: {response.text[:500]}"
+            f'Error fragment missing data-status="{status}".\nResponse body: {response.text[:500]}'
         )
 
 
@@ -86,9 +79,7 @@ def hx_headers(response: Response) -> dict[str, str]:
     for name, value in response.headers:
         if name.upper().startswith("HX-"):
             # Normalize: "hx-push-url" / "HX-Push-Url" -> "HX-Push-Url"
-            canonical = "HX-" + "-".join(
-                p.capitalize() for p in name.split("-")[1:]
-            )
+            canonical = "HX-" + "-".join(p.capitalize() for p in name.split("-")[1:])
             result[canonical] = value
     return result
 
@@ -96,10 +87,7 @@ def hx_headers(response: Response) -> dict[str, str]:
 def assert_hx_redirect(response: Response, url: str) -> None:
     """Assert the response contains an ``HX-Redirect`` header with the given URL."""
     headers = hx_headers(response)
-    assert "HX-Redirect" in headers, (
-        f"Response has no HX-Redirect header.\n"
-        f"HX headers: {headers}"
-    )
+    assert "HX-Redirect" in headers, f"Response has no HX-Redirect header.\nHX headers: {headers}"
     assert headers["HX-Redirect"] == url, (
         f"Expected HX-Redirect to be {url!r}, got {headers['HX-Redirect']!r}"
     )
@@ -128,10 +116,7 @@ def assert_hx_trigger(
         header_name = "HX-Trigger"
 
     headers = hx_headers(response)
-    assert header_name in headers, (
-        f"Response has no {header_name} header.\n"
-        f"HX headers: {headers}"
-    )
+    assert header_name in headers, f"Response has no {header_name} header.\nHX headers: {headers}"
     raw = headers[header_name]
 
     if isinstance(event, str):
@@ -140,27 +125,18 @@ def assert_hx_trigger(
             return
         try:
             parsed = json_module.loads(raw)
-            assert event in parsed, (
-                f"Event {event!r} not found in {header_name} header {raw!r}"
-            )
+            assert event in parsed, f"Event {event!r} not found in {header_name} header {raw!r}"
         except (json_module.JSONDecodeError, TypeError):
-            assert raw == event, (
-                f"Expected {header_name} to be {event!r}, got {raw!r}"
-            )
+            assert raw == event, f"Expected {header_name} to be {event!r}, got {raw!r}"
     else:
         parsed = json_module.loads(raw)
-        assert parsed == event, (
-            f"Expected {header_name} to be {event!r}, got {parsed!r}"
-        )
+        assert parsed == event, f"Expected {header_name} to be {event!r}, got {parsed!r}"
 
 
 def assert_hx_retarget(response: Response, selector: str) -> None:
     """Assert the response contains an ``HX-Retarget`` header."""
     headers = hx_headers(response)
-    assert "HX-Retarget" in headers, (
-        f"Response has no HX-Retarget header.\n"
-        f"HX headers: {headers}"
-    )
+    assert "HX-Retarget" in headers, f"Response has no HX-Retarget header.\nHX headers: {headers}"
     assert headers["HX-Retarget"] == selector, (
         f"Expected HX-Retarget to be {selector!r}, got {headers['HX-Retarget']!r}"
     )
@@ -169,10 +145,7 @@ def assert_hx_retarget(response: Response, selector: str) -> None:
 def assert_hx_reswap(response: Response, strategy: str) -> None:
     """Assert the response contains an ``HX-Reswap`` header."""
     headers = hx_headers(response)
-    assert "HX-Reswap" in headers, (
-        f"Response has no HX-Reswap header.\n"
-        f"HX headers: {headers}"
-    )
+    assert "HX-Reswap" in headers, f"Response has no HX-Reswap header.\nHX headers: {headers}"
     assert headers["HX-Reswap"] == strategy, (
         f"Expected HX-Reswap to be {strategy!r}, got {headers['HX-Reswap']!r}"
     )
@@ -181,10 +154,7 @@ def assert_hx_reswap(response: Response, strategy: str) -> None:
 def assert_hx_push_url(response: Response, url: str) -> None:
     """Assert the response contains an ``HX-Push-Url`` header."""
     headers = hx_headers(response)
-    assert "HX-Push-Url" in headers, (
-        f"Response has no HX-Push-Url header.\n"
-        f"HX headers: {headers}"
-    )
+    assert "HX-Push-Url" in headers, f"Response has no HX-Push-Url header.\nHX headers: {headers}"
     assert headers["HX-Push-Url"] == url, (
         f"Expected HX-Push-Url to be {url!r}, got {headers['HX-Push-Url']!r}"
     )

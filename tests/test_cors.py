@@ -1,6 +1,5 @@
 """Tests for CORS middleware."""
 
-
 from chirp.app import App
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.testing import TestClient
@@ -76,11 +75,13 @@ class TestCORSPreflightRequests:
     """Preflight OPTIONS requests."""
 
     async def test_preflight_returns_204(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://example.com",),
-            allow_methods=("GET", "POST", "PUT"),
-            allow_headers=("Content-Type", "Authorization"),
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://example.com",),
+                allow_methods=("GET", "POST", "PUT"),
+                allow_headers=("Content-Type", "Authorization"),
+            )
+        )
         async with TestClient(app) as client:
             response = await client.request(
                 "OPTIONS",
@@ -92,20 +93,16 @@ class TestCORSPreflightRequests:
             )
             assert response.status == 204
             assert ("access-control-allow-origin", "https://example.com") in response.headers
-            assert any(
-                name == "access-control-allow-methods"
-                for name, _ in response.headers
-            )
-            assert any(
-                name == "access-control-allow-headers"
-                for name, _ in response.headers
-            )
+            assert any(name == "access-control-allow-methods" for name, _ in response.headers)
+            assert any(name == "access-control-allow-headers" for name, _ in response.headers)
 
     async def test_preflight_max_age(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("*",),
-            max_age=3600,
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("*",),
+                max_age=3600,
+            )
+        )
         async with TestClient(app) as client:
             response = await client.request(
                 "OPTIONS",
@@ -122,33 +119,33 @@ class TestCORSCredentials:
     """Credential support."""
 
     async def test_credentials_header(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://example.com",),
-            allow_credentials=True,
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://example.com",),
+                allow_credentials=True,
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",
                 headers={"Origin": "https://example.com"},
             )
-            assert (
-                "access-control-allow-credentials", "true"
-            ) in response.headers
+            assert ("access-control-allow-credentials", "true") in response.headers
 
     async def test_credentials_with_specific_origin(self) -> None:
         """With credentials=True, the origin must be echoed (not *)."""
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://example.com",),
-            allow_credentials=True,
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://example.com",),
+                allow_credentials=True,
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",
                 headers={"Origin": "https://example.com"},
             )
-            assert (
-                "access-control-allow-origin", "https://example.com"
-            ) in response.headers
+            assert ("access-control-allow-origin", "https://example.com") in response.headers
             # Should include Vary since it's not wildcard
             assert ("vary", "Origin") in response.headers
 
@@ -157,10 +154,12 @@ class TestCORSExposeHeaders:
     """Expose-Headers support."""
 
     async def test_expose_headers(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("*",),
-            expose_headers=("X-Request-Id", "X-Rate-Limit"),
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("*",),
+                expose_headers=("X-Request-Id", "X-Rate-Limit"),
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",
@@ -175,9 +174,11 @@ class TestCORSMultipleOrigins:
     """Multiple allowed origins."""
 
     async def test_first_origin_allowed(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://a.com", "https://b.com", "https://c.com"),
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://a.com", "https://b.com", "https://c.com"),
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",
@@ -186,9 +187,11 @@ class TestCORSMultipleOrigins:
             assert ("access-control-allow-origin", "https://a.com") in response.headers
 
     async def test_second_origin_allowed(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://a.com", "https://b.com"),
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://a.com", "https://b.com"),
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",
@@ -197,9 +200,11 @@ class TestCORSMultipleOrigins:
             assert ("access-control-allow-origin", "https://b.com") in response.headers
 
     async def test_unlisted_origin_blocked(self) -> None:
-        app = _make_cors_app(CORSConfig(
-            allow_origins=("https://a.com", "https://b.com"),
-        ))
+        app = _make_cors_app(
+            CORSConfig(
+                allow_origins=("https://a.com", "https://b.com"),
+            )
+        )
         async with TestClient(app) as client:
             response = await client.get(
                 "/api/data",

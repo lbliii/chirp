@@ -75,9 +75,7 @@ class AsyncConnection:
         cursor = await anyio.to_thread.run_sync(lambda: self._conn.execute(sql, params))
         return AsyncCursor(cursor)
 
-    async def executemany(
-        self, sql: str, params_seq: Sequence[Sequence[Any]]
-    ) -> AsyncCursor:
+    async def executemany(self, sql: str, params_seq: Sequence[Sequence[Any]]) -> AsyncCursor:
         cursor = await anyio.to_thread.run_sync(lambda: self._conn.executemany(sql, params_seq))
         return AsyncCursor(cursor)
 

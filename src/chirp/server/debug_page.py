@@ -101,14 +101,16 @@ def _extract_frames(
             except Exception:
                 local_vars[name] = "<unrepresentable>"
 
-        frames.append({
-            "filename": filename,
-            "lineno": lineno,
-            "func_name": func_name,
-            "source_lines": source_lines,
-            "locals": local_vars,
-            "is_app": _is_app_frame(filename),
-        })
+        frames.append(
+            {
+                "filename": filename,
+                "lineno": lineno,
+                "func_name": func_name,
+                "source_lines": source_lines,
+                "locals": local_vars,
+                "is_app": _is_app_frame(filename),
+            }
+        )
         tb = tb.tb_next
 
     return frames
@@ -150,9 +152,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
             ln = ctx["lineno"]
             start = max(0, ln - 3)
             end = min(len(lines), ln + 2)
-            ctx["source_lines"] = [
-                (i + 1, lines[i]) for i in range(start, end)
-            ]
+            ctx["source_lines"] = [(i + 1, lines[i]) for i in range(start, end)]
         ctx["message"] = getattr(exc, "message", str(exc))
         return ctx
 
@@ -194,14 +194,16 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 # Headers whose values should be masked in debug output
-_SENSITIVE_HEADERS = frozenset({
-    "authorization",
-    "cookie",
-    "set-cookie",
-    "x-api-key",
-    "x-auth-token",
-    "proxy-authorization",
-})
+_SENSITIVE_HEADERS = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "set-cookie",
+        "x-api-key",
+        "x-auth-token",
+        "proxy-authorization",
+    }
+)
 
 
 def _extract_request_context(request: Any) -> dict[str, Any]:
@@ -357,10 +359,7 @@ def _render_locals(local_vars: dict[str, str]) -> str:
         f"</div>"
         for name, value in local_vars.items()
     )
-    return (
-        f'<div class="locals-toggle">▸ locals</div>'
-        f'<div class="locals">{items}</div>'
-    )
+    return f'<div class="locals-toggle">▸ locals</div><div class="locals">{items}</div>'
 
 
 def _render_frame(frame: dict[str, Any]) -> str:
@@ -405,10 +404,10 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
         parts.append(
             f'<h3><span style="background:#f7768e;color:#1a1b26;padding:2px 8px;'
             f'border-radius:3px;font-size:0.85em;margin-right:8px">{_esc(error_code)}</span>'
-            f'Template Error: {_esc(ctx["type"])}</h3>'
+            f"Template Error: {_esc(ctx['type'])}</h3>"
         )
     else:
-        parts.append(f'<h3>Template Error: {_esc(ctx["type"])}</h3>')
+        parts.append(f"<h3>Template Error: {_esc(ctx['type'])}</h3>")
 
     message = ctx.get("message", "")
     parts.append(f'<div class="exc-message">{_esc(message)}</div>')
@@ -420,18 +419,24 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
         loc = _esc(str(template or "<template>"))
         if lineno:
             loc += f":{lineno}"
-        parts.append(f'<div class="request-line"><span class="label">Template</span><span class="val">{loc}</span></div>')
+        parts.append(
+            f'<div class="request-line"><span class="label">Template</span><span class="val">{loc}</span></div>'
+        )
 
     # Expression
     expression = ctx.get("expression")
     if expression:
-        parts.append(f'<div class="request-line"><span class="label">Expression</span><span class="val">{_esc(expression)}</span></div>')
+        parts.append(
+            f'<div class="request-line"><span class="label">Expression</span><span class="val">{_esc(expression)}</span></div>'
+        )
 
     # Source lines (syntax errors have lineno as highlight, runtime/undefined use snippet_error_line)
     source_lines = ctx.get("source_lines")
     highlight_line = ctx.get("snippet_error_line") or lineno
     if source_lines and highlight_line:
-        parts.append(f'<div class="template-source">{_render_source_lines(source_lines, highlight_line)}</div>')
+        parts.append(
+            f'<div class="template-source">{_render_source_lines(source_lines, highlight_line)}</div>'
+        )
 
     # Values (for runtime errors)
     values = ctx.get("values", {})
@@ -442,13 +447,17 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
             value_repr = repr(value)
             if len(value_repr) > 80:
                 value_repr = value_repr[:77] + "..."
-            parts.append(f'<div class="local-var"><span class="name">{_esc(name)}</span><span class="value">{_esc(value_repr)} ({_esc(type_name)})</span></div>')
+            parts.append(
+                f'<div class="local-var"><span class="name">{_esc(name)}</span><span class="value">{_esc(value_repr)} ({_esc(type_name)})</span></div>'
+            )
         parts.append("</div>")
 
     # Variable name (for undefined errors)
     variable = ctx.get("variable")
     if variable:
-        parts.append(f'<div class="request-line"><span class="label">Variable</span><span class="val">{_esc(variable)}</span></div>')
+        parts.append(
+            f'<div class="request-line"><span class="label">Variable</span><span class="val">{_esc(variable)}</span></div>'
+        )
 
     # Suggestion
     suggestion = ctx.get("suggestion")
@@ -461,7 +470,7 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
         parts.append(
             f'<div class="template-suggestion" style="margin-top:8px">'
             f'📖 <a href="{_esc(docs_url)}" style="color:#7aa2f7">'
-            f'{_esc(error_code)} documentation</a></div>'
+            f"{_esc(error_code)} documentation</a></div>"
         )
 
     parts.append("</div>")
@@ -478,18 +487,24 @@ def _render_request_panel(request: Any) -> str:
     method = ctx["method"]
     path = ctx["path"]
     version = ctx["http_version"]
-    parts.append(f'<div class="request-line"><span class="label">Request</span><span class="val">{_esc(method)} {_esc(path)} HTTP/{_esc(version)}</span></div>')
+    parts.append(
+        f'<div class="request-line"><span class="label">Request</span><span class="val">{_esc(method)} {_esc(path)} HTTP/{_esc(version)}</span></div>'
+    )
 
     # Client
     client = ctx.get("client")
     if client:
-        parts.append(f'<div class="request-line"><span class="label">Client</span><span class="val">{_esc(client)}</span></div>')
+        parts.append(
+            f'<div class="request-line"><span class="label">Client</span><span class="val">{_esc(client)}</span></div>'
+        )
 
     # Path params
     path_params = ctx.get("path_params")
     if path_params:
         pp = ", ".join(f"{k}={v!r}" for k, v in path_params.items())
-        parts.append(f'<div class="request-line"><span class="label">Path Params</span><span class="val">{_esc(pp)}</span></div>')
+        parts.append(
+            f'<div class="request-line"><span class="label">Path Params</span><span class="val">{_esc(pp)}</span></div>'
+        )
 
     # Query params
     query = ctx.get("query")
@@ -502,7 +517,9 @@ def _render_request_panel(request: Any) -> str:
     # Headers
     headers = ctx.get("headers", [])
     if headers:
-        parts.append('<div class="request-line"><span class="label">Headers</span><span class="val">')
+        parts.append(
+            '<div class="request-line"><span class="label">Headers</span><span class="val">'
+        )
         for name, value in headers:
             parts.append(f"{_esc(name)}: {_esc(value)}<br>")
         parts.append("</span></div>")
@@ -547,7 +564,9 @@ def render_debug_page(
     context = exc.__context__ if not exc.__suppress_context__ else None
     chain_note = ""
     if cause:
-        chain_note = f"The above exception was the direct cause (raised from {type(cause).__name__})"
+        chain_note = (
+            f"The above exception was the direct cause (raised from {type(cause).__name__})"
+        )
     elif context:
         chain_note = f"During handling, another exception occurred ({type(context).__name__})"
 
@@ -584,7 +603,9 @@ def render_debug_page(
     # Python / chirp info
     sections.append("<h2>Environment</h2>")
     sections.append('<div class="request-panel">')
-    sections.append(f'<div class="request-line"><span class="label">Python</span><span class="val">{_esc(sys.version)}</span></div>')
+    sections.append(
+        f'<div class="request-line"><span class="label">Python</span><span class="val">{_esc(sys.version)}</span></div>'
+    )
 
     try:
         import chirp
@@ -592,7 +613,9 @@ def render_debug_page(
         chirp_version = getattr(chirp, "__version__", "unknown")
     except Exception:
         chirp_version = "unknown"
-    sections.append(f'<div class="request-line"><span class="label">Chirp</span><span class="val">{_esc(chirp_version)}</span></div>')
+    sections.append(
+        f'<div class="request-line"><span class="label">Chirp</span><span class="val">{_esc(chirp_version)}</span></div>'
+    )
     sections.append("</div>")
 
     body_html = "\n".join(sections)
@@ -609,7 +632,7 @@ def render_debug_page(
     return (
         f"<!DOCTYPE html>"
         f'<html lang="en"><head>'
-        f"<meta charset=\"utf-8\">"
+        f'<meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{_esc(qualified)}: {_esc(exc_message[:80])}</title>"
         f"<style>{_CSS}</style>"

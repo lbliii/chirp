@@ -72,7 +72,7 @@ class TestIslandsInjection:
 class TestIslandHelpers:
     def test_island_props_filter_escapes_json(self) -> None:
         env = _make_env()
-        tpl = env.from_string('{{ payload | island_props }}')
+        tpl = env.from_string("{{ payload | island_props }}")
         rendered = tpl.render({"payload": {"x": "<tag>", "items": [1, 2]}})
         assert "&quot;" in rendered
         assert "<tag>" not in rendered

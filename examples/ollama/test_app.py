@@ -299,9 +299,7 @@ class TestChatNonStreaming:
             assert "2 + 2 = 4" in response.text
             assert state["count"] == 2
 
-    async def test_chat_tool_results_sent_back(
-        self, example_app, example_module
-    ) -> None:
+    async def test_chat_tool_results_sent_back(self, example_app, example_module) -> None:
         captured_messages: list[list[dict]] = []
 
         responses = [
@@ -358,9 +356,7 @@ class TestChatNonStreaming:
 class TestChatStreaming:
     """Test the streaming chat path (stream toggle ON)."""
 
-    async def test_stream_toggle_returns_sse_scaffolding(
-        self, example_app
-    ) -> None:
+    async def test_stream_toggle_returns_sse_scaffolding(self, example_app) -> None:
         """POST with stream=1 returns the user bubble + SSE-connected div."""
         async with TestClient(example_app) as client:
             response = await client.post(
@@ -394,9 +390,7 @@ class TestChatStreaming:
             assert "Full response here." in response.text
             assert "sse-connect" not in response.text
 
-    async def test_chat_stream_endpoint_simple(
-        self, example_app, example_module
-    ) -> None:
+    async def test_chat_stream_endpoint_simple(self, example_app, example_module) -> None:
         """GET /chat/stream streams tokens via ollama_chat_stream."""
         example_module._append_history("user", "Hello")
 
@@ -419,9 +413,7 @@ class TestChatStreaming:
         done_events = [e for e in result.events if e.event == "done"]
         assert len(done_events) == 1
 
-    async def test_chat_stream_endpoint_with_tools(
-        self, example_app, example_module
-    ) -> None:
+    async def test_chat_stream_endpoint_with_tools(self, example_app, example_module) -> None:
         """GET /chat/stream handles tool rounds then streams the answer."""
         example_module._append_history("user", "What time is it?")
 
@@ -432,9 +424,7 @@ class TestChatStreaming:
         )
         example_module.ollama_chat = fake_chat
         # Phase 2: streaming delivers the answer
-        example_module.ollama_chat_stream = _fake_stream(
-            "It is ", "noon ", "UTC."
-        )
+        example_module.ollama_chat_stream = _fake_stream("It is ", "noon ", "UTC.")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=10)
@@ -447,9 +437,7 @@ class TestChatStreaming:
         assert "noon" in text
         assert "UTC" in text
 
-    async def test_chat_stream_endpoint_closes_with_done(
-        self, example_app, example_module
-    ) -> None:
+    async def test_chat_stream_endpoint_closes_with_done(self, example_app, example_module) -> None:
         """Stream always closes with a 'done' SSE event for sse-close."""
         example_module._append_history("user", "Tell me a joke")
 
@@ -457,9 +445,7 @@ class TestChatStreaming:
             _ollama_response(content="(discarded)"),
         )
         example_module.ollama_chat = fake_chat
-        example_module.ollama_chat_stream = _fake_stream(
-            "Why did the chicken ", "cross the road?"
-        )
+        example_module.ollama_chat_stream = _fake_stream("Why did the chicken ", "cross the road?")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=5)

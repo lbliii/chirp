@@ -99,11 +99,11 @@ def _severity_icon(severity: Severity, c: _Palette) -> str:
 
     match severity:
         case Severity.ERROR:
-            return f"{c.red}{c.bold}\u2717{c.reset}"   # ✗
+            return f"{c.red}{c.bold}\u2717{c.reset}"  # ✗
         case Severity.WARNING:
-            return f"{c.yellow}\u25b2{c.reset}"         # ▲
+            return f"{c.yellow}\u25b2{c.reset}"  # ▲
         case Severity.INFO:
-            return f"{c.dim}\u00b7{c.reset}"            # ·
+            return f"{c.dim}\u00b7{c.reset}"  # ·
 
 
 def _format_issue(issue: ContractIssue, c: _Palette) -> list[str]:
@@ -161,34 +161,21 @@ def format_check_result(
     # Build the title rule manually so ANSI codes don't affect width
     title_text = "chirp check"
     pad = _W - len(title_text) - 4  # 4 = "── " + " "
-    lines.append(
-        f"  {c.dim}\u2500\u2500{c.reset} {title} "
-        f"{c.dim}{'\u2500' * max(pad, 1)}{c.reset}"
-    )
+    lines.append(f"  {c.dim}\u2500\u2500{c.reset} {title} {c.dim}{'\u2500' * max(pad, 1)}{c.reset}")
     lines.append("")
 
     # ── Stats ───────────────────────────────────────────────
     sep = f" {c.dim}\u00b7{c.reset} "
     stats_parts: list[str] = []
     if result.routes_checked:
-        stats_parts.append(
-            f"{c.bold}{result.routes_checked}{c.reset} "
-            f"{c.dim}routes{c.reset}"
-        )
+        stats_parts.append(f"{c.bold}{result.routes_checked}{c.reset} {c.dim}routes{c.reset}")
     if result.templates_scanned:
-        stats_parts.append(
-            f"{c.bold}{result.templates_scanned}{c.reset} "
-            f"{c.dim}templates{c.reset}"
-        )
+        stats_parts.append(f"{c.bold}{result.templates_scanned}{c.reset} {c.dim}templates{c.reset}")
     if result.targets_found:
-        stats_parts.append(
-            f"{c.bold}{result.targets_found}{c.reset} "
-            f"{c.dim}targets{c.reset}"
-        )
+        stats_parts.append(f"{c.bold}{result.targets_found}{c.reset} {c.dim}targets{c.reset}")
     if result.hx_targets_validated:
         stats_parts.append(
-            f"{c.bold}{result.hx_targets_validated}{c.reset} "
-            f"{c.dim}hx-target selectors{c.reset}"
+            f"{c.bold}{result.hx_targets_validated}{c.reset} {c.dim}hx-target selectors{c.reset}"
         )
     if stats_parts:
         lines.append(f"  {sep.join(stats_parts)}")
@@ -206,10 +193,7 @@ def format_check_result(
 
     # ── Summary line ────────────────────────────────────────
     if not errors and not warnings:
-        lines.append(
-            f"  {c.green}{c.bold}\u2713{c.reset}  "
-            f"{c.green}All clear{c.reset}"
-        )
+        lines.append(f"  {c.green}{c.bold}\u2713{c.reset}  {c.green}All clear{c.reset}")
     elif not errors:
         lines.append(
             f"  {c.green}{c.bold}\u2713{c.reset}  "

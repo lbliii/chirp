@@ -43,6 +43,7 @@ def _has_chirpui() -> bool:
     """Return True if chirp-ui is installed."""
     try:
         import chirp_ui  # noqa: F401
+
         return True
     except ImportError:
         return False

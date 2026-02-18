@@ -29,10 +29,13 @@ def index():
 async def feedback(request: Request):
     """Handle feedback form submission."""
     form = await request.form()
-    result = validate(form, {
-        "name": [required],
-        "message": [required],
-    })
+    result = validate(
+        form,
+        {
+            "name": [required],
+            "message": [required],
+        },
+    )
 
     if not result:
         return ValidationError(

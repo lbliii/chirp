@@ -166,9 +166,7 @@ class TestHTMLInjectWithStaticFiles:
 
         site = tmp_path / "public"
         site.mkdir()
-        (site / "index.html").write_text(
-            "<html><body><p>Hello</p></body></html>"
-        )
+        (site / "index.html").write_text("<html><body><p>Hello</p></body></html>")
 
         app = App()
         app.add_middleware(HTMLInject(SCRIPT_TAG))

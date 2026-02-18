@@ -124,11 +124,13 @@ def compile_tools(
         seen_names.add(name)
 
         schema = function_to_schema(handler)
-        tools.append(ToolDef(
-            name=name,
-            description=description,
-            handler=handler,
-            schema=schema,
-        ))
+        tools.append(
+            ToolDef(
+                name=name,
+                description=description,
+                handler=handler,
+                schema=schema,
+            )
+        )
 
     return ToolRegistry(tools, event_bus)

@@ -57,11 +57,7 @@ class Headers(Mapping[str, str]):
     def get_list(self, key: str) -> list[str]:
         """Return all values for *key* (e.g. multiple ``Set-Cookie``)."""
         key_lower = key.lower().encode("latin-1")
-        return [
-            value.decode("latin-1")
-            for name, value in self._raw
-            if name.lower() == key_lower
-        ]
+        return [value.decode("latin-1") for name, value in self._raw if name.lower() == key_lower]
 
     @property
     def raw(self) -> tuple[tuple[bytes, bytes], ...]:

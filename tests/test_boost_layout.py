@@ -30,7 +30,7 @@ class TestBoostLayout:
         assert 'hx-swap="innerHTML"' in html
         # Container must NOT have transition:true (only nav links do)
         assert 'hx-swap="innerHTML"' in html
-        main_swap = html[html.find('id="main"'): html.find('id="main"') + 80]
+        main_swap = html[html.find('id="main"') : html.find('id="main"') + 80]
         assert "transition:true" not in main_swap
         assert 'meta name="view-transition"' in html
         assert "htmx.org" in html
@@ -47,7 +47,7 @@ class TestBoostLayout:
     def test_sse_scope_block_renders_outside_main(self) -> None:
         """sse_scope block content appears after #main so connection persists."""
         env = _make_env()
-        source = '''
+        source = """
 {% extends "chirp/layouts/boost.html" %}
 {% block content %}
   <p>Hello</p>
@@ -56,7 +56,7 @@ class TestBoostLayout:
   {% from "chirp/sse.html" import sse_scope %}
   {{ sse_scope("/events") }}
 {% endblock %}
-'''
+"""
         tpl = env.from_string(source)
         html = tpl.render().strip()
         main_pos = html.find('id="main"')
@@ -64,6 +64,6 @@ class TestBoostLayout:
         # First </div> after #main closes the main container (content has no nested divs)
         main_close = html.find("</div>", main_pos)
         assert main_close >= 0
-        sse_pos = html.find('sse-connect=')
+        sse_pos = html.find("sse-connect=")
         assert sse_pos >= 0
         assert sse_pos > main_close, "sse_scope must render outside #main"

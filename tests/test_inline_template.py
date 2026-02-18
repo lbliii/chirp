@@ -71,10 +71,7 @@ class TestInlineTemplateContractWarning:
         app._ensure_frozen()
         result = check_hypermedia_surface(app)
 
-        inline_warnings = [
-            i for i in result.issues
-            if i.category == "inline_template"
-        ]
+        inline_warnings = [i for i in result.issues if i.category == "inline_template"]
         assert len(inline_warnings) == 1
         assert inline_warnings[0].severity == Severity.WARNING
         assert "/proto" in inline_warnings[0].message

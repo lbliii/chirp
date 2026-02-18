@@ -71,7 +71,8 @@ class TestValidationError:
 
     def test_multiple_context_kwargs(self) -> None:
         ve = ValidationError(
-            "form.html", "form_body",
+            "form.html",
+            "form_body",
             errors={"name": ["Too short"]},
             form={"name": "x"},
         )

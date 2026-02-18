@@ -178,7 +178,8 @@ class TestUploadSuccess:
             token = _extract_csrf_token(page)
 
             body, ct = _build_multipart_body(
-                title="My Sunset", csrf_token=token,
+                title="My Sunset",
+                csrf_token=token,
             )
             await client.post(
                 "/upload",
@@ -218,7 +219,8 @@ class TestPhotoDetail:
             token = _extract_csrf_token(page)
 
             body, ct = _build_multipart_body(
-                title="Detail Test", description="A lovely photo",
+                title="Detail Test",
+                description="A lovely photo",
                 csrf_token=token,
             )
             await client.post(

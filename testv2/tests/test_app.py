@@ -12,6 +12,7 @@ def _extract_cookie(response, name: str = "chirp_session") -> str | None:
 
 async def test_index_public():
     from app import app
+
     async with TestClient(app) as client:
         response = await client.get("/")
         assert response.status == 200
@@ -19,6 +20,7 @@ async def test_index_public():
 
 async def test_dashboard_requires_login():
     from app import app
+
     async with TestClient(app) as client:
         response = await client.get("/dashboard")
         assert response.status == 302
@@ -27,6 +29,7 @@ async def test_dashboard_requires_login():
 
 async def test_login_success():
     from app import app
+
     async with TestClient(app) as client:
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
@@ -47,6 +50,7 @@ async def test_login_success():
 
 async def test_login_failure():
     from app import app
+
     async with TestClient(app) as client:
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
@@ -67,6 +71,7 @@ async def test_login_failure():
 
 async def test_dashboard_authenticated():
     from app import app
+
     async with TestClient(app) as client:
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
@@ -90,6 +95,7 @@ async def test_dashboard_authenticated():
 
 async def test_logout():
     from app import app
+
     async with TestClient(app) as client:
         r1 = await client.get("/login")
         csrf = _extract_csrf_token(r1.text)
@@ -124,6 +130,7 @@ async def test_logout():
 
 async def test_csrf_required():
     from app import app
+
     async with TestClient(app) as client:
         r = await client.post(
             "/login",
@@ -135,5 +142,6 @@ async def test_csrf_required():
 
 def _extract_csrf_token(html: str) -> str | None:
     import re
+
     m = re.search(r'name="_csrf_token" value="([^"]+)"', html)
     return m.group(1) if m else None

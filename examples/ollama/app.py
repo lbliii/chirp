@@ -329,11 +329,13 @@ async def _run_tool_rounds(
             return None
 
         # Append the assistant message with tool_calls
-        messages.append({
-            "role": "assistant",
-            "content": msg.get("content", ""),
-            "tool_calls": tool_calls,
-        })
+        messages.append(
+            {
+                "role": "assistant",
+                "content": msg.get("content", ""),
+                "tool_calls": tool_calls,
+            }
+        )
 
         # Dispatch each tool call through the registry (fires event bus)
         for call in tool_calls:
@@ -441,10 +443,7 @@ async def post_chat(request: Request):
         )
         final_content = final_content or "(no response)"
     except httpx.ConnectError:
-        final_content = (
-            "Could not connect to Ollama. "
-            "Make sure it's running: `ollama serve`"
-        )
+        final_content = "Could not connect to Ollama. Make sure it's running: `ollama serve`"
     except httpx.HTTPStatusError as exc:
         final_content = f"Ollama returned an error: {exc.response.status_code}"
     except Exception as exc:
@@ -501,9 +500,7 @@ def chat_stream():
             # --- Phase 2: stream the final answer token-by-token ---
             # No tools parameter — model can only respond with text.
             collected: list[str] = []
-            async for token in ollama_chat_stream(
-                client, model=_get_model(), messages=messages
-            ):
+            async for token in ollama_chat_stream(client, model=_get_model(), messages=messages):
                 collected.append(token)
                 yield Fragment("chat.html", "stream_token", token=token)
 
@@ -514,10 +511,7 @@ def chat_stream():
             yield Fragment(
                 "chat.html",
                 "stream_token",
-                token=(
-                    "Could not connect to Ollama. "
-                    "Make sure it's running: `ollama serve`"
-                ),
+                token=("Could not connect to Ollama. Make sure it's running: `ollama serve`"),
             )
         except Exception as exc:
             yield Fragment("chat.html", "stream_token", token=f"Error: {exc}")

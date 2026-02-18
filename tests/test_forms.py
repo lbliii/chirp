@@ -383,9 +383,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return "error"
             return f"ok:{result.title}|{result.priority}"
@@ -403,9 +401,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return f"errors:{sorted(result.context['errors'].keys())}"
             return "ok"
@@ -423,9 +419,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return f"form:{result.context.get('form', {})}"
             return "ok"
@@ -445,7 +439,10 @@ class TestFormOrErrors:
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
             result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body",
+                request,
+                SimpleForm,
+                "form.html",
+                "form_body",
                 columns=["todo", "done"],
             )
             if isinstance(result, ValidationError):
@@ -466,7 +463,10 @@ class TestFormOrErrors:
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
             result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body",
+                request,
+                SimpleForm,
+                "form.html",
+                "form_body",
                 retarget="#errors",
             )
             if isinstance(result, ValidationError):
@@ -486,9 +486,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, SimpleForm, "tasks.html", "task_form"
-            )
+            result = await form_or_errors(request, SimpleForm, "tasks.html", "task_form")
             if isinstance(result, ValidationError):
                 return f"{result.template_name}|{result.block_name}"
             return "ok"
@@ -507,9 +505,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, TypedForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, TypedForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return f"errors:{sorted(result.context['errors'].keys())}"
             return "ok"
@@ -528,9 +524,7 @@ class TestFormOrErrors:
 
         @app.route("/submit", methods=["POST"])
         async def submit(request: Request):
-            result = await form_or_errors(
-                request, SimpleForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return "error"
             return f"{result.title}|{result.description}|{result.priority}"

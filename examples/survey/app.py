@@ -112,19 +112,22 @@ async def submit_survey(request: Request):
     selected_interests = form.get_list("interests")
 
     # Validate single-value fields
-    result = validate(form, {
-        "name": [required, max_length(100)],
-        "age": [required, integer, _valid_age],
-        "experience": [
-            required,
-            one_of("beginner", "intermediate", "advanced", "expert"),
-        ],
-        "country": [
-            required,
-            one_of("us", "gb", "ca", "de", "fr", "jp", "au", "br", "other"),
-        ],
-        "comments": [max_length(1000)],
-    })
+    result = validate(
+        form,
+        {
+            "name": [required, max_length(100)],
+            "age": [required, integer, _valid_age],
+            "experience": [
+                required,
+                one_of("beginner", "intermediate", "advanced", "expert"),
+            ],
+            "country": [
+                required,
+                one_of("us", "gb", "ca", "de", "fr", "jp", "au", "br", "other"),
+            ],
+            "comments": [max_length(1000)],
+        },
+    )
 
     errors = dict(result.errors) if not result else {}
 
@@ -137,7 +140,8 @@ async def submit_survey(request: Request):
 
     if errors:
         return ValidationError(
-            "survey.html", "survey_form",
+            "survey.html",
+            "survey_form",
             errors=errors,
             form=form_values,
             selected_interests=selected_interests,

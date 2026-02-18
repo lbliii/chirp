@@ -64,12 +64,14 @@ _RELOAD_SCRIPT = """\
 app.add_middleware(HTMLInject(_RELOAD_SCRIPT))
 
 # 2. Serve the static site from ./public at the root
-app.add_middleware(StaticFiles(
-    directory=PUBLIC_DIR,
-    prefix="/",
-    not_found_page="404.html",
-    cache_control="no-cache",
-))
+app.add_middleware(
+    StaticFiles(
+        directory=PUBLIC_DIR,
+        prefix="/",
+        not_found_page="404.html",
+        cache_control="no-cache",
+    )
+)
 
 
 if __name__ == "__main__":

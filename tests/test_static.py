@@ -204,9 +204,13 @@ class TestStaticFileCaching:
     async def test_custom_cache_control(self, static_dir) -> None:
         """The cache_control parameter controls the header value."""
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=static_dir, prefix="/static", cache_control="no-cache",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=static_dir,
+                prefix="/static",
+                cache_control="no-cache",
+            )
+        )
 
         @app.route("/")
         def index():
@@ -309,9 +313,13 @@ class TestIndexResolution:
         (site / "default.htm").write_text("<h1>Default</h1>")
 
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=site, prefix="/", index="default.htm",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=site,
+                prefix="/",
+                index="default.htm",
+            )
+        )
 
         async with TestClient(app) as client:
             response = await client.get("/")
@@ -346,9 +354,13 @@ class TestCustomNotFoundPage:
     async def test_custom_404_page(self, static_dir) -> None:
         """When not_found_page is set, serves it with 404 status."""
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=static_dir, prefix="/", not_found_page="404.html",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=static_dir,
+                prefix="/",
+                not_found_page="404.html",
+            )
+        )
 
         async with TestClient(app) as client:
             response = await client.get("/nonexistent")
@@ -372,9 +384,13 @@ class TestCustomNotFoundPage:
     async def test_missing_404_page_falls_through(self, static_dir) -> None:
         """If not_found_page file doesn't exist, still falls through."""
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=static_dir, prefix="/", not_found_page="missing.html",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=static_dir,
+                prefix="/",
+                not_found_page="missing.html",
+            )
+        )
 
         @app.route("/")
         def index():
@@ -389,10 +405,13 @@ class TestCustomNotFoundPage:
     async def test_not_found_page_traversal_blocked(self, static_dir) -> None:
         """Path traversal in not_found_page is blocked."""
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=static_dir, prefix="/",
-            not_found_page="../../../etc/passwd",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=static_dir,
+                prefix="/",
+                not_found_page="../../../etc/passwd",
+            )
+        )
 
         async with TestClient(app) as client:
             # not_found_page resolves outside directory — falls through
@@ -402,9 +421,13 @@ class TestCustomNotFoundPage:
     async def test_custom_404_lets_routes_through(self, static_dir) -> None:
         """Dynamic routes take priority over the custom 404 page."""
         app = App()
-        app.add_middleware(StaticFiles(
-            directory=static_dir, prefix="/", not_found_page="404.html",
-        ))
+        app.add_middleware(
+            StaticFiles(
+                directory=static_dir,
+                prefix="/",
+                not_found_page="404.html",
+            )
+        )
 
         @app.route("/api/health")
         def health():

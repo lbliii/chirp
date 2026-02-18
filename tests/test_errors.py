@@ -111,9 +111,7 @@ class TestRouterErrorMessages:
 
         router = Router()
         router.add(Route(path="/items", handler=handler, methods=frozenset({"GET"}), name=None))
-        router.add(
-            Route(path="/items", handler=handler, methods=frozenset({"POST"}), name=None)
-        )
+        router.add(Route(path="/items", handler=handler, methods=frozenset({"POST"}), name=None))
         router.compile()
         return router
 

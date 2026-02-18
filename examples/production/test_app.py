@@ -49,11 +49,13 @@ class TestProductionApp:
     async def test_contact_post_without_csrf_fails(self, example_app) -> None:
         async with TestClient(example_app) as client:
             await client.get("/")
-            body = urlencode({
-                "name": "Alice",
-                "email": "a@b.com",
-                "message": "Hi",
-            }).encode()
+            body = urlencode(
+                {
+                    "name": "Alice",
+                    "email": "a@b.com",
+                    "message": "Hi",
+                }
+            ).encode()
             response = await client.post("/contact", body=body, headers=_FORM_CT)
             assert response.status == 403
 
@@ -62,12 +64,14 @@ class TestProductionApp:
             page = await client.get("/")
             cookie = _extract_cookie(page)
             token = _extract_csrf_token(page)
-            body = urlencode({
-                "_csrf_token": token,
-                "name": "Alice",
-                "email": "a@b.com",
-                "message": "Hello",
-            }).encode()
+            body = urlencode(
+                {
+                    "_csrf_token": token,
+                    "name": "Alice",
+                    "email": "a@b.com",
+                    "message": "Hello",
+                }
+            ).encode()
             response = await client.post(
                 "/contact",
                 body=body,
@@ -81,12 +85,14 @@ class TestProductionApp:
             page = await client.get("/")
             cookie = _extract_cookie(page)
             token = _extract_csrf_token(page)
-            body = urlencode({
-                "_csrf_token": token,
-                "name": "Bob",
-                "email": "bob@example.com",
-                "message": "Hi",
-            }).encode()
+            body = urlencode(
+                {
+                    "_csrf_token": token,
+                    "name": "Bob",
+                    "email": "bob@example.com",
+                    "message": "Hi",
+                }
+            ).encode()
             post_resp = await client.post(
                 "/contact",
                 body=body,

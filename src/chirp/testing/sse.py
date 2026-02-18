@@ -66,11 +66,13 @@ def parse_sse_frames(raw: str) -> tuple[list[SSEEvent], int]:
                 heartbeats += 1
 
         if data_lines:
-            events.append(SSEEvent(
-                data="\n".join(data_lines),
-                event=event_type,
-                id=event_id,
-                retry=retry,
-            ))
+            events.append(
+                SSEEvent(
+                    data="\n".join(data_lines),
+                    event=event_type,
+                    id=event_id,
+                    retry=retry,
+                )
+            )
 
     return events, heartbeats

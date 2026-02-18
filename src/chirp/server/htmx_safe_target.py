@@ -43,6 +43,4 @@ SAFE_TARGET_JS = """\
 })();
 """
 
-SAFE_TARGET_SNIPPET = (
-    '<script data-chirp="safe-target">' + SAFE_TARGET_JS + "</script>"
-)
+SAFE_TARGET_SNIPPET = '<script data-chirp="safe-target">' + SAFE_TARGET_JS + "</script>"

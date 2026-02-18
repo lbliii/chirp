@@ -109,7 +109,9 @@ def stream_to_fragments(
     from chirp.templating.returns import Fragment
 
     return _stream_fragments(
-        tokens, template_name, block_name,
+        tokens,
+        template_name,
+        block_name,
         context_key=context_key,
         extra_context=extra_context or {},
         fragment_cls=Fragment,

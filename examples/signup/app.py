@@ -102,16 +102,23 @@ async def do_signup(request: Request):
     }
 
     # Validate with built-in + custom rules
-    result = validate(form, {
-        "username": [required, min_length(3), max_length(30), _username_pattern],
-        "email": [required, email],
-        "password": [required, min_length(8), max_length(128)],
-        "confirm_password": [required, _passwords_match(form_values["confirm_password"], form_values)],
-    })
+    result = validate(
+        form,
+        {
+            "username": [required, min_length(3), max_length(30), _username_pattern],
+            "email": [required, email],
+            "password": [required, min_length(8), max_length(128)],
+            "confirm_password": [
+                required,
+                _passwords_match(form_values["confirm_password"], form_values),
+            ],
+        },
+    )
 
     if not result:
         return ValidationError(
-            "signup.html", "signup_form",
+            "signup.html",
+            "signup_form",
             errors=result.errors,
             form=form_values,
         )
@@ -120,7 +127,8 @@ async def do_signup(request: Request):
     for user in _users:
         if user["username"] == form_values["username"]:
             return ValidationError(
-                "signup.html", "signup_form",
+                "signup.html",
+                "signup_form",
                 errors={"username": ["This username is already taken"]},
                 form=form_values,
             )

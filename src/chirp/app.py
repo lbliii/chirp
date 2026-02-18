@@ -277,12 +277,8 @@ class App:
 
         async def page_wrapper(request: Request) -> Any:
             """Wrapper that runs context cascade and upgrades Page → LayoutPage."""
-            cascade_ctx = await build_cascade_context(
-                _providers, request.path_params
-            )
-            kwargs = await resolve_kwargs(
-                _handler, request, cascade_ctx, _service_providers
-            )
+            cascade_ctx = await build_cascade_context(_providers, request.path_params)
+            kwargs = await resolve_kwargs(_handler, request, cascade_ctx, _service_providers)
             result = await invoke(_handler, **kwargs)
             return upgrade_result(result, cascade_ctx, _chain, _providers)
 
@@ -748,9 +744,7 @@ class App:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET
 
-            middleware_list.append(
-                HTMLInject(SAFE_TARGET_SNIPPET, full_page_only=True)
-            )
+            middleware_list.append(HTMLInject(SAFE_TARGET_SNIPPET, full_page_only=True))
 
         #    SSE lifecycle: data-sse-state attribute + custom events on
         #    [sse-connect] elements.  Enabled by default.
@@ -758,18 +752,14 @@ class App:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.sse_lifecycle import SSE_LIFECYCLE_SNIPPET
 
-            middleware_list.append(
-                HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True)
-            )
+            middleware_list.append(HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True))
 
         #    Event delegation: copy-btn, compare-switch for SSE-swapped content.
         if self.config.delegation:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.delegation import DELEGATION_SNIPPET
 
-            middleware_list.append(
-                HTMLInject(DELEGATION_SNIPPET, full_page_only=True)
-            )
+            middleware_list.append(HTMLInject(DELEGATION_SNIPPET, full_page_only=True))
 
         #    Alpine.js — local UI state (dropdowns, modals, tabs)
         if self.config.alpine:
@@ -814,9 +804,7 @@ class App:
                     full_page_only=True,
                 )
             )
-            middleware_list.append(
-                HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True)
-            )
+            middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
 
         #    Debug overlays (htmx error toasts, etc.) — debug mode only.
         if self.config.debug:

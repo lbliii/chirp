@@ -146,7 +146,8 @@ class TestNegotiateValidationError:
     def test_renders_fragment_with_422(self, kida_env: Environment) -> None:
         result = negotiate(
             ValidationError(
-                "form.html", "form_body",
+                "form.html",
+                "form_body",
                 errors={"email": ["Required"]},
                 form={"email": ""},
             ),
@@ -170,7 +171,8 @@ class TestNegotiateValidationError:
     def test_with_retarget_sets_header(self, kida_env: Environment) -> None:
         result = negotiate(
             ValidationError(
-                "form.html", "form_errors",
+                "form.html",
+                "form_errors",
                 retarget="#error-banner",
                 errors={"email": ["Invalid"]},
             ),
@@ -212,6 +214,7 @@ class TestNegotiateFormAction:
     @staticmethod
     def _plain_request() -> Request:
         """Create a plain (non-htmx) request."""
+
         async def _receive():
             return {"type": "http.request", "body": b"", "more_body": False}
 
@@ -232,6 +235,7 @@ class TestNegotiateFormAction:
     @staticmethod
     def _htmx_request() -> Request:
         """Create a fake htmx request (is_fragment=True)."""
+
         async def _receive():
             return {"type": "http.request", "body": b"", "more_body": False}
 
@@ -413,10 +417,12 @@ class TestNegotiateOOB:
         from chirp.errors import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="requires kida integration"):
-            negotiate(OOB(
-                Fragment("search.html", "results_list", results=[]),
-                Fragment("cart.html", "counter", count=0),
-            ))
+            negotiate(
+                OOB(
+                    Fragment("search.html", "results_list", results=[]),
+                    Fragment("cart.html", "counter", count=0),
+                )
+            )
 
 
 class TestNegotiatePrimitives:
@@ -493,7 +499,7 @@ class TestNegotiateEdgeCases:
         )
         assert result.status == 200
         assert "only" in result.text
-        assert 'hx-swap-oob' not in result.text
+        assert "hx-swap-oob" not in result.text
 
     def test_fragment_tuple_422(self, kida_env: Environment) -> None:
         """Plain Fragment in a (value, 422) tuple works for manual validation."""

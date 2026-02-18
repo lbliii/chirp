@@ -91,9 +91,7 @@ async def add_todo(request: Request):
 @app.route("/todos/{todo_id}/toggle", methods=["POST"])
 async def toggle_todo(todo_id: int):
     """Toggle a todo's completion state — returns the list fragment."""
-    await app.db.execute(
-        "UPDATE todos SET done = NOT done WHERE id = ?", todo_id
-    )
+    await app.db.execute("UPDATE todos SET done = NOT done WHERE id = ?", todo_id)
     todos = await ALL_TODOS.fetch(app.db)
     return Fragment("index.html", "todo_list", todos=todos)
 

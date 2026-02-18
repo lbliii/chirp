@@ -55,6 +55,9 @@ def run_dev_server(
         reload_dirs=reload_dirs,
     )
     server = Server(
-        config, app, app_path=app_path, lifecycle_collector=lifecycle_collector,
+        config,
+        app,
+        app_path=app_path,
+        lifecycle_collector=lifecycle_collector,
     )
     server.run()

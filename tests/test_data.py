@@ -678,8 +678,16 @@ class TestExports:
         """chirp.data.__all__ includes all public names."""
         import chirp.data
 
-        expected = {"Database", "DataError", "DriverNotInstalledError",
-                    "MigrationError", "Notification", "Query", "get_db", "migrate"}
+        expected = {
+            "Database",
+            "DataError",
+            "DriverNotInstalledError",
+            "MigrationError",
+            "Notification",
+            "Query",
+            "get_db",
+            "migrate",
+        }
         assert set(chirp.data.__all__) == expected
 
     def test_error_hierarchy(self) -> None:

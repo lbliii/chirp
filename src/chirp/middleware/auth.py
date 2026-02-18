@@ -106,8 +106,7 @@ def get_user() -> User:
         return _user_var.get()
     except LookupError:
         msg = (
-            "No auth context. Ensure AuthMiddleware is added "
-            "to the app before accessing the user."
+            "No auth context. Ensure AuthMiddleware is added to the app before accessing the user."
         )
         raise LookupError(msg) from None
 
@@ -117,9 +116,7 @@ def get_user() -> User:
 # ---------------------------------------------------------------------------
 
 # Module-level reference to the active config, set by AuthMiddleware.__init__
-_active_config: ContextVar[AuthConfig | None] = ContextVar(
-    "chirp_auth_config", default=None
-)
+_active_config: ContextVar[AuthConfig | None] = ContextVar("chirp_auth_config", default=None)
 
 
 def login(user: User) -> None:

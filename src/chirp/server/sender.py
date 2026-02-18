@@ -27,23 +27,26 @@ async def send_response(response: Response, send: Send) -> None:
     for name, value in response.headers:
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
     raw_headers.extend(
-        (b"set-cookie", cookie.to_header_value().encode("latin-1"))
-        for cookie in response.cookies
+        (b"set-cookie", cookie.to_header_value().encode("latin-1")) for cookie in response.cookies
     )
 
     body = response.body_bytes if _body_allowed(response.status) else b""
 
     raw_headers.append((b"content-length", str(len(body)).encode("latin-1")))
 
-    await send({
-        "type": "http.response.start",
-        "status": response.status,
-        "headers": raw_headers,
-    })
-    await send({
-        "type": "http.response.body",
-        "body": body,
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": response.status,
+            "headers": raw_headers,
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": body,
+        }
+    )
 
 
 async def send_streaming_response(
@@ -66,29 +69,35 @@ async def send_streaming_response(
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
 
     # No content-length — chunked transfer encoding signals body boundaries
-    await send({
-        "type": "http.response.start",
-        "status": response.status,
-        "headers": raw_headers,
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": response.status,
+            "headers": raw_headers,
+        }
+    )
 
     try:
         if isinstance(response.chunks, AsyncIterator):
             async for chunk in response.chunks:
                 if chunk:
-                    await send({
-                        "type": "http.response.body",
-                        "body": chunk.encode("utf-8"),
-                        "more_body": True,
-                    })
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": chunk.encode("utf-8"),
+                            "more_body": True,
+                        }
+                    )
         else:
             for chunk in response.chunks:
                 if chunk:
-                    await send({
-                        "type": "http.response.body",
-                        "body": chunk.encode("utf-8"),
-                        "more_body": True,
-                    })
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": chunk.encode("utf-8"),
+                            "more_body": True,
+                        }
+                    )
     except Exception as exc:
         # Mid-stream error: log with structured formatting, emit visible error
         import sys
@@ -106,12 +115,7 @@ async def send_streaming_response(
 
                 error_msg = traceback.format_exc()
             # Escape HTML in the error message
-            escaped = (
-                error_msg
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-            )
+            escaped = error_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             error_chunk = (
                 '<div class="chirp-error" data-status="500"'
                 f' style="white-space:pre-wrap;font-family:monospace;'
@@ -120,17 +124,21 @@ async def send_streaming_response(
             )
         else:
             error_chunk = "<!-- chirp: render error -->"
-        await send({
-            "type": "http.response.body",
-            "body": error_chunk.encode("utf-8"),
-            "more_body": True,
-        })
+        await send(
+            {
+                "type": "http.response.body",
+                "body": error_chunk.encode("utf-8"),
+                "more_body": True,
+            }
+        )
         # Re-store exception info for any caller that needs it
         sys.exc_info()
 
     # Close the stream
-    await send({
-        "type": "http.response.body",
-        "body": b"",
-        "more_body": False,
-    })
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b"",
+            "more_body": False,
+        }
+    )

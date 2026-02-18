@@ -30,8 +30,7 @@ class TestSseScope:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/sse.html" import sse_scope %}'
-            '{{ sse_scope("/events") }}',
+            '{% from "chirp/sse.html" import sse_scope %}{{ sse_scope("/events") }}',
         )
         assert 'sse-connect="/events"' in html
         assert "hx-disinherit" in html

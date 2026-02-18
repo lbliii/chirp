@@ -106,6 +106,7 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_location("/page", target="#main")
         header = r.header("HX-Location")
         import json
+
         obj = json.loads(header)
         assert obj["path"] == "/page"
         assert obj["target"] == "#main"
@@ -116,6 +117,7 @@ class TestHtmxResponseHeaders:
         )
         header = r.header("HX-Location")
         import json
+
         obj = json.loads(header)
         assert obj == {
             "path": "/page",
@@ -148,6 +150,7 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_trigger({"showToast": {"message": "Saved!"}})
         header = r.header("HX-Trigger")
         import json
+
         obj = json.loads(header)
         assert obj == {"showToast": {"message": "Saved!"}}
 
@@ -159,6 +162,7 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_trigger_after_settle({"flash": {"level": "info"}})
         header = r.header("HX-Trigger-After-Settle")
         import json
+
         assert json.loads(header) == {"flash": {"level": "info"}}
 
     def test_hx_trigger_after_swap_string(self) -> None:
@@ -169,6 +173,7 @@ class TestHtmxResponseHeaders:
         r = Response().with_hx_trigger_after_swap({"animate": True})
         header = r.header("HX-Trigger-After-Swap")
         import json
+
         assert json.loads(header) == {"animate": True}
 
     def test_hx_push_url_string(self) -> None:
@@ -252,14 +257,12 @@ class TestSSEResponse:
         response_methods = {
             name
             for name in dir(Response)
-            if (name.startswith(("with_", "without_")))
-            and callable(getattr(Response, name))
+            if (name.startswith(("with_", "without_"))) and callable(getattr(Response, name))
         }
         sse_methods = {
             name
             for name in dir(SSEResponse)
-            if (name.startswith(("with_", "without_")))
-            and callable(getattr(SSEResponse, name))
+            if (name.startswith(("with_", "without_"))) and callable(getattr(SSEResponse, name))
         }
         missing = response_methods - sse_methods
         assert not missing, (

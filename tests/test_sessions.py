@@ -237,10 +237,14 @@ class TestSessionDataTypes:
 class TestSessionCookieAttributes:
     async def test_custom_cookie_name(self) -> None:
         app = App()
-        app.add_middleware(SessionMiddleware(SessionConfig(
-            secret_key="test-secret",
-            cookie_name="my_session",
-        )))
+        app.add_middleware(
+            SessionMiddleware(
+                SessionConfig(
+                    secret_key="test-secret",
+                    cookie_name="my_session",
+                )
+            )
+        )
 
         @app.route("/set")
         def set_session():
@@ -452,9 +456,7 @@ class TestSessionTimeouts:
     async def test_idle_timeout_expires_session(self) -> None:
         app = App()
         app.add_middleware(
-            SessionMiddleware(
-                SessionConfig(secret_key="test-secret", idle_timeout_seconds=0)
-            )
+            SessionMiddleware(SessionConfig(secret_key="test-secret", idle_timeout_seconds=0))
         )
 
         @app.route("/set")
@@ -477,9 +479,7 @@ class TestSessionTimeouts:
     async def test_absolute_timeout_expires_session(self) -> None:
         app = App()
         app.add_middleware(
-            SessionMiddleware(
-                SessionConfig(secret_key="test-secret", absolute_timeout_seconds=0)
-            )
+            SessionMiddleware(SessionConfig(secret_key="test-secret", absolute_timeout_seconds=0))
         )
 
         @app.route("/set")

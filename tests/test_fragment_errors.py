@@ -4,7 +4,6 @@ When htmx sends a fragment request and an error occurs, the response
 should be a minimal HTML snippet instead of a full page.
 """
 
-
 from chirp.app import App
 from chirp.config import AppConfig
 from chirp.errors import HTTPError

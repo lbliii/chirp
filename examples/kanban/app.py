@@ -499,7 +499,11 @@ def index(request: Request):
 async def add_task(request: Request):
     """Add a task — returns OOB (column + stats) or ValidationError."""
     result = await form_or_errors(
-        request, TaskForm, "board.html", "add_form", columns=COLUMNS,
+        request,
+        TaskForm,
+        "board.html",
+        "add_form",
+        columns=COLUMNS,
     )
     if isinstance(result, ValidationError):
         return result
@@ -545,7 +549,11 @@ async def save_task(request: Request, task_id: int):
         return ("Task not found", 404)
 
     result = await form_or_errors(
-        request, EditTaskForm, "task_form.html", "edit_form", task=task,
+        request,
+        EditTaskForm,
+        "task_form.html",
+        "edit_form",
+        task=task,
     )
     if isinstance(result, ValidationError):
         return result

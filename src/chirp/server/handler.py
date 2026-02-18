@@ -68,18 +68,17 @@ async def handle_request(
                 )
 
             # MCP endpoint — dispatched inside middleware so auth/CORS apply
-            if (
-                tool_registry is not None
-                and len(tool_registry) > 0
-                and req.path == mcp_path
-            ):
+            if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
                 from chirp.tools.handler import handle_mcp_request
 
                 return await handle_mcp_request(req, tool_registry)
 
             match = router.match(req.method, req.path)
             return await _invoke_handler(
-                match, req, kida_env=kida_env, providers=providers,
+                match,
+                req,
+                kida_env=kida_env,
+                providers=providers,
             )
 
         # Wrap middleware around the dispatch
@@ -158,7 +157,11 @@ async def _invoke_handler(
 
     # Build kwargs from handler signature
     kwargs = _build_handler_kwargs(
-        handler, request, match.path_params, providers, body_data=body_data,
+        handler,
+        request,
+        match.path_params,
+        providers,
+        body_data=body_data,
     )
 
     # Call the handler (sync or async — invoke() handles both)
@@ -208,9 +211,8 @@ def _build_handler_kwargs(
             and param.annotation in providers
         ):
             kwargs[name] = providers[param.annotation]()
-        elif (
-            param.annotation is not inspect.Parameter.empty
-            and is_extractable_dataclass(param.annotation)
+        elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
+            param.annotation
         ):
             # Typed extraction: GET → query, POST/PUT/PATCH → body
             if request.method in ("GET", "HEAD"):

@@ -1028,6 +1028,7 @@ class TestServiceInjection:
 
 # Minimal receive/send for testing worker lifecycle scopes
 
+
 async def _dummy_receive() -> dict[str, Any]:
     return {"type": "http.disconnect"}
 

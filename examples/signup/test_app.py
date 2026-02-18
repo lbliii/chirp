@@ -34,13 +34,15 @@ def _build_signup_body(
     """Build URL-encoded signup form body."""
     from urllib.parse import urlencode
 
-    return urlencode({
-        "_csrf_token": csrf_token,
-        "username": username,
-        "email": email,
-        "password": password,
-        "confirm_password": confirm,
-    }).encode()
+    return urlencode(
+        {
+            "_csrf_token": csrf_token,
+            "username": username,
+            "email": email,
+            "password": password,
+            "confirm_password": confirm,
+        }
+    ).encode()
 
 
 class TestSignupPage:
@@ -56,7 +58,7 @@ class TestSignupPage:
     async def test_signup_page_has_csrf_token(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/signup")
-            assert '_csrf_token' in response.text
+            assert "_csrf_token" in response.text
 
     async def test_index_redirects_to_signup(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -78,7 +80,10 @@ class TestValidation:
             response = await client.post(
                 "/signup",
                 body=_build_signup_body(
-                    username="", email="", password="", confirm="",
+                    username="",
+                    email="",
+                    password="",
+                    confirm="",
                     csrf_token=token,
                 ),
                 headers={**_FORM_CT, "Cookie": f"chirp_session={cookie}"},
@@ -137,7 +142,8 @@ class TestValidation:
             response = await client.post(
                 "/signup",
                 body=_build_signup_body(
-                    password="securepass123", confirm="different123",
+                    password="securepass123",
+                    confirm="different123",
                     csrf_token=token,
                 ),
                 headers={**_FORM_CT, "Cookie": f"chirp_session={cookie}"},

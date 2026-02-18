@@ -89,10 +89,7 @@ def _get_httpx() -> Any:
 
         return httpx
     except ImportError:
-        msg = (
-            "chirp.ai requires 'httpx' for LLM API calls. "
-            "Install it with: pip install chirp[ai]"
-        )
+        msg = "chirp.ai requires 'httpx' for LLM API calls. Install it with: pip install chirp[ai]"
         raise ProviderNotInstalledError(msg) from None
 
 
@@ -161,17 +158,20 @@ async def anthropic_stream(
     if system:
         body["system"] = system
 
-    async with httpx.AsyncClient() as client, client.stream(
-        "POST",
-        f"{config.base_url}/v1/messages",
-        json=body,
-        headers={
-            "x-api-key": config.api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        timeout=120.0,
-    ) as response:
+    async with (
+        httpx.AsyncClient() as client,
+        client.stream(
+            "POST",
+            f"{config.base_url}/v1/messages",
+            json=body,
+            headers={
+                "x-api-key": config.api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            timeout=120.0,
+        ) as response,
+    ):
         if response.status_code != 200:
             text = await response.aread()
             raise ProviderError("anthropic", response.status_code, text.decode())
@@ -252,16 +252,19 @@ async def openai_stream(
         "stream": True,
     }
 
-    async with httpx.AsyncClient() as client, client.stream(
-        "POST",
-        f"{config.base_url}/v1/chat/completions",
-        json=body,
-        headers={
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json",
-        },
-        timeout=120.0,
-    ) as response:
+    async with (
+        httpx.AsyncClient() as client,
+        client.stream(
+            "POST",
+            f"{config.base_url}/v1/chat/completions",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {config.api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=120.0,
+        ) as response,
+    ):
         if response.status_code != 200:
             text = await response.aread()
             raise ProviderError("openai", response.status_code, text.decode())

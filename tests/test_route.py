@@ -38,9 +38,7 @@ class TestRoute:
         assert route.name is None
 
     def test_named_route(self) -> None:
-        route = Route(
-            path="/users", handler=_handler, methods=frozenset({"GET"}), name="user_list"
-        )
+        route = Route(path="/users", handler=_handler, methods=frozenset({"GET"}), name="user_list")
         assert route.name == "user_list"
 
     def test_frozen(self) -> None:

@@ -18,7 +18,6 @@ def _get_latest_cookie(response, prev_cookie: str, name: str = "chirp_session") 
     return new if new else prev_cookie
 
 
-
 class TestStepNavigation:
     """Step guards redirect to the correct step."""
 

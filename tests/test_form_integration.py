@@ -39,9 +39,7 @@ class TestFormOrErrorsIntegration:
 
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
-            result = await form_or_errors(
-                request, ContactForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, ContactForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return result
             return f"ok:{result.name}|{result.email}"
@@ -60,9 +58,7 @@ class TestFormOrErrorsIntegration:
 
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
-            result = await form_or_errors(
-                request, ContactForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, ContactForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return result
             return "ok"
@@ -83,9 +79,7 @@ class TestFormOrErrorsIntegration:
 
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
-            result = await form_or_errors(
-                request, ContactForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, ContactForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return result
             return "ok"
@@ -107,7 +101,10 @@ class TestFormOrErrorsIntegration:
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
             result = await form_or_errors(
-                request, ContactForm, "form.html", "form_body",
+                request,
+                ContactForm,
+                "form.html",
+                "form_body",
                 page_title="Contact Us",
             )
             if isinstance(result, ValidationError):
@@ -122,7 +119,6 @@ class TestFormOrErrorsIntegration:
             )
             assert response.status == 422
 
-
     async def test_retarget_sets_hx_header(self) -> None:
         """HX-Retarget header appears on the 422 response."""
         app = _app()
@@ -130,7 +126,10 @@ class TestFormOrErrorsIntegration:
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
             result = await form_or_errors(
-                request, ContactForm, "form.html", "form_errors",
+                request,
+                ContactForm,
+                "form.html",
+                "form_errors",
                 retarget="#error-banner",
             )
             if isinstance(result, ValidationError):
@@ -155,16 +154,15 @@ class TestFormValuesIntegration:
 
         @app.route("/contact", methods=["POST"])
         async def contact(request: Request):
-            result = await form_or_errors(
-                request, ContactForm, "form.html", "form_body"
-            )
+            result = await form_or_errors(request, ContactForm, "form.html", "form_body")
             if isinstance(result, ValidationError):
                 return result
 
             # Business validation (e.g., name too short)
             if len(result.name) < 3:
                 return ValidationError(
-                    "form.html", "form_body",
+                    "form.html",
+                    "form_body",
                     errors={"name": ["Name must be at least 3 characters."]},
                     form=form_values(result),
                 )

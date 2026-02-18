@@ -1,6 +1,5 @@
 """Tests for is_safe_url — open redirect prevention."""
 
-
 from chirp.security.urls import is_safe_url
 
 
