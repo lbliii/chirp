@@ -28,6 +28,8 @@ Usage::
 from __future__ import annotations
 
 import dataclasses
+import html
+import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -288,6 +290,24 @@ _FORM_EXCLUDED_FIELDS = frozenset({
     "_csrf_token", "csrf_token", "_method",
 })
 
+# Regex: generic HTML tag scanner for island metadata checks.
+_ISLAND_TAG_PATTERN = re.compile(
+    r"<(?P<tag>[a-zA-Z][\w:-]*)(?P<attrs>[^>]*)>",
+    re.IGNORECASE,
+)
+_ISLAND_NAME_PATTERN = re.compile(
+    r"\bdata-island\s*=\s*[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+_ISLAND_PROPS_PATTERN = re.compile(
+    r"\bdata-island-props\s*=\s*[\"']([^\"']*)[\"']",
+    re.IGNORECASE,
+)
+_ISLAND_SRC_PATTERN = re.compile(
+    r"\bdata-island-src\s*=\s*[\"']([^\"']*)[\"']",
+    re.IGNORECASE,
+)
+
 
 def _extract_form_field_names(source: str) -> set[str]:
     """Extract ``name`` attribute values from form fields in template HTML.
@@ -305,6 +325,99 @@ def _extract_form_field_names(source: str) -> set[str]:
             continue
         names.add(name)
     return names
+
+
+def _extract_island_mounts(source: str) -> list[dict[str, str | None]]:
+    """Extract island mount metadata from template HTML."""
+    mounts: list[dict[str, str | None]] = []
+    for match in _ISLAND_TAG_PATTERN.finditer(source):
+        attrs = match.group("attrs")
+        name_match = _ISLAND_NAME_PATTERN.search(attrs)
+        if not name_match:
+            continue
+        name = name_match.group(1).strip()
+
+        id_match = _ID_PATTERN.search(attrs)
+        props_match = _ISLAND_PROPS_PATTERN.search(attrs)
+        src_match = _ISLAND_SRC_PATTERN.search(attrs)
+        mounts.append(
+            {
+                "name": name or None,
+                "mount_id": id_match.group(1).strip() if id_match else None,
+                "props_raw": props_match.group(1) if props_match else None,
+                "src": src_match.group(1).strip() if src_match else None,
+            }
+        )
+    return mounts
+
+
+def _check_island_mounts(
+    template_sources: dict[str, str],
+    *,
+    strict: bool,
+) -> list[ContractIssue]:
+    """Validate framework-agnostic island mount metadata in templates."""
+    issues: list[ContractIssue] = []
+    for tmpl_name, source in template_sources.items():
+        if tmpl_name.startswith(("chirp/", "chirpui/")):
+            continue
+        for mount in _extract_island_mounts(source):
+            name = mount["name"]
+            if not name:
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="islands",
+                        message="Found data-island mount without a component name.",
+                        template=tmpl_name,
+                    )
+                )
+                continue
+
+            props_raw = mount["props_raw"]
+            if props_raw is not None and "{{" not in props_raw and "{%" not in props_raw:
+                # Skip dynamic expressions that cannot be validated statically.
+                decoded = html.unescape(props_raw)
+                try:
+                    parsed = json.loads(decoded)
+                except Exception:
+                    issues.append(
+                        ContractIssue(
+                            severity=Severity.ERROR,
+                            category="islands",
+                            message=(
+                                f"Island '{name}' has malformed data-island-props JSON."
+                            ),
+                            template=tmpl_name,
+                            details=f"raw={props_raw!r}",
+                        )
+                    )
+                else:
+                    if not isinstance(parsed, (dict, list, str, int, float, bool, type(None))):
+                        issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="islands",
+                                message=(
+                                    f"Island '{name}' uses unsupported props JSON type."
+                                ),
+                                template=tmpl_name,
+                            )
+                        )
+
+            if strict and not mount["mount_id"]:
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="islands",
+                        message=(
+                            f"Island '{name}' has no stable mount id. "
+                            "Add id=... for deterministic remount targeting."
+                        ),
+                        template=tmpl_name,
+                    )
+                )
+    return issues
 
 
 def _closest_field(target: str, fields: set[str], *, max_dist: int = 2) -> str | None:
@@ -1054,7 +1167,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     9. **Page context gaps**: Routes with FragmentContract where the full
        template requires variables the target block does not — a sign
        that full-page Page renders may crash at runtime (warning).
-    10. **Component call validation**: ``{% call %}`` sites match
+    10. **Islands metadata**: Validate ``data-island`` mount metadata and
+        ``data-island-props`` JSON payloads.
+    11. **Component call validation**: ``{% call %}`` sites match
         ``{% def %}`` signatures (requires kida typed def support).
 
     Args:
@@ -1249,6 +1364,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         # 4g. Cross-reference sse-swap values against SSEContract.event_types
         result.issues.extend(
             _check_sse_event_crossref(template_sources, router)
+        )
+
+        # 4h. Validate framework-agnostic island mounts.
+        result.issues.extend(
+            _check_island_mounts(
+                template_sources,
+                strict=app.config.islands_contract_strict,
+            )
         )
 
         # 5. Check accessibility — htmx on non-interactive elements

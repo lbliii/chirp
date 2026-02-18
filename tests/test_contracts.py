@@ -15,11 +15,13 @@ from chirp.contracts import (
     SSEContract,
     _attr_to_method,
     _check_accessibility,
+    _check_island_mounts,
     _check_sse_connect_scope,
     _check_sse_self_swap,
     _check_swap_safety,
     _collect_broad_targets,
     _extract_form_field_names,
+    _extract_island_mounts,
     _extract_targets_from_source,
     _extract_template_references,
     _path_matches_route,
@@ -95,6 +97,48 @@ class TestExtractTargets:
 
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
+
+
+class TestIslandMountExtraction:
+    def test_extract_mount_with_props_and_src(self):
+        html = (
+            '<div data-island="chart" id="sales-chart" '
+            'data-island-src="/static/chart.js" data-island-props="{&quot;series&quot;:[1,2]}"></div>'
+        )
+        mounts = _extract_island_mounts(html)
+        assert len(mounts) == 1
+        assert mounts[0]["name"] == "chart"
+        assert mounts[0]["mount_id"] == "sales-chart"
+        assert mounts[0]["src"] == "/static/chart.js"
+
+    def test_empty_when_no_mounts(self):
+        assert _extract_island_mounts("<div>No island</div>") == []
+
+
+class TestIslandMountValidation:
+    def test_malformed_props_json_errors(self):
+        sources = {"index.html": '<div data-island="chart" data-island-props="{oops"></div>'}
+        issues = _check_island_mounts(sources, strict=False)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "islands"
+
+    def test_missing_id_warns_in_strict_mode(self):
+        sources = {"index.html": '<div data-island="editor" data-island-props="{&quot;a&quot;:1}"></div>'}
+        issues = _check_island_mounts(sources, strict=True)
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "islands"
+
+    def test_valid_mount_has_no_issues(self):
+        sources = {
+            "index.html": (
+                '<div data-island="editor" id="editor-root" '
+                'data-island-props="{&quot;a&quot;:1}"></div>'
+            )
+        }
+        issues = _check_island_mounts(sources, strict=True)
+        assert issues == []
 
 
 class TestPathMatchesRoute:

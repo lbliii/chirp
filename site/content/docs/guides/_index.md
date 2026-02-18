@@ -32,4 +32,11 @@ Build inclusive apps with Chirp.
 Complement htmx with Alpine for client-only interactivity.
 :::{/card}
 
+:::{card} Islands Contract
+:icon: puzzle
+:link: ./islands
+:description: Framework-agnostic high-state mount roots
+Mount isolated high-state widgets while keeping pages server-rendered.
+:::{/card}
+
 :::{/cards}

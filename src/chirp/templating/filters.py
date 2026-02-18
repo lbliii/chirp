@@ -6,6 +6,7 @@ common in server-rendered HTML + htmx apps.
 """
 
 import html
+import json
 import time as time_module
 from datetime import UTC, datetime
 from typing import Any
@@ -151,12 +152,62 @@ def url(value: str, fallback: str = "#") -> str:
     return safe_url(str(value), fallback=fallback)
 
 
+def island_props(value: Any) -> Markup:
+    """Serialize a value for safe use in ``data-island-props``.
+
+    Returns HTML-escaped JSON as Markup so templates can embed props
+    without manual escaping:
+
+        <div data-island-props="{{ props | island_props }}"></div>
+    """
+    payload = json.dumps(value, separators=(",", ":"), ensure_ascii=True)
+    return Markup(html.escape(payload, quote=True))
+
+
+def island_attrs(
+    name: str,
+    props: Any | None = None,
+    *,
+    mount_id: str | None = None,
+    version: str = "1",
+    src: str | None = None,
+    cls: str = "",
+) -> Markup:
+    """Build a safe island mount attribute string.
+
+    Designed for framework-agnostic mount roots:
+
+        <div{{ island_attrs("editor", props=state, mount_id="editor-root") }}>
+            ...
+        </div>
+    """
+    attrs: list[str] = [
+        f' data-island="{html.escape(name, quote=True)}"',
+        f' data-island-version="{html.escape(version, quote=True)}"',
+    ]
+    if mount_id:
+        attrs.append(f' id="{html.escape(mount_id, quote=True)}"')
+    if src:
+        attrs.append(f' data-island-src="{html.escape(src, quote=True)}"')
+    if cls:
+        attrs.append(f' class="{html.escape(cls, quote=True)}"')
+    if props is not None:
+        attrs.append(f' data-island-props="{island_props(props)}"')
+    return Markup("".join(attrs))
+
+
+BUILTIN_GLOBALS: dict[str, Any] = {
+    "island_attrs": island_attrs,
+}
+
+
 # All built-in chirp filters, registered automatically on every env.
 BUILTIN_FILTERS: dict[str, Any] = {
     "attr": attr,
     "bem": bem,
     "field_errors": field_errors,
     "format_time": format_time,
+    "island_props": island_props,
     "pluralize": pluralize,
     "qs": qs,
     "timeago": timeago,

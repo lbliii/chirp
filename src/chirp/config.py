@@ -65,6 +65,11 @@ class AppConfig:
     alpine_version: str = "3.15.8"  # Pinned for reproducibility
     alpine_csp: bool = False  # Use CSP-safe build when True
 
+    # Islands runtime — framework-agnostic high-state mount lifecycle
+    islands: bool = False
+    islands_version: str = "1"
+    islands_contract_strict: bool = False  # Validate mount metadata in app.check()
+
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB
 
