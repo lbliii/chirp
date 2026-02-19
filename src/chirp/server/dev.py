@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from pounce import ASGIApp
+
 if TYPE_CHECKING:
-    from pounce import ASGIApp
     from pounce.server import LifecycleCollector
 
 
