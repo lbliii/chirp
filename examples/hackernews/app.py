@@ -183,7 +183,7 @@ async def _fetch_item(item_id: int) -> dict | None:
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, dict) else None
-    except (httpx.HTTPError, ValueError):
+    except httpx.HTTPError, ValueError:
         return None
 
 
@@ -196,7 +196,7 @@ async def _fetch_stories(count: int = 30) -> list[Story]:
         resp = await client.get("topstories.json")
         resp.raise_for_status()
         ids = resp.json()
-    except (httpx.HTTPError, ValueError):
+    except httpx.HTTPError, ValueError:
         return []
 
     ids = ids[:count]
@@ -332,6 +332,10 @@ def events():
         # cause visible flicker.
         yield SSEEvent(event="ping", data="connected")
 
+        # The ``while True`` loop is intentional: this is a long-lived SSE
+        # connection that polls until the client disconnects.  The framework
+        # runs a concurrent disconnect-monitor task and cancels this generator
+        # when the connection closes, so no explicit break condition is needed.
         while True:
             with _lock:
                 ids = list(_story_ids[:30])

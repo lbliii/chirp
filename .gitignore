@@ -65,6 +65,7 @@ Thumbs.db
 
 # Project specific
 *.log
+*.db
 *.db-shm
 *.db-wal
 

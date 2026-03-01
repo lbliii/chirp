@@ -153,7 +153,7 @@ class SessionMiddleware:
             try:
                 created_ts = float(created_at)
                 last_seen_ts = float(last_seen_at)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return {}
 
             if (

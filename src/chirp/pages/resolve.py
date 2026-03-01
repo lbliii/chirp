@@ -76,7 +76,7 @@ async def resolve_kwargs(
             if param.annotation is not inspect.Parameter.empty:
                 try:
                     kwargs[name] = param.annotation(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     kwargs[name] = value
             else:
                 kwargs[name] = value

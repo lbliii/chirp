@@ -16,6 +16,7 @@ Run:
 """
 
 import asyncio
+import os
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,7 +27,7 @@ from chirp.data import Query
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-DB_PATH = Path(__file__).parent / "dashboard.db"
+DB_PATH = Path(os.environ.get("CHIRP_DASHBOARD_DB", str(Path(__file__).parent / "dashboard.db")))
 
 app = App(
     config=AppConfig(template_dir=TEMPLATES_DIR, debug=True),
