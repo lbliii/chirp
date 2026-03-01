@@ -225,6 +225,7 @@ dev = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "patitas>=0.3.1",  # Markdown rendering for ollama example tests
+    "chirp-ui>=0.1.0",  # Layout macros for llm_playground example tests
 ]
 
 # =============================================================================

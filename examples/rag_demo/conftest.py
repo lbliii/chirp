@@ -12,6 +12,16 @@ from pathlib import Path
 
 import pytest
 
+# Skip entire module when patitas lacks render_llm/sanitize (not yet released)
+try:
+    from patitas import render_llm, sanitize  # noqa: F401
+    from patitas.sanitize import llm_safe  # noqa: F401
+except ImportError:
+    pytest.skip(
+        "rag_demo requires patitas render_llm and sanitize (not yet in PyPI)",
+        allow_module_level=True,
+    )
+
 
 @pytest.fixture
 def example_module(monkeypatch, tmp_path):
