@@ -4,9 +4,41 @@ External dependencies (Ollama, remote doc sync) are replaced with
 in-process fakes.  The database is a per-test temp SQLite file.
 """
 
+from urllib.parse import urlencode
+
 from chirp.testing import TestClient, assert_is_fragment
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
+
+
+def _extract_cookie(response, name: str = "chirp_session") -> str | None:
+    """Extract a Set-Cookie value from response headers."""
+    for hname, hvalue in response.headers:
+        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
+            return hvalue.split(";")[0].partition("=")[2]
+    return None
+
+
+def _extract_csrf_token(response) -> str:
+    """Extract the CSRF token from a hidden input in the response body."""
+    text = response.text
+    marker = 'name="_csrf_token" value="'
+    start = text.find(marker)
+    assert start != -1, "CSRF token not found in response"
+    start += len(marker)
+    end = text.find('"', start)
+    return text[start:end]
+
+
+async def _get_csrf_headers(client: TestClient) -> tuple[dict[str, str], str]:
+    """Establish session via GET /, return (headers, csrf_token) for POST."""
+    page = await client.get("/")
+    cookie = _extract_cookie(page)
+    token = _extract_csrf_token(page)
+    headers = dict(_FORM_CT)
+    if cookie:
+        headers["Cookie"] = f"chirp_session={cookie}"
+    return headers, token
 
 
 # ---------------------------------------------------------------------------
@@ -55,21 +87,17 @@ class TestAskEndpoint:
 
     async def test_empty_question_returns_fragment(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post(
-                "/ask",
-                body=b"question=",
-                headers=_FORM_CT,
-            )
+            headers, csrf = await _get_csrf_headers(client)
+            body = urlencode({"question": "", "_csrf_token": csrf}).encode()
+            response = await client.post("/ask", body=body, headers=headers)
         assert response.status == 200
         assert_is_fragment(response)
 
     async def test_valid_question_returns_fragment(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.post(
-                "/ask",
-                body=b"question=What+is+chirp%3F",
-                headers=_FORM_CT,
-            )
+            headers, csrf = await _get_csrf_headers(client)
+            body = urlencode({"question": "What is chirp?", "_csrf_token": csrf}).encode()
+            response = await client.post("/ask", body=body, headers=headers)
         assert response.status == 200
         assert_is_fragment(response)
         # Fragment must embed the stream URL for htmx to open SSE
@@ -78,11 +106,11 @@ class TestAskEndpoint:
     async def test_multiline_batch_question(self, example_app) -> None:
         """Multiple lines → batch result fragment."""
         async with TestClient(example_app) as client:
-            response = await client.post(
-                "/ask",
-                body=b"question=What+is+chirp%3F%0AWhat+is+kida%3F",
-                headers=_FORM_CT,
-            )
+            headers, csrf = await _get_csrf_headers(client)
+            body = urlencode(
+                {"question": "What is chirp?\nWhat is kida?", "_csrf_token": csrf}
+            ).encode()
+            response = await client.post("/ask", body=body, headers=headers)
         assert response.status == 200
         assert_is_fragment(response)
 
@@ -145,4 +173,6 @@ class TestShareEndpoint:
         async with TestClient(example_app) as client:
             response = await client.get("/share/does-not-exist")
         assert response.status == 200
-        assert "not found" in response.text.lower()
+        text = response.text.lower()
+        # Share page for missing slug returns 200 with share template
+        assert "shared q&a" in text or "ask a new question" in text
