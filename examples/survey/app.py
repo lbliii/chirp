@@ -73,7 +73,7 @@ def _valid_age(value: str) -> str | None:
     """Age must be between 1 and 150."""
     try:
         age = int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "Must be a whole number"
     if age < 1 or age > 150:
         return "Age must be between 1 and 150"
