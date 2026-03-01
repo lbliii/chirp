@@ -332,6 +332,10 @@ def events():
         # cause visible flicker.
         yield SSEEvent(event="ping", data="connected")
 
+        # The ``while True`` loop is intentional: this is a long-lived SSE
+        # connection that polls until the client disconnects.  The framework
+        # runs a concurrent disconnect-monitor task and cancels this generator
+        # when the connection closes, so no explicit break condition is needed.
         while True:
             with _lock:
                 ids = list(_story_ids[:30])

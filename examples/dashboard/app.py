@@ -136,6 +136,11 @@ def events():
     sensor_ids = list(SENSORS.keys())
 
     async def generate():
+        # The ``while True`` loop is intentional: this is a long-lived SSE
+        # connection that pushes updates until the client disconnects.  The
+        # framework runs a concurrent disconnect-monitor task and cancels this
+        # generator when the connection closes, so no explicit break condition
+        # is needed.
         while True:
             # Pick a random sensor and update it
             sensor_id = random.choice(sensor_ids)

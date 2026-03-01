@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import OOB, App, AppConfig, Fragment, Page, Request, ValidationError
+from chirp.validation import email as email_rule, max_length, required, validate
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -101,20 +102,10 @@ def _delete_contact(contact_id: int) -> bool:
 # Validation
 # ---------------------------------------------------------------------------
 
-
-def _validate(name: str, email: str) -> dict[str, list[str]]:
-    """Validate contact fields. Returns a dict of errors (empty = valid)."""
-    errors: dict[str, list[str]] = {}
-    if not name.strip():
-        errors.setdefault("name", []).append("Name is required.")
-    elif len(name) > 100:
-        errors.setdefault("name", []).append("Name must be 100 characters or less.")
-    if not email.strip():
-        errors.setdefault("email", []).append("Email is required.")
-    elif "@" not in email:
-        errors.setdefault("email", []).append("Email must contain @.")
-    return errors
-
+_CONTACT_RULES = {
+    "name": [required, max_length(100)],
+    "email": [required, email_rule],
+}
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -132,20 +123,19 @@ def index(request: Request):
 async def add_contact(request: Request):
     """Add a contact — returns OOB (table + count) or ValidationError."""
     form = await request.form()
-    name = form.get("name", "")
-    email = form.get("email", "")
-
-    errors = _validate(name, email)
-    if errors:
+    result = validate(form, _CONTACT_RULES)
+    if not result:
         return ValidationError(
             "contacts.html",
             "contact_form",
             retarget="#form-section",
-            errors=errors,
-            form={"name": name, "email": email},
+            errors=result.errors,
+            form={"name": form.get("name", ""), "email": form.get("email", "")},
         )
 
-    _add_contact(name, email)
+    name = form.get("name", "")
+    contact_email = form.get("email", "")
+    _add_contact(name, contact_email)
     contacts = _get_contacts()
     return OOB(
         Fragment("contacts.html", "contact_table", contacts=contacts),
@@ -180,20 +170,21 @@ def edit_contact(contact_id: int):
 async def save_contact(request: Request, contact_id: int):
     """Save an edited contact — returns OOB (row + count) or ValidationError."""
     form = await request.form()
-    name = form.get("name", "")
-    email = form.get("email", "")
-
-    errors = _validate(name, email)
-    if errors:
+    result = validate(form, _CONTACT_RULES)
+    if not result:
+        name = form.get("name", "")
+        contact_email = form.get("email", "")
         contact = _get_contact(contact_id)
         return ValidationError(
             "contacts.html",
             "edit_row",
-            errors=errors,
-            contact=contact or Contact(id=contact_id, name=name, email=email),
+            errors=result.errors,
+            contact=contact or Contact(id=contact_id, name=name, email=contact_email),
         )
 
-    updated = _update_contact(contact_id, name, email)
+    name = form.get("name", "")
+    contact_email = form.get("email", "")
+    updated = _update_contact(contact_id, name, contact_email)
     if updated is None:
         return ("Contact not found", 404)
 

@@ -394,38 +394,38 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
-| Path parameters | x | x | x | | | | x | | | | | | | | | x | | x | | | x | | | | x |
-| String returns | x | | | | | | | | | | | | | | | | | | | | | | | |
+| Feature | hello | todo | contacts | sse | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | llm_playground | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
+| Path parameters | x | x | x | | | | x | | | | | | | | | | x | | x | | | x | | | | x |
+| String returns | x | | | | | | | | | | | | | | | | | | | | | | | | |
 | Dict/JSON returns | x | | | | | | | | | | | | | | | | | | | x | | | | x |
 | `Response` chaining | x | | | | | | | | | | | | | | | | | | | | | | | |
 | `@app.error()` | x | | | | | | | | | | | | | | | | | | | x | | | | x |
-| `Template` | | x | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | |
-| `Fragment` | | x | x | x | x | x | x | x | | | | | x | x | | | | | | x | | | | | |
+| `Template` | | x | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | | x |
+| `Fragment` | | x | x | x | x | x | x | x | | | | | x | x | x | | | | | x | | | | | | |
 | `Page` | | | x | | | | x | | | | | x | | | | | | x | | x | | | | |
-| `ValidationError` | | x | x | | | | | | | | | x | | x | x | x | x | | | | | x | |
+| `ValidationError` | | x | x | | | | | | | | | x | | | x | x | x | x | | | | | x | |
 | `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | |
 | `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | |
 | `request.is_fragment` | | x | | | | | x | | | | | | | | | | | | | | | | | |
 | `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x |
-| `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | | x | | x | | | |
+| `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | x | | x | | x | | | |
 | `request.json()` | | | | | | | | | | | | | | | | | | | | | | | | x |
-| `@app.template_filter()` | | x | | | x | | x | | | | | | x | | x | | | | | x | | | | |
-| `EventStream` | | | | x | x | x | x | x | x | | x | x | x | | | | | | x | | | | | |
-| `SSEEvent` | | | | x | | | | | | | | | | | | | | | | | | | | |
+| `@app.template_filter()` | | x | | | x | | x | | | | | | x | x | x | | | | | x | | | | |
+| `EventStream` | | | | x | x | x | x | x | x | | x | x | x | x | | | | | x | | | | | |
+| `SSEEvent` | | | | x | | | | | | | | | | x | | | | | | | | | | |
 | `{% cache %}` | | | | | x | | x | | | | | | | | | | | | | | | | | |
 | `hx-swap-oob` | | | x | | x | x | x | | | | x | | | | | | | | | | | | | |
 | `with_hx_*()` headers | | | x | | | | | | | | | | | | | | | | | | | | | |
 | `assert_hx_*` test helpers | | | x | | | | | | | | | | | | | | | | | | | | | |
-| Multi-worker Pounce | | | | | x | | x | x | | | | | | | | | | | | | | | | |
+| Multi-worker Pounce | | | | | x | | x | x | | | | | | x | | | | | | | | | | |
 | `TestClient.fragment()` | | x | | | | | x | | | | | | x | | | | | x | | x | | | | |
-| `TestClient.sse()` | | | | x | x | x | x | | x | | | | | | | | | | x | | | | | |
+| `TestClient.sse()` | | | | x | x | x | x | | x | | | | | x | | | | | x | | | | | |
 | `@app.on_startup` | | | | | | x | x | x | | | | | | | | | | | | | | | | |
 | `@app.on_worker_startup` | | | | | | | x | x | | | | | | | | | | | | | | | | |
 | `@app.on_worker_shutdown` | | | | | | | x | x | | | | | | | | | | | | | | | | |
-| `httpx` (real API) | | | | | | | x | | | | | | | | | | | | | | | | | |
+| `httpx` (real API) | | | | | | | x | | | | | | x | | | | | | | | | | | |
 | `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | | | x | | | | |
 | `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | | | x | | | | |
 | `Query` builder | | x | | | | x | | | | | | | | | | | | | x | | | | |
@@ -433,11 +433,11 @@ pytest examples/hello/
 | `db.execute_many()` | | | | | | x | | | | | | | | | | | | | | | | | | |
 | `db.fetch_val()` | | | | | | x | | | | | | | | | | | | | x | | | | |
 | `migrate()` (auto-migration) | | | | | | x | | | | | | | | | | | | | x | | | | |
-| `chirp.ai` (LLM streaming) | | | | | | | | x | | | x | | | | | | | | | | | | | |
+| `chirp.ai` (LLM streaming) | | | | | | | | x | | | x | | | x | | | | | | | | | | |
 | `ContextVar` per-worker | | | | | | | x | x | | | | | | | | | | | | | | | | |
 | Recursive `{% def %}` | | | | | | | x | | | | | | | | | | | | | | | | | |
 | View Transitions | | | | | | | x | | | | | | | | | | | | | | | | | |
-| `StaticFiles` (root prefix) | | | | | | | | | x | | | | | | x | | | | | | | | | |
+| `StaticFiles` (root prefix) | | | | | | | | | x | | | | | x | x | | | | | | | | | |
 | `HTMLInject` | | | | | | | | | x | | | | | | | | | | | | | | | |
 | Custom 404 page | | | | | | | | | x | | | | | | | | | | | | | | | |
 | `SecurityHeadersMiddleware` | | | | | | | | | | | | | | | | | | | | | x | | | |
@@ -449,8 +449,8 @@ pytest examples/hello/
 | `hash_password` / `verify_password` | | | | | | | | | | x | x | | | | | | | | | | | | | |
 | `is_safe_url()` | | | | | | | | | | x | x | | | | | | | | | | | | | |
 | `Redirect` | | | | | | | | | | x | x | | x | x | | x | | x | | x | | | |
-| `validate()` + built-in rules | | | | | | | | | | | | | x | x | x | x | | | | | x | |
-| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | x | | x | x | | | | | | x | | | |
+| `validate()` + built-in rules | | | | | | | | | | | | | x | | x | x | x | | | | | x | |
+| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | x | | x | | x | | | | | x | | | |
 | `UploadFile` / multipart | | | | | | | | | | | | | | | x | | | | | | | | | |
 | `form.files` / `file.save()` | | | | | | | | | | | | | | | x | | | | | | | | | |
 | `form.get_list()` (multi-value) | | | | | | | | | | | | | | | | x | | | | | | | | |

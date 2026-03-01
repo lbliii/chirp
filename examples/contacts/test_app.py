@@ -64,7 +64,7 @@ class TestAddContact:
                 headers=_FORM_CT,
             )
             assert response.status == 422
-            assert "@" in response.text
+            assert "valid email" in response.text.lower()
 
     async def test_add_retargets_on_error(self, example_app) -> None:
         """ValidationError includes HX-Retarget to swap errors into the form."""

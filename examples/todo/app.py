@@ -22,7 +22,7 @@ from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-DB_PATH = Path(__file__).parent / "todo.db"
+DB_PATH = Path(os.environ.get("CHIRP_TODO_DB", str(Path(__file__).parent / "todo.db")))
 
 # ---------------------------------------------------------------------------
 # Data model — frozen dataclass, same object from DB through to template
