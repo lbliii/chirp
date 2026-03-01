@@ -78,8 +78,8 @@ async def send_streaming_response(
         }
     )
 
-    def _encode_chunk(chunk: str | bytes) -> bytes:
-        return chunk.encode("utf-8") if isinstance(chunk, str) else chunk
+    def _encode_chunk(chunk: str) -> bytes:
+        return chunk.encode("utf-8")
 
     try:
         if isinstance(response.chunks, AsyncIterator):
@@ -88,7 +88,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": _encode_chunk(cast(str | bytes, chunk)),
+                            "body": _encode_chunk(cast(str, chunk)),
                             "more_body": True,
                         }
                     )
@@ -98,7 +98,7 @@ async def send_streaming_response(
                     await send(
                         {
                             "type": "http.response.body",
-                            "body": _encode_chunk(cast(str | bytes, chunk)),
+                            "body": _encode_chunk(cast(str, chunk)),
                             "more_body": True,
                         }
                     )

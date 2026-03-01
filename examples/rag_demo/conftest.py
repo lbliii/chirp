@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-# Skip entire module when patitas lacks render_llm/sanitize (not yet released)
+# Skip entire module when patitas lacks render_llm/sanitize (patitas>=0.3.2)
 try:
     from patitas import render_llm, sanitize  # noqa: F401
     from patitas.sanitize import llm_safe  # noqa: F401
 except ImportError:
     pytest.skip(
-        "rag_demo requires patitas render_llm and sanitize (not yet in PyPI)",
+        "rag_demo requires patitas>=0.3.2 (render_llm, sanitize)",
         allow_module_level=True,
     )
 
@@ -32,8 +32,8 @@ def example_module(monkeypatch, tmp_path):
 
     db_file = tmp_path / "rag_test.db"
     monkeypatch.setenv("DB_URL", f"sqlite:///{db_file}")
-    # Skip remote doc sync — fall back to sample docs only
-    monkeypatch.setenv("RAG_DOC_SOURCES", "")
+    # Skip remote doc sync — fall back to sample docs only ("," = empty URL list)
+    monkeypatch.setenv("RAG_DOC_SOURCES", ",")
 
     app_path = Path(__file__).parent / "app.py"
     spec = importlib.util.spec_from_file_location("example_rag_demo", app_path)
