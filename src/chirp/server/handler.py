@@ -45,6 +45,7 @@ async def handle_request(
     sse_heartbeat_interval: float = 15.0,
     sse_retry_ms: int | None = None,
     sse_close_event: str | None = None,
+    db: Any = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -55,6 +56,13 @@ async def handle_request(
 
     # Set request context var (reset after dispatch)
     token: Token[Request] = request_var.set(request)
+
+    # Set database context var per-request (lifespan sets it only in its task)
+    db_token: Token[Any] | None = None
+    if db is not None:
+        from chirp.data.database import _db_var
+
+        db_token = _db_var.set(db)
 
     try:
         # Build the innermost handler (router dispatch + MCP)
@@ -100,6 +108,10 @@ async def handle_request(
     except Exception as exc:
         response = await handle_internal_error(exc, request, error_handlers, kida_env, debug)
     finally:
+        if db_token is not None:
+            from chirp.data.database import _db_var
+
+            _db_var.reset(db_token)
         g._reset()
         request_var.reset(token)
 

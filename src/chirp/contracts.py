@@ -210,15 +210,20 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
     This catches static URLs in HTML; dynamic URLs (from template expressions)
     are not captured and should be validated separately.
 
+    Uses separate patterns for double and single quotes so that Kida string
+    boundaries like attrs='hx-get="/f/' ~ var ~ '"' do not produce false
+    extractions of truncated URLs (e.g. /f/) — the mismatched delimiters
+    prevent a match.
     """
     targets: list[tuple[str, str]] = []
+    attr_pattern = r"(hx-(?:get|post|put|patch|delete)|action)\s*="
     for match in re.finditer(
-        r'(hx-(?:get|post|put|patch|delete)|action)\s*=\s*["\']([^"\']*)["\']',
+        rf'{attr_pattern}\s*"([^"]*)"|{attr_pattern}\s*\'([^\']*)\'',
         source,
     ):
-        attr_name = match.group(1)
-        url = match.group(2)
-        # Skip template expressions ({{ ... }}), Jinja concatenation (~), anchors
+        attr_name = match.group(1) or match.group(3)
+        url = match.group(2) or match.group(4)
+        # Skip template expressions ({{ ... }}), Kida concatenation (~), anchors
         if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
             continue
         targets.append((attr_name, url))

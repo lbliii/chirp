@@ -98,6 +98,18 @@ class TestExtractTargets:
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
 
+    def test_ignores_kida_concatenation_boundary(self):
+        """Kida attrs='hx-get="/f/' ~ var ~ '"' must not extract truncated /f/."""
+        html = 'attrs=\'hx-get="/f/\' ~ forum.slug ~ \'/catch-up-trigger"\''
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_ignores_mismatched_delimiters(self):
+        """Mismatched quote delimiters (Kida string boundary) must not match."""
+        html = '<div hx-get="/f/\' ~ x ~ \'"></div>'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
 
 class TestIslandMountExtraction:
     def test_extract_mount_with_props_and_src(self):

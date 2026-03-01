@@ -608,6 +608,7 @@ class App:
             sse_heartbeat_interval=self.config.sse_heartbeat_interval,
             sse_retry_ms=self.config.sse_retry_ms,
             sse_close_event=self.config.sse_close_event,
+            db=self._db,
         )
 
     async def _handle_lifespan(
