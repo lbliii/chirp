@@ -82,9 +82,7 @@ class TestAskEndpoint:
         # Empty prompt → "empty" fragment (still a 200, not an error)
         assert response.status == 200
 
-    async def test_valid_prompt_returns_compare_fragment(
-        self, example_module, monkeypatch
-    ) -> None:
+    async def test_valid_prompt_returns_compare_fragment(self, example_module, monkeypatch) -> None:
         monkeypatch.setattr(example_module, "_ollama_models", _fake_ollama_models)
         async with TestClient(example_module.app) as client:
             response = await client.post(

@@ -174,7 +174,8 @@ async def handle_sse(
             # Send an error event so the client can react
             if debug:
                 if _is_kida_error(exc):
-                    detail = exc.format_compact() if hasattr(exc, "format_compact") else str(exc)
+                    fmt = getattr(exc, "format_compact", None)
+                    detail = fmt() if fmt is not None else str(exc)
                 else:
                     import traceback
 
@@ -291,7 +292,8 @@ def _format_error_event(value: Any, exc: Exception) -> str:
     from chirp.server.terminal_errors import _is_kida_error
 
     if _is_kida_error(exc):
-        detail = exc.format_compact() if hasattr(exc, "format_compact") else str(exc)
+        fmt = getattr(exc, "format_compact", None)
+        detail = fmt() if fmt is not None else str(exc)
     else:
         detail = f"{type(exc).__name__}: {exc}"
 

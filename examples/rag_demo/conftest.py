@@ -18,9 +18,7 @@ def example_module(monkeypatch, tmp_path):
     """Load a fresh module with external dependencies mocked."""
     import chirp.ext.chirp_ui
 
-    monkeypatch.setattr(
-        chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None
-    )
+    monkeypatch.setattr(chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None)
 
     db_file = tmp_path / "rag_test.db"
     monkeypatch.setenv("DB_URL", f"sqlite:///{db_file}")
