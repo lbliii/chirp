@@ -116,7 +116,9 @@ _CONTACT_RULES = {
 def index(request: Request):
     """Full page or fragment depending on htmx request."""
     contacts = _get_contacts()
-    return Page("contacts.html", "contact_table", contacts=contacts, count=len(contacts))
+    return Page(
+        "contacts.html", "contact_table", contacts=contacts, count=len(contacts)
+    )
 
 
 @app.route("/contacts", methods=["POST"])
@@ -139,7 +141,12 @@ async def add_contact(request: Request):
     contacts = _get_contacts()
     return OOB(
         Fragment("contacts.html", "contact_table", contacts=contacts),
-        Fragment("contacts.html", "contact_count", target="contact-count", count=len(contacts)),
+        Fragment(
+            "contacts.html",
+            "contact_count",
+            target="contact-count",
+            count=len(contacts),
+        ),
     )
 
 
@@ -191,7 +198,12 @@ async def save_contact(request: Request, contact_id: int):
     contacts = _get_contacts()
     return OOB(
         Fragment("contacts.html", "contact_row", contact=updated),
-        Fragment("contacts.html", "contact_count", target="contact-count", count=len(contacts)),
+        Fragment(
+            "contacts.html",
+            "contact_count",
+            target="contact-count",
+            count=len(contacts),
+        ),
     )
 
 

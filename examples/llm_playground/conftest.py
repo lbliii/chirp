@@ -17,7 +17,9 @@ def example_module(monkeypatch):
     """Load a fresh module with chirp-ui dependency mocked out."""
     import chirp.ext.chirp_ui
 
-    monkeypatch.setattr(chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None)
+    monkeypatch.setattr(
+        chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None
+    )
 
     app_path = Path(__file__).parent / "app.py"
     spec = importlib.util.spec_from_file_location("example_llm_playground", app_path)

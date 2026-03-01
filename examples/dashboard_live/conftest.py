@@ -17,7 +17,9 @@ def example_app(tmp_path):
     os.environ["CHIRP_DASHBOARD_DB"] = str(tmp_path / "dashboard.db")
     try:
         app_path = Path(__file__).parent / "app.py"
-        spec = importlib.util.spec_from_file_location("example_dashboard_live", app_path)
+        spec = importlib.util.spec_from_file_location(
+            "example_dashboard_live", app_path
+        )
         assert spec is not None
         assert spec.loader is not None
         module = importlib.util.module_from_spec(spec)

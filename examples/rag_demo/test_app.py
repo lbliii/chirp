@@ -4,8 +4,6 @@ External dependencies (Ollama, remote doc sync) are replaced with
 in-process fakes.  The database is a per-test temp SQLite file.
 """
 
-from types import SimpleNamespace
-
 from chirp.testing import TestClient, assert_is_fragment
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}

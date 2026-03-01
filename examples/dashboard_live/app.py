@@ -27,7 +27,9 @@ from chirp.data import Query
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-DB_PATH = Path(os.environ.get("CHIRP_DASHBOARD_DB", str(Path(__file__).parent / "dashboard.db")))
+DB_PATH = Path(
+    os.environ.get("CHIRP_DASHBOARD_DB", str(Path(__file__).parent / "dashboard.db"))
+)
 
 app = App(
     config=AppConfig(template_dir=TEMPLATES_DIR, debug=True),
@@ -106,7 +108,9 @@ async def seed_data():
 async def get_stats() -> Stats:
     """Compute dashboard statistics from the database."""
     total = await ORDERS.count(app.db)
-    revenue = await app.db.fetch_val("SELECT COALESCE(SUM(amount), 0) FROM orders") or 0.0
+    revenue = (
+        await app.db.fetch_val("SELECT COALESCE(SUM(amount), 0) FROM orders") or 0.0
+    )
     pending = await ORDERS.where("status = ?", "pending").count(app.db)
     avg = round(revenue / total, 2) if total > 0 else 0.0
     return Stats(
