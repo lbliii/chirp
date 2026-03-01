@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import OOB, App, AppConfig, Fragment, Page, Request, ValidationError
-from chirp.validation import email as email_rule, max_length, required, validate
+from chirp.validation import email as email_rule
+from chirp.validation import max_length, required, validate
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
