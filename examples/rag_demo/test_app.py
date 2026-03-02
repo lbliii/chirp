@@ -175,8 +175,5 @@ class TestShareEndpoint:
         assert response.status == 200
         text = response.text.lower()
         # Share page for missing slug returns 200 with share template
-        assert (
-            "shared q&a" in text
-            or "ask a new question" in text
-            or "not found" in text
-        )
+        assert "expired" in text or "does not exist" in text, "expected not-found message"
+        assert "shared q&a" in text, "expected share template"
