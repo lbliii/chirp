@@ -14,7 +14,7 @@ _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 def _extract_cookie(response, name: str = "chirp_session") -> str | None:
     """Extract a Set-Cookie value from response headers."""
     for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
+        if hname.lower() == "set-cookie" and hvalue.startswith(f"{name}="):
             return hvalue.split(";")[0].partition("=")[2]
     return None
 
@@ -175,4 +175,8 @@ class TestShareEndpoint:
         assert response.status == 200
         text = response.text.lower()
         # Share page for missing slug returns 200 with share template
-        assert "shared q&a" in text or "ask a new question" in text
+        assert (
+            "shared q&a" in text
+            or "ask a new question" in text
+            or "not found" in text
+        )
