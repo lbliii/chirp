@@ -52,6 +52,26 @@ all three SSE payload types.
 cd examples/sse && python app.py
 ```
 
+### `streaming/` — Stream() with Async Context
+
+`return Stream("page.html", stats=..., feed=...)` where context values are awaitables.
+Chirp resolves them concurrently, then streams the template via Kida's `render_stream()` —
+chunks sent as they're rendered for faster TTFB.
+
+```bash
+cd examples/streaming && python app.py
+```
+
+### `llm_streaming_kida/` — TemplateStream + {% async for %}
+
+`return TemplateStream("response.html", stream=..., prompt=...)` where the template
+contains `{% async for token in stream %}`. Kida's `render_stream_async` yields chunks
+as the template iterates — O(n) work, not Fragment-per-token re-renders.
+
+```bash
+cd examples/llm_streaming_kida && python app.py
+```
+
 ### `dashboard/` — Full Stack Showcase
 
 The complete Pounce + Chirp + Kida pipeline. A weather station with 6 live sensors:
@@ -394,8 +414,8 @@ pytest examples/hello/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | llm_playground | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Feature | hello | todo | contacts | sse | streaming | llm_streaming_kida | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | llm_playground | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x |
 | Path parameters | x | x | x | | | | x | | | | | | | | | | x | | x | | | x | | | | x |
 | String returns | x | | | | | | | | | | | | | | | | | | | | | | | | |
@@ -408,6 +428,7 @@ pytest examples/hello/
 | `ValidationError` | | x | x | | | | | | | | | x | | | x | x | x | x | | | | | x | |
 | `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | |
 | `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | |
+| `TemplateStream` | | | | | | x | | | | | | | | | | | | | | | | | | |
 | `request.is_fragment` | | x | | | | | x | | | | | | | | | | | | | | | | | |
 | `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x |
 | `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | x | | x | | x | | | |

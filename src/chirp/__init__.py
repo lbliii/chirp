@@ -61,6 +61,7 @@ __all__ = [
     "Stream",
     "Suspense",
     "Template",
+    "TemplateStream",
     "ToolCallEvent",
     "ValidationError",
     "form_from",
@@ -98,6 +99,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "FormAction": ("chirp.templating.returns", "FormAction"),
     "Stream": ("chirp.templating.returns", "Stream"),
     "Suspense": ("chirp.templating.returns", "Suspense"),
+    "TemplateStream": ("chirp.templating.returns", "TemplateStream"),
     "ValidationError": ("chirp.templating.returns", "ValidationError"),
     "OOB": ("chirp.templating.returns", "OOB"),
     # Realtime

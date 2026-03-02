@@ -269,6 +269,30 @@ class Stream:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateStream:
+    """Render a template with Kida's render_stream_async.
+
+    Use when the template contains ``{% async for %}`` or ``{{ await }}``
+    and context includes async iterators consumed during rendering.
+    O(n) work — template yields chunks as it iterates, not re-render per item.
+
+    Usage::
+
+        return TemplateStream("chat.html",
+            stream=llm.stream(prompt),
+            prompt=prompt,
+        )
+    """
+
+    template_name: str
+    context: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(self, template_name: str, /, **context: Any) -> None:
+        object.__setattr__(self, "template_name", template_name)
+        object.__setattr__(self, "context", context)
+
+
+@dataclass(frozen=True, slots=True)
 class Suspense:
     """Render a page shell immediately, then fill in deferred blocks via OOB.
 

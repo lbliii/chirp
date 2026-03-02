@@ -25,6 +25,7 @@ from chirp.templating.returns import (
     Stream,
     Suspense,
     Template,
+    TemplateStream,
     ValidationError,
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
@@ -224,6 +225,19 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
             )
+        case TemplateStream():
+            if kida_env is None:
+                msg = (
+                    "TemplateStream return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            tmpl = kida_env.get_template(value.template_name)
+            chunks = tmpl.render_stream_async(**value.context)
+            return StreamingResponse(
+                chunks=chunks,
+                content_type="text/html; charset=utf-8",
+            )
         case Suspense():
             if kida_env is None:
                 msg = (
@@ -265,7 +279,7 @@ def negotiate(
             msg = (
                 f"Cannot convert {type(value).__name__} to a response. "
                 f"Return str, dict, bytes, Template, InlineTemplate, Fragment, "
-                f"Action, Stream, EventStream, Response, or Redirect."
+                f"TemplateStream, Action, Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)
 

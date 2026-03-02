@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Response</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 1.5rem;
+    }
+    .prompt { color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem; }
+    .response {
+      background: #1e293b; padding: 1rem; border-radius: 0.5rem;
+      min-height: 4rem; white-space: pre-wrap;
+    }
+    .back { margin-top: 1rem; }
+    .back a { color: #22c55e; text-decoration: none; }
+    .back a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <p class="prompt">You asked: {{ prompt }}</p>
+  <div class="response">{% async for token in stream %}{{ token }}{% end %}</div>
+  <p class="back"><a href="/">← Back</a></p>
+</body>
+</html>

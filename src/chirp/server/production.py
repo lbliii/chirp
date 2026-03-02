@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-if TYPE_CHECKING:
-    from pounce import ASGIApp
+from pounce import ASGIApp
 
+if TYPE_CHECKING:
     from chirp.app import App
 
 
