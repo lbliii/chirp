@@ -30,7 +30,7 @@ jobs:
             uv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --no-sources --group dev
 
       - name: Ruff (lint)
         run: uv run ruff check .
@@ -57,7 +57,7 @@ jobs:
             uv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --no-sources --group dev
 
       - name: Ty type checker
         run: uv run ty check src/chirp/
@@ -82,7 +82,7 @@ jobs:
             uv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --no-sources --group dev
 
       - name: Tests
         env:

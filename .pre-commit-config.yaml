@@ -16,12 +16,14 @@ repos:
         args: [--fix]
         types_or: [python, pyi]
 
-      # Run the formatter
-      - id: ruff-format
-        types_or: [python, pyi]
-
   - repo: local
     hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run poe format
+        language: system
+        types: [python]
+        pass_filenames: false
       - id: ty
         name: ty type checker
         entry: uv run ty check src/chirp/
