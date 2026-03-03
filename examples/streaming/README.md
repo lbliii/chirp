@@ -15,6 +15,7 @@ Open http://127.0.0.1:8000/live — items appear one by one every 2 seconds.
 
 - **Stream** — `Stream(template, **context)` where context can include awaitables
 - **TemplateStream** — `TemplateStream(template, stream=async_iterator)` — template consumes with `{% async for %}`, chunks yield as it iterates
+- **`{% flush %}`** — (kida 0.2.3+) Emit a streaming boundary so the shell (header/nav) reaches the client before async content. See `live.html` — header appears immediately, items stream in every 2s.
 - **Visible chunk delivery** — /live demonstrates progressive rendering with 2s delays
 
 ## Stream vs Suspense vs TemplateStream

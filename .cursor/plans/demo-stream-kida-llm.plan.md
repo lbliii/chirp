@@ -107,7 +107,7 @@ Demonstrate the last three gaps from the template-engine research:
 ### Chirp changes (for Option B)
 
 1. `**chirp/templating/returns.py`**: Add `TemplateStream` dataclass.
-2. `**chirp/server/negotiation.py**`: Add case for `TemplateStream` → get template, `render_stream_async`, `StreamingResponse`.
+2. `**chirp/server/negotiation.py`**: Add case for `TemplateStream` → get template, `render_stream_async`, `StreamingResponse`.
 3. `**chirp/__init__.py**`: Export `TemplateStream`.
 
 ### Kida template (reuse pattern from Kida's llm_streaming)

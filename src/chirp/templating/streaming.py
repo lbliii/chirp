@@ -20,6 +20,16 @@ Pipeline::
     2. Resolve all awaitables concurrently (anyio.create_task_group)
     3. Pass fully-resolved context to kida render_stream()
     4. Yield HTML chunks via chunked transfer encoding
+
+Shell-first streaming (kida 0.2.3+):
+    Use ``{% flush %}`` in templates to emit a streaming boundary. Place it
+    after header/nav so the client receives the shell before main content::
+
+        <html><head>...</head><body>
+        <header>...</header><nav>...</nav>
+        {% flush %}
+        <main>{% for item in items %}...{% end %}</main>
+        </body></html>
 """
 
 import inspect

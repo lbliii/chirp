@@ -34,7 +34,7 @@
     <h1>TemplateStream — Visible Chunks</h1>
     <p>Items arrive every 2 seconds via &#123;% async for %&#125;</p>
   </header>
-
+  {% flush %}
   <section class="feed">
     <h2>Live Feed</h2>
     {% async for item in stream %}
