@@ -160,7 +160,7 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            html = _render_layout_page(value, kida_env, request)
+            html = _render_layout_page(value, kida_env, request=request)
             render_intent = (
                 "fragment"
                 if request is not None and request.is_fragment and not request.is_history_restore
@@ -333,6 +333,34 @@ def _render_layout_page(
     )
     page_template = kida_env.get_template(value.name)
     page_html = page_template.render_block(value.block_name, value.context)
+
+    # Compute layout depth for render_with_layouts
+    layouts = layout_chain.layouts
+    if is_history_restore or htmx_target is None:
+        start_index = 0
+        mode = "full"
+    elif htmx_target:
+        idx = layout_chain.find_start_index_for_target(htmx_target)
+        if idx is None:
+            start_index = len(layouts) if layouts else 0
+            mode = "fragment"
+        else:
+            start_index = idx
+            mode = "partial"
+    else:
+        start_index = 0
+        mode = "full"
+
+    # Debug metadata for LayoutDebugMiddleware (when config.debug)
+    try:
+        from chirp.middleware.layout_debug import set_layout_debug_metadata
+
+        chain_str = " > ".join(f"{l.target}({i})" for i, l in enumerate(layouts))
+        target_id = (htmx_target or "").lstrip("#")
+        match_str = f"target={target_id}, start={start_index}, rendered={len(layouts[start_index:])}"
+        set_layout_debug_metadata(request, chain_str, match_str, mode)
+    except ImportError:
+        pass
 
     # Compose with layout chain at the appropriate depth
     return render_with_layouts(

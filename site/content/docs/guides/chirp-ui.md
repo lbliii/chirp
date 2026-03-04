@@ -100,7 +100,35 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 ## App Shell
 
-chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html` to get a topbar + sidebar + content area that persists across htmx-boosted navigations.
+**Quick start:** Extend `chirpui/app_shell_layout.html` and fill the blocks. No manual HTML boilerplate:
+
+```html
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% block brand %}My App{% end %}
+{% block sidebar %}
+  {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+  {% call sidebar() %}
+    {% call sidebar_section("Main") %}
+      {{ sidebar_link("/", "Home") }}
+      {{ sidebar_link("/items", "Items") }}
+    {% end %}
+  {% end %}
+{% end %}
+```
+
+**Adding an inner shell:** For nested layouts (e.g. forum > subforum), use the `shell_section` macro from Chirp:
+
+```html
+{% from "chirp/macros/shell.html" import shell_section %}
+{% call shell_section("forum-content") %}
+  {% block content %}{% end %}
+{% end %}
+```
+
+**Migrating from boost.html:** Replace `{% extends "chirp/layouts/boost.html" %}` with `{% extends "chirpui/app_shell_layout.html" %}`. Add `{% block brand %}`, `{% block sidebar %}`, etc. The `hx-select="#page-content"` and `id="page-content"` are already in place.
+
+**Manual shell:** For full control, chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html`:
 
 ```html
 {# target: main #}

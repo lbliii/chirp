@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Include SSE boilerplate (EventStream, sse_scope)",
     )
+    new_parser.add_argument(
+        "--shell",
+        action="store_true",
+        help="Generate project with persistent app shell (topbar, sidebar)",
+    )
 
     # -- chirp run --------------------------------------------------------
     run_parser = subparsers.add_parser("run", help="Start dev or production server")

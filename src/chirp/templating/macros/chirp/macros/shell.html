@@ -1,0 +1,25 @@
+{#- Chirp shell_section macro — htmx plumbing for inner layout shells
+
+   Use for nested shells (forum > subforum > thread). Abstracts hx-target,
+   hx-swap so inner layouts don't need to know htmx details.
+
+   The renderer produces fragments for inner layouts, so hx-select is NOT
+   needed here — only at the root where responses may be full HTML docs.
+
+   Usage:
+       {% from "chirp/macros/shell.html" import shell_section %}
+       <div class="forum-shell">
+         <nav>Forum navigation</nav>
+         {% call shell_section("forum-content") %}
+           {% block content %}{% end %}
+         {% end %}
+       </div>
+-#}
+
+{% def shell_section(id, transition=true) %}
+<div id="{{ id }}"
+     hx-target="#{{ id }}"
+     hx-swap="innerHTML{% if transition %} transition:true{% end %}">
+  {% slot %}
+</div>
+{% end %}

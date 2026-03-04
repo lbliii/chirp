@@ -1,0 +1,55 @@
+{#- Chirp shell layout — base for persistent app shells with hx-select
+
+   Use this instead of boost.html for apps with a persistent shell (topbar,
+   sidebar) that stays fixed while only #page-content swaps on navigation.
+
+   Key differences from boost.html:
+   - hx-select="#page-content" — extracts only the content div from full-page
+     responses, so the shell persists across htmx-boost navigations
+   - {% block shell %} — override to wrap main with topbar/sidebar; child
+     templates add structure AROUND main, not inside {% block content %}
+   - {% block scripts %} — centralizes htmx CDN; override to change versions
+
+   Usage:
+       {% extends "chirp/layouts/shell.html" %}
+       {% block shell %}
+         <header>...</header>
+         <main id="main" ...>
+           <div id="page-content">{% block content %}{% end %}</div>
+         </main>
+       {% end %}
+       {% block sse_scope %}
+         {% from "chirp/sse.html" import sse_scope %}
+         {{ sse_scope("/events") }}
+       {% end %}
+
+   For ChirpUI apps, extend chirpui/app_shell_layout.html instead.
+-#}
+{# target: body #}
+<!DOCTYPE html>
+<html lang="{% block lang %}en{% end %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% end %}</title>
+  {% block head %}{% end %}
+  {% block scripts %}
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  {% end %}
+</head>
+<body>
+  {% block shell %}
+  <main id="main"
+        hx-boost="true"
+        hx-target="#main"
+        hx-swap="innerHTML transition:true"
+        hx-select="#page-content">
+    <div id="page-content">
+      {% block content %}{% end %}
+    </div>
+  </main>
+  {% end %}
+  {% block sse_scope %}{% end %}
+</body>
+</html>

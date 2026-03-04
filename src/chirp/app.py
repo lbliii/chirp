@@ -76,6 +76,7 @@ class App:
         "_middleware_list",
         "_migrations_dir",
         # Page convention metadata (populated by mount_pages)
+        "_discovered_layout_chains",
         "_page_route_paths",
         "_page_templates",
         "_pending_routes",
@@ -116,6 +117,7 @@ class App:
         self._shutdown_hooks: list[Callable[..., Any]] = []
         self._worker_startup_hooks: list[Callable[..., Any]] = []
         self._worker_shutdown_hooks: list[Callable[..., Any]] = []
+        self._discovered_layout_chains: list[Any] = []
         self._page_route_paths: set[str] = set()
         self._page_templates: set[str] = set()
         self._providers: dict[type, Callable[..., Any]] = {}
@@ -238,6 +240,7 @@ class App:
         # uses this to suppress false-positive orphan/dead warnings.
         for page_route in page_routes:
             self._page_route_paths.add(page_route.url_path)
+            self._discovered_layout_chains.append(page_route.layout_chain)
             if page_route.template_name:
                 self._page_templates.add(page_route.template_name)
             for layout in page_route.layout_chain.layouts:
@@ -815,8 +818,10 @@ class App:
         #    Debug overlays (htmx error toasts, etc.) — debug mode only.
         if self.config.debug:
             from chirp.middleware.inject import HTMLInject
+            from chirp.middleware.layout_debug import LayoutDebugMiddleware
             from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
 
+            middleware_list.append(LayoutDebugMiddleware())
             middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
         self._middleware = tuple(middleware_list)
 

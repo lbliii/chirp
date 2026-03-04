@@ -1,0 +1,10 @@
+{# target: items-content #}
+{% from "chirp/macros/shell.html" import shell_section %}
+<div class="chirpui-shell-section">
+    <nav class="chirpui-shell-section__nav">
+        <a href="/items">Items</a>
+    </nav>
+    {% call shell_section("items-content") %}
+    {% block content %}{% end %}
+    {% end %}
+</div>

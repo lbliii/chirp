@@ -146,44 +146,71 @@ This means persistent UI (navbars, sidebars, topbars) must live **outside** `{% 
 </main>
 ```
 
+### Layout ramp: boost → shell → nested shells
+
+Chirp offers three layout patterns, from simplest to most structured:
+
+| Layout | Use case |
+|--------|----------|
+| `chirp/layouts/boost.html` | Simple pages, no persistent shell. Uses `hx-select="#page-content"` for fragment swaps. |
+| `chirp/layouts/shell.html` | Persistent shell (topbar, sidebar). Override `{% block shell %}` to wrap main. |
+| `chirpui/app_shell_layout.html` | ChirpUI apps — extends shell.html with sidebar, toast, CSS. |
+| Nested shells | Forum > subforum > thread. Use `shell_section` macro for inner levels. |
+
+**hx-select vs hx-disinherit**: Prefer `hx-select="#page-content"` on the boosted container. When the server returns a full HTML page, htmx extracts only `#page-content` for the swap. `hx-disinherit` breaks inheritance for fragment swaps; use `hx-target="this"` on event-driven elements instead (the `safe_target` middleware auto-injects this).
+
 ### Persistent app shell pattern
 
-For dashboard-style apps with a topbar, sidebar, and content area, use a **standalone layout** (no `{% extends %}`) that puts the shell structure outside the content block:
+For dashboard-style apps with a topbar, sidebar, and content area, extend `chirpui/app_shell_layout.html` (if using ChirpUI) or `chirp/layouts/shell.html`:
 
 ```html
-{# target: main #}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>My App</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <link rel="stylesheet" href="/static/chirpui.css">
-</head>
-<body>
-<div class="chirpui-app-shell">
-  <header class="chirpui-app-shell__topbar">...</header>
-  <aside class="chirpui-app-shell__sidebar">...</aside>
-  <main id="main" class="chirpui-app-shell__main"
-        hx-boost="true" hx-target="#main"
-        hx-swap="innerHTML transition:true"
-        hx-select="#page-content">
-    <div id="page-content">
-      {% block content %}{% end %}
-    </div>
-  </main>
-</div>
-</body>
-</html>
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% block brand %}My App{% end %}
+{% block sidebar %}
+  {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+  {% call sidebar() %}
+    {% call sidebar_section("Main") %}
+      {{ sidebar_link("/", "Home") }}
+      {{ sidebar_link("/items", "Items") }}
+    {% end %}
+  {% end %}
+{% end %}
 ```
+
+Or without ChirpUI, extend `chirp/layouts/shell.html` and override `{% block shell %}`.
 
 Key elements:
 
-- **Standalone HTML** — The layout owns the full document. Don't extend `boost.html` for app shell layouts.
+- **Extend shell.html or app_shell_layout.html** — Don't extend `boost.html` for app shell layouts.
 - **`hx-boost="true"`** on `<main id="main">` — Boosted links inside the content area use AJAX navigation.
 - **`hx-select="#page-content"`** — When the server returns a full HTML page, htmx parses it and extracts only `#page-content` for the swap. The shell persists client-side.
 - **No `hx-disinherit`** on the content wrapper — Boosted links must inherit `hx-target`, `hx-swap`, and `hx-select` from `#main`. Fragment requests with explicit `hx-target` override the inherited value.
 - **`{# target: main #}`** — Tells Chirp which layout depth to render for `HX-Target: main` requests.
+
+### Nested shells with shell_section
+
+For multi-level layouts (e.g. forum > subforum > thread), use the `shell_section` macro:
+
+```html
+{# target: items-content #}
+{% from "chirp/macros/shell.html" import shell_section %}
+<div class="chirpui-shell-section">
+  <nav class="chirpui-shell-section__nav">Items</nav>
+  {% call shell_section("items-content") %}
+    {% block content %}{% end %}
+  {% end %}
+</div>
+```
+
+Inner layouts don't need `hx-select` — the renderer produces fragments for them. Use `chirp new myapp --shell` to scaffold a project with this pattern.
+
+### Common mistakes
+
+- **`{% extends %}` in inner layouts** — Inner `_layout.html` files that use `{% extends %}` can conflict with `render_with_blocks`. The child template may wipe the shell. Prefer composing with `shell_section` instead.
+- **Missing `{# target: X #}` on inner layouts** — Non-root layouts default to `"body"` if no target is declared. Add `{# target: element_id #}` so the layout chain resolves correctly.
+- **`hx-disinherit` in shell layouts** — Prefer `hx-select` on the parent. Use `hx-target="this"` on event-driven elements (e.g. SSE) instead of `hx-disinherit`.
+- **Duplicate targets in a chain** — Two layouts with the same target cause `find_start_index_for_target` to return the first match. Use unique targets per layout.
 
 ## Context Cascade
 

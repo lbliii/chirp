@@ -853,13 +853,8 @@ def _check_sse_connect_scope(
 ) -> list[ContractIssue]:
     """Warn when ``sse-connect`` is inside a broad ``hx-target`` scope.
 
-    If a layout sets ``hx-target="#app-content"`` and an SSE container
-    does not use ``hx-disinherit`` to break inheritance, every
-    ``sse-swap`` descendant inherits the broad target and SSE fragments
-    replace the wrong region.
-
-    The fix is ``hx-disinherit="hx-target hx-swap"`` on the
-    ``sse-connect`` element.
+    Valid mitigations: hx-disinherit, hx-target="this" (safe_target
+    auto-injects), or parent has hx-select. Prefer hx-target="this".
     """
     if not broad_targets:
         return []
@@ -872,25 +867,26 @@ def _check_sse_connect_scope(
             continue  # Built-in macros are correct by design
         for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
             attrs_lower = match.group("attrs").lower()
-            # Already has hx-disinherit — assume the author handled it
             if "hx-disinherit" in attrs_lower:
                 continue
+            if 'hx-target="this"' in attrs_lower or "hx-target='this'" in attrs_lower:
+                continue
+            # Parent hx-select: would need DOM analysis; skip for now
             issues.append(
                 ContractIssue(
                     severity=Severity.ERROR,
                     category="sse_scope",
                     message=(
                         "sse-connect element is inside a broad hx-target scope "
-                        "without hx-disinherit. Fragments will swap into the "
-                        "layout target and wipe the whole page. Use "
-                        '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }} '
-                        'or add hx-disinherit="hx-target hx-swap" on sse-connect.'
+                        "without mitigation. Add hx-target=\"this\" (safe_target "
+                        "middleware auto-injects this), or hx-disinherit="
+                        '"hx-target hx-swap" on sse-connect. Use '
+                        '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }}.'
                     ),
                     template=tmpl_name,
                     details=f"Inherited broad target(s): {targets_text}",
                 )
             )
-            # One warning per template is sufficient.
             break
 
     return issues
@@ -921,6 +917,94 @@ def _collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
             if is_broad_scope:
                 broad_targets.add(f"{target} ({tmpl_name})")
     return broad_targets
+
+
+def _check_layout_chains(
+    layout_chains: list[Any],
+    template_sources: dict[str, str],
+) -> list[ContractIssue]:
+    """Validate layout chains: duplicate targets, missing target, extends conflict."""
+    issues: list[ContractIssue] = []
+    seen_chains: set[tuple[tuple[str, str, int], ...]] = set()
+
+    for chain in layout_chains:
+        layouts = getattr(chain, "layouts", ())
+        if not layouts:
+            continue
+
+        # Dedupe by chain signature to avoid repeating for same chain
+        sig = tuple((l.template_name, l.target, l.depth) for l in layouts)
+        if sig in seen_chains:
+            continue
+        seen_chains.add(sig)
+
+        # Duplicate targets in same chain
+        targets_seen: dict[str, str] = {}
+        for layout in layouts:
+            t = layout.target
+            if t in targets_seen:
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="layout_chain",
+                        message=(
+                            f"Duplicate target '{t}' in layout chain: "
+                            f"{targets_seen[t]} and {layout.template_name}. "
+                            "find_start_index_for_target returns first match."
+                        ),
+                        template=layout.template_name,
+                    )
+                )
+            else:
+                targets_seen[t] = layout.template_name
+
+        # Inner layouts defaulting to body
+        for layout in layouts:
+            if layout.depth > 0 and layout.target == "body":
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="layout_chain",
+                        message=(
+                            f"Inner layout {layout.template_name} defaulting to "
+                            "target 'body'. Add {# target: element_id #}."
+                        ),
+                        template=layout.template_name,
+                    )
+                )
+
+        # extends + layout chain conflict (inner layouts), hx-disinherit in shells
+        for layout in layouts:
+            src = template_sources.get(layout.template_name)
+            if src is None:
+                continue
+            if layout.depth > 0 and re.search(r"\{\%\s*extends\s+", src):
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="layout_chain",
+                        message=(
+                            f"Inner layout {layout.template_name} uses "
+                            "{% extends %}. "
+                            "With render_with_blocks, the child may wipe the shell."
+                        ),
+                        template=layout.template_name,
+                    )
+                )
+            if "hx-disinherit" in src.lower():
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.INFO,
+                        category="layout_chain",
+                        message=(
+                            f"Layout {layout.template_name} uses hx-disinherit. "
+                            "Prefer hx-select on parent for shell layouts."
+                        ),
+                        template=layout.template_name,
+                    )
+                )
+
+    return issues
 
 
 def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
@@ -1570,6 +1654,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         # 4g. Cross-reference sse-swap values against SSEContract.event_types
         result.issues.extend(_check_sse_event_crossref(template_sources, router))
+
+        # 4g2. Layout chain validation (duplicate targets, missing target comment)
+        layout_chains = getattr(app, "_discovered_layout_chains", [])
+        result.issues.extend(_check_layout_chains(layout_chains, template_sources))
 
         # 4h. Validate framework-agnostic island mounts.
         result.issues.extend(
