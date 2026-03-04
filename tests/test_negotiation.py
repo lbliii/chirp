@@ -15,6 +15,7 @@ from chirp.templating.returns import (
     Action,
     FormAction,
     Fragment,
+    LayoutPage,
     Page,
     Stream,
     Template,
@@ -509,6 +510,35 @@ class TestNegotiateEdgeCases:
         )
         assert result.status == 422
         assert "err" in result.text
+
+
+class TestLayoutPageSlotContext:
+    """Integration test: page vars in nested macro slots via LayoutPage negotiation.
+
+    Mirrors Dori skills page: container → stack → form from chirpui-style
+    templates. If selected_tags/all_tags are undefined in the form slot,
+    negotiation would raise UndefinedError. This test ensures the full
+    Chirp negotiation path (LayoutPage, render_block, FileSystemLoader)
+    propagates context into slot bodies.
+    """
+
+    def test_layout_page_slot_context_inheritance(self, kida_env: Environment) -> None:
+        """selected_tags and all_tags in nested slots render without UndefinedError."""
+        result = negotiate(
+            LayoutPage(
+                "skills/page.html",
+                "page_content",
+                q="search",
+                selected_tags=["a", "b"],
+                all_tags=["a", "b", "c"],
+            ),
+            kida_env=kida_env,
+        )
+        assert result.status == 200
+        assert "a,b" in result.text
+        assert "abc" in result.text
+        assert 'action="/skills"' in result.text
+        assert "Skills" in result.text
 
 
 class TestNegotiateErrors:

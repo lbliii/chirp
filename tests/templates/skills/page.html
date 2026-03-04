@@ -1,0 +1,15 @@
+{% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/forms.html" import form %}
+
+{% block page_content %}
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>Skills</h1>
+  {% call form("/skills", method="get") %}
+  q={{ q }}
+  {% if selected_tags %}{{ selected_tags | join(",") }}{% end %}
+  {% if all_tags %}{% for tag in all_tags %}{{ tag }}{% end %}{% end %}
+  {% end %}
+{% end %}
+{% end %}
+{% endblock %}
