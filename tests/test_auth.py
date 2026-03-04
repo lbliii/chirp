@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.errors import ConfigurationError
 from chirp.middleware.auth import (
     AnonymousUser,

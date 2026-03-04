@@ -1,6 +1,6 @@
 """Tests for View Transitions — auto-inject meta tag, CSS, and htmx config."""
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.server.view_transitions import (
     VIEW_TRANSITIONS_CSS,

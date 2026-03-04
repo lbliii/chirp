@@ -88,8 +88,12 @@ After installation, the `chirp` command is available:
 |---------|-------------|
 | `chirp new <name>` | Scaffold an auth-ready v2 project with filesystem pages, static assets, and tests |
 | `chirp new <name> --minimal` | Scaffold a minimal single-file project |
+| `chirp new <name> --shell` | Scaffold with a persistent app shell (topbar + sidebar) |
+| `chirp new <name> --sse` | Scaffold with SSE boilerplate and template scope macro |
 | `chirp run <app>` | Start the dev server (e.g. `chirp run myapp:app`) |
 | `chirp check <app>` | Validate hypermedia contracts from the command line |
+| `chirp check <app> --warnings-as-errors` | Exit non-zero on contract warnings (CI gate) |
+| `chirp routes <app>` | Print the registered route table |
 
 ## Next Steps
 

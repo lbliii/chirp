@@ -1,9 +1,8 @@
 """Pytest configuration for the llm_playground example.
 
-Provides ``example_module`` and ``example_app`` fixtures that patch
-``use_chirp_ui`` so chirp-ui does not need to be installed to run the
-tests, and exposes the loaded module so tests can monkeypatch
-``_ollama_models`` and ``LLM`` for mock-based testing.
+Provides ``example_module`` and ``example_app`` fixtures and exposes the
+loaded module so tests can monkeypatch ``_ollama_models`` and ``LLM`` for
+mock-based testing.
 """
 
 import importlib.util
@@ -14,10 +13,16 @@ import pytest
 
 @pytest.fixture
 def example_module(monkeypatch):
-    """Load a fresh module with chirp-ui dependency mocked out."""
-    import chirp.ext.chirp_ui
+    """Load a fresh module for each test.
 
-    monkeypatch.setattr(chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None)
+    This example imports ChirpUI templates/macros that require ChirpUI's
+    runtime registration (filters/globals). If chirp-ui isn't installed,
+    skip example tests cleanly.
+    """
+    try:
+        import chirp_ui  # noqa: F401
+    except ImportError:
+        pytest.skip("llm_playground requires chirp-ui to render templates")
 
     app_path = Path(__file__).parent / "app.py"
     spec = importlib.util.spec_from_file_location("example_llm_playground", app_path)

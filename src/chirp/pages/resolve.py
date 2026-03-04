@@ -21,6 +21,25 @@ from typing import TYPE_CHECKING, Any
 
 from chirp.extraction import extract_dataclass, is_extractable_dataclass
 
+
+def _invoke_provider_factory(
+    factory: Callable[..., Any],
+    request: Request,
+    cascade_ctx: dict[str, Any],
+) -> Any:
+    """Call a service provider factory, injecting request/cascade_ctx if requested."""
+    from chirp.http.request import Request as RequestType
+
+    sig = inspect.signature(factory, eval_str=True)
+    kwargs: dict[str, Any] = {}
+    for pname, p in sig.parameters.items():
+        if pname == "request" or p.annotation is RequestType:
+            kwargs[pname] = request
+        elif pname in ("cascade_ctx", "context"):
+            kwargs[pname] = cascade_ctx
+    return factory(**kwargs)
+
+
 if TYPE_CHECKING:
     from chirp.http.request import Request
     from chirp.pages.types import ContextProvider, LayoutChain
@@ -86,7 +105,8 @@ async def resolve_kwargs(
             param.annotation is not inspect.Parameter.empty
             and param.annotation in service_providers
         ):
-            kwargs[name] = service_providers[param.annotation]()
+            factory = service_providers[param.annotation]
+            kwargs[name] = _invoke_provider_factory(factory, request, cascade_ctx)
         elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
             param.annotation
         ):

@@ -2,7 +2,6 @@
    Uses chirp-ui container, grid, card, streaming_block.
    Custom SSE: sources + answer + share_link swap targets. hx-disinherit isolates from boost. #}
 {% from "chirpui/layout.html" import container, grid %}
-{% from "chirpui/streaming.html" import copy_btn %}
 
 {% block sources %}
 <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
@@ -37,7 +36,7 @@
   <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
   {% else %}
   <div class="chirpui-prose">{{ text | markdown | cite(sources) | safe(reason="patitas output") }}</div>
-  {{ copy_btn(label="Copy", copy_text=text) }}
+  <button type="button" class="chirpui-copy-btn" data-copy-text="{{ text | e }}">Copy</button>
   {% end %}
 </div>
 {% end %}

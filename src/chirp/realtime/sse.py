@@ -167,15 +167,14 @@ async def handle_sse(
             pass
         except Exception as exc:
             # Log with structured formatting for kida errors
-            from chirp.server.terminal_errors import _is_kida_error, log_error
+            from chirp.server.terminal_errors import _is_kida_error, _plain_error_message, log_error
 
             log_error(exc)
 
             # Send an error event so the client can react
             if debug:
                 if _is_kida_error(exc):
-                    fmt = getattr(exc, "format_compact", None)
-                    detail = fmt() if fmt is not None else str(exc)
+                    detail = _plain_error_message(exc)
                 else:
                     import traceback
 
@@ -289,18 +288,15 @@ def _format_error_event(value: Any, exc: Exception) -> str:
     """
     from html import escape
 
-    from chirp.server.terminal_errors import _is_kida_error
+    from chirp.server.terminal_errors import _is_kida_error, _plain_error_message
 
-    if _is_kida_error(exc):
-        fmt = getattr(exc, "format_compact", None)
-        detail = fmt() if fmt is not None else str(exc)
-    else:
-        detail = f"{type(exc).__name__}: {exc}"
+    detail = _plain_error_message(exc) if _is_kida_error(exc) else f"{type(exc).__name__}: {exc}"
 
     if isinstance(value, Fragment) and value.target:
+        plain_msg = _plain_error_message(exc)
         html = (
             f'<div class="chirp-block-error" data-block="{escape(value.block_name)}">'
-            f"<strong>{escape(type(exc).__name__)}</strong>: {escape(str(exc))}"
+            f"<strong>{escape(type(exc).__name__)}</strong>: {escape(plain_msg)}"
             f"</div>"
         )
         return SSEEvent(data=html, event=value.target).encode()

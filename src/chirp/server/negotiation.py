@@ -6,6 +6,7 @@ no magic, fully predictable.
 """
 
 import json as json_module
+import logging
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
@@ -30,6 +31,8 @@ from chirp.templating.returns import (
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
 from chirp.templating.suspense import render_suspense
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
@@ -157,7 +160,7 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            html = _render_layout_page(value, kida_env, request)
+            html = _render_layout_page(value, kida_env, request=request)
             render_intent = (
                 "fragment"
                 if request is not None and request.is_fragment and not request.is_history_restore
@@ -292,6 +295,11 @@ def _render_layout_page(
 ) -> str:
     """Render a LayoutPage through its layout chain.
 
+    Context propagation: value.context is passed unchanged to
+    render_block() and render_with_layouts(). Page variables (e.g.
+    selected_tags, q) are available in macro slot content because
+    Kida renders slot bodies in the caller's context.
+
     Decides rendering depth based on request headers:
 
     - Fragment request (no history restore): render just the named block
@@ -316,9 +324,45 @@ def _render_layout_page(
         frag = Fragment(value.name, value.block_name, **value.context)
         return render_fragment(kida_env, frag)
 
-    # Render the page's content block
+    # Render the page's content block (value.context passed through for slot inheritance)
+    _logger.debug(
+        "render_block %s.%s with context keys: %s",
+        value.name,
+        value.block_name,
+        sorted(value.context.keys()),
+    )
     page_template = kida_env.get_template(value.name)
     page_html = page_template.render_block(value.block_name, value.context)
+
+    # Compute layout depth for render_with_layouts
+    layouts = layout_chain.layouts
+    if is_history_restore or htmx_target is None:
+        start_index = 0
+        mode = "full"
+    elif htmx_target:
+        idx = layout_chain.find_start_index_for_target(htmx_target)
+        if idx is None:
+            start_index = len(layouts) if layouts else 0
+            mode = "fragment"
+        else:
+            start_index = idx
+            mode = "partial"
+    else:
+        start_index = 0
+        mode = "full"
+
+    # Debug metadata for LayoutDebugMiddleware (when config.debug)
+    try:
+        from chirp.middleware.layout_debug import set_layout_debug_metadata
+
+        chain_str = " > ".join(f"{layout.target}({i})" for i, layout in enumerate(layouts))
+        target_id = (htmx_target or "").lstrip("#")
+        match_str = (
+            f"target={target_id}, start={start_index}, rendered={len(layouts[start_index:])}"
+        )
+        set_layout_debug_metadata(request, chain_str, match_str, mode)
+    except ImportError:
+        pass
 
     # Compose with layout chain at the appropriate depth
     return render_with_layouts(

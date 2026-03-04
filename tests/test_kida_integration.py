@@ -6,7 +6,7 @@ when routed through App -> handler -> negotiate -> kida.
 
 from pathlib import Path
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.templating.returns import Fragment, Template

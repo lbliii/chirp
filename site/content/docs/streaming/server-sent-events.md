@@ -138,7 +138,7 @@ async def live_stats():
 </section>
 ```
 
-> **Tip**: Add `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element to prevent layout-level `hx-target` from bleeding into SSE swap targets. Without this, SSE fragments can accidentally replace the wrong region.
+> **Tip**: Prevent layout-level `hx-target` from bleeding into SSE swaps. Use either `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element, or add `hx-target="this"` on the `sse-connect` element (safe_target middleware can auto-inject this).
 
 ## Error Boundaries
 

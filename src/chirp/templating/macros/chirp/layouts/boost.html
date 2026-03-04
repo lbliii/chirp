@@ -21,9 +21,8 @@
    Important: sse_scope is OUTSIDE #main so the connection persists across
    navigations. If placed inside content, it gets replaced and live updates stop.
 
-   The hx-disinherit wrapper prevents content from inheriting hx-target/hx-swap
-   from #main, so fragment swaps (e.g. data tables, pagination) target correctly
-   instead of accidentally replacing the whole page.
+   Uses hx-select="#page-content" to extract only the content div from full-page
+   responses. For persistent shells (topbar, sidebar), prefer chirp/layouts/shell.html.
 -#}
 <!DOCTYPE html>
 <html lang="{% block lang %}en{% end %}">
@@ -47,8 +46,9 @@
 </head>
 <body>
   {% block body_before %}{% end %}
-  <div id="main" hx-boost="true" hx-target="#main" hx-swap="innerHTML">
-    <div hx-disinherit="hx-target hx-swap">
+  <div id="main" hx-boost="true" hx-target="#main" hx-swap="innerHTML"
+       hx-select="#page-content">
+    <div id="page-content">
       {% block content %}{% end %}
     </div>
   </div>

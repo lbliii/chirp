@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
 from chirp.testing import TestClient
 

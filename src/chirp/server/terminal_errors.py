@@ -47,6 +47,17 @@ def _is_kida_error(exc: BaseException) -> bool:
     return "kida" in module
 
 
+def _plain_error_message(exc: BaseException) -> str:
+    """Error message safe for HTTP/SSE/JSON (no ANSI codes)."""
+    fmt = getattr(exc, "format_compact", None)
+    msg = fmt() if fmt is not None else str(exc)
+    if _is_kida_error(exc):
+        from kida.environment.terminal import strip_colors
+
+        return strip_colors(msg)
+    return msg
+
+
 def _is_app_frame(filename: str) -> bool:
     """True if the frame is from the application (not stdlib/site-packages)."""
     if "site-packages" in filename:

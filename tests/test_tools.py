@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.http.response import Response

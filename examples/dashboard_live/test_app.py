@@ -53,7 +53,7 @@ class TestDashboardPage:
             assert 'sse-connect="/events"' in response.text
 
     async def test_index_no_raw_template_tags(self, example_app) -> None:
-        """Template is fully rendered — no Jinja syntax leaks."""
+        """Template is fully rendered — no Kida syntax leaks."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert "{{" not in response.text

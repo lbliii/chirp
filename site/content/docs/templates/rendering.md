@@ -70,7 +70,7 @@ In the template:
 
 ## Template Inheritance
 
-Kida supports Jinja2-style template inheritance:
+Kida supports template inheritance:
 
 ```html
 {# base.html #}

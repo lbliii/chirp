@@ -2,7 +2,7 @@
 
 from kida import Environment
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.server.islands import islands_snippet
 from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS

@@ -4,8 +4,34 @@ AppConfig is a frozen dataclass — immutable after creation, IDE-autocompletabl
 no string-key dict lookups.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def _env_bool(key: str, default: bool = False) -> bool:
+    val = os.environ.get(key, "").lower()
+    return val in ("1", "true", "yes", "on")
+
+
+def _env_int(key: str, default: int) -> int:
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
+
+def _env_float(key: str, default: float) -> float:
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +49,8 @@ class AppConfig:
     debug: bool = False
 
     # Reload (development mode — requires debug=True)
-    reload_include: tuple[str, ...] = ()  # Extra extensions to watch (e.g. ".html", ".css")
+    # Default: web assets. API-only apps use reload_include=() to opt out.
+    reload_include: tuple[str, ...] = (".html", ".css", ".md")
     reload_dirs: tuple[str, ...] = ()  # Extra directories to watch alongside cwd
 
     # Security
@@ -120,3 +147,71 @@ class AppConfig:
     # TLS (optional)
     ssl_certfile: str | None = None
     ssl_keyfile: str | None = None
+
+    # Enterprise scale (12-factor, observability, shared state)
+    env: str = "development"  # development | staging | production
+    redis_url: str | None = None
+    audit_sink: str | None = "log"  # "log" | "none" | custom
+    feature_flags: tuple[tuple[str, bool], ...] = ()  # (name, value) pairs
+    http_timeout: float = 30.0
+    http_retries: int = 0
+    skip_contract_checks: bool = False
+    lazy_pages: bool = False
+
+    @classmethod
+    def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:
+        """Load configuration from environment variables.
+
+        Reads env vars with the given prefix (default ``CHIRP_``).
+        Unset vars use AppConfig defaults.
+
+        If ``python-dotenv`` is installed (``pip install chirp[config]``),
+        loads ``.env`` from the current directory before reading env.
+
+        Env vars (with CHIRP_ prefix):
+            SECRET_KEY, SESSION_SECRET_KEY, DEBUG, ENV, HOST, PORT,
+            SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
+            REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
+            HTTP_TIMEOUT, HTTP_RETRIES,
+            FEATURE_<NAME>=true|false (e.g. CHIRP_FEATURE_X=true)
+        """
+        try:
+            from dotenv import load_dotenv
+
+            load_dotenv()
+        except ImportError:
+            pass
+
+        p = prefix
+        debug = _env_bool(f"{p}DEBUG", False)
+        env_val = os.environ.get(f"{p}ENV", "development")
+        feature_flags: list[tuple[str, bool]] = []
+        for k, v in os.environ.items():
+            if k.startswith(f"{p}FEATURE_") and len(k) > len(f"{p}FEATURE_"):
+                name = k[len(f"{p}FEATURE_") :].lower().replace("_", "-")
+                feature_flags.append((name, (v or "").lower() in ("1", "true", "yes", "on")))
+
+        return cls(
+            host=os.environ.get(f"{p}HOST", "127.0.0.1"),
+            port=_env_int(f"{p}PORT", 8000),
+            debug=debug,
+            secret_key=os.environ.get(f"{p}SECRET_KEY", ""),
+            env=env_val,
+            redis_url=os.environ.get(f"{p}REDIS_URL") or None,
+            audit_sink=os.environ.get(f"{p}AUDIT_SINK", "log") or None,
+            feature_flags=tuple(feature_flags),
+            http_timeout=_env_float(f"{p}HTTP_TIMEOUT", 30.0),
+            http_retries=_env_int(f"{p}HTTP_RETRIES", 0),
+            skip_contract_checks=_env_bool(f"{p}SKIP_CONTRACT_CHECKS", False),
+            lazy_pages=_env_bool(f"{p}LAZY_PAGES", False),
+            sentry_dsn=os.environ.get(f"{p}SENTRY_DSN") or None,
+            sentry_environment=os.environ.get(f"{p}SENTRY_ENVIRONMENT") or None,
+            sentry_release=os.environ.get(f"{p}SENTRY_RELEASE") or None,
+        )
+
+    def feature(self, name: str) -> bool:
+        """Return True if the named feature flag is enabled."""
+        for k, v in self.feature_flags:
+            if k == name:
+                return v
+        return False

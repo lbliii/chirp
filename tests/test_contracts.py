@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
@@ -13,20 +13,25 @@ from chirp.contracts import (
     RouteContract,
     Severity,
     SSEContract,
-    _attr_to_method,
-    _check_accessibility,
-    _check_island_mounts,
-    _check_sse_connect_scope,
-    _check_sse_self_swap,
-    _check_swap_safety,
-    _collect_broad_targets,
-    _extract_form_field_names,
-    _extract_island_mounts,
-    _extract_targets_from_source,
-    _extract_template_references,
-    _path_matches_route,
     check_hypermedia_surface,
     contract,
+)
+from chirp.contracts.routes import attr_to_method as _attr_to_method
+from chirp.contracts.routes import path_matches_route as _path_matches_route
+from chirp.contracts.rules_accessibility import check_accessibility as _check_accessibility
+from chirp.contracts.rules_forms import extract_form_field_names as _extract_form_field_names
+from chirp.contracts.rules_htmx import check_selector_syntax as _check_selector_syntax
+from chirp.contracts.rules_islands import check_island_mounts as _check_island_mounts
+from chirp.contracts.rules_islands import extract_island_mounts as _extract_island_mounts
+from chirp.contracts.rules_sse import check_sse_connect_scope as _check_sse_connect_scope
+from chirp.contracts.rules_sse import check_sse_self_swap as _check_sse_self_swap
+from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
+from chirp.contracts.rules_swap import collect_broad_targets as _collect_broad_targets
+from chirp.contracts.template_scan import (
+    extract_targets_from_source as _extract_targets_from_source,
+)
+from chirp.contracts.template_scan import (
+    extract_template_references as _extract_template_references,
 )
 
 
@@ -48,8 +53,28 @@ class TestAttrToMethod:
     def test_hx_patch(self):
         assert _attr_to_method("hx-patch") == "PATCH"
 
-    def test_form_action(self):
-        assert _attr_to_method("action") == "POST"
+    def test_form_action_default(self):
+        assert _attr_to_method("action") == "GET"
+
+    def test_form_action_get_override(self):
+        assert _attr_to_method("action", "GET") == "GET"
+
+    def test_form_action_post_override(self):
+        assert _attr_to_method("action", "POST") == "POST"
+
+
+class TestContractCheckSnapshot:
+    def test_snapshot_exposes_stable_read_model(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._ensure_frozen()
+        snapshot = app._contract_check_snapshot()
+        assert snapshot.router is not None
+        assert snapshot.islands_contract_strict == app.config.islands_contract_strict
 
 
 class TestExtractTargets:
@@ -59,17 +84,22 @@ class TestExtractTargets:
         html = '<div hx-get="/api/search"></div>'
         targets = _extract_targets_from_source(html)
         assert len(targets) == 1
-        assert targets[0] == ("hx-get", "/api/search")
+        assert targets[0] == ("hx-get", "/api/search", None)
 
     def test_hx_post(self):
         html = '<button hx-post="/submit"></button>'
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("hx-post", "/submit")
+        assert targets[0] == ("hx-post", "/submit", None)
 
-    def test_form_action(self):
+    def test_form_action_post(self):
         html = '<form action="/login" method="post"></form>'
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("action", "/login")
+        assert targets[0] == ("action", "/login", "POST")
+
+    def test_form_action_get(self):
+        html = '<form action="/skills" method="get" class="chirpui-form"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/skills", "GET")
 
     def test_multiple_targets(self):
         html = """
@@ -79,6 +109,17 @@ class TestExtractTargets:
         """
         targets = _extract_targets_from_source(html)
         assert len(targets) == 3
+        assert targets[2] == ("action", "/search", "GET")
+
+    def test_form_action_omitted(self):
+        html = '<form action="/search"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/search", "GET")
+
+    def test_form_action_dialog(self):
+        html = '<form action="/x" method="dialog"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/x", "GET")
 
     def test_ignores_template_expressions(self):
         html = "<div hx-get=\"{{ url_for('search') }}\"></div>"
@@ -93,10 +134,76 @@ class TestExtractTargets:
     def test_single_quotes(self):
         html = "<div hx-get='/api/data'></div>"
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("hx-get", "/api/data")
+        assert targets[0] == ("hx-get", "/api/data", None)
+
+    def test_ignores_kida_tilde_concatenation_in_attrs(self):
+        """Kida attrs='hx-post="/chains/' ~ id ~ '/add-step"' must not truncate to /chains/."""
+        html = "attrs='hx-post=\"/chains/' ~ chain_id ~ '/add-step\" hx-target=\"#step-list\"'"
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_ignores_kida_variable_in_url(self):
+        html = '<div hx-post="/chains/{{ id }}/add"></div>'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_extracts_attrs_map_hx_post_literal(self):
+        html = '{{ form("/x", attrs_map={"hx-post": "/config/set", "hx-target": "#result"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert ("hx-post", "/config/set", None) in targets
+
+    def test_extracts_attrs_map_action_literal(self):
+        html = '{{ form("/x", attrs_map={"action": "/skills"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert ("action", "/skills", None) in targets
+
+    def test_ignores_attrs_map_hx_post_with_kida_concat(self):
+        html = '{{ form("/x", attrs_map={"hx-post": "/chains/" ~ chain_id ~ "/add-step"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_ignores_attrs_map_unsafe_or_anchor_urls(self):
+        html = '{{ btn("X", attrs_map={"hx-get": "#tab-1", "hx-post": "javascript:alert(1)"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
 
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
+
+
+class TestSelectorSyntaxValidation:
+    """Validate malformed selector syntax for HTMX selector attributes."""
+
+    def test_errors_for_quoted_selector_literal(self):
+        issues = _check_selector_syntax(
+            {"page.html": '<button hx-post="/x" hx-target="\'#result\'">Run</button>'}
+        )
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "selector_syntax"
+        assert "wrapped in quotes" in issues[0].message
+
+    def test_errors_for_unbalanced_selector(self):
+        issues = _check_selector_syntax({"page.html": '<div hx-select="#panel["></div>'})
+        assert len(issues) == 1
+        assert "unbalanced" in issues[0].message
+
+    def test_errors_for_empty_selector_list_entry(self):
+        issues = _check_selector_syntax({"page.html": '<div hx-include="#a,,#b"></div>'})
+        assert len(issues) == 1
+        assert "empty entry" in issues[0].message
+
+    def test_skips_dynamic_selector_values(self):
+        issues = _check_selector_syntax(
+            {"page.html": '<div hx-target="{{ target_selector }}"></div>'}
+        )
+        assert issues == []
+
+    def test_allows_selector_command_prefixes(self):
+        issues = _check_selector_syntax(
+            {"page.html": '<button hx-target="closest .card"></button>'}
+        )
+        assert issues == []
 
 
 class TestIslandMountExtraction:
@@ -456,6 +563,25 @@ class TestSwapSafetyWarnings:
         issues = _check_swap_safety(template_sources)
         assert issues == []
 
+    def test_no_warning_for_form_action_get_or_omitted(self):
+        """Form with action and method=get or omitted (HTML default) is not mutating."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "search.html": '<form action="/search"></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
+
+    def test_warns_for_form_action_post_without_target(self):
+        """Form with action method=post and no hx-target inherits broad target."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "login.html": '<form action="/login" method="post"><button>Submit</button></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert len(issues) == 1
+        assert issues[0].category == "swap_safety"
+
     def test_warns_for_sse_swap_without_local_target(self):
         template_sources = {
             "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
@@ -534,7 +660,9 @@ class TestCheckHypermediaSurface:
         def fake_has_flask_syntax(path: str) -> bool:
             return path == "/api/items"
 
-        monkeypatch.setattr("chirp.contracts._route_path_has_flask_syntax", fake_has_flask_syntax)
+        monkeypatch.setattr(
+            "chirp.contracts.checker._route_path_has_flask_syntax", fake_has_flask_syntax
+        )
         result = check_hypermedia_surface(app)
         assert not result.ok
         routing_errors = [i for i in result.issues if i.category == "routing"]
@@ -573,6 +701,26 @@ class TestCheckHypermediaSurface:
         assert not result.ok
         assert any("no matching route" in i.message for i in result.errors)
 
+    def test_attrs_map_reference_counts_for_orphan_detection(self, tmp_path):
+        (tmp_path / "index.html").write_text(
+            '{{ form("/x", method="post", attrs_map={"hx-post": "/config/set"}) }}'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        @app.route("/config/set", methods=["POST"])
+        async def config_set():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        orphan_issues = [
+            i for i in result.issues if i.category == "orphan" and i.route == "/config/set"
+        ]
+        assert orphan_issues == []
+
     def test_detects_method_mismatch(self, tmp_path):
         """Template uses hx-post but route only allows GET."""
         (tmp_path / "index.html").write_text('<button hx-post="/api/items">submit</button>')
@@ -585,6 +733,21 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert not result.ok
         assert any("POST" in i.message and "GET" in i.message for i in result.errors)
+
+    def test_detects_invalid_hx_selector_syntax(self, tmp_path):
+        (tmp_path / "index.html").write_text(
+            '<button hx-post="/api/items" hx-target="\'#result\'">go</button>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items", methods=["POST"])
+        async def create_item():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        selector_errors = [i for i in result.errors if i.category == "selector_syntax"]
+        assert len(selector_errors) == 1
+        assert "wrapped in quotes" in selector_errors[0].message
 
     def test_valid_hx_targets(self, tmp_path):
         """All htmx targets match registered routes."""
@@ -709,7 +872,7 @@ class TestCheckHypermediaSurface:
 
 
 class TestExtractTemplateReferences:
-    """Extract template references from Jinja source."""
+    """Extract template references from Kida template source."""
 
     def test_extends(self):
         source = '{% extends "base.html" %}'
@@ -1409,8 +1572,8 @@ class TestSSEEventCrossref:
         crossref = [i for i in result.issues if i.category == "sse_crossref"]
         assert crossref == []
 
-    def test_handles_jinja_urls(self, tmp_path):
-        """sse-connect with Jinja expressions should match parameterized routes."""
+    def test_handles_kida_urls(self, tmp_path):
+        """sse-connect with Kida expressions should match parameterized routes."""
         (tmp_path / "page.html").write_text(
             '<div hx-ext="sse" sse-connect="/doc/{{ doc.id }}/stream">'
             '<span sse-swap="status">ok</span>'

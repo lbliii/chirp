@@ -8,6 +8,7 @@ common in server-rendered HTML + htmx apps.
 import html
 import json
 import time as time_module
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlencode
@@ -46,6 +47,51 @@ def attr(value: Any, name: str) -> str | Markup:
     if not value:
         return ""
     return Markup(f' {name}="{html.escape(str(value))}"')
+
+
+def _serialize_attr_value(value: Any) -> str:
+    """Serialize attribute value into a stable string."""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, separators=(",", ":"), ensure_ascii=True)
+    return str(value)
+
+
+def html_attrs(value: Any) -> str | Markup:
+    """Render HTML attributes from mapping or legacy raw string.
+
+    Contract:
+    - ``dict`` / ``Mapping``: escaped, deterministic HTML attributes
+    - ``str`` / ``Markup``: pass through (legacy compatibility)
+    - ``None`` / ``False``: no output
+
+    Mapping values follow HTML attribute semantics:
+    - ``True`` renders as a valueless attribute (e.g. ``disabled``)
+    - ``False`` / ``None`` are omitted
+    - other values are escaped and rendered as ``key="value"``
+    """
+    if value is None or value is False:
+        return ""
+
+    if isinstance(value, Mapping):
+        chunks: list[str] = []
+        for raw_key, raw_value in value.items():
+            key = str(raw_key).strip()
+            if not key or raw_value is None or raw_value is False:
+                continue
+            escaped_key = html.escape(key, quote=True)
+            if raw_value is True:
+                chunks.append(f" {escaped_key}")
+                continue
+            serialized = _serialize_attr_value(raw_value)
+            chunks.append(f' {escaped_key}="{html.escape(serialized, quote=True)}"')
+        return Markup("".join(chunks))
+
+    text = str(value).strip()
+    if not text:
+        return ""
+    if text.startswith(" "):
+        return Markup(text)
+    return Markup(f" {text}")
 
 
 def field_errors(errors: Any, field_name: str) -> list[str]:
@@ -232,6 +278,7 @@ BUILTIN_FILTERS: dict[str, Any] = {
     "bem": bem,
     "field_errors": field_errors,
     "format_time": format_time,
+    "html_attrs": html_attrs,
     "island_props": island_props,
     "pluralize": pluralize,
     "qs": qs,

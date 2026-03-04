@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware, get_csrf_token
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.testing import TestClient

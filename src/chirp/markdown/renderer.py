@@ -24,14 +24,14 @@ class MarkdownRenderer:
 
     Args:
         plugins: Patitas plugins to enable (default: all).
-        highlight: Enable syntax highlighting for fenced code blocks.
+        highlight: Enable syntax highlighting for fenced code blocks (default: True).
     """
 
     def __init__(
         self,
         *,
         plugins: list[str] | None = None,
-        highlight: bool = False,
+        highlight: bool = True,
     ) -> None:
         self._md: Markdown = _get_markdown(plugins=plugins, highlight=highlight)
 

@@ -1,0 +1,11 @@
+{% extends "chirpui/app_shell_layout.html" %}
+{% block brand %}{{ current_path or "App" }}{% end %}
+{% block sidebar %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% call sidebar() %}
+{% call sidebar_section("Main") %}
+{{ sidebar_link("/", "Home") }}
+{{ sidebar_link("/items", "Items") }}
+{% end %}
+{% end %}
+{% end %}

@@ -32,8 +32,15 @@ AI streaming (``pip install chirp[ai]``)::
 # Declare free-threading support (PEP 703)
 _Py_mod_gil = 0
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
+CHIRP_CAPABILITIES = frozenset(
+    {
+        # Guarantees startup contract checks run after runtime state publication.
+        "contract_checks_runtime_ready",
+    }
+)
 __all__ = [
+    "CHIRP_CAPABILITIES",
     "OOB",
     "Action",
     "AnyResponse",
@@ -84,6 +91,7 @@ __all__ = [
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Application
     "App": ("chirp.app", "App"),
+    "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # HTTP
     "Request": ("chirp.http.request", "Request"),

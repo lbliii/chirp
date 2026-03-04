@@ -63,6 +63,16 @@ class TestRequestFromASGI:
         req = Request.from_asgi(_make_scope(), _make_receive())
         assert req.path_params == {}
 
+    def test_request_id_generated_when_missing(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.request_id
+        assert len(req.request_id) == 36  # UUID format
+
+    def test_request_id_from_header(self) -> None:
+        scope = _make_scope(headers=[(b"x-request-id", b"my-correlation-id")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.request_id == "my-correlation-id"
+
     def test_headers_parsed(self) -> None:
         scope = _make_scope(headers=[(b"content-type", b"application/json"), (b"accept", b"*/*")])
         req = Request.from_asgi(scope, _make_receive())

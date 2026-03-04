@@ -185,6 +185,24 @@ class TestResolveKwargsProviders:
         )
         assert kwargs["store"] is store_instance
 
+    async def test_provider_factory_receives_request(self) -> None:
+        """Factory with request param receives the current request."""
+
+        def get_store(request: Request) -> object:
+            return request
+
+        def handler(store: object):
+            pass
+
+        req = _make_request()
+        kwargs = await resolve_kwargs(
+            handler,
+            req,
+            {},
+            {object: get_store},
+        )
+        assert kwargs["store"] is req
+
 
 class TestResolveKwargsExtraction:
     """resolve_kwargs extracts dataclasses from query (GET) and body (POST)."""

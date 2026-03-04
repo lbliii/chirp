@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Search</title>
+</head>
+<body>
+<h1>Search</h1>
+
+<form action="/" method="get">
+  <input type="search" name="q" value="{{ query }}" placeholder="Search...">
+  <button type="submit">Search</button>
+</form>
+
+{% if results %}
+<ul>
+  {% for r in results %}
+  <li>{{ r }}</li>
+  {% end %}
+</ul>
+{% else %}
+<p>Enter a query to search.</p>
+{% end %}
+</body>
+</html>

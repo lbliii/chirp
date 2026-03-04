@@ -1020,7 +1020,7 @@ Everything users need is re-exported from `chirp.__init__`:
 # chirp/__init__.py
 
 # App
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 
 # HTTP
@@ -1263,3 +1263,16 @@ To support chirp's `Stream` return type, kida needs:
 
 This is the only kida dependency that blocks a chirp phase. Plan as parallel work alongside
 chirp Phases 2-4, targeting completion before Phase 5.
+
+## Contract Check Invariant (Startup)
+
+Chirp startup contract checks are fail-fast by design in debug mode and now depend on a strict
+runtime publication order:
+
+1. Freeze compiles runtime state (router, middleware, template env, tools).
+2. Runtime aliases are synchronized to the app facade.
+3. `contracts_ready` is set only when runtime state is published and router is available.
+4. Contract checks run.
+
+If checks run before runtime publication, Chirp raises a runtime error to prevent non-deterministic
+boot behavior.

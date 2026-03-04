@@ -105,13 +105,6 @@ Handlers receive path parameters as keyword arguments. Type annotations are resp
 Each `_layout.html` defines a shell with a `{% block content %}` slot. The layout declares which DOM element it owns via a target comment:
 
 ```html
-{# target: body #}
-<body hx-boost="true" hx-target="#app-content">
-  {% block content %}{% endblock %}
-</body>
-```
-
-```html
 {# target: app-content #}
 <div id="app-content">
   {% block content %}{% endblock %}
@@ -126,9 +119,139 @@ Layouts nest from root to leaf. The negotiation layer uses `HX-Target` to decide
 
 If no target is declared, it defaults to `"body"`.
 
+### How `render_with_blocks` works
+
+Chirp composes layouts using `render_with_blocks({"content": page_html})`. This **replaces** `{% block content %}` with the pre-rendered page HTML. Any markup you put inside `{% block content %}` in your layout is overridden — it never renders.
+
+This means persistent UI (navbars, sidebars, topbars) must live **outside** `{% block content %}`:
+
+```html
+{# target: main #}
+{# ❌ Shell is INSIDE content — gets replaced, never renders #}
+{% extends "chirpui/app_layout.html" %}
+{% block content %}
+  <nav>...</nav>
+  {% block page_content %}{% end %}
+{% end %}
+```
+
+```html
+{# target: main #}
+{# ✅ Shell is OUTSIDE content — always renders #}
+<nav>...</nav>
+<main id="main">
+  <div id="page-content">
+    {% block content %}{% end %}
+  </div>
+</main>
+```
+
+### Layout ramp: boost → shell → nested shells
+
+Chirp offers three layout patterns, from simplest to most structured:
+
+| Layout | Use case |
+|--------|----------|
+| `chirp/layouts/boost.html` | Simple pages, no persistent shell. Uses `hx-select="#page-content"` for fragment swaps. |
+| `chirp/layouts/shell.html` | Persistent shell (topbar, sidebar). Override `{% block shell %}` to wrap main. |
+| `chirpui/app_shell_layout.html` | ChirpUI apps — extends shell.html with sidebar, toast, CSS. |
+| Nested shells | Forum > subforum > thread. Use `shell_section` macro for inner levels. |
+
+**hx-select vs hx-disinherit**: Prefer `hx-select="#page-content"` on the boosted container. When the server returns a full HTML page, htmx extracts only `#page-content` for the swap. `hx-disinherit` breaks inheritance for fragment swaps; use `hx-target="this"` on event-driven elements instead (the `safe_target` middleware auto-injects this).
+
+### Persistent app shell pattern
+
+For dashboard-style apps with a topbar, sidebar, and content area, extend `chirpui/app_shell_layout.html` (if using ChirpUI) or `chirp/layouts/shell.html`:
+
+```html
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% block brand %}My App{% end %}
+{% block sidebar %}
+  {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+  {% call sidebar() %}
+    {% call sidebar_section("Main") %}
+      {{ sidebar_link("/", "Home") }}
+      {{ sidebar_link("/items", "Items") }}
+    {% end %}
+  {% end %}
+{% end %}
+```
+
+Or without ChirpUI, extend `chirp/layouts/shell.html` and override `{% block shell %}`.
+
+Key elements:
+
+- **Extend shell.html or app_shell_layout.html** — Don't extend `boost.html` for app shell layouts.
+- **`hx-boost="true"`** on `<main id="main">` — Boosted links inside the content area use AJAX navigation.
+- **`hx-select="#page-content"`** — When the server returns a full HTML page, htmx parses it and extracts only `#page-content` for the swap. The shell persists client-side.
+- **No `hx-disinherit`** on the content wrapper — Boosted links must inherit `hx-target`, `hx-swap`, and `hx-select` from `#main`. Fragment requests with explicit `hx-target` override the inherited value.
+- **`{# target: main #}`** — Tells Chirp which layout depth to render for `HX-Target: main` requests.
+
+### Nested shells with shell_section
+
+For multi-level layouts (e.g. forum > subforum > thread), use the `shell_section` macro:
+
+```html
+{# target: items-content #}
+{% from "chirp/macros/shell.html" import shell_section %}
+<div class="chirpui-shell-section">
+  <nav class="chirpui-shell-section__nav">Items</nav>
+  {% call shell_section("items-content") %}
+    {% block content %}{% end %}
+  {% end %}
+</div>
+```
+
+Inner layouts don't need `hx-select` — the renderer produces fragments for them. Use `chirp new myapp --shell` to scaffold a project with this pattern.
+
+### Common mistakes
+
+- **`{% extends %}` in inner layouts** — Inner `_layout.html` files that use `{% extends %}` can conflict with `render_with_blocks`. The child template may wipe the shell. Prefer composing with `shell_section` instead.
+- **Missing `{# target: X #}` on inner layouts** — Non-root layouts default to `"body"` if no target is declared. Add `{# target: element_id #}` so the layout chain resolves correctly.
+- **`hx-disinherit` in shell layouts** — Prefer `hx-select` on the parent. Use `hx-target="this"` on event-driven elements (e.g. SSE) instead of `hx-disinherit`.
+- **Duplicate targets in a chain** — Two layouts with the same target cause `find_start_index_for_target` to return the first match. Use unique targets per layout.
+
 ## Context Cascade
 
 `_context.py` files export a `context` function that provides shared data to handlers. Context cascades from root to leaf; child context overrides parent.
+
+### Provider Signatures
+
+Context providers receive arguments from two sources:
+
+1. **Path parameters** — From the URL match (e.g. `doc_id` from `/documents/{doc_id}`)
+2. **Parent context** — Values from providers higher in the filesystem tree
+
+```python
+# pages/_context.py — root provider, no params
+def context() -> dict:
+    return {"store": get_store(), "data_dir": "..."}
+
+# pages/documents/{doc_id}/_context.py — child receives doc_id from path, store from parent
+def context(doc_id: str, store) -> dict:
+    doc = store.get(doc_id)
+    if doc is None:
+        raise NotFound(f"Document '{doc_id}' not found")
+    return {"doc": doc}
+```
+
+For `/documents/abc-123`, the root provider runs first and adds `store` and `data_dir`. The child provider then receives `doc_id="abc-123"` from the path and `store` from the accumulated context.
+
+**Service providers:** Context providers can also request types registered via `app.provide()`. Parameters with matching type annotations are resolved from the service provider factories:
+
+```python
+# pages/documents/{doc_id}/_context.py
+def context(doc_id: str, store: DocumentStore) -> dict:
+    doc = store.get(doc_id)
+    return {"doc": doc}
+```
+
+With `app.provide(DocumentStore, get_store)`, the `store` param is injected from the factory.
+
+### Early Abort with HTTPError
+
+Providers may raise `NotFound` (or other `HTTPError` subclasses) to abort the cascade. Chirp renders the appropriate error page automatically.
 
 ```python
 # pages/documents/{doc_id}/_context.py
@@ -141,7 +264,7 @@ def context(doc_id: str) -> dict:
     return {"doc": doc}
 ```
 
-Handlers receive context as keyword arguments. Providers can be sync or async. Raising `NotFound` (or other `HTTPError` subclasses) aborts the cascade and returns the appropriate error response.
+Handlers receive context as keyword arguments. Providers can be sync or async.
 
 ## Template Convention
 

@@ -16,6 +16,7 @@ from chirp.pages.types import ContextProvider
 async def build_cascade_context(
     providers: tuple[ContextProvider, ...],
     path_params: dict[str, str],
+    service_providers: dict[type, Any] | None = None,
 ) -> dict[str, Any]:
     """Run context providers from root to leaf, merging results.
 
@@ -41,6 +42,8 @@ async def build_cascade_context(
     Args:
         providers: Context providers ordered from root (depth=0) to leaf.
         path_params: Extracted path parameters from the URL match.
+        service_providers: Type-keyed factories from ``app.provide()``.
+            Provider params with matching annotations are resolved from these.
 
     Returns:
         Merged context dictionary.
@@ -49,8 +52,9 @@ async def build_cascade_context(
         HTTPError: If a provider raises (e.g. ``NotFound``).
     """
     ctx: dict[str, Any] = {}
+    svc = service_providers or {}
     for provider in providers:
-        result = _call_provider(provider.func, path_params)
+        result = _call_provider(provider.func, path_params, ctx, svc)
         if inspect.isawaitable(result):
             result = await result
         if isinstance(result, dict):
@@ -61,17 +65,22 @@ async def build_cascade_context(
 def _call_provider(
     func: Any,
     path_params: dict[str, str],
+    accumulated_ctx: dict[str, Any],
+    service_providers: dict[type, Any],
 ) -> Any:
-    """Call a context provider, injecting matching path params.
+    """Call a context provider, injecting path params, parent context, and services.
 
-    The provider function's signature determines which path params
-    it receives::
-
-        async def context(doc_id: str) -> dict:
-            ...  # receives doc_id from /doc/{doc_id}/...
+    The provider function's signature determines which arguments it receives:
+    - Path params (e.g. ``name`` from ``/skill/{name}``) come from the URL.
+    - Other params come from the accumulated context of parent providers.
+    - Params with type annotations matching ``app.provide()`` are resolved
+      from service providers::
 
         def context() -> dict:
             ...  # receives nothing
+
+        def context(doc_id: str, store: DocumentStore) -> dict:
+            ...  # doc_id from path, store from app.provide()
     """
     sig = inspect.signature(func, eval_str=True)
     kwargs: dict[str, Any] = {}
@@ -86,5 +95,12 @@ def _call_provider(
                     kwargs[name] = value
             else:
                 kwargs[name] = value
+        elif name in accumulated_ctx:
+            kwargs[name] = accumulated_ctx[name]
+        elif (
+            param.annotation is not inspect.Parameter.empty
+            and param.annotation in service_providers
+        ):
+            kwargs[name] = service_providers[param.annotation]()
 
     return func(**kwargs)

@@ -59,7 +59,7 @@ class TestInlineTemplateTopLevelImport:
 class TestInlineTemplateContractWarning:
     def test_check_warns_about_inline_template(self) -> None:
         """app.check() should warn when a route returns InlineTemplate."""
-        from chirp.app import App
+        from chirp import App
         from chirp.contracts import Severity, check_hypermedia_surface
 
         app = App()

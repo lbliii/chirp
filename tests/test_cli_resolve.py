@@ -10,7 +10,7 @@ from chirp.cli._resolve import resolve_app
 @pytest.fixture
 def _fake_app_module(monkeypatch: pytest.MonkeyPatch) -> None:
     """Register a fake module with a chirp App on sys.modules."""
-    from chirp.app import App
+    from chirp import App
 
     mod = types.ModuleType("_fake_chirp_app")
     mod.app = App()  # type: ignore[attr-defined]
@@ -23,20 +23,20 @@ def _fake_app_module(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestResolveApp:
     def test_explicit_attribute(self) -> None:
         app = resolve_app("_fake_chirp_app:app")
-        from chirp.app import App
+        from chirp import App
 
         assert isinstance(app, App)
 
     def test_custom_attribute(self) -> None:
         app = resolve_app("_fake_chirp_app:custom")
-        from chirp.app import App
+        from chirp import App
 
         assert isinstance(app, App)
 
     def test_default_attribute(self) -> None:
         """Omitting :attr defaults to 'app'."""
         app = resolve_app("_fake_chirp_app")
-        from chirp.app import App
+        from chirp import App
 
         assert isinstance(app, App)
 

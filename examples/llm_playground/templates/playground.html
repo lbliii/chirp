@@ -1,15 +1,44 @@
 {#- LLM Playground fragments — compare_result, response, empty #}
 {% from "chirpui/layout.html" import container, grid %}
-{% from "chirpui/streaming.html" import model_card %}
 {% from "chirpui/empty.html" import empty_state %}
 
 {% block compare_result %}
 {% call container() %}
 <div class="chirpui-grid chirpui-grid--cols-2">
-  {% call model_card(model_a, badge="A", cls="chirpui-model-card--a", sse_connect=stream_url_a, sse_streaming=true) %}
-  {% end %}
-  {% call model_card(model_b, badge="B", cls="chirpui-model-card--b", sse_connect=stream_url_b, sse_streaming=true) %}
-  {% end %}
+  <article class="chirpui-card chirpui-model-card chirpui-model-card--a"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_a }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model response A">
+    <header class="chirpui-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">A</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ model_a }}</p>
+    </header>
+    <div class="chirpui-card__body">
+      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Generating…</span>
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+    </div>
+  </article>
+  <article class="chirpui-card chirpui-model-card chirpui-model-card--b"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_b }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model response B">
+    <header class="chirpui-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">B</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ model_b }}</p>
+    </header>
+    <div class="chirpui-card__body">
+      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Generating…</span>
+        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+      </div>
+    </div>
+  </article>
 </div>
 {% end %}
 {% end %}

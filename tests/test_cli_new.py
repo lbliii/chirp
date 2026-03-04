@@ -105,6 +105,34 @@ class TestChirpNewSSE:
         assert (project / "tests" / "test_app.py").is_file()
 
 
+class TestChirpNewShell:
+    def test_creates_shell_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--shell creates persistent app shell with layout, items inner shell."""
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--shell"])
+
+        project = tmp_path / "myapp"
+        assert (project / "app.py").is_file()
+        assert (project / "pages" / "_context.py").is_file()
+        assert (project / "pages" / "_layout.html").is_file()
+        assert (project / "pages" / "page.py").is_file()
+        assert (project / "pages" / "page.html").is_file()
+        assert (project / "pages" / "items" / "_layout.html").is_file()
+        assert (project / "pages" / "items" / "page.py").is_file()
+        assert (project / "pages" / "items" / "page.html").is_file()
+
+    def test_shell_app_is_valid_python(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--shell"])
+
+        app_source = (tmp_path / "myapp" / "app.py").read_text()
+        context_source = (tmp_path / "myapp" / "pages" / "_context.py").read_text()
+        compile(app_source, "app.py", "exec")
+        compile(context_source, "_context.py", "exec")
+
+
 class TestChirpNewGuards:
     def test_existing_directory_exits_one(
         self,

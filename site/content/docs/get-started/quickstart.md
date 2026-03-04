@@ -237,7 +237,7 @@ def events():
 :::{/step}
 :::{step} Run chirp check
 
-Run `chirp check` to catch SSE scope violations before opening the browser.
+Run `chirp check myapp:app` to catch SSE scope violations before opening the browser.
 
 :::{/step}
 :::{/steps}

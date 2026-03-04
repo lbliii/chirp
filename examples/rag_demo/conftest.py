@@ -1,10 +1,9 @@
 """Pytest configuration for the rag_demo example.
 
-Patches ``use_chirp_ui`` (requires optional chirp-ui package) to a no-op
-and configures a temporary SQLite database via ``DB_URL`` so each test
-starts with a clean schema and sample documents.  Also exposes
-``example_module`` for tests that need to monkeypatch module-level names
-such as ``llm`` and ``_db_var``.
+Configures a temporary SQLite database via ``DB_URL`` so each test starts
+with a clean schema and sample documents. Also exposes ``example_module``
+for tests that need to monkeypatch module-level names such as ``llm`` and
+``_db_var``.
 """
 
 import importlib.util
@@ -26,9 +25,10 @@ except ImportError:
 @pytest.fixture
 def example_module(monkeypatch, tmp_path):
     """Load a fresh module with external dependencies mocked."""
-    import chirp.ext.chirp_ui
-
-    monkeypatch.setattr(chirp.ext.chirp_ui, "use_chirp_ui", lambda app, prefix="/static": None)
+    try:
+        import chirp_ui  # noqa: F401
+    except ImportError:
+        pytest.skip("rag_demo requires chirp-ui to render templates")
 
     db_file = tmp_path / "rag_test.db"
     monkeypatch.setenv("DB_URL", f"sqlite:///{db_file}")

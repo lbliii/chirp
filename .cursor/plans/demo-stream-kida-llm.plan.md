@@ -38,7 +38,7 @@ Demonstrate the last three gaps from the template-engine research:
   <section id="stats">{% block stats %}...{% end %}</section>
   <section id="feed">{% block feed %}...{% end %}</section>
   </body></html>
-  
+
 
 ```
 
@@ -56,7 +56,7 @@ Demonstrate the last three gaps from the template-engine research:
   @app.route("/")
   async def index():
       return Stream("dashboard.html", stats=load_stats(), feed=load_feed())
-  
+
 
 ```
 
@@ -255,4 +255,3 @@ case TemplateStream():
 - `examples/llm_streaming_kida/` (or equivalent) demonstrates LLM tokens streaming via Kida's `{% async for %}`.
 - README feature table updated (Stream in streaming example).
 - Docs explain Stream vs Suspense vs TemplateStream and when to use each.
-

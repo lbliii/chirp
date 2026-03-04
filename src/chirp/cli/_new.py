@@ -14,6 +14,15 @@ from pathlib import Path
 from chirp.cli._templates import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
+    SHELL_APP_PY,
+    SHELL_CONTEXT_PY,
+    SHELL_ITEMS_LAYOUT_HTML,
+    SHELL_ITEMS_PAGE_HTML,
+    SHELL_ITEMS_PAGE_PY,
+    SHELL_LAYOUT_CHIRPUI_HTML,
+    SHELL_LAYOUT_HTML,
+    SHELL_PAGE_HTML,
+    SHELL_PAGE_PY,
     SSE_APP_PY,
     SSE_INDEX_HTML,
     STYLE_CSS,
@@ -68,11 +77,13 @@ def create_project(args: argparse.Namespace) -> None:
         _create_minimal(project_dir, args.name)
     elif getattr(args, "sse", False):
         _create_sse(project_dir, args.name)
+    elif getattr(args, "shell", False):
+        _create_shell(project_dir, args.name)
     else:
         _create_v2(project_dir, args.name)
 
     print(f"Created project '{args.name}'")
-    if not args.minimal and not getattr(args, "sse", False):
+    if not args.minimal and not getattr(args, "sse", False) and not getattr(args, "shell", False):
         print()
         print(f"  cd {args.name} && python app.py")
         print()
@@ -126,6 +137,31 @@ def _create_v2(project_dir: Path, name: str) -> None:
 
     (tests_dir / "conftest.py").write_text(V2_CONFTEST_PY)
     (tests_dir / "test_app.py").write_text(V2_TEST_APP_PY.format(name=name))
+
+
+def _create_shell(project_dir: Path, name: str) -> None:
+    """Generate project with persistent app shell (topbar, sidebar)."""
+    use_chirpui = _has_chirpui()
+    pages_dir = project_dir / "pages"
+    static_dir = project_dir / "static"
+
+    project_dir.mkdir(parents=True)
+    pages_dir.mkdir(parents=True)
+    static_dir.mkdir(parents=True)
+
+    (project_dir / "app.py").write_text(SHELL_APP_PY)
+    (pages_dir / "_context.py").write_text(SHELL_CONTEXT_PY)
+    (pages_dir / "_layout.html").write_text(
+        SHELL_LAYOUT_CHIRPUI_HTML if use_chirpui else SHELL_LAYOUT_HTML,
+    )
+    (pages_dir / "page.py").write_text(SHELL_PAGE_PY)
+    (pages_dir / "page.html").write_text(SHELL_PAGE_HTML)
+
+    items_dir = pages_dir / "items"
+    items_dir.mkdir()
+    (items_dir / "_layout.html").write_text(SHELL_ITEMS_LAYOUT_HTML)
+    (items_dir / "page.py").write_text(SHELL_ITEMS_PAGE_PY)
+    (items_dir / "page.html").write_text(SHELL_ITEMS_PAGE_HTML)
 
 
 def _create_minimal(project_dir: Path, name: str) -> None:

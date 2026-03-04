@@ -1,6 +1,6 @@
 """Tests for CORS middleware."""
 
-from chirp.app import App
+from chirp import App
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.testing import TestClient
 
