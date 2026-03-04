@@ -40,13 +40,13 @@ CHIRP_CAPABILITIES = frozenset(
     }
 )
 __all__ = [
+    "CHIRP_CAPABILITIES",
     "OOB",
     "Action",
     "AnyResponse",
     "App",
     "AppConfig",
     "ChirpError",
-    "CHIRP_CAPABILITIES",
     "ConfigurationError",
     "EventStream",
     "FormAction",

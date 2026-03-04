@@ -1,14 +1,13 @@
 """Hypermedia contracts checker orchestration."""
 
-import re
 from typing import TYPE_CHECKING
 
 from chirp.routing.router import _route_path_has_flask_syntax
 
-from .declarations import FormContract, FragmentContract, SSEContract
+from .declarations import FragmentContract, SSEContract
 from .routes import attr_to_method, collect_route_paths, path_matches_route
 from .rules_accessibility import check_accessibility
-from .rules_forms import extract_form_field_names, validate_form_contracts
+from .rules_forms import validate_form_contracts
 from .rules_htmx import (
     check_hx_boost,
     check_hx_indicator_selectors,
@@ -16,14 +15,12 @@ from .rules_htmx import (
     check_selector_syntax,
 )
 from .rules_inline import check_inline_templates
-from .rules_islands import check_island_mounts, extract_island_mounts
+from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,
     check_sse_self_swap,
-    extract_sse_swap_values,
-    normalize_sse_url,
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
@@ -343,4 +340,3 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 )
 
     return result
-

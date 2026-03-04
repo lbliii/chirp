@@ -15,7 +15,13 @@ from .lifecycle import LifecycleCoordinator
 from .registry import AppRegistry
 from .runtime import ASGIRuntime
 from .server import ServerLauncher
-from .state import ContractCheckSnapshot, MutableAppState, PendingRoute, PendingTool, RuntimeAppState
+from .state import (
+    ContractCheckSnapshot,
+    MutableAppState,
+    PendingRoute,
+    PendingTool,
+    RuntimeAppState,
+)
 
 if TYPE_CHECKING:
     from pounce.server import LifecycleCollector
@@ -38,32 +44,32 @@ class App:
     __slots__ = (
         "_compiler",
         "_contract_checks",
-        "_freeze_lock",
-        "_lifecycle",
-        "_mutable_state",
-        "_registry",
-        "_runtime",
-        "_runtime_state",
-        "_server",
         # Backwards-compatible field aliases (tests and advanced users).
         "_custom_kida_env",
         "_db",
         "_discovered_layout_chains",
         "_error_handlers",
+        "_freeze_lock",
         "_frozen",
         "_kida_env",
         "_lazy_pages_dir",
+        "_lifecycle",
         "_middleware",
         "_middleware_list",
         "_migrations_dir",
+        "_mutable_state",
         "_page_route_paths",
         "_page_templates",
         "_pending_domains",
         "_pending_routes",
         "_pending_tools",
         "_providers",
+        "_registry",
         "_reload_dirs_extra",
         "_router",
+        "_runtime",
+        "_runtime_state",
+        "_server",
         "_shutdown_hooks",
         "_startup_hooks",
         "_template_filters",
@@ -99,8 +105,12 @@ class App:
 
         self._registry = AppRegistry(self._mutable_state, self._check_not_frozen)
         self._contract_checks = ContractCheckRunner(self.config)
-        self._compiler = AppCompiler(self.config, self._registry, self._mutable_state, self._runtime_state)
-        self._lifecycle = LifecycleCoordinator(self.config, self._mutable_state, self._ensure_frozen)
+        self._compiler = AppCompiler(
+            self.config, self._registry, self._mutable_state, self._runtime_state
+        )
+        self._lifecycle = LifecycleCoordinator(
+            self.config, self._mutable_state, self._ensure_frozen
+        )
         self._runtime = ASGIRuntime(
             self.config,
             self._mutable_state,
@@ -219,7 +229,7 @@ class App:
         return self._mutable_state.db
 
     @property
-    def tool_events(self):  # noqa: ANN201
+    def tool_events(self):
         return self._mutable_state.tool_events
 
     def error(

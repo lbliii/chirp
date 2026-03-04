@@ -41,19 +41,19 @@ def check_layout_chains(
             else:
                 targets_seen[target] = layout.template_name
 
-        for layout in layouts:
-            if layout.depth > 0 and layout.target == "body":
-                issues.append(
-                    ContractIssue(
-                        severity=Severity.WARNING,
-                        category="layout_chain",
-                        message=(
-                            f"Inner layout {layout.template_name} defaulting to "
-                            "target 'body'. Add {# target: element_id #}."
-                        ),
-                        template=layout.template_name,
-                    )
-                )
+        issues.extend(
+            ContractIssue(
+                severity=Severity.WARNING,
+                category="layout_chain",
+                message=(
+                    f"Inner layout {layout.template_name} defaulting to "
+                    "target 'body'. Add {# target: element_id #}."
+                ),
+                template=layout.template_name,
+            )
+            for layout in layouts
+            if layout.depth > 0 and layout.target == "body"
+        )
 
         for layout in layouts:
             source = template_sources.get(layout.template_name)

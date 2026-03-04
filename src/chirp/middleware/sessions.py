@@ -21,7 +21,7 @@ from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    pass
 
 
 class SessionStore(Protocol):
@@ -44,6 +44,7 @@ class SessionStore(Protocol):
         session and delete the old one (for Redis).
         """
         ...
+
 
 # -- Session ContextVar --
 
@@ -132,8 +133,7 @@ class CookieSessionStore:
             from itsdangerous import URLSafeTimedSerializer
         except ImportError:
             msg = (
-                "CookieSessionStore requires 'itsdangerous'. "
-                "Install with: pip install itsdangerous"
+                "CookieSessionStore requires 'itsdangerous'. Install with: pip install itsdangerous"
             )
             raise ConfigurationError(msg) from None
         if not config.secret_key:
@@ -184,17 +184,14 @@ class CookieSessionStore:
         try:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return {}
         if (
             cfg.absolute_timeout_seconds is not None
             and now - created_ts > cfg.absolute_timeout_seconds
         ):
             return {}
-        if (
-            cfg.idle_timeout_seconds is not None
-            and now - last_seen_ts > cfg.idle_timeout_seconds
-        ):
+        if cfg.idle_timeout_seconds is not None and now - last_seen_ts > cfg.idle_timeout_seconds:
             return {}
         return data
 
@@ -202,7 +199,7 @@ class CookieSessionStore:
 class RedisSessionStore:
     """Redis-backed session store. Cookie stores session ID only."""
 
-    __slots__ = ("_config", "_redis_url", "_prefix")
+    __slots__ = ("_config", "_prefix", "_redis_url")
 
     def __init__(
         self,
@@ -210,14 +207,12 @@ class RedisSessionStore:
         redis_url: str,
         key_prefix: str = "chirp:session:",
     ) -> None:
-        try:
-            import redis.asyncio
-        except ImportError:
-            msg = (
-                "RedisSessionStore requires 'redis'. "
-                "Install with: pip install chirp[redis]"
-            )
-            raise ConfigurationError(msg) from None
+        import importlib.util
+
+        if importlib.util.find_spec("redis.asyncio") is None:
+            raise ConfigurationError(
+                "RedisSessionStore requires 'redis'. Install with: pip install chirp[redis]"
+            ) from None
         if not config.secret_key:
             msg = "SessionConfig.secret_key must not be empty."
             raise ConfigurationError(msg)
@@ -242,7 +237,7 @@ class RedisSessionStore:
             return {}
         try:
             data = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return {}
         if not isinstance(data, dict):
             return {}
@@ -304,17 +299,14 @@ class RedisSessionStore:
         try:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return {}
         if (
             cfg.absolute_timeout_seconds is not None
             and now - created_ts > cfg.absolute_timeout_seconds
         ):
             return {}
-        if (
-            cfg.idle_timeout_seconds is not None
-            and now - last_seen_ts > cfg.idle_timeout_seconds
-        ):
+        if cfg.idle_timeout_seconds is not None and now - last_seen_ts > cfg.idle_timeout_seconds:
             return {}
         return data
 
@@ -371,8 +363,6 @@ class SessionMiddleware:
         regenerate_old_id = _regenerate_var.get()
         try:
             _regenerate_var.set(None)
-            return await self._store.save(
-                response, session, regenerate_old_id=regenerate_old_id
-            )
+            return await self._store.save(response, session, regenerate_old_id=regenerate_old_id)
         finally:
             _regenerate_var.set(None)

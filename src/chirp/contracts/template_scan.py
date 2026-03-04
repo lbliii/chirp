@@ -54,7 +54,9 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
         for match in pattern.finditer(source):
             attr_name = match.group(1)
             url = match.group(2)
-            method_override = get_form_method(source, match.start()) if attr_name == "action" else None
+            method_override = (
+                get_form_method(source, match.start()) if attr_name == "action" else None
+            )
             _append_target(attr_name, url, method_override)
 
     for match in _ATTRS_MAP_PATTERN.finditer(source):

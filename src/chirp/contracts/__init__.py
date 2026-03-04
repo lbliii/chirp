@@ -10,8 +10,8 @@ __all__ = [
     "FormContract",
     "FragmentContract",
     "RouteContract",
-    "Severity",
     "SSEContract",
+    "Severity",
     "check_hypermedia_surface",
     "contract",
 ]

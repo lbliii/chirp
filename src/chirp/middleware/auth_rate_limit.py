@@ -44,7 +44,9 @@ class AuthRateLimitConfig:
     backend: RateLimitBackend | None = None  # None = in-memory
 
 
-def redis_rate_limit_backend(redis_url: str, key_prefix: str = "chirp:ratelimit:") -> RateLimitBackend:
+def redis_rate_limit_backend(
+    redis_url: str, key_prefix: str = "chirp:ratelimit:"
+) -> RateLimitBackend:
     """Create a Redis-backed rate limit backend. Requires ``pip install chirp[redis]``."""
     from chirp.middleware._redis_rate_limit import RedisRateLimitBackend
 
@@ -87,7 +89,7 @@ class _InMemoryRateLimitBackend:
 class AuthRateLimitMiddleware:
     """Rate limiter for authentication-related endpoints."""
 
-    __slots__ = ("_config", "_backend")
+    __slots__ = ("_backend", "_config")
 
     def __init__(self, config: AuthRateLimitConfig | None = None) -> None:
         self._config = config or AuthRateLimitConfig()

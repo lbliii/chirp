@@ -1,13 +1,12 @@
 """ASGI lifespan and worker lifecycle coordination."""
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Any
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.server.terminal_errors import _plain_error_message
-from chirp.tools.events import ToolEventBus
 
 from .state import MutableAppState
 
@@ -21,7 +20,7 @@ async def _run_hook(hook: Callable[..., Any]) -> None:
 class LifecycleCoordinator:
     """Owns lifespan and worker startup/shutdown behavior."""
 
-    __slots__ = ("_config", "_state", "_ensure_frozen")
+    __slots__ = ("_config", "_ensure_frozen", "_state")
 
     def __init__(
         self,

@@ -92,7 +92,7 @@ class TestShellLayout:
         env = _make_env()
         tpl = env.get_template("chirp/layouts/shell.html")
         html = tpl.render({"content": "Fragment"}).strip()
-        assert '#page-content' in html
+        assert "#page-content" in html
         assert 'hx-select="#page-content"' in html
 
     def test_shell_section_macro_renders(self) -> None:

@@ -19,15 +19,17 @@ from chirp.contracts import (
 from chirp.contracts.routes import attr_to_method as _attr_to_method
 from chirp.contracts.routes import path_matches_route as _path_matches_route
 from chirp.contracts.rules_accessibility import check_accessibility as _check_accessibility
-from chirp.contracts.rules_islands import check_island_mounts as _check_island_mounts
-from chirp.contracts.rules_islands import extract_island_mounts as _extract_island_mounts
 from chirp.contracts.rules_forms import extract_form_field_names as _extract_form_field_names
 from chirp.contracts.rules_htmx import check_selector_syntax as _check_selector_syntax
+from chirp.contracts.rules_islands import check_island_mounts as _check_island_mounts
+from chirp.contracts.rules_islands import extract_island_mounts as _extract_island_mounts
 from chirp.contracts.rules_sse import check_sse_connect_scope as _check_sse_connect_scope
 from chirp.contracts.rules_sse import check_sse_self_swap as _check_sse_self_swap
 from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
 from chirp.contracts.rules_swap import collect_broad_targets as _collect_broad_targets
-from chirp.contracts.template_scan import extract_targets_from_source as _extract_targets_from_source
+from chirp.contracts.template_scan import (
+    extract_targets_from_source as _extract_targets_from_source,
+)
 from chirp.contracts.template_scan import (
     extract_template_references as _extract_template_references,
 )
@@ -161,9 +163,7 @@ class TestExtractTargets:
         assert len(targets) == 0
 
     def test_ignores_attrs_map_unsafe_or_anchor_urls(self):
-        html = (
-            '{{ btn("X", attrs_map={"hx-get": "#tab-1", "hx-post": "javascript:alert(1)"}) }}'
-        )
+        html = '{{ btn("X", attrs_map={"hx-get": "#tab-1", "hx-post": "javascript:alert(1)"}) }}'
         targets = _extract_targets_from_source(html)
         assert len(targets) == 0
 
@@ -194,11 +194,15 @@ class TestSelectorSyntaxValidation:
         assert "empty entry" in issues[0].message
 
     def test_skips_dynamic_selector_values(self):
-        issues = _check_selector_syntax({"page.html": '<div hx-target="{{ target_selector }}"></div>'})
+        issues = _check_selector_syntax(
+            {"page.html": '<div hx-target="{{ target_selector }}"></div>'}
+        )
         assert issues == []
 
     def test_allows_selector_command_prefixes(self):
-        issues = _check_selector_syntax({"page.html": '<button hx-target="closest .card"></button>'})
+        issues = _check_selector_syntax(
+            {"page.html": '<button hx-target="closest .card"></button>'}
+        )
         assert issues == []
 
 
@@ -656,7 +660,9 @@ class TestCheckHypermediaSurface:
         def fake_has_flask_syntax(path: str) -> bool:
             return path == "/api/items"
 
-        monkeypatch.setattr("chirp.contracts.checker._route_path_has_flask_syntax", fake_has_flask_syntax)
+        monkeypatch.setattr(
+            "chirp.contracts.checker._route_path_has_flask_syntax", fake_has_flask_syntax
+        )
         result = check_hypermedia_surface(app)
         assert not result.ok
         routing_errors = [i for i in result.issues if i.category == "routing"]
@@ -710,7 +716,9 @@ class TestCheckHypermediaSurface:
             return "ok"
 
         result = check_hypermedia_surface(app)
-        orphan_issues = [i for i in result.issues if i.category == "orphan" and i.route == "/config/set"]
+        orphan_issues = [
+            i for i in result.issues if i.category == "orphan" and i.route == "/config/set"
+        ]
         assert orphan_issues == []
 
     def test_detects_method_mismatch(self, tmp_path):
@@ -727,7 +735,9 @@ class TestCheckHypermediaSurface:
         assert any("POST" in i.message and "GET" in i.message for i in result.errors)
 
     def test_detects_invalid_hx_selector_syntax(self, tmp_path):
-        (tmp_path / "index.html").write_text('<button hx-post="/api/items" hx-target="\'#result\'">go</button>')
+        (tmp_path / "index.html").write_text(
+            '<button hx-post="/api/items" hx-target="\'#result\'">go</button>'
+        )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/api/items", methods=["POST"])

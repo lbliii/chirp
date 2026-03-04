@@ -15,7 +15,7 @@ from .state import MutableAppState, RuntimeAppState
 class AppCompiler:
     """Compiles app setup state into immutable runtime state."""
 
-    __slots__ = ("_config", "_registry", "_mutable", "_runtime")
+    __slots__ = ("_config", "_mutable", "_registry", "_runtime")
 
     def __init__(
         self,

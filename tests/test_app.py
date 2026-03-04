@@ -100,7 +100,9 @@ class TestAppFreeze:
         app._ensure_frozen()
         assert app._runtime_state.contracts_ready is True
 
-    def test_debug_checks_run_after_runtime_published(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_debug_checks_run_after_runtime_published(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from chirp.contracts.types import CheckResult
 
         app = App(config=AppConfig(debug=True))

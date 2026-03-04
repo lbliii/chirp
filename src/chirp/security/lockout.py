@@ -65,9 +65,7 @@ class _InMemoryLockoutBackend:
         cfg = self._config
         now = time()
         with self._lock:
-            failures, first_failure_at, locked_until = self._state.get(
-                key, (0, now, 0.0)
-            )
+            failures, first_failure_at, locked_until = self._state.get(key, (0, now, 0.0))
             if locked_until > now:
                 return True, max(1, int(locked_until - now))
             if now - first_failure_at > cfg.window_seconds:
@@ -89,7 +87,7 @@ class _InMemoryLockoutBackend:
 class LoginLockout:
     """Track login failures and compute lockout windows."""
 
-    __slots__ = ("_config", "_backend")
+    __slots__ = ("_backend", "_config")
 
     def __init__(self, config: LockoutConfig | None = None) -> None:
         self._config = config or LockoutConfig()

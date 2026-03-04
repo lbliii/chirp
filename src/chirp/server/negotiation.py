@@ -355,9 +355,11 @@ def _render_layout_page(
     try:
         from chirp.middleware.layout_debug import set_layout_debug_metadata
 
-        chain_str = " > ".join(f"{l.target}({i})" for i, l in enumerate(layouts))
+        chain_str = " > ".join(f"{layout.target}({i})" for i, layout in enumerate(layouts))
         target_id = (htmx_target or "").lstrip("#")
-        match_str = f"target={target_id}, start={start_index}, rendered={len(layouts[start_index:])}"
+        match_str = (
+            f"target={target_id}, start={start_index}, rendered={len(layouts[start_index:])}"
+        )
         set_layout_debug_metadata(request, chain_str, match_str, mode)
     except ImportError:
         pass

@@ -12,7 +12,7 @@ from .state import MutableAppState, PendingRoute, PendingTool
 class AppRegistry:
     """Owns setup-time registration and page mount wiring."""
 
-    __slots__ = ("_state", "_ensure_mutable")
+    __slots__ = ("_ensure_mutable", "_state")
 
     def __init__(self, state: MutableAppState, ensure_mutable: Callable[[], None]) -> None:
         self._state = state

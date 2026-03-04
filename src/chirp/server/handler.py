@@ -17,9 +17,9 @@ from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.invoke import invoke
 from chirp.context import g, request_var
 from chirp.errors import HTTPError
-from chirp.logging import request_id_var
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
+from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router

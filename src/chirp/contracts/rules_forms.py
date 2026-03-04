@@ -82,22 +82,22 @@ def validate_form_contracts(
             )
             continue
 
-        for field_name in sorted(dataclass_fields - html_fields):
-            issues.append(
-                ContractIssue(
-                    severity=Severity.ERROR,
-                    category="form",
-                    message=(
-                        f"Route '{route.path}' (POST) expects field "
-                        f"'{field_name}' ({form_contract.datacls.__name__}.{field_name}) "
-                        f"but template '{form_contract.template}'"
-                        + (f" block '{form_contract.block}'" if form_contract.block else "")
-                        + f' has no <input name="{field_name}">.'
-                    ),
-                    route=route.path,
-                    template=form_contract.template,
-                )
+        issues.extend(
+            ContractIssue(
+                severity=Severity.ERROR,
+                category="form",
+                message=(
+                    f"Route '{route.path}' (POST) expects field "
+                    f"'{field_name}' ({form_contract.datacls.__name__}.{field_name}) "
+                    f"but template '{form_contract.template}'"
+                    + (f" block '{form_contract.block}'" if form_contract.block else "")
+                    + f' has no <input name="{field_name}">.'
+                ),
+                route=route.path,
+                template=form_contract.template,
             )
+            for field_name in sorted(dataclass_fields - html_fields)
+        )
 
         for field_name in sorted(html_fields - dataclass_fields):
             suggestion = closest_field(field_name, dataclass_fields)

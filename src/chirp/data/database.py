@@ -536,7 +536,7 @@ class Database:
                     )
                     self._initialized = True
                     return
-                except asyncio.TimeoutError as e:
+                except TimeoutError as e:
                     last_exc = e
                 except BaseException as e:
                     last_exc = e

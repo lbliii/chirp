@@ -6,14 +6,15 @@ from chirp.errors import ConfigurationError
 class RedisRateLimitBackend:
     """Redis-backed sliding window rate limiter."""
 
-    __slots__ = ("_redis_url", "_prefix")
+    __slots__ = ("_prefix", "_redis_url")
 
     def __init__(self, redis_url: str, key_prefix: str = "chirp:ratelimit:") -> None:
-        try:
-            import redis.asyncio
-        except ImportError:
-            msg = "RedisRateLimitBackend requires 'redis'. Install with: pip install chirp[redis]"
-            raise ConfigurationError(msg) from None
+        import importlib.util
+
+        if importlib.util.find_spec("redis.asyncio") is None:
+            raise ConfigurationError(
+                "RedisRateLimitBackend requires 'redis'. Install with: pip install chirp[redis]"
+            ) from None
         self._redis_url = redis_url
         self._prefix = key_prefix
 

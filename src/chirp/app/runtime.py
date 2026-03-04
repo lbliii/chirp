@@ -13,7 +13,7 @@ from .state import MutableAppState, RuntimeAppState
 class ASGIRuntime:
     """Dispatches ASGI scopes to lifecycle or request handling."""
 
-    __slots__ = ("_config", "_mutable", "_runtime", "_lifecycle", "_ensure_frozen")
+    __slots__ = ("_config", "_ensure_frozen", "_lifecycle", "_mutable", "_runtime")
 
     def __init__(
         self,

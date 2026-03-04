@@ -75,7 +75,7 @@ def check_sse_connect_scope(
                     category="sse_scope",
                     message=(
                         "sse-connect element is inside a broad hx-target scope "
-                        "without mitigation. Add hx-target=\"this\" (safe_target "
+                        'without mitigation. Add hx-target="this" (safe_target '
                         "middleware auto-injects this), or hx-disinherit="
                         '"hx-target hx-swap" on sse-connect. Use '
                         '{% from "chirp/sse.html" import sse_scope %} {{ sse_scope(url) }}.'
