@@ -6,7 +6,10 @@ no magic, fully predictable.
 """
 
 import json as json_module
+import logging
 from typing import TYPE_CHECKING, Any
+
+_logger = logging.getLogger(__name__)
 
 from kida import Environment
 
@@ -292,6 +295,11 @@ def _render_layout_page(
 ) -> str:
     """Render a LayoutPage through its layout chain.
 
+    Context propagation: value.context is passed unchanged to
+    render_block() and render_with_layouts(). Page variables (e.g.
+    selected_tags, q) are available in macro slot content because
+    Kida renders slot bodies in the caller's context.
+
     Decides rendering depth based on request headers:
 
     - Fragment request (no history restore): render just the named block
@@ -316,7 +324,13 @@ def _render_layout_page(
         frag = Fragment(value.name, value.block_name, **value.context)
         return render_fragment(kida_env, frag)
 
-    # Render the page's content block
+    # Render the page's content block (value.context passed through for slot inheritance)
+    _logger.debug(
+        "render_block %s.%s with context keys: %s",
+        value.name,
+        value.block_name,
+        sorted(value.context.keys()),
+    )
     page_template = kida_env.get_template(value.name)
     page_html = page_template.render_block(value.block_name, value.context)
 
