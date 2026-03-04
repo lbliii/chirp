@@ -1,4 +1,4 @@
-"""Template, Fragment, Page, Stream, and ValidationError return types.
+"""Template, Fragment, Page, Stream, TemplateStream, and ValidationError return types.
 
 Frozen dataclasses that handlers return. The content negotiation layer
 inspects these to dispatch to the kida renderer.
@@ -257,6 +257,30 @@ class Stream:
             header=site_header(),
             stats=await load_stats(),
             feed=await load_feed(),
+        )
+    """
+
+    template_name: str
+    context: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(self, template_name: str, /, **context: Any) -> None:
+        object.__setattr__(self, "template_name", template_name)
+        object.__setattr__(self, "context", context)
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateStream:
+    """Render a template with Kida's render_stream_async.
+
+    Use when the template contains ``{% async for %}`` or ``{{ await }}``
+    and context includes async iterators consumed during rendering.
+    O(n) work — template yields chunks as it iterates, not re-render per item.
+
+    Usage::
+
+        return TemplateStream("chat.html",
+            stream=llm.stream(prompt),
+            prompt=prompt,
         )
     """
 

@@ -25,6 +25,7 @@ from chirp.templating.returns import (
     Stream,
     Suspense,
     Template,
+    TemplateStream,
     ValidationError,
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
@@ -73,14 +74,15 @@ def negotiate(
     9. ``OOB``              -> primary + hx-swap-oob fragments
     10. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    11. ``Suspense``         -> shell + deferred OOB blocks -> StreamingResponse
+    11. ``TemplateStream``   -> kida render_stream_async() -> StreamingResponse
+    12. ``Suspense``         -> shell + deferred OOB blocks -> StreamingResponse
                                (first paint instant, blocks fill in)
-    12. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
-    11. ``str``             -> 200, text/html
-    12. ``bytes``           -> 200, application/octet-stream
-    13. ``dict`` / ``list`` -> 200, application/json
-    14. ``(value, int)``    -> negotiate value, override status
-    15. ``(value, int, dict)`` -> negotiate value, override status + headers
+    13. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    14. ``str``              -> 200, text/html
+    15. ``bytes``            -> 200, application/octet-stream
+    16. ``dict`` / ``list``  -> 200, application/json
+    17. ``(value, int)``     -> negotiate value, override status
+    18. ``(value, int, dict)`` -> negotiate value, override status + headers
     """
     match value:
         case Response():
@@ -224,6 +226,19 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
             )
+        case TemplateStream():
+            if kida_env is None:
+                msg = (
+                    "TemplateStream return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            tmpl = kida_env.get_template(value.template_name)
+            chunks = tmpl.render_stream_async(**value.context)
+            return StreamingResponse(
+                chunks=chunks,
+                content_type="text/html; charset=utf-8",
+            )
         case Suspense():
             if kida_env is None:
                 msg = (
@@ -265,7 +280,7 @@ def negotiate(
             msg = (
                 f"Cannot convert {type(value).__name__} to a response. "
                 f"Return str, dict, bytes, Template, InlineTemplate, Fragment, "
-                f"Action, Stream, EventStream, Response, or Redirect."
+                f"TemplateStream, Action, Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)
 

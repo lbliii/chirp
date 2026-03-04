@@ -39,7 +39,7 @@ jobs:
           repository-owner: ${{ github.repository_owner }}
 
       - name: Install docs dependencies
-        run: uv sync --group docs
+        run: uv sync --no-sources --group docs
         env:
           PYTHON_GIL: "0"
 

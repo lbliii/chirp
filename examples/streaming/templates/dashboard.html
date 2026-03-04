@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Streaming Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 1.5rem;
+    }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; font-weight: 600; color: #f8fafc; }
+    header p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+    .stats {
+      display: flex; justify-content: center; gap: 2rem;
+      padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+      background: #1e293b; border-radius: 0.5rem;
+    }
+    .stats span { white-space: nowrap; }
+    .stats strong { color: #22c55e; }
+    .feed {
+      max-width: 480px; margin: 0 auto;
+      background: #1e293b; border-radius: 0.5rem; padding: 1rem;
+    }
+    .feed h2 { font-size: 0.9rem; color: #94a3b8; margin-bottom: 0.75rem; }
+    .feed-item {
+      padding: 0.5rem 0; border-bottom: 1px solid #334155;
+      font-size: 0.9rem;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-item .time { font-size: 0.75rem; color: #64748b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Progressive Stream</h1>
+    <p>Chirp Stream() — awaitables resolve concurrently, chunks stream out</p>
+    <p style="margin-top: 0.5rem;"><a href="/live" style="color: #22c55e;">Watch visible chunks — /live</a></p>
+  </header>
+
+  <section class="stats">
+    {% for s in stats %}
+    <span>{{ s.label }}: <strong>{{ s.value }}</strong></span>
+    {% end %}
+  </section>
+
+  <section class="feed">
+    <h2>Activity Feed</h2>
+    {% for item in feed %}
+    <div class="feed-item">
+      {{ item.title }} <span class="time">{{ item.time }}</span>
+    </div>
+    {% end %}
+  </section>
+</body>
+</html>
