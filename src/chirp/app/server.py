@@ -9,6 +9,8 @@ from .state import MutableAppState
 if TYPE_CHECKING:
     from pounce.server import LifecycleCollector
 
+    from chirp.app import App
+
 
 class ServerLauncher:
     """Runs development or production server based on app config."""
@@ -21,7 +23,7 @@ class ServerLauncher:
 
     def run(
         self,
-        app: object,
+        app: App,
         *,
         host: str | None,
         port: int | None,

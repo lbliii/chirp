@@ -1,7 +1,12 @@
 """Diagnostics and contract checking for App."""
 
+from typing import TYPE_CHECKING
+
 from chirp.config import AppConfig
 from chirp.server.terminal_checks import format_check_result
+
+if TYPE_CHECKING:
+    from chirp.app import App
 
 
 class ContractCheckRunner:
@@ -12,7 +17,7 @@ class ContractCheckRunner:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
-    def run_debug_checks(self, app: object) -> None:
+    def run_debug_checks(self, app: App) -> None:
         import sys
 
         from chirp.contracts import check_hypermedia_surface
@@ -22,7 +27,7 @@ class ContractCheckRunner:
         if not result.ok:
             sys.exit(1)
 
-    def check(self, app: object, *, warnings_as_errors: bool = False) -> None:
+    def check(self, app: App, *, warnings_as_errors: bool = False) -> None:
         from chirp.contracts import check_hypermedia_surface
 
         result = check_hypermedia_surface(app)

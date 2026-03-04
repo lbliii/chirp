@@ -91,6 +91,7 @@ __all__ = [
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Application
     "App": ("chirp.app", "App"),
+    "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # HTTP
     "Request": ("chirp.http.request", "Request"),
