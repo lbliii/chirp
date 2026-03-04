@@ -130,6 +130,43 @@ If no target is declared, it defaults to `"body"`.
 
 `_context.py` files export a `context` function that provides shared data to handlers. Context cascades from root to leaf; child context overrides parent.
 
+### Provider Signatures
+
+Context providers receive arguments from two sources:
+
+1. **Path parameters** — From the URL match (e.g. `doc_id` from `/documents/{doc_id}`)
+2. **Parent context** — Values from providers higher in the filesystem tree
+
+```python
+# pages/_context.py — root provider, no params
+def context() -> dict:
+    return {"store": get_store(), "data_dir": "..."}
+
+# pages/documents/{doc_id}/_context.py — child receives doc_id from path, store from parent
+def context(doc_id: str, store) -> dict:
+    doc = store.get(doc_id)
+    if doc is None:
+        raise NotFound(f"Document '{doc_id}' not found")
+    return {"doc": doc}
+```
+
+For `/documents/abc-123`, the root provider runs first and adds `store` and `data_dir`. The child provider then receives `doc_id="abc-123"` from the path and `store` from the accumulated context.
+
+**Service providers:** Context providers can also request types registered via `app.provide()`. Parameters with matching type annotations are resolved from the service provider factories:
+
+```python
+# pages/documents/{doc_id}/_context.py
+def context(doc_id: str, store: DocumentStore) -> dict:
+    doc = store.get(doc_id)
+    return {"doc": doc}
+```
+
+With `app.provide(DocumentStore, get_store)`, the `store` param is injected from the factory.
+
+### Early Abort with HTTPError
+
+Providers may raise `NotFound` (or other `HTTPError` subclasses) to abort the cascade. Chirp renders the appropriate error page automatically.
+
 ```python
 # pages/documents/{doc_id}/_context.py
 from chirp import NotFound
@@ -141,7 +178,7 @@ def context(doc_id: str) -> dict:
     return {"doc": doc}
 ```
 
-Handlers receive context as keyword arguments. Providers can be sync or async. Raising `NotFound` (or other `HTTPError` subclasses) aborts the cascade and returns the appropriate error response.
+Handlers receive context as keyword arguments. Providers can be sync or async.
 
 ## Template Convention
 

@@ -21,12 +21,30 @@ if TYPE_CHECKING:
     from chirp.app import App
 
 
-def use_chirp_ui(app: App, prefix: str = "/static") -> None:
+class _ChirpUIStrictMiddleware:
+    """Middleware that sets chirp-ui strict mode per request for variant validation."""
+
+    __slots__ = ("_strict",)
+
+    def __init__(self, strict: bool) -> None:
+        self._strict = strict
+
+    async def __call__(self, request: object, next: object) -> object:
+        import chirp_ui
+
+        chirp_ui.set_strict(self._strict)
+        return await next(request)
+
+
+def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) -> None:
     """Register chirp-ui static files (CSS, themes) with the app.
 
     Call after App creation. Serves chirpui.css, themes/, chirpui-transitions.css
     from the chirp-ui package. Also call chirp_ui.register_filters(app) so
     chirp-ui components (badge, alert, etc.) have access to bem and field_errors.
+
+    When strict is None, uses app.config.debug. When True, invalid component
+    variants log warnings during template render. When False, no validation.
 
     Raises ImportError if chirp-ui is not installed.
     """
@@ -35,3 +53,5 @@ def use_chirp_ui(app: App, prefix: str = "/static") -> None:
     from chirp.middleware.static import StaticFiles
 
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
+    strict_value = strict if strict is not None else app.config.debug
+    app.add_middleware(_ChirpUIStrictMiddleware(strict_value))

@@ -52,14 +52,15 @@ Two steps to wire chirp-ui into your app:
 Use Chirp's integration helper to serve chirpui.css, themes, and transitions:
 
 ```python
-from chirp import App, AppConfig
-from chirp.ext.chirp_ui import use_chirp_ui
+from chirp import App, AppConfig, use_chirp_ui
 import chirp_ui
 
 app = App(AppConfig(template_dir="templates"))
 use_chirp_ui(app)
 chirp_ui.register_filters(app)
 ```
+
+**Import:** `use_chirp_ui` is provided by Chirp. Use `from chirp import use_chirp_ui` when the `chirp[ui]` extra is installed. If that fails (e.g. older Chirp), use `from chirp.ext.chirp_ui import use_chirp_ui`.
 
 `use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory. By default it serves at `/static`. Pass `prefix="/assets"` to change it.
 

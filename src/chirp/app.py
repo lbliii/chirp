@@ -279,7 +279,9 @@ class App:
 
         async def page_wrapper(request: Request) -> Any:
             """Wrapper that runs context cascade and upgrades Page → LayoutPage."""
-            cascade_ctx = await build_cascade_context(_providers, request.path_params)
+            cascade_ctx = await build_cascade_context(
+                _providers, request.path_params, _service_providers
+            )
             kwargs = await resolve_kwargs(_handler, request, cascade_ctx, _service_providers)
             result = await invoke(_handler, **kwargs)
             return upgrade_result(result, cascade_ctx, _chain, _providers)
