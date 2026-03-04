@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-03-04
+
+### Added
+
+- **Enterprise config** — `AppConfig.from_env()` loads config from environment (CHIRP_* vars). Optional `python-dotenv` via `pip install chirp[config]`. New fields: `env`, `redis_url`, `audit_sink`, `feature_flags`, `http_timeout`, `http_retries`, `skip_contract_checks`, `lazy_pages`
+- **Health probes** — `chirp.health.liveness()`, `readiness(checks)`, `HealthCheck` for Kubernetes liveness/readiness probes
+- **Request ID** — `Request.request_id` for request tracing
+- **Structured logging** — `chirp.logging` module for JSON log format and lifecycle events
+- **Pluggable session backends** — `SessionStore` protocol with `CookieSessionStore` and `RedisSessionStore`. `RateLimitBackend`, `LockoutBackend` protocols for auth middleware
+- **Domain protocol** — `Domain` protocol and `register_domain()` for pluggable feature modules
+- **Shell scaffolding** — `chirp new <name> --shell` scaffolds app with persistent shell (topbar + sidebar)
+- **Layout slot context** — `LayoutPage` slot content inherits caller context; documented in server
+- **form_get example** — New example demonstrating GET-based form search
+- **Layout debug middleware** — `LayoutDebugMiddleware` for development
+- **Resilience** — `chirp.resilience` with HTTP/DB timeout and retry docs; `Database` gains `connect_timeout`, `connect_retries`
+
+### Changed
+
+- **App architecture** — `app.py` split into `app/` package (compiler, lifecycle, registry, runtime, server, state, diagnostics)
+- **Contracts** — `contracts.py` split into `contracts/` package with modular rules (htmx, forms, layout, SSE, islands, swap, etc.)
+- **Lazy imports** — Top-level `chirp` uses lazy imports for faster startup
+- **Kida errors** — ANSI escape codes stripped from Kida errors in HTTP/SSE/JSON responses
+- **Session middleware** — Refactored for pluggable backends
+
+### Fixed
+
+- **Contracts** — Regex for Kida URL extraction in htmx attributes
+- **Contracts** — Action+method matrix: GET default, swap safety for form actions
+
+[0.1.4]: https://github.com/lbliii/chirp/releases/tag/v0.1.4
+
 ## [0.1.3] — 2026-03-03
 
 (Release notes to be added)
