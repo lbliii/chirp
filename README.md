@@ -56,9 +56,13 @@ chirp new myapp && cd myapp && python app.py
 
 | Function | Description |
 |----------|-------------|
-| `chirp new <name>` | Scaffold a new project |
+| `chirp new <name>` | Scaffold an auth-ready project |
+| `chirp new <name> --shell` | Scaffold with a persistent app shell (topbar + sidebar) |
+| `chirp new <name> --sse` | Scaffold with SSE boilerplate (`EventStream`, `sse_scope`) |
 | `chirp run <app>` | Start the dev server from an import string |
 | `chirp check <app>` | Validate hypermedia contracts |
+| `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
+| `chirp routes <app>` | Print the registered route table |
 | `App()` | Create an application |
 | `@app.route(path)` | Register a route handler |
 | `Template(name, **ctx)` | Render a full template |
@@ -153,7 +157,7 @@ RUN pip install bengal-chirp
 CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
 ```
 
-📦 **Full deployment guide**: [docs/deployment/production.md](docs/deployment/production.md)
+**Full deployment guide**: [Deployment docs](https://lbliii.github.io/chirp/docs/deployment/production/)
 
 ---
 
@@ -278,14 +282,23 @@ Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions, SecurityHeaders.
 Chirp validates the server-client boundary at startup:
 
 ```python
-issues = app.check()
-for issue in issues:
-    print(f"{issue.severity}: {issue.message}")
+# Prints a contract report and exits non-zero on errors.
+app.check()
+
+# Optional strict mode: treat warnings as failures too.
+app.check(warnings_as_errors=True)
 ```
 
 Every `hx-get`, `hx-post`, and `action` attribute in your templates is checked against the
 registered route table. Every `Fragment` and `SSE` return type is checked against available
-template blocks. Broken references become compile-time errors, not runtime 404s.
+template blocks. SSE safety checks catch broken `sse-connect` / `sse-swap` structures and
+unsafe inherited target scopes before runtime.
+
+For strict CI:
+
+```bash
+chirp check myapp:app --warnings-as-errors
+```
 
 </details>
 

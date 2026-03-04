@@ -6,7 +6,7 @@ weight: 30
 lang: en
 type: doc
 tags: [templates, filters, globals, kida]
-keywords: [filter, global, template-filter, template-global, jinja, kida]
+keywords: [filter, global, template-filter, template-global, kida, template-engine]
 category: guide
 ---
 
@@ -140,7 +140,7 @@ The `reason` argument is for code review and audit; it is not used at runtime.
 
 **URL attributes** — When building `href` from user data, use the `url` filter or Kida's `url_is_safe()` / `safe_url()` in a custom filter. See [Kida security docs](https://lbliii.github.io/kida/docs/advanced/security/) for context-specific escaping (JavaScript, CSS).
 
-**HTML validation** — Validate markup with [whatwg.org/validator](https://whatwg.org/validator/) to catch conformance errors. Chirp's `chirp check` (and `app.check()`) validates hypermedia contracts: every `hx-get`, `hx-post`, and `action` URL in templates must resolve to a registered route. Query params (e.g. `?page=1`) are stripped before matching. Use both for full coverage.
+**HTML validation** — Validate markup with [whatwg.org/validator](https://whatwg.org/validator/) to catch conformance errors. Chirp's `chirp check <app>` (and `app.check()`) validates hypermedia contracts: `hx-get`/`hx-post`/`hx-put`/`hx-delete`/`hx-patch` and `action` URLs must resolve to registered routes with compatible methods. Query params (e.g. `?page=1`) are stripped before matching. Use both for full coverage.
 
 ---
 

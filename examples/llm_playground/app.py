@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import quote
 
+import chirp_ui
 import httpx
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template, use_chirp_ui
@@ -22,6 +23,7 @@ PLAYGROUND_STATIC = Path(__file__).parent / "static" / "playground"
 app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True))
 app.add_middleware(StaticFiles(directory=str(PLAYGROUND_STATIC), prefix="/static/playground"))
 use_chirp_ui(app)
+chirp_ui.register_filters(app)
 register_markdown_filter(app)
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE", "http://localhost:11434")

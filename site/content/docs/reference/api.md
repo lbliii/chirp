@@ -30,7 +30,12 @@ from chirp import (
     InlineTemplate,
     Fragment,
     Page,
+    LayoutPage,
+    Action,
+    FormAction,
     Stream,
+    Suspense,
+    TemplateStream,
     ValidationError,
     OOB,
 
@@ -70,6 +75,12 @@ from chirp import (
 
     # Tools
     ToolCallEvent,
+
+    # Markdown
+    MarkdownRenderer,
+
+    # Extensions
+    use_chirp_ui,
 )
 ```
 
@@ -103,7 +114,7 @@ app = App(config=AppConfig(...))
 |--------|-------------|
 | `app.add_middleware(mw)` | Add middleware to the pipeline |
 | `app.run()` | Start the development server (freezes the app) |
-| `app.check()` | Validate hypermedia contracts |
+| `app.check(warnings_as_errors=False)` | Validate hypermedia contracts (optional strict mode) |
 
 ### CLI
 
@@ -113,8 +124,12 @@ The `chirp` command is registered as a console script:
 |---------|-------------|
 | `chirp new <name>` | Scaffold a new project |
 | `chirp new <name> --minimal` | Scaffold a minimal project |
+| `chirp new <name> --shell` | Scaffold with a persistent app shell |
+| `chirp new <name> --sse` | Scaffold with SSE boilerplate |
 | `chirp run <app>` | Start the dev server (e.g. `chirp run myapp:app`) |
 | `chirp check <app>` | Validate hypermedia contracts |
+| `chirp check <app> --warnings-as-errors` | Fail when warnings are present |
+| `chirp routes <app>` | List registered routes |
 
 The `<app>` argument is an import string in `module:attribute` format. The attribute defaults to `app` when omitted (e.g. `chirp run myapp` resolves to `myapp:app`).
 
@@ -154,8 +169,12 @@ Convenience for 302 redirects: `Redirect(url)`.
 | `Fragment(name, block, **ctx)` | Named block render |
 | `Page(name, block, **ctx)` | Auto-detect fragment vs full page |
 | `Stream(name, **ctx)` | Progressive streaming render |
+| `Suspense(name, **ctx)` | Shell-first render with deferred OOB swaps |
+| `TemplateStream(...)` | Lower-level streaming template response |
 | `ValidationError(name, block, **ctx)` | 422 fragment response |
 | `OOB(main, *fragments)` | Out-of-band multi-fragment response |
+| `Action(trigger=...)` | 204 no-content action response (optional HX-Trigger) |
+| `FormAction(...)` | Form-focused action response helper |
 
 ## Real-Time
 

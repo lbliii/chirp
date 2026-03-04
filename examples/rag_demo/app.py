@@ -43,6 +43,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import chirp_ui
 import httpx
 
 # Allow importing sync when run as script (python app.py)
@@ -158,6 +159,7 @@ RAG_STATIC = Path(__file__).parent / "static"
 app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True))
 app.add_middleware(StaticFiles(directory=str(RAG_STATIC), prefix="/static/rag"))
 use_chirp_ui(app)
+chirp_ui.register_filters(app)
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
@@ -517,7 +519,7 @@ _SAMPLE_DOCS = [
     (
         "Templates",
         "Chirp uses kida for templates. Return Template('page.html', **context) "
-        "from a route handler. Templates support Jinja2-compatible syntax with "
+        "from a route handler. Templates support Kida syntax with "
         "block inheritance and includes.",
         "/docs/templates",
     ),

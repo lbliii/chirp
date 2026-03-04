@@ -13,12 +13,12 @@ _SSE_CONNECT_TAG_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SSE_SWAP_VALUE_PATTERN = re.compile(r'\bsse-swap\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
-_JINJA_EXPR_PATTERN = re.compile(r"\{\{[^}]+\}\}")
+_KIDA_EXPR_PATTERN = re.compile(r"\{\{[^}]+\}\}")
 
 
 def normalize_sse_url(url: str) -> str:
-    """Replace jinja expressions so route-pattern matching still works."""
-    return _JINJA_EXPR_PATTERN.sub("__p__", url).strip()
+    """Replace Kida expressions so route-pattern matching still works."""
+    return _KIDA_EXPR_PATTERN.sub("__p__", url).strip()
 
 
 def extract_sse_swap_values(source: str) -> set[str]:

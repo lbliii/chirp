@@ -170,10 +170,10 @@ Control terminal traceback style with the `CHIRP_TRACEBACK` environment variable
 
 ```bash
 # Show full tracebacks during deep debugging
-CHIRP_TRACEBACK=full chirp run
+CHIRP_TRACEBACK=full chirp run myapp:app
 
 # Minimal output for CI/production
-CHIRP_TRACEBACK=minimal chirp run
+CHIRP_TRACEBACK=minimal chirp run myapp:app
 ```
 
 ### Streaming and SSE Errors

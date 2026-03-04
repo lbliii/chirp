@@ -291,8 +291,8 @@ See [[docs/examples/rag-demo|RAG demo]] for the full implementation.
 | Check | Severity | What it catches |
 |---|---|---|
 | `sse_self_swap` | ERROR | `sse-swap` on the same element as `sse-connect` |
-| `sse_scope` | WARNING | `sse-connect` inside broad `hx-target` without `hx-disinherit` |
+| `sse_scope` | ERROR | `sse-connect` inside broad `hx-target` without mitigation |
 | `swap_safety` | WARNING | `sse-swap` element inheriting a broad `hx-target` |
 | `swap_safety` | INFO | `sse-swap` without `hx-target="this"` (suggests adding it for robustness) |
 
-Run `chirp check` during development to catch these before they become runtime mysteries.
+Run `chirp check myapp:app` during development to catch these before runtime.

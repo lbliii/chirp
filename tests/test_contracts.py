@@ -862,7 +862,7 @@ class TestCheckHypermediaSurface:
 
 
 class TestExtractTemplateReferences:
-    """Extract template references from Jinja source."""
+    """Extract template references from Kida template source."""
 
     def test_extends(self):
         source = '{% extends "base.html" %}'
@@ -1562,8 +1562,8 @@ class TestSSEEventCrossref:
         crossref = [i for i in result.issues if i.category == "sse_crossref"]
         assert crossref == []
 
-    def test_handles_jinja_urls(self, tmp_path):
-        """sse-connect with Jinja expressions should match parameterized routes."""
+    def test_handles_kida_urls(self, tmp_path):
+        """sse-connect with Kida expressions should match parameterized routes."""
         (tmp_path / "page.html").write_text(
             '<div hx-ext="sse" sse-connect="/doc/{{ doc.id }}/stream">'
             '<span sse-swap="status">ok</span>'

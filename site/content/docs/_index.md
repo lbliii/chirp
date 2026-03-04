@@ -79,7 +79,7 @@ TestClient, fragment assertions, SSE testing.
 :::{card} Deployment
 :icon: server
 :link: ./deployment/
-Production deployment with Pounce Phase 5 & 6.
+Production deployment with `chirp run myapp:app --production` and Pounce.
 :::{/card}
 
 :::{/cards}
