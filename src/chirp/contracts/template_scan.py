@@ -9,6 +9,9 @@ _ATTR_PATTERN_DOUBLE = re.compile(
 _ATTR_PATTERN_SINGLE = re.compile(
     r"(hx-(?:get|post|put|patch|delete)|action)\s*=\s*'([^']*)'",
 )
+_ATTRS_MAP_PATTERN = re.compile(
+    r"""["'](hx-(?:get|post|put|patch|delete)|action)["']\s*:\s*["']([^"']*)["'](?=\s*[,}])"""
+)
 _HX_TARGET_PATTERN = re.compile(r'hx-target\s*=\s*["\']([^"\']*)["\']')
 _ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
 _TEMPLATE_REF_PATTERN = re.compile(
@@ -36,14 +39,29 @@ def get_form_method(source: str, action_pos: int) -> str | None:
 def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]]:
     """Extract (attr_name, url, method_override) from template source."""
     targets: list[tuple[str, str, str | None]] = []
+    seen: set[tuple[str, str, str | None]] = set()
+
+    def _append_target(attr_name: str, url: str, method_override: str | None) -> None:
+        if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
+            return
+        target = (attr_name, url, method_override)
+        if target in seen:
+            return
+        seen.add(target)
+        targets.append(target)
+
     for pattern in (_ATTR_PATTERN_DOUBLE, _ATTR_PATTERN_SINGLE):
         for match in pattern.finditer(source):
             attr_name = match.group(1)
             url = match.group(2)
-            if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
-                continue
             method_override = get_form_method(source, match.start()) if attr_name == "action" else None
-            targets.append((attr_name, url, method_override))
+            _append_target(attr_name, url, method_override)
+
+    for match in _ATTRS_MAP_PATTERN.finditer(source):
+        attr_name = match.group(1)
+        url = match.group(2)
+        _append_target(attr_name, url, None)
+
     return targets
 
 
@@ -70,7 +88,7 @@ def extract_static_ids(source: str) -> set[str]:
 
 
 def extract_template_references(source: str) -> set[str]:
-    """Extract static template references from jinja tags."""
+    """Extract static template references from Kida template tags."""
     return {m.group(1) for m in _TEMPLATE_REF_PATTERN.finditer(source)}
 
 

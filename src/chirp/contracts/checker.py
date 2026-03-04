@@ -9,7 +9,12 @@ from .declarations import FormContract, FragmentContract, SSEContract
 from .routes import attr_to_method, collect_route_paths, path_matches_route
 from .rules_accessibility import check_accessibility
 from .rules_forms import extract_form_field_names, validate_form_contracts
-from .rules_htmx import check_hx_boost, check_hx_indicator_selectors, check_hx_target_selectors
+from .rules_htmx import (
+    check_hx_boost,
+    check_hx_indicator_selectors,
+    check_hx_target_selectors,
+    check_selector_syntax,
+)
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts, extract_island_mounts
 from .rules_layout import check_layout_chains
@@ -211,6 +216,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
+        result.issues.extend(check_selector_syntax(template_sources))
         result.issues.extend(check_hx_boost(template_sources))
         result.issues.extend(check_swap_safety(template_sources))
         result.issues.extend(check_sse_self_swap(template_sources))

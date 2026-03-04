@@ -1,8 +1,8 @@
-"""Tests for chirp built-in template filters (field_errors, qs)."""
+"""Tests for chirp built-in template filters."""
 
 from __future__ import annotations
 
-from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, qs
+from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, html_attrs, qs
 
 # ── attr ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,37 @@ class TestFieldErrors:
 
     def test_field_with_single_error(self) -> None:
         assert field_errors({"name": ["required"]}, "name") == ["required"]
+
+
+# ── html_attrs ────────────────────────────────────────────────────────────────
+
+
+class TestHtmlAttrs:
+    """Test structured HTML attrs rendering and legacy passthrough."""
+
+    def test_none_returns_empty(self) -> None:
+        assert html_attrs(None) == ""
+
+    def test_mapping_renders_escaped_attrs(self) -> None:
+        rendered = str(html_attrs({"hx-target": "#panel", "data-msg": 'hi"there'}))
+        assert ' hx-target="#panel"' in rendered
+        assert ' data-msg="hi&quot;there"' in rendered
+
+    def test_mapping_handles_boolean_attrs(self) -> None:
+        rendered = str(html_attrs({"disabled": True, "hidden": False, "title": None}))
+        assert " disabled" in rendered
+        assert "hidden" not in rendered
+        assert "title" not in rendered
+
+    def test_mapping_serializes_structured_values(self) -> None:
+        rendered = str(html_attrs({"hx-vals": {"page": 1}}))
+        assert ' hx-vals="{&quot;page&quot;:1}"' in rendered
+
+    def test_string_passthrough(self) -> None:
+        rendered = str(html_attrs('hx-post="/x" hx-target="#y"'))
+        assert rendered.startswith(" ")
+        assert 'hx-post="/x"' in rendered
+        assert 'hx-target="#y"' in rendered
 
 
 # ── qs ───────────────────────────────────────────────────────────────────
@@ -121,7 +152,11 @@ class TestBuiltinFiltersRegistry:
     def test_registry_contains_qs(self) -> None:
         assert "qs" in BUILTIN_FILTERS
 
+    def test_registry_contains_html_attrs(self) -> None:
+        assert "html_attrs" in BUILTIN_FILTERS
+
     def test_registry_functions_match(self) -> None:
         assert BUILTIN_FILTERS["attr"] is attr
         assert BUILTIN_FILTERS["field_errors"] is field_errors
+        assert BUILTIN_FILTERS["html_attrs"] is html_attrs
         assert BUILTIN_FILTERS["qs"] is qs

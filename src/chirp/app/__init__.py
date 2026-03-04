@@ -305,10 +305,10 @@ class App:
         self._assert_contracts_ready()
         self._contract_checks.run_debug_checks(self)
 
-    def check(self) -> None:
+    def check(self, *, warnings_as_errors: bool = False) -> None:
         self._ensure_frozen()
         self._assert_contracts_ready()
-        self._contract_checks.check(self)
+        self._contract_checks.check(self, warnings_as_errors=warnings_as_errors)
 
     def _check_not_frozen(self) -> None:
         if self._runtime_state.frozen:

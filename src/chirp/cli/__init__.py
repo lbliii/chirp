@@ -86,6 +86,11 @@ def main(argv: list[str] | None = None) -> None:
         "app",
         help="Import string (e.g. myapp:app)",
     )
+    check_parser.add_argument(
+        "--warnings-as-errors",
+        action="store_true",
+        help="Exit with code 1 if contract warnings are present",
+    )
 
     # -- chirp routes -----------------------------------------------------
     routes_parser = subparsers.add_parser("routes", help="List registered routes")

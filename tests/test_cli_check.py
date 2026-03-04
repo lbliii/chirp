@@ -38,6 +38,12 @@ class TestChirpCheck:
             main(["check", "_check_test_app:app"])
         assert exc_info.value.code == 1
 
+    def test_warnings_as_errors_flag_is_forwarded(self, fake_check: MagicMock) -> None:
+        """check forwards strict warning mode to App.check()."""
+        fake_check.return_value = None
+        main(["check", "_check_test_app:app", "--warnings-as-errors"])
+        fake_check.assert_called_once_with(warnings_as_errors=True)
+
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """check exits 1 with error message for bad import string."""
         with pytest.raises(SystemExit) as exc_info:

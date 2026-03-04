@@ -22,6 +22,7 @@ from chirp.contracts.rules_accessibility import check_accessibility as _check_ac
 from chirp.contracts.rules_islands import check_island_mounts as _check_island_mounts
 from chirp.contracts.rules_islands import extract_island_mounts as _extract_island_mounts
 from chirp.contracts.rules_forms import extract_form_field_names as _extract_form_field_names
+from chirp.contracts.rules_htmx import check_selector_syntax as _check_selector_syntax
 from chirp.contracts.rules_sse import check_sse_connect_scope as _check_sse_connect_scope
 from chirp.contracts.rules_sse import check_sse_self_swap as _check_sse_self_swap
 from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
@@ -144,8 +145,61 @@ class TestExtractTargets:
         targets = _extract_targets_from_source(html)
         assert len(targets) == 0
 
+    def test_extracts_attrs_map_hx_post_literal(self):
+        html = '{{ form("/x", attrs_map={"hx-post": "/config/set", "hx-target": "#result"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert ("hx-post", "/config/set", None) in targets
+
+    def test_extracts_attrs_map_action_literal(self):
+        html = '{{ form("/x", attrs_map={"action": "/skills"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert ("action", "/skills", None) in targets
+
+    def test_ignores_attrs_map_hx_post_with_kida_concat(self):
+        html = '{{ form("/x", attrs_map={"hx-post": "/chains/" ~ chain_id ~ "/add-step"}) }}'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_ignores_attrs_map_unsafe_or_anchor_urls(self):
+        html = (
+            '{{ btn("X", attrs_map={"hx-get": "#tab-1", "hx-post": "javascript:alert(1)"}) }}'
+        )
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
+
+
+class TestSelectorSyntaxValidation:
+    """Validate malformed selector syntax for HTMX selector attributes."""
+
+    def test_errors_for_quoted_selector_literal(self):
+        issues = _check_selector_syntax(
+            {"page.html": '<button hx-post="/x" hx-target="\'#result\'">Run</button>'}
+        )
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "selector_syntax"
+        assert "wrapped in quotes" in issues[0].message
+
+    def test_errors_for_unbalanced_selector(self):
+        issues = _check_selector_syntax({"page.html": '<div hx-select="#panel["></div>'})
+        assert len(issues) == 1
+        assert "unbalanced" in issues[0].message
+
+    def test_errors_for_empty_selector_list_entry(self):
+        issues = _check_selector_syntax({"page.html": '<div hx-include="#a,,#b"></div>'})
+        assert len(issues) == 1
+        assert "empty entry" in issues[0].message
+
+    def test_skips_dynamic_selector_values(self):
+        issues = _check_selector_syntax({"page.html": '<div hx-target="{{ target_selector }}"></div>'})
+        assert issues == []
+
+    def test_allows_selector_command_prefixes(self):
+        issues = _check_selector_syntax({"page.html": '<button hx-target="closest .card"></button>'})
+        assert issues == []
 
 
 class TestIslandMountExtraction:
@@ -641,6 +695,24 @@ class TestCheckHypermediaSurface:
         assert not result.ok
         assert any("no matching route" in i.message for i in result.errors)
 
+    def test_attrs_map_reference_counts_for_orphan_detection(self, tmp_path):
+        (tmp_path / "index.html").write_text(
+            '{{ form("/x", method="post", attrs_map={"hx-post": "/config/set"}) }}'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        @app.route("/config/set", methods=["POST"])
+        async def config_set():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        orphan_issues = [i for i in result.issues if i.category == "orphan" and i.route == "/config/set"]
+        assert orphan_issues == []
+
     def test_detects_method_mismatch(self, tmp_path):
         """Template uses hx-post but route only allows GET."""
         (tmp_path / "index.html").write_text('<button hx-post="/api/items">submit</button>')
@@ -653,6 +725,19 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert not result.ok
         assert any("POST" in i.message and "GET" in i.message for i in result.errors)
+
+    def test_detects_invalid_hx_selector_syntax(self, tmp_path):
+        (tmp_path / "index.html").write_text('<button hx-post="/api/items" hx-target="\'#result\'">go</button>')
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items", methods=["POST"])
+        async def create_item():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        selector_errors = [i for i in result.errors if i.category == "selector_syntax"]
+        assert len(selector_errors) == 1
+        assert "wrapped in quotes" in selector_errors[0].message
 
     def test_valid_hx_targets(self, tmp_path):
         """All htmx targets match registered routes."""

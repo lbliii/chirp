@@ -22,10 +22,11 @@ class ContractCheckRunner:
         if not result.ok:
             sys.exit(1)
 
-    def check(self, app: object) -> None:
+    def check(self, app: object, *, warnings_as_errors: bool = False) -> None:
         from chirp.contracts import check_hypermedia_surface
 
         result = check_hypermedia_surface(app)
         print(format_check_result(result, color=None))
-        if not result.ok:
+        has_warnings = len(result.warnings) > 0
+        if not result.ok or (warnings_as_errors and has_warnings):
             raise SystemExit(1)

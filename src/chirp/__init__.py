@@ -33,6 +33,12 @@ AI streaming (``pip install chirp[ai]``)::
 _Py_mod_gil = 0
 
 __version__ = "0.1.3"
+CHIRP_CAPABILITIES = frozenset(
+    {
+        # Guarantees startup contract checks run after runtime state publication.
+        "contract_checks_runtime_ready",
+    }
+)
 __all__ = [
     "OOB",
     "Action",
@@ -40,6 +46,7 @@ __all__ = [
     "App",
     "AppConfig",
     "ChirpError",
+    "CHIRP_CAPABILITIES",
     "ConfigurationError",
     "EventStream",
     "FormAction",
