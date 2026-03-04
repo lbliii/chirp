@@ -203,15 +203,28 @@ _ATTR_PATTERN = re.compile(
 )
 
 
-def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
-    """Extract (attr_name, url) pairs from template source text.
+def _get_form_method(source: str, action_pos: int) -> str | None:
+    """Return 'POST' only when form has method='post'; else 'GET' (HTML default for get/omitted/dialog)."""
+    before = source[:action_pos]
+    form_matches = list(re.finditer(r"<form\b", before, re.IGNORECASE))
+    if not form_matches:
+        return None
+    form_start = form_matches[-1].start()
+    tag_end = source.find(">", form_start)
+    if tag_end == -1 or tag_end < action_pos:
+        return None
+    form_tag = source[form_start:tag_end]
+    if re.search(r'method\s*=\s*["\']post["\']', form_tag, re.IGNORECASE):
+        return "POST"
+    return "GET"
 
-    Scans raw template source for htmx URL attributes and form actions.
-    This catches static URLs in HTML; dynamic URLs (from template expressions)
-    are not captured and should be validated separately.
 
+def _extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]]:
+    """Extract (attr_name, url, method_override) from template source.
+
+    method_override is 'GET' or 'POST' for action (from form method); None for htmx attrs.
     """
-    targets: list[tuple[str, str]] = []
+    targets: list[tuple[str, str, str | None]] = []
     for match in re.finditer(
         r'(hx-(?:get|post|put|patch|delete)|action)\s*=\s*["\']([^"\']*)["\']',
         source,
@@ -221,7 +234,8 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str]]:
         # Skip template expressions ({{ ... }}), Jinja concatenation (~), anchors
         if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
             continue
-        targets.append((attr_name, url))
+        method_override = _get_form_method(source, match.start()) if attr_name == "action" else None
+        targets.append((attr_name, url, method_override))
     return targets
 
 
@@ -773,6 +787,12 @@ _MUTATING_TAG_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Form with action is mutating only when method="post"; GET/omitted/dialog — exclude from swap safety
+_FORM_POST_PATTERN = re.compile(
+    r'method\s*=\s*["\']post["\']',
+    re.IGNORECASE,
+)
+
 _SSE_SWAP_TAG_PATTERN = re.compile(
     r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-swap\s*=\s*[\"'][^\"']+[\"'][^>]*)>",
     re.IGNORECASE,
@@ -926,6 +946,12 @@ def _check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
         for match in _MUTATING_TAG_PATTERN.finditer(source):
             attrs = match.group("attrs")
             attrs_lower = attrs.lower()
+            # Form with action: skip when GET (method="get", omitted, or dialog)
+            if "action=" in attrs_lower:
+                full_tag = match.group(0)
+                if not _FORM_POST_PATTERN.search(full_tag):
+                    continue  # GET or omitted or dialog — not mutating
+            # hx-post/put/patch/delete are always mutating
             if "hx-target=" in attrs_lower:
                 continue
             if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
@@ -1187,10 +1213,10 @@ def _check_accessibility(source: str, template_name: str) -> list[ContractIssue]
     return issues
 
 
-def _attr_to_method(attr: str) -> str:
+def _attr_to_method(attr: str, method_override: str | None = None) -> str:
     """Map an htmx attribute name to its HTTP method."""
     if attr == "action":
-        return "POST"  # Default form method
+        return method_override if method_override in ("GET", "POST") else "GET"
     # hx-get → GET, hx-post → POST, etc.
     return attr.split("-", 1)[1].upper()
 
@@ -1480,8 +1506,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             targets = _extract_targets_from_source(source)
             result.targets_found += len(targets)
 
-            for attr_name, url in targets:
-                method = _attr_to_method(attr_name)
+            for attr_name, url, method_override in targets:
+                method = _attr_to_method(attr_name, method_override)
 
                 # Find a matching route
                 matched = False

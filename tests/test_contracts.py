@@ -48,8 +48,14 @@ class TestAttrToMethod:
     def test_hx_patch(self):
         assert _attr_to_method("hx-patch") == "PATCH"
 
-    def test_form_action(self):
-        assert _attr_to_method("action") == "POST"
+    def test_form_action_default(self):
+        assert _attr_to_method("action") == "GET"
+
+    def test_form_action_get_override(self):
+        assert _attr_to_method("action", "GET") == "GET"
+
+    def test_form_action_post_override(self):
+        assert _attr_to_method("action", "POST") == "POST"
 
 
 class TestExtractTargets:
@@ -59,17 +65,22 @@ class TestExtractTargets:
         html = '<div hx-get="/api/search"></div>'
         targets = _extract_targets_from_source(html)
         assert len(targets) == 1
-        assert targets[0] == ("hx-get", "/api/search")
+        assert targets[0] == ("hx-get", "/api/search", None)
 
     def test_hx_post(self):
         html = '<button hx-post="/submit"></button>'
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("hx-post", "/submit")
+        assert targets[0] == ("hx-post", "/submit", None)
 
-    def test_form_action(self):
+    def test_form_action_post(self):
         html = '<form action="/login" method="post"></form>'
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("action", "/login")
+        assert targets[0] == ("action", "/login", "POST")
+
+    def test_form_action_get(self):
+        html = '<form action="/skills" method="get" class="chirpui-form"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/skills", "GET")
 
     def test_multiple_targets(self):
         html = """
@@ -79,6 +90,17 @@ class TestExtractTargets:
         """
         targets = _extract_targets_from_source(html)
         assert len(targets) == 3
+        assert targets[2] == ("action", "/search", "GET")
+
+    def test_form_action_omitted(self):
+        html = '<form action="/search"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/search", "GET")
+
+    def test_form_action_dialog(self):
+        html = '<form action="/x" method="dialog"></form>'
+        targets = _extract_targets_from_source(html)
+        assert targets[0] == ("action", "/x", "GET")
 
     def test_ignores_template_expressions(self):
         html = "<div hx-get=\"{{ url_for('search') }}\"></div>"
@@ -93,7 +115,7 @@ class TestExtractTargets:
     def test_single_quotes(self):
         html = "<div hx-get='/api/data'></div>"
         targets = _extract_targets_from_source(html)
-        assert targets[0] == ("hx-get", "/api/data")
+        assert targets[0] == ("hx-get", "/api/data", None)
 
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
@@ -455,6 +477,25 @@ class TestSwapSafetyWarnings:
         }
         issues = _check_swap_safety(template_sources)
         assert issues == []
+
+    def test_no_warning_for_form_action_get_or_omitted(self):
+        """Form with action and method=get or omitted (HTML default) is not mutating."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "search.html": '<form action="/search"></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert issues == []
+
+    def test_warns_for_form_action_post_without_target(self):
+        """Form with action method=post and no hx-target inherits broad target."""
+        template_sources = {
+            "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
+            "login.html": '<form action="/login" method="post"><button>Submit</button></form>',
+        }
+        issues = _check_swap_safety(template_sources)
+        assert len(issues) == 1
+        assert issues[0].category == "swap_safety"
 
     def test_warns_for_sse_swap_without_local_target(self):
         template_sources = {
