@@ -134,6 +134,8 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
     if "kida" not in module:
         return None
 
+    from chirp.server.terminal_errors import _plain_error_message
+
     ctx: dict[str, Any] = {"type": cls_name}
 
     # Extract error code and docs URL (available on all Kida exceptions)
@@ -153,7 +155,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
             start = max(0, ln - 3)
             end = min(len(lines), ln + 2)
             ctx["source_lines"] = [(i + 1, lines[i]) for i in range(start, end)]
-        ctx["message"] = getattr(exc, "message", str(exc))
+        ctx["message"] = _plain_error_message(exc)
         return ctx
 
     if cls_name in ("TemplateRuntimeError", "RequiredValueError", "NoneComparisonError"):
@@ -162,7 +164,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["expression"] = getattr(exc, "expression", None)
         ctx["values"] = getattr(exc, "values", {})
         ctx["suggestion"] = getattr(exc, "suggestion", None)
-        ctx["message"] = getattr(exc, "message", str(exc))
+        ctx["message"] = _plain_error_message(exc)
         # Extract source snippet (new: runtime errors now have source context)
         snippet = getattr(exc, "source_snippet", None)
         if snippet is not None:
@@ -174,7 +176,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["template"] = getattr(exc, "template", None)
         ctx["lineno"] = getattr(exc, "lineno", None)
         ctx["variable"] = getattr(exc, "name", None)
-        ctx["message"] = str(exc)
+        ctx["message"] = _plain_error_message(exc)
         # Extract source snippet (new: UndefinedError now has source context)
         snippet = getattr(exc, "source_snippet", None)
         if snippet is not None:
@@ -183,7 +185,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         return ctx
 
     if cls_name == "TemplateNotFoundError":
-        ctx["message"] = str(exc)
+        ctx["message"] = _plain_error_message(exc)
         return ctx
 
     return None

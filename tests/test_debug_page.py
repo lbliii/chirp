@@ -7,6 +7,7 @@ masking, editor URL generation, and both full-page and fragment output.
 import os
 import types
 
+from chirp.server.terminal_errors import _plain_error_message
 from chirp.server.debug_page import (
     _editor_url,
     _extract_frames,
@@ -399,6 +400,36 @@ class TestRenderDebugPageFragment:
         exc, _ = _raise_and_capture()
         html = render_debug_page(exc, _make_request(), is_fragment=True)
         assert "Traceback" in html
+
+
+# ---------------------------------------------------------------------------
+# _plain_error_message (strip ANSI for non-terminal display)
+# ---------------------------------------------------------------------------
+
+
+class TestPlainErrorMessage:
+    """_plain_error_message strips ANSI codes from Kida errors."""
+
+    def test_kida_error_has_no_ansi_codes(self) -> None:
+        from kida.environment.exceptions import TemplateRuntimeError, build_source_snippet
+
+        snippet = build_source_snippet("<p>{{ 1 / 0 }}</p>", 1)
+        exc = TemplateRuntimeError(
+            "division by zero",
+            template_name="calc.html",
+            lineno=1,
+            source_snippet=snippet,
+        )
+        plain = _plain_error_message(exc)
+        assert "division by zero" in plain
+        assert "calc.html" in plain
+        assert "\033[" not in plain
+        assert "\x1b[" not in plain
+
+    def test_non_kida_error_unchanged(self) -> None:
+        exc = ValueError("something went wrong")
+        plain = _plain_error_message(exc)
+        assert plain == "something went wrong"
 
 
 # ---------------------------------------------------------------------------

@@ -106,7 +106,7 @@ async def send_streaming_response(
         # Mid-stream error: log with structured formatting, emit visible error
         import sys
 
-        from chirp.server.terminal_errors import _is_kida_error, log_error
+        from chirp.server.terminal_errors import _is_kida_error, log_error, _plain_error_message
 
         log_error(exc)
 
@@ -115,8 +115,7 @@ async def send_streaming_response(
             import traceback
 
             if _is_kida_error(exc):
-                fmt = getattr(exc, "format_compact", None)
-                error_msg = fmt() if fmt is not None else str(exc)
+                error_msg = _plain_error_message(exc)
             else:
                 error_msg = traceback.format_exc()
             # Escape HTML in the error message

@@ -649,10 +649,12 @@ class App:
                             await result
                     await send({"type": "lifespan.startup.complete"})
                 except Exception as exc:
+                    from chirp.server.terminal_errors import _plain_error_message
+
                     await send(
                         {
                             "type": "lifespan.startup.failed",
-                            "message": str(exc),
+                            "message": _plain_error_message(exc),
                         }
                     )
                     return
