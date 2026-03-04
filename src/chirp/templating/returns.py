@@ -1,4 +1,4 @@
-"""Template, Fragment, Page, Stream, and ValidationError return types.
+"""Template, Fragment, Page, Stream, TemplateStream, and ValidationError return types.
 
 Frozen dataclasses that handlers return. The content negotiation layer
 inspects these to dispatch to the kida renderer.

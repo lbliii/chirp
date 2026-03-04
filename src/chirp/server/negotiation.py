@@ -74,14 +74,15 @@ def negotiate(
     9. ``OOB``              -> primary + hx-swap-oob fragments
     10. ``Stream``           -> kida render_stream() -> StreamingResponse
                                (async sources resolved concurrently)
-    11. ``Suspense``         -> shell + deferred OOB blocks -> StreamingResponse
+    11. ``TemplateStream``   -> kida render_stream_async() -> StreamingResponse
+    12. ``Suspense``         -> shell + deferred OOB blocks -> StreamingResponse
                                (first paint instant, blocks fill in)
-    12. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
-    11. ``str``             -> 200, text/html
-    12. ``bytes``           -> 200, application/octet-stream
-    13. ``dict`` / ``list`` -> 200, application/json
-    14. ``(value, int)``    -> negotiate value, override status
-    15. ``(value, int, dict)`` -> negotiate value, override status + headers
+    13. ``EventStream``      -> SSEResponse (handler dispatches to SSE)
+    14. ``str``              -> 200, text/html
+    15. ``bytes``            -> 200, application/octet-stream
+    16. ``dict`` / ``list``  -> 200, application/json
+    17. ``(value, int)``     -> negotiate value, override status
+    18. ``(value, int, dict)`` -> negotiate value, override status + headers
     """
     match value:
         case Response():
