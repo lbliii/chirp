@@ -1,5 +1,6 @@
 """Tests for chirp.config — AppConfig frozen dataclass."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,10 @@ class TestAppConfig:
 
     def test_reload_include_default(self) -> None:
         cfg = AppConfig()
+        assert cfg.reload_include == (".html", ".css", ".md")
+
+    def test_reload_include_opt_out(self) -> None:
+        cfg = AppConfig(reload_include=())
         assert cfg.reload_include == ()
 
     def test_reload_dirs_default(self) -> None:
@@ -78,3 +83,56 @@ class TestAppConfig:
     def test_alpine_csp(self) -> None:
         cfg = AppConfig(alpine=True, alpine_csp=True)
         assert cfg.alpine_csp is True
+
+    def test_from_env_defaults(self) -> None:
+        """from_env uses defaults when env is empty."""
+        # Clear chirp-related env to avoid leakage from test runner
+        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.host == "127.0.0.1"
+            assert cfg.port == 8000
+            assert cfg.debug is False
+            assert cfg.env == "development"
+            assert cfg.redis_url is None
+            assert cfg.http_timeout == 30.0
+            assert cfg.http_retries == 0
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_overrides(self) -> None:
+        """from_env reads CHIRP_* env vars."""
+        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        try:
+            os.environ["CHIRP_HOST"] = "0.0.0.0"
+            os.environ["CHIRP_PORT"] = "3000"
+            os.environ["CHIRP_DEBUG"] = "true"
+            os.environ["CHIRP_SECRET_KEY"] = "from-env"
+            os.environ["CHIRP_ENV"] = "production"
+            os.environ["CHIRP_REDIS_URL"] = "redis://localhost"
+            os.environ["CHIRP_HTTP_TIMEOUT"] = "60"
+            os.environ["CHIRP_HTTP_RETRIES"] = "3"
+            cfg = AppConfig.from_env()
+            assert cfg.host == "0.0.0.0"
+            assert cfg.port == 3000
+            assert cfg.debug is True
+            assert cfg.secret_key == "from-env"
+            assert cfg.env == "production"
+            assert cfg.redis_url == "redis://localhost"
+            assert cfg.http_timeout == 60.0
+            assert cfg.http_retries == 3
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_feature_flags(self) -> None:
+        """from_env parses CHIRP_FEATURE_* vars."""
+        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        try:
+            os.environ["CHIRP_FEATURE_X"] = "true"
+            os.environ["CHIRP_FEATURE_Y"] = "false"
+            cfg = AppConfig.from_env()
+            assert cfg.feature("x") is True
+            assert cfg.feature("y") is False
+            assert cfg.feature("z") is False
+        finally:
+            os.environ.update(env_backup)

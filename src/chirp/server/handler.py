@@ -17,6 +17,7 @@ from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.invoke import invoke
 from chirp.context import g, request_var
 from chirp.errors import HTTPError
+from chirp.logging import request_id_var
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
@@ -53,8 +54,9 @@ async def handle_request(
     # Build Request from ASGI scope
     request = Request.from_asgi(scope, receive)
 
-    # Set request context var (reset after dispatch)
+    # Set request and request_id context vars (reset after dispatch)
     token: Token[Request] = request_var.set(request)
+    rid_token = request_id_var.set(request.request_id)
 
     try:
         # Build the innermost handler (router dispatch + MCP)
@@ -102,6 +104,11 @@ async def handle_request(
     finally:
         g._reset()
         request_var.reset(token)
+        request_id_var.reset(rid_token)
+
+    # Add X-Request-ID to response for correlation (Response and StreamingResponse)
+    if hasattr(response, "with_header") and not isinstance(response, SSEResponse):
+        response = response.with_header("X-Request-ID", request.request_id)
 
     # Dispatch based on response type
     if isinstance(response, SSEResponse):
@@ -148,6 +155,7 @@ async def _invoke_handler(
         server=request.server,
         client=request.client,
         cookies=request.cookies,
+        request_id=request.request_id,
         _receive=request._receive,
         _cache=request._cache,
     )

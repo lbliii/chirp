@@ -62,6 +62,12 @@ markdown = ["patitas[syntax]>=0.3.2"]
 # chirp-ui component library (CSS, themes, layout macros)
 ui = ["chirp-ui>=0.1.0"]
 
+# Config from env (python-dotenv for local .env loading)
+config = ["python-dotenv>=1.0.0"]
+
+# Redis-backed sessions and rate limiting
+redis = ["redis>=5.0.0"]
+
 # All optional features
 all = [
     "python-multipart>=0.0.18",

@@ -81,6 +81,8 @@ class DatabaseConfig:
     url: str
     pool_size: int = 5
     echo: bool = False
+    connect_timeout: float = 30.0
+    connect_retries: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,8 +140,23 @@ class Database:
 
     __slots__ = ("_async_lock", "_config", "_driver", "_initialized", "_lock", "_pool")
 
-    def __init__(self, url: str, /, *, pool_size: int = 5, echo: bool = False) -> None:
-        self._config = DatabaseConfig(url=url, pool_size=pool_size, echo=echo)
+    def __init__(
+        self,
+        url: str,
+        /,
+        *,
+        pool_size: int = 5,
+        echo: bool = False,
+        connect_timeout: float = 30.0,
+        connect_retries: int = 0,
+    ) -> None:
+        self._config = DatabaseConfig(
+            url=url,
+            pool_size=pool_size,
+            echo=echo,
+            connect_timeout=connect_timeout,
+            connect_retries=connect_retries,
+        )
         self._driver = _detect_driver(url)
         self._lock = threading.Lock()
         self._async_lock: anyio.Lock | None = None  # Created lazily on first use
@@ -501,15 +518,32 @@ class Database:
         """Initialize the connection pool.
 
         Called automatically on first query. Call explicitly if you want
-        to fail fast at startup.
+        to fail fast at startup. Uses connect_timeout and connect_retries
+        from config for resilience.
         """
         if self._initialized:
             return
         with self._lock:
             if self._initialized:
                 return
-            self._pool = await _create_pool(self._driver, self._config)
-            self._initialized = True
+            cfg = self._config
+            last_exc: BaseException | None = None
+            for attempt in range(cfg.connect_retries + 1):
+                try:
+                    self._pool = await asyncio.wait_for(
+                        _create_pool(self._driver, cfg),
+                        timeout=cfg.connect_timeout,
+                    )
+                    self._initialized = True
+                    return
+                except asyncio.TimeoutError as e:
+                    last_exc = e
+                except BaseException as e:
+                    last_exc = e
+                    if attempt == cfg.connect_retries:
+                        raise
+            if last_exc is not None:
+                raise last_exc
 
     async def disconnect(self) -> None:
         """Close all connections in the pool."""

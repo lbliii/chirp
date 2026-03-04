@@ -8,6 +8,7 @@ import inspect
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
@@ -77,12 +78,16 @@ class App:
         "_migrations_dir",
         # Page convention metadata (populated by mount_pages)
         "_discovered_layout_chains",
+        "_lazy_pages_dir",
         "_page_route_paths",
         "_page_templates",
+        "_pending_domains",
         "_pending_routes",
         "_pending_tools",
         # Service injection via providers
         "_providers",
+        # Reload dirs added by extensions (e.g. chirp-ui when editable)
+        "_reload_dirs_extra",
         # Compiled state (populated by _freeze)
         "_router",
         "_shutdown_hooks",
@@ -118,9 +123,12 @@ class App:
         self._worker_startup_hooks: list[Callable[..., Any]] = []
         self._worker_shutdown_hooks: list[Callable[..., Any]] = []
         self._discovered_layout_chains: list[Any] = []
+        self._lazy_pages_dir: str | None = None
         self._page_route_paths: set[str] = set()
         self._page_templates: set[str] = set()
+        self._pending_domains: list[type] = []
         self._providers: dict[type, Callable[..., Any]] = {}
+        self._reload_dirs_extra: list[str] = []
         self._frozen: bool = False
         self._freeze_lock: threading.Lock = threading.Lock()
         self._custom_kida_env: Environment | None = kida_env  # User-provided kida environment
@@ -211,7 +219,8 @@ class App:
 
         Walks the directory and registers routes for every ``page.py``
         and handler ``.py`` file, with automatic layout nesting and
-        context cascade.
+        context cascade. When ``config.lazy_pages`` is True, discovery
+        is deferred until the first request (or freeze for non-lazy).
 
         ``_layout.html`` files define shells with ``{% block content %}``
         and ``{# target: element_id #}`` declarations.
@@ -227,17 +236,20 @@ class App:
             app = App(AppConfig(template_dir="pages"))
             app.mount_pages("pages")
         """
-        from chirp.pages.discovery import discover_pages
-
         self._check_not_frozen()
 
         pages_dir = pages_dir or "pages"
-        page_routes = discover_pages(pages_dir)
+        if self.config.lazy_pages:
+            self._lazy_pages_dir = pages_dir
+            return
 
-        # Record page convention metadata for contract checking.
-        # Page routes are navigated to directly (browser URL bar, JS fetch)
-        # and their sibling templates are rendered implicitly — the checker
-        # uses this to suppress false-positive orphan/dead warnings.
+        self._discover_and_register_pages(pages_dir)
+
+    def _discover_and_register_pages(self, pages_dir: str) -> None:
+        """Discover pages and register handlers. Used by mount_pages and _ensure_pages_loaded."""
+        from chirp.pages.discovery import discover_pages
+
+        page_routes = discover_pages(pages_dir)
         for page_route in page_routes:
             self._page_route_paths.add(page_route.url_path)
             self._discovered_layout_chains.append(page_route.layout_chain)
@@ -247,12 +259,9 @@ class App:
                 self._page_templates.add(layout.template_name)
 
         for page_route in page_routes:
-            # Capture route metadata in closure
             original_handler = page_route.handler
             chain = page_route.layout_chain
             providers = page_route.context_providers
-
-            # Wrap handler to inject cascade context and return LayoutPage
             self._register_page_handler(
                 url_path=page_route.url_path,
                 handler=original_handler,
@@ -260,6 +269,11 @@ class App:
                 layout_chain=chain,
                 context_providers=providers,
             )
+
+    def register_domain(self, domain: object) -> None:
+        """Register a domain. The domain's ``register(app)`` is called at freeze."""
+        self._check_not_frozen()
+        self._pending_domains.append(domain)
 
     def _register_page_handler(
         self,
@@ -382,6 +396,15 @@ class App:
         """Add a middleware to the pipeline."""
         self._check_not_frozen()
         self._middleware_list.append(middleware)
+
+    def add_reload_dir(self, path: str | Path) -> None:
+        """Add a directory to watch for hot reload (dev mode).
+
+        Merged with config.reload_dirs at run(). Used by extensions like
+        chirp-ui to add their package root when installed as editable.
+        """
+        self._check_not_frozen()
+        self._reload_dirs_extra.append(str(Path(path).resolve()))
 
     # -- Template integration --
 
@@ -520,13 +543,14 @@ class App:
             # Development mode (existing behavior)
             from chirp.server.dev import run_dev_server
 
+            reload_dirs = (*self.config.reload_dirs, *self._reload_dirs_extra)
             run_dev_server(
                 self,
                 _host,
                 _port,
                 reload=self.config.debug,
                 reload_include=self.config.reload_include,
-                reload_dirs=self.config.reload_dirs,
+                reload_dirs=reload_dirs,
                 lifecycle_collector=lifecycle_collector,
             )
         else:
@@ -635,6 +659,27 @@ class App:
 
             if msg_type == "lifespan.startup":
                 try:
+                    # Configure audit sink from config (log | none | custom)
+                    if self.config.audit_sink == "log":
+                        from chirp.logging import structured_log
+                        from chirp.security.audit import SecurityEvent, set_security_event_sink
+
+                        def _log_sink(event: SecurityEvent) -> None:
+                            structured_log(
+                                20,  # INFO
+                                f"security:{event.name}",
+                                path=event.path,
+                                method=event.method,
+                                user_id=event.user_id,
+                                **event.details,
+                            )
+
+                        set_security_event_sink(_log_sink)
+                    elif self.config.audit_sink == "none":
+                        from chirp.security.audit import set_security_event_sink
+
+                        set_security_event_sink(None)
+
                     # Auto-connect database if configured
                     if self._db is not None:
                         await self._db.connect()
@@ -726,6 +771,17 @@ class App:
 
         MUST only be called while holding _freeze_lock.
         """
+        # 0. Register domains (they may add routes/middleware)
+        for domain in self._pending_domains:
+            register = getattr(domain, "register", None)
+            if register is not None and callable(register):
+                register(self)
+
+        # 0b. Lazy pages: discover at freeze (deferred from mount_pages)
+        if self._lazy_pages_dir is not None:
+            self._discover_and_register_pages(self._lazy_pages_dir)
+            self._lazy_pages_dir = None
+
         # 1. Compile route table
         router = Router()
         for pending in self._pending_routes:
@@ -859,13 +915,13 @@ class App:
 
         self._frozen = True
 
-        # 5. Auto-validate hypermedia surface in debug mode.
+        # 5. Auto-validate hypermedia surface in debug mode (unless skipped).
         #    Prints warnings to the terminal at startup so the developer
         #    sees broken hx-target selectors, missing routes, and
         #    accessibility issues before opening a browser.
         #    Warnings only — never blocks startup (false positives are
         #    possible for dynamic IDs).
-        if self.config.debug:
+        if self.config.debug and not self.config.skip_contract_checks:
             self._run_debug_checks()
 
     def _run_debug_checks(self) -> None:

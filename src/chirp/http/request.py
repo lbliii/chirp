@@ -39,6 +39,7 @@ class Request:
     server: tuple[str, int] | None
     client: tuple[str, int] | None
     cookies: Mapping[str, str]
+    request_id: str  # X-Request-ID from header or generated UUID
 
     # Private: ASGI receive callable for body streaming
     _receive: Receive
@@ -181,9 +182,12 @@ class Request:
         path_params: dict[str, str] | None = None,
     ) -> Request:
         """Create a Request from an ASGI scope and receive callable."""
+        import uuid
+
         headers = Headers(tuple(scope.get("headers", ())))
         server = scope.get("server")
         client = scope.get("client")
+        request_id = headers.get("x-request-id") or str(uuid.uuid4())
         return cls(
             method=scope["method"],
             path=scope["path"],
@@ -194,5 +198,6 @@ class Request:
             server=tuple(server) if server else None,
             client=tuple(client) if client else None,
             cookies=parse_cookies(headers.get("cookie") or ""),
+            request_id=request_id,
             _receive=receive,
         )
