@@ -1,4 +1,4 @@
-"""chirp-ui integration — register static files for chirp-ui components.
+"""chirp-ui integration — register static files and filters for chirp-ui components.
 
 Requires: pip install chirp-ui
 
@@ -8,8 +8,7 @@ Usage::
     from chirp.ext.chirp_ui import use_chirp_ui
 
     app = App(AppConfig(template_dir="templates"))
-    use_chirp_ui(app)
-    chirp_ui.register_filters(app)  # for bem, field_errors used by components
+    use_chirp_ui(app)  # Registers static files, filters (bem, field_errors, html_attrs), and middleware
     app.run()
 """
 
@@ -41,11 +40,11 @@ class _ChirpUIStrictMiddleware(Middleware):
 
 
 def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) -> None:
-    """Register chirp-ui static files (CSS, themes) with the app.
+    """Register chirp-ui static files (CSS, themes) and filters with the app.
 
     Call after App creation. Serves chirpui.css, themes/, chirpui-transitions.css
-    from the chirp-ui package. Also call chirp_ui.register_filters(app) so
-    chirp-ui components (badge, alert, etc.) have access to bem and field_errors.
+    from the chirp-ui package. Automatically registers chirp-ui filters (bem,
+    field_errors, html_attrs, validate_variant) so components render correctly.
 
     When strict is None, uses app.config.debug. When True, invalid component
     variants log warnings during template render. When False, no validation.
@@ -56,6 +55,7 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
 
     from chirp.middleware.static import StaticFiles
 
+    chirp_ui.register_filters(app)
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     # Add chirp-ui to reload dirs when editable (for dev on component library)
     try:

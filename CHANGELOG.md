@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-03-04
+
+### Fixed
+
+- **chirp-ui filters** — `TemplateSyntaxError: Unknown filter 'html_attrs'` when using chirp-ui templates. `use_chirp_ui(app)` now auto-registers chirp-ui filters (`html_attrs`, `bem`, `field_errors`, `validate_variant`). `create_environment` adds env-level fallback when chirp-ui is installed, so filters are present even without explicit `register_filters`. See RFC 001 (component-filter-contract).
+
 ## [0.1.4] — 2026-03-04
 
 ### Added
@@ -36,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Regex for Kida URL extraction in htmx attributes
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
+[0.1.5]: https://github.com/lbliii/chirp/releases/tag/v0.1.5
 [0.1.4]: https://github.com/lbliii/chirp/releases/tag/v0.1.4
 
 ## [0.1.3] — 2026-03-03

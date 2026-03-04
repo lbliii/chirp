@@ -47,28 +47,22 @@ uv add chirp-ui
 
 Two steps to wire chirp-ui into your app:
 
-### 1. Serve static assets
+### 1. Wire chirp-ui into your app
 
-Use Chirp's integration helper to serve chirpui.css, themes, and transitions:
+Use Chirp's integration helper to serve chirpui.css, themes, transitions, and register required filters:
 
 ```python
 from chirp import App, AppConfig, use_chirp_ui
-import chirp_ui
 
 app = App(AppConfig(template_dir="templates"))
 use_chirp_ui(app)
-chirp_ui.register_filters(app)
 ```
 
 **Import:** `use_chirp_ui` is provided by Chirp. Use `from chirp import use_chirp_ui` when the `chirp[ui]` extra is installed. If that fails (e.g. older Chirp), use `from chirp.ext.chirp_ui import use_chirp_ui`.
 
-`use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory. By default it serves at `/static`. Pass `prefix="/assets"` to change it.
+`use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory (default `/static`) and registers filters (`bem`, `field_errors`, `html_attrs`, `validate_variant`) so chirp-ui components render correctly.
 
-### 2. Register filters
-
-`chirp_ui.register_filters(app)` registers `bem` and `field_errors` so chirp-ui components (badge, alert, form fields) work correctly. Call it after `use_chirp_ui`.
-
-### 3. Include CSS in your base template
+### 2. Include CSS in your base template
 
 ```html
 <link rel="stylesheet" href="/static/chirpui.css">
@@ -217,7 +211,7 @@ Optional theme: `<link rel="stylesheet" href="/static/themes/holy-light.css">`
 
 ## chirp new
 
-When chirp-ui is installed, `chirp new <name>` scaffolds a project with `use_chirp_ui(app)` and `chirp_ui.register_filters(app)` already wired in the app module. The base template includes chirpui.css.
+When chirp-ui is installed, `chirp new <name>` scaffolds a project with `use_chirp_ui(app)` wired in the app module. The base template includes chirpui.css.
 
 ## Next steps
 

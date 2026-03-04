@@ -15,6 +15,32 @@ from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
 from chirp.templating.returns import Fragment, Template
 
 
+def _ensure_chirp_ui_filters(env: Environment) -> None:
+    """Ensure chirp-ui required filters exist when chirp-ui templates are loadable.
+
+    When chirp adds chirp-ui's PackageLoader, those templates require bem, field_errors,
+    html_attrs, validate_variant. This fallback adds any missing filters so the env
+    is self-consistent. See docs/rfcs/001-component-filter-contract.md.
+    """
+    try:
+        import chirp_ui  # noqa: F401
+    except ImportError:
+        return
+    try:
+        from chirp_ui.filters import bem, field_errors, html_attrs, validate_variant
+    except ImportError:
+        return
+    chirp_ui_filters = {
+        "bem": bem,
+        "field_errors": field_errors,
+        "html_attrs": html_attrs,
+        "validate_variant": validate_variant,
+    }
+    missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
+    if missing:
+        env.update_filters(missing)
+
+
 def create_environment(
     config: AppConfig,
     filters: dict[str, Callable[..., Any]],
@@ -61,6 +87,11 @@ def create_environment(
     # Register user-defined filters (may override built-ins)
     if filters:
         env.update_filters(filters)
+
+    # When chirp-ui templates are loadable, ensure required filters exist.
+    # Fallback for older chirp or apps that didn't call register_filters.
+    # See docs/rfcs/001-component-filter-contract.md
+    _ensure_chirp_ui_filters(env)
 
     # Register user-defined globals
     for name, value in BUILTIN_GLOBALS.items():
