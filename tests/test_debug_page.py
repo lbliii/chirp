@@ -7,7 +7,6 @@ masking, editor URL generation, and both full-page and fragment output.
 import os
 import types
 
-from chirp.server.terminal_errors import _plain_error_message
 from chirp.server.debug_page import (
     _editor_url,
     _extract_frames,
@@ -16,6 +15,7 @@ from chirp.server.debug_page import (
     _is_app_frame,
     render_debug_page,
 )
+from chirp.server.terminal_errors import _plain_error_message
 
 # ---------------------------------------------------------------------------
 # Helpers

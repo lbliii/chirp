@@ -14,7 +14,7 @@ Then in templates::
 
     {{ content | markdown }}
 
-Requires ``patitas``::
+Requires ``patitas`` (includes rosettes for syntax highlighting)::
 
     pip install chirp[markdown]
 """

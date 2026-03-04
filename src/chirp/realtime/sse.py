@@ -167,7 +167,7 @@ async def handle_sse(
             pass
         except Exception as exc:
             # Log with structured formatting for kida errors
-            from chirp.server.terminal_errors import _is_kida_error, log_error, _plain_error_message
+            from chirp.server.terminal_errors import _is_kida_error, _plain_error_message, log_error
 
             log_error(exc)
 
@@ -290,10 +290,7 @@ def _format_error_event(value: Any, exc: Exception) -> str:
 
     from chirp.server.terminal_errors import _is_kida_error, _plain_error_message
 
-    if _is_kida_error(exc):
-        detail = _plain_error_message(exc)
-    else:
-        detail = f"{type(exc).__name__}: {exc}"
+    detail = _plain_error_message(exc) if _is_kida_error(exc) else f"{type(exc).__name__}: {exc}"
 
     if isinstance(value, Fragment) and value.target:
         plain_msg = _plain_error_message(exc)

@@ -20,8 +20,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from chirp.app import App
 
+from chirp.http.request import Request
+from chirp.middleware.protocol import AnyResponse, Middleware, Next
 
-class _ChirpUIStrictMiddleware:
+
+class _ChirpUIStrictMiddleware(Middleware):
     """Middleware that sets chirp-ui strict mode per request for variant validation."""
 
     __slots__ = ("_strict",)
@@ -29,10 +32,10 @@ class _ChirpUIStrictMiddleware:
     def __init__(self, strict: bool) -> None:
         self._strict = strict
 
-    async def __call__(self, request: object, next: object) -> object:
-        import chirp_ui
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        from chirp_ui import set_strict
 
-        chirp_ui.set_strict(self._strict)
+        set_strict(self._strict)
         return await next(request)
 
 

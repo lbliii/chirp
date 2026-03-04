@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from chirp import App, AppConfig, Page
+from chirp import App, AppConfig
 from chirp.testing import TestClient
 
 
@@ -20,10 +20,10 @@ def _create_cascade_app(tmp_path: Path) -> App:
 
     # Root context: provides shared value
     (pages_dir / "_context.py").write_text(
-        '''
+        """
 def context() -> dict:
     return {"shared": "from-root"}
-'''
+"""
     )
 
     # doc/{id}/ structure
@@ -32,20 +32,20 @@ def context() -> dict:
 
     # Child context: receives id from path, shared from parent
     (doc_id_dir / "_context.py").write_text(
-        '''
+        """
 def context(id: str, shared: str) -> dict:
     return {"doc_id": id, "shared": shared}
-'''
+"""
     )
 
     # Page handler: receives doc_id and shared from cascade
     (doc_id_dir / "page.py").write_text(
-        '''
+        """
 from chirp import Page
 
 def get(doc_id: str, shared: str) -> Page:
     return Page("doc/{id}/page.html", "content", doc_id=doc_id, shared=shared)
-'''
+"""
     )
 
     (doc_id_dir / "page.html").write_text(

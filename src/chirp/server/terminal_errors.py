@@ -52,7 +52,7 @@ def _plain_error_message(exc: BaseException) -> str:
     fmt = getattr(exc, "format_compact", None)
     msg = fmt() if fmt is not None else str(exc)
     if _is_kida_error(exc):
-        from kida import strip_colors
+        from kida.environment.terminal import strip_colors
 
         return strip_colors(msg)
     return msg

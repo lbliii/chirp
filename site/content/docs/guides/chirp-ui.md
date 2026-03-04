@@ -98,6 +98,68 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 {% end %}
 ```
 
+## App Shell
+
+chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html` to get a topbar + sidebar + content area that persists across htmx-boosted navigations.
+
+```html
+{# target: main #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Dashboard</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/static/chirpui.css">
+</head>
+<body>
+{% from "chirpui/sidebar.html" import sidebar, sidebar_section, sidebar_link %}
+{% from "chirpui/breadcrumbs.html" import breadcrumbs %}
+{% from "chirpui/command_palette.html" import command_palette, command_palette_trigger %}
+{% from "chirpui/toast.html" import toast_container %}
+
+{% set cp = current_path | default("/") %}
+
+<div class="chirpui-app-shell">
+  <header class="chirpui-app-shell__topbar">
+    <a href="/" class="chirpui-app-shell__brand">My App</a>
+    <div class="chirpui-app-shell__topbar-center">
+      {{ breadcrumbs(breadcrumb_items | default([{"label": "Home", "href": "/"}])) }}
+    </div>
+    <div class="chirpui-app-shell__topbar-end">
+      {{ command_palette_trigger() }}
+    </div>
+  </header>
+  <aside class="chirpui-app-shell__sidebar">
+    {% call sidebar() %}
+      {% call sidebar_section("Navigate") %}
+        {{ sidebar_link("/", "Home", active=cp == "/") }}
+        {{ sidebar_link("/items", "Items", active=cp.startswith("/items")) }}
+      {% end %}
+    {% end %}
+  </aside>
+  <main id="main" class="chirpui-app-shell__main"
+        hx-boost="true" hx-target="#main"
+        hx-swap="innerHTML transition:true"
+        hx-select="#page-content">
+    <div id="page-content">
+      {% block content %}{% end %}
+    </div>
+  </main>
+</div>
+
+{{ command_palette(search_url="/search") }}
+{{ toast_container() }}
+</body>
+</html>
+```
+
+**Why standalone?** Chirp's `render_with_blocks({"content": ...})` replaces `{% block content %}` entirely. If you extend `boost.html` and put the shell inside `{% block content %}`, it gets overwritten. A standalone layout puts the shell outside the content block so it always renders. See [[docs/routing/filesystem-routing|Filesystem Routing]] for the full explanation.
+
+**Why `hx-select`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-select="#page-content"` tells htmx to parse the response and extract only `#page-content` — the shell stays untouched.
+
+**Why no `hx-disinherit`?** Boosted links inside the content area need to inherit `hx-target="#main"`, `hx-swap`, and `hx-select` from the `<main>` element. If you add `hx-disinherit`, boosted links fall back to targeting `body`, which replaces everything. Fragment requests with explicit `hx-target` (e.g. `hx-target="#compare-result"`) override the inherited value naturally.
+
 ## Component categories
 
 | Category | Examples |

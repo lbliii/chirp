@@ -105,13 +105,6 @@ Handlers receive path parameters as keyword arguments. Type annotations are resp
 Each `_layout.html` defines a shell with a `{% block content %}` slot. The layout declares which DOM element it owns via a target comment:
 
 ```html
-{# target: body #}
-<body hx-boost="true" hx-target="#app-content">
-  {% block content %}{% endblock %}
-</body>
-```
-
-```html
 {# target: app-content #}
 <div id="app-content">
   {% block content %}{% endblock %}
@@ -125,6 +118,72 @@ Layouts nest from root to leaf. The negotiation layer uses `HX-Target` to decide
 - **Fragment request**: render just the targeted block
 
 If no target is declared, it defaults to `"body"`.
+
+### How `render_with_blocks` works
+
+Chirp composes layouts using `render_with_blocks({"content": page_html})`. This **replaces** `{% block content %}` with the pre-rendered page HTML. Any markup you put inside `{% block content %}` in your layout is overridden — it never renders.
+
+This means persistent UI (navbars, sidebars, topbars) must live **outside** `{% block content %}`:
+
+```html
+{# target: main #}
+{# ❌ Shell is INSIDE content — gets replaced, never renders #}
+{% extends "chirpui/app_layout.html" %}
+{% block content %}
+  <nav>...</nav>
+  {% block page_content %}{% end %}
+{% end %}
+```
+
+```html
+{# target: main #}
+{# ✅ Shell is OUTSIDE content — always renders #}
+<nav>...</nav>
+<main id="main">
+  <div id="page-content">
+    {% block content %}{% end %}
+  </div>
+</main>
+```
+
+### Persistent app shell pattern
+
+For dashboard-style apps with a topbar, sidebar, and content area, use a **standalone layout** (no `{% extends %}`) that puts the shell structure outside the content block:
+
+```html
+{# target: main #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My App</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/static/chirpui.css">
+</head>
+<body>
+<div class="chirpui-app-shell">
+  <header class="chirpui-app-shell__topbar">...</header>
+  <aside class="chirpui-app-shell__sidebar">...</aside>
+  <main id="main" class="chirpui-app-shell__main"
+        hx-boost="true" hx-target="#main"
+        hx-swap="innerHTML transition:true"
+        hx-select="#page-content">
+    <div id="page-content">
+      {% block content %}{% end %}
+    </div>
+  </main>
+</div>
+</body>
+</html>
+```
+
+Key elements:
+
+- **Standalone HTML** — The layout owns the full document. Don't extend `boost.html` for app shell layouts.
+- **`hx-boost="true"`** on `<main id="main">` — Boosted links inside the content area use AJAX navigation.
+- **`hx-select="#page-content"`** — When the server returns a full HTML page, htmx parses it and extracts only `#page-content` for the swap. The shell persists client-side.
+- **No `hx-disinherit`** on the content wrapper — Boosted links must inherit `hx-target`, `hx-swap`, and `hx-select` from `#main`. Fragment requests with explicit `hx-target` override the inherited value.
+- **`{# target: main #}`** — Tells Chirp which layout depth to render for `HX-Target: main` requests.
 
 ## Context Cascade
 

@@ -106,9 +106,7 @@ async def resolve_kwargs(
             and param.annotation in service_providers
         ):
             factory = service_providers[param.annotation]
-            kwargs[name] = _invoke_provider_factory(
-                factory, request, cascade_ctx
-            )
+            kwargs[name] = _invoke_provider_factory(factory, request, cascade_ctx)
         elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
             param.annotation
         ):

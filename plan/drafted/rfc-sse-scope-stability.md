@@ -90,7 +90,7 @@ Renders:
 1. **Component (A)**: Added `chirp/templating/macros/chirp/sse.html` with `sse_scope` macro. Usage: `{% from "chirp/sse" import sse_scope %}` then `{{ sse_scope("/events") }}`. Always includes `hx-disinherit`.
 2. **Validation (C)**: Upgraded `sse_scope` contract check from WARNING to ERROR. `chirp check` fails if raw `sse-connect` lacks `hx-disinherit` inside a broad target.
 
-**Result**: 
+**Result**:
 - Use the component → correct by default, works at any depth.
 - Use raw HTML → `chirp check` fails. Fix by using `sse_scope` or adding `hx-disinherit`.
 

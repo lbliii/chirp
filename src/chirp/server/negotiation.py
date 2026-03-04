@@ -9,8 +9,6 @@ import json as json_module
 import logging
 from typing import TYPE_CHECKING, Any
 
-_logger = logging.getLogger(__name__)
-
 from kida import Environment
 
 from chirp.errors import ConfigurationError
@@ -33,6 +31,8 @@ from chirp.templating.returns import (
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
 from chirp.templating.suspense import render_suspense
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request

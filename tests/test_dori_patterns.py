@@ -21,32 +21,32 @@ def _create_dori_pattern_app(tmp_path: Path) -> App:
 
     # /skills page with plain GET form (Dori skills search)
     (pages_dir / "skills" / "page.py").write_text(
-        '''
+        """
 from chirp import Template
 
 async def handler():
     return Template("skills/page.html", skills=[], q="")
-'''
+"""
     )
     (pages_dir / "skills" / "page.html").write_text(
-        '{% block page_content %}'
+        "{% block page_content %}"
         '<form action="/skills" method="get">'
         '<input type="search" name="q" value="{{ q }}">'
         '<button type="submit">Search</button></form>'
-        '{% end %}'
+        "{% end %}"
     )
 
     # Root page
     (pages_dir / "page.py").write_text(
-        '''
+        """
 from chirp import Template
 
 async def handler():
     return Template("page.html")
-'''
+"""
     )
     (pages_dir / "page.html").write_text(
-        '{% block page_content %}<h1>Home</h1>'
+        "{% block page_content %}<h1>Home</h1>"
         '<form action="/exec" method="post" hx-post="/exec" hx-target="#result">'
         '<input name="skill" value="test"><button>Run</button></form>'
         '<div id="result"></div>{% end %}'
@@ -69,11 +69,11 @@ async def handler():
 
     # Add exec_result block to page.html for Fragment
     (pages_dir / "page.html").write_text(
-        '{% block page_content %}<h1>Home</h1>'
+        "{% block page_content %}<h1>Home</h1>"
         '<form action="/exec" method="post" hx-post="/exec" hx-target="#result">'
         '<input name="skill" value="test"><button>Run</button></form>'
         '<div id="result"></div>{% end %}'
-        '{% block exec_result %}<p>{{ text }}</p>{% end %}'
+        "{% block exec_result %}<p>{{ text }}</p>{% end %}"
     )
 
     return app
