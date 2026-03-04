@@ -8,7 +8,7 @@ messages and re-populated form values.
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.http.forms import form_or_errors, form_values
 from chirp.http.request import Request

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.realtime.events import EventStream, SSEEvent
 from chirp.templating.returns import Fragment

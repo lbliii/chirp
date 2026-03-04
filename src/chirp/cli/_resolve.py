@@ -6,7 +6,7 @@ chirp App from a user-supplied import string.
 
 import importlib
 
-from chirp.app import App
+from chirp import App
 
 
 def resolve_app(import_string: str) -> App:

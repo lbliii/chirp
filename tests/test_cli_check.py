@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.cli import main
 
 

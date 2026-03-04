@@ -10,7 +10,7 @@ import inspect
 from collections.abc import MutableMapping
 from typing import Any
 
-from chirp.app import App
+from chirp import App
 from chirp.http.response import Response
 from chirp.testing.sse import SSETestResult, parse_sse_frames
 

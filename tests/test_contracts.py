@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
@@ -13,20 +13,22 @@ from chirp.contracts import (
     RouteContract,
     Severity,
     SSEContract,
-    _attr_to_method,
-    _check_accessibility,
-    _check_island_mounts,
-    _check_sse_connect_scope,
-    _check_sse_self_swap,
-    _check_swap_safety,
-    _collect_broad_targets,
-    _extract_form_field_names,
-    _extract_island_mounts,
-    _extract_targets_from_source,
-    _extract_template_references,
-    _path_matches_route,
     check_hypermedia_surface,
     contract,
+)
+from chirp.contracts.routes import attr_to_method as _attr_to_method
+from chirp.contracts.routes import path_matches_route as _path_matches_route
+from chirp.contracts.rules_accessibility import check_accessibility as _check_accessibility
+from chirp.contracts.rules_islands import check_island_mounts as _check_island_mounts
+from chirp.contracts.rules_islands import extract_island_mounts as _extract_island_mounts
+from chirp.contracts.rules_forms import extract_form_field_names as _extract_form_field_names
+from chirp.contracts.rules_sse import check_sse_connect_scope as _check_sse_connect_scope
+from chirp.contracts.rules_sse import check_sse_self_swap as _check_sse_self_swap
+from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
+from chirp.contracts.rules_swap import collect_broad_targets as _collect_broad_targets
+from chirp.contracts.template_scan import extract_targets_from_source as _extract_targets_from_source
+from chirp.contracts.template_scan import (
+    extract_template_references as _extract_template_references,
 )
 
 
@@ -56,6 +58,20 @@ class TestAttrToMethod:
 
     def test_form_action_post_override(self):
         assert _attr_to_method("action", "POST") == "POST"
+
+
+class TestContractCheckSnapshot:
+    def test_snapshot_exposes_stable_read_model(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._ensure_frozen()
+        snapshot = app._contract_check_snapshot()
+        assert snapshot.router is not None
+        assert snapshot.islands_contract_strict == app.config.islands_contract_strict
 
 
 class TestExtractTargets:
@@ -586,7 +602,7 @@ class TestCheckHypermediaSurface:
         def fake_has_flask_syntax(path: str) -> bool:
             return path == "/api/items"
 
-        monkeypatch.setattr("chirp.contracts._route_path_has_flask_syntax", fake_has_flask_syntax)
+        monkeypatch.setattr("chirp.contracts.checker._route_path_has_flask_syntax", fake_has_flask_syntax)
         result = check_hypermedia_surface(app)
         assert not result.ok
         routing_errors = [i for i in result.issues if i.category == "routing"]

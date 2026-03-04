@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.templating.returns import FormAction, Fragment
 from chirp.testing import TestClient

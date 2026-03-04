@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.middleware.security_headers import (
     SecurityHeadersConfig,
     SecurityHeadersMiddleware,

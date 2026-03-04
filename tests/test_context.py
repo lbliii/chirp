@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.context import _RequestGlobals, g, get_request, request_var
 from chirp.http.request import Request
 from chirp.testing import TestClient

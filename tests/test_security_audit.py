@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from chirp.app import App
+from chirp import App
 from chirp.middleware.auth import AuthConfig, AuthMiddleware, login, logout
 from chirp.middleware.csrf import CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session

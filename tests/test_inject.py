@@ -1,6 +1,6 @@
 """Tests for HTML injection middleware."""
 
-from chirp.app import App
+from chirp import App
 from chirp.http.response import Response
 from chirp.middleware.inject import HTMLInject
 from chirp.testing import TestClient

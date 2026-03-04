@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 from pounce import ASGIApp
 
 if TYPE_CHECKING:
-    from chirp.app import App
+    from chirp import App
 
 
 def run_production_server(

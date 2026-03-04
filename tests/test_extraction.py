@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from chirp.app import App
+from chirp import App
 from chirp.http.request import Request
 from chirp.testing import TestClient
 

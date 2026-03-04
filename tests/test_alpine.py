@@ -2,7 +2,7 @@
 
 from kida import Environment, PackageLoader
 
-from chirp.app import App
+from chirp import App
 from chirp.config import AppConfig
 from chirp.server.alpine import alpine_snippet
 from chirp.templating.filters import BUILTIN_FILTERS
