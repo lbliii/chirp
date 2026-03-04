@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, html_attrs, qs
 
 # ── attr ──────────────────────────────────────────────────────────────────
@@ -160,3 +162,39 @@ class TestBuiltinFiltersRegistry:
         assert BUILTIN_FILTERS["field_errors"] is field_errors
         assert BUILTIN_FILTERS["html_attrs"] is html_attrs
         assert BUILTIN_FILTERS["qs"] is qs
+
+
+# ── create_environment chirp-ui fallback ────────────────────────────────────
+
+
+class TestCreateEnvironmentChirpUIFallback:
+    """Env-level chirp-ui filter fallback (RFC 001)."""
+
+    def test_env_has_chirp_ui_filters_when_chirp_ui_installed(self, tmp_path: Path) -> None:
+        """create_environment ensures chirp-ui filters exist when chirp_ui is loadable."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        # When chirp_ui is installed, env should have html_attrs even without register_filters
+        assert "html_attrs" in env.filters
+        assert "bem" in env.filters
+        assert "field_errors" in env.filters
+        assert "validate_variant" in env.filters
+
+    def test_user_filter_overrides_chirp_ui_fallback(self, tmp_path: Path) -> None:
+        """User-registered filters take precedence over chirp-ui fallback."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        def custom_html_attrs(x: object) -> str:
+            return "custom"
+
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(
+            config,
+            filters={"html_attrs": custom_html_attrs},
+            globals_={},
+        )
+        assert env.filters["html_attrs"] is custom_html_attrs

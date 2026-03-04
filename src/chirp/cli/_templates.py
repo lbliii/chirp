@@ -402,7 +402,6 @@ app.add_middleware(CSRFMiddleware(CSRFConfig()))
 app.add_middleware(SecurityHeadersMiddleware())
 
 use_chirp_ui(app)
-chirp_ui.register_filters(app)
 
 app.mount_pages("pages")
 
