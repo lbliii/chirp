@@ -117,6 +117,17 @@ class TestExtractTargets:
         targets = _extract_targets_from_source(html)
         assert targets[0] == ("hx-get", "/api/data", None)
 
+    def test_ignores_kida_tilde_concatenation_in_attrs(self):
+        """Kida attrs='hx-post="/chains/' ~ id ~ '/add-step"' must not truncate to /chains/."""
+        html = "attrs='hx-post=\"/chains/' ~ chain_id ~ '/add-step\" hx-target=\"#step-list\"'"
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
+    def test_ignores_kida_variable_in_url(self):
+        html = '<div hx-post="/chains/{{ id }}/add"></div>'
+        targets = _extract_targets_from_source(html)
+        assert len(targets) == 0
+
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
 

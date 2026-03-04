@@ -185,6 +185,10 @@ At freeze time, routes compile into a trie (prefix tree). Matching is O(path-seg
 
 The compiled route table is immutable. Under free-threading, all worker threads share it without synchronization.
 
+## Dynamic URLs in htmx Attributes
+
+When `chirp check` validates templates, it extracts `hx-get`, `hx-post`, `action`, etc. and verifies each URL against the route table. Dynamic URLs (built with Kida's `~` or `{{ }}`) are skipped — only literal URLs are validated. Use `~` or `{{ var }}` for path parameters; both work at render time and are correctly treated as dynamic by the checker.
+
 ## Next Steps
 
 - [[docs/routing/filesystem-routing|Filesystem Routing]] -- Discover routes from a pages/ directory

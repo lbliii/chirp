@@ -196,10 +196,14 @@ _HTMX_ALL_ATTRS = frozenset(
 )
 # Note: hx-on::* (event handlers) use a wildcard prefix pattern, checked separately
 
-# Regex to extract htmx/form attributes from raw template HTML
-# Matches: hx-get="/path" or action="/path"
-_ATTR_PATTERN = re.compile(
-    r'(?:hx-(?:get|post|put|patch|delete)|action)\s*=\s*["\']([^"\']*)["\']',
+# Regex to extract htmx/form attributes from raw template HTML.
+# Use quote-matching patterns so values containing the other quote (e.g.
+# attrs='hx-post="/chains/' ~ id ~ '/add"') capture the full value and skip.
+_ATTR_PATTERN_DOUBLE = re.compile(
+    r'(hx-(?:get|post|put|patch|delete)|action)\s*=\s*"([^"]*)"',
+)
+_ATTR_PATTERN_SINGLE = re.compile(
+    r"(hx-(?:get|post|put|patch|delete)|action)\s*=\s*'([^']*)'",
 )
 
 
@@ -223,19 +227,21 @@ def _extract_targets_from_source(source: str) -> list[tuple[str, str, str | None
     """Extract (attr_name, url, method_override) from template source.
 
     method_override is 'GET' or 'POST' for action (from form method); None for htmx attrs.
+    Uses quote-matching patterns so values like attrs='hx-post="/x/' ~ id ~ '/y"' capture
+    the full value and are correctly skipped as dynamic.
     """
     targets: list[tuple[str, str, str | None]] = []
-    for match in re.finditer(
-        r'(hx-(?:get|post|put|patch|delete)|action)\s*=\s*["\']([^"\']*)["\']',
-        source,
-    ):
-        attr_name = match.group(1)
-        url = match.group(2)
-        # Skip template expressions ({{ ... }}), Jinja concatenation (~), anchors
-        if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
-            continue
-        method_override = _get_form_method(source, match.start()) if attr_name == "action" else None
-        targets.append((attr_name, url, method_override))
+    for pattern in (_ATTR_PATTERN_DOUBLE, _ATTR_PATTERN_SINGLE):
+        for match in pattern.finditer(source):
+            attr_name = match.group(1)
+            url = match.group(2)
+            # Skip template expressions ({{ ... }}), Kida concatenation (~), anchors
+            if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
+                continue
+            method_override = (
+                _get_form_method(source, match.start()) if attr_name == "action" else None
+            )
+            targets.append((attr_name, url, method_override))
     return targets
 
 
