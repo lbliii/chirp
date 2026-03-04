@@ -32,7 +32,7 @@ AI streaming (``pip install chirp[ai]``)::
 # Declare free-threading support (PEP 703)
 _Py_mod_gil = 0
 
-__version__ = "0.1.1"
+__version__ = "0.1.3"
 __all__ = [
     "OOB",
     "Action",
