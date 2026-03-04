@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from chirp.markdown.renderer import MarkdownRenderer
 
 if TYPE_CHECKING:
-    from chirp import App
+    from chirp.app import App
 
 
 def register_markdown_filter(

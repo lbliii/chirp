@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from chirp import App
+    from chirp.app import App
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Middleware, Next

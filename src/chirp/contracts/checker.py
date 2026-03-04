@@ -35,7 +35,7 @@ from .template_scan import (
 from .types import CheckResult, ContractIssue, Severity
 
 if TYPE_CHECKING:
-    from chirp import App
+    from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
 
 

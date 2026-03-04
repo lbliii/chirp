@@ -1,5 +1,7 @@
 """ASGI runtime dispatch for App."""
 
+from collections.abc import Callable
+
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.server.handler import handle_request
@@ -19,7 +21,7 @@ class ASGIRuntime:
         mutable_state: MutableAppState,
         runtime_state: RuntimeAppState,
         lifecycle: LifecycleCoordinator,
-        ensure_frozen: callable,
+        ensure_frozen: Callable[[], None],
     ) -> None:
         self._config = config
         self._mutable = mutable_state

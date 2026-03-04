@@ -148,7 +148,15 @@ python-version = "3.14"
 
 [tool.ty.analysis]
 # Optional deps; allow when not installed
-allowed-unresolved-imports = ["chirp_ui", "asyncpg", "patitas", "argon2", "argon2.exceptions"]
+allowed-unresolved-imports = [
+    "chirp_ui",
+    "asyncpg",
+    "patitas",
+    "argon2",
+    "argon2.exceptions",
+    "dotenv",
+    "redis.asyncio",
+]
 
 [tool.ty.src]
 exclude = ["dist/", "build/", "tests/"]

@@ -6,7 +6,7 @@ Domains register routes, middleware, and other app extensions on first access.
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from chirp import App
+    from chirp.app import App
 
 
 class Domain(Protocol):
