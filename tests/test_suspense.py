@@ -353,3 +353,81 @@ class TestDeferMap:
         oob_combined = "".join(chunks[1:])
         assert "_chirp_d_main-panel" in oob_combined
         assert 'getElementById("main-panel")' in oob_combined
+
+
+# ---------------------------------------------------------------------------
+# Layout wrapping
+# ---------------------------------------------------------------------------
+
+
+class TestLayoutWrapping:
+    """render_suspense with layout_chain wraps shell in layout shell."""
+
+    async def test_layout_chain_wraps_shell(self):
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        layout_html = """<!DOCTYPE html><html><head><title>{{ title }}</title></head>
+<body><div id="body">{% block content %}{% end %}</div></body></html>"""
+
+        env = Environment(
+            loader=DictLoader(
+                {
+                    "dashboard.html": _DASHBOARD_TEMPLATE,
+                    "_layout.html": layout_html,
+                }
+            )
+        )
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+
+        s = Suspense("dashboard.html", title="Dashboard", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                layout_chain=chain,
+                layout_context={"title": "Dashboard"},
+            )
+        ]
+
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" in chunks[0]
+        assert "<title>Dashboard</title>" in chunks[0]
+        assert 'id="body"' in chunks[0]
+        assert "<h1>Dashboard</h1>" in chunks[0]
+
+    async def test_no_layout_when_layout_chain_none(self):
+        env = _env()
+        s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(env, s, layout_chain=None)
+        ]
+
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" not in chunks[0]  # no layout shell
+        assert "<h1>X</h1>" in chunks[0]
+
+    async def test_fragment_request_skips_layout_wrapping(self):
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        env = _env()
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+        request = type("Req", (), {"is_fragment": True, "is_history_restore": False, "htmx_target": None})()
+
+        s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                layout_chain=chain,
+                layout_context={},
+                request=request,
+            )
+        ]
+
+        # Fragment request → no layout wrapping
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" not in chunks[0]
+        assert "<h1>X</h1>" in chunks[0]

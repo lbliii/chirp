@@ -327,3 +327,45 @@ class TestUpgradeResult:
     def test_none_passes_through(self) -> None:
         result = upgrade_result(None, {}, layout_chain=None, context_providers=())
         assert result is None
+
+    @pytest.mark.filterwarnings("ignore:coroutine .* was never awaited")
+    def test_suspense_to_layout_suspense_when_layout_chain_has_layouts(self) -> None:
+        from chirp.pages.types import LayoutChain, LayoutInfo
+        from chirp.templating.returns import LayoutSuspense, Suspense
+
+        async def _delayed():
+            return "done"
+
+        result = Suspense("dashboard.html", title="Home", stats=_delayed())
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+
+        upgraded = upgrade_result(
+            result,
+            {"nav": "main"},
+            layout_chain=chain,
+            context_providers=(),
+        )
+
+        assert isinstance(upgraded, LayoutSuspense)
+        assert upgraded.suspense is result
+        assert upgraded.layout_chain is chain
+        assert upgraded.context["title"] == "Home"
+        assert upgraded.context["nav"] == "main"
+        # awaitable replaced with None in layout context
+        assert upgraded.context.get("stats") is None
+
+    def test_suspense_passes_through_when_no_layout_chain(self) -> None:
+        from chirp.templating.returns import Suspense
+
+        result = Suspense("page.html", title="X")
+        upgraded = upgrade_result(result, {}, layout_chain=None, context_providers=())
+        assert upgraded is result
+
+    def test_suspense_passes_through_when_layout_chain_empty(self) -> None:
+        from chirp.pages.types import LayoutChain
+        from chirp.templating.returns import Suspense
+
+        result = Suspense("page.html", title="X")
+        chain = LayoutChain(layouts=())
+        upgraded = upgrade_result(result, {}, layout_chain=chain, context_providers=())
+        assert upgraded is result

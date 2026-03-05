@@ -111,16 +111,37 @@ def _find_deferred_blocks(
     return key_to_blocks
 
 
+def _should_wrap_in_layouts(
+    layout_chain: Any,
+    request: Any,
+) -> bool:
+    """Return True if the shell should be wrapped in the layout chain."""
+    if layout_chain is None or not getattr(layout_chain, "layouts", ()):
+        return False
+    if request is None:
+        return True
+    # Mirror LayoutPage: skip layouts for pure fragment requests
+    if getattr(request, "is_fragment", False) and not getattr(
+        request, "is_history_restore", False
+    ) and not getattr(request, "htmx_target", None):
+        return False
+    return True
+
+
 async def render_suspense(
     env: Environment,
     suspense: Suspense,
     *,
     is_htmx: bool = False,
+    layout_chain: Any = None,
+    layout_context: dict[str, Any] | None = None,
+    request: Any = None,
 ) -> AsyncIterator[str]:
     """Render a ``Suspense`` return value as an async chunk stream.
 
     Yields:
-        1. The full page shell (with ``None`` for deferred values)
+        1. The full page shell (with ``None`` for deferred values),
+           optionally wrapped in the layout chain
         2. One OOB swap chunk per deferred block as its data resolves
 
     Args:
@@ -128,6 +149,9 @@ async def render_suspense(
         suspense: The ``Suspense`` return value from a route handler.
         is_htmx: If ``True``, use ``hx-swap-oob`` formatting.
             If ``False``, use ``<template>`` + ``<script>`` pairs.
+        layout_chain: Optional layout chain to wrap the shell in.
+        layout_context: Context for layout templates (when layout_chain used).
+        request: Request for fragment detection (when layout_chain used).
     """
     context = suspense.context
     template_name = suspense.template_name
@@ -144,16 +168,36 @@ async def render_suspense(
         else:
             sync_ctx[key] = value
 
+    def _wrap_shell(page_html: str, ctx: dict[str, Any]) -> str:
+        if not _should_wrap_in_layouts(layout_chain, request):
+            return page_html
+        from chirp.pages.renderer import render_with_layouts
+
+        htmx_target = getattr(request, "htmx_target", None) if request else None
+        is_history_restore = getattr(request, "is_history_restore", False) if request else False
+        return render_with_layouts(
+            env,
+            layout_chain=layout_chain,
+            page_html=page_html,
+            context=ctx,
+            htmx_target=htmx_target,
+            is_history_restore=is_history_restore,
+        )
+
+    layout_ctx = layout_context if layout_context is not None else {}
+
     # Fast path: no awaitables — render full page in one shot
     if not pending:
         template = env.get_template(template_name)
-        yield template.render(sync_ctx)
+        page_html = template.render(sync_ctx)
+        yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
         return
 
     # -- Phase 2: Render shell with None for deferred keys --
     shell_ctx = {**sync_ctx, **dict.fromkeys(pending)}
     template = env.get_template(template_name)
-    yield template.render(shell_ctx)
+    page_html = template.render(shell_ctx)
+    yield _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
 
     # -- Phase 3: Resolve awaitables concurrently --
     resolved: dict[str, Any] = {}

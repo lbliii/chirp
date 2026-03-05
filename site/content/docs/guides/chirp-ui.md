@@ -194,6 +194,33 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 See the [chirp-ui repository](https://github.com/lbliii/chirp-ui) for the full component reference and API.
 
+## Data layout patterns
+
+For dashboard and settings pages, use these patterns for consistent structure:
+
+**Section with header actions** — Put section-level buttons (Refresh, Auto-detect, Run validation) in the `section` actions slot, not beneath the content:
+
+```html
+{% from "chirpui/layout.html" import section %}
+{% from "chirpui/button.html" import btn %}
+{% call section("Setup targets", subtitle="Configure your IDE") %}
+{% slot actions %}{{ btn("Refresh", attrs_map={"hx-get": "/status", "hx-target": "#targets"}) }}{% end %}
+<div id="targets">...</div>
+{% end %}
+```
+
+**Settings rows** — For label + status + value (e.g. setup targets, health checks), use `settings_row_list` and `settings_row`:
+
+```html
+{% from "chirpui/settings_row.html" import settings_row_list, settings_row %}
+{% call settings_row_list() %}
+{{ settings_row("Cursor IDE", status="Configured", detail="dori setup cursor") }}
+{{ settings_row("Skills directory", status="ok", detail="/path/to/skills") }}
+{% end %}
+```
+
+**When to use what** — Use `description_list` for term + detail only (no status badge). Use `settings_row_list` when you have label + status + detail.
+
 ## Theming
 
 chirp-ui uses `prefers-color-scheme` for dark mode. Override any `--chirpui-*` variable:

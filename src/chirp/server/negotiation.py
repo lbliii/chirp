@@ -22,6 +22,7 @@ from chirp.templating.returns import (
     Fragment,
     InlineTemplate,
     LayoutPage,
+    LayoutSuspense,
     Page,
     Stream,
     Suspense,
@@ -238,6 +239,27 @@ def negotiate(
                 raise ConfigurationError(msg)
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream_async(**value.context)
+            return StreamingResponse(
+                chunks=chunks,
+                content_type="text/html; charset=utf-8",
+            )
+        case LayoutSuspense():
+            if kida_env is None:
+                msg = (
+                    "LayoutSuspense return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            is_htmx = request is not None and request.is_fragment
+            req = value.request if value.request is not None else request
+            chunks = render_suspense(
+                kida_env,
+                value.suspense,
+                is_htmx=is_htmx,
+                layout_chain=value.layout_chain,
+                layout_context=value.context,
+                request=req,
+            )
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",

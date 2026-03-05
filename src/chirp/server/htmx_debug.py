@@ -98,6 +98,54 @@ HTMX_DEBUG_BOOT_JS = """\
     toast("Load Handler Error", String(d.error || "(unknown)"), "#e0af68");
   });
 
+  document.body.addEventListener("htmx:beforeSwap", function(evt) {
+    var d = evt.detail || {};
+    var xhr = d.xhr;
+    var elt = d.elt;
+    if (!xhr || !xhr.responseText || !elt) return;
+    var sel = (elt.getAttribute && elt.getAttribute("hx-select")) ||
+      (elt.closest && elt.closest("[hx-select]") && elt.closest("[hx-select]").getAttribute("hx-select"));
+    if (!sel || typeof sel !== "string") return;
+    sel = sel.trim();
+    if (sel.indexOf("#") !== 0 || sel.indexOf(" ") >= 0) return;
+    var id = sel.slice(1);
+    if (!id) return;
+    var re = new RegExp("id\\s*=\\s*[\"']" + id.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&") + "[\"']");
+    if (!re.test(xhr.responseText)) {
+      console.warn("chirp htmx: empty hx-select", { selector: sel, path: d.pathInfo && d.pathInfo.requestPath });
+      toast(
+        "Empty hx-select",
+        "Response has no element matching " + sel + ". Inherited hx-select may yield blank swap.",
+        "#e0af68"
+      );
+    }
+  });
+
+  document.body.addEventListener("htmx:configRequest", function(evt) {
+    var d = evt.detail || {};
+    var elt = d.elt;
+    var path = d.pathInfo ? d.pathInfo.requestPath : "";
+    if (!elt) return;
+    var method = (elt.getAttribute && elt.getAttribute("hx-post")) ? "post" :
+      (elt.getAttribute && elt.getAttribute("hx-put")) ? "put" :
+      (elt.getAttribute && elt.getAttribute("hx-patch")) ? "patch" :
+      (elt.getAttribute && elt.getAttribute("hx-delete")) ? "delete" :
+      (elt.getAttribute && elt.getAttribute("method")) === "post" ? "post" : null;
+    if (!method || method === "get") return;
+    var hasExplicitTarget = elt.getAttribute && elt.getAttribute("hx-target");
+    if (!hasExplicitTarget) {
+      var ancestor = elt.closest && elt.closest("[hx-target]");
+      if (ancestor && /#main|#page-content/.test(ancestor.getAttribute("hx-target") || "")) {
+        console.warn("chirp htmx: broad inherited target", { path: path });
+        toast(
+          "Broad inherited target",
+          "Mutating request to " + path + " inherits broad target. Use fragment_island or explicit hx-target.",
+          "#e0af68"
+        );
+      }
+    }
+  });
+
   console.log("chirp htmx debug overlay active");
 })();
 """

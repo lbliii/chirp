@@ -6,7 +6,7 @@ weight: 10
 lang: en
 type: doc
 tags: [production, pounce, docker, metrics, rate-limit]
-keywords: [deploy, production, pounce, workers, metrics, rate-limit, docker]
+keywords: [deploy, production, pounce, workers, metrics, rate-limit, docker, port, SO_REUSEADDR, TIME_WAIT, CLI]
 category: guide
 ---
 
@@ -73,6 +73,26 @@ app.run()  # Multi-worker, Phase 5 & 6 features
 ```bash
 chirp run myapp:app --production --workers 4 --metrics --rate-limit
 ```
+
+## Custom Port Checks
+
+If your CLI checks whether a port is free before calling `app.run()` (e.g. to avoid split-brain or show a clearer error), use `SO_REUSEADDR` in that check. Otherwise you'll block restarts when the port is in **TIME_WAIT** (30–120 seconds after shutdown). The server already uses `SO_REUSEADDR`; your check should match.
+
+```python
+import socket
+
+def is_port_in_use(host: str, port: int) -> bool:
+    """Return True if another process is actively listening on host:port."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+            return False
+    except OSError:
+        return True
+```
+
+Without `SO_REUSEADDR`, the check fails when the port is in TIME_WAIT even though the server would bind successfully. When you can't identify the process holding the port, include a TIME_WAIT hint in your error message (e.g. "wait 30–60s or use a different port").
 
 ## Docker
 

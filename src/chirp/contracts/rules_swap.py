@@ -2,6 +2,11 @@
 
 import re
 
+from .template_scan import (
+    extract_ids_with_disinherit,
+    extract_mutation_target_ids,
+    extract_static_ids,
+)
 from .types import ContractIssue, Severity
 
 _TAG_WITH_TARGET_PATTERN = re.compile(
@@ -123,5 +128,37 @@ def check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
                 )
             )
             break
+
+    all_ids: set[str] = set()
+    all_ids_with_disinherit: set[str] = set()
+    for source in template_sources.values():
+        all_ids.update(extract_static_ids(source))
+        all_ids_with_disinherit.update(extract_ids_with_disinherit(source))
+
+    seen_fragment_issues: set[tuple[str, str]] = set()
+    for template_name, source in template_sources.items():
+        if template_name.startswith(("chirp/", "chirpui/")):
+            continue
+        mutation_targets = extract_mutation_target_ids(source)
+        for target_id in mutation_targets:
+            if target_id not in all_ids or target_id in all_ids_with_disinherit:
+                continue
+            key = (template_name, target_id)
+            if key in seen_fragment_issues:
+                continue
+            seen_fragment_issues.add(key)
+            issues.append(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="fragment_island",
+                    message=(
+                        f'Mutation target #"{target_id}" has no hx-disinherit. '
+                        "Use fragment_island() or add hx-disinherit to avoid inherited "
+                        "hx-select/hx-target breaking local swaps."
+                    ),
+                    template=template_name,
+                    details="See chirpui/fragment_island.html",
+                )
+            )
 
     return issues

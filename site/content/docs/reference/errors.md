@@ -190,10 +190,13 @@ Catastrophic errors (ASGI failures, unrecoverable state) still terminate the str
 
 When `AppConfig(debug=True)`, unhandled exceptions render a detailed debug page with:
 
-- Full traceback with source code context
+- Full traceback with source code context (framework frames collapsed)
 - Request details (method, path, headers, query parameters)
 - Application configuration
-- **Template error panel** with error code, source snippet, and docs link (for Kida errors)
+- **Kida template error panel** with error code, source snippet, suggestion, and docs link
+- **Environment section** — Python, Chirp, and Kida versions
+
+When a Kida parse error is wrapped (e.g. by `TemplateRuntimeError`), the debug page prefers the cause's template context (correct file and line) over the wrapper's. Consecutive framework frames (middleware, ASGI adapters) are collapsed into an expandable block to reduce noise.
 
 :::{warning}
 Debug pages expose internal details. Never enable `debug=True` in production.

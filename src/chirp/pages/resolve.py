@@ -129,11 +129,14 @@ def upgrade_result(
     cascade_ctx: dict[str, Any],
     layout_chain: LayoutChain | None,
     context_providers: tuple[ContextProvider, ...],
+    request: Request | None = None,
 ) -> Any:
     """Upgrade a Page result to a LayoutPage with layout chain metadata.
 
     If *result* is a ``Page``, merges cascade context with the page's
     own context and wraps it in a ``LayoutPage`` for layout composition.
+    If *result* is a ``Suspense`` and *layout_chain* has layouts, wraps
+    it in a ``LayoutSuspense`` so the shell is composed with layouts.
     All other return types pass through unchanged.
 
     Args:
@@ -141,12 +144,14 @@ def upgrade_result(
         cascade_ctx: Merged context from ``_context.py`` providers.
         layout_chain: The layout chain for this page route.
         context_providers: The context providers for this page route.
+        request: The current request (for LayoutSuspense fragment detection).
 
     Returns:
-        A ``LayoutPage`` if *result* was a ``Page``, otherwise *result*
+        A ``LayoutPage`` if *result* was a ``Page``, a ``LayoutSuspense``
+        if *result* was a ``Suspense`` with layouts, otherwise *result*
         unchanged.
     """
-    from chirp.templating.returns import LayoutPage, Page
+    from chirp.templating.returns import LayoutPage, LayoutSuspense, Page, Suspense
 
     if isinstance(result, Page):
         merged_ctx = {**cascade_ctx, **result.context}
@@ -156,6 +161,23 @@ def upgrade_result(
             layout_chain=layout_chain,
             context_providers=context_providers,
             **merged_ctx,
+        )
+
+    if (
+        isinstance(result, Suspense)
+        and layout_chain is not None
+        and getattr(layout_chain, "layouts", ())
+    ):
+        merged = {**cascade_ctx, **result.context}
+        layout_ctx = {
+            k: (None if inspect.isawaitable(v) else v)
+            for k, v in merged.items()
+        }
+        return LayoutSuspense(
+            result,
+            layout_chain,
+            context=layout_ctx,
+            request=request,
         )
 
     return result

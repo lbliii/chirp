@@ -347,6 +347,34 @@ class Suspense:
 
 
 @dataclass(frozen=True, slots=True)
+class LayoutSuspense:
+    """Suspense with layout chain — used when Suspense is returned from mount_pages.
+
+    Carries layout metadata so the first chunk is wrapped in the layout shell
+    (head, CSS, sidebar, etc.). OOB chunks target block IDs inside the page.
+    """
+
+    suspense: Suspense
+    layout_chain: Any  # LayoutChain, but Any to avoid circular import
+    context: dict[str, Any] = field(default_factory=dict)
+    request: Any = None
+
+    def __init__(
+        self,
+        suspense: Suspense,
+        layout_chain: Any,
+        /,
+        *,
+        context: dict[str, Any] | None = None,
+        request: Any = None,
+    ) -> None:
+        object.__setattr__(self, "suspense", suspense)
+        object.__setattr__(self, "layout_chain", layout_chain)
+        object.__setattr__(self, "context", context or {})
+        object.__setattr__(self, "request", request)
+
+
+@dataclass(frozen=True, slots=True)
 class LayoutPage:
     """Render a page within a filesystem-based layout chain.
 
