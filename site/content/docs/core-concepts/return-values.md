@@ -92,7 +92,7 @@ def search(request: Request):
 `Page` is sugar over the `if request.is_fragment` pattern. If the request comes from htmx, it renders the block. Otherwise, it renders the full template.
 
 :::{note}
-**LayoutPage** is the internal type used when filesystem routing renders through layout chains. Handlers return `Page`; Chirp upgrades it to `LayoutPage` when layouts are involved. You typically don't construct `LayoutPage` directly.
+**LayoutPage** and **LayoutSuspense** are internal types used when filesystem routing renders through layout chains. Handlers return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You typically don't construct these directly.
 :::
 
 ## Stream

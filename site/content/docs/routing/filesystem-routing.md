@@ -67,6 +67,8 @@ def get():
     return Page("documents/page.html", "content", items=load_items())
 ```
 
+You can also return `Suspense` for instant first paint with deferred blocks. The layout chain is applied automatically — the shell gets the full layout (head, CSS, sidebar), and OOB swaps target block IDs inside the page.
+
 ### Other .py Files
 
 Any other `.py` file (except those starting with `_`) appends its stem to the path:

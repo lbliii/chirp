@@ -1,6 +1,6 @@
 # Suspense + Layout Chain Support
 
-**Status**: Proposal  
+**Status**: Implemented  
 **Scope**: Chirp (chirp package)  
 **Related**: dori collections page, mount_pages
 
