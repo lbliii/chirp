@@ -6,7 +6,7 @@ once during App._freeze() and passed through the request pipeline.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
@@ -43,7 +43,7 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
     }
     missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
     if missing:
-        env.update_filters(missing)
+        env.update_filters(cast(dict[str, Callable[..., Any]], missing))
 
 
 def create_environment(
