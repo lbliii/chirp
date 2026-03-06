@@ -43,5 +43,5 @@ class KidaAdapter:
         try:
             tmpl = self._env.get_template(template)
             return tmpl.template_metadata()
-        except (TemplateNotFoundError, TemplateSyntaxError):
+        except TemplateNotFoundError, TemplateSyntaxError:
             return None

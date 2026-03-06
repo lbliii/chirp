@@ -191,9 +191,7 @@ def negotiate(
             plan = build_render_plan(composition, request=request)
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(
-                plan, adapter=adapter, validate_blocks=validate_blocks
-            )
+            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
             html = serialize_rendered_plan(rendered)
             intent = "fragment" if plan.intent != "full_page" else "full_page"
             return _html_response(html, intent=intent)
@@ -207,9 +205,7 @@ def negotiate(
             plan = build_render_plan(value, request=request)
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(
-                plan, adapter=adapter, validate_blocks=validate_blocks
-            )
+            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
             html = serialize_rendered_plan(rendered)
             intent = "fragment" if plan.intent != "full_page" else "full_page"
             return _html_response(html, intent=intent)
@@ -400,8 +396,4 @@ def _should_append_streamed_shell_actions_oob(
     del context
     if request is None:
         return False
-    return (
-        request.is_fragment
-        and not request.is_history_restore
-        and request.is_boosted
-    )
+    return request.is_fragment and not request.is_history_restore and request.is_boosted

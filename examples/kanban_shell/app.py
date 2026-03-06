@@ -7,36 +7,12 @@ ShellActions, toast, filter sidebar, OOB swaps, and SSE.
 import asyncio
 import os
 import random
+from dataclasses import dataclass
 from pathlib import Path
-
-from chirp import (
-    OOB,
-    App,
-    AppConfig,
-    EventStream,
-    Fragment,
-    Page,
-    Redirect,
-    Request,
-    Template,
-    ValidationError,
-    get_user,
-    is_safe_url,
-    login,
-    login_required,
-    logout,
-    use_chirp_ui,
-)
-from chirp.http.forms import form_or_errors, form_values
-from chirp.middleware.auth import AuthConfig, AuthMiddleware
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-from chirp.middleware.static import StaticFiles
-from chirp.security.passwords import hash_password, verify_password
 
 from store import (
     COLUMNS,
-    PRIORITIES,
+    Task,  # noqa: F401
     add_task,
     delete_task,
     get_task,
@@ -46,7 +22,27 @@ from store import (
     update_task,
     validate_task,
 )
-from store import Task  # noqa: F401
+
+from chirp import (
+    OOB,
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    Redirect,
+    Request,
+    ValidationError,
+    get_user,
+    login_required,
+    logout,
+    use_chirp_ui,
+)
+from chirp.http.forms import form_or_errors, form_values
+from chirp.middleware.auth import AuthConfig, AuthMiddleware
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.static import StaticFiles
+from chirp.security.passwords import hash_password
 
 PAGES_DIR = Path(__file__).parent / "pages"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -54,9 +50,6 @@ STATIC_DIR = Path(__file__).parent / "static"
 # ---------------------------------------------------------------------------
 # User model
 # ---------------------------------------------------------------------------
-
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)

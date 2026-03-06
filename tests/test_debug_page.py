@@ -228,7 +228,6 @@ class TestExtractTemplateContext:
             assert "underscores" in ctx["suggestion"].lower()
 
 
-
 # ---------------------------------------------------------------------------
 # _extract_request_context
 # ---------------------------------------------------------------------------

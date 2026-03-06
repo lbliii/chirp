@@ -1,6 +1,5 @@
 """Tests for the kanban_shell example — auth, board rendering, CRUD, move, filter, SSE."""
 
-import asyncio
 import re
 from unittest.mock import AsyncMock, patch
 
@@ -538,7 +537,7 @@ class TestSSE:
             tasks = get_tasks()
             if tasks:
                 t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
                 mock_move.return_value = (replace(t, status=new_status), t.status)
             async with TestClient(example_app) as client:
                 auth = await _login(client)
@@ -560,7 +559,7 @@ class TestSSE:
             tasks = get_tasks()
             if tasks:
                 t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
                 mock_move.return_value = (replace(t, status=new_status), t.status)
             async with TestClient(example_app) as client:
                 auth = await _login(client)
@@ -585,7 +584,7 @@ class TestSSE:
             tasks = get_tasks()
             if tasks:
                 t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
                 mock_move.return_value = (replace(t, status=new_status), t.status)
             async with TestClient(example_app) as client:
                 auth = await _login(client)

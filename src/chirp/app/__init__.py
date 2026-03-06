@@ -323,9 +323,7 @@ class App:
         self._assert_contracts_ready()
         self._contract_checks.check(self, warnings_as_errors=warnings_as_errors)
 
-    def render(
-        self, value: Fragment | Template | InlineTemplate
-    ) -> str:
+    def render(self, value: Fragment | Template | InlineTemplate) -> str:
         """Render a Fragment, Template, or InlineTemplate to HTML without an HTTP request.
 
         Use for tests, background jobs, scripts, or AI runtimes that need to

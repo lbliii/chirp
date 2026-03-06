@@ -1,7 +1,7 @@
+from contacts_shell_store import CONTACT_RULES, normalize_query, page_context, store
+
 from chirp import Page, Request, ValidationError
 from chirp.validation import validate
-
-from contacts_shell_store import CONTACT_RULES, normalize_query, page_context, store
 
 
 async def post(contact, request: Request):

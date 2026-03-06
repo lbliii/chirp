@@ -8,6 +8,7 @@ def get(request) -> Page:
     if get_user().is_authenticated:
         return Redirect("/")
     from app import get_users
+
     next_url = request.query.get("next", "/")
     return Page("login/page.html", "page_content", error="", users=get_users(), next_url=next_url)
 
@@ -22,6 +23,7 @@ async def post(request) -> Page | Redirect:
     next_url = form.get("next", "/")
 
     from app import get_users
+
     users = get_users()
     user = users.get(username)
     if user and verify_password(password, user.password_hash):

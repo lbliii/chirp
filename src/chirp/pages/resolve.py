@@ -176,7 +176,7 @@ def upgrade_result(
         if *result* was a ``Suspense`` with layouts, otherwise *result*
         unchanged.
     """
-    from chirp.templating.returns import LayoutPage, LayoutSuspense, OOB, Page, Suspense
+    from chirp.templating.returns import OOB, LayoutPage, LayoutSuspense, Page, Suspense
 
     merged_ctx = _merge_result_context(cascade_ctx, getattr(result, "context", {}))
 

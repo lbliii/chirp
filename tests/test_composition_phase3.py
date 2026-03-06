@@ -59,9 +59,7 @@ class TestKidaAdapterTemplateMetadata:
 class TestRenderPlanBlockValidation:
     """execute_render_plan validate_blocks catches missing blocks before render."""
 
-    def test_validate_blocks_raises_for_missing_block(
-        self, kida_env: Environment
-    ) -> None:
+    def test_validate_blocks_raises_for_missing_block(self, kida_env: Environment) -> None:
         adapter = KidaAdapter(kida_env)
         comp = PageComposition(
             template="search.html",
@@ -72,9 +70,7 @@ class TestRenderPlanBlockValidation:
         with pytest.raises(KeyError, match="Block 'nonexistent_block' not found"):
             execute_render_plan(plan, adapter=adapter, validate_blocks=True)
 
-    def test_validate_blocks_succeeds_for_valid_block(
-        self, kida_env: Environment
-    ) -> None:
+    def test_validate_blocks_succeeds_for_valid_block(self, kida_env: Environment) -> None:
         adapter = KidaAdapter(kida_env)
         comp = PageComposition(
             template="search.html",
@@ -85,9 +81,7 @@ class TestRenderPlanBlockValidation:
         rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=True)
         assert "a" in rendered.main_html
 
-    def test_validate_blocks_default_off_raises_at_render(
-        self, kida_env: Environment
-    ) -> None:
+    def test_validate_blocks_default_off_raises_at_render(self, kida_env: Environment) -> None:
         """Without validate_blocks, missing block raises at render time (Kida KeyError)."""
         adapter = KidaAdapter(kida_env)
         comp = PageComposition(

@@ -4,25 +4,21 @@ import re
 from typing import Any
 
 # \baction\b avoids matching "action" inside form_action, data-action, etc.
-_ACTION_OR_HX = r'(hx-(?:get|post|put|patch|delete)|\baction\b)'
+_ACTION_OR_HX = r"(hx-(?:get|post|put|patch|delete)|\baction\b)"
 _ATTR_PATTERN_DOUBLE = re.compile(
     rf'{_ACTION_OR_HX}\s*=\s*"([^"]*)"',
 )
 _ATTR_PATTERN_SINGLE = re.compile(
     rf"{_ACTION_OR_HX}\s*=\s*'([^']*)'",
 )
-_ATTRS_MAP_PATTERN = re.compile(
-    rf"""["']{_ACTION_OR_HX}["']\s*:\s*["']([^"']*)["'](?=\s*[,}}])"""
-)
+_ATTRS_MAP_PATTERN = re.compile(rf"""["']{_ACTION_OR_HX}["']\s*:\s*["']([^"']*)["'](?=\s*[,}}])""")
 _HX_TARGET_PATTERN = re.compile(r'hx-target\s*=\s*["\']([^"\']*)["\']')
 _ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
 _TEMPLATE_REF_PATTERN = re.compile(
     r"""\{%-?\s*(?:extends|include|from|import)\s+["']([^"']+)["']"""
 )
 _TEMPLATE_SOURCE_SUFFIXES = (".html", ".htm", ".jinja", ".j2")
-_FRAGMENT_ISLAND_PATTERN = re.compile(
-    r'fragment_island\s*\(\s*["\']([^"\']+)["\']'
-)
+_FRAGMENT_ISLAND_PATTERN = re.compile(r'fragment_island\s*\(\s*["\']([^"\']+)["\']')
 _ID_WITH_DISINHERIT_PATTERN = re.compile(
     r'<[^>]+\bid\s*=\s*["\']([^"\']+)["\'][^>]*hx-disinherit',
     re.IGNORECASE | re.DOTALL,
@@ -32,7 +28,7 @@ _ID_WITH_DISINHERIT_REVERSE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _MUTATING_WITH_TARGET = re.compile(
-    r'<(?:form|button|a|div|span)\b[^>]*\b(?:hx-(?:post|put|patch|delete)|\baction\b)\s*='
+    r"<(?:form|button|a|div|span)\b[^>]*\b(?:hx-(?:post|put|patch|delete)|\baction\b)\s*="
     r'[^>]*\bhx-target\s*=\s*["\']#([^"\'\s]+)["\']',
     re.IGNORECASE,
 )
@@ -137,7 +133,7 @@ def extract_mutation_target_ids(source: str) -> set[str]:
         if val and "{{" not in val and "{%" not in val:
             ids.add(val)
     mutating_blocks = re.findall(
-        r'(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|action)\s*[=:][^}]+'
+        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|action)\s*[=:][^}]+"
         r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\']',
         source,
         re.IGNORECASE | re.DOTALL,
@@ -147,7 +143,7 @@ def extract_mutation_target_ids(source: str) -> set[str]:
             ids.add(val.strip())
     target_in_mutating = re.findall(
         r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\'][^}]*'
-        r'(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete)',
+        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete)",
         source,
         re.IGNORECASE | re.DOTALL,
     )

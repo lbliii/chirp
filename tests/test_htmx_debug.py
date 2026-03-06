@@ -31,9 +31,7 @@ def test_htmx_debug_js_valid_syntax() -> None:
     if not node:
         pytest.skip("node not found — install Node.js to validate JS syntax")
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".js", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
         f.write(HTMX_DEBUG_BOOT_JS)
         path = f.name
 
@@ -44,8 +42,6 @@ def test_htmx_debug_js_valid_syntax() -> None:
             text=True,
             timeout=5,
         )
-        assert result.returncode == 0, (
-            f"JS syntax error: {result.stderr or result.stdout}"
-        )
+        assert result.returncode == 0, f"JS syntax error: {result.stderr or result.stdout}"
     finally:
         os.unlink(path)

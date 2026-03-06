@@ -129,10 +129,7 @@ def normalize_shell_actions(value: Any) -> ShellActions | None:
     if isinstance(value, ShellActions):
         validate_shell_actions(value)
         return value
-    msg = (
-        "shell_actions must be a ShellActions instance. "
-        f"Got {type(value).__name__} instead."
-    )
+    msg = f"shell_actions must be a ShellActions instance. Got {type(value).__name__} instead."
     raise TypeError(msg)
 
 

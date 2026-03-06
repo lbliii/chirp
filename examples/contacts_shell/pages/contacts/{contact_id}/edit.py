@@ -1,6 +1,6 @@
-from chirp import Page, Request
-
 from contacts_shell_store import normalize_query, page_context
+
+from chirp import Page, Request
 
 
 def get(contact, request: Request) -> Page:

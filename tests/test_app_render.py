@@ -58,9 +58,7 @@ class TestAppRenderTemplate:
     def test_render_template_with_list(self) -> None:
         app = _app()
 
-        html = app.render(
-            Template("page.html", title="List", items=["a", "b", "c"])
-        )
+        html = app.render(Template("page.html", title="List", items=["a", "b", "c"]))
         assert "<li>a</li>" in html
         assert "<li>b</li>" in html
         assert "<li>c</li>" in html
@@ -97,9 +95,11 @@ class TestAppRenderWithCustomEnv:
         from kida import DictLoader, Environment
 
         env = Environment(
-            loader=DictLoader({
-                "custom.html": "{% block content %}CUSTOM {{ x }}{% endblock %}",
-            })
+            loader=DictLoader(
+                {
+                    "custom.html": "{% block content %}CUSTOM {{ x }}{% endblock %}",
+                }
+            )
         )
         app = App(kida_env=env)
 

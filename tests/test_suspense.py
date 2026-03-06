@@ -399,10 +399,7 @@ class TestLayoutWrapping:
     async def test_no_layout_when_layout_chain_none(self):
         env = _env()
         s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
-        chunks = [
-            c
-            async for c in render_suspense(env, s, layout_chain=None)
-        ]
+        chunks = [c async for c in render_suspense(env, s, layout_chain=None)]
 
         assert len(chunks) == 1
         assert "<!DOCTYPE html>" not in chunks[0]  # no layout shell
@@ -413,7 +410,9 @@ class TestLayoutWrapping:
 
         env = _env()
         chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
-        request = type("Req", (), {"is_fragment": True, "is_history_restore": False, "htmx_target": None})()
+        request = type(
+            "Req", (), {"is_fragment": True, "is_history_restore": False, "htmx_target": None}
+        )()
 
         s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
         chunks = [

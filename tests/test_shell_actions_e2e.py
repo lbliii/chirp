@@ -62,7 +62,7 @@ def handler() -> Page:
         encoding="utf-8",
     )
     (pages_dir / "forum" / "page.html").write_text(
-        '{% block content %}<h1>Forum Index</h1><p>Root forum page.</p>{% end %}',
+        "{% block content %}<h1>Forum Index</h1><p>Root forum page.</p>{% end %}",
         encoding="utf-8",
     )
 
@@ -94,7 +94,7 @@ def handler() -> Page:
         encoding="utf-8",
     )
     (pages_dir / "forum" / "thread" / "page.html").write_text(
-        '{% block content %}<h1>Thread</h1><p>Thread detail page.</p>{% end %}',
+        "{% block content %}<h1>Thread</h1><p>Thread detail page.</p>{% end %}",
         encoding="utf-8",
     )
 
@@ -125,7 +125,7 @@ def handler() -> Page:
         encoding="utf-8",
     )
     (pages_dir / "forum" / "archived" / "page.html").write_text(
-        '{% block content %}<h1>Archived</h1><p>No shell actions here.</p>{% end %}',
+        "{% block content %}<h1>Archived</h1><p>No shell actions here.</p>{% end %}",
         encoding="utf-8",
     )
 
@@ -135,7 +135,9 @@ def handler() -> Page:
 
 
 class TestShellActionsMountedPages:
-    async def test_boosted_navigation_updates_and_clears_shell_actions(self, tmp_path: Path) -> None:
+    async def test_boosted_navigation_updates_and_clears_shell_actions(
+        self, tmp_path: Path
+    ) -> None:
         app = _create_shell_actions_app(tmp_path)
 
         async with TestClient(app) as client:

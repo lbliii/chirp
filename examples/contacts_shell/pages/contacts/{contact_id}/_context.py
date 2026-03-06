@@ -1,6 +1,6 @@
-from chirp import NotFound
-
 from contacts_shell_store import store
+
+from chirp import NotFound
 
 
 def context(contact_id: str) -> dict[str, object]:

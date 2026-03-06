@@ -90,7 +90,9 @@ class TestBuildCascadeContext:
             return {
                 "shell_actions": ShellActions(
                     primary=ShellActionZone(
-                        items=(ShellAction(id="new-thread", label="New thread", href="/threads/new"),)
+                        items=(
+                            ShellAction(id="new-thread", label="New thread", href="/threads/new"),
+                        )
                     )
                 ),
                 "title": "Forum",

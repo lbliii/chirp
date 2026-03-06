@@ -1,8 +1,8 @@
 """Root context for kanban_shell — columns, shell_actions, current_user."""
 
-from chirp import ShellAction, ShellActions, ShellActionZone, get_user
-
 from store import COLUMNS
+
+from chirp import ShellAction, ShellActions, ShellActionZone, get_user
 
 
 def context() -> dict:

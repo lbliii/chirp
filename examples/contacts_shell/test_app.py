@@ -79,7 +79,9 @@ class TestContactsShell:
             assert "Betty Jones" not in response.text
             assert "3 total" in response.text
 
-    async def test_delete_success_recomputes_filtered_view_and_triggers_feedback(self, example_app) -> None:
+    async def test_delete_success_recomputes_filtered_view_and_triggers_feedback(
+        self, example_app
+    ) -> None:
         async with TestClient(example_app) as client:
             response = await client.delete("/contacts/1/delete?q=alice")
             assert response.status == 200

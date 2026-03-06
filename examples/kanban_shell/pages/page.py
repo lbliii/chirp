@@ -1,8 +1,8 @@
 """Board page handler — GET /."""
 
-from chirp import Page, Redirect, get_user
+from store import get_tasks, tasks_by_column
 
-from store import COLUMNS, get_tasks, tasks_by_column
+from chirp import Page, Redirect, get_user
 
 
 def get(request, columns) -> Page | Redirect:

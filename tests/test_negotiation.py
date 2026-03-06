@@ -9,11 +9,11 @@ from kida import Environment, FileSystemLoader
 from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.http.response import Redirect, Response
+from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
 from chirp.realtime.events import EventStream
 from chirp.server.negotiation import negotiate
+from chirp.templating.composition import PageComposition
 from chirp.templating.integration import create_environment
-from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
-from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.returns import (
     OOB,
     Action,
@@ -731,8 +731,8 @@ class TestLayoutPageSlotContext:
     ) -> None:
         (tmp_path / "page.html").write_text(
             '{% extends "chirpui/app_shell_layout.html" %}'
-            '{% block brand %}Shell App{% end %}'
-            '{% block sidebar %}'
+            "{% block brand %}Shell App{% end %}"
+            "{% block sidebar %}"
             '{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}'
             "{% call sidebar() %}"
             '{% call sidebar_section("Main") %}'
@@ -740,7 +740,7 @@ class TestLayoutPageSlotContext:
             "{% end %}"
             "{% end %}"
             "{% end %}"
-            '{% block content %}<div>Hello shell</div>{% end %}',
+            "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
         env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
@@ -758,9 +758,9 @@ class TestLayoutPageSlotContext:
     ) -> None:
         (tmp_path / "page.html").write_text(
             '{% extends "chirpui/app_shell_layout.html" %}'
-            '{% block sidebar_collapsible %}true{% end %}'
-            '{% block brand %}Shell App{% end %}'
-            '{% block content %}<div>Hello shell</div>{% end %}',
+            "{% block sidebar_collapsible %}true{% end %}"
+            "{% block brand %}Shell App{% end %}"
+            "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
         env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
@@ -775,8 +775,8 @@ class TestLayoutPageSlotContext:
         self,
         tmp_path: Path,
     ) -> None:
-        from chirp.pages.types import LayoutChain, LayoutInfo
         from chirp.http.response import StreamingResponse
+        from chirp.pages.types import LayoutChain, LayoutInfo
 
         (tmp_path / "dashboard.html").write_text(
             "<h1>{{ title }}</h1>"
@@ -786,7 +786,7 @@ class TestLayoutPageSlotContext:
             encoding="utf-8",
         )
         (tmp_path / "_layout.html").write_text(
-            '{# target: body #}'
+            "{# target: body #}"
             '<html><body><div id="chirp-shell-actions"></div><main id="main">{% block content %}{% end %}</main></body></html>',
             encoding="utf-8",
         )
