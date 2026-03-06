@@ -291,8 +291,8 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            is_htmx = request is not None and request.is_fragment
             req = value.request if value.request is not None else request
+            is_htmx = bool(req and req.is_fragment)
             chunks = render_suspense(
                 kida_env,
                 value.suspense,
@@ -355,6 +355,8 @@ def negotiate(
 
 def _render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
     """Render shell action OOB markup for boosted layout navigations."""
+    from kida.environment.exceptions import TemplateNotFoundError
+
     actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
     fragment = shell_actions_fragment(actions)
     if fragment is None or actions is None:
@@ -362,12 +364,14 @@ def _render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) ->
         html = ""
     else:
         template_name, block_name, target = fragment
-        html = render_fragment(
-            kida_env,
-            Fragment(template_name, block_name, shell_actions=actions),
-        )
-
-    return f'<div id="{target}" hx-swap-oob="true">{html}</div>'
+        try:
+            html = render_fragment(
+                kida_env,
+                Fragment(template_name, block_name, shell_actions=actions),
+            )
+        except TemplateNotFoundError:
+            html = ""
+    return f'<div id="{target}" hx-swap-oob="innerHTML">{html}</div>'
 
 
 async def _append_shell_actions_oob_stream(

@@ -120,11 +120,11 @@ def _should_wrap_in_layouts(
         return False
     if request is None:
         return True
-    # Mirror LayoutPage: skip layouts for pure fragment requests
+    # Mirror LayoutPage: skip layouts for non-boosted fragment requests
     if (
         getattr(request, "is_fragment", False)
         and not getattr(request, "is_history_restore", False)
-        and not getattr(request, "htmx_target", None)
+        and not getattr(request, "is_boosted", False)
     ):
         return False
     return True

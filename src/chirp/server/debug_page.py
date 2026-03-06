@@ -119,13 +119,13 @@ def _extract_frames(
 def _collapse_framework_frames(
     frames: list[dict[str, Any]],
     min_collapse: int = 3,
-) -> list[dict[str, Any] | dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Collapse consecutive non-app (framework) frames into a summary.
 
     Reduces traceback noise from middleware, ASGI adapters, etc.
     Returns a mix of frame dicts and collapsed-group dicts.
     """
-    result: list[dict[str, Any] | dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     i = 0
     while i < len(frames):
         frame = frames[i]

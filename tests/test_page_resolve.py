@@ -385,15 +385,18 @@ class TestUpgradeResult:
         assert upgraded.main.context["title"] == "Home"
         assert upgraded.main.context["nav"] == "main"
 
-    @pytest.mark.filterwarnings("ignore:coroutine .* was never awaited")
     def test_suspense_to_layout_suspense_when_layout_chain_has_layouts(self) -> None:
         from chirp.pages.types import LayoutChain, LayoutInfo
         from chirp.templating.returns import LayoutSuspense, Suspense
 
-        async def _delayed():
-            return "done"
+        class _Delayed:
+            def __await__(self):
+                async def _coro():
+                    return "done"
 
-        result = Suspense("dashboard.html", title="Home", stats=_delayed())
+                return _coro().__await__()
+
+        result = Suspense("dashboard.html", title="Home", stats=_Delayed())
         chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
 
         upgraded = upgrade_result(

@@ -17,7 +17,7 @@
   // responses (filter, edit, etc.) get empty swap because they have no #page-content.
   document.body.addEventListener("htmx:beforeSwap", function(evt) {
     var target = evt.detail.target;
-    if (target && !/^#(main|page-content)$/.test(target)) {
+    if (target && !target.matches("#main, #page-content")) {
       evt.detail.selectOverride = "";
     }
   });

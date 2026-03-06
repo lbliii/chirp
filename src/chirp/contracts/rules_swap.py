@@ -152,7 +152,7 @@ def check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
                     severity=Severity.INFO,
                     category="fragment_island",
                     message=(
-                        f'Mutation target #"{target_id}" has no hx-disinherit. '
+                        f"Mutation target #{target_id} has no hx-disinherit. "
                         "Use fragment_island() or add hx-disinherit to avoid inherited "
                         "hx-select/hx-target breaking local swaps."
                     ),
