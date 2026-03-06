@@ -97,6 +97,20 @@ def search(request: Request):
 
 If `request.is_fragment` is `True`, it renders the block. Otherwise, it renders the full template. This eliminates the `if/else` pattern.
 
+When a route needs two fragment scopes, pass `page_block_name`:
+
+```python
+return Page(
+    "search.html",
+    "results_list",
+    page_block_name="page_root",
+    results=results,
+)
+```
+
+- `results_list` stays the narrow fragment target for explicit swaps
+- `page_root` becomes the fragment-safe root for boosted navigation
+
 ## OOB (Out-of-Band Swaps)
 
 Sometimes a single action needs to update multiple parts of the page. `OOB` sends a primary fragment plus additional out-of-band fragments in one response:
@@ -136,22 +150,30 @@ This renders the `form_errors` block with a 422 status code, which htmx can hand
 
 ## Block Availability
 
-Only blocks that the template explicitly defines or overrides are available for fragment rendering. Inherited parent blocks that are not overridden in the child template are not available.
+`render_block()` resolves inherited blocks. You can render a parent-defined page root from a child template, and child overrides still win inside that parent block.
 
 ```html
 {# child.html #}
 {% extends "base.html" %}
 
-{% block content %}
-  {# This block IS available as a fragment #}
-  {% block search_results %}
-    <div id="results">...</div>
-  {% endblock %}
+{% block search_results %}
+  <div id="results">...</div>
 {% endblock %}
-
-{# The "nav" block from base.html is NOT available #}
-{# unless child.html explicitly overrides it #}
 ```
+
+```html
+{# base.html #}
+{% block page_root %}
+  <section class="page-shell">
+    {% block search_results %}{% endblock %}
+  </section>
+{% endblock %}
+```
+
+In this shape:
+
+- `render_block("search_results")` returns only the inner results fragment
+- `render_block("page_root")` returns the full page shell with the child's `search_results` block injected
 
 ## Block-Heavy Layouts
 
@@ -193,7 +215,7 @@ Child templates override `extra_head` or `extra_scripts` to add content without 
 
 ### Nesting for Fragments
 
-Define fragment blocks inside the block that gets swapped. For example, if `content` is the target, put `results_list` inside it so the fragment target (`#results`) exists in the DOM.
+Define fragment blocks inside the block that gets swapped. For example, if `page_root` is the page-level swap target, put `results_list` inside it so the fragment target (`#results`) exists in the DOM.
 
 ## Next Steps
 

@@ -242,6 +242,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 continue
             if route_path in referenced_route_paths:
                 continue
+            # Skip param-based routes: static analysis can't prove dynamic URLs reference them
+            if "{" in route_path:
+                continue
             result.issues.append(
                 ContractIssue(
                     severity=Severity.INFO,

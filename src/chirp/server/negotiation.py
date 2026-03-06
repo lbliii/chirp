@@ -13,6 +13,12 @@ from kida import Environment
 
 from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, RenderIntent, Response, SSEResponse, StreamingResponse
+from chirp.pages.shell_actions import (
+    SHELL_ACTIONS_TARGET,
+    SHELL_ACTIONS_CONTEXT_KEY,
+    normalize_shell_actions,
+    shell_actions_fragment,
+)
 from chirp.realtime.events import EventStream
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import (
@@ -55,6 +61,22 @@ def _html_response(body: str, *, intent: RenderIntent) -> Response:
         content_type="text/html; charset=utf-8",
         render_intent=intent,
     )
+
+
+def _fragment_block_for_page(value: Page | LayoutPage, request: Request | None) -> str:
+    """Choose the block to render for an htmx fragment response."""
+    if request is not None and request.is_boosted:
+        return value.effective_page_block_name
+    return value.block_name
+
+
+def _should_render_page_block(request: Request | None) -> bool:
+    """Whether the request needs the page-level root instead of a narrow fragment."""
+    if request is None:
+        return True
+    if request.is_history_restore or not request.is_fragment:
+        return True
+    return request.is_boosted
 
 
 def negotiate(
@@ -146,7 +168,7 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             if request is not None and request.is_fragment and not request.is_history_restore:
-                frag = Fragment(value.name, value.block_name, **value.context)
+                frag = Fragment(value.name, _fragment_block_for_page(value, request), **value.context)
                 html = render_fragment(kida_env, frag)
                 intent = "fragment"
             else:
@@ -167,6 +189,8 @@ def negotiate(
                 if request is not None and request.is_fragment and not request.is_history_restore
                 else "full_page"
             )
+            if _should_append_shell_actions_oob(value, request):
+                html = _append_shell_actions_oob(html, value, kida_env)
             return _html_response(html, intent=render_intent)
         case Action():
             response = Response(body="").with_status(value.status)
@@ -341,20 +365,22 @@ def _render_layout_page(
         is_fragment = request.is_fragment
         is_history_restore = request.is_history_restore
 
-    # For pure fragment requests (no layouts involved), render just the block
-    if is_fragment and not is_history_restore and not htmx_target:
+    # Non-boosted htmx swaps should continue rendering the narrow fragment block,
+    # even when HX-Target is present. Boosted navigation and full-page/history
+    # flows use the wider page block below.
+    if not _should_render_page_block(request):
         frag = Fragment(value.name, value.block_name, **value.context)
         return render_fragment(kida_env, frag)
 
-    # Render the page's content block (value.context passed through for slot inheritance)
+    # Render the page's root block (value.context passed through for slot inheritance)
     _logger.debug(
         "render_block %s.%s with context keys: %s",
         value.name,
-        value.block_name,
+        value.effective_page_block_name,
         sorted(value.context.keys()),
     )
     page_template = kida_env.get_template(value.name)
-    page_html = page_template.render_block(value.block_name, value.context)
+    page_html = page_template.render_block(value.effective_page_block_name, value.context)
 
     # Compute layout depth for render_with_layouts
     layouts = layout_chain.layouts
@@ -395,3 +421,30 @@ def _render_layout_page(
         htmx_target=htmx_target,
         is_history_restore=is_history_restore,
     )
+
+
+def _append_shell_actions_oob(main_html: str, value: LayoutPage, kida_env: Environment) -> str:
+    """Append shell action OOB markup for boosted layout navigations."""
+    actions = normalize_shell_actions(value.context.get(SHELL_ACTIONS_CONTEXT_KEY))
+    fragment = shell_actions_fragment(actions)
+    if fragment is None or actions is None:
+        target = SHELL_ACTIONS_TARGET
+        html = ""
+    else:
+        template_name, block_name, target = fragment
+        html = render_fragment(
+            kida_env,
+            Fragment(template_name, block_name, shell_actions=actions),
+        )
+
+    return "\n".join((main_html, f'<div id="{target}" hx-swap-oob="true">{html}</div>'))
+
+
+def _should_append_shell_actions_oob(value: LayoutPage, request: "Request | None") -> bool:
+    """Whether a LayoutPage response should refresh shell actions via OOB."""
+    del value
+    if request is None:
+        return False
+    if not request.is_fragment or request.is_history_restore or not request.is_boosted:
+        return False
+    return True

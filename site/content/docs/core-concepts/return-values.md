@@ -91,6 +91,23 @@ def search(request: Request):
 
 `Page` is sugar over the `if request.is_fragment` pattern. If the request comes from htmx, it renders the block. Otherwise, it renders the full template.
 
+Use `page_block_name` when boosted page navigation needs a wider, fragment-safe root than the narrow fragment block:
+
+```python
+from chirp import Page
+
+@app.route("/dashboard")
+def dashboard():
+    return Page(
+        "dashboard.html",
+        "results_panel",
+        page_block_name="page_root",
+        stats=load_stats(),
+    )
+```
+
+This keeps ordinary fragment requests narrow (`results_panel`) while boosted navigation can swap a self-contained page root (`page_root`) that includes layout wrappers such as stacks, toolbars, and section spacing.
+
 :::{note}
 **LayoutPage** and **LayoutSuspense** are internal types used when filesystem routing renders through layout chains. Handlers return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You typically don't construct these directly.
 :::

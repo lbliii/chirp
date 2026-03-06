@@ -65,6 +65,10 @@ __all__ = [
     "Request",
     "Response",
     "SSEEvent",
+    "ShellAction",
+    "ShellActions",
+    "ShellActionZone",
+    "ShellMenuItem",
     "Stream",
     "Suspense",
     "Template",
@@ -113,6 +117,10 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Realtime
     "EventStream": ("chirp.realtime.events", "EventStream"),
     "SSEEvent": ("chirp.realtime.events", "SSEEvent"),
+    "ShellAction": ("chirp.pages.shell_actions", "ShellAction"),
+    "ShellActions": ("chirp.pages.shell_actions", "ShellActions"),
+    "ShellActionZone": ("chirp.pages.shell_actions", "ShellActionZone"),
+    "ShellMenuItem": ("chirp.pages.shell_actions", "ShellMenuItem"),
     # Middleware
     "AnyResponse": ("chirp.middleware.protocol", "AnyResponse"),
     "Middleware": ("chirp.middleware.protocol", "Middleware"),

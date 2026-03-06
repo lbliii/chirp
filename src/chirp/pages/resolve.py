@@ -16,10 +16,16 @@ Resolution priority for each handler parameter:
 from __future__ import annotations
 
 import inspect
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from chirp.extraction import extract_dataclass, is_extractable_dataclass
+from chirp.pages.shell_actions import (
+    SHELL_ACTIONS_CONTEXT_KEY,
+    merge_shell_actions,
+    normalize_shell_actions,
+)
 
 
 def _invoke_provider_factory(
@@ -43,6 +49,25 @@ def _invoke_provider_factory(
 if TYPE_CHECKING:
     from chirp.http.request import Request
     from chirp.pages.types import ContextProvider, LayoutChain
+
+
+def _warn_if_page_root_missing(result: Any) -> None:
+    """Warn about common mounted-pages fragment roots that drop page wrappers."""
+    from chirp.templating.returns import Page
+
+    if not isinstance(result, Page):
+        return
+    if result.page_block_name is not None:
+        return
+    if result.block_name != "page_content":
+        return
+    warnings.warn(
+        "Page(..., 'page_content') inside mount_pages should set "
+        "page_block_name='page_root' (or another fragment-safe page root) "
+        "so boosted navigation preserves page-level wrappers.",
+        UserWarning,
+        stacklevel=3,
+    )
 
 
 async def resolve_kwargs(
@@ -151,13 +176,16 @@ def upgrade_result(
         if *result* was a ``Suspense`` with layouts, otherwise *result*
         unchanged.
     """
-    from chirp.templating.returns import LayoutPage, LayoutSuspense, Page, Suspense
+    from chirp.templating.returns import LayoutPage, LayoutSuspense, OOB, Page, Suspense
+
+    merged_ctx = _merge_result_context(cascade_ctx, getattr(result, "context", {}))
 
     if isinstance(result, Page):
-        merged_ctx = {**cascade_ctx, **result.context}
+        _warn_if_page_root_missing(result)
         return LayoutPage(
             result.name,
             result.block_name,
+            page_block_name=result.page_block_name,
             layout_chain=layout_chain,
             context_providers=context_providers,
             **merged_ctx,
@@ -168,10 +196,9 @@ def upgrade_result(
         and layout_chain is not None
         and getattr(layout_chain, "layouts", ())
     ):
-        merged = {**cascade_ctx, **result.context}
         layout_ctx = {
             k: (None if inspect.isawaitable(v) else v)
-            for k, v in merged.items()
+            for k, v in merged_ctx.items()
         }
         return LayoutSuspense(
             result,
@@ -180,4 +207,27 @@ def upgrade_result(
             request=request,
         )
 
+    if isinstance(result, OOB):
+        upgraded_main = upgrade_result(
+            result.main,
+            cascade_ctx,
+            layout_chain,
+            context_providers,
+            request=request,
+        )
+        if upgraded_main is result.main:
+            return result
+        return OOB(upgraded_main, *result.oob_fragments)
+
     return result
+
+
+def _merge_result_context(cascade_ctx: dict[str, Any], result_ctx: dict[str, Any]) -> dict[str, Any]:
+    """Merge page result context with cascade context, preserving shell semantics."""
+    merged_ctx = {**cascade_ctx, **result_ctx}
+    cascade_actions = normalize_shell_actions(cascade_ctx.get(SHELL_ACTIONS_CONTEXT_KEY))
+    result_actions = normalize_shell_actions(result_ctx.get(SHELL_ACTIONS_CONTEXT_KEY))
+    merged_actions = merge_shell_actions(cascade_actions, result_actions)
+    if merged_actions is not None:
+        merged_ctx[SHELL_ACTIONS_CONTEXT_KEY] = merged_actions
+    return merged_ctx

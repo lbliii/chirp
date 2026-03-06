@@ -2,6 +2,7 @@
 
 import pytest
 
+from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone, ShellMenuItem
 from chirp.templating.returns import OOB, Fragment, Page, Stream, Template, ValidationError
 
 
@@ -114,6 +115,20 @@ class TestOOB:
             oob.main = Fragment("c.html", "d")  # type: ignore[misc]
 
 
+class TestPage:
+    def test_page_block_defaults_to_fragment_block(self) -> None:
+        page = Page("page.html", "content")
+        assert page.block_name == "content"
+        assert page.page_block_name is None
+        assert page.effective_page_block_name == "content"
+
+    def test_page_with_explicit_page_block(self) -> None:
+        page = Page("page.html", "panel", page_block_name="page_root")
+        assert page.block_name == "panel"
+        assert page.page_block_name == "page_root"
+        assert page.effective_page_block_name == "page_root"
+
+
 class TestTopLevelImports:
     """New return types are importable from the top-level chirp package."""
 
@@ -126,6 +141,14 @@ class TestTopLevelImports:
         import chirp
 
         assert chirp.OOB is OOB
+
+    def test_import_shell_actions(self) -> None:
+        import chirp
+
+        assert chirp.ShellAction is ShellAction
+        assert chirp.ShellActions is ShellActions
+        assert chirp.ShellActionZone is ShellActionZone
+        assert chirp.ShellMenuItem is ShellMenuItem
 
 
 class TestStream:

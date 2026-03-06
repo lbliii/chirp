@@ -6,7 +6,8 @@ import pytest
 
 from chirp.http.request import Request
 from chirp.pages.resolve import resolve_kwargs, upgrade_result
-from chirp.templating.returns import LayoutPage, Page
+from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
+from chirp.templating.returns import LayoutPage, OOB, Page
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -293,6 +294,24 @@ class TestUpgradeResult:
         assert upgraded.context["title"] == "Home"
         assert upgraded.context["nav"] == "main"
 
+    def test_page_root_block_is_preserved(self) -> None:
+        result = Page("page.html", "panel", page_block_name="page_root", title="Home")
+
+        upgraded = upgrade_result(result, {}, layout_chain=None, context_providers=())
+
+        assert isinstance(upgraded, LayoutPage)
+        assert upgraded.block_name == "panel"
+        assert upgraded.page_block_name == "page_root"
+        assert upgraded.effective_page_block_name == "page_root"
+
+    def test_warns_when_page_content_has_no_page_root(self) -> None:
+        result = Page("page.html", "page_content", title="Home")
+
+        with pytest.warns(UserWarning, match="page_block_name='page_root'"):
+            upgraded = upgrade_result(result, {}, layout_chain=None, context_providers=())
+
+        assert isinstance(upgraded, LayoutPage)
+
     def test_page_context_overrides_cascade(self) -> None:
         """Page's own context takes precedence over cascade context."""
         result = Page("page.html", "content", title="Page Title")
@@ -303,6 +322,32 @@ class TestUpgradeResult:
         assert isinstance(upgraded, LayoutPage)
         assert upgraded.context["title"] == "Page Title"
         assert upgraded.context["extra"] == "value"
+
+    def test_page_shell_actions_merge_with_cascade(self) -> None:
+        result = Page(
+            "page.html",
+            "content",
+            shell_actions=ShellActions(
+                primary=ShellActionZone(
+                    items=(ShellAction(id="reply", label="Reply", href="/reply"),),
+                    remove=("new-thread",),
+                )
+            ),
+        )
+        cascade_ctx = {
+            "shell_actions": ShellActions(
+                primary=ShellActionZone(
+                    items=(ShellAction(id="new-thread", label="New thread", href="/new"),)
+                )
+            )
+        }
+
+        upgraded = upgrade_result(result, cascade_ctx, layout_chain=None, context_providers=())
+
+        assert isinstance(upgraded, LayoutPage)
+        shell_actions = upgraded.context["shell_actions"]
+        assert isinstance(shell_actions, ShellActions)
+        assert [item.id for item in shell_actions.primary.items] == ["reply"]
 
     def test_layout_chain_passed_through(self) -> None:
         result = Page("page.html", "content")
@@ -329,6 +374,16 @@ class TestUpgradeResult:
     def test_none_passes_through(self) -> None:
         result = upgrade_result(None, {}, layout_chain=None, context_providers=())
         assert result is None
+
+    def test_oob_main_page_is_upgraded(self) -> None:
+        result = OOB(Page("page.html", "content", title="Home"))
+
+        upgraded = upgrade_result(result, {"nav": "main"}, layout_chain=None, context_providers=())
+
+        assert isinstance(upgraded, OOB)
+        assert isinstance(upgraded.main, LayoutPage)
+        assert upgraded.main.context["title"] == "Home"
+        assert upgraded.main.context["nav"] == "main"
 
     @pytest.mark.filterwarnings("ignore:coroutine .* was never awaited")
     def test_suspense_to_layout_suspense_when_layout_chain_has_layouts(self) -> None:

@@ -1,0 +1,10 @@
+{#- Chirp shell actions fragment
+
+   Renders the resolved route-scoped shell actions for OOB delivery into the
+   persistent shell target.
+-#}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+
+{% fragment content %}
+{{ shell_actions_bar(shell_actions) }}
+{% end %}

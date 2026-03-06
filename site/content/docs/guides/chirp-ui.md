@@ -122,6 +122,8 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 **Migrating from boost.html:** Replace `{% extends "chirp/layouts/boost.html" %}` with `{% extends "chirpui/app_shell_layout.html" %}`. Add `{% block brand %}`, `{% block sidebar %}`, etc. The `hx-select="#page-content"` and `id="page-content"` are already in place.
 
+**Page spacing contract:** Let the page-level wrapper own vertical rhythm. A good pattern is a parent layout with a `page_root` block that contains `container()` + `stack(gap="lg")`, while inner blocks such as `page_content` hold the page-specific sections. Pair that with `Page(..., "page_content", page_block_name="page_root", ...)` so boosted navigation swaps the full page shell instead of a too-narrow inner fragment.
+
 **Manual shell:** For full control, chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html`:
 
 ```html

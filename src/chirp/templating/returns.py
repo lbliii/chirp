@@ -108,15 +108,17 @@ class Fragment:
 
 @dataclass(frozen=True, slots=True)
 class Page:
-    """Render a full template or a named block, depending on the request.
+    """Render a full template or a request-aware page fragment.
 
     Combines Template and Fragment semantics.  The content negotiation
     layer inspects the incoming request headers and renders:
 
     * **Full template** for normal browser navigations and htmx
       history-restore requests.
-    * **Named block only** for htmx fragment requests (``HX-Request``
-      without ``HX-History-Restore-Request``).
+    * **Named fragment block** for narrow htmx fragment requests
+      (``HX-Request`` without ``HX-History-Restore-Request``).
+    * **Page block** for boosted navigations when a page needs a wider,
+      fragment-safe root than the narrow fragment block.
 
     This eliminates the manual ``if request.is_fragment`` boilerplate
     that every htmx-reachable route would otherwise need.
@@ -125,16 +127,40 @@ class Page:
 
         return Page("hackernews.html", "story_list",
                      stories=stories, page="list")
+
+    With an explicit page-level block for boosted navigation::
+
+        return Page(
+            "dashboard.html",
+            "results_panel",
+            page_block_name="page_root",
+            stats=stats,
+        )
     """
 
     name: str
     block_name: str
+    page_block_name: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, name: str, block_name: str, /, **context: Any) -> None:
+    def __init__(
+        self,
+        name: str,
+        block_name: str,
+        /,
+        *,
+        page_block_name: str | None = None,
+        **context: Any,
+    ) -> None:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "block_name", block_name)
+        object.__setattr__(self, "page_block_name", page_block_name)
         object.__setattr__(self, "context", context)
+
+    @property
+    def effective_page_block_name(self) -> str:
+        """Block used when a full page fragment root is required."""
+        return self.page_block_name or self.block_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,9 +407,10 @@ class LayoutPage:
     Used by ``mount_pages()`` routes.  The negotiation layer composes
     the layout chain at the correct depth based on ``HX-Target``:
 
-    * **Full page load**: render all layouts nested
-    * **Boosted navigation**: render from the targeted layout down
-    * **Fragment request**: render just the named block
+    * **Full page load**: render all layouts nested around the page block
+    * **Boosted navigation**: render from the targeted layout down using
+      the page block
+    * **Fragment request**: render just the fragment block
 
     The *layout_chain* and *context_providers* are set by the pages
     discovery system — handlers never construct this directly.
@@ -391,7 +418,9 @@ class LayoutPage:
     Usage (internal — set by the pages framework)::
 
         return LayoutPage(
-            "page.html", "content",
+            "page.html",
+            "content",
+            page_block_name="page_root",
             layout_chain=chain,
             context_providers=providers,
             title="Home",
@@ -400,6 +429,7 @@ class LayoutPage:
 
     name: str
     block_name: str
+    page_block_name: str | None = None
     layout_chain: LayoutChain | None = None
     context_providers: tuple[ContextProvider, ...] = ()
     context: dict[str, Any] = field(default_factory=dict)
@@ -410,15 +440,22 @@ class LayoutPage:
         block_name: str,
         /,
         *,
+        page_block_name: str | None = None,
         layout_chain: LayoutChain | None = None,
         context_providers: tuple[ContextProvider, ...] = (),
         **context: Any,
     ) -> None:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "block_name", block_name)
+        object.__setattr__(self, "page_block_name", page_block_name)
         object.__setattr__(self, "layout_chain", layout_chain)
         object.__setattr__(self, "context_providers", context_providers)
         object.__setattr__(self, "context", context)
+
+    @property
+    def effective_page_block_name(self) -> str:
+        """Block used when layouts or boosted swaps need the page root."""
+        return self.page_block_name or self.block_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,12 +483,12 @@ class OOB:
     matching their target.
     """
 
-    main: Fragment | Template | Page
+    main: Fragment | Template | Page | LayoutPage
     oob_fragments: tuple[Fragment, ...]
 
     def __init__(
         self,
-        main: Fragment | Template | Page,
+        main: Fragment | Template | Page | LayoutPage,
         /,
         *oob_fragments: Fragment,
     ) -> None:

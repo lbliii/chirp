@@ -3,14 +3,16 @@
 import re
 from typing import Any
 
+# \baction\b avoids matching "action" inside form_action, data-action, etc.
+_ACTION_OR_HX = r'(hx-(?:get|post|put|patch|delete)|\baction\b)'
 _ATTR_PATTERN_DOUBLE = re.compile(
-    r'(hx-(?:get|post|put|patch|delete)|action)\s*=\s*"([^"]*)"',
+    rf'{_ACTION_OR_HX}\s*=\s*"([^"]*)"',
 )
 _ATTR_PATTERN_SINGLE = re.compile(
-    r"(hx-(?:get|post|put|patch|delete)|action)\s*=\s*'([^']*)'",
+    rf"{_ACTION_OR_HX}\s*=\s*'([^']*)'",
 )
 _ATTRS_MAP_PATTERN = re.compile(
-    r"""["'](hx-(?:get|post|put|patch|delete)|action)["']\s*:\s*["']([^"']*)["'](?=\s*[,}])"""
+    rf"""["']{_ACTION_OR_HX}["']\s*:\s*["']([^"']*)["'](?=\s*[,}}])"""
 )
 _HX_TARGET_PATTERN = re.compile(r'hx-target\s*=\s*["\']([^"\']*)["\']')
 _ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
@@ -30,7 +32,7 @@ _ID_WITH_DISINHERIT_REVERSE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _MUTATING_WITH_TARGET = re.compile(
-    r'<(?:form|button|a|div|span)\b[^>]*\b(?:hx-(?:post|put|patch|delete)|action)\s*='
+    r'<(?:form|button|a|div|span)\b[^>]*\b(?:hx-(?:post|put|patch|delete)|\baction\b)\s*='
     r'[^>]*\bhx-target\s*=\s*["\']#([^"\'\s]+)["\']',
     re.IGNORECASE,
 )

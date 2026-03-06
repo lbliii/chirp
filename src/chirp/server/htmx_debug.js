@@ -225,7 +225,7 @@
     var style = document.createElement("style");
     style.id = "chirp-debug-styles";
     style.textContent = [
-      "#chirp-debug{font-family:ui-monospace,monospace;font-size:12px;--chirp-bg:" + COLORS.bg + ";--chirp-text:" + COLORS.text + ";--chirp-success:" + COLORS.success + ";--chirp-warning:" + COLORS.warning + ";--chirp-error:" + COLORS.error + ";--chirp-info:" + COLORS.info + ";--chirp-oob:" + COLORS.oob + "}",
+      "#chirp-debug{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:99998;font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:14px;line-height:1.5;--chirp-bg:" + COLORS.bg + ";--chirp-text:" + COLORS.text + ";--chirp-success:" + COLORS.success + ";--chirp-warning:" + COLORS.warning + ";--chirp-error:" + COLORS.error + ";--chirp-info:" + COLORS.info + ";--chirp-oob:" + COLORS.oob + "}",
       ".chirp-dbg-pill{position:fixed;bottom:16px;right:16px;z-index:99998;background:var(--chirp-bg);color:var(--chirp-text);border:1px solid var(--chirp-info);border-radius:20px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.3)}",
       ".chirp-dbg-pill:hover{background:#252530}",
       ".chirp-dbg-pill .chirp-dbg-badge{background:var(--chirp-info);color:var(--chirp-bg);border-radius:10px;padding:2px 6px;font-size:10px}",
@@ -239,28 +239,32 @@
       ".chirp-dbg-tab:hover{background:#252530}",
       ".chirp-dbg-tab.active{border-bottom-color:var(--chirp-info);color:var(--chirp-info)}",
       ".chirp-dbg-tab .badge{background:var(--chirp-error);color:var(--chirp-bg);border-radius:8px;padding:1px 5px;font-size:10px;margin-left:4px}",
-      ".chirp-dbg-panel{flex:1;overflow:auto;padding:12px}",
-      ".chirp-dbg-log-row{padding:6px 8px;border-radius:4px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}",
+      ".chirp-dbg-panel{flex:1;overflow:auto;padding:16px}",
+      ".chirp-dbg-log-row{padding:10px 12px;border-radius:4px;cursor:pointer;margin-bottom:4px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}",
       ".chirp-dbg-log-row:hover{background:#252530}",
       ".chirp-dbg-log-row.expanded{background:#252530}",
       ".chirp-dbg-log-row .method{font-weight:bold;min-width:40px}",
       ".chirp-dbg-log-row .path{flex:1;overflow:hidden;text-overflow:ellipsis}",
       ".chirp-dbg-log-row .status{min-width:36px}",
-      ".chirp-dbg-log-row .time{min-width:40px;color:#666}",
-      ".chirp-dbg-log-row .target{color:#888;font-size:11px}",
-      ".chirp-dbg-log-detail{padding:8px 12px;margin:4px 0;background:#0d0e14;border-radius:4px;font-size:11px;white-space:pre-wrap;word-break:break-all}",
+      ".chirp-dbg-log-row .time{min-width:40px;color:#7c8396}",
+      ".chirp-dbg-log-row .target{color:#9aa2c9;font-size:13px}",
+      ".chirp-dbg-log-detail{padding:12px 14px;margin:6px 0;background:#0d0e14;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}",
       ".chirp-dbg-filter{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}",
       ".chirp-dbg-filter input{flex:1;min-width:120px;padding:6px 8px;background:#0d0e14;border:1px solid #333;border-radius:4px;color:var(--chirp-text)}",
       ".chirp-dbg-filter button{padding:6px 12px;background:#333;border:none;border-radius:4px;color:var(--chirp-text);cursor:pointer}",
       ".chirp-dbg-filter button:hover{background:#444}",
-      ".chirp-dbg-toast{pointer-events:auto;background:var(--chirp-bg);color:var(--chirp-text);border:1px solid;border-left:4px solid;border-radius:6px;padding:10px 14px;max-width:420px;font-size:13px;display:flex;align-items:flex-start;gap:8px}",
+      ".chirp-dbg-toast{pointer-events:auto;background:var(--chirp-bg);color:var(--chirp-text);border:1px solid;border-left:4px solid;border-radius:6px;padding:12px 16px;max-width:440px;font-size:14px;line-height:1.5;display:flex;align-items:flex-start;gap:8px}",
       ".chirp-dbg-toast .body{flex:1;white-space:pre-wrap}",
       ".chirp-dbg-toast .copy{cursor:pointer;opacity:.7}",
       ".chirp-dbg-toast .copy:hover{opacity:1}",
       ".chirp-dbg-inspector-overlay{position:fixed;inset:0;z-index:99996;pointer-events:none}",
       ".chirp-dbg-inspector-overlay.active{pointer-events:auto}",
       ".chirp-dbg-highlight{outline:2px solid var(--chirp-info);outline-offset:2px;pointer-events:none}",
-      ".chirp-dbg-tooltip{position:fixed;background:var(--chirp-bg);border:1px solid var(--chirp-info);border-radius:6px;padding:10px;max-width:400px;font-size:11px;white-space:pre-wrap;z-index:99999;pointer-events:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)}",
+      ".chirp-dbg-tooltip{position:fixed;background:var(--chirp-bg);border:1px solid var(--chirp-info);border-radius:6px;padding:12px;max-width:420px;font-size:13px;line-height:1.5;white-space:pre-wrap;z-index:99999;pointer-events:auto;box-shadow:0 4px 12px rgba(0,0,0,.4)}",
+      ".chirp-dbg-err-row{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:4px;cursor:pointer;margin-bottom:6px;background:#1e1f2e;border-left:4px solid var(--chirp-error)}",
+      ".chirp-dbg-err-row:hover{background:#252530}",
+      ".chirp-dbg-err-row .chirp-dbg-err-title{font-weight:bold;color:var(--chirp-error);font-size:14px}",
+      ".chirp-dbg-err-row .chirp-dbg-err-body{color:var(--chirp-text);white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.5}",
       "@keyframes chirp-dbg-flash{0%{outline-color:var(--chirp-info);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
       "@keyframes chirp-dbg-flash-oob{0%{outline-color:var(--chirp-oob);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
       "@keyframes chirp-dbg-flash-err{0%{outline-color:var(--chirp-error);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
@@ -329,7 +333,7 @@
 
     panelRoot = document.createElement("div");
     panelRoot.id = "chirp-debug";
-    panelRoot.setAttribute("style", "position:fixed;inset:0;pointer-events:none;z-index:99998");
+    panelRoot.setAttribute("style", "position:fixed;inset:0;pointer-events:none;z-index:99998;overflow:hidden");
 
     togglePill = document.createElement("div");
     togglePill.className = "chirp-dbg-pill";
@@ -538,28 +542,30 @@
     errorsPanel.innerHTML = "";
     state.errors.forEach(function(e, i) {
       var row = document.createElement("div");
-      row.className = "chirp-dbg-log-row";
+      row.className = "chirp-dbg-err-row";
       var full = e.title + "\n\n" + e.body + (e.config ? "\n\n" + e.config : "");
+      var bodyEscaped = (e.body || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       row.innerHTML =
-        "<span class='method' style='color:" + COLORS.error + "'>" + e.title + "</span>" +
-        "<span class='path'>" + e.body.slice(0, 60) + (e.body.length > 60 ? "..." : "") + "</span>" +
-        "<span class='copy' title='Copy'>\u2398</span>";
+        "<div style='display:flex;align-items:flex-start;justify-content:space-between;gap:8px'>" +
+        "<span class='chirp-dbg-err-title'>" + (e.title || "Error") + "</span>" +
+        "<span class='copy' title='Copy' style='cursor:pointer;opacity:.8;flex-shrink:0'>\u2398</span>" +
+        "</div>" +
+        "<div class='chirp-dbg-err-body'>" + bodyEscaped + "</div>";
       row.querySelector(".copy").addEventListener("click", function(ev) {
         ev.stopPropagation();
         navigator.clipboard.writeText(full).catch(function() {});
       });
-      row.addEventListener("click", function(ev) {
-        if (!ev.target.classList.contains("copy")) {
-          var detail = row.querySelector(".chirp-dbg-log-detail");
-          if (detail) detail.remove();
-          else {
-            var d = document.createElement("div");
-            d.className = "chirp-dbg-log-detail";
-            d.textContent = full;
-            row.appendChild(d);
-          }
-        }
-      });
+      if (e.config) {
+        var cfgDiv = document.createElement("div");
+        cfgDiv.className = "chirp-dbg-log-detail";
+        cfgDiv.style.display = "none";
+        cfgDiv.textContent = "Effective hx-* attributes:\n" + e.config;
+        row.appendChild(cfgDiv);
+        row.addEventListener("click", function(ev) {
+          if (ev.target.classList.contains("copy")) return;
+          cfgDiv.style.display = cfgDiv.style.display === "none" ? "block" : "none";
+        });
+      }
       errorsPanel.appendChild(row);
     });
   }
