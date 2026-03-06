@@ -8,6 +8,9 @@ from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
+from chirp.errors import ConfigurationError
+from chirp.templating.integration import render_fragment, render_template
+from chirp.templating.returns import Fragment, InlineTemplate, Template
 
 from .compiler import AppCompiler
 from .diagnostics import ContractCheckRunner
@@ -319,6 +322,34 @@ class App:
         self._ensure_frozen()
         self._assert_contracts_ready()
         self._contract_checks.check(self, warnings_as_errors=warnings_as_errors)
+
+    def render(
+        self, value: Fragment | Template | InlineTemplate
+    ) -> str:
+        """Render a Fragment, Template, or InlineTemplate to HTML without an HTTP request.
+
+        Use for tests, background jobs, scripts, or AI runtimes that need to
+        produce HTML from the app's templates.
+
+        Raises:
+            ConfigurationError: If kida_env is not configured (Fragment/Template
+                require template_dir or custom kida_env).
+        """
+        self._ensure_frozen()
+        env = self._runtime_state.kida_env
+        if isinstance(value, InlineTemplate):
+            if env is None:
+                env = Environment()
+            return env.from_string(value.source).render(value.context)
+        if env is None:
+            msg = (
+                "Fragment/Template return types require kida integration. "
+                "Ensure a template_dir is configured in AppConfig."
+            )
+            raise ConfigurationError(msg)
+        if isinstance(value, Fragment):
+            return render_fragment(env, value)
+        return render_template(env, value)
 
     def _check_not_frozen(self) -> None:
         if self._runtime_state.frozen:

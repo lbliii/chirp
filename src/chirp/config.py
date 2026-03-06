@@ -7,6 +7,7 @@ no string-key dict lookups.
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 def _env_bool(key: str, default: bool = False) -> bool:
@@ -61,6 +62,7 @@ class AppConfig:
     component_dirs: tuple[
         str | Path, ...
     ] = ()  # Additional template directories (e.g. components, partials)
+    extra_loaders: tuple[Any, ...] = ()  # Kida Loader instances, tried first (CMS, DB, state)
     autoescape: bool = True
     trim_blocks: bool = True
     lstrip_blocks: bool = True

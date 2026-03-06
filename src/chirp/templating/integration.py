@@ -58,10 +58,10 @@ def create_environment(
 
     Supports multiple template directories via ``config.component_dirs``
     for component libraries, partials, and shared templates.
+    Extra loaders (CMS, DB, state) are tried first when configured.
     """
-    loaders = [
-        FileSystemLoader(str(config.template_dir)),
-    ]
+    loaders = list(config.extra_loaders)
+    loaders.append(FileSystemLoader(str(config.template_dir)))
 
     # Add component directories (for components, partials, shared templates)
     loaders.extend(FileSystemLoader(str(d)) for d in config.component_dirs)
