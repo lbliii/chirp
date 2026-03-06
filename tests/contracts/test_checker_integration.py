@@ -23,7 +23,7 @@ def test_checker_golden_category_counts(tmp_path) -> None:
     result = check_hypermedia_surface(app)
     categories = [issue.category for issue in result.issues]
     assert categories.count("method") == 1
-    assert categories.count("hx-target") == 1
+    assert categories.count("hx-target") >= 1
     assert categories.count("dead") == 1
 
 

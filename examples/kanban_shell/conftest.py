@@ -25,6 +25,10 @@ def example_app(request: pytest.FixtureRequest):
         sys.modules[module_name] = module
         sys.modules["app"] = module
         spec.loader.exec_module(module)
+        # Reset store to seed state for test isolation
+        store_mod = sys.modules.get("store")
+        if store_mod is not None and hasattr(store_mod, "reseed"):
+            store_mod.reseed()
         yield module.app
     finally:
         if module is not None and sys.modules.get("app") is module:

@@ -80,6 +80,15 @@ def _seed() -> None:
 _seed()
 
 
+def reseed() -> None:
+    """Reset store to initial seed state. Used by tests for isolation."""
+    global _tasks, _next_id
+    with _lock:
+        _tasks.clear()
+        _next_id = 1
+    _seed()
+
+
 def get_tasks() -> list[Task]:
     with _lock:
         return list(_tasks)

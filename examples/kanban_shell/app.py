@@ -265,7 +265,7 @@ async def save_task_route(request: Request, task_id: int):
 
     tasks = get_tasks()
     return OOB(
-        Fragment("page.html", "task_card_block", task=updated),
+        Fragment("page.html", "task_card_block", task=updated, current_user=get_user()),
         _stats_fragment(tasks),
     )
 

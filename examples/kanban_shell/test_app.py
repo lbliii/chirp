@@ -1,6 +1,8 @@
 """Tests for the kanban_shell example — auth, board rendering, CRUD, move, filter, SSE."""
 
+import asyncio
 import re
+from unittest.mock import AsyncMock, patch
 
 from chirp.testing import (
     TestClient,
@@ -525,29 +527,68 @@ class TestSSE:
 
     async def test_sse_returns_events(self, example_app) -> None:
         """SSE stream emits fragment events with OOB swaps."""
-        async with TestClient(example_app) as client:
-            auth = await _login(client)
-            result = await client.sse("/events", max_events=3, headers=auth)
+        with (
+            patch("app.random_move") as mock_move,
+            patch("app.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            from dataclasses import replace
+
+            from store import COLUMNS, get_tasks
+
+            tasks = get_tasks()
+            if tasks:
+                t = tasks[0]
+                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                mock_move.return_value = (replace(t, status=new_status), t.status)
+            async with TestClient(example_app) as client:
+                auth = await _login(client)
+                result = await client.sse("/events", max_events=3, headers=auth)
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 3
 
     async def test_sse_events_are_fragments(self, example_app) -> None:
         """Fragment events contain rendered HTML, not raw template syntax."""
-        async with TestClient(example_app) as client:
-            auth = await _login(client)
-            result = await client.sse("/events", max_events=3, headers=auth)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
-        assert len(fragment_events) >= 3
-        for evt in fragment_events:
+        with (
+            patch("app.random_move") as mock_move,
+            patch("app.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            from dataclasses import replace
+
+            from store import COLUMNS, get_tasks
+
+            tasks = get_tasks()
+            if tasks:
+                t = tasks[0]
+                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                mock_move.return_value = (replace(t, status=new_status), t.status)
+            async with TestClient(example_app) as client:
+                auth = await _login(client)
+                result = await client.sse("/events", max_events=3, headers=auth)
+        # Events use Fragment target as event name (e.g. column-backlog, board-stats)
+        html_events = [e for e in result.events if e.data]
+        assert len(html_events) >= 3
+        for evt in html_events:
             assert "{{" not in evt.data
             assert "{%" not in evt.data
 
     async def test_sse_includes_oob_swaps(self, example_app) -> None:
         """SSE fragment events include hx-swap-oob for targeted updates."""
-        async with TestClient(example_app) as client:
-            auth = await _login(client)
-            result = await client.sse("/events", max_events=3, headers=auth)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
-        oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
+        with (
+            patch("app.random_move") as mock_move,
+            patch("app.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            from dataclasses import replace
+
+            from store import COLUMNS, get_tasks
+
+            tasks = get_tasks()
+            if tasks:
+                t = tasks[0]
+                new_status = next((s for s in dict(COLUMNS).keys() if s != t.status), t.status)
+                mock_move.return_value = (replace(t, status=new_status), t.status)
+            async with TestClient(example_app) as client:
+                auth = await _login(client)
+                result = await client.sse("/events", max_events=3, headers=auth)
+        oob_events = [e for e in result.events if e.data and "hx-swap-oob" in e.data]
         assert len(oob_events) >= 1

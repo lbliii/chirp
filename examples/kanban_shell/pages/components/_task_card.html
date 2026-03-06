@@ -1,7 +1,6 @@
 {% from "chirpui/badge.html" import badge %}
 
-{% def task_card(task, oob=false) %}
-{% let me = current_user %}
+{% def task_card(task, oob=false, me=none) %}
 <div id="task-{{ task.id }}" class="kanban-card kanban-card--{{ task.priority }}{{ " kanban-card--mine" if me and me.name == (task.assignee or "") else "" }}"
      {{ ' hx-swap-oob="outerHTML"' if oob else "" }}
      data-task-id="{{ task.id }}" data-status="{{ task.status }}">
