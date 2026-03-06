@@ -121,13 +121,11 @@ def _should_wrap_in_layouts(
     if request is None:
         return True
     # Mirror LayoutPage: skip layouts for non-boosted fragment requests
-    if (
+    return not (
         getattr(request, "is_fragment", False)
         and not getattr(request, "is_history_restore", False)
         and not getattr(request, "is_boosted", False)
-    ):
-        return False
-    return True
+    )
 
 
 async def render_suspense(

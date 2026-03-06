@@ -447,7 +447,6 @@ def _render_frame(frame: dict[str, Any]) -> str:
 
 def _render_collapsed_frames(group: dict[str, Any]) -> str:
     """Render a collapsed group of framework frames with expand toggle."""
-    count = group["count"]
     summary = group["summary"]
     frames = group["frames"]
     frames_html = "".join(_render_frame(f) for f in frames)
