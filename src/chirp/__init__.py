@@ -32,7 +32,7 @@ AI streaming (``pip install chirp[ai]``)::
 # Declare free-threading support (PEP 703)
 _Py_mod_gil = 0
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 CHIRP_CAPABILITIES = frozenset(
     {
         # Guarantees startup contract checks run after runtime state publication.

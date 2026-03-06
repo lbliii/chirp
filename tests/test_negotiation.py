@@ -682,7 +682,7 @@ class TestLayoutPageSlotContext:
 
         assert result.render_intent == "fragment"
         assert 'id="chirp-shell-actions"' in result.text
-        assert 'hx-swap-oob="true"' in result.text
+        assert 'hx-swap-oob="innerHTML"' in result.text
         assert 'href="/skills/new"' in result.text
 
     def test_layout_page_boosted_navigation_clears_shell_actions_when_missing(
@@ -723,7 +723,7 @@ class TestLayoutPageSlotContext:
         )
 
         assert 'id="chirp-shell-actions"' in result.text
-        assert 'hx-swap-oob="true"></div>' in result.text
+        assert 'hx-swap-oob="innerHTML"></div>' in result.text
 
     def test_template_extending_chirpui_app_shell_layout_renders(
         self,
@@ -838,7 +838,7 @@ class TestLayoutPageSlotContext:
         combined = "".join(chunks)
         assert "Loading stats..." in combined
         assert 'id="chirp-shell-actions"' in combined
-        assert 'hx-swap-oob="true"' in combined
+        assert 'hx-swap-oob="innerHTML"' in combined
         assert 'href="/deploy"' in combined
 
     def test_layout_page_boosted_navigation_prefers_page_block_name(self, tmp_path: Path) -> None:

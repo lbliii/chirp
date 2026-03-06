@@ -158,11 +158,14 @@ async def render_suspense(
     defer_map = suspense.defer_map
     formatter = format_oob_htmx if is_htmx else format_oob_script
 
+    layout_ctx = layout_context if layout_context is not None else {}
+
     # -- Phase 1: Separate sync vs. async context --
+    # Merge layout_context (cascade: shell_actions, current_user) so template can access it
     sync_ctx: dict[str, Any] = {}
     pending: dict[str, Awaitable[Any]] = {}
 
-    for key, value in context.items():
+    for key, value in {**layout_ctx, **context}.items():
         if inspect.isawaitable(value):
             pending[key] = value
         else:
@@ -183,8 +186,6 @@ async def render_suspense(
             htmx_target=htmx_target,
             is_history_restore=is_history_restore,
         )
-
-    layout_ctx = layout_context if layout_context is not None else {}
 
     # Fast path: no awaitables — render full page in one shot
     if not pending:
@@ -219,7 +220,7 @@ async def render_suspense(
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
-    full_ctx = {**sync_ctx, **resolved}
+    full_ctx = {**layout_ctx, **sync_ctx, **resolved}
     deferred_keys = set(pending.keys())
     key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
 

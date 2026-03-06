@@ -7,10 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-03-06
+
 ### Added
 
 - **PageComposition API** — Python-first composition with `ViewRef`, `RegionUpdate`, and `PageComposition`. Explicit `fragment_block` / `page_block` semantics and region updates for shell actions. `Page` and `LayoutPage` are normalized through the same render-plan pipeline. See `chirp.templating.composition`.
-- **Suspense + layout chain** — Handlers that return `Suspense` from `mount_pages` routes now receive the full layout shell (head, CSS, sidebar). `upgrade_result` wraps `Suspense` in `LayoutSuspense` when a layout chain exists; `render_suspense` wraps the first chunk via `render_with_layouts`. Fragment-only requests skip layout wrapping (same as `LayoutPage`).
+- **Suspense + layout chain** — Handlers that return `Suspense` from `mount_pages` routes now receive the full layout shell (head, CSS, sidebar). `upgrade_result` wraps `Suspense` in `LayoutSuspense` when a layout chain exists; `render_suspense` wraps the first chunk via `render_with_layouts`. Fragment-only requests skip layout wrapping (same as `LayoutPage`). `layout_context` is merged into template context so cascade values (`shell_actions`, `current_user`) reach Suspense templates.
+- **kanban_shell example** — Full example app with app shell, chirp-ui, mount_pages, OOB swaps, SSE, filter sidebar, and CRUD. Demonstrates `mount_pages` + `@app.route` mix.
+- **htmx debug overlay** — S-tier debug panel with activity log, inspector, and swap flash when `config.debug=True`. Collapsible framework frames, Kida branding/version, ParseError suggestions.
+- **HX-Reselect header** — Fragment responses now send `HX-Reselect: *` so htmx re-parses OOB swaps correctly when the response structure differs from the initial request.
+- **Data layout patterns** — chirp-ui guide documents UI layout patterns for app shells and content regions.
+
+### Changed
+
+- **Shell-actions OOB** — Region updates for `#chirp-shell-actions` now use `hx-swap-oob="innerHTML"` instead of `"true"` to preserve container attributes (classes, structure) during boosted navigation.
+- **Contracts** — `extract_mutation_target_ids()` uses `\baction\b` in regex to avoid false positives from `form_action`, `data-action`, etc.
+
+### Fixed
+
+- **TemplateNotFoundError** — Shell-actions OOB render catches `TemplateNotFoundError` when chirp-ui is not installed and falls back to empty OOB.
 
 ## [0.1.5] — 2026-03-04
 
@@ -47,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Regex for Kida URL extraction in htmx attributes
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
+[0.1.6]: https://github.com/lbliii/chirp/releases/tag/v0.1.6
 [0.1.5]: https://github.com/lbliii/chirp/releases/tag/v0.1.5
 [0.1.4]: https://github.com/lbliii/chirp/releases/tag/v0.1.4
 

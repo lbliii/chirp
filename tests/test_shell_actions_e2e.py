@@ -154,7 +154,7 @@ class TestShellActionsMountedPages:
             assert thread_response.status == 200
             assert "<h1>Thread</h1>" in thread_response.text
             assert 'id="chirp-shell-actions"' in thread_response.text
-            assert 'hx-swap-oob="true"' in thread_response.text
+            assert 'hx-swap-oob="innerHTML"' in thread_response.text
             assert "Reply" in thread_response.text
             assert "New thread" not in thread_response.text
 
@@ -165,6 +165,8 @@ class TestShellActionsMountedPages:
             )
             assert archived_response.status == 200
             assert "<h1>Archived</h1>" in archived_response.text
-            assert '<div id="chirp-shell-actions" hx-swap-oob="true">' in archived_response.text
+            assert (
+                '<div id="chirp-shell-actions" hx-swap-oob="innerHTML">' in archived_response.text
+            )
             assert "Reply" not in archived_response.text
             assert "New thread" not in archived_response.text

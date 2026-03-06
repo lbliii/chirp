@@ -153,9 +153,7 @@ app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
 app.add_middleware(
-    SessionMiddleware(
-        SessionConfig(secret_key=_secret, cookie_name="chirp_session_kanban_shell")
-    )
+    SessionMiddleware(SessionConfig(secret_key=_secret, cookie_name="chirp_session_kanban_shell"))
 )
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
@@ -300,7 +298,9 @@ def delete_task_route(task_id: int):
     delete_task(task_id)
     tasks = get_tasks()
 
-    toast_frag = Fragment("components/toast_oob.html", "toast", message="Task deleted.", variant="info")
+    toast_frag = Fragment(
+        "components/toast_oob.html", "toast", message="Task deleted.", variant="info"
+    )
     return (
         OOB(
             _column_fragment(column, tasks),

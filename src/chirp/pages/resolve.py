@@ -196,10 +196,7 @@ def upgrade_result(
         and layout_chain is not None
         and getattr(layout_chain, "layouts", ())
     ):
-        layout_ctx = {
-            k: (None if inspect.isawaitable(v) else v)
-            for k, v in merged_ctx.items()
-        }
+        layout_ctx = {k: (None if inspect.isawaitable(v) else v) for k, v in merged_ctx.items()}
         return LayoutSuspense(
             result,
             layout_chain,
@@ -222,7 +219,9 @@ def upgrade_result(
     return result
 
 
-def _merge_result_context(cascade_ctx: dict[str, Any], result_ctx: dict[str, Any]) -> dict[str, Any]:
+def _merge_result_context(
+    cascade_ctx: dict[str, Any], result_ctx: dict[str, Any]
+) -> dict[str, Any]:
     """Merge page result context with cascade context, preserving shell semantics."""
     merged_ctx = {**cascade_ctx, **result_ctx}
     cascade_actions = normalize_shell_actions(cascade_ctx.get(SHELL_ACTIONS_CONTEXT_KEY))

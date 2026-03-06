@@ -133,7 +133,7 @@ def extract_mutation_target_ids(source: str) -> set[str]:
         if val and "{{" not in val and "{%" not in val:
             ids.add(val)
     mutating_blocks = re.findall(
-        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|action)\s*[=:][^}]+"
+        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|\baction\b)\s*[=:][^}]+"
         r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\']',
         source,
         re.IGNORECASE | re.DOTALL,

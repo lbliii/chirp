@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 
 if TYPE_CHECKING:
@@ -278,5 +279,7 @@ def serialize_rendered_plan(rendered: RenderedPlan) -> str:
     """Serialize rendered plan to final HTML with OOB fragments."""
     parts: list[str] = [rendered.main_html]
     for region_id, html in rendered.region_htmls.items():
-        parts.append(f'<div id="{region_id}" hx-swap-oob="true">{html}</div>')
+        # Use innerHTML for shell-actions to preserve container attributes
+        swap = "innerHTML" if region_id == SHELL_ACTIONS_TARGET else "true"
+        parts.append(f'<div id="{region_id}" hx-swap-oob="{swap}">{html}</div>')
     return "\n".join(parts)
