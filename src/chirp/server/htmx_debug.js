@@ -178,12 +178,14 @@
   document.body.addEventListener("htmx:afterSwap", function(evt) {
     var d = evt.detail || {};
     var r = findPendingRecord(true, true);
+    if (!r) return;
     r.timing.afterSwap = Date.now();
     if (state.flash && d.target) flashTarget(d.target, r.failed ? "error" : "normal");
   });
 
   document.body.addEventListener("htmx:afterSettle", function(evt) {
     var r = findPendingRecord(true, true);
+    if (!r) return;
     r.timing.settle = Date.now();
   });
 

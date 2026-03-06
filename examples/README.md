@@ -42,6 +42,17 @@ and `HX-Push-Url` for bookmarkable edit URLs. Tests use all `assert_hx_*` helper
 cd examples/contacts && python app.py
 ```
 
+### `pages_shell/` — Filesystem Routing + Shell Actions
+
+A focused mounted-pages example for Chirp's current routing story. Shows
+`app.mount_pages()`, co-located `page.py` / `page.html`, `_context.py`
+cascade, route-scoped shell actions, `page_root` for boosted list navigation,
+and `Suspense` on a nested detail page.
+
+```bash
+cd examples/pages_shell && python app.py
+```
+
 ### `sse/` — Real-Time Events
 
 Server-Sent Events pushing HTML fragments to the browser in real-time. The async generator

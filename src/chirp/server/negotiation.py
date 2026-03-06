@@ -7,6 +7,7 @@ no magic, fully predictable.
 
 import json as json_module
 import logging
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
@@ -284,6 +285,8 @@ def negotiate(
                 layout_context=value.context,
                 request=req,
             )
+            if _should_append_streamed_shell_actions_oob(value.context, req):
+                chunks = _append_shell_actions_oob_stream(chunks, value.context, kida_env)
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
@@ -423,9 +426,9 @@ def _render_layout_page(
     )
 
 
-def _append_shell_actions_oob(main_html: str, value: LayoutPage, kida_env: Environment) -> str:
-    """Append shell action OOB markup for boosted layout navigations."""
-    actions = normalize_shell_actions(value.context.get(SHELL_ACTIONS_CONTEXT_KEY))
+def _render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
+    """Render shell action OOB markup for boosted layout navigations."""
+    actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
     fragment = shell_actions_fragment(actions)
     if fragment is None or actions is None:
         target = SHELL_ACTIONS_TARGET
@@ -437,12 +440,48 @@ def _append_shell_actions_oob(main_html: str, value: LayoutPage, kida_env: Envir
             Fragment(template_name, block_name, shell_actions=actions),
         )
 
-    return "\n".join((main_html, f'<div id="{target}" hx-swap-oob="true">{html}</div>'))
+    return f'<div id="{target}" hx-swap-oob="true">{html}</div>'
+
+
+def _append_shell_actions_oob(main_html: str, value: LayoutPage, kida_env: Environment) -> str:
+    """Append shell action OOB markup for boosted layout navigations."""
+    return "\n".join((main_html, _render_shell_actions_oob(value.context, kida_env)))
+
+
+async def _append_shell_actions_oob_stream(
+    chunks: AsyncIterator[str],
+    context: dict[str, Any],
+    kida_env: Environment,
+) -> AsyncIterator[str]:
+    """Append shell action OOB markup to the first streamed chunk."""
+    first_chunk = True
+    oob = _render_shell_actions_oob(context, kida_env)
+    async for chunk in chunks:
+        if first_chunk:
+            yield "\n".join((chunk, oob))
+            first_chunk = False
+            continue
+        yield chunk
+    if first_chunk:
+        yield oob
 
 
 def _should_append_shell_actions_oob(value: LayoutPage, request: "Request | None") -> bool:
     """Whether a LayoutPage response should refresh shell actions via OOB."""
     del value
+    if request is None:
+        return False
+    if not request.is_fragment or request.is_history_restore or not request.is_boosted:
+        return False
+    return True
+
+
+def _should_append_streamed_shell_actions_oob(
+    context: dict[str, Any],
+    request: "Request | None",
+) -> bool:
+    """Whether a streamed layout response should refresh shell actions via OOB."""
+    del context
     if request is None:
         return False
     if not request.is_fragment or request.is_history_restore or not request.is_boosted:

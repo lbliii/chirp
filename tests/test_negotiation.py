@@ -19,8 +19,10 @@ from chirp.templating.returns import (
     FormAction,
     Fragment,
     LayoutPage,
+    LayoutSuspense,
     Page,
     Stream,
+    Suspense,
     Template,
     ValidationError,
 )
@@ -676,6 +678,122 @@ class TestLayoutPageSlotContext:
 
         assert 'id="chirp-shell-actions"' in result.text
         assert 'hx-swap-oob="true"></div>' in result.text
+
+    def test_template_extending_chirpui_app_shell_layout_renders(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% extends "chirpui/app_shell_layout.html" %}'
+            '{% block brand %}Shell App{% end %}'
+            '{% block sidebar %}'
+            '{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}'
+            "{% call sidebar() %}"
+            '{% call sidebar_section("Main") %}'
+            '{{ sidebar_link("/", "Home") }}'
+            "{% end %}"
+            "{% end %}"
+            "{% end %}"
+            '{% block content %}<div>Hello shell</div>{% end %}',
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        result = negotiate(Template("page.html"), kida_env=env)
+
+        assert result.status == 200
+        assert "Shell App" in result.text
+        assert "Hello shell" in result.text
+        assert 'class="chirpui-app-shell' in result.text
+
+    def test_template_extending_chirpui_app_shell_layout_keeps_collapsible_override(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% extends "chirpui/app_shell_layout.html" %}'
+            '{% block sidebar_collapsible %}true{% end %}'
+            '{% block brand %}Shell App{% end %}'
+            '{% block content %}<div>Hello shell</div>{% end %}',
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        result = negotiate(Template("page.html"), kida_env=env)
+
+        assert result.status == 200
+        assert 'data-sidebar-collapsible="true"' in result.text
+
+    @pytest.mark.asyncio
+    async def test_layout_suspense_boosted_navigation_appends_shell_actions_oob(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        from chirp.pages.types import LayoutChain, LayoutInfo
+        from chirp.http.response import StreamingResponse
+
+        (tmp_path / "dashboard.html").write_text(
+            "<h1>{{ title }}</h1>"
+            '<div id="stats">{% block stats %}'
+            "{% if stats %}<p>{{ stats[0] }}</p>{% else %}<p>Loading stats...</p>{% end %}"
+            "{% end %}</div>",
+            encoding="utf-8",
+        )
+        (tmp_path / "_layout.html").write_text(
+            '{# target: body #}'
+            '<html><body><div id="chirp-shell-actions"></div><main id="main">{% block content %}{% end %}</main></body></html>',
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/dashboard",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        async def _stats():
+            return ["ready"]
+
+        result = negotiate(
+            LayoutSuspense(
+                Suspense("dashboard.html", title="Dashboard", stats=_stats()),
+                LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),)),
+                context={
+                    "shell_actions": ShellActions(
+                        primary=ShellActionZone(
+                            items=(ShellAction(id="deploy", label="Deploy", href="/deploy"),)
+                        )
+                    )
+                },
+                request=request,
+            ),
+            kida_env=env,
+            request=request,
+        )
+
+        assert isinstance(result, StreamingResponse)
+        chunks = [chunk async for chunk in result.chunks]
+        combined = "".join(chunks)
+        assert "Loading stats..." in combined
+        assert 'id="chirp-shell-actions"' in combined
+        assert 'hx-swap-oob="true"' in combined
+        assert 'href="/deploy"' in combined
 
     def test_layout_page_boosted_navigation_prefers_page_block_name(self, tmp_path: Path) -> None:
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
