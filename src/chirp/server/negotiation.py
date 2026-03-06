@@ -57,11 +57,14 @@ def _minimal_kida_env() -> Environment:
 
 def _html_response(body: str, *, intent: RenderIntent) -> Response:
     """Build a text/html response with explicit render intent."""
-    return Response(
+    resp = Response(
         body=body,
         content_type="text/html; charset=utf-8",
         render_intent=intent,
     )
+    if intent == "fragment":
+        resp = resp.with_header("HX-Reselect", "*")
+    return resp
 
 
 def _fragment_block_for_page(value: Page | LayoutPage, request: Request | None) -> str:
