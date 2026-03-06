@@ -1,0 +1,9 @@
+{% def field(name, label, type="text", value="", placeholder="", required=true) %}
+<div class="chirpui-field">
+  <label class="chirpui-field__label" for="field-{{ name }}">{{ label }}</label>
+  <input class="chirpui-field__input" type="{{ type }}" id="field-{{ name }}" name="{{ name }}"
+         value="{{ value }}"
+         placeholder="{{ placeholder }}"
+         {{ "required" if required else "" }}>
+</div>
+{% end %}

@@ -1,0 +1,60 @@
+{# target: body #}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+{% from "chirpui/toast.html" import toast_container %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kanban</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <link rel="stylesheet" href="/static/chirpui.css">
+  <link rel="stylesheet" href="/static/chirpui-transitions.css">
+  <link rel="stylesheet" href="/static/board.css">
+</head>
+<body>
+  {% set shell_actions_target = shell_actions.target if shell_actions is defined and shell_actions else "chirp-shell-actions" %}
+  <div class="chirpui-app-shell">
+    <header class="chirpui-app-shell__topbar">
+      <a href="/" class="chirpui-app-shell__brand">Kanban</a>
+      <div class="chirpui-app-shell__topbar-center">
+        <span class="chirpui-text-muted chirpui-font-sm">App shell + chirp-ui + mount_pages</span>
+      </div>
+      <div class="chirpui-app-shell__topbar-end">
+        <div id="{{ shell_actions_target }}" class="chirpui-app-shell__shell-actions">
+          {% if shell_actions is defined %}
+          {{ shell_actions_bar(shell_actions) }}
+          {% end %}
+        </div>
+        {% if current_user is defined and current_user %}
+        <div class="kanban-user-info">
+          <span class="kanban-avatar">{{ current_user.name | first | upper }}</span>
+          <span class="kanban-name">{{ current_user.name }}</span>
+          <form method="post" action="/logout" style="margin:0;display:inline">
+            {{ csrf_field() }}
+            <button type="submit" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm">Logout</button>
+          </form>
+        </div>
+        {% end %}
+      </div>
+    </header>
+    <aside class="chirpui-app-shell__sidebar">
+      {% call sidebar() %}
+        {% call sidebar_section("Navigation") %}
+          {{ sidebar_link("/", "Board", icon="grid", active=true) }}
+          {{ sidebar_link("/login", "Login", icon="user") }}
+        {% end %}
+      {% end %}
+    </aside>
+    <main id="main" class="chirpui-app-shell__main"
+          hx-boost="true" hx-target="#main"
+          hx-swap="innerHTML transition:true" hx-select="#page-content">
+      <div id="page-content">{% block content %}{% end %}</div>
+    </main>
+  </div>
+  {{ toast_container() }}
+</body>
+</html>

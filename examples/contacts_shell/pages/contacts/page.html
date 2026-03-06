@@ -1,0 +1,212 @@
+{% imports %}
+  {% from "chirpui/badge.html" import badge %}
+  {% from "chirpui/button.html" import btn, button_group %}
+  {% from "chirpui/card.html" import card %}
+  {% from "chirpui/confirm.html" import confirm_dialog, confirm_trigger %}
+  {% from "chirpui/fragment_island.html" import fragment_island %}
+  {% from "chirpui/forms.html" import hidden_field, text_field %}
+  {% from "chirpui/layout.html" import container, grid, page_header, stack, cluster %}
+  {% from "chirpui/table.html" import table %}
+{% end %}
+
+{% block page_root %}
+{% call container(max_width="84rem") %}
+{% call stack(gap="lg") %}
+{% call page_header(
+  "Contacts",
+  subtitle="A chirp-ui shell version of the canonical contacts CRUD example.",
+  meta="Search state lives in the URL, shell actions live in _context.py, and inline edits re-render the current filtered view."
+) %}
+{% slot actions %}
+{{ badge(total_count ~ " total", variant="primary") }}
+{% end %}
+{% end %}
+
+{% block page_content %}
+{% block contacts_page %}
+{% call fragment_island("contacts-page", cls="chirpui-stack chirpui-stack--lg") %}
+  <div id="contacts-status" class="chirpui-visually-hidden" aria-live="polite"></div>
+  <input id="contacts-query-state" type="hidden" name="q" value="{{ query }}">
+
+  {% call grid(cols=2, gap="lg") %}
+    <div>
+      {% block contact_form %}
+      <div id="contact-form-card">
+        {% call card(
+          title="Add contact",
+          subtitle="This form always submits against the current query state.",
+          icon="add"
+        ) %}
+        <form
+          id="contact-add-form"
+          class="chirpui-form"
+          action="/contacts/create"
+          method="post"
+          hx-post="/contacts/create"
+          hx-target="#contacts-page"
+          hx-swap="outerHTML"
+          hx-disabled-elt="find button"
+        >
+          {{ hidden_field("q", query) }}
+          {{ text_field("name", value=add_form?.name ?? "", label="Name", errors=add_errors, placeholder="Ada Lovelace", required=true) }}
+          {{ text_field("email", value=add_form?.email ?? "", label="Email", errors=add_errors, type="email", placeholder="ada@example.com", required=true) }}
+          <div class="chirpui-form-actions chirpui-form-actions--end">
+            {{ btn("Add contact", variant="primary", icon="add", loading=true) }}
+          </div>
+        </form>
+        {% end %}
+      </div>
+      {% endblock %}
+    </div>
+
+    <div>
+      {% call stack(gap="lg") %}
+        {% call card(
+          title="Directory",
+          subtitle="Filter with the URL, then edit or delete rows inline.",
+          icon="search"
+        ) %}
+        <form
+          id="contact-search-form"
+          class="chirpui-form"
+          action="/contacts"
+          method="get"
+          hx-get="/contacts"
+          hx-target="#contacts-page"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+        >
+          {{ text_field("q", value=query, label="Search", placeholder="Filter by name or email") }}
+          <div class="chirpui-form-actions chirpui-form-actions--end">
+            {{ btn("Search", variant="primary", icon="search", type="submit") }}
+            {{ btn("Clear", href="/contacts", variant="ghost", size="sm") }}
+          </div>
+        </form>
+
+        <div class="chirpui-cluster chirpui-cluster--sm">
+          {{ badge(visible_count ~ " visible", variant="info") }}
+          {{ badge(total_count ~ " total", variant="primary") }}
+          {% if query %}
+          {{ badge("Query: " ~ query, variant="warning") }}
+          {% end %}
+        </div>
+
+        {% block contacts_table %}
+        <div id="contacts-table-region">
+          {% call table(headers=["Name", "Email"], striped=true, actions_header=true) %}
+            {% for contact in contacts %}
+            <tr class="chirpui-table__row" id="contact-{{ contact.id }}">
+              {% if editing_contact_id == contact.id %}
+              <td class="chirpui-table__td">
+                <input
+                  class="chirpui-field__input"
+                  type="text"
+                  name="name"
+                  value="{{ edit_form?.name ?? contact.name }}"
+                  form="contact-edit-{{ contact.id }}"
+                >
+                {% for msg in (edit_errors ?? {}).get("name", []) %}
+                <span class="chirpui-field__error">{{ msg }}</span>
+                {% end %}
+              </td>
+              <td class="chirpui-table__td">
+                <input
+                  class="chirpui-field__input"
+                  type="email"
+                  name="email"
+                  value="{{ edit_form?.email ?? contact.email }}"
+                  form="contact-edit-{{ contact.id }}"
+                >
+                {% for msg in (edit_errors ?? {}).get("email", []) %}
+                <span class="chirpui-field__error">{{ msg }}</span>
+                {% end %}
+              </td>
+              <td class="chirpui-table__td">
+                <form
+                  id="contact-edit-{{ contact.id }}"
+                  action="/contacts/{{ contact.id }}/save"
+                  method="post"
+                  hx-post="/contacts/{{ contact.id }}/save"
+                  hx-target="#contacts-page"
+                  hx-swap="outerHTML"
+                >
+                  {{ hidden_field("q", query) }}
+                  {% call button_group() %}
+                  {{ btn("Save", variant="primary", size="sm", loading=true) }}
+                  {{ btn("Cancel", href="/contacts/" ~ contact.id ~ "/cancel", variant="ghost", size="sm", type="button", hx_get="/contacts/" ~ contact.id ~ "/cancel", hx_target="#contacts-page", hx_swap="outerHTML", hx_include="#contacts-query-state") }}
+                  {% end %}
+                </form>
+              </td>
+              {% else %}
+              <td class="chirpui-table__td">
+                <strong>{{ contact.name }}</strong>
+              </td>
+              <td class="chirpui-table__td">{{ contact.email }}</td>
+              <td class="chirpui-table__td">
+                {% call button_group() %}
+                {{ btn("Edit", href="/contacts/" ~ contact.id ~ "/edit", variant="ghost", size="sm", hx_get="/contacts/" ~ contact.id ~ "/edit", hx_target="#contacts-page", hx_swap="outerHTML", hx_include="#contacts-query-state") }}
+                {{ confirm_trigger("delete-contact-" ~ contact.id, label="Delete", cls="chirpui-btn chirpui-btn--danger chirpui-btn--sm") }}
+                {% end %}
+                {% call confirm_dialog(
+                  "delete-contact-" ~ contact.id,
+                  title="Delete " ~ contact.name ~ "?",
+                  message="The table will re-render using the current filter after delete.",
+                  confirm_label="Delete",
+                  cancel_label="Keep",
+                  variant="danger",
+                  confirm_url="/contacts/" ~ contact.id ~ "/delete",
+                  confirm_method="DELETE",
+                  hx_target="#contacts-page",
+                  hx_swap="outerHTML"
+                ) %}
+                  {% slot form_content %}
+                  {{ hidden_field("q", query) }}
+                  {% end %}
+                {% end %}
+              </td>
+              {% end %}
+            </tr>
+            {% endfor %}
+            {% unless contacts %}
+            <tr class="chirpui-table__row">
+              <td class="chirpui-table__td" colspan="3">
+                No contacts match this query.
+              </td>
+            </tr>
+            {% end %}
+          {% end %}
+        </div>
+        {% endblock %}
+        {% end %}
+      {% end %}
+    </div>
+  {% end %}
+{% end %}
+{% endblock %}
+{% endblock %}
+
+<script>
+(function() {
+  if (window.__contactsShellBound) return;
+  window.__contactsShellBound = true;
+  const messages = {
+    contactCreated: "Contact created.",
+    contactSaved: "Contact saved.",
+    contactDeleted: "Contact deleted."
+  };
+
+  Object.entries(messages).forEach(function(entry) {
+    const eventName = entry[0];
+    const message = entry[1];
+    document.body.addEventListener(eventName, function() {
+      const status = document.getElementById("contacts-status");
+      if (status) {
+        status.textContent = message;
+      }
+    });
+  });
+})();
+</script>
+{% end %}
+{% end %}
+{% endblock %}

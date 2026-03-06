@@ -42,6 +42,17 @@ and `HX-Push-Url` for bookmarkable edit URLs. Tests use all `assert_hx_*` helper
 cd examples/contacts && python app.py
 ```
 
+### `contacts_shell/` — chirp-ui App Shell CRUD
+
+A shell-first companion to the vanilla contacts demo. Shows `use_chirp_ui(app)`,
+`app.mount_pages()`, `chirpui/app_shell_layout.html`, route-scoped `ShellActions`,
+query-backed filtering, and inline row editing that always re-renders the current
+filtered view from the server.
+
+```bash
+cd examples/contacts_shell && python app.py
+```
+
 ### `pages_shell/` — Filesystem Routing + Shell Actions
 
 A focused mounted-pages example for Chirp's current routing story. Shows
@@ -180,6 +191,17 @@ coalescing (`??`), component imports, fragment caching.
 
 ```bash
 cd examples/kanban && python app.py
+```
+
+### `kanban_shell/` — Kanban with App Shell and mount_pages
+
+Same kanban features (auth, CRUD, OOB, SSE, filtering) using the app shell pattern,
+chirp-ui components, and `mount_pages` routing. Demonstrates mixing filesystem
+routing with explicit `@app.route` API endpoints, filter sidebar, and toast notifications.
+
+```bash
+pip install chirp[ui]
+cd examples/kanban_shell && python app.py
 ```
 
 ### `ollama/` — Local LLM Chat with Ollama
