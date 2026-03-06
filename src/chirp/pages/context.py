@@ -10,6 +10,11 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
+from chirp.pages.shell_actions import (
+    SHELL_ACTIONS_CONTEXT_KEY,
+    merge_shell_actions,
+    normalize_shell_actions,
+)
 from chirp.pages.types import ContextProvider
 
 
@@ -58,7 +63,16 @@ async def build_cascade_context(
         if inspect.isawaitable(result):
             result = await result
         if isinstance(result, dict):
-            ctx.update(result)
+            for key, value in result.items():
+                if key != SHELL_ACTIONS_CONTEXT_KEY:
+                    ctx[key] = value
+                    continue
+
+                current = normalize_shell_actions(ctx.get(SHELL_ACTIONS_CONTEXT_KEY))
+                incoming = normalize_shell_actions(value)
+                merged = merge_shell_actions(current, incoming)
+                if merged is not None:
+                    ctx[SHELL_ACTIONS_CONTEXT_KEY] = merged
     return ctx
 
 

@@ -198,3 +198,43 @@ class TestCreateEnvironmentChirpUIFallback:
             globals_={},
         )
         assert env.filters["html_attrs"] is custom_html_attrs
+
+
+# ── create_environment extra_loaders ──────────────────────────────────────
+
+
+class TestCreateEnvironmentExtraLoaders:
+    """Extra loaders are tried first (CMS, DB, state)."""
+
+    def test_extra_loaders_tried_first(self, tmp_path: Path) -> None:
+        """Templates from extra_loaders override filesystem."""
+        from kida import DictLoader
+
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "override.html").write_text("<p>filesystem</p>")
+        config = AppConfig(
+            template_dir=str(tmp_path),
+            extra_loaders=(DictLoader({"override.html": "<p>OVERRIDE</p>"}),),
+        )
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("override.html").render()
+        assert "OVERRIDE" in html
+        assert "filesystem" not in html
+
+    def test_extra_loaders_fallback_to_filesystem(self, tmp_path: Path) -> None:
+        """When extra_loader lacks a template, filesystem is used."""
+        from kida import DictLoader
+
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "page.html").write_text("<h1>{{ title }}</h1>")
+        config = AppConfig(
+            template_dir=str(tmp_path),
+            extra_loaders=(DictLoader({"other.html": "<p>other</p>"}),),
+        )
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("page.html").render(title="Home")
+        assert "<h1>Home</h1>" in html

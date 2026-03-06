@@ -91,9 +91,55 @@ def search(request: Request):
 
 `Page` is sugar over the `if request.is_fragment` pattern. If the request comes from htmx, it renders the block. Otherwise, it renders the full template.
 
+Use `page_block_name` when boosted page navigation needs a wider, fragment-safe root than the narrow fragment block:
+
+```python
+from chirp import Page
+
+@app.route("/dashboard")
+def dashboard():
+    return Page(
+        "dashboard.html",
+        "results_panel",
+        page_block_name="page_root",
+        stats=load_stats(),
+    )
+```
+
+This keeps ordinary fragment requests narrow (`results_panel`) while boosted navigation can swap a self-contained page root (`page_root`) that includes layout wrappers such as stacks, toolbars, and section spacing.
+
 :::{note}
-**LayoutPage** is the internal type used when filesystem routing renders through layout chains. Handlers return `Page`; Chirp upgrades it to `LayoutPage` when layouts are involved. You typically don't construct `LayoutPage` directly.
+**LayoutPage** and **LayoutSuspense** are internal types used when filesystem routing renders through layout chains. Handlers return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You typically don't construct these directly.
 :::
+
+## PageComposition
+
+Python-first composition API for explicit page structure. Use `fragment_block` and `page_block` instead of `block_name` / `page_block_name`, and add optional region updates for shell actions:
+
+```python
+from chirp import PageComposition, RegionUpdate, ViewRef
+
+@app.route("/skills")
+def skills():
+    return PageComposition(
+        template="skills/page.html",
+        fragment_block="page_content",
+        page_block="page_root",
+        context={"skills": skills},
+        regions=(
+            RegionUpdate(
+                region="shell_actions",
+                view=ViewRef(
+                    template="chirp/shell_actions.html",
+                    block="content",
+                    context={"shell_actions": actions},
+                ),
+            ),
+        ),
+    )
+```
+
+`Page` and `LayoutPage` are normalized to `PageComposition` internally; both APIs work. Use `PageComposition` when you want explicit region updates or clearer semantics.
 
 ## Stream
 

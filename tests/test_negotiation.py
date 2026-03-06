@@ -6,18 +6,24 @@ from pathlib import Path
 import pytest
 from kida import Environment, FileSystemLoader
 
+from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.http.response import Redirect, Response
+from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
 from chirp.realtime.events import EventStream
 from chirp.server.negotiation import negotiate
+from chirp.templating.composition import PageComposition
+from chirp.templating.integration import create_environment
 from chirp.templating.returns import (
     OOB,
     Action,
     FormAction,
     Fragment,
     LayoutPage,
+    LayoutSuspense,
     Page,
     Stream,
+    Suspense,
     Template,
     ValidationError,
 )
@@ -28,6 +34,15 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 @pytest.fixture
 def kida_env() -> Environment:
     return Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+
+
+@pytest.fixture
+def kida_env_with_packages() -> Environment:
+    return create_environment(
+        AppConfig(template_dir=TEMPLATES_DIR),
+        filters={},
+        globals_={},
+    )
 
 
 class TestNegotiatePassthrough:
@@ -77,6 +92,7 @@ class TestNegotiateTemplateTypes:
         # Fragment should NOT include the full page wrapper
         assert "<form>" not in result.text
         assert result.render_intent == "fragment"
+        assert result.header("HX-Reselect") == "*"
 
     def test_page_intent_tracks_fragment_request(self, kida_env: Environment) -> None:
         async def _receive():
@@ -101,6 +117,82 @@ class TestNegotiateTemplateTypes:
             request=request,
         )
         assert result.render_intent == "fragment"
+
+    def test_page_composition_renders_fragment(self, kida_env: Environment) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [(b"hx-request", b"true")],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+        comp = PageComposition(
+            template="search.html",
+            fragment_block="results_list",
+            context={"results": ["a", "b"]},
+        )
+        result = negotiate(comp, kida_env=kida_env, request=request)
+        assert result.render_intent == "fragment"
+        assert "a" in result.text
+        assert "b" in result.text
+
+    def test_page_composition_renders_full_page(self, kida_env: Environment) -> None:
+        comp = PageComposition(
+            template="page.html",
+            fragment_block="content",
+            page_block="content",
+            context={"title": "Composed", "items": []},
+        )
+        result = negotiate(comp, kida_env=kida_env)
+        assert result.render_intent == "full_page"
+        assert "<title>Composed</title>" in result.text
+
+    def test_page_boosted_request_prefers_page_block_name(self, tmp_path: Path) -> None:
+        env = Environment(loader=FileSystemLoader(str(tmp_path)))
+        (tmp_path / "base.html").write_text(
+            '{% block page_root %}<div class="page-root">{% block panel %}{% endblock %}</div>{% endblock %}'
+        )
+        (tmp_path / "child.html").write_text(
+            '{% extends "base.html" %}{% block panel %}<div id="panel">{{ message }}</div>{% endblock %}'
+        )
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+        result = negotiate(
+            Page("child.html", "panel", page_block_name="page_root", message="Hello"),
+            kida_env=env,
+            request=request,
+        )
+        assert result.render_intent == "fragment"
+        assert 'class="page-root"' in result.text
+        assert 'id="panel"' in result.text
+        assert "Hello" in result.text
 
     def test_template_without_env_raises(self) -> None:
         from chirp.errors import ConfigurationError
@@ -159,6 +251,7 @@ class TestNegotiateValidationError:
         assert "email: Required" in result.text
         # Should be a fragment, not the full page
         assert "<html>" not in result.text
+        assert result.header("HX-Reselect") == "*"
 
     def test_without_retarget_has_no_hx_header(self, kida_env: Environment) -> None:
         result = negotiate(
@@ -166,6 +259,7 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
         header_names = {name for name, _ in result.headers}
         assert "HX-Retarget" not in header_names
 
@@ -180,6 +274,7 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
         assert ("HX-Retarget", "#error-banner") in result.headers
         assert "email: Invalid" in result.text
 
@@ -483,6 +578,7 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
 
     def test_validation_error_tuple_can_override_status(self, kida_env: Environment) -> None:
         """A tuple can override ValidationError's default 422 to another code."""
@@ -491,6 +587,7 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 400
+        assert result.header("HX-Reselect") == "*"
 
     def test_oob_with_zero_fragments(self, kida_env: Environment) -> None:
         """OOB with only a main and no OOB fragments renders normally."""
@@ -510,6 +607,7 @@ class TestNegotiateEdgeCases:
         )
         assert result.status == 422
         assert "err" in result.text
+        assert result.header("HX-Reselect") == "*"
 
 
 class TestLayoutPageSlotContext:
@@ -539,6 +637,290 @@ class TestLayoutPageSlotContext:
         assert "abc" in result.text
         assert 'action="/skills"' in result.text
         assert "Skills" in result.text
+
+    def test_layout_page_boosted_navigation_appends_shell_actions_oob(
+        self,
+        kida_env_with_packages: Environment,
+    ) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/skills",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        result = negotiate(
+            LayoutPage(
+                "skills/page.html",
+                "page_content",
+                shell_actions=ShellActions(
+                    primary=ShellActionZone(
+                        items=(ShellAction(id="new-skill", label="New skill", href="/skills/new"),)
+                    )
+                ),
+                q="search",
+                selected_tags=["a", "b"],
+                all_tags=["a", "b", "c"],
+            ),
+            kida_env=kida_env_with_packages,
+            request=request,
+        )
+
+        assert result.render_intent == "fragment"
+        assert 'id="chirp-shell-actions"' in result.text
+        assert 'hx-swap-oob="innerHTML"' in result.text
+        assert 'href="/skills/new"' in result.text
+
+    def test_layout_page_boosted_navigation_clears_shell_actions_when_missing(
+        self,
+        kida_env_with_packages: Environment,
+    ) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/skills",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        result = negotiate(
+            LayoutPage(
+                "skills/page.html",
+                "page_content",
+                q="search",
+                selected_tags=["a", "b"],
+                all_tags=["a", "b", "c"],
+            ),
+            kida_env=kida_env_with_packages,
+            request=request,
+        )
+
+        assert 'id="chirp-shell-actions"' in result.text
+        assert 'hx-swap-oob="innerHTML"></div>' in result.text
+
+    def test_template_extending_chirpui_app_shell_layout_renders(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% extends "chirpui/app_shell_layout.html" %}'
+            "{% block brand %}Shell App{% end %}"
+            "{% block sidebar %}"
+            '{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}'
+            "{% call sidebar() %}"
+            '{% call sidebar_section("Main") %}'
+            '{{ sidebar_link("/", "Home") }}'
+            "{% end %}"
+            "{% end %}"
+            "{% end %}"
+            "{% block content %}<div>Hello shell</div>{% end %}",
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        result = negotiate(Template("page.html"), kida_env=env)
+
+        assert result.status == 200
+        assert "Shell App" in result.text
+        assert "Hello shell" in result.text
+        assert 'class="chirpui-app-shell' in result.text
+
+    def test_template_extending_chirpui_app_shell_layout_keeps_collapsible_override(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% extends "chirpui/app_shell_layout.html" %}'
+            "{% block sidebar_collapsible %}true{% end %}"
+            "{% block brand %}Shell App{% end %}"
+            "{% block content %}<div>Hello shell</div>{% end %}",
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        result = negotiate(Template("page.html"), kida_env=env)
+
+        assert result.status == 200
+        assert 'data-sidebar-collapsible="true"' in result.text
+
+    @pytest.mark.asyncio
+    async def test_layout_suspense_boosted_navigation_appends_shell_actions_oob(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        from chirp.http.response import StreamingResponse
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        (tmp_path / "dashboard.html").write_text(
+            "<h1>{{ title }}</h1>"
+            '<div id="stats">{% block stats %}'
+            "{% if stats %}<p>{{ stats[0] }}</p>{% else %}<p>Loading stats...</p>{% end %}"
+            "{% end %}</div>",
+            encoding="utf-8",
+        )
+        (tmp_path / "_layout.html").write_text(
+            "{# target: body #}"
+            '<html><body><div id="chirp-shell-actions"></div><main id="main">{% block content %}{% end %}</main></body></html>',
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/dashboard",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        async def _stats():
+            return ["ready"]
+
+        result = negotiate(
+            LayoutSuspense(
+                Suspense("dashboard.html", title="Dashboard", stats=_stats()),
+                LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),)),
+                context={
+                    "shell_actions": ShellActions(
+                        primary=ShellActionZone(
+                            items=(ShellAction(id="deploy", label="Deploy", href="/deploy"),)
+                        )
+                    )
+                },
+                request=request,
+            ),
+            kida_env=env,
+            request=request,
+        )
+
+        assert isinstance(result, StreamingResponse)
+        chunks = [chunk async for chunk in result.chunks]
+        combined = "".join(chunks)
+        assert "Loading stats..." in combined
+        assert 'id="chirp-shell-actions"' in combined
+        assert 'hx-swap-oob="innerHTML"' in combined
+        assert 'href="/deploy"' in combined
+
+    def test_layout_page_boosted_navigation_prefers_page_block_name(self, tmp_path: Path) -> None:
+        env = Environment(loader=FileSystemLoader(str(tmp_path)))
+        (tmp_path / "base.html").write_text(
+            '{% block page_root %}<section class="page-root">{% block panel %}{% endblock %}</section>{% endblock %}'
+        )
+        (tmp_path / "child.html").write_text(
+            '{% extends "base.html" %}{% block panel %}<div id="panel">{{ body }}</div>{% endblock %}'
+        )
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/child",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        result = negotiate(
+            LayoutPage("child.html", "panel", page_block_name="page_root", body="Hello"),
+            kida_env=env,
+            request=request,
+        )
+
+        assert result.render_intent == "fragment"
+        assert 'class="page-root"' in result.text
+        assert 'id="panel"' in result.text
+        assert "Hello" in result.text
+
+    def test_layout_page_non_boosted_fragment_keeps_fragment_block(self, tmp_path: Path) -> None:
+        env = Environment(loader=FileSystemLoader(str(tmp_path)))
+        (tmp_path / "base.html").write_text(
+            '{% block page_root %}<section class="page-root">{% block panel %}{% endblock %}</section>{% endblock %}'
+        )
+        (tmp_path / "child.html").write_text(
+            '{% extends "base.html" %}{% block panel %}<div id="panel">{{ body }}</div>{% endblock %}'
+        )
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/child",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-target", b"panel"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        result = negotiate(
+            LayoutPage("child.html", "panel", page_block_name="page_root", body="Hello"),
+            kida_env=env,
+            request=request,
+        )
+
+        assert result.render_intent == "fragment"
+        assert 'id="panel"' in result.text
+        assert "Hello" in result.text
+        assert 'class="page-root"' not in result.text
 
 
 class TestNegotiateErrors:

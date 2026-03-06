@@ -6,7 +6,7 @@ once during App._freeze() and passed through the request pipeline.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
@@ -19,8 +19,8 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
     """Ensure chirp-ui required filters exist when chirp-ui templates are loadable.
 
     When chirp adds chirp-ui's PackageLoader, those templates require bem, field_errors,
-    html_attrs, validate_variant. This fallback adds any missing filters so the env
-    is self-consistent. See docs/rfcs/001-component-filter-contract.md.
+    html_attrs, validate_variant, icon. This fallback adds any missing filters so the
+    env is self-consistent. See docs/rfcs/001-component-filter-contract.md.
     """
     try:
         import chirp_ui  # noqa: F401
@@ -30,15 +30,20 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
         from chirp_ui.filters import bem, field_errors, html_attrs, validate_variant
     except ImportError:
         return
+    try:
+        from chirp_ui.filters import icon
+    except ImportError:
+        from chirp_ui.icons import icon
     chirp_ui_filters = {
         "bem": bem,
         "field_errors": field_errors,
         "html_attrs": html_attrs,
+        "icon": icon,
         "validate_variant": validate_variant,
     }
     missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
     if missing:
-        env.update_filters(missing)
+        env.update_filters(cast(dict[str, Callable[..., Any]], missing))
 
 
 def create_environment(
@@ -53,10 +58,10 @@ def create_environment(
 
     Supports multiple template directories via ``config.component_dirs``
     for component libraries, partials, and shared templates.
+    Extra loaders (CMS, DB, state) are tried first when configured.
     """
-    loaders = [
-        FileSystemLoader(str(config.template_dir)),
-    ]
+    loaders = list(config.extra_loaders)
+    loaders.append(FileSystemLoader(str(config.template_dir)))
 
     # Add component directories (for components, partials, shared templates)
     loaders.extend(FileSystemLoader(str(d)) for d in config.component_dirs)

@@ -1,0 +1,41 @@
+"""Conftest for kanban_shell — ensures store module can be imported when loading app."""
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def example_app(request: pytest.FixtureRequest):
+    """Load app from app.py with kanban_shell directory on path for store import."""
+    here = Path(request.path).parent
+    app_path = here / "app.py"
+    module_name = f"example_{here.name}"
+    module = None
+    prior_app_module = sys.modules.get("app")
+    if str(here) not in sys.path:
+        sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, app_path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        sys.modules["app"] = module
+        spec.loader.exec_module(module)
+        # Reset store to seed state for test isolation
+        store_mod = sys.modules.get("store")
+        if store_mod is not None and hasattr(store_mod, "reseed"):
+            store_mod.reseed()
+        yield module.app
+    finally:
+        if module is not None and sys.modules.get("app") is module:
+            if prior_app_module is None:
+                del sys.modules["app"]
+            else:
+                sys.modules["app"] = prior_app_module
+        sys.modules.pop(module_name, None)
+        if str(here) in sys.path:
+            sys.path.remove(str(here))

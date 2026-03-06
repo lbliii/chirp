@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://pypi.org/project/bengal-chirp/)
 
-**A Python web framework for the modern web platform.**
+**A Python web framework for HTML over the wire.**
 
 ```python
 from chirp import App
@@ -23,7 +23,7 @@ app.run()
 
 ## What is Chirp?
 
-Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
+Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Use plain Kida templates, your own CSS, or optional companion packages like `chirp-ui`. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
 
 **What's good about it:**
 
@@ -44,7 +44,9 @@ pip install bengal-chirp
 uv add bengal-chirp
 ```
 
-Requires Python 3.14+
+Requires Python 3.14+.
+
+Chirp works on its own with plain templates. `chirp-ui` is an optional companion UI layer, not part of the framework core.
 
 ---
 
@@ -68,6 +70,7 @@ chirp new myapp && cd myapp && python app.py
 | `Template(name, **ctx)` | Render a full template |
 | `Template.inline(src, **ctx)` | Render from string (prototyping) |
 | `Page(name, block, **ctx)` | Auto Fragment or Template based on request |
+| `PageComposition(template, fragment_block, ...)` | Python-first composition with regions |
 | `Fragment(name, block, **ctx)` | Render a named template block |
 | `Stream(name, **ctx)` | Stream HTML progressively |
 | `Suspense(name, **ctx)` | Shell first, OOB swaps for deferred data |
@@ -91,6 +94,7 @@ chirp new myapp && cd myapp && python app.py
 | **Contracts** | Compile-time validation of hypermedia surface | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
 | **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/testing/) |
 | **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/data/) |
+| **Optional UI layer** | `chirp-ui` companion components and styles | [chirp-ui →](https://github.com/lbliii/chirp-ui) |
 
 📚 **Full documentation**: [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
 
@@ -316,6 +320,8 @@ chirp check myapp:app --warnings-as-errors
   structures, ContextVar isolation.
 - **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
   startup.
+- **UI is optional.** Build with plain templates and your own design system, or add
+  `chirp-ui` as a companion layer.
 - **Minimal dependencies.** `kida-templates` + `anyio` + `bengal-pounce`. Everything else is optional.
 
 ---
@@ -354,13 +360,14 @@ pytest
 
 ## The Bengal Ecosystem
 
-A structured reactive stack — every layer written in pure Python for 3.14t free-threading.
+A structured reactive stack written in pure Python for 3.14t free-threading. Chirp is the framework; packages like `chirp-ui` sit on top as optional companions.
 
 | | | | |
 |--:|---|---|---|
 | **ᓚᘏᗢ** | [Bengal](https://github.com/lbliii/bengal) | Static site generator | [Docs](https://lbliii.github.io/bengal/) |
 | **∿∿** | [Purr](https://github.com/lbliii/purr) | Content runtime | — |
 | **⌁⌁** | **Chirp** | Web framework ← You are here | [Docs](https://lbliii.github.io/chirp/) |
+| **ʘ** | [chirp-ui](https://github.com/lbliii/chirp-ui) | Optional companion UI layer | — |
 | **=^..^=** | [Pounce](https://github.com/lbliii/pounce) | ASGI server | [Docs](https://lbliii.github.io/pounce/) |
 | **)彡** | [Kida](https://github.com/lbliii/kida) | Template engine | [Docs](https://lbliii.github.io/kida/) |
 | **ฅᨐฅ** | [Patitas](https://github.com/lbliii/patitas) | Markdown parser | [Docs](https://lbliii.github.io/patitas/) |

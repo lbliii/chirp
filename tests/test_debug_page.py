@@ -8,6 +8,7 @@ import os
 import types
 
 from chirp.server.debug_page import (
+    _collapse_framework_frames,
     _editor_url,
     _extract_frames,
     _extract_request_context,
@@ -212,6 +213,20 @@ class TestExtractTemplateContext:
         assert ctx is not None
         assert ctx["type"] == "TemplateNotFoundError"
 
+    def test_parse_error_extracts_suggestion(self) -> None:
+        """ParseError (e.g. hyphen-in-block-name) extracts suggestion."""
+        from kida import Environment
+
+        env = Environment()
+        try:
+            env.from_string("{% block settings-status %}x{% end %}").render()
+        except Exception as exc:
+            ctx = _extract_template_context(exc)
+            assert ctx is not None
+            assert ctx["type"] == "ParseError"
+            assert ctx["suggestion"] is not None
+            assert "underscores" in ctx["suggestion"].lower()
+
 
 # ---------------------------------------------------------------------------
 # _extract_request_context
@@ -257,6 +272,52 @@ class TestExtractRequestContext:
         req = _make_request(client=("10.0.0.1", 9999))
         ctx = _extract_request_context(req)
         assert ctx["client"] == "10.0.0.1:9999"
+
+
+# ---------------------------------------------------------------------------
+# _collapse_framework_frames
+# ---------------------------------------------------------------------------
+
+
+class TestCollapseFrameworkFrames:
+    """Framework frame collapsing reduces traceback noise."""
+
+    def test_collapses_consecutive_non_app_frames(self) -> None:
+        """3+ consecutive non-app frames become a collapsed group."""
+        frames = [
+            {"is_app": True, "filename": "app.py", "lineno": 1},
+            {"is_app": False, "filename": "site-packages/x.py", "lineno": 1},
+            {"is_app": False, "filename": "site-packages/y.py", "lineno": 1},
+            {"is_app": False, "filename": "site-packages/z.py", "lineno": 1},
+            {"is_app": True, "filename": "app.py", "lineno": 2},
+        ]
+        result = _collapse_framework_frames(frames)
+        assert len(result) == 3  # app, collapsed, app
+        collapsed = result[1]
+        assert collapsed.get("collapsed") is True
+        assert collapsed["count"] == 3
+        assert "framework frames" in collapsed["summary"].lower()
+
+    def test_preserves_app_frames(self) -> None:
+        """App frames are not collapsed."""
+        frames = [
+            {"is_app": True, "filename": "a.py", "lineno": 1},
+            {"is_app": True, "filename": "b.py", "lineno": 1},
+        ]
+        result = _collapse_framework_frames(frames)
+        assert len(result) == 2
+        assert result[0]["is_app"] is True
+        assert result[1]["is_app"] is True
+
+    def test_short_non_app_run_not_collapsed(self) -> None:
+        """Fewer than 3 consecutive non-app frames stay expanded."""
+        frames = [
+            {"is_app": False, "filename": "x.py", "lineno": 1},
+            {"is_app": False, "filename": "y.py", "lineno": 1},
+        ]
+        result = _collapse_framework_frames(frames)
+        assert len(result) == 2
+        assert not any(r.get("collapsed") for r in result if isinstance(r, dict))
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +424,49 @@ class TestRenderDebugPageFull:
         exc, _ = _raise_and_capture()
         html = render_debug_page(exc, _make_request())
         assert "vscode://file/" not in html
+
+    def test_contains_kida_version_in_environment(self) -> None:
+        """Environment section includes Kida version."""
+        exc, _ = _raise_and_capture()
+        html = render_debug_page(exc, _make_request())
+        assert "Kida" in html
+        assert 'class="label">Kida<' in html or "Kida</span>" in html
+
+    def test_kida_template_error_panel_branding(self) -> None:
+        """Template error panel shows Kida branding (not generic 'Template Error')."""
+        from kida.environment.exceptions import TemplateRuntimeError
+
+        exc = TemplateRuntimeError(
+            "test error",
+            template_name="page.html",
+            lineno=1,
+        )
+        html = render_debug_page(exc, _make_request())
+        assert "Kida Template Error" in html
+
+    def test_prefers_cause_template_context(self) -> None:
+        """When __cause__ has template context, debug page uses it over wrapper."""
+        from kida._types import Token, TokenType
+        from kida.environment.exceptions import TemplateRuntimeError
+        from kida.parser.errors import ParseError
+
+        token = Token(TokenType.NAME, "x", lineno=5, col_offset=10)
+        parse_err = ParseError(
+            "Invalid block name",
+            token=token,
+            source="{% block x-y %}",
+            filename="_status.html",
+            suggestion="Use underscores",
+        )
+        runtime_err = TemplateRuntimeError(
+            "ParseError during render",
+            template_name="page.html",
+            lineno=10,
+        )
+        runtime_err.__cause__ = parse_err  # type: ignore[attr-defined]
+        html = render_debug_page(runtime_err, _make_request())
+        assert "_status.html" in html
+        assert "Use underscores" in html
 
 
 # ---------------------------------------------------------------------------

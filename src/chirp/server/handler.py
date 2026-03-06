@@ -81,6 +81,7 @@ async def handle_request(
                 req,
                 kida_env=kida_env,
                 providers=providers,
+                validate_blocks=debug,
             )
 
         # Wrap middleware around the dispatch
@@ -139,6 +140,7 @@ async def _invoke_handler(
     *,
     kida_env: Environment | None = None,
     providers: dict[type, Callable[..., Any]] | None = None,
+    validate_blocks: bool = False,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -175,7 +177,12 @@ async def _invoke_handler(
     # Call the handler (sync or async — invoke() handles both)
     result = await invoke(handler, **kwargs)
 
-    return negotiate(result, kida_env=kida_env, request=request)
+    return negotiate(
+        result,
+        kida_env=kida_env,
+        request=request,
+        validate_blocks=validate_blocks,
+    )
 
 
 def _build_handler_kwargs(

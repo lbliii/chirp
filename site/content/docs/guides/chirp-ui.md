@@ -122,6 +122,8 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 **Migrating from boost.html:** Replace `{% extends "chirp/layouts/boost.html" %}` with `{% extends "chirpui/app_shell_layout.html" %}`. Add `{% block brand %}`, `{% block sidebar %}`, etc. The `hx-select="#page-content"` and `id="page-content"` are already in place.
 
+**Page spacing contract:** Let the page-level wrapper own vertical rhythm. A good pattern is a parent layout with a `page_root` block that contains `container()` + `stack(gap="lg")`, while inner blocks such as `page_content` hold the page-specific sections. Pair that with `Page(..., "page_content", page_block_name="page_root", ...)` or `PageComposition(..., fragment_block="page_content", page_block="page_root", ...)` so boosted navigation swaps the full page shell instead of a too-narrow inner fragment.
+
 **Manual shell:** For full control, chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html`:
 
 ```html
@@ -193,6 +195,33 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 | **Streaming** | streaming_block, copy_btn, model_card — for htmx SSE and LLM UIs |
 
 See the [chirp-ui repository](https://github.com/lbliii/chirp-ui) for the full component reference and API.
+
+## Data layout patterns
+
+For dashboard and settings pages, use these patterns for consistent structure:
+
+**Section with header actions** — Put section-level buttons (Refresh, Auto-detect, Run validation) in the `section` actions slot, not beneath the content:
+
+```html
+{% from "chirpui/layout.html" import section %}
+{% from "chirpui/button.html" import btn %}
+{% call section("Setup targets", subtitle="Configure your IDE") %}
+{% slot actions %}{{ btn("Refresh", attrs_map={"hx-get": "/status", "hx-target": "#targets"}) }}{% end %}
+<div id="targets">...</div>
+{% end %}
+```
+
+**Settings rows** — For label + status + value (e.g. setup targets, health checks), use `settings_row_list` and `settings_row`:
+
+```html
+{% from "chirpui/settings_row.html" import settings_row_list, settings_row %}
+{% call settings_row_list() %}
+{{ settings_row("Cursor IDE", status="Configured", detail="dori setup cursor") }}
+{{ settings_row("Skills directory", status="ok", detail="/path/to/skills") }}
+{% end %}
+```
+
+**When to use what** — Use `description_list` for term + detail only (no status badge). Use `settings_row_list` when you have label + status + detail.
 
 ## Theming
 

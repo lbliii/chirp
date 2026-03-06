@@ -7,14 +7,29 @@ no magic, fully predictable.
 
 import json as json_module
 import logging
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
 from chirp.errors import ConfigurationError
 from chirp.http.response import Redirect, RenderIntent, Response, SSEResponse, StreamingResponse
+from chirp.pages.shell_actions import (
+    SHELL_ACTIONS_CONTEXT_KEY,
+    SHELL_ACTIONS_TARGET,
+    normalize_shell_actions,
+    shell_actions_fragment,
+)
 from chirp.realtime.events import EventStream
+from chirp.templating.composition import PageComposition
 from chirp.templating.integration import render_fragment, render_template
+from chirp.templating.kida_adapter import KidaAdapter
+from chirp.templating.render_plan import (
+    build_render_plan,
+    execute_render_plan,
+    normalize_to_composition,
+    serialize_rendered_plan,
+)
 from chirp.templating.returns import (
     OOB,
     Action,
@@ -22,6 +37,7 @@ from chirp.templating.returns import (
     Fragment,
     InlineTemplate,
     LayoutPage,
+    LayoutSuspense,
     Page,
     Stream,
     Suspense,
@@ -49,11 +65,34 @@ def _minimal_kida_env() -> Environment:
 
 def _html_response(body: str, *, intent: RenderIntent) -> Response:
     """Build a text/html response with explicit render intent."""
-    return Response(
+    resp = Response(
         body=body,
         content_type="text/html; charset=utf-8",
         render_intent=intent,
     )
+    if intent == "fragment":
+        resp = resp.with_header("HX-Reselect", "*")
+    return resp
+
+
+def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:
+    """Set layout debug metadata for LayoutDebugMiddleware when config.debug."""
+    if request is None or plan.layout_chain is None or not plan.layout_chain.layouts:
+        return
+    try:
+        from chirp.middleware.layout_debug import set_layout_debug_metadata
+
+        layouts = plan.layout_chain.layouts
+        chain_str = " > ".join(f"{lay.target}({i})" for i, lay in enumerate(layouts))
+        target_id = (request.htmx_target or "").lstrip("#")
+        rendered = len(layouts[plan.layout_start_index :])
+        mode = "full" if plan.intent == "full_page" else "fragment"
+        if plan.layout_start_index > 0 and plan.layout_start_index < len(layouts):
+            mode = "partial"
+        match_str = f"target={target_id}, start={plan.layout_start_index}, rendered={rendered}"
+        set_layout_debug_metadata(request, chain_str, match_str, mode)
+    except ImportError:
+        pass
 
 
 def negotiate(
@@ -61,6 +100,7 @@ def negotiate(
     *,
     kida_env: Environment | None = None,
     request: Request | None = None,
+    validate_blocks: bool = False,
 ) -> Response | StreamingResponse | SSEResponse:
     """Convert a route handler's return value to a Response.
 
@@ -137,36 +177,38 @@ def negotiate(
                 raise ConfigurationError(msg)
             html = render_fragment(kida_env, value)
             return _html_response(html, intent="fragment")
-        case Page():
+        case Page() | LayoutPage():
             if kida_env is None:
                 msg = (
-                    "Page return type requires kida integration. "
+                    "Page/LayoutPage return type requires kida integration. "
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            if request is not None and request.is_fragment and not request.is_history_restore:
-                frag = Fragment(value.name, value.block_name, **value.context)
-                html = render_fragment(kida_env, frag)
-                intent = "fragment"
-            else:
-                tpl = Template(value.name, **value.context)
-                html = render_template(kida_env, tpl)
-                intent = "full_page"
+            composition = normalize_to_composition(value)
+            if composition is None:
+                msg = f"Cannot normalize {type(value).__name__} to composition"
+                raise TypeError(msg)
+            plan = build_render_plan(composition, request=request)
+            _set_layout_debug_from_plan(plan, request)
+            adapter = KidaAdapter(kida_env)
+            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
+            html = serialize_rendered_plan(rendered)
+            intent = "fragment" if plan.intent != "full_page" else "full_page"
             return _html_response(html, intent=intent)
-        case LayoutPage():
+        case PageComposition():
             if kida_env is None:
                 msg = (
-                    "LayoutPage return type requires kida integration. "
+                    "PageComposition return type requires kida integration. "
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            html = _render_layout_page(value, kida_env, request=request)
-            render_intent = (
-                "fragment"
-                if request is not None and request.is_fragment and not request.is_history_restore
-                else "full_page"
-            )
-            return _html_response(html, intent=render_intent)
+            plan = build_render_plan(value, request=request)
+            _set_layout_debug_from_plan(plan, request)
+            adapter = KidaAdapter(kida_env)
+            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
+            html = serialize_rendered_plan(rendered)
+            intent = "fragment" if plan.intent != "full_page" else "full_page"
+            return _html_response(html, intent=intent)
         case Action():
             response = Response(body="").with_status(value.status)
             if value.trigger is not None:
@@ -183,11 +225,7 @@ def negotiate(
                 raise ConfigurationError(msg)
             frag = Fragment(value.template_name, value.block_name, **value.context)
             html = render_fragment(kida_env, frag)
-            response = (
-                Response(body=html, content_type="text/html; charset=utf-8")
-                .with_status(422)
-                .with_render_intent("fragment")
-            )
+            response = _html_response(html, intent="fragment").with_status(422)
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
@@ -242,6 +280,29 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
             )
+        case LayoutSuspense():
+            if kida_env is None:
+                msg = (
+                    "LayoutSuspense return type requires kida integration. "
+                    "Ensure a template_dir is configured in AppConfig."
+                )
+                raise ConfigurationError(msg)
+            req = value.request if value.request is not None else request
+            is_htmx = bool(req and req.is_fragment)
+            chunks = render_suspense(
+                kida_env,
+                value.suspense,
+                is_htmx=is_htmx,
+                layout_chain=value.layout_chain,
+                layout_context=value.context,
+                request=req,
+            )
+            if _should_append_streamed_shell_actions_oob(value.context, req):
+                chunks = _append_shell_actions_oob_stream(chunks, value.context, kida_env)
+            return StreamingResponse(
+                chunks=chunks,
+                content_type="text/html; charset=utf-8",
+            )
         case Suspense():
             if kida_env is None:
                 msg = (
@@ -288,88 +349,51 @@ def negotiate(
             raise TypeError(msg)
 
 
-def _render_layout_page(
-    value: LayoutPage,
-    kida_env: Environment,
-    request: Request | None,
-) -> str:
-    """Render a LayoutPage through its layout chain.
+def _render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
+    """Render shell action OOB markup for boosted layout navigations."""
+    from kida.environment.exceptions import TemplateNotFoundError
 
-    Context propagation: value.context is passed unchanged to
-    render_block() and render_with_layouts(). Page variables (e.g.
-    selected_tags, q) are available in macro slot content because
-    Kida renders slot bodies in the caller's context.
-
-    Decides rendering depth based on request headers:
-
-    - Fragment request (no history restore): render just the named block
-    - Full page / history restore: render page block, then wrap with layouts
-    - HX-Target present: render at the appropriate layout depth
-    """
-    from chirp.pages.renderer import render_with_layouts
-    from chirp.pages.types import LayoutChain
-
-    layout_chain: LayoutChain = value.layout_chain or LayoutChain()
-    htmx_target: str | None = None
-    is_fragment = False
-    is_history_restore = False
-
-    if request is not None:
-        htmx_target = request.htmx_target
-        is_fragment = request.is_fragment
-        is_history_restore = request.is_history_restore
-
-    # For pure fragment requests (no layouts involved), render just the block
-    if is_fragment and not is_history_restore and not htmx_target:
-        frag = Fragment(value.name, value.block_name, **value.context)
-        return render_fragment(kida_env, frag)
-
-    # Render the page's content block (value.context passed through for slot inheritance)
-    _logger.debug(
-        "render_block %s.%s with context keys: %s",
-        value.name,
-        value.block_name,
-        sorted(value.context.keys()),
-    )
-    page_template = kida_env.get_template(value.name)
-    page_html = page_template.render_block(value.block_name, value.context)
-
-    # Compute layout depth for render_with_layouts
-    layouts = layout_chain.layouts
-    if is_history_restore or htmx_target is None:
-        start_index = 0
-        mode = "full"
-    elif htmx_target:
-        idx = layout_chain.find_start_index_for_target(htmx_target)
-        if idx is None:
-            start_index = len(layouts) if layouts else 0
-            mode = "fragment"
-        else:
-            start_index = idx
-            mode = "partial"
+    actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
+    fragment = shell_actions_fragment(actions)
+    if fragment is None or actions is None:
+        target = SHELL_ACTIONS_TARGET
+        html = ""
     else:
-        start_index = 0
-        mode = "full"
+        template_name, block_name, target = fragment
+        try:
+            html = render_fragment(
+                kida_env,
+                Fragment(template_name, block_name, shell_actions=actions),
+            )
+        except TemplateNotFoundError:
+            html = ""
+    return f'<div id="{target}" hx-swap-oob="innerHTML">{html}</div>'
 
-    # Debug metadata for LayoutDebugMiddleware (when config.debug)
-    try:
-        from chirp.middleware.layout_debug import set_layout_debug_metadata
 
-        chain_str = " > ".join(f"{layout.target}({i})" for i, layout in enumerate(layouts))
-        target_id = (htmx_target or "").lstrip("#")
-        match_str = (
-            f"target={target_id}, start={start_index}, rendered={len(layouts[start_index:])}"
-        )
-        set_layout_debug_metadata(request, chain_str, match_str, mode)
-    except ImportError:
-        pass
+async def _append_shell_actions_oob_stream(
+    chunks: AsyncIterator[str],
+    context: dict[str, Any],
+    kida_env: Environment,
+) -> AsyncIterator[str]:
+    """Append shell action OOB markup to the first streamed chunk."""
+    first_chunk = True
+    oob = _render_shell_actions_oob(context, kida_env)
+    async for chunk in chunks:
+        if first_chunk:
+            yield "\n".join((chunk, oob))
+            first_chunk = False
+            continue
+        yield chunk
+    if first_chunk:
+        yield oob
 
-    # Compose with layout chain at the appropriate depth
-    return render_with_layouts(
-        kida_env,
-        layout_chain=layout_chain,
-        page_html=page_html,
-        context=value.context,
-        htmx_target=htmx_target,
-        is_history_restore=is_history_restore,
-    )
+
+def _should_append_streamed_shell_actions_oob(
+    context: dict[str, Any],
+    request: Request | None,
+) -> bool:
+    """Whether a streamed layout response should refresh shell actions via OOB."""
+    del context
+    if request is None:
+        return False
+    return request.is_fragment and not request.is_history_restore and request.is_boosted

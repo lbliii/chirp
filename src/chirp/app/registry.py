@@ -171,7 +171,7 @@ class AppRegistry:
             )
             kwargs = await resolve_kwargs(_handler, request, cascade_ctx, _service_providers)
             result = await invoke(_handler, **kwargs)
-            return upgrade_result(result, cascade_ctx, _chain, _providers)
+            return upgrade_result(result, cascade_ctx, _chain, _providers, request=request)
 
         self._state.pending_routes.append(
             PendingRoute(url_path, page_wrapper, methods, name=None, referenced=False)

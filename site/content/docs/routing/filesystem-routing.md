@@ -67,6 +67,8 @@ def get():
     return Page("documents/page.html", "content", items=load_items())
 ```
 
+You can also return `Suspense` for instant first paint with deferred blocks. The layout chain is applied automatically — the shell gets the full layout (head, CSS, sidebar), and OOB swaps target block IDs inside the page.
+
 ### Other .py Files
 
 Any other `.py` file (except those starting with `_`) appends its stem to the path:
@@ -266,6 +268,54 @@ def context(doc_id: str) -> dict:
 
 Handlers receive context as keyword arguments. Providers can be sync or async.
 
+### Route-Scoped Shell Actions
+
+`_context.py` can also return a reserved `shell_actions` value to drive persistent
+shell chrome such as a global top bar. Shell actions cascade root-to-leaf just
+like other context, but they merge by stable action `id` instead of plain dict
+overwrite:
+
+- child routes inherit parent actions by default
+- child routes can override an inherited action by `id`
+- child routes can remove inherited actions by `id`
+- a zone can `replace` its inherited actions entirely
+
+```python
+from chirp import ShellAction, ShellActions, ShellActionZone
+
+
+# pages/forum/_context.py
+def context() -> dict:
+    return {
+        "shell_actions": ShellActions(
+            primary=ShellActionZone(
+                items=(
+                    ShellAction(id="new-thread", label="New thread", href="/forum/new"),
+                )
+            )
+        )
+    }
+
+
+# pages/forum/{thread_id}/_context.py
+def context(thread_id: str) -> dict:
+    return {
+        "shell_actions": ShellActions(
+            primary=ShellActionZone(
+                items=(
+                    ShellAction(id="reply", label="Reply", href=f"/forum/{thread_id}/reply"),
+                ),
+                remove=("new-thread",),
+            )
+        )
+    }
+```
+
+The resolved `shell_actions` object is available in page and layout templates.
+For boosted shell navigations, Chirp also emits an out-of-band refresh for the
+default target `#chirp-shell-actions`, so persistent top bars stay in sync as
+the active route changes.
+
 ## Template Convention
 
 When a route file has a sibling `.html` file with the same stem, that template is used implicitly:
@@ -274,6 +324,34 @@ When a route file has a sibling `.html` file with the same stem, that template i
 - `edit.py` + `edit.html` → handler returns `Page("path/to/edit.html", "content", ...)`
 
 Template paths are relative to the pages root. The handler must pass the correct path to `Page()`.
+
+For layout-heavy pages, prefer a self-contained page root plus narrower inner fragments:
+
+```html
+{# pages/_page_layout.html #}
+{% block content %}
+{% block page_root %}
+  <div class="page-shell">
+    {% block page_header %}{% end %}
+    {% block page_content %}{% end %}
+  </div>
+{% endblock %}
+{% endblock %}
+```
+
+```python
+return Page(
+    "documents/page.html",
+    "page_content",
+    page_block_name="page_root",
+    items=load_items(),
+)
+```
+
+This gives Chirp two safe render scopes:
+
+- `page_content` for explicit fragment swaps into a narrow target
+- `page_root` for boosted navigation, where the response must carry page-level wrappers such as stacks, toolbars, and spacing
 
 ## Handler Argument Resolution
 

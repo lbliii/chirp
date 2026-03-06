@@ -32,7 +32,7 @@ AI streaming (``pip install chirp[ai]``)::
 # Declare free-threading support (PEP 703)
 _Py_mod_gil = 0
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 CHIRP_CAPABILITIES = frozenset(
     {
         # Guarantees startup contract checks run after runtime state publication.
@@ -61,16 +61,23 @@ __all__ = [
     "Next",
     "NotFound",
     "Page",
+    "PageComposition",
     "Redirect",
+    "RegionUpdate",
     "Request",
     "Response",
     "SSEEvent",
+    "ShellAction",
+    "ShellActionZone",
+    "ShellActions",
+    "ShellMenuItem",
     "Stream",
     "Suspense",
     "Template",
     "TemplateStream",
     "ToolCallEvent",
     "ValidationError",
+    "ViewRef",
     "form_from",
     "form_or_errors",
     "form_values",
@@ -102,6 +109,9 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "InlineTemplate": ("chirp.templating.returns", "InlineTemplate"),
     "Fragment": ("chirp.templating.returns", "Fragment"),
     "Page": ("chirp.templating.returns", "Page"),
+    "PageComposition": ("chirp.templating.composition", "PageComposition"),
+    "RegionUpdate": ("chirp.templating.composition", "RegionUpdate"),
+    "ViewRef": ("chirp.templating.composition", "ViewRef"),
     "LayoutPage": ("chirp.templating.returns", "LayoutPage"),
     "Action": ("chirp.templating.returns", "Action"),
     "FormAction": ("chirp.templating.returns", "FormAction"),
@@ -113,6 +123,10 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Realtime
     "EventStream": ("chirp.realtime.events", "EventStream"),
     "SSEEvent": ("chirp.realtime.events", "SSEEvent"),
+    "ShellAction": ("chirp.pages.shell_actions", "ShellAction"),
+    "ShellActions": ("chirp.pages.shell_actions", "ShellActions"),
+    "ShellActionZone": ("chirp.pages.shell_actions", "ShellActionZone"),
+    "ShellMenuItem": ("chirp.pages.shell_actions", "ShellMenuItem"),
     # Middleware
     "AnyResponse": ("chirp.middleware.protocol", "AnyResponse"),
     "Middleware": ("chirp.middleware.protocol", "Middleware"),

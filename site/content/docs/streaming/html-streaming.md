@@ -180,6 +180,8 @@ For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<tem
 
 No client-side framework needed. The browser renders the shell, and blocks fill in as data arrives.
 
+When using `mount_pages`, `Suspense` receives the layout chain automatically. The first chunk is wrapped in your `_layout.html` shell (head, CSS, sidebar), and OOB swaps target block IDs inside the page. Fragment-only requests skip the layout (same as `Page`).
+
 ## When to Use Each
 
 Use `Suspense` when:

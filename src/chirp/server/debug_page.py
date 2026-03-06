@@ -116,6 +116,43 @@ def _extract_frames(
     return frames
 
 
+def _collapse_framework_frames(
+    frames: list[dict[str, Any]],
+    min_collapse: int = 3,
+) -> list[dict[str, Any]]:
+    """Collapse consecutive non-app (framework) frames into a summary.
+
+    Reduces traceback noise from middleware, ASGI adapters, etc.
+    Returns a mix of frame dicts and collapsed-group dicts.
+    """
+    result: list[dict[str, Any]] = []
+    i = 0
+    while i < len(frames):
+        frame = frames[i]
+        if frame["is_app"]:
+            result.append(frame)
+            i += 1
+            continue
+        # Collect consecutive non-app frames
+        run: list[dict[str, Any]] = [frame]
+        i += 1
+        while i < len(frames) and not frames[i]["is_app"]:
+            run.append(frames[i])
+            i += 1
+        if len(run) >= min_collapse:
+            result.append(
+                {
+                    "collapsed": True,
+                    "count": len(run),
+                    "frames": run,
+                    "summary": f"{len(run)} framework frames",
+                }
+            )
+        else:
+            result.extend(run)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Kida template error extraction
 # ---------------------------------------------------------------------------
@@ -144,10 +181,11 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["error_code"] = getattr(error_code, "value", None)
         ctx["docs_url"] = getattr(error_code, "docs_url", None)
 
-    if cls_name == "TemplateSyntaxError":
+    if cls_name in ("TemplateSyntaxError", "ParseError"):
         ctx["template"] = getattr(exc, "filename", None) or getattr(exc, "name", None)
         ctx["lineno"] = getattr(exc, "lineno", None)
         ctx["col_offset"] = getattr(exc, "col_offset", None)
+        ctx["suggestion"] = getattr(exc, "suggestion", None)
         source = getattr(exc, "source", None)
         if source and ctx["lineno"]:
             lines = source.splitlines()
@@ -291,6 +329,13 @@ h3 { color: #bb9af7; font-size: 0.95rem; margin: 0.8rem 0 0.3rem; }
 .local-var { display: flex; gap: 0.5rem; padding: 0.15rem 0; }
 .local-var .name { color: #7dcfff; min-width: 120px; flex-shrink: 0; }
 .local-var .value { color: #a9b1d6; white-space: pre-wrap; word-break: break-all; }
+.frame-collapsed { margin: 0.5rem 0; border: 1px solid #2f3549; border-radius: 6px; overflow: hidden; }
+.frame-collapsed .collapse-toggle { padding: 0.4rem 0.8rem; background: #24283b; font-size: 0.85rem; cursor: pointer; color: #565f89; }
+.frame-collapsed .collapse-toggle:hover { color: #7aa2f7; }
+.frame-collapsed .collapse-content { display: none; }
+.frame-collapsed.open .collapse-content { display: block; }
+.frame-collapsed.open .collapse-toggle .arrow { transform: rotate(0deg); }
+.frame-collapsed .collapse-toggle .arrow { display: inline-block; margin-right: 0.5rem; transform: rotate(-90deg); }
 
 /* Request context */
 .request-panel { background: #24283b; border-radius: 6px; padding: 0.8rem; margin: 0.5rem 0; }
@@ -318,6 +363,11 @@ document.querySelectorAll('.locals-toggle').forEach(el => {
         const panel = el.nextElementSibling;
         panel.classList.toggle('open');
         el.textContent = panel.classList.contains('open') ? '▾ locals' : '▸ locals';
+    });
+});
+document.querySelectorAll('.frame-collapsed .collapse-toggle').forEach(el => {
+    el.addEventListener('click', () => {
+        el.closest('.frame-collapsed').classList.toggle('open');
     });
 });
 """
@@ -395,21 +445,36 @@ def _render_frame(frame: dict[str, Any]) -> str:
     )
 
 
+def _render_collapsed_frames(group: dict[str, Any]) -> str:
+    """Render a collapsed group of framework frames with expand toggle."""
+    summary = group["summary"]
+    frames = group["frames"]
+    frames_html = "".join(_render_frame(f) for f in frames)
+    return (
+        f'<div class="frame-collapsed">'
+        f'<div class="collapse-toggle">'
+        f'<span class="arrow">▸</span>{_esc(summary)} (click to expand)'
+        f"</div>"
+        f'<div class="collapse-content">{frames_html}</div>'
+        f"</div>"
+    )
+
+
 def _render_template_panel(ctx: dict[str, Any]) -> str:
     """Render the kida template error panel."""
     parts: list[str] = []
     parts.append('<div class="template-panel">')
 
-    # Error code badge + type header
+    # Error code badge + type header (Kida branding for AI consumers)
     error_code = ctx.get("error_code")
     if error_code:
         parts.append(
             f'<h3><span style="background:#f7768e;color:#1a1b26;padding:2px 8px;'
             f'border-radius:3px;font-size:0.85em;margin-right:8px">{_esc(error_code)}</span>'
-            f"Template Error: {_esc(ctx['type'])}</h3>"
+            f"Kida Template Error: {_esc(ctx['type'])}</h3>"
         )
     else:
-        parts.append(f"<h3>Template Error: {_esc(ctx['type'])}</h3>")
+        parts.append(f"<h3>Kida Template Error: {_esc(ctx['type'])}</h3>")
 
     message = ctx.get("message", "")
     parts.append(f'<div class="exc-message">{_esc(message)}</div>')
@@ -572,11 +637,12 @@ def render_debug_page(
     elif context:
         chain_note = f"During handling, another exception occurred ({type(context).__name__})"
 
-    # Kida template error context
+    # Kida template error context — prefer cause when it has more specific location
     template_ctx = _extract_template_context(exc)
-    # Also check __cause__ for wrapped template errors
-    if template_ctx is None and cause:
-        template_ctx = _extract_template_context(cause)
+    if cause:
+        cause_ctx = _extract_template_context(cause)
+        if cause_ctx is not None:
+            template_ctx = cause_ctx
     if template_ctx is None and context:
         template_ctx = _extract_template_context(context)
 
@@ -593,16 +659,21 @@ def render_debug_page(
     if template_ctx:
         sections.append(_render_template_panel(template_ctx))
 
-    # Traceback
+    # Traceback (with framework frame collapsing)
     if frames:
         sections.append("<h2>Traceback</h2>")
-        sections.extend(_render_frame(f) for f in frames)
+        collapsed = _collapse_framework_frames(frames)
+        for item in collapsed:
+            if isinstance(item, dict) and item.get("collapsed"):
+                sections.append(_render_collapsed_frames(item))
+            else:
+                sections.append(_render_frame(item))
 
     # Request context
     sections.append("<h2>Request</h2>")
     sections.append(_render_request_panel(request))
 
-    # Python / chirp info
+    # Python / chirp / kida info
     sections.append("<h2>Environment</h2>")
     sections.append('<div class="request-panel">')
     sections.append(
@@ -617,6 +688,16 @@ def render_debug_page(
         chirp_version = "unknown"
     sections.append(
         f'<div class="request-line"><span class="label">Chirp</span><span class="val">{_esc(chirp_version)}</span></div>'
+    )
+
+    try:
+        import kida
+
+        kida_version = getattr(kida, "__version__", "unknown")
+    except Exception:
+        kida_version = "unknown"
+    sections.append(
+        f'<div class="request-line"><span class="label">Kida</span><span class="val">{_esc(kida_version)}</span></div>'
     )
     sections.append("</div>")
 
