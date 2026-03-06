@@ -5,7 +5,7 @@ from chirp.security.passwords import verify_password
 
 
 def get(request) -> Page:
-    if get_user() is not None:
+    if get_user().is_authenticated:
         return Redirect("/")
     from app import get_users
     next_url = request.query.get("next", "/")
@@ -13,7 +13,7 @@ def get(request) -> Page:
 
 
 async def post(request) -> Page | Redirect:
-    if get_user() is not None:
+    if get_user().is_authenticated:
         return Redirect("/")
 
     form = await request.form()

@@ -7,7 +7,7 @@ from store import COLUMNS, get_tasks, tasks_by_column
 
 def get(request, columns) -> Page | Redirect:
     user = get_user()
-    if user is None:
+    if not user.is_authenticated:
         next_url = request.query.get("next", "/")
         return Redirect(f"/login?next={next_url}")
 

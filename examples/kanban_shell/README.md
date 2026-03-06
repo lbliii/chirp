@@ -4,6 +4,9 @@ Kanban board reimplemented using the app shell pattern, chirp-ui components, and
 `mount_pages` routing. Preserves all kanban features (auth, CRUD, OOB, SSE,
 filtering) while showcasing chirp, kida, and chirp-ui improvements.
 
+Uses a distinct session cookie (`chirp_session_kanban_shell`) so you can run
+kanban and kanban_shell on the same host/port without session collision.
+
 ## Features
 
 - **App shell** — `chirpui-app-shell` with persistent topbar, sidebar, and main content

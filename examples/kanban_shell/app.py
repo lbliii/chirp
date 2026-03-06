@@ -135,6 +135,7 @@ def _column_fragment(column_id: str, tasks: list | None = None) -> Fragment:
     return Fragment(
         "page.html",
         "column_block",
+        target=f"column-{column_id}",
         column_id=column_id,
         column_name=column_name,
         tasks=column_tasks,
@@ -144,7 +145,7 @@ def _column_fragment(column_id: str, tasks: list | None = None) -> Fragment:
 def _stats_fragment(tasks: list | None = None) -> Fragment:
     if tasks is None:
         tasks = get_tasks()
-    return Fragment("page.html", "header_stats", all_tasks=tasks)
+    return Fragment("page.html", "header_stats_oob", target="board-stats", all_tasks=tasks)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +159,11 @@ use_chirp_ui(app)
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
-app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
+app.add_middleware(
+    SessionMiddleware(
+        SessionConfig(secret_key=_secret, cookie_name="chirp_session_kanban_shell")
+    )
+)
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 

@@ -70,6 +70,7 @@ chirp new myapp && cd myapp && python app.py
 | `Template(name, **ctx)` | Render a full template |
 | `Template.inline(src, **ctx)` | Render from string (prototyping) |
 | `Page(name, block, **ctx)` | Auto Fragment or Template based on request |
+| `PageComposition(template, fragment_block, ...)` | Python-first composition with regions |
 | `Fragment(name, block, **ctx)` | Render a named template block |
 | `Stream(name, **ctx)` | Stream HTML progressively |
 | `Suspense(name, **ctx)` | Shell first, OOB swaps for deferred data |

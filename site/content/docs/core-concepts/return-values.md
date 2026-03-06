@@ -112,6 +112,35 @@ This keeps ordinary fragment requests narrow (`results_panel`) while boosted nav
 **LayoutPage** and **LayoutSuspense** are internal types used when filesystem routing renders through layout chains. Handlers return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You typically don't construct these directly.
 :::
 
+## PageComposition
+
+Python-first composition API for explicit page structure. Use `fragment_block` and `page_block` instead of `block_name` / `page_block_name`, and add optional region updates for shell actions:
+
+```python
+from chirp import PageComposition, RegionUpdate, ViewRef
+
+@app.route("/skills")
+def skills():
+    return PageComposition(
+        template="skills/page.html",
+        fragment_block="page_content",
+        page_block="page_root",
+        context={"skills": skills},
+        regions=(
+            RegionUpdate(
+                region="shell_actions",
+                view=ViewRef(
+                    template="chirp/shell_actions.html",
+                    block="content",
+                    context={"shell_actions": actions},
+                ),
+            ),
+        ),
+    )
+```
+
+`Page` and `LayoutPage` are normalized to `PageComposition` internally; both APIs work. Use `PageComposition` when you want explicit region updates or clearer semantics.
+
 ## Stream
 
 Progressive HTML rendering. The browser receives the page shell immediately and content fills in as data becomes available:

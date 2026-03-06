@@ -13,6 +13,7 @@ from chirp.realtime.events import EventStream
 from chirp.server.negotiation import negotiate
 from chirp.templating.integration import create_environment
 from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
+from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.returns import (
     OOB,
     Action,
@@ -91,6 +92,7 @@ class TestNegotiateTemplateTypes:
         # Fragment should NOT include the full page wrapper
         assert "<form>" not in result.text
         assert result.render_intent == "fragment"
+        assert result.header("HX-Reselect") == "*"
 
     def test_page_intent_tracks_fragment_request(self, kida_env: Environment) -> None:
         async def _receive():
@@ -115,6 +117,44 @@ class TestNegotiateTemplateTypes:
             request=request,
         )
         assert result.render_intent == "fragment"
+
+    def test_page_composition_renders_fragment(self, kida_env: Environment) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [(b"hx-request", b"true")],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+        comp = PageComposition(
+            template="search.html",
+            fragment_block="results_list",
+            context={"results": ["a", "b"]},
+        )
+        result = negotiate(comp, kida_env=kida_env, request=request)
+        assert result.render_intent == "fragment"
+        assert "a" in result.text
+        assert "b" in result.text
+
+    def test_page_composition_renders_full_page(self, kida_env: Environment) -> None:
+        comp = PageComposition(
+            template="page.html",
+            fragment_block="content",
+            page_block="content",
+            context={"title": "Composed", "items": []},
+        )
+        result = negotiate(comp, kida_env=kida_env)
+        assert result.render_intent == "full_page"
+        assert "<title>Composed</title>" in result.text
 
     def test_page_boosted_request_prefers_page_block_name(self, tmp_path: Path) -> None:
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
@@ -211,6 +251,7 @@ class TestNegotiateValidationError:
         assert "email: Required" in result.text
         # Should be a fragment, not the full page
         assert "<html>" not in result.text
+        assert result.header("HX-Reselect") == "*"
 
     def test_without_retarget_has_no_hx_header(self, kida_env: Environment) -> None:
         result = negotiate(
@@ -218,6 +259,7 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
         header_names = {name for name, _ in result.headers}
         assert "HX-Retarget" not in header_names
 
@@ -232,6 +274,7 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
         assert ("HX-Retarget", "#error-banner") in result.headers
         assert "email: Invalid" in result.text
 
@@ -535,6 +578,7 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 422
+        assert result.header("HX-Reselect") == "*"
 
     def test_validation_error_tuple_can_override_status(self, kida_env: Environment) -> None:
         """A tuple can override ValidationError's default 422 to another code."""
@@ -543,6 +587,7 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 400
+        assert result.header("HX-Reselect") == "*"
 
     def test_oob_with_zero_fragments(self, kida_env: Environment) -> None:
         """OOB with only a main and no OOB fragments renders normally."""
@@ -562,6 +607,7 @@ class TestNegotiateEdgeCases:
         )
         assert result.status == 422
         assert "err" in result.text
+        assert result.header("HX-Reselect") == "*"
 
 
 class TestLayoutPageSlotContext:

@@ -18,7 +18,7 @@ _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 # ---------------------------------------------------------------------------
 
 
-def _extract_cookie(response, name: str = "chirp_session") -> str | None:
+def _extract_cookie(response, name: str = "chirp_session_kanban_shell") -> str | None:
     """Extract a Set-Cookie value from response headers."""
     for hname, hvalue in response.headers:
         if hname == "set-cookie" and hvalue.startswith(f"{name}="):
@@ -28,16 +28,27 @@ def _extract_cookie(response, name: str = "chirp_session") -> str | None:
 
 def _extract_csrf_token(html: str) -> str | None:
     """Extract CSRF token from a rendered form (hidden input) or meta tag."""
-    m = re.search(r'name="_csrf_token"\s+value="([^"]+)"', html)
-    if m:
-        return m.group(1)
-    m = re.search(r'name="csrf-token"\s+content="([^"]+)"', html)
-    return m.group(1) if m else None
+    patterns = (
+        r'<input[^>]*name="_csrf_token"[^>]*value="([^"]+)"',
+        r'<input[^>]*value="([^"]+)"[^>]*name="_csrf_token"',
+        r'<meta[^>]*name="csrf-token"[^>]*content="([^"]+)"',
+        r'<meta[^>]*content="([^"]+)"[^>]*name="csrf-token"',
+    )
+    for pattern in patterns:
+        match = re.search(pattern, html)
+        if match:
+            return match.group(1)
+    return None
 
 
 def _extract_csrf_meta(html: str) -> str | None:
     """Extract CSRF token from a meta tag (for htmx requests)."""
     return _extract_csrf_token(html)
+
+
+def _assert_hx_reselect_star(response) -> None:
+    """Fragments should override inherited shell hx-select."""
+    assert response.header("HX-Reselect") == "*"
 
 
 async def _login(client, username: str = "alice") -> dict[str, str]:
@@ -48,7 +59,7 @@ async def _login(client, username: str = "alice") -> dict[str, str]:
 
     headers = {**_FORM_CT}
     if session_cookie:
-        headers["Cookie"] = f"chirp_session={session_cookie}"
+        headers["Cookie"] = f"chirp_session_kanban_shell={session_cookie}"
 
     body = f"username={username}&password=password"
     if csrf_token:
@@ -58,11 +69,11 @@ async def _login(client, username: str = "alice") -> dict[str, str]:
     cookie = _extract_cookie(r) or session_cookie
     assert cookie is not None, f"Login failed for {username}"
 
-    board = await client.get("/", headers={"Cookie": f"chirp_session={cookie}"})
+    board = await client.get("/", headers={"Cookie": f"chirp_session_kanban_shell={cookie}"})
     board_cookie = _extract_cookie(board) or cookie
     fresh_csrf = _extract_csrf_meta(board.text) or csrf_token
 
-    auth_headers: dict[str, str] = {"Cookie": f"chirp_session={board_cookie}"}
+    auth_headers: dict[str, str] = {"Cookie": f"chirp_session_kanban_shell={board_cookie}"}
     if fresh_csrf:
         auth_headers["X-CSRF-Token"] = fresh_csrf
     return auth_headers
@@ -97,7 +108,7 @@ class TestAuth:
             csrf = _extract_csrf_token(page.text)
             headers = {**_FORM_CT}
             if session:
-                headers["Cookie"] = f"chirp_session={session}"
+                headers["Cookie"] = f"chirp_session_kanban_shell={session}"
             body = b"username=alice&password=password"
             if csrf:
                 body += f"&_csrf_token={csrf}".encode()
@@ -112,7 +123,7 @@ class TestAuth:
             csrf = _extract_csrf_token(page.text)
             headers = {**_FORM_CT}
             if session:
-                headers["Cookie"] = f"chirp_session={session}"
+                headers["Cookie"] = f"chirp_session_kanban_shell={session}"
             body = b"username=alice&password=wrong"
             if csrf:
                 body += f"&_csrf_token={csrf}".encode()
@@ -140,7 +151,7 @@ class TestAuth:
                 csrf = _extract_csrf_token(page.text)
                 headers = {**_FORM_CT}
                 if session:
-                    headers["Cookie"] = f"chirp_session={session}"
+                    headers["Cookie"] = f"chirp_session_kanban_shell={session}"
                 body = f"username={name}&password=password"
                 if csrf:
                     body += f"&_csrf_token={csrf}"
@@ -210,6 +221,19 @@ class TestBoard:
             assert_fragment_contains(response, 'id="board"')
             assert_fragment_not_contains(response, "<html")
 
+    async def test_index_boosted_fragment_keeps_page_content_contract(self, example_app) -> None:
+        """Boosted app-shell navigations still override inherited shell selection."""
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            response = await client.fragment(
+                "/",
+                target="main",
+                headers={**auth, "HX-Boosted": "true"},
+            )
+            assert_is_fragment(response)
+            assert_fragment_contains(response, 'id="board"')
+            _assert_hx_reselect_star(response)
+
     async def test_index_contains_stats(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
@@ -271,13 +295,16 @@ class TestAddTask:
     async def test_add_empty_title_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
-            response = await client.post(
+            response = await client.fragment(
                 "/tasks",
+                method="POST",
+                target="add-form",
                 body=b"title=&status=backlog&priority=medium",
                 headers={**_FORM_CT, **auth},
             )
             assert response.status == 422
             assert "required" in response.text.lower()
+            _assert_hx_reselect_star(response)
 
     async def test_add_invalid_priority_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -315,10 +342,11 @@ class TestEditTask:
         """GET returns the inline edit form fragment."""
         async with TestClient(example_app) as client:
             auth = await _login(client)
-            response = await client.get("/tasks/1/edit", headers=auth)
+            response = await client.fragment("/tasks/1/edit", target="task-1", headers=auth)
             assert response.status == 200
             assert 'name="title"' in response.text
             assert "Design landing page" in response.text
+            _assert_hx_reselect_star(response)
 
     async def test_edit_form_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -341,13 +369,16 @@ class TestEditTask:
     async def test_save_invalid_empty_title(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
-            response = await client.put(
+            response = await client.fragment(
                 "/tasks/1",
+                method="PUT",
+                target="task-1",
                 body=b"title=&description=test&priority=high&assignee=&tags=",
                 headers={**_FORM_CT, **auth},
             )
             assert response.status == 422
             assert "required" in response.text.lower()
+            _assert_hx_reselect_star(response)
 
     async def test_save_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -451,10 +482,11 @@ class TestFilter:
     async def test_filter_by_priority(self, example_app) -> None:
         async with TestClient(example_app) as client:
             auth = await _login(client)
-            response = await client.get("/filter?priority=high", headers=auth)
+            response = await client.fragment("/filter?priority=high", target="board", headers=auth)
             assert response.status == 200
             assert "Implement auth flow" in response.text
             assert "Dark mode toggle" not in response.text
+            _assert_hx_reselect_star(response)
 
     async def test_filter_by_assignee(self, example_app) -> None:
         async with TestClient(example_app) as client:

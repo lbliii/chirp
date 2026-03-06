@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from chirp.pages.types import ContextProvider, LayoutChain
+    from chirp.templating.composition import PageComposition
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,12 +484,12 @@ class OOB:
     matching their target.
     """
 
-    main: Fragment | Template | Page | LayoutPage
+    main: Fragment | Template | Page | LayoutPage | PageComposition
     oob_fragments: tuple[Fragment, ...]
 
     def __init__(
         self,
-        main: Fragment | Template | Page | LayoutPage,
+        main: Fragment | Template | Page | LayoutPage | PageComposition,
         /,
         *oob_fragments: Fragment,
     ) -> None:

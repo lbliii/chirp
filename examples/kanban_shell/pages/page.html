@@ -18,6 +18,14 @@
       <span><strong>{{ assignees | length }}</strong> people</span>
     </div>
     {% end %}
+    {% block header_stats_oob %}
+    <div class="kanban-stats">
+      <span><strong>{{ all_tasks | length }}</strong> tasks</span>
+      <span><strong>{{ all_tasks | selectattr("priority", "equalto", "high") | list | length }}</strong> high priority</span>
+      {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+      <span><strong>{{ assignees | length }}</strong> people</span>
+    </div>
+    {% end %}
   </div>
 
   <div class="kanban-board-layout">
@@ -137,7 +145,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {# Fragment blocks for OOB #}
 {% fragment column_block %}
 {% if column_id is defined %}
-{% call column(column_id, column_name, tasks | length) %}
+{% call column(column_id, column_name, tasks | length, oob=false) %}
   {% unless tasks %}
     <p class="kanban-empty">No tasks.</p>
   {% end %}
