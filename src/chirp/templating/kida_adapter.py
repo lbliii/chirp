@@ -32,3 +32,16 @@ class KidaAdapter:
         """Render template with pre-rendered HTML injected into blocks."""
         tmpl = self._env.get_template(template)
         return tmpl.render_with_blocks(block_overrides, **context)
+
+    def template_metadata(self, template: str) -> object | None:
+        """Return TemplateMetadata for block validation and composition planning."""
+        from kida.environment.exceptions import (
+            TemplateNotFoundError,
+            TemplateSyntaxError,
+        )
+
+        try:
+            tmpl = self._env.get_template(template)
+            return tmpl.template_metadata()
+        except (TemplateNotFoundError, TemplateSyntaxError):
+            return None

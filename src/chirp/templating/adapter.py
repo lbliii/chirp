@@ -2,7 +2,7 @@
 
 Chirp uses this protocol so the composition layer stays independent of
 Kida internals. The KidaAdapter routes render_template, render_block,
-and compose_layout through Kida's public APIs.
+compose_layout, and template_metadata through Kida's public APIs.
 """
 
 from __future__ import annotations
@@ -32,4 +32,13 @@ class TemplateAdapter(Protocol):
         context: dict[str, Any],
     ) -> str:
         """Render template with pre-rendered HTML injected into blocks."""
+        ...
+
+    def template_metadata(self, template: str) -> object | None:
+        """Return structure metadata for a template, or None if unavailable.
+
+        Used for block validation and composition planning. KidaAdapter
+        returns TemplateMetadata. Adapters that do not support metadata
+        may return None.
+        """
         ...

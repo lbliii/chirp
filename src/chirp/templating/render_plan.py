@@ -196,12 +196,45 @@ def build_render_plan(
     )
 
 
+def _validate_view_ref(adapter: TemplateAdapter, view: ViewRef) -> None:
+    """Validate that a view's block exists. Raises KeyError if missing."""
+    if not view.template or not view.block:
+        return
+    meta = adapter.template_metadata(view.template)
+    if meta is None:
+        return
+    blocks = getattr(meta, "blocks", None)
+    if blocks is None:
+        return
+    if view.block not in blocks:
+        raise KeyError(
+            f"Block '{view.block}' not found in template '{view.template}'. "
+            f"Available blocks: {sorted(blocks.keys())}"
+        )
+
+
 def execute_render_plan(
     plan: RenderPlan,
     *,
     adapter: TemplateAdapter,
+    validate_blocks: bool = False,
 ) -> RenderedPlan:
-    """Execute a render plan using the template adapter."""
+    """Execute a render plan using the template adapter.
+
+    Args:
+        plan: Render plan from build_render_plan.
+        adapter: Template engine adapter (e.g., KidaAdapter).
+        validate_blocks: When True, validate blocks exist before render.
+            Uses adapter.template_metadata() when available. Raises KeyError
+            if a block is missing.
+    """
+    if validate_blocks:
+        if not plan.render_full_template:
+            _validate_view_ref(adapter, plan.main_view)
+        for ru in plan.region_updates:
+            if ru.view.template and ru.view.block:
+                _validate_view_ref(adapter, ru.view)
+
     # Render main content
     if plan.render_full_template:
         main_html = adapter.render_template(
