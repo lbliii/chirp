@@ -369,9 +369,7 @@
   </div>
   {% end %}
 
-  {# No transition:true on #main — OOB swaps (score updates) would trigger view transitions
-     and cause the whole list to flicker/disappear. Use transition only on nav links. #}
-  <div id="main" class="container" hx-boost="true" hx-target="#main" hx-swap="innerHTML">
+  <div id="main" class="container">
 
     {% if page == "list" %}
 

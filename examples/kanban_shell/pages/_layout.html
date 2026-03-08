@@ -11,17 +11,6 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-  <script>
-  // Fix hx-select inheritance: fragment targets (not #main) should use raw response.
-  // Without this, elements inside main inherit hx-select="#page-content" and fragment
-  // responses (filter, edit, etc.) get empty swap because they have no #page-content.
-  document.body.addEventListener("htmx:beforeSwap", function(evt) {
-    var target = evt.detail.target;
-    if (target && !target.matches("#main, #page-content")) {
-      evt.detail.selectOverride = "";
-    }
-  });
-  </script>
   <link rel="stylesheet" href="/static/chirpui.css">
   <link rel="stylesheet" href="/static/chirpui-transitions.css">
   <link rel="stylesheet" href="/static/board.css">
@@ -60,9 +49,7 @@
         {% end %}
       {% end %}
     </aside>
-    <main id="main" class="chirpui-app-shell__main"
-          hx-boost="true" hx-target="#main"
-          hx-swap="innerHTML transition:true" hx-select="#page-content">
+    <main id="main" class="chirpui-app-shell__main">
       <div id="page-content">{% block content %}{% end %}</div>
     </main>
   </div>
