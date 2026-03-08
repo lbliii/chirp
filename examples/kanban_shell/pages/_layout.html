@@ -50,7 +50,7 @@
       {% end %}
     </aside>
     <main id="main" class="chirpui-app-shell__main">
-      <div id="page-content">{% block content %}{% end %}</div>
+      {% block content %}{% end %}
     </main>
   </div>
   {{ toast_container() }}

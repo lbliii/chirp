@@ -72,28 +72,25 @@ class TestBoostLayout:
 
 
 class TestShellLayout:
-    """Tests for chirp shell layout (persistent app shell with hx-select)."""
+    """Tests for chirp shell layout (persistent app shell, no inherited hx-boost)."""
 
     def test_shell_layout_loads_and_renders(self) -> None:
         env = _make_env()
         tpl = env.get_template("chirp/layouts/shell.html")
         html = tpl.render({"content": "Hello"}).strip()
         assert 'id="main"' in html
-        assert 'id="page-content"' in html
-        assert 'hx-boost="true"' in html
-        assert 'hx-target="#main"' in html
-        assert 'hx-select="#page-content"' in html
-        assert 'hx-swap="innerHTML transition:true"' in html
+        assert "hx-boost" not in html
+        assert "hx-select" not in html
+        assert 'id="page-content"' not in html
         assert "htmx.org" in html
         assert "htmx-ext-sse" in html
 
-    def test_shell_layout_hx_target_matches_page_content(self) -> None:
-        """HX-Target requests swap into #page-content via hx-select."""
+    def test_shell_layout_no_page_content_wrapper(self) -> None:
+        """Shell layout renders content directly inside <main>, no wrapper div."""
         env = _make_env()
         tpl = env.get_template("chirp/layouts/shell.html")
         html = tpl.render({"content": "Fragment"}).strip()
-        assert "#page-content" in html
-        assert 'hx-select="#page-content"' in html
+        assert "page-content" not in html
 
     def test_shell_section_macro_renders(self) -> None:
         """shell_section macro produces hx-target/hx-swap for inner shells."""

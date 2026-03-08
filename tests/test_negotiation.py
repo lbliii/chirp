@@ -257,9 +257,9 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
-        assert result.header("HX-Reselect") == "*"
         header_names = {name for name, _ in result.headers}
         assert "HX-Retarget" not in header_names
+        assert "HX-Reselect" not in header_names
 
     def test_with_retarget_sets_header(self, kida_env: Environment) -> None:
         result = negotiate(
@@ -272,7 +272,6 @@ class TestNegotiateValidationError:
             kida_env=kida_env,
         )
         assert result.status == 422
-        assert result.header("HX-Reselect") == "*"
         assert ("HX-Retarget", "#error-banner") in result.headers
         assert "email: Invalid" in result.text
 
@@ -576,7 +575,6 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 422
-        assert result.header("HX-Reselect") == "*"
 
     def test_validation_error_tuple_can_override_status(self, kida_env: Environment) -> None:
         """A tuple can override ValidationError's default 422 to another code."""
@@ -585,7 +583,6 @@ class TestNegotiateEdgeCases:
             kida_env=kida_env,
         )
         assert result.status == 400
-        assert result.header("HX-Reselect") == "*"
 
     def test_oob_with_zero_fragments(self, kida_env: Environment) -> None:
         """OOB with only a main and no OOB fragments renders normally."""
@@ -605,7 +602,6 @@ class TestNegotiateEdgeCases:
         )
         assert result.status == 422
         assert "err" in result.text
-        assert result.header("HX-Reselect") == "*"
 
 
 class TestLayoutPageSlotContext:

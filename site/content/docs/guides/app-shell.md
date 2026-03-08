@@ -229,7 +229,7 @@ rules:
 1. **No `hx-boost` on `<main>`** — put it on individual nav links instead
 2. **Use `sidebar_link(boost=true)`** or add `hx-boost="true" hx-target="#main"
    hx-swap="innerHTML transition:true"` on each nav link
-3. **Keep `<div id="page-content">` inside `<main>`** so the layout chain
-   can find the content target
+3. **No wrapper div inside `<main>`** — content renders directly; the server's
+   `page_block` response is the raw content for `#main`
 
 See `examples/kanban_shell` for a working custom shell.
