@@ -47,11 +47,6 @@ def _extract_csrf_meta(html: str) -> str | None:
     return _extract_csrf_token(html)
 
 
-def _assert_hx_reselect_star(response) -> None:
-    """Fragments should override inherited shell hx-select."""
-    assert response.header("HX-Reselect") == "*"
-
-
 async def _login(client, username: str = "alice") -> dict[str, str]:
     """Log in (CSRF-aware) and return auth + CSRF headers for subsequent requests."""
     page = await client.get("/login")
@@ -233,7 +228,6 @@ class TestBoard:
             )
             assert_is_fragment(response)
             assert_fragment_contains(response, 'id="board"')
-            _assert_hx_reselect_star(response)
 
     async def test_index_contains_stats(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -305,7 +299,6 @@ class TestAddTask:
             )
             assert response.status == 422
             assert "required" in response.text.lower()
-            _assert_hx_reselect_star(response)
 
     async def test_add_invalid_priority_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -347,7 +340,6 @@ class TestEditTask:
             assert response.status == 200
             assert 'name="title"' in response.text
             assert "Design landing page" in response.text
-            _assert_hx_reselect_star(response)
 
     async def test_edit_form_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -379,7 +371,6 @@ class TestEditTask:
             )
             assert response.status == 422
             assert "required" in response.text.lower()
-            _assert_hx_reselect_star(response)
 
     async def test_save_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -487,7 +478,6 @@ class TestFilter:
             assert response.status == 200
             assert "Implement auth flow" in response.text
             assert "Dark mode toggle" not in response.text
-            _assert_hx_reselect_star(response)
 
     async def test_filter_by_assignee(self, example_app) -> None:
         async with TestClient(example_app) as client:

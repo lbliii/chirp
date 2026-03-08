@@ -92,7 +92,6 @@ class TestNegotiateTemplateTypes:
         # Fragment should NOT include the full page wrapper
         assert "<form>" not in result.text
         assert result.render_intent == "fragment"
-        assert result.header("HX-Reselect") == "*"
 
     def test_page_intent_tracks_fragment_request(self, kida_env: Environment) -> None:
         async def _receive():
@@ -251,7 +250,6 @@ class TestNegotiateValidationError:
         assert "email: Required" in result.text
         # Should be a fragment, not the full page
         assert "<html>" not in result.text
-        assert result.header("HX-Reselect") == "*"
 
     def test_without_retarget_has_no_hx_header(self, kida_env: Environment) -> None:
         result = negotiate(
