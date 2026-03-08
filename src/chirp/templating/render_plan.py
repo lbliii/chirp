@@ -12,6 +12,12 @@ from typing import TYPE_CHECKING, Any
 from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 
+# OOB region IDs for shell updates (breadcrumbs, sidebar) on boosted navigation
+CHIRPUI_BREADCRUMBS_TARGET = "chirpui-topbar-breadcrumbs"
+CHIRPUI_SIDEBAR_TARGET = "chirpui-sidebar-nav"
+BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
+SIDEBAR_OOB_BLOCK = "sidebar_oob"
+
 if TYPE_CHECKING:
     from chirp.http.request import Request
     from chirp.pages.types import LayoutChain
@@ -185,6 +191,41 @@ def build_render_plan(
                 )
             )
 
+    # Add breadcrumbs and sidebar OOB when root layout targets #main
+    if (
+        request
+        and request.is_fragment
+        and not request.is_history_restore
+        and request.is_boosted
+        and layout_chain
+        and layout_chain.layouts
+        and layout_chain.layouts[0].target == "main"
+    ):
+        root_layout = layout_chain.layouts[0]
+        layout_ctx = composition.context
+        if "breadcrumb_items" in layout_ctx:
+            region_updates.append(
+                RegionUpdate(
+                    region=CHIRPUI_BREADCRUMBS_TARGET,
+                    view=ViewRef(
+                        template=root_layout.template_name,
+                        block=BREADCRUMBS_OOB_BLOCK,
+                        context=layout_ctx,
+                    ),
+                )
+            )
+        if "current_path" in layout_ctx:
+            region_updates.append(
+                RegionUpdate(
+                    region=CHIRPUI_SIDEBAR_TARGET,
+                    view=ViewRef(
+                        template=root_layout.template_name,
+                        block=SIDEBAR_OOB_BLOCK,
+                        context=layout_ctx,
+                    ),
+                )
+            )
+
     return RenderPlan(
         intent=intent,
         main_view=main_view,
@@ -278,8 +319,12 @@ def execute_render_plan(
 def serialize_rendered_plan(rendered: RenderedPlan) -> str:
     """Serialize rendered plan to final HTML with OOB fragments."""
     parts: list[str] = [rendered.main_html]
+    inner_html_regions = {
+        SHELL_ACTIONS_TARGET,
+        CHIRPUI_BREADCRUMBS_TARGET,
+        CHIRPUI_SIDEBAR_TARGET,
+    }
     for region_id, html in rendered.region_htmls.items():
-        # Use innerHTML for shell-actions to preserve container attributes
-        swap = "innerHTML" if region_id == SHELL_ACTIONS_TARGET else "true"
+        swap = "innerHTML" if region_id in inner_html_regions else "true"
         parts.append(f'<div id="{region_id}" hx-swap-oob="{swap}">{html}</div>')
     return "\n".join(parts)
