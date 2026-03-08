@@ -130,9 +130,39 @@ document.body.addEventListener("htmx:configRequest", function(event) {
   var meta = document.querySelector('meta[name="csrf-token"]');
   if (meta) { event.detail.headers["X-CSRF-Token"] = meta.content; }
 });
+
+(function initSortable() {
+  function setupColumns() {
+    document.querySelectorAll(".kanban-column__body").forEach(function(el) {
+      if (el._sortable) return;
+      el._sortable = new Sortable(el, {
+        group: "kanban",
+        animation: 150,
+        ghostClass: "kanban-card--ghost",
+        dragClass: "kanban-card--drag",
+        draggable: ".kanban-card-wrapper",
+        onEnd: function(evt) {
+          if (evt.from === evt.to) return;
+          var card = evt.item.querySelector(".kanban-card");
+          if (!card) return;
+          var taskId = card.dataset.taskId;
+          var newStatus = evt.to.dataset.status;
+          if (!taskId || !newStatus) return;
+          htmx.ajax("POST", "/tasks/" + taskId + "/move/" + newStatus, {swap: "none"});
+        }
+      });
+    });
+  }
+  setupColumns();
+  document.body.addEventListener("htmx:afterSwap", setupColumns);
+  document.body.addEventListener("htmx:oobAfterSwap", setupColumns);
+})();
 </script>
 {% end %}
 {% end %}
+
+{# Empty main for hx-swap="none" OOB routes #}
+{% fragment empty %}{% endfragment %}
 
 {# Fragment blocks for OOB #}
 {% fragment header_stats_oob %}
@@ -164,5 +194,34 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {% fragment task_card_block %}
 {% if task is defined %}
 {{ task_card(task, oob=true, me=current_user) }}
+{% end %}
+{% endfragment %}
+
+{# OOB-aware fragments for SSE — hx-swap-oob is baked into the HTML
+   so they can be yielded without a Fragment target and still route
+   correctly via the sse-swap="fragment" listener. #}
+{% fragment column_block_oob %}
+{% if column_id is defined %}
+{% call column(column_id, column_name, tasks | length, oob=true) %}
+  {% unless tasks %}
+    <p class="kanban-empty">No tasks.</p>
+  {% end %}
+  {% for task in tasks | sort(attribute="created_at") %}
+  <div class="kanban-card-wrapper">
+    {{ task_card(task, me=current_user) }}
+  </div>
+  {% end %}
+{% end %}
+{% end %}
+{% endfragment %}
+
+{% fragment stats_block_oob %}
+{% if all_tasks is defined %}
+<div id="board-stats" class="kanban-stats" hx-swap-oob="true">
+  <span><strong>{{ all_tasks | length }}</strong> tasks</span>
+  <span><strong>{{ all_tasks | selectattr("priority", "equalto", "high") | list | length }}</strong> high priority</span>
+  {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+  <span><strong>{{ assignees | length }}</strong> people</span>
+</div>
 {% end %}
 {% endfragment %}
