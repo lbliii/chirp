@@ -233,3 +233,106 @@ rules:
    `page_block` response is the raw content for `#main`
 
 See `examples/kanban_shell` for a working custom shell.
+
+## Gotchas for Interactive Shells
+
+Interactive shells — boards, dashboards, real-time feeds — combine OOB swaps,
+SSE, and action-style routes. These patterns have sharp edges worth knowing.
+
+### OOB with `hx-swap="none"` — the Lost Main
+
+Chirp's `OOB(main, *oob_fragments)` renders the first argument as the **main**
+response (no `hx-swap-oob` wrapping). The rest get wrapped. When a button uses
+`hx-swap="none"` (delete, move, toggle), the main is **discarded** — htmx only
+processes the OOB elements.
+
+If you put important content as the main, it vanishes silently:
+
+```python
+# BAD — old_column is the main, discarded by hx-swap="none"
+return OOB(
+    _column_fragment(old_status, tasks),
+    _column_fragment(new_status, tasks),
+    _stats_fragment(tasks),
+)
+
+# GOOD — empty main, all real content is OOB
+return OOB(
+    Fragment("page.html", "empty"),
+    _column_fragment(old_status, tasks),
+    _column_fragment(new_status, tasks),
+    _stats_fragment(tasks),
+)
+```
+
+**Rule of thumb:** if the route uses `hx-swap="none"`, make the OOB main an
+empty fragment and put everything else in the OOB positions.
+
+### SSE Event Naming — the Silent Mismatch
+
+When you yield a `Fragment` with a `target` in an SSE generator,
+`_format_event` uses the target as the SSE event name (e.g.,
+`"column-backlog"`). But `sse-swap="fragment"` only listens for events
+literally named `"fragment"`. Everything else is silently ignored.
+
+**Fix:** Create template blocks with `hx-swap-oob` baked into the HTML, and
+yield `Fragment` objects without `target`. The event name defaults to
+`"fragment"` and htmx processes the OOB attributes from the content:
+
+```html
+{%- fragment column_block_oob -%}
+{% call column(column_id, column_name, tasks | length, oob=true) %}
+  ...
+{% end %}
+{%- endfragment -%}
+```
+
+```python
+# No target → event name is "fragment" → client receives it
+yield Fragment("page.html", "column_block_oob",
+               column_id="backlog", tasks=filtered, ...)
+```
+
+### ContextVar Loss in SSE Generators
+
+The SSE async generator runs in its own task, outside the middleware context.
+Calling `get_user()`, `csrf_token()`, or any ContextVar-backed function inside
+the generator raises `LookupError`.
+
+**Fix:** Capture request-scoped values **before** entering the generator:
+
+```python
+def events_route():
+    user = get_user()  # captured in handler scope
+
+    async def generate():
+        # user is available via closure; get_user() would fail here
+        yield _fragment(..., current_user=user)
+
+    return EventStream(generate())
+```
+
+### Dual Template Blocks for HTTP vs SSE
+
+HTTP OOB routes rely on Chirp's negotiation layer to wrap fragments with
+`hx-swap-oob`. SSE fragments are rendered by `_format_event`, which only adds
+OOB wrapping when `target` is set — but setting `target` breaks event naming
+(see above).
+
+The result: you need separate template blocks for the same content. One for
+HTTP (no inline OOB, the framework adds it) and one for SSE (OOB baked into
+the HTML):
+
+```html
+{%- fragment column_block -%}
+{# HTTP — negotiate() adds hx-swap-oob externally #}
+{% call column(col_id, col_name, count, oob=false) %}...{% end %}
+{%- endfragment -%}
+
+{%- fragment column_block_oob -%}
+{# SSE — OOB is inline so _format_event doesn't need target #}
+{% call column(col_id, col_name, count, oob=true) %}...{% end %}
+{%- endfragment -%}
+```
+
+See `examples/kanban_shell` for a working example of all four patterns.
