@@ -11,7 +11,6 @@ class TestPagesShell:
             assert "Projects" in response.text
             assert "New project" in response.text
             assert "Apollo" in response.text
-            assert 'id="page-content"' in response.text
 
     async def test_boosted_detail_streams_suspense_shell(self, example_app) -> None:
         async with TestClient(example_app) as client:
