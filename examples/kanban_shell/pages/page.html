@@ -141,6 +141,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
         ghostClass: "kanban-card--ghost",
         dragClass: "kanban-card--drag",
         draggable: ".kanban-card-wrapper",
+        handle: ".kanban-card__header, .kanban-card__desc, .kanban-card__tags, .kanban-card__time",
         onEnd: function(evt) {
           if (evt.from === evt.to) return;
           var card = evt.item.querySelector(".kanban-card");

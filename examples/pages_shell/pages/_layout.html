@@ -7,10 +7,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pages Shell</title>
+  {% if csrf_token is defined %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  {% end %}
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <link rel="stylesheet" href="/static/chirpui.css">
   <link rel="stylesheet" href="/static/chirpui-transitions.css">
+  <script src="/static/chirpui.js"></script>
+  <script>
+  (function(){var t=localStorage.getItem("chirpui-theme")||"system";var s=localStorage.getItem("chirpui-style")||"default";document.documentElement.setAttribute("data-theme",t);document.documentElement.setAttribute("data-style",s);})();
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script>
+  document.addEventListener("alpine:init",function(){
+    Alpine.store("modals",{});
+    Alpine.store("trays",{});
+    Alpine.effect(function(){
+      var any=Object.values(Alpine.store("modals")).some(Boolean)||Object.values(Alpine.store("trays")).some(Boolean);
+      document.body.style.overflow=any?"hidden":"";
+    });
+  });
+  </script>
   <style>
     .example-page {
       padding-block: 1.5rem 2rem;
@@ -55,5 +73,11 @@
       {% block content %}{% end %}
     </main>
   </div>
+  <script>
+  document.body.addEventListener("htmx:configRequest", function(event) {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) { event.detail.headers["X-CSRF-Token"] = meta.content; }
+  });
+  </script>
 </body>
 </html>
