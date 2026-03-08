@@ -19,6 +19,7 @@ _TEMPLATE_REF_PATTERN = re.compile(
 )
 _TEMPLATE_SOURCE_SUFFIXES = (".html", ".htm", ".jinja", ".j2")
 _FRAGMENT_ISLAND_PATTERN = re.compile(r'fragment_island\s*\(\s*["\']([^"\']+)["\']')
+_WIZARD_FORM_PATTERN = re.compile(r'wizard_form\s*\(\s*["\']([^"\']+)["\']')
 _ID_WITH_DISINHERIT_PATTERN = re.compile(
     r'<[^>]+\bid\s*=\s*["\']([^"\']+)["\'][^>]*hx-disinherit',
     re.IGNORECASE | re.DOTALL,
@@ -111,6 +112,11 @@ def extract_template_references(source: str) -> set[str]:
 def extract_fragment_island_ids(source: str) -> set[str]:
     """Extract id values from fragment_island() macro calls."""
     return {m.group(1) for m in _FRAGMENT_ISLAND_PATTERN.finditer(source)}
+
+
+def extract_wizard_form_ids(source: str) -> set[str]:
+    """Extract id values from wizard_form() macro calls."""
+    return {m.group(1) for m in _WIZARD_FORM_PATTERN.finditer(source)}
 
 
 def extract_ids_with_disinherit(source: str) -> set[str]:

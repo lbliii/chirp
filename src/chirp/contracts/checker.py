@@ -24,9 +24,11 @@ from .rules_sse import (
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
+    extract_fragment_island_ids,
     extract_static_ids,
     extract_targets_from_source,
     extract_template_references,
+    extract_wizard_form_ids,
     load_template_sources,
 )
 from .types import CheckResult, ContractIssue, Severity
@@ -209,6 +211,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         all_ids: set[str] = set()
         for source in template_sources.values():
             all_ids.update(extract_static_ids(source))
+            all_ids.update(extract_fragment_island_ids(source))
+            all_ids.update(extract_wizard_form_ids(source))
         hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
