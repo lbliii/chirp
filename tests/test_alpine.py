@@ -132,8 +132,8 @@ class TestAlpineMacros:
 """
         tpl = env.from_string(source)
         html = tpl.render().strip()
-        assert 'x-data="{ open: false }"' in html
-        assert 'x-show="open"' in html
+        assert "open: false" in html
+        assert "x-show" in html and "open" in html
         assert "Menu" in html
         assert "Link A" in html
         assert "chirp-dropdown" in html

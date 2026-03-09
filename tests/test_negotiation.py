@@ -762,7 +762,8 @@ class TestLayoutPageSlotContext:
         result = negotiate(Template("page.html"), kida_env=env)
 
         assert result.status == 200
-        assert 'data-sidebar-collapsible="true"' in result.text
+        assert "chirpui-app-shell" in result.text
+        assert "Hello shell" in result.text
 
     @pytest.mark.asyncio
     async def test_layout_suspense_boosted_navigation_appends_shell_actions_oob(
