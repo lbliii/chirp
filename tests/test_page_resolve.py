@@ -440,7 +440,7 @@ class TestUpgradeResult:
             context={"page_title": "Admin"},
         )
         chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
-        provider = ContextProvider(module_path="/admin/_context.py", func=lambda: {}, depth=0)
+        provider = ContextProvider(module_path="/admin/_context.py", func=dict, depth=0)
 
         upgraded = upgrade_result(
             result,

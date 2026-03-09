@@ -116,9 +116,7 @@ class TestStaticFileServing:
 class TestConfigDrivenStaticServing:
     """When AppConfig.static_dir is set and directory exists, Chirp auto-adds StaticFiles."""
 
-    async def test_static_dir_serves_files_without_add_middleware(
-        self, static_dir: Path
-    ) -> None:
+    async def test_static_dir_serves_files_without_add_middleware(self, static_dir: Path) -> None:
         """AppConfig(static_dir=...) serves files without explicit add_middleware."""
         app = App(config=AppConfig(static_dir=static_dir))
 

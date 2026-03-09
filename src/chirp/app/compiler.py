@@ -68,9 +68,7 @@ class AppCompiler:
                 from chirp.middleware.static import StaticFiles
 
                 prefix = self._config.static_url.strip("/") or "static"
-                middleware_list.append(
-                    StaticFiles(directory=str(static_path), prefix=f"/{prefix}")
-                )
+                middleware_list.append(StaticFiles(directory=str(static_path), prefix=f"/{prefix}"))
         if self._config.safe_target:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET

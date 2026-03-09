@@ -229,7 +229,9 @@ def upgrade_result(
                 context=merged_ctx,
                 regions=result.regions,
                 layout_chain=layout_chain if needs_chain else result.layout_chain,
-                context_providers=context_providers if needs_providers else result.context_providers,
+                context_providers=context_providers
+                if needs_providers
+                else result.context_providers,
             )
         return result
 

@@ -234,12 +234,7 @@ def build_render_plan(
     # Breadcrumbs/sidebar OOB added in execute_render_plan when layout has blocks
     # Ensure layout_context has current_path for sidebar active state on boosted nav
     layout_context = dict(composition.context)
-    if (
-        request
-        and layout_chain
-        and layout_chain.layouts
-        and "current_path" not in layout_context
-    ):
+    if request and layout_chain and layout_chain.layouts and "current_path" not in layout_context:
         layout_context["current_path"] = request.path
 
     return RenderPlan(
@@ -384,9 +379,7 @@ def execute_render_plan(
         oob_blocks_to_suppress: set[str] = set(CHIRPUI_OOB_BLOCKS)
         if plan.intent == "full_page":
             for layout_info in layouts:
-                oob_blocks_to_suppress |= _oob_block_names(
-                    adapter, layout_info.template_name
-                )
+                oob_blocks_to_suppress |= _oob_block_names(adapter, layout_info.template_name)
         for layout_info in reversed(layouts):
             block_overrides: dict[str, str] = {"content": main_html}
             if plan.intent == "full_page":
@@ -400,11 +393,7 @@ def execute_render_plan(
 
     # Augment region_updates with shell OOB blocks discovered via AST (fragment only)
     region_updates_list: list[RegionUpdate] = list(plan.region_updates)
-    if (
-        plan.intent == "page_fragment"
-        and plan.layout_chain
-        and plan.layout_chain.layouts
-    ):
+    if plan.intent == "page_fragment" and plan.layout_chain and plan.layout_chain.layouts:
         root_layout = plan.layout_chain.layouts[0]
         contract = _get_or_build_contract(adapter, root_layout.template_name)
         layout_ctx = plan.layout_context
