@@ -188,6 +188,38 @@ which blocks exist. That enables:
 
 See [[docs/templates/kida-integration|Kida Integration]] for the full flow.
 
+## Regions for Shell OOB
+
+`{% region %}` is the preferred pattern for app shell updates (breadcrumbs, sidebar, title). One definition serves both full-page slots and OOB swaps — no duplication.
+
+Minimal layout example:
+
+```html
+{% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
+{{ breadcrumbs(breadcrumb_items) }}
+{% end %}
+
+{% region title_oob(page_title="My App") %}
+<title id="chirpui-document-title" hx-swap-oob="true">{{ page_title }}</title>
+{% end %}
+
+{% region sidebar_oob(current_path="/") %}
+{{ sidebar(current_path=current_path) }}
+{% end %}
+
+{% call app_shell(brand="My App") %}
+  {% slot topbar %}
+  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items | default([{"label":"Home","href":"/"}])) }}
+  {% end %}
+  {% slot sidebar %}
+  {{ sidebar_oob(current_path=current_path | default("/")) }}
+  {% end %}
+  {% block content %}{% end %}
+{% end %}
+```
+
+ChirpUI's `breadcrumbs_oob`, `sidebar_oob`, and `title_oob` map to `chirpui-topbar-breadcrumbs`, `chirpui-sidebar-nav`, and `chirpui-document-title` automatically. See [[docs/templates/kida-integration|Kida Integration]] for the full flow and `examples/shell_oob` for a complete reference.
+
 ## Block-Heavy Layouts
 
 Templates with many blocks (extends, nested blocks, fragments) benefit from a clear structure. Use the **extension block pattern** so child templates can add content without replacing parent layout.

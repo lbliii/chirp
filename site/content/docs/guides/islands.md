@@ -1,24 +1,141 @@
 ---
 title: Islands Contract (V1)
-description: Framework-agnostic contract for isolated high-state UI islands
+description: Framework-agnostic contract for isolated client-managed surfaces
 draft: false
 weight: 30
 lang: en
 type: doc
 tags: [guides, islands, htmx, progressive-enhancement]
-keywords: [islands, data-island, hydration, remount, fallback]
+keywords: [islands, data-island, fragment_island, hydration, remount, fallback]
 category: guide
 ---
 
-## Overview
+## Current State
 
-Chirp islands let you keep the app server-rendered by default while mounting
-isolated high-state widgets where needed (editors, canvases, complex grids).
-The contract is framework-agnostic: React/Svelte/Vue adapters can all target
-the same mount metadata and lifecycle events.
+Chirp ships a real V1 islands system. The following are implemented and available:
 
-Chirp also supports a no-build primitive style, where islands load plain ES
-modules served from static assets (`/static/islands/*.js`).
+- **AppConfig flags** in `src/chirp/config.py`: `islands`, `islands_version`, `islands_contract_strict`
+- **Runtime injection** in `src/chirp/app/compiler.py`: bootstrap script when `islands=True`
+- **Islands bootstrap/runtime** in `src/chirp/server/islands.py`: mount/unmount lifecycle, htmx integration
+- **Template helpers** in `src/chirp/templating/filters.py`: `island_props`, `island_attrs`
+- **Static checks** in `src/chirp/contracts/rules_islands.py`: metadata validation
+- **Test coverage** in `tests/test_islands.py` and `tests/test_contracts.py`
+
+### Already Shipped
+
+- V1 mount contract and helpers
+- Inline runtime bootstrap
+- Dynamic adapter loading via `data-island-src`
+- Lifecycle events (`chirp:island:*`)
+- Primitive metadata conventions and schema checks
+- `app.check()` enforcement
+
+### Not Yet Strong In-Repo
+
+- First-party adapter modules or `/static/islands/*.js` examples
+- A prominent example app using the islands runtime end-to-end
+- Deep integration between islands and `PageComposition.regions`
+- Env-based config loading for islands flags in `AppConfig.from_env()`
+
+## Philosophy
+
+Chirp islands are the framework's answer for genuinely client-managed surfaces.
+Chirp remains HTML-over-the-wire by default: routing, shell composition,
+fragments, OOB updates, and most mutations stay server-owned. Islands provide
+an explicit, validated mount contract for the narrower class of widgets whose
+state and DOM must live in the browser.
+
+Islands are:
+
+- explicit mount roots with stable metadata
+- progressive enhancement over SSR fallback HTML
+- compatible with no-build ES modules
+- validated by `app.check()`
+- deliberately separate from shell/navigation ownership
+
+Islands are not:
+
+- a replacement for `Page`, `Fragment`, `OOB`, or app-shell rendering
+- a client router
+- global hydration
+- a rebranding of Chirp as a SPA framework
+
+## Boundaries: `data-island` vs `fragment_island`
+
+Two concepts look similar in prose but are different in code. The proposal must
+clearly separate them.
+
+### `data-island` Islands
+
+These are the real islands runtime contract shipped by Chirp V1. They are
+client-runtime islands: elements where a JavaScript adapter mounts and owns the
+DOM.
+
+Relevant files:
+
+- `src/chirp/server/islands.py`
+- `src/chirp/templating/filters.py`
+- This guide
+
+### `fragment_island` / `safe_region`
+
+These are ChirpUI/HTMX safety primitives that isolate local mutation regions
+from inherited `hx-*` behavior. They use `hx-disinherit` to prevent shell-level
+`hx-target` / `hx-swap` from bleeding into form submissions and fragment swaps.
+
+Relevant files:
+
+- `src/chirp_ui/templates/chirpui/fragment_island.html`
+- [App Shells](app-shell.md)
+
+**`fragment_island` is a swap-safety boundary, not the same thing as a
+client-runtime island.** Use it when you need semantic grouping or when a
+region needs its own `hx-target` / `hx-swap` defaults. It does not run any
+client-side JavaScript or mount framework adapters.
+
+## Architecture
+
+Islands complement Chirp's existing rendering pipeline; they do not replace it.
+
+### Server-Owned Pipeline Stays Primary
+
+Chirp has a coherent composition model:
+
+- semantic return types in `src/chirp/templating/returns.py`
+- composition types in `src/chirp/templating/composition.py`
+- request-aware planning in `src/chirp/templating/render_plan.py`
+- negotiation in `src/chirp/server/negotiation.py`
+
+### Ownership Model
+
+Document three ownership classes:
+
+- **Server-owned regions**: normal fragments, OOB targets, shell actions, SSE
+  display blocks
+- **Client-owned surfaces**: `data-island` roots and their internal DOM
+- **Shared boundaries**: coarse remount/invalidation boundaries where server
+  swaps may replace an island root but should not patch inside it
+
+This ownership model is implied by [SSE Patterns](../streaming/sse-patterns.md):
+client-managed surfaces should not be reactively re-rendered. Do not register
+client-owned blocks in the reactive dependency index. See [App Shells](app-shell.md)
+for how islands fit inside shell layouts and OOB regions.
+
+## Shell Constraints
+
+ChirpUI shell contracts that islands must respect:
+
+- `#main` is the persistent page-content swap target
+- Shell OOB regions are stable server-owned containers:
+  - `#chirpui-topbar-breadcrumbs`
+  - `#chirpui-sidebar-nav`
+  - `#chirpui-document-title`
+  - `#chirp-shell-actions` or custom `ShellActions.target`
+- `sidebar_link()` and `nav_link()` assume boosted navigation targets `#main`
+
+Islands may live inside those regions, but they must not take ownership of the
+OOB target containers themselves. Custom shells may not expose every built-in
+OOB target id automatically.
 
 ## Mount Root Contract
 
@@ -45,7 +162,7 @@ Supported attributes:
 - `id` (recommended): stable mount id for deterministic remount targeting.
 - `data-island-primitive` (optional): explicit primitive type tag for contract checks.
 
-## Props Rules
+### Props Rules
 
 - Props must be JSON-serializable (`dict`, `list`, string, number, boolean, null).
 - Chirp helpers serialize and escape props for HTML attributes.
@@ -128,6 +245,43 @@ The runtime also exposes a small channel API:
 
 Always place useful fallback markup inside the mount root. If island runtime
 fails, the SSR fallback remains visible and functional.
+
+## Risks
+
+- **Conflating HTMX-safe region boundaries with client-runtime islands** — use
+  `fragment_island` for swap safety; use `data-island` for client-managed DOM.
+- **Letting islands become a second default rendering model** — Chirp stays
+  server-first; islands are an escape hatch.
+- **Allowing server swaps to patch inside client-owned DOM** — establish
+  explicit ownership; do not re-render client-managed surfaces via SSE or OOB.
+- **Assuming all ChirpUI shells expose every built-in OOB target id** — custom
+  shells may omit or rename targets; document your shell's contract.
+
+## Roadmap
+
+### V1.5: Positioning and Documentation Cleanup
+
+- Clarify the distinction between `data-island` and `fragment_island`
+- Add ownership-language docs for server-owned vs client-owned surfaces
+- Connect islands guidance directly to app-shell and SSE docs
+- Add one end-to-end no-build example using `island_attrs(...)` — see `examples/islands/`
+- Islands + app shell: `examples/islands_shell/`
+- Islands + htmx fragment swap: `examples/islands_swap/`
+
+### V2: Render-Pipeline Alignment
+
+- Explore how islands can participate more explicitly in `PageComposition` and
+  `RegionUpdate`
+- Define coarse invalidation/remount semantics around HTMX swaps
+- Document how server-owned OOB regions can host remount-safe islands without
+  excessive churn
+
+### V3: Optional Higher-Level Ergonomics
+
+- Stronger action/state conventions over the existing runtime channels
+- Optional adapter packages or reference implementations
+- Clearer realtime guidance for client-owned surfaces receiving JSON/operation
+  streams rather than HTML patches
 
 ## Non-goals (V1)
 

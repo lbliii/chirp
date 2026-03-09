@@ -60,7 +60,13 @@ Chirp does not hard-code which blocks to render as OOB. Instead, it uses Kida's
 Adding new OOB regions requires only:
 
 1. Add a `{% region name_oob(params) %}...{% end %}` to the layout
-2. Map the region name to a target DOM ID in ChirpUI's OOB target map
+2. Map the region name to a target DOM ID
+
+ChirpUI pre-maps `breadcrumbs_oob`, `sidebar_oob`, and `title_oob` to
+`chirpui-topbar-breadcrumbs`, `chirpui-sidebar-nav`, and `chirpui-document-title`.
+For custom regions, use `custom_oob` → target `custom` (Chirp derives the target
+from `block_name.removesuffix("_oob")`), or add an entry to `_OOB_TARGET_MAP` in
+Chirp when using ChirpUI shell IDs.
 
 ## Block Validation
 
@@ -89,6 +95,45 @@ and defs:
 
 Chirp uses `meta.regions()` when available to prefer region-typed blocks for OOB
 discovery, falling back to the `*_oob` naming convention for plain blocks.
+
+## Migrating from blocks to regions
+
+If your layout uses `{% block name_oob %}...{% end %}` with duplicated content in
+app shell slots, migrate to regions for a single definition:
+
+**Before** — block + duplication in slots:
+
+```html
+{% block breadcrumbs_oob %}
+{{ breadcrumbs(breadcrumb_items) }}
+{% end %}
+
+{% call app_shell() %}
+  {% slot topbar %}
+  {{ breadcrumbs(breadcrumb_items) }}  {# duplicated #}
+  {% end %}
+{% end %}
+```
+
+**After** — region + call in slots:
+
+```html
+{% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
+{{ breadcrumbs(breadcrumb_items) }}
+{% end %}
+
+{% call app_shell() %}
+  {% slot topbar %}
+  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items | default([{"label":"Home","href":"/"}])) }}
+  {% end %}
+{% end %}
+```
+
+**Checklist:**
+
+1. Convert each `{% block name_oob %}...{% end %}` to `{% region name_oob(params) %}...{% end %}`
+2. Update app shell slots to call the region: `{{ name_oob(...) }}` instead of duplicating content
+3. Remove redundant `_page_layout` empty block overrides — Chirp suppresses OOB on full-page via `block_overrides`
 
 ## Metadata Fields Used
 

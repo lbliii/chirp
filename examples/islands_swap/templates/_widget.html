@@ -1,0 +1,18 @@
+{% block widget_block %}
+<div class="island-container">
+  <p><strong>Counter island</strong> — loaded via htmx swap.</p>
+  <div{{ island_attrs("counter", props={"initial_count": initial_count | default(0)}, mount_id="counter-root", src="/static/counter.js") }}>
+    <p>Count: <span id="counter-value">{{ initial_count | default(0) }}</span></p>
+    <button type="button" disabled>Enable JavaScript to interact</button>
+  </div>
+  <p style="margin-top:1rem;">
+    <button class="secondary"
+            hx-get="/widget"
+            hx-target="#widget-area"
+            hx-swap="innerHTML"
+            hx-trigger="click">
+      Reload (unmount + remount)
+    </button>
+  </p>
+</div>
+{% endblock %}

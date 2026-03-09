@@ -1,0 +1,18 @@
+{% block page_root %}
+{% block page_content %}
+<div style="padding: 2rem;">
+  <h1>Home</h1>
+  <p>This page has a counter island. Click the sidebar to navigate — the island
+  unmounts before the swap and remounts when the new content loads. Open the
+  console to see <code>chirp:island:unmount</code> and <code>chirp:island:remount</code>.</p>
+
+  <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1.5rem;margin:1rem 0;">
+    <p><strong>Counter island</strong> — client-managed, survives navigation via remount.</p>
+    <div{{ island_attrs("counter", props={"initial_count": 0}, mount_id="counter-root", src="/static/counter.js") }}>
+      <p>Count: <span id="counter-value">0</span></p>
+      <button type="button" disabled>Enable JavaScript to interact</button>
+    </div>
+  </div>
+</div>
+{% end %}
+{% end %}

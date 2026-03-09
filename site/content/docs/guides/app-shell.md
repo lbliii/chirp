@@ -132,6 +132,34 @@ def get(request: Request) -> Page:
     )
 ```
 
+### Regions (recommended for OOB)
+
+When you need both full-page slots and OOB swaps (breadcrumbs, sidebar, title),
+use `{% region %}` instead of blocks. One definition serves both — no duplication:
+
+```html
+{% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
+{{ breadcrumbs(breadcrumb_items) }}
+{% end %}
+
+{% region sidebar_oob(current_path="/") %}
+{{ sidebar(current_path=current_path) }}
+{% end %}
+
+{% call app_shell(brand="My App") %}
+  {% slot topbar %}
+  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items | default([{"label":"Home","href":"/"}])) }}
+  {% end %}
+  {% slot sidebar %}
+  {{ sidebar_oob(current_path=current_path | default("/")) }}
+  {% end %}
+  {% block content %}{% end %}
+{% end %}
+```
+
+See `examples/shell_oob` for the reference implementation. The block-based
+extend pattern above remains valid for apps that don't need OOB.
+
 ## Forms Inside the Shell
 
 Forms inside `<main>` work without any special wrappers.  Since `<main>` has no
@@ -209,9 +237,10 @@ when you want the smooth SPA transition within the shell.
 
 ## Fragment Regions (Optional)
 
-The `fragment_island` / `safe_region` macros still work but are no longer
-required for correctness.  Use them when you want semantic grouping or
-when a region needs its own `hx-target` / `hx-swap` defaults:
+The `fragment_island` / `safe_region` macros are ChirpUI/HTMX swap-safety
+primitives. They isolate local mutation regions from inherited `hx-*` behavior
+using `hx-disinherit`. Use them when you want semantic grouping or when a
+region needs its own `hx-target` / `hx-swap` defaults:
 
 ```html
 {% from "chirpui/fragment_island.html" import fragment_island %}
@@ -220,6 +249,11 @@ when a region needs its own `hx-target` / `hx-swap` defaults:
   {# forms inside here target #contacts-page by default #}
 {% end %}
 ```
+
+**Important:** `fragment_island` is not the same as Chirp's `data-island` islands.
+`fragment_island` is a swap-safety boundary (no client runtime). Chirp islands
+(`data-island`) are client-managed surfaces with mount/unmount lifecycle. See
+[Islands Contract](islands.md) for the distinction.
 
 ## Custom Shells
 
@@ -232,7 +266,8 @@ rules:
 3. **No wrapper div inside `<main>`** — content renders directly; the server's
    `page_block` response is the raw content for `#main`
 
-See `examples/kanban_shell` for a working custom shell.
+See `examples/kanban_shell` for a working custom shell and `examples/shell_oob` for
+regions-based OOB.
 
 ## Gotchas for Interactive Shells
 

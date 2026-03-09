@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Islands Swap</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    p { margin-bottom: 1rem; color: #374151; }
+    .island-container {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover { background: #2563eb; }
+    button.secondary { background: #6b7280; }
+    button.secondary:hover { background: #4b5563; }
+    code { background: #e5e7eb; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>Islands + htmx Swap</h1>
+
+  {% block content %}
+  <p>
+    Click "Load widget" to fetch a fragment and swap it in. The fragment contains
+    an island. The runtime unmounts before the swap and mounts after. Click
+    "Reload" to swap again — watch the console for <code>chirp:island:unmount</code>
+    and <code>chirp:island:remount</code>.
+  </p>
+
+  <div id="widget-area">
+    <p style="color:#94a3b8;">No widget loaded yet.</p>
+    <button hx-get="/widget"
+            hx-target="#widget-area"
+            hx-swap="innerHTML"
+            hx-trigger="click">
+      Load widget
+    </button>
+  </div>
+  {% endblock %}
+</body>
+</html>
