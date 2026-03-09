@@ -25,7 +25,9 @@
 {% from "chirpui/breadcrumbs.html" import breadcrumbs %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 
-{# Regions: one definition for both app shell slots AND OOB render_block (RFC: kida-regions) #}
+{# Regions: one definition for both app shell slots AND OOB render_block (RFC: kida-regions)
+   Chirp discovers these via template_metadata().regions() → *_oob blocks.
+   build_layout_contract() extracts cache_scope, depends_on from BlockMetadata. #}
 
 {% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
 {{ breadcrumbs(breadcrumb_items) }}

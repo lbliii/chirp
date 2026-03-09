@@ -255,10 +255,21 @@ def build_render_plan(
 
 
 def _oob_block_names(adapter: TemplateAdapter, template_name: str) -> set[str]:
-    """Return block names ending with _oob for the given template."""
+    """Return block names ending with _oob for the given template.
+
+    Prefers meta.regions() when available (region-typed blocks); otherwise
+    filters meta.blocks by *_oob suffix. Falls back to empty set when
+    template_metadata is unavailable (e.g. Jinja2 adapter).
+    """
     meta = adapter.template_metadata(template_name)
     if meta is None:
         return set()
+    # Prefer regions() when available (Kida); fallback to blocks
+    regions = getattr(meta, "regions", None)
+    if callable(regions):
+        region_blocks = regions()
+        if region_blocks is not None:
+            return {b for b in region_blocks if b.endswith(OOB_BLOCK_SUFFIX)}
     blocks = getattr(meta, "blocks", None)
     if blocks is None:
         return set()

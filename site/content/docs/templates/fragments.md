@@ -175,6 +175,19 @@ In this shape:
 - `render_block("search_results")` returns only the inner results fragment
 - `render_block("page_root")` returns the full page shell with the child's `search_results` block injected
 
+## How Chirp Finds Blocks
+
+Chirp uses Kida's `template_metadata()` to introspect templates at build time.
+Block names, regions, and dependencies come from the AST — Chirp never hard-codes
+which blocks exist. That enables:
+
+- **Validation** — `fragment_block` and `page_block` are checked before render
+- **OOB discovery** — Blocks named `*_oob` are discovered automatically for app shells
+- **Layout contracts** — `depends_on` and `cache_scope` from each block drive
+  when OOB regions are rendered
+
+See [[docs/templates/kida-integration|Kida Integration]] for the full flow.
+
 ## Block-Heavy Layouts
 
 Templates with many blocks (extends, nested blocks, fragments) benefit from a clear structure. Use the **extension block pattern** so child templates can add content without replacing parent layout.
