@@ -7,6 +7,8 @@ import pytest
 from chirp.http.request import Request
 from chirp.pages.resolve import resolve_kwargs, upgrade_result
 from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
+from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo
+from chirp.templating.composition import PageComposition
 from chirp.templating.returns import OOB, LayoutPage, Page
 
 # ---------------------------------------------------------------------------
@@ -422,10 +424,55 @@ class TestUpgradeResult:
         assert upgraded is result
 
     def test_suspense_passes_through_when_layout_chain_empty(self) -> None:
-        from chirp.pages.types import LayoutChain
         from chirp.templating.returns import Suspense
 
         result = Suspense("page.html", title="X")
         chain = LayoutChain(layouts=())
         upgraded = upgrade_result(result, {}, layout_chain=chain, context_providers=())
         assert upgraded is result
+
+    def test_page_composition_gets_layout_chain_and_providers(self) -> None:
+        """PageComposition with layout_chain=None gets discovered chain attached."""
+        result = PageComposition(
+            template="admin/page.html",
+            fragment_block="page_content",
+            page_block="page_root",
+            context={"page_title": "Admin"},
+        )
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+        provider = ContextProvider(module_path="/admin/_context.py", func=lambda: {}, depth=0)
+
+        upgraded = upgrade_result(
+            result,
+            {"cascade_key": "value"},
+            layout_chain=chain,
+            context_providers=(provider,),
+        )
+
+        assert isinstance(upgraded, PageComposition)
+        assert upgraded.layout_chain is chain
+        assert upgraded.context_providers == (provider,)
+        assert upgraded.context["page_title"] == "Admin"
+        assert upgraded.context["cascade_key"] == "value"
+        assert upgraded.template == "admin/page.html"
+        assert upgraded.regions == ()
+
+    def test_page_composition_preserves_explicit_chain(self) -> None:
+        """PageComposition with explicit layout_chain keeps it unchanged."""
+        chain = LayoutChain(layouts=(LayoutInfo("custom.html", "body", 0),))
+        result = PageComposition(
+            template="page.html",
+            fragment_block="content",
+            page_block="root",
+            layout_chain=chain,
+        )
+        other_chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+
+        upgraded = upgrade_result(
+            result,
+            {},
+            layout_chain=other_chain,
+            context_providers=(),
+        )
+
+        assert upgraded.layout_chain is chain

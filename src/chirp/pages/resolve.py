@@ -176,6 +176,7 @@ def upgrade_result(
         if *result* was a ``Suspense`` with layouts, otherwise *result*
         unchanged.
     """
+    from chirp.templating.composition import PageComposition
     from chirp.templating.returns import OOB, LayoutPage, LayoutSuspense, Page, Suspense
 
     merged_ctx = _merge_result_context(cascade_ctx, getattr(result, "context", {}))
@@ -215,6 +216,22 @@ def upgrade_result(
         if upgraded_main is result.main:
             return result
         return OOB(upgraded_main, *result.oob_fragments)
+
+    if isinstance(result, PageComposition):
+        needs_chain = result.layout_chain is None and layout_chain is not None
+        needs_providers = not result.context_providers and context_providers
+        if needs_chain or needs_providers:
+            merged_ctx = _merge_result_context(cascade_ctx, result.context)
+            return PageComposition(
+                template=result.template,
+                fragment_block=result.fragment_block,
+                page_block=result.page_block,
+                context=merged_ctx,
+                regions=result.regions,
+                layout_chain=layout_chain if needs_chain else result.layout_chain,
+                context_providers=context_providers if needs_providers else result.context_providers,
+            )
+        return result
 
     return result
 
