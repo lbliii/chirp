@@ -46,7 +46,10 @@ def _get_version() -> str:
         pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
         if pyproject.exists():
             with open(pyproject, "rb") as f:
-                return tomllib.load(f)["project"]["version"]
+                try:
+                    return tomllib.load(f)["project"]["version"]
+                except KeyError:
+                    return "0.0.0.dev"
         return "0.0.0.dev"
 
 

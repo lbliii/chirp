@@ -19,15 +19,23 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
     """Ensure chirp-ui required filters exist when chirp-ui templates are loadable.
 
     When chirp adds chirp-ui's PackageLoader, those templates require bem, field_errors,
-    html_attrs, validate_variant, icon. This fallback adds any missing filters so the
-    env is self-consistent. See docs/rfcs/001-component-filter-contract.md.
+    html_attrs, validate_variant, validate_variant_block, validate_size, icon. This
+    fallback adds any missing filters so the env is self-consistent.
+    See docs/rfcs/001-component-filter-contract.md.
     """
     try:
         import chirp_ui  # noqa: F401
     except ImportError:
         return
     try:
-        from chirp_ui.filters import bem, field_errors, html_attrs, validate_variant
+        from chirp_ui.filters import (
+            bem,
+            field_errors,
+            html_attrs,
+            validate_size,
+            validate_variant,
+            validate_variant_block,
+        )
     except ImportError:
         return
     try:
@@ -39,7 +47,9 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
         "field_errors": field_errors,
         "html_attrs": html_attrs,
         "icon": icon,
+        "validate_size": validate_size,
         "validate_variant": validate_variant,
+        "validate_variant_block": validate_variant_block,
     }
     missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
     if missing:
