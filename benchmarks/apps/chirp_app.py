@@ -23,7 +23,7 @@ def _cpu_work(iterations: int = 50_000) -> int:
 
 
 @app.route("/json")
-def json_handler():
+async def json_handler():
     return JSON_PAYLOAD
 
 
