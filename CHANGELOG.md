@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-03-10
+
+### Dependencies
+
+- `chirp-ui>=0.1.5` (optional, for `chirp[ui]`)
+
+[0.1.8]: https://github.com/lbliii/chirp/releases/tag/v0.1.8
+
 ## [0.1.7] — 2026-03-10
 
 ### Added
