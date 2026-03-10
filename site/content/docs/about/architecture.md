@@ -134,6 +134,29 @@ ASGI messages sent back to the server.
 :::{/step}
 :::{/steps}
 
+## Template Rendering Flow
+
+Chirp uses Kida's AST metadata for OOB discovery and block validation:
+
+```mermaid
+flowchart LR
+    subgraph Kida["Kida"]
+        T[Template]
+        M[TemplateMetadata]
+        T --> M
+    end
+
+    subgraph Chirp["Chirp"]
+        BC[build_layout_contract]
+        LC[LayoutContract]
+        RP[RenderPlan]
+        M --> BC --> LC
+        LC --> RP
+    end
+```
+
+See [[docs/templates/kida-integration|Kida Integration]] for the full flow.
+
 ## Dependencies
 
 Chirp owns the developer interface and delegates commodity infrastructure:

@@ -308,6 +308,34 @@
   color: var(--chirpui-accent, #818cf8);
 }
 
+/* Drag-and-drop */
+.kanban-card-wrapper {
+  cursor: grab;
+}
+
+.kanban-card-wrapper:active {
+  cursor: grabbing;
+}
+
+.kanban-card--ghost {
+  opacity: 0.35;
+}
+
+.kanban-card--ghost .kanban-card {
+  border-color: var(--chirpui-accent, #818cf8);
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.25);
+}
+
+.kanban-card--drag {
+  opacity: 0.9;
+  transform: rotate(2deg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.kanban-column__body.sortable-chosen {
+  background: rgba(129, 140, 248, 0.04);
+}
+
 @media (max-width: 900px) {
   .kanban-board-layout {
     grid-template-columns: 1fr;

@@ -118,6 +118,11 @@ class EditTaskForm:
 # ---------------------------------------------------------------------------
 
 
+def _empty_main() -> Fragment:
+    """Trivial main for OOB-only responses (hx-swap='none' routes)."""
+    return Fragment("page.html", "empty")
+
+
 def _column_fragment(column_id: str, tasks: list | None = None) -> Fragment:
     from store import COLUMNS
 
@@ -139,6 +144,31 @@ def _stats_fragment(tasks: list | None = None) -> Fragment:
     if tasks is None:
         tasks = get_tasks()
     return Fragment("page.html", "header_stats_oob", target="board-stats", all_tasks=tasks)
+
+
+def _column_sse_fragment(
+    column_id: str, tasks: list | None = None, current_user: object = None
+) -> Fragment:
+    """Column fragment for SSE — OOB baked into template, no target needed."""
+    if tasks is None:
+        tasks = get_tasks()
+    column_tasks = [t for t in tasks if t.status == column_id]
+    column_name = dict(COLUMNS).get(column_id, column_id)
+    return Fragment(
+        "page.html",
+        "column_block_oob",
+        column_id=column_id,
+        column_name=column_name,
+        tasks=column_tasks,
+        current_user=current_user,
+    )
+
+
+def _stats_sse_fragment(tasks: list | None = None) -> Fragment:
+    """Stats fragment for SSE — OOB baked into template, no target needed."""
+    if tasks is None:
+        tasks = get_tasks()
+    return Fragment("page.html", "stats_block_oob", all_tasks=tasks)
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +229,7 @@ async def add_task_route(request: Request):
     add_task(f.title, f.description, f.status, f.priority, assignee, tags)
     tasks = get_tasks()
     return OOB(
+        _empty_main(),
         _column_fragment(f.status, tasks),
         _stats_fragment(tasks),
     )
@@ -281,6 +312,7 @@ def move_task_route(task_id: int, new_status: str):
     tasks = get_tasks()
 
     return OOB(
+        _empty_main(),
         _column_fragment(old_status, tasks),
         _column_fragment(new_status, tasks),
         _stats_fragment(tasks),
@@ -303,6 +335,7 @@ def delete_task_route(task_id: int):
     )
     return (
         OOB(
+            _empty_main(),
             _column_fragment(column, tasks),
             _stats_fragment(tasks),
             toast_frag,
@@ -346,15 +379,17 @@ def filter_board_route(request: Request):
 @app.route("/events", referenced=True)
 @login_required
 def events_route():
+    user = get_user()
+
     async def generate():
         while True:
             result = random_move()
             if result is not None:
                 moved_task, old_status = result
                 tasks = get_tasks()
-                yield _column_fragment(old_status, tasks)
-                yield _column_fragment(moved_task.status, tasks)
-                yield _stats_fragment(tasks)
+                yield _column_sse_fragment(old_status, tasks, current_user=user)
+                yield _column_sse_fragment(moved_task.status, tasks, current_user=user)
+                yield _stats_sse_fragment(tasks)
             await asyncio.sleep(random.uniform(1.0, 4.0))
 
     return EventStream(generate())

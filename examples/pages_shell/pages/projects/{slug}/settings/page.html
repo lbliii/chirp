@@ -1,0 +1,29 @@
+{% from "chirpui/card.html" import card %}
+{% from "chirpui/layout.html" import container, page_header, stack %}
+{% from "chirpui/nav_link.html" import nav_link %}
+
+{% block page_root %}
+<div class="example-page">
+{% call container(max_width="48rem") %}
+{% call stack(gap="lg") %}
+{% call page_header(
+  "Project settings",
+  subtitle=project.name,
+  meta="Form page with mode='replace' — replaces parent shell actions entirely."
+) %}
+{% slot actions %}
+{{ nav_link("/projects/" ~ slug, "← Back to project") }}
+{% end %}
+{% end %}
+
+{% call card(title="Settings", subtitle="Shell actions override demo") %}
+  <p>This page uses <code>mode="replace"</code> on all zones. The topbar shows
+  only Save and Cancel — no inherited New project, Deploy, Metrics, or
+  overflow menu.</p>
+  <p>Use this pattern for wizard steps, install flows, or settings forms where
+  navigation actions would be distracting.</p>
+{% end %}
+{% end %}
+{% end %}
+</div>
+{% endblock %}

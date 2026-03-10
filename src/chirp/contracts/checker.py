@@ -24,9 +24,12 @@ from .rules_sse import (
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
+    extract_fragment_island_ids,
+    extract_legacy_action_contracts,
     extract_static_ids,
     extract_targets_from_source,
     extract_template_references,
+    extract_wizard_form_ids,
     load_template_sources,
 )
 from .types import CheckResult, ContractIssue, Severity
@@ -172,9 +175,24 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         for template_name, source in template_sources.items():
             if template_name.startswith("chirpui/"):
                 continue
+            for legacy_action in sorted(extract_legacy_action_contracts(source)):
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="template_contract",
+                        message=(
+                            f"'action=\"{legacy_action}\"' looks like a legacy component contract, "
+                            "not a URL. Replace it with href=, hx-*, confirm_url=, or a real "
+                            "form action path."
+                        ),
+                        template=template_name,
+                    )
+                )
             targets = extract_targets_from_source(source)
             result.targets_found += len(targets)
             for attr_name, url, method_override in targets:
+                if attr_name == "action" and not url.startswith("/"):
+                    continue
                 method = attr_to_method(attr_name, method_override)
                 matched = False
                 for route_path, methods in route_paths.items():
@@ -209,6 +227,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         all_ids: set[str] = set()
         for source in template_sources.values():
             all_ids.update(extract_static_ids(source))
+            all_ids.update(extract_fragment_island_ids(source))
+            all_ids.update(extract_wizard_form_ids(source))
         hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)

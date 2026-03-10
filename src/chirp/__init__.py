@@ -84,6 +84,7 @@ __all__ = [
     "g",
     "get_request",
     "get_user",
+    "hx_redirect",
     "is_safe_url",
     "login",
     "login_required",
@@ -104,6 +105,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Request": ("chirp.http.request", "Request"),
     "Response": ("chirp.http.response", "Response"),
     "Redirect": ("chirp.http.response", "Redirect"),
+    "hx_redirect": ("chirp.http.response", "hx_redirect"),
     # Return types
     "Template": ("chirp.templating.returns", "Template"),
     "InlineTemplate": ("chirp.templating.returns", "InlineTemplate"),

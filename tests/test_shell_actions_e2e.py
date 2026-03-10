@@ -27,8 +27,8 @@ def _create_shell_actions_app(tmp_path: Path) -> App:
         "</div>"
         "</header>"
         '<aside class="chirpui-app-shell__sidebar"><nav>Sidebar</nav></aside>'
-        '<main id="main" class="chirpui-app-shell__main" hx-boost="true" hx-target="#main" hx-swap="innerHTML transition:true" hx-select="#page-content">'
-        '<div id="page-content">{% block content %}{% end %}</div>'
+        '<main id="main" class="chirpui-app-shell__main">'
+        "{% block content %}{% end %}"
         "</main>"
         "</div>",
         encoding="utf-8",

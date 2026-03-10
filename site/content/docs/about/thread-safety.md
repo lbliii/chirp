@@ -37,8 +37,8 @@ Per-request state uses `ContextVar`, which provides automatic isolation between 
 from contextvars import ContextVar
 
 # Each request gets its own copy
-_request_var: ContextVar[Request] = ContextVar("request")
-_g_var: ContextVar[Namespace] = ContextVar("g")
+request_var: ContextVar[Request] = ContextVar("chirp_request")
+# g uses a ContextVar-backed namespace (see context.py)
 ```
 
 When you access `g.user` or `get_request()`, you get the value for the *current* request, regardless of how many other requests are being handled concurrently.
@@ -80,11 +80,10 @@ app.run()  # Compiles routes, creates kida env, sets _frozen = True
 The freeze uses double-check locking to be safe if multiple threads trigger it simultaneously:
 
 ```python
-if not self._frozen:
+if not self._runtime_state.frozen:
     with self._freeze_lock:
-        if not self._frozen:
-            self._compile()
-            self._frozen = True
+        if not self._runtime_state.frozen:
+            self._freeze()  # calls _compiler.freeze()
 ```
 
 ## Module-Level State
@@ -149,6 +148,14 @@ g.start_time = time.monotonic()
 | Response building | Immutable `.with_*()` chains |
 | Shared mutable state | Explicit `threading.Lock()` |
 | Module-level state | None (no global mutables) |
+
+## Code References
+
+| Pattern | File |
+|---------|------|
+| PEP 703 declaration | [src/chirp/__init__.py](https://github.com/lbliii/chirp/blob/main/src/chirp/__init__.py) |
+| Request/ContextVar (`g`, `get_request`) | [src/chirp/context.py](https://github.com/lbliii/chirp/blob/main/src/chirp/context.py) |
+| App freeze, double-check locking | [src/chirp/app/__init__.py](https://github.com/lbliii/chirp/blob/main/src/chirp/app/__init__.py) |
 
 ## Next Steps
 

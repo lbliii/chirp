@@ -46,4 +46,11 @@ When to use block, include, and call.
 Register filters and globals on your app.
 :::{/card}
 
+:::{card} Kida Integration
+:icon: puzzle
+:link: ./kida-integration
+:description: AST-driven OOB discovery and regions
+How Chirp uses template_metadata() for block validation.
+:::{/card}
+
 :::{/cards}

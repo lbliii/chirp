@@ -1,6 +1,7 @@
 """Compilation pipeline from mutable setup state to runtime state."""
 
 from collections.abc import Callable
+from pathlib import Path
 
 from chirp.config import AppConfig
 from chirp.routing.route import Route
@@ -61,6 +62,13 @@ class AppCompiler:
         self._runtime.router = router
 
         middleware_list = list(self._mutable.middleware_list)
+        if self._config.static_dir is not None:
+            static_path = Path(self._config.static_dir).resolve()
+            if static_path.is_dir():
+                from chirp.middleware.static import StaticFiles
+
+                prefix = self._config.static_url.strip("/") or "static"
+                middleware_list.append(StaticFiles(directory=str(static_path), prefix=f"/{prefix}"))
         if self._config.safe_target:
             from chirp.middleware.inject import HTMLInject
             from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET

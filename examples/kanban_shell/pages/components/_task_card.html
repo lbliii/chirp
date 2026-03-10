@@ -34,25 +34,25 @@
       {% match task.status %}
         {% case "backlog" %}
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/in_progress"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to In Progress">&rarr;</button>
         {% case "in_progress" %}
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/backlog"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Backlog">&larr;</button>
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/review"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Review">&rarr;</button>
         {% case "review" %}
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/in_progress"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move back">&larr;</button>
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/done"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Done">&rarr;</button>
         {% case "done" %}
           <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/review"
-                  hx-swap="none" hx-sync="closest .column:replace"
+                  hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move back">&larr;</button>
       {% end %}
       <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm kanban-card__delete" hx-delete="/tasks/{{ task.id }}"

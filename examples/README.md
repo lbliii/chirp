@@ -283,6 +283,35 @@ and `hx-include` so the URL always reflects the current search state.
 cd examples/search && python app.py
 ```
 
+### `islands/` — No-Build Client-Managed Surfaces
+
+Chirp's islands runtime for isolated client-owned widgets. Uses `AppConfig(islands=True)`,
+`island_attrs()` for mount metadata, and a plain ES module adapter loaded via `data-island-src`.
+Server renders the fallback; the adapter mounts and owns the DOM. No bundler required.
+
+```bash
+cd examples/islands && python app.py
+```
+
+### `islands_shell/` — Islands + App Shell
+
+Islands inside ChirpUI shells with htmx-boosted navigation. Sidebar links swap `#main`;
+islands unmount before the swap and remount after. OOB updates for breadcrumbs and title.
+
+```bash
+pip install chirp[ui]
+cd examples/islands_shell && python app.py
+```
+
+### `islands_swap/` — Islands + htmx Fragment Swap
+
+Island inside dynamically swapped content. A "Load widget" button fetches a fragment
+containing an island; the runtime unmounts before the swap and mounts after.
+
+```bash
+cd examples/islands_swap && python app.py
+```
+
 ### `chat/` — Real-Time Chat via SSE + POST
 
 A multi-user chat room proving you don't need WebSocket. POST to send messages,

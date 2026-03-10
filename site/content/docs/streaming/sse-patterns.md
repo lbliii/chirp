@@ -83,6 +83,8 @@ Key rules:
 
 The browser maintains internal state (cursor position, undo history, selection, paragraph elements) that cannot survive innerHTML replacement. **Do not register these blocks in the reactive dependency index.**
 
+For complex widgets that need framework adapters (React, Svelte, Vue) or custom logic, use [Chirp islands](../guides/islands.md). Islands provide a `data-island` mount contract with lifecycle events (`chirp:island:mount`, `chirp:island:unmount`) and optional dynamic adapter loading via `data-island-src`. Islands are client-owned surfaces; the server does not swap HTML inside them.
+
 ```python
 # Server: return JSON, not rendered HTML
 async def post(doc_id: str, request: Request) -> dict:

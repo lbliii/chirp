@@ -33,7 +33,11 @@ def context() -> dict:
                 items=(ShellAction(id="new-project", label="New project", href="/projects"),)
             ),
             overflow=ShellActionZone(
-                items=(ShellAction(id="docs", label="Routing docs", href="/projects"),)
+                items=(
+                    ShellAction(id="docs", label="Routing docs", href="/projects"),
+                    ShellAction(id="archive", label="Archive", href="/projects", icon="archive"),
+                    ShellAction(id="export", label="Export", href="/projects", icon="export"),
+                ),
             ),
         ),
     }

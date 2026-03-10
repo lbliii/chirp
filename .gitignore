@@ -8,6 +8,10 @@ __pycache__/
 # Build artifacts
 build/
 dist/
+site/.bengal/
+site/public/
+.bengal/
+.bengal.pid
 downloads/
 eggs/
 .eggs/

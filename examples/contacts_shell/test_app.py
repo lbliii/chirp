@@ -12,7 +12,6 @@ class TestContactsShell:
             assert response.status == 200
             assert "Contacts Shell" in response.text
             assert "New contact" in response.text
-            assert 'id="page-content"' in response.text
             assert 'id="contacts-page"' in response.text
 
     async def test_boosted_contacts_page_renders_fragment_only(self, example_app) -> None:

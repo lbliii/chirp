@@ -32,6 +32,13 @@ Build inclusive apps with Chirp.
 Complement htmx with Alpine for client-only interactivity.
 :::{/card}
 
+:::{card} App Shells
+:icon: layout
+:link: ./app-shell
+:description: Persistent layout with SPA-style navigation
+Sidebar, topbar, and fragment regions with zero client JS.
+:::{/card}
+
 :::{card} chirp-ui
 :icon: palette
 :link: ./chirp-ui

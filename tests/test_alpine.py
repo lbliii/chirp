@@ -31,6 +31,11 @@ class TestAlpineSnippet:
         assert 'data-chirp="alpine"' in s
         assert "defer" in s
 
+    def test_includes_focus_plugin_for_tray_modal_overlay(self) -> None:
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "@alpinejs/focus" in s
+        assert 'data-chirp="alpine-focus"' in s
+
     def test_csp_uses_csp_build(self) -> None:
         s = alpine_snippet("3.15.8", csp=True)
         assert "alpinejs/dist/cdn/csp" in s
@@ -56,6 +61,7 @@ class TestAlpineInjection:
             assert response.status == 200
             assert 'data-chirp="alpine"' in response.text
             assert "unpkg.com/alpinejs" in response.text
+            assert "@alpinejs/focus" in response.text
 
     async def test_not_injected_when_alpine_disabled(self) -> None:
         """alpine=False (default) does not inject."""
@@ -126,8 +132,9 @@ class TestAlpineMacros:
 """
         tpl = env.from_string(source)
         html = tpl.render().strip()
-        assert 'x-data="{ open: false }"' in html
-        assert 'x-show="open"' in html
+        assert "open: false" in html
+        assert "x-show" in html
+        assert "open" in html
         assert "Menu" in html
         assert "Link A" in html
         assert "chirp-dropdown" in html

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Islands Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    p { margin-bottom: 1rem; color: #374151; }
+    .island-container {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    .island-container p { margin-bottom: 0.5rem; }
+    code { background: #e5e7eb; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>Islands Demo</h1>
+  <p>
+    This page uses Chirp's islands runtime. The counter below is a client-managed
+    surface: the server renders the fallback, then a plain ES module mounts and
+    owns the DOM. Open the console to see <code>chirp:island:mount</code> events.
+  </p>
+
+  <div class="island-container">
+    <p><strong>Counter island</strong> — click to increment. Fallback shown when JS is disabled.</p>
+    <div{{ island_attrs("counter", props={"initial_count": initial_count}, mount_id="counter-root", src="/static/counter.js") }}>
+      <p>Count: <span id="counter-value">{{ initial_count }}</span></p>
+      <button type="button" disabled>Enable JavaScript to interact</button>
+    </div>
+  </div>
+
+  <p>
+    The island uses <code>island_attrs()</code> to generate <code>data-island</code>,
+    <code>data-island-props</code>, and <code>data-island-src</code>. The runtime
+    scans on load, unmounts before htmx swaps, and remounts after.
+  </p>
+</body>
+</html>

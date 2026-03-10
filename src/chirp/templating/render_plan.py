@@ -12,6 +12,23 @@ from typing import TYPE_CHECKING, Any
 from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 
+# OOB region IDs for shell updates (breadcrumbs, sidebar, title) on boosted navigation
+CHIRPUI_BREADCRUMBS_TARGET = "chirpui-topbar-breadcrumbs"
+CHIRPUI_SIDEBAR_TARGET = "chirpui-sidebar-nav"
+CHIRPUI_DOCUMENT_TITLE_TARGET = "chirpui-document-title"
+BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
+SIDEBAR_OOB_BLOCK = "sidebar_oob"
+TITLE_OOB_BLOCK = "title_oob"
+
+# Convention: blocks whose names end with _oob are suppressed during full-page composition
+OOB_BLOCK_SUFFIX = "_oob"
+
+# ChirpUI shell OOB blocks — always suppressed on full-page to avoid orphaned fragments
+# (breadcrumbs, title, sidebar appear inside app_shell slots; OOB is for HTMX swaps only)
+CHIRPUI_OOB_BLOCKS: frozenset[str] = frozenset(
+    {BREADCRUMBS_OOB_BLOCK, TITLE_OOB_BLOCK, SIDEBAR_OOB_BLOCK}
+)
+
 if TYPE_CHECKING:
     from chirp.http.request import Request
     from chirp.pages.types import LayoutChain
@@ -19,6 +36,35 @@ if TYPE_CHECKING:
 
 
 type RenderIntent = str  # "full_page" | "page_fragment" | "local_fragment"
+
+# Block name → OOB target ID mapping (well-known ChirpUI shell regions)
+_OOB_TARGET_MAP: dict[str, str] = {
+    BREADCRUMBS_OOB_BLOCK: CHIRPUI_BREADCRUMBS_TARGET,
+    SIDEBAR_OOB_BLOCK: CHIRPUI_SIDEBAR_TARGET,
+    TITLE_OOB_BLOCK: CHIRPUI_DOCUMENT_TITLE_TARGET,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class OOBBlockInfo:
+    """AST-derived metadata for a single OOB block in a layout template."""
+
+    block_name: str
+    target_id: str
+    cache_scope: str
+    depends_on: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class LayoutContract:
+    """Cached contract describing which OOB blocks a layout template provides."""
+
+    template_name: str
+    oob_blocks: tuple[OOBBlockInfo, ...]
+
+
+# Module-level cache: template_name → LayoutContract (built once per template)
+_layout_contract_cache: dict[str, LayoutContract] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,6 +231,12 @@ def build_render_plan(
                 )
             )
 
+    # Breadcrumbs/sidebar OOB added in execute_render_plan when layout has blocks
+    # Ensure layout_context has current_path for sidebar active state on boosted nav
+    layout_context = dict(composition.context)
+    if request and layout_chain and layout_chain.layouts and "current_path" not in layout_context:
+        layout_context["current_path"] = request.path
+
     return RenderPlan(
         intent=intent,
         main_view=main_view,
@@ -192,9 +244,78 @@ def build_render_plan(
         apply_layouts=apply_layouts,
         layout_chain=layout_chain,
         layout_start_index=layout_start_index,
-        layout_context=composition.context,
+        layout_context=layout_context,
         region_updates=tuple(region_updates),
     )
+
+
+def _oob_block_names(adapter: TemplateAdapter, template_name: str) -> set[str]:
+    """Return block names ending with _oob for the given template.
+
+    Prefers meta.regions() when available (region-typed blocks); otherwise
+    filters meta.blocks by *_oob suffix. Falls back to empty set when
+    template_metadata is unavailable (e.g. Jinja2 adapter).
+    """
+    meta = adapter.template_metadata(template_name)
+    if meta is None:
+        return set()
+    # Prefer regions() when available (Kida); fallback to blocks
+    regions = getattr(meta, "regions", None)
+    if callable(regions):
+        region_blocks = regions()
+        if region_blocks is not None:
+            return {b for b in region_blocks if b.endswith(OOB_BLOCK_SUFFIX)}
+    blocks = getattr(meta, "blocks", None)
+    if blocks is None:
+        return set()
+    return {b for b in blocks if b.endswith(OOB_BLOCK_SUFFIX)}
+
+
+def build_layout_contract(adapter: TemplateAdapter, template_name: str) -> LayoutContract:
+    """Build a LayoutContract from Kida's AST metadata for a layout template.
+
+    Discovers all *_oob blocks and extracts their cache_scope and depends_on
+    from BlockMetadata. Falls back to well-known ChirpUI OOB blocks when
+    template_metadata is unavailable.
+    """
+    meta = adapter.template_metadata(template_name)
+    oob_blocks: list[OOBBlockInfo] = []
+
+    if meta is not None:
+        blocks = getattr(meta, "blocks", None) or {}
+        for block_name, block_meta in blocks.items():
+            if not block_name.endswith(OOB_BLOCK_SUFFIX):
+                continue
+            target_id = _OOB_TARGET_MAP.get(block_name, block_name.removesuffix(OOB_BLOCK_SUFFIX))
+            oob_blocks.append(
+                OOBBlockInfo(
+                    block_name=block_name,
+                    target_id=target_id,
+                    cache_scope=getattr(block_meta, "cache_scope", "unknown"),
+                    depends_on=frozenset(getattr(block_meta, "depends_on", ())),
+                )
+            )
+    else:
+        for block_name, target_id in _OOB_TARGET_MAP.items():
+            oob_blocks.append(
+                OOBBlockInfo(
+                    block_name=block_name,
+                    target_id=target_id,
+                    cache_scope="unknown",
+                    depends_on=frozenset(),
+                )
+            )
+
+    return LayoutContract(template_name=template_name, oob_blocks=tuple(oob_blocks))
+
+
+def _get_or_build_contract(adapter: TemplateAdapter, template_name: str) -> LayoutContract:
+    """Return cached LayoutContract, building on first access."""
+    contract = _layout_contract_cache.get(template_name)
+    if contract is None:
+        contract = build_layout_contract(adapter, template_name)
+        _layout_contract_cache[template_name] = contract
+    return contract
 
 
 def _validate_view_ref(adapter: TemplateAdapter, view: ViewRef) -> None:
@@ -252,22 +373,60 @@ def execute_render_plan(
     # Apply layout chain if needed
     if plan.apply_layouts and plan.layout_chain is not None:
         layouts = plan.layout_chain.layouts[plan.layout_start_index :]
+        # Collect *_oob blocks from ALL layouts (child layouts extend root, which has the blocks)
+        # Always include ChirpUI OOB blocks as fallback — template_metadata may fail or
+        # return empty; suppressing unknown blocks is safe (no-op if layout has none)
+        oob_blocks_to_suppress: set[str] = set(CHIRPUI_OOB_BLOCKS)
+        if plan.intent == "full_page":
+            for layout_info in layouts:
+                oob_blocks_to_suppress |= _oob_block_names(adapter, layout_info.template_name)
         for layout_info in reversed(layouts):
+            block_overrides: dict[str, str] = {"content": main_html}
+            if plan.intent == "full_page":
+                for name in oob_blocks_to_suppress:
+                    block_overrides[name] = ""
             main_html = adapter.compose_layout(
                 layout_info.template_name,
-                {"content": main_html},
+                block_overrides,
                 plan.layout_context,
+            )
+
+    # Augment region_updates with shell OOB blocks discovered via AST (fragment only)
+    region_updates_list: list[RegionUpdate] = list(plan.region_updates)
+    if plan.intent == "page_fragment" and plan.layout_chain and plan.layout_chain.layouts:
+        root_layout = plan.layout_chain.layouts[0]
+        contract = _get_or_build_contract(adapter, root_layout.template_name)
+        layout_ctx = plan.layout_context
+
+        for oob in contract.oob_blocks:
+            if oob.cache_scope == "site":
+                continue
+            if oob.block_name == TITLE_OOB_BLOCK and "page_title" not in layout_ctx:
+                continue
+            region_updates_list.append(
+                RegionUpdate(
+                    region=oob.target_id,
+                    view=ViewRef(
+                        template=root_layout.template_name,
+                        block=oob.block_name,
+                        context=layout_ctx,
+                    ),
+                )
             )
 
     # Render region updates
     region_htmls: dict[str, str] = {}
-    for ru in plan.region_updates:
+    for ru in region_updates_list:
         if ru.view.template and ru.view.block:
-            html = adapter.render_block(
-                ru.view.template,
-                ru.view.block,
-                ru.view.context,
-            )
+            try:
+                html = adapter.render_block(
+                    ru.view.template,
+                    ru.view.block,
+                    ru.view.context,
+                )
+            except Exception:
+                # Block may not exist (e.g. layout lacks ChirpUI OOB blocks)
+                html = ""
         else:
             html = ""
         region_htmls[ru.region] = html
@@ -278,8 +437,17 @@ def execute_render_plan(
 def serialize_rendered_plan(rendered: RenderedPlan) -> str:
     """Serialize rendered plan to final HTML with OOB fragments."""
     parts: list[str] = [rendered.main_html]
+    # innerHTML: replace content inside existing element. outerHTML (true): replace element.
+    inner_html_regions = {
+        SHELL_ACTIONS_TARGET,
+        CHIRPUI_BREADCRUMBS_TARGET,
+        CHIRPUI_SIDEBAR_TARGET,
+    }
     for region_id, html in rendered.region_htmls.items():
-        # Use innerHTML for shell-actions to preserve container attributes
-        swap = "innerHTML" if region_id == SHELL_ACTIONS_TARGET else "true"
-        parts.append(f'<div id="{region_id}" hx-swap-oob="{swap}">{html}</div>')
+        if region_id == CHIRPUI_DOCUMENT_TITLE_TARGET:
+            # title_oob outputs full <title id="..." hx-swap-oob="true">; no div wrapper
+            parts.append(html)
+        else:
+            swap = "innerHTML" if region_id in inner_html_regions else "true"
+            parts.append(f'<div id="{region_id}" hx-swap-oob="{swap}">{html}</div>')
     return "\n".join(parts)

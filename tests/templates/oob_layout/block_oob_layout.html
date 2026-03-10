@@ -1,0 +1,10 @@
+{# Synthetic: layout with regular {% block content_oob %} (not region) - combine would suppress it #}
+{# target: body #}
+<html><body>
+{% block content_oob %}
+<div id="critical-wrapper">CRITICAL_STRUCTURE</div>
+{% end %}
+<main id="main">
+{% block content %}{% end %}
+</main>
+</body></html>

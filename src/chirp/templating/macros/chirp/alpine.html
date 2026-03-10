@@ -21,20 +21,26 @@
        {% end %}
 -#}
 
-{# Dropdown — toggle panel with click-outside and escape key #}
+{# Dropdown — toggle panel with click-outside, escape key, focus return #}
 {% def dropdown(trigger="Menu", wrapper_class="", panel_class="") %}
-<div class="chirp-dropdown{{ " " + wrapper_class if wrapper_class else "" }}"
-     x-data="{ open: false }"
-     @keydown.escape.window="open = false">
-  <button type="button"
-          @click="open = !open"
-          @click.outside="open = false"
+<div class="chirp-dropdown{{ " " + wrapper_class if wrapper_class else "" }}" x-id="['dropdown-panel']"
+     x-data="{
+       open: false,
+       toggle() { if (this.open) return this.close(); this.$refs.button?.focus(); this.open = true },
+       close(focusAfter) { if (!this.open) return; this.open = false; focusAfter?.focus() }
+     }"
+     @keydown.escape.prevent.stop="close($refs.button)"
+     @focusin.window="!$refs.panel?.contains($event.target) && close($refs.button)"
+     @click.outside="close($refs.button)">
+  <button type="button" x-ref="button"
+          @click="toggle()"
           :aria-expanded="open"
+          :aria-controls="$id('dropdown-panel')"
           aria-haspopup="true"
           class="chirp-dropdown-trigger">
     {{ trigger }}
   </button>
-  <div x-show="open"
+  <div x-ref="panel" :id="$id('dropdown-panel')" x-show="open"
        x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
@@ -42,7 +48,8 @@
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="chirp-dropdown-panel{{ " " + panel_class if panel_class else "" }}"
-       role="menu">
+       role="menu"
+       @click="close()">
     {% slot %}
   </div>
 </div>
@@ -82,14 +89,16 @@
 {# Tabs — tab list + panel slot; caller provides panel content with x-show per tab #}
 {% def tabs(tab_names, default=none, tab_list_class="", panel_class="") %}
 {% let default_tab = default ?? tab_names[0] if tab_names else "" %}
-<div class="chirp-tabs"
+<div class="chirp-tabs" x-id="['tab', 'tabpanel']"
      x-data="{ active: '{{ default_tab }}' }">
   <div role="tablist" class="chirp-tab-list{{ " " + tab_list_class if tab_list_class else "" }}">
     {% for name in tab_names %}
     <button type="button"
             role="tab"
             :aria-selected="active === '{{ name }}'"
-            @click="active = '{{ name }}'"
+            :aria-controls="$id('tabpanel', '{{ name }}')"
+            :id="$id('tab', '{{ name }}')"
+            @click="active = '{{ name }}'; $dispatch('chirpui:tab-changed', { tab: '{{ name }}' })"
             class="chirp-tab">
       {{ name }}
     </button>

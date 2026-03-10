@@ -4,6 +4,7 @@
 
 {% call container(max_width="76rem") %}
 {% call stack(gap="lg", cls="example-page") %}
+{% from "chirpui/nav_link.html" import nav_link %}
 {% call page_header(
   project.name,
   subtitle=project.summary,
@@ -11,6 +12,7 @@
 ) %}
 {% slot actions %}
 {{ badge(project.status, variant="info") }}
+{{ nav_link("/projects/" ~ project.slug ~ "/settings", "Settings") }}
 {% end %}
 {% end %}
 

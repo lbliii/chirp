@@ -14,6 +14,7 @@ def test_htmx_debug_js_loads() -> None:
     """HTMX debug script loads and contains expected content."""
     assert "__chirpHtmxDebugBooted" in HTMX_DEBUG_BOOT_JS
     assert "htmx:targetError" in HTMX_DEBUG_BOOT_JS
+    assert "Co-locate the target with the mutating element" in HTMX_DEBUG_BOOT_JS
     assert "htmx:beforeSwap" in HTMX_DEBUG_BOOT_JS
     assert "chirp-debug" in HTMX_DEBUG_BOOT_JS
     assert "chirp-dbg-drawer" in HTMX_DEBUG_BOOT_JS

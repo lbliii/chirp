@@ -1,61 +1,38 @@
 {# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
-{% from "chirpui/shell_actions.html" import shell_actions_bar %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pages Shell</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-  <link rel="stylesheet" href="/static/chirpui.css">
-  <link rel="stylesheet" href="/static/chirpui-transitions.css">
-  <style>
-    .example-page {
-      padding-block: 1.5rem 2rem;
-    }
 
-    .example-project-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-    }
+{% block title %}Pages Shell{% end %}
 
-    .example-list {
-      display: grid;
-      gap: 0.75rem;
-    }
-  </style>
-</head>
-<body>
-  {% set shell_actions_target = shell_actions.target if shell_actions is defined and shell_actions else "chirp-shell-actions" %}
-  <div class="chirpui-app-shell">
-    <header class="chirpui-app-shell__topbar">
-      <a href="/projects" class="chirpui-app-shell__brand">Pages Shell</a>
-      <div class="chirpui-app-shell__topbar-center">
-        <span class="chirpui-text-muted chirpui-font-sm">Mounted pages + shell actions + suspense</span>
-      </div>
-      <div class="chirpui-app-shell__topbar-end">
-        <div id="{{ shell_actions_target }}" class="chirpui-app-shell__shell-actions">
-          {% if shell_actions is defined %}
-          {{ shell_actions_bar(shell_actions) }}
-          {% end %}
-        </div>
-      </div>
-    </header>
-    <aside class="chirpui-app-shell__sidebar">
-      {% call sidebar() %}
-        {% call sidebar_section("Pages") %}
-          {{ sidebar_link("/projects", "Projects", icon="grid", active=true) }}
-        {% end %}
-      {% end %}
-    </aside>
-    <main id="main" class="chirpui-app-shell__main"
-          hx-boost="true" hx-target="#main"
-          hx-swap="innerHTML transition:true" hx-select="#page-content">
-      <div id="page-content">{% block content %}{% end %}</div>
-    </main>
-  </div>
-</body>
-</html>
+{% block brand_link %}<a href="/projects" class="chirpui-app-shell__brand">Pages Shell</a>{% end %}
+
+{% block head_extra %}
+<style>
+  .example-page {
+    padding-block: 1.5rem 2rem;
+  }
+
+  .example-project-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  }
+
+  .example-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+</style>
+{% end %}
+
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">Mounted pages + shell actions + suspense</span>
+{% end %}
+
+{% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Pages") %}
+    {{ sidebar_link("/projects", "Projects", icon="grid", active=true) }}
+  {% end %}
+{% end %}
+{% end %}

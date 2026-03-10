@@ -47,11 +47,6 @@ def _extract_csrf_meta(html: str) -> str | None:
     return _extract_csrf_token(html)
 
 
-def _assert_hx_reselect_star(response) -> None:
-    """Fragments should override inherited shell hx-select."""
-    assert response.header("HX-Reselect") == "*"
-
-
 async def _login(client, username: str = "alice") -> dict[str, str]:
     """Log in (CSRF-aware) and return auth + CSRF headers for subsequent requests."""
     page = await client.get("/login")
@@ -233,7 +228,6 @@ class TestBoard:
             )
             assert_is_fragment(response)
             assert_fragment_contains(response, 'id="board"')
-            _assert_hx_reselect_star(response)
 
     async def test_index_contains_stats(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -305,7 +299,6 @@ class TestAddTask:
             )
             assert response.status == 422
             assert "required" in response.text.lower()
-            _assert_hx_reselect_star(response)
 
     async def test_add_invalid_priority_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -347,7 +340,6 @@ class TestEditTask:
             assert response.status == 200
             assert 'name="title"' in response.text
             assert "Design landing page" in response.text
-            _assert_hx_reselect_star(response)
 
     async def test_edit_form_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -379,7 +371,6 @@ class TestEditTask:
             )
             assert response.status == 422
             assert "required" in response.text.lower()
-            _assert_hx_reselect_star(response)
 
     async def test_save_not_found(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -400,15 +391,14 @@ class TestEditTask:
 class TestMoveTask:
     """POST /tasks/{id}/move/{status} — move between columns."""
 
-    async def test_move_to_adjacent(self, example_app) -> None:
-        """Move task 1 (done → review) returns OOB with both columns."""
+    async def test_move_updates_both_columns(self, example_app) -> None:
+        """Move task 1 (done → review) returns OOB fragments for BOTH columns."""
         async with TestClient(example_app) as client:
             auth = await _login(client)
             response = await client.post("/tasks/1/move/review", headers=auth)
             assert response.status == 200
-            assert "hx-swap-oob" in response.text
-            assert 'id="column-done"' in response.text
-            assert 'id="column-review"' in response.text
+            assert 'id="column-done" hx-swap-oob="true"' in response.text
+            assert 'id="column-review" hx-swap-oob="true"' in response.text
 
     async def test_move_invalid_status(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -430,11 +420,11 @@ class TestMoveTask:
             assert response.status == 404
 
     async def test_move_updates_stats(self, example_app) -> None:
-        """Move response includes the stats bar OOB fragment."""
+        """Move response includes the stats bar as OOB fragment."""
         async with TestClient(example_app) as client:
             auth = await _login(client)
             response = await client.post("/tasks/1/move/review", headers=auth)
-            assert 'id="board-stats"' in response.text
+            assert 'id="board-stats" hx-swap-oob="true"' in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +477,6 @@ class TestFilter:
             assert response.status == 200
             assert "Implement auth flow" in response.text
             assert "Dark mode toggle" not in response.text
-            _assert_hx_reselect_star(response)
 
     async def test_filter_by_assignee(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -546,8 +535,8 @@ class TestSSE:
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 3
 
-    async def test_sse_events_are_fragments(self, example_app) -> None:
-        """Fragment events contain rendered HTML, not raw template syntax."""
+    async def test_sse_events_all_named_fragment(self, example_app) -> None:
+        """All SSE events are named 'fragment' so sse-swap='fragment' receives them."""
         with (
             patch("app.random_move") as mock_move,
             patch("app.asyncio.sleep", new_callable=AsyncMock),
@@ -564,10 +553,10 @@ class TestSSE:
             async with TestClient(example_app) as client:
                 auth = await _login(client)
                 result = await client.sse("/events", max_events=3, headers=auth)
-        # Events use Fragment target as event name (e.g. column-backlog, board-stats)
         html_events = [e for e in result.events if e.data]
         assert len(html_events) >= 3
         for evt in html_events:
+            assert evt.event == "fragment", f"Expected event='fragment', got '{evt.event}'"
             assert "{{" not in evt.data
             assert "{%" not in evt.data
 
@@ -590,4 +579,4 @@ class TestSSE:
                 auth = await _login(client)
                 result = await client.sse("/events", max_events=3, headers=auth)
         oob_events = [e for e in result.events if e.data and "hx-swap-oob" in e.data]
-        assert len(oob_events) >= 1
+        assert len(oob_events) >= 3

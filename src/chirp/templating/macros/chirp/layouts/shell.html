@@ -1,11 +1,11 @@
-{#- Chirp shell layout — base for persistent app shells with hx-select
+{#- Chirp shell layout — base for persistent app shells
 
    Use this instead of boost.html for apps with a persistent shell (topbar,
-   sidebar) that stays fixed while only #page-content swaps on navigation.
+   sidebar) that stays fixed while only #main swaps on navigation.
 
    Key differences from boost.html:
-   - hx-select="#page-content" — extracts only the content div from full-page
-     responses, so the shell persists across htmx-boost navigations
+   - No hx-boost on <main> — navigation is driven by explicit hx-boost
+     on sidebar/nav links (see sidebar_link and nav_link macros)
    - {% block shell %} — override to wrap main with topbar/sidebar; child
      templates add structure AROUND main, not inside {% block content %}
    - {% block scripts %} — centralizes htmx CDN; override to change versions
@@ -14,8 +14,8 @@
        {% extends "chirp/layouts/shell.html" %}
        {% block shell %}
          <header>...</header>
-         <main id="main" ...>
-           <div id="page-content">{% block content %}{% end %}</div>
+         <main id="main" class="...">
+           {% block content %}{% end %}
          </main>
        {% end %}
        {% block sse_scope %}
@@ -40,14 +40,8 @@
 </head>
 <body>
   {% block shell %}
-  <main id="main"
-        hx-boost="true"
-        hx-target="#main"
-        hx-swap="innerHTML transition:true"
-        hx-select="#page-content">
-    <div id="page-content">
-      {% block content %}{% end %}
-    </div>
+  <main id="main">
+    {% block content %}{% end %}
   </main>
   {% end %}
   {% block sse_scope %}{% end %}

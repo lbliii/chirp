@@ -1,8 +1,10 @@
 """Tests for static file serving middleware."""
 
+from pathlib import Path
+
 import pytest
 
-from chirp import App
+from chirp import App, AppConfig
 from chirp.middleware.static import StaticFiles
 from chirp.testing import TestClient
 
@@ -104,6 +106,80 @@ class TestStaticFileServing:
             response = await client.get("/static/data.bin")
             assert response.status == 200
             assert response.content_type == "application/octet-stream"
+
+
+# ------------------------------------------------------------------
+# Config-driven static serving (static_dir in AppConfig)
+# ------------------------------------------------------------------
+
+
+class TestConfigDrivenStaticServing:
+    """When AppConfig.static_dir is set and directory exists, Chirp auto-adds StaticFiles."""
+
+    async def test_static_dir_serves_files_without_add_middleware(self, static_dir: Path) -> None:
+        """AppConfig(static_dir=...) serves files without explicit add_middleware."""
+        app = App(config=AppConfig(static_dir=static_dir))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css")
+            assert response.status == 200
+            assert "text/css" in response.content_type
+            assert "body { color: red; }" in response.text
+
+    async def test_static_dir_with_path_object(self, static_dir: Path) -> None:
+        """static_dir accepts Path objects."""
+        app = App(config=AppConfig(static_dir=Path(static_dir)))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/app.js")
+            assert response.status == 200
+            assert "console.log" in response.text
+
+    async def test_static_dir_none_no_staticfiles(self, static_dir: Path) -> None:
+        """static_dir=None disables auto StaticFiles; /static/... falls through to 404."""
+        app = App(config=AppConfig(static_dir=None))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css")
+            assert response.status == 404
+
+    async def test_static_dir_missing_directory_no_middleware(self, tmp_path: Path) -> None:
+        """When static_dir points to non-existent dir, no StaticFiles added."""
+        missing = tmp_path / "nonexistent"
+        app = App(config=AppConfig(static_dir=missing))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/foo.css")
+            assert response.status == 404
+
+    async def test_static_url_custom_prefix(self, static_dir: Path) -> None:
+        """static_url controls the URL prefix."""
+        app = App(config=AppConfig(static_dir=static_dir, static_url="/assets"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/assets/style.css")
+            assert response.status == 200
+            assert "body { color: red; }" in response.text
 
 
 class TestStaticFileFallthrough:
