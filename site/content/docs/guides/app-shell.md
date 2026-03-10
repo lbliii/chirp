@@ -197,26 +197,95 @@ async def post(request: Request):
 
 ## Shell Actions
 
-Routes can contribute actions to the topbar (buttons, links, menus) via
-`_context.py` files in the page directory:
+Routes contribute actions to the topbar (buttons, links, menus) via
+`_context.py` files. The correct pattern is to return a `context()` dict with
+a `shell_actions` key — not a standalone `shell_actions()` function.
+
+### Declaration
 
 ```python
 # pages/contacts/_context.py
-from chirp.pages.shell_actions import ShellActions, ShellAction, ShellActionZone
+from chirp import ShellAction, ShellActions, ShellActionZone
 
-def shell_actions() -> ShellActions:
-    return ShellActions(
-        primary=ShellActionZone(
-            items=(
-                ShellAction(id="add", label="Add Contact", icon="add", href="/contacts/new"),
+def context() -> dict:
+    return {
+        "shell_actions": ShellActions(
+            primary=ShellActionZone(
+                items=(ShellAction(id="add", label="Add Contact", icon="add", href="/contacts/new"),),
             ),
         ),
-    )
+    }
 ```
 
-Shell actions are delivered via OOB swap when navigating between pages —
-the topbar updates automatically.  Child routes inherit parent actions and
-can override or remove them.
+### Three Zones
+
+- **primary** — Main buttons/links (e.g. "New project", "Deploy")
+- **controls** — Secondary actions (e.g. "Metrics", filters)
+- **overflow** — Dropdown menu (e.g. "More" with Archive, Export, Docs)
+
+```python
+ShellActions(
+    primary=ShellActionZone(items=(ShellAction(id="new", label="New", href="/new"),)),
+    controls=ShellActionZone(items=(ShellAction(id="metrics", label="Metrics", href="#stats"),)),
+    overflow=ShellActionZone(
+        items=(
+            ShellAction(id="archive", label="Archive", href="/archive"),
+            ShellAction(id="export", label="Export", href="/export"),
+        ),
+    ),
+)
+```
+
+### Cascade Inheritance
+
+Parent `_context.py` defines section defaults; child routes inherit them.
+Child `_context.py` can add actions, override by `id`, or replace entire zones.
+
+### Override Patterns
+
+**Remove specific parent actions:**
+
+```python
+ShellActionZone(items=(...), remove=("parent-action-id",))
+```
+
+**Replace an entire zone** (e.g. form pages that need different actions):
+
+```python
+ShellActions(
+    primary=ShellActionZone(
+        items=(ShellAction(id="save", label="Save", href="/save"),),
+        mode="replace",
+    ),
+)
+```
+
+Use `mode="replace"` when a subroute (e.g. settings, wizard, install) should
+completely replace parent navigation actions. Cannot combine with `remove=`.
+
+### Layout Wiring
+
+When using `chirpui/app_shell_layout.html`, `shell_actions` is passed via the
+layout chain from merged `_context.py` results. No extra wiring needed.
+
+When using the `app_shell()` macro (regions-based layouts), pass it explicitly:
+
+```html
+{% call app_shell(brand="My App", shell_actions=shell_actions | default(none)) %}
+  ...
+{% end %}
+```
+
+### OOB Mechanism
+
+Chirp's render plan adds shell actions as an OOB fragment when serving boosted
+navigation requests. The topbar updates automatically on each page change — no
+client-side logic required. See `render_plan.py` for the implementation.
+
+### Reference
+
+See `examples/pages_shell` for a working cascade with `remove=` and
+`mode="replace"`.
 
 ## Content Navigation Links
 
