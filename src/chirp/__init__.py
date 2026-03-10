@@ -37,10 +37,12 @@ def _get_version() -> str:
     """Single source of truth: pyproject.toml via package metadata."""
     try:
         from importlib.metadata import PackageNotFoundError, version
+
         return version("bengal-chirp")
     except PackageNotFoundError:
         import tomllib
         from pathlib import Path
+
         pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
         if pyproject.exists():
             with open(pyproject, "rb") as f:
