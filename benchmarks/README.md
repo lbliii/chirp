@@ -17,6 +17,9 @@ uv run poe benchmark
 python -m benchmarks.run chirp
 python -m benchmarks.run fastapi
 python -m benchmarks.run flask
+
+# Run Chirp experiments (client strategies, Chirp+Uvicorn)
+python -m benchmarks.run_experiments
 ```
 
 ## Methodology
@@ -26,14 +29,16 @@ python -m benchmarks.run flask
 | Requests per run | 2000 | Matches Barq PR |
 | Concurrent clients | 100 | Matches Barq PR |
 | Workers | 10 | Per-framework optimal |
+| Rounds | 3 | Reported values are medians across rounds |
 | Workloads | JSON, CPU | Phase 1; DB + Template in Phase 2 |
+| Client | Shared pooled httpx.Client | Measures server behavior without per-request client setup churn |
 
 **Workloads:**
 - **JSON** — Return `{"message": "hello", "count": 42}`. Minimal framework overhead.
 - **CPU** — 50k hash iterations per request. CPU-bound; free-threading benefit most visible.
 
 **Servers:**
-- Chirp: Pounce (threads on 3.14t, processes on GIL)
+- Chirp: Pounce (threads on 3.14t, processes on GIL), request queue disabled for benchmarks
 - FastAPI: Uvicorn (async)
 - Flask: Gunicorn with sync workers
 
@@ -43,6 +48,8 @@ python -m benchmarks.run flask
 
 > **Configuration matters.** Results depend on worker count, Python version (GIL vs free-threaded), and load-test parameters. We document our configs; your mileage may vary.
 
+> **Latency includes failed attempts.** Percentiles are calculated across all requests, not only 200 responses, so overload and instability remain visible in the output.
+
 > **Python 3.14t recommended.** Chirp and Pounce are designed for free-threaded Python. Run on 3.14t to see the full benefit. On GIL builds, Pounce falls back to multi-process workers.
 
 ## Output
@@ -50,16 +57,15 @@ python -m benchmarks.run flask
 ```
 ============================================================
   CHIRP vs FASTAPI vs FLASK (synthetic benchmarks)
-  2000 requests, 100 concurrent clients
-  Workers: 10
+  Python 3.14t | 2000 req, 100 concurrent | 10 workers | median of 3 rounds
 ============================================================
 
 ─── JSON ───
-  Chirp        2000/2000 ok, 12000.0 req/s
-               latency: avg=2.1ms p50=1.9ms p99=7.2ms (→ +141% vs FastAPI)
-  Fastapi      2000/2000 ok, 4975.2 req/s
-               latency: avg=19.3ms p50=18.6ms p99=28.5ms
-  Flask        2000/2000 ok, 3500.0 req/s
+  Chirp        2000/2000 ok, 0 failed, 12000.0 req/s
+               latency(all attempts): avg=2.1ms p50=1.9ms p99=7.2ms (→ +141% vs FastAPI)
+  Fastapi      2000/2000 ok, 0 failed, 4975.2 req/s
+               latency(all attempts): avg=19.3ms p50=18.6ms p99=28.5ms
+  Flask        2000/2000 ok, 0 failed, 3500.0 req/s
                ...
 
 ─── CPU ───

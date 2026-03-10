@@ -2,13 +2,12 @@
 
 from chirp import App, AppConfig
 
-# request_queue_enabled helps handle bursts; max_depth 2000 > our load
+# Normalized config: no request queue (avoids 503s under burst, matches FastAPI/Flask)
 app = App(
     AppConfig(
         debug=False,
         workers=10,
-        request_queue_enabled=True,
-        request_queue_max_depth=2000,
+        request_queue_enabled=False,
     )
 )
 
