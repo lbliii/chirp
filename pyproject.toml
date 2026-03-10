@@ -81,6 +81,15 @@ all = [
     "patitas[syntax]>=0.3.5",
 ]
 
+# Benchmark suite (Chirp vs FastAPI vs Flask)
+benchmark = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "flask>=3.0.0",
+    "gunicorn>=23.0.0",
+    "httpx>=0.27.0",
+]
+
 # Full stack: framework + data + AI
 full = [
     "python-multipart>=0.0.18",
@@ -278,6 +287,9 @@ check = { sequence = [
 
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build && ls -la dist/", help = "Build distribution" }
+
+# Benchmarks
+benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask benchmarks" }
 
 # Cleanup
 clean.shell = """
