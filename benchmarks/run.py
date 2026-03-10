@@ -1,11 +1,14 @@
 """Benchmark runner — start server, run load test, report.
 
 Usage:
-    uv run python benchmarks/run.py [chirp|fastapi|flask|all]
-    uv run python benchmarks/run.py all  # default
+    uv run python -m benchmarks.run [chirp|fastapi|flask|all]
+    uv run python -m benchmarks.run all  # default
+
+    # Run on Python 3.14t (free-threaded) to see Chirp benefit:
+    uv run --python 3.14t python -m benchmarks.run all
 
 Requires: chirp, fastapi, uvicorn, flask, gunicorn, httpx
-Install: uv sync --group benchmark  (or pip install chirp[benchmark])
+Install: uv sync --extra benchmark  (or pip install chirp[benchmark])
 """
 
 import os
@@ -38,12 +41,12 @@ class BenchResult:
     p99_ms: float
 
 
-def wait_for_server(url: str, timeout: float = 10.0) -> bool:
-    """Poll until server responds or timeout."""
+def wait_for_server(url: str, timeout: float = 15.0) -> bool:
+    """Poll until server responds or timeout. Chirp with 10 workers needs extra time."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            r = httpx.get(url, timeout=1.0)
+            r = httpx.get(url, timeout=2.0)
             if r.status_code == 200:
                 return True
         except Exception:
@@ -178,6 +181,14 @@ def run_framework(name: str, port: int) -> list[BenchResult]:
             print(f"  {name}: server failed to start", file=sys.stderr)
             return []
 
+        # Warmup: a few requests so workers are ready before load
+        for _ in range(5):
+            try:
+                httpx.get(f"{base}/json", timeout=5.0)
+            except Exception:
+                pass
+            time.sleep(0.05)
+
         for workload, path in [("json", "/json"), ("cpu", "/cpu")]:
             r = run_load_test(f"{base}{path}", NUM_REQUESTS, CONCURRENCY)
             if r:
@@ -195,12 +206,17 @@ def print_report(results: list[BenchResult]) -> None:
     """Print formatted benchmark report."""
     frameworks = sorted({r.framework for r in results})
     workloads = sorted({r.workload for r in results})
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    try:
+        free_threaded = not sys._is_gil_enabled()
+    except AttributeError:
+        free_threaded = False
+    py_label = f"{py_ver}t" if free_threaded else py_ver
 
     print()
     print("=" * 60)
     print("  CHIRP vs FASTAPI vs FLASK (synthetic benchmarks)")
-    print(f"  {NUM_REQUESTS} requests, {CONCURRENCY} concurrent clients")
-    print(f"  Workers: {WORKERS}")
+    print(f"  Python {py_label} | {NUM_REQUESTS} req, {CONCURRENCY} concurrent | {WORKERS} workers")
     print("=" * 60)
     print()
 

@@ -2,7 +2,15 @@
 
 from chirp import App, AppConfig
 
-app = App(AppConfig(debug=False, workers=10))
+# request_queue_enabled helps handle bursts; max_depth 2000 > our load
+app = App(
+    AppConfig(
+        debug=False,
+        workers=10,
+        request_queue_enabled=True,
+        request_queue_max_depth=2000,
+    )
+)
 
 JSON_PAYLOAD = {"message": "hello", "count": 42}
 
