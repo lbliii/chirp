@@ -7,10 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-03-10
+
+### Added
+
+- **App shell guide** — Full documentation for persistent layouts: navigation model (explicit boost on sidebar links), rendering rule (`Page` with `page_block_name`), shell actions, `nav_link` for content links, and interactive shell gotchas (OOB with `hx-swap="none"`, SSE event naming, ContextVar loss, dual template blocks).
+- **Islands examples** — `islands/`, `islands_shell/`, `islands_swap/`, and `oob_layout_chain/` examples. Islands inside app shells, islands in dynamically swapped content, and OOB layout chains with depth/nesting.
+- **Breadcrumbs and sidebar OOB** — Boosted layout navigation now updates breadcrumbs and sidebar state via OOB swaps.
+- **Alpine Focus plugin** — Injected when `alpine=True` for tray/modal overlay focus management. Modals/trays store auto-injected for Alpine apps.
+- **Alpine macro improvements** — Dropdown and tabs macros use `x-ref`, `x-id`, focus return, and `$dispatch tab-changed` for better accessibility.
+- **Kida integration docs** — Template integration guide and fragments reference.
+- **`wizard_form` contract extraction** — Contract checker now extracts IDs from `wizard_form()` macro (fixes false-positive "unknown target" for wizard form containers).
+
 ### Changed
 
+- **Explicit boost migration** — Shell layout no longer uses `hx-boost` on `<main>`. Sidebar links carry explicit `hx-boost` via `sidebar_link(boost=true)`. Removed `#page-content` wrapper. Navigation is explicit; forms and interactive regions need no defensive wrappers.
+- **HX-Reselect removal** — Fragment responses no longer send `HX-Reselect: *`; no longer needed with explicit boost on links.
+- **Context provider module names** — `_context.py` files load with path-based names (`_chirp_ctx_collections`, `_chirp_ctx_settings`, etc.) instead of depth-based ones. Sibling directories no longer overwrite each other in `sys.modules`.
 - **htmx debug targetError** — "Target Not Found" toast now includes remediation hint: co-locate target with mutating element when target is in a different fragment than the form.
-- **Context provider module names** — `_context.py` files are loaded with path-based names (`_chirp_ctx_collections`, `_chirp_ctx_settings`, etc.) instead of depth-based ones. Sibling directories no longer overwrite each other in `sys.modules`, so tests that monkeypatch context providers can target the correct module.
+
+### Fixed
+
+- **Kanban board OOB/SSE** — Move/add/delete routes use empty main fragment so column and stats updates are OOB-wrapped. SSE adds OOB-aware template blocks (e.g. `column_block_oob`, `stats_block_oob`) with correct event naming for `sse-swap` listeners.
+- **Wizard form contract** — Templates targeting `wizard_form` IDs no longer get false-positive "unknown target" warnings.
+
+### Dependencies
+
+- `kida-templates>=0.2.6`
+- `chirp-ui>=0.1.4` (optional)
+- `patitas>=0.3.5` (optional, for markdown)
 
 ## [0.1.6] — 2026-03-06
 
@@ -67,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Regex for Kida URL extraction in htmx attributes
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
+[0.1.7]: https://github.com/lbliii/chirp/releases/tag/v0.1.7
 [0.1.6]: https://github.com/lbliii/chirp/releases/tag/v0.1.6
 [0.1.5]: https://github.com/lbliii/chirp/releases/tag/v0.1.5
 [0.1.4]: https://github.com/lbliii/chirp/releases/tag/v0.1.4
