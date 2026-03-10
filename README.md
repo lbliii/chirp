@@ -347,6 +347,7 @@ chirp check myapp:app --warnings-as-errors
 | [Data](https://lbliii.github.io/chirp/docs/data/) | Database integration and forms |
 | [Testing](https://lbliii.github.io/chirp/docs/testing/) | Test client and assertions |
 | [Deployment](https://lbliii.github.io/chirp/docs/deployment/) | Production deployment with Pounce |
+| [Guides](https://lbliii.github.io/chirp/docs/guides/) | App shells, islands, Alpine, accessibility |
 | [Tutorials](https://lbliii.github.io/chirp/docs/tutorials/) | Flask migration, htmx patterns |
 | [Examples](https://lbliii.github.io/chirp/docs/examples/) | RAG demo, production stack, API |
 | [Reference](https://lbliii.github.io/chirp/docs/reference/) | API documentation |

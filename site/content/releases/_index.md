@@ -1,16 +1,41 @@
 ---
 title: Releases
-description: Chirp release notes and changelog
+description: Stay up to date with Chirp's latest features, improvements, and fixes. Each release includes detailed notes about what's new, what changed, and how to upgrade.
+type: changelog
+weight: 90
 draft: false
-weight: 200
 lang: en
-type: doc
-tags: [releases, changelog]
-keywords: [releases, changelog, versions, updates]
-category: releases
-icon: tag
+icon: calendar
+tags: [releases, changelog, version history]
+keywords: [releases, changelog, version, updates]
+category: changelog
+cascade:
+  type: changelog
 ---
 
-## Release History
+## Quick Upgrade
 
-Release notes for each version of Chirp. The project is currently in **alpha** -- APIs may change between releases.
+To upgrade to the latest version:
+
+:::{tab-set}
+:::{tab-item} UV
+
+```bash
+uv pip install --upgrade bengal-chirp
+```
+
+:::
+
+:::{tab-item} pip
+
+```bash
+pip install --upgrade bengal-chirp
+```
+
+:::
+
+:::{/tab-set}
+
+## Browse Releases
+
+Releases appear below in reverse chronological order (newest first). Click any release to read the full details.
