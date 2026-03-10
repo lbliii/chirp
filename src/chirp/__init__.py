@@ -32,7 +32,23 @@ AI streaming (``pip install chirp[ai]``)::
 # Declare free-threading support (PEP 703)
 _Py_mod_gil = 0
 
-__version__ = "0.1.6"
+
+def _get_version() -> str:
+    """Single source of truth: pyproject.toml via package metadata."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        return version("bengal-chirp")
+    except PackageNotFoundError:
+        from pathlib import Path
+        import tomllib
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        if pyproject.exists():
+            with open(pyproject, "rb") as f:
+                return tomllib.load(f)["project"]["version"]
+        return "0.0.0.dev"
+
+
+__version__ = _get_version()
 CHIRP_CAPABILITIES = frozenset(
     {
         # Guarantees startup contract checks run after runtime state publication.
