@@ -54,6 +54,11 @@ def _confirm_method_for_match(source: str, match_start: int, match_end: int) -> 
     return method_match.group(1).upper()
 
 
+def _is_kida_expression_continued(source: str, match_end: int) -> bool:
+    next_source = source[match_end:].lstrip()
+    return next_source.startswith("~")
+
+
 def get_form_method(source: str, action_pos: int) -> str | None:
     """Return POST only when form has method='post', otherwise GET."""
     before = source[:action_pos]
@@ -99,6 +104,8 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
         _append_target(attr_name, url, None)
 
     for match in _CONFIRM_URL_PATTERN.finditer(source):
+        if _is_kida_expression_continued(source, match.end()):
+            continue
         url = match.group(1)
         method_override = _confirm_method_for_match(source, match.start(), match.end())
         _append_target("confirm_url", url, method_override)

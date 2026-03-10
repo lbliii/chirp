@@ -166,6 +166,14 @@ class TestExtractTargets:
         targets = _extract_targets_from_source(html)
         assert ("confirm_url", "/items/1", "DELETE") in targets
 
+    def test_ignores_confirm_dialog_target_with_kida_concat(self):
+        html = (
+            '{{ confirm_dialog("del", confirm_url="/contacts/" ~ contact.id ~ "/delete", '
+            'confirm_method="DELETE") }}'
+        )
+        targets = _extract_targets_from_source(html)
+        assert targets == []
+
     def test_ignores_attrs_map_hx_post_with_kida_concat(self):
         html = '{{ form("/x", attrs_map={"hx-post": "/chains/" ~ chain_id ~ "/add-step"}) }}'
         targets = _extract_targets_from_source(html)
