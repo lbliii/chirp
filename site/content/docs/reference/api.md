@@ -24,6 +24,7 @@ from chirp import (
     Request,
     Response,
     Redirect,
+    hx_redirect,
 
     # Template return types
     Template,
@@ -161,6 +162,12 @@ HTTP response with chainable `.with_*()` API.
 ### Redirect
 
 Convenience for 302 redirects: `Redirect(url)`.
+
+### hx_redirect
+
+Helper that returns a `Response` with both `Location` and `HX-Redirect`
+headers so the same handler works for normal and htmx navigation:
+`hx_redirect(url, status=303, body="", headers=None)`.
 
 ## Template Return Types
 

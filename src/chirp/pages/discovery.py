@@ -97,7 +97,7 @@ def _walk_directory(
     context_file = directory / "_context.py"
     current_providers = list(context_providers)
     if context_file.is_file():
-        provider = _load_context_provider(context_file, depth)
+        provider = _load_context_provider(context_file, root, depth)
         if provider is not None:
             current_providers.append(provider)
 
@@ -158,20 +158,26 @@ def _parse_layout_target(layout_file: Path) -> str:
     return "body"
 
 
-def _load_context_provider(context_file: Path, depth: int) -> ContextProvider | None:
+def _load_context_provider(context_file: Path, root: Path, depth: int) -> ContextProvider | None:
     """Load a context() function from a _context.py file.
+
+    Uses path-based module names (_chirp_ctx_collections, etc.) so sibling
+    directories do not overwrite each other in sys.modules.
 
     Returns None if the module doesn't export a ``context`` function.
     """
-    spec = importlib.util.spec_from_file_location(
-        f"_context_{depth}",
-        context_file,
-    )
+    try:
+        rel = context_file.parent.relative_to(root)
+        path_slug = "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
+    except ValueError:
+        path_slug = "root"
+    module_name = f"_chirp_ctx_{path_slug}"
+
+    spec = importlib.util.spec_from_file_location(module_name, context_file)
     if spec is None or spec.loader is None:
         return None
 
     module = importlib.util.module_from_spec(spec)
-    module_name = f"_context_{depth}"
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)

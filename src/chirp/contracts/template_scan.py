@@ -12,6 +12,8 @@ _ATTR_PATTERN_SINGLE = re.compile(
     rf"{_ACTION_OR_HX}\s*=\s*'([^']*)'",
 )
 _ATTRS_MAP_PATTERN = re.compile(rf"""["']{_ACTION_OR_HX}["']\s*:\s*["']([^"']*)["'](?=\s*[,}}])""")
+_CONFIRM_URL_PATTERN = re.compile(r'confirm_url\s*=\s*["\']([^"\']*)["\']')
+_CONFIRM_METHOD_PATTERN = re.compile(r'confirm_method\s*=\s*["\']([^"\']*)["\']', re.IGNORECASE)
 _HX_TARGET_PATTERN = re.compile(r'hx-target\s*=\s*["\']([^"\']*)["\']')
 _ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
 _TEMPLATE_REF_PATTERN = re.compile(
@@ -33,6 +35,23 @@ _MUTATING_WITH_TARGET = re.compile(
     r'[^>]*\bhx-target\s*=\s*["\']#([^"\'\s]+)["\']',
     re.IGNORECASE,
 )
+_LEGACY_ACTION_PATTERN = re.compile(r'\baction\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
+
+
+def _is_static_url_candidate(url: str) -> bool:
+    return not (
+        "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")) or "://" in url
+    )
+
+
+def _confirm_method_for_match(source: str, match_start: int, match_end: int) -> str:
+    window_start = max(0, match_start - 160)
+    window_end = min(len(source), match_end + 160)
+    window = source[window_start:window_end]
+    method_match = _CONFIRM_METHOD_PATTERN.search(window)
+    if method_match is None:
+        return "POST"
+    return method_match.group(1).upper()
 
 
 def get_form_method(source: str, action_pos: int) -> str | None:
@@ -57,7 +76,7 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
     seen: set[tuple[str, str, str | None]] = set()
 
     def _append_target(attr_name: str, url: str, method_override: str | None) -> None:
-        if "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")):
+        if not _is_static_url_candidate(url):
             return
         target = (attr_name, url, method_override)
         if target in seen:
@@ -79,7 +98,22 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
         url = match.group(2)
         _append_target(attr_name, url, None)
 
+    for match in _CONFIRM_URL_PATTERN.finditer(source):
+        url = match.group(1)
+        method_override = _confirm_method_for_match(source, match.start(), match.end())
+        _append_target("confirm_url", url, method_override)
+
     return targets
+
+
+def extract_legacy_action_contracts(source: str) -> set[str]:
+    """Extract legacy action= contract names from template call arguments."""
+    names: set[str] = set()
+    for match in _LEGACY_ACTION_PATTERN.finditer(source):
+        value = match.group(1).strip()
+        if value and _is_static_url_candidate(value) and not value.startswith("/"):
+            names.add(value)
+    return names
 
 
 def extract_hx_target_selectors(source: str) -> list[str]:

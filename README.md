@@ -75,6 +75,7 @@ chirp new myapp && cd myapp && python app.py
 | `Stream(name, **ctx)` | Stream HTML progressively |
 | `Suspense(name, **ctx)` | Shell first, OOB swaps for deferred data |
 | `EventStream(gen)` | Server-Sent Events stream |
+| `hx_redirect(url)` | Redirect helper for htmx and full-page requests |
 | `app.run()` | Start the development server |
 
 ---
@@ -91,7 +92,7 @@ chirp new myapp && cd myapp && python app.py
 | **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/streaming/) |
 | **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/streaming/server-sent-events/) |
 | **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
-| **Contracts** | Compile-time validation of hypermedia surface | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
+| **Contracts** | Validate htmx attrs, form actions, and route-bearing dialog args | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
 | **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/testing/) |
 | **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/data/) |
 | **Optional UI layer** | `chirp-ui` companion components and styles | [chirp-ui →](https://github.com/lbliii/chirp-ui) |
@@ -181,11 +182,16 @@ return Fragment("page.html", "results", items=x) # -> 200, rendered block
 return Stream("dashboard.html", **async_ctx)    # -> 200, streamed HTML
 return Suspense("dashboard.html", stats=...)    # -> shell + OOB swaps
 return EventStream(generator())                 # -> SSE stream
+return hx_redirect("/dashboard")                # -> Location + HX-Redirect
 return Response(body=b"...", status=201)         # -> explicit control
 return Redirect("/login")                       # -> 302
 ```
 
 No `make_response()`. No `jsonify()`. The type *is* the intent.
+
+For htmx-driven form posts or mutations that should trigger a full-page
+navigation, prefer `hx_redirect()` so both plain browser and htmx requests
+follow the redirect correctly.
 
 </details>
 

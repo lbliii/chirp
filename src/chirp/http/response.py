@@ -238,6 +238,24 @@ class Redirect:
     headers: tuple[tuple[str, str], ...] = ()
 
 
+def hx_redirect(
+    url: str,
+    *,
+    status: int = 303,
+    body: str | bytes = "",
+    headers: Mapping[str, str] | None = None,
+) -> Response:
+    """Build a redirect response that works for htmx and non-htmx clients.
+
+    Adds both ``Location`` and ``HX-Redirect`` so a normal browser follows the
+    HTTP redirect while htmx performs a full-page navigation.
+    """
+    response = Response(body=body).with_status(status).with_header("Location", url).with_hx_redirect(url)
+    if headers:
+        response = response.with_headers(headers)
+    return response
+
+
 @dataclass(frozen=True, slots=True)
 class StreamingResponse:
     """A streaming HTTP response that sends chunks progressively.

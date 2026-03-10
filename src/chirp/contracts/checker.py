@@ -24,6 +24,7 @@ from .rules_sse import (
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
+    extract_legacy_action_contracts,
     extract_fragment_island_ids,
     extract_static_ids,
     extract_targets_from_source,
@@ -174,9 +175,24 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         for template_name, source in template_sources.items():
             if template_name.startswith("chirpui/"):
                 continue
+            for legacy_action in sorted(extract_legacy_action_contracts(source)):
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="template_contract",
+                        message=(
+                            f"'action=\"{legacy_action}\"' looks like a legacy component contract, "
+                            "not a URL. Replace it with href=, hx-*, confirm_url=, or a real "
+                            "form action path."
+                        ),
+                        template=template_name,
+                    )
+                )
             targets = extract_targets_from_source(source)
             result.targets_found += len(targets)
             for attr_name, url, method_override in targets:
+                if attr_name == "action" and not url.startswith("/"):
+                    continue
                 method = attr_to_method(attr_name, method_override)
                 matched = False
                 for route_path, methods in route_paths.items():

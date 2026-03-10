@@ -7,6 +7,8 @@ def attr_to_method(attr: str, method_override: str | None = None) -> str:
     """Map a URL-bearing template attribute name to HTTP method."""
     if attr == "action":
         return method_override if method_override in ("GET", "POST") else "GET"
+    if attr == "confirm_url":
+        return method_override if method_override else "POST"
     return attr.split("-", 1)[1].upper()
 
 

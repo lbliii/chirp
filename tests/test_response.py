@@ -2,7 +2,7 @@
 
 import pytest
 
-from chirp.http.response import Redirect, Response, SSEResponse
+from chirp.http.response import Redirect, Response, SSEResponse, hx_redirect
 
 
 class TestResponse:
@@ -218,6 +218,16 @@ class TestHtmxResponseHeaders:
         r2 = r1.with_hx_redirect("/home")
         assert r1.headers == ()
         assert ("HX-Redirect", "/home") in r2.headers
+
+    def test_hx_redirect_helper_sets_location_and_hx_redirect(self) -> None:
+        r = hx_redirect("/dashboard")
+        assert r.status == 303
+        assert r.header("Location") == "/dashboard"
+        assert r.header("HX-Redirect") == "/dashboard"
+
+    def test_hx_redirect_helper_accepts_custom_headers(self) -> None:
+        r = hx_redirect("/dashboard", headers={"X-Test": "1"})
+        assert r.header("X-Test") == "1"
 
 
 class TestSSEResponse:

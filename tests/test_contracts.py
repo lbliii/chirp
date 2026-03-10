@@ -28,6 +28,7 @@ from chirp.contracts.rules_sse import check_sse_self_swap as _check_sse_self_swa
 from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
 from chirp.contracts.rules_swap import collect_broad_targets as _collect_broad_targets
 from chirp.contracts.template_scan import (
+    extract_legacy_action_contracts as _extract_legacy_action_contracts,
     extract_targets_from_source as _extract_targets_from_source,
 )
 from chirp.contracts.template_scan import (
@@ -61,6 +62,9 @@ class TestAttrToMethod:
 
     def test_form_action_post_override(self):
         assert _attr_to_method("action", "POST") == "POST"
+
+    def test_confirm_url_post_override(self):
+        assert _attr_to_method("confirm_url", "DELETE") == "DELETE"
 
 
 class TestContractCheckSnapshot:
@@ -157,6 +161,11 @@ class TestExtractTargets:
         targets = _extract_targets_from_source(html)
         assert ("action", "/skills", None) in targets
 
+    def test_extracts_confirm_dialog_target(self):
+        html = '{{ confirm_dialog("del", confirm_url="/items/1", confirm_method="DELETE") }}'
+        targets = _extract_targets_from_source(html)
+        assert ("confirm_url", "/items/1", "DELETE") in targets
+
     def test_ignores_attrs_map_hx_post_with_kida_concat(self):
         html = '{{ form("/x", attrs_map={"hx-post": "/chains/" ~ chain_id ~ "/add-step"}) }}'
         targets = _extract_targets_from_source(html)
@@ -169,6 +178,14 @@ class TestExtractTargets:
 
     def test_empty_source(self):
         assert _extract_targets_from_source("") == []
+
+    def test_extracts_legacy_action_contract_name(self):
+        html = '{{ btn("Update", action="update-collection") }}'
+        assert _extract_legacy_action_contracts(html) == {"update-collection"}
+
+    def test_ignores_action_paths_for_legacy_contract_scan(self):
+        html = '<form action="/login" method="post"></form>'
+        assert _extract_legacy_action_contracts(html) == set()
 
 
 class TestSelectorSyntaxValidation:
@@ -767,6 +784,40 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         assert result.ok
         assert result.targets_found == 2
+
+    def test_confirm_url_counts_as_route_reference(self, tmp_path):
+        (tmp_path / "index.html").write_text(
+            '{{ confirm_dialog("del", confirm_url="/items/1", confirm_method="DELETE") }}'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/items/{item_id}", methods=["DELETE"])
+        async def delete_item():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        route_errors = [issue for issue in result.errors if issue.category == "target"]
+        assert route_errors == []
+        assert ("confirm_url", "/items/1", "DELETE") in _extract_targets_from_source(
+            (tmp_path / "index.html").read_text()
+        )
+
+    def test_legacy_action_contract_warns_without_route_error(self, tmp_path):
+        (tmp_path / "index.html").write_text('{{ btn("Update", action="update-collection") }}')
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/collections/update", methods=["POST"])
+        async def update_collection():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        route_errors = [issue for issue in result.errors if "no matching route" in issue.message]
+        assert route_errors == []
+        contract_warnings = [
+            issue for issue in result.warnings if issue.category == "template_contract"
+        ]
+        assert len(contract_warnings) == 1
+        assert "legacy component contract" in contract_warnings[0].message
 
     def test_hx_get_with_query_params_matches_route(self, tmp_path):
         """hx-get URLs with query params match routes (component-showcase-like setup).

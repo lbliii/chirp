@@ -200,6 +200,8 @@ Submit a form and show inline errors:
 ```
 
 ```python
+from chirp import ValidationError, hx_redirect
+
 @app.route("/register", methods=["POST"])
 async def register(request: Request):
     form = await request.form()
@@ -207,8 +209,11 @@ async def register(request: Request):
     if errors:
         return ValidationError("register.html", "form_errors", errors=errors)
     create_user(form)
-    return Redirect("/welcome")
+    return hx_redirect("/welcome")
 ```
+
+`hx_redirect()` is the safer default here because the same form can be
+submitted either normally or via htmx.
 
 ## Real-Time Notifications
 

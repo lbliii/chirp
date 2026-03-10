@@ -678,9 +678,12 @@
     var d = evt.detail || {};
     var target = d.target || "(unknown selector)";
     var trigger = desc(d.elt || evt.target);
+    var hint =
+      "Common cause: target is in a different fragment than the form. Co-locate the target with the mutating element (e.g. put the result div inside the same HTMX-loaded content).";
+    var msg = target + "\nTriggered by " + trigger + "\n\n" + hint;
     var cfg = d.elt ? formatConfig(getEffectiveConfig(d.elt)) : "";
-    addError("Target Not Found", target + "\nTriggered by " + trigger, cfg);
-    toast("Target Not Found", target + "\nTriggered by " + trigger, COLORS.error, cfg);
+    addError("Target Not Found", msg, cfg);
+    toast("Target Not Found", msg, COLORS.error, cfg);
   });
 
   document.body.addEventListener("htmx:responseError", function(evt) {

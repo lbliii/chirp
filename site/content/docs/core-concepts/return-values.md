@@ -24,6 +24,7 @@ return Stream("dashboard.html", **async_ctx)         # -> 200, streamed HTML
 return Suspense("dashboard.html", stats=get_stats()) # -> 200, shell + OOB swaps
 return EventStream(generator())                      # -> SSE stream
 return Response(body=b"...", status=201)              # -> explicit control
+return hx_redirect("/dashboard")                      # -> Location + HX-Redirect
 return Redirect("/login")                            # -> 302
 ```
 
@@ -221,6 +222,31 @@ from chirp import Redirect
 def old_page():
     return Redirect("/new-page")  # 302 by default
 ```
+
+Use `Redirect(...)` when you want a normal HTTP redirect and do not need to
+shape the response further.
+
+## hx_redirect
+
+`hx_redirect()` is a response helper for handlers that may be reached by either
+plain browser navigation or htmx requests:
+
+```python
+from chirp import hx_redirect
+
+@app.route("/login", methods=["POST"])
+async def login(request: Request):
+    # ... authenticate ...
+    return hx_redirect("/dashboard")
+```
+
+It returns a `Response` with both:
+
+- `Location: /dashboard` for normal browser redirects
+- `HX-Redirect: /dashboard` for htmx full-page navigation
+
+Use it when the same handler services both progressive enhancement paths and you
+want one return value that works cleanly for both.
 
 ## FormAction
 

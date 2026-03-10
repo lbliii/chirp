@@ -116,6 +116,15 @@ return (
 )
 ```
 
+If you need a full-page redirect that works for both htmx and non-htmx
+requests, use the helper instead of manually composing headers:
+
+```python
+from chirp import hx_redirect
+
+return hx_redirect("/dashboard")
+```
+
 ### Immutable Transformations
 
 Each `.with_*()` call creates a new `Response`. The original is never mutated:
@@ -140,6 +149,21 @@ from chirp import Redirect
 @app.route("/old")
 def old():
     return Redirect("/new")
+```
+
+## hx_redirect
+
+`hx_redirect()` returns a `Response` with both `Location` and `HX-Redirect`.
+That makes it a good default for POST/PUT/DELETE handlers that can be submitted
+either normally or via htmx:
+
+```python
+from chirp import hx_redirect
+
+@app.route("/items/{id:int}/archive", methods=["POST"])
+def archive_item(id: int):
+    archive(id)
+    return hx_redirect("/items")
 ```
 
 ## Next Steps
