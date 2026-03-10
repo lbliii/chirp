@@ -1,11 +1,11 @@
 ---
 title: Documentation
-description: Everything you need to know about Chirp
+description: Documentation for building HTMX-driven, server-rendered web apps with the Chirp Python web framework
 draft: false
 weight: 10
 lang: en
 type: doc
-keywords: [chirp, documentation, web framework, python]
+keywords: [chirp, python web framework, htmx, server-rendered, html fragments, streaming]
 category: overview
 
 cascade:
@@ -13,6 +13,10 @@ cascade:
 ---
 
 ## Learn Chirp
+
+Chirp is a Python web framework for HTMX, server-rendered UI, HTML fragments,
+streaming HTML, and Server-Sent Events. Start with quickstart and core concepts, then
+move into templates, routing, streaming, and production deployment.
 
 :::{cards}
 :columns: 2
@@ -82,6 +86,12 @@ TestClient, fragment assertions, SSE testing.
 Production deployment with `chirp run myapp:app --production` and Pounce.
 :::{/card}
 
+::::{card} htmx Patterns
+:icon: repeat
+:link: ./tutorials/htmx-patterns
+Search, inline edit, infinite scroll, and fragment-based interaction patterns.
+::::{/card}
+
 :::{/cards}
 
 ---
@@ -95,7 +105,7 @@ Production deployment with `chirp run myapp:app --production` and Pounce.
 :::{card} About
 :icon: info
 :link: ./about/
-Architecture, philosophy, comparisons, and thread safety.
+Architecture, philosophy, framework comparisons, and thread safety.
 :::{/card}
 
 :::{card} Tutorials

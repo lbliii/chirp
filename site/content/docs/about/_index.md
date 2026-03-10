@@ -1,12 +1,12 @@
 ---
 title: About
-description: Architecture, philosophy, comparisons, and thread safety
+description: Architecture, philosophy, framework comparisons, and thread-safety guidance for Chirp
 draft: false
 weight: 100
 lang: en
 type: doc
 tags: [about, architecture, philosophy]
-keywords: [architecture, philosophy, comparison, thread-safety, design]
+keywords: [python web framework, architecture, comparison, thread-safety, htmx]
 category: explanation
 icon: info
 
@@ -17,6 +17,9 @@ cascade:
 :::{cards}
 :columns: 2
 :gap: medium
+
+Chirp focuses on server-rendered UI, HTML fragments, and browser-native interaction.
+This section explains the framework's structure and where it fits.
 
 :::{card} Architecture
 :icon: box
@@ -36,7 +39,7 @@ The instincts that shape every decision.
 :icon: bar-chart
 :link: ./comparison
 :description: Chirp vs Flask vs FastAPI vs Django
-When to use what, and why Chirp exists.
+When to use what, and why Chirp exists as a framework for HTML over the wire.
 :::{/card}
 
 :::{card} Thread Safety

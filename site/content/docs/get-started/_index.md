@@ -1,12 +1,12 @@
 ---
 title: Get Started
-description: Install Chirp and build your first web application
+description: Install Chirp and build your first HTMX-friendly, server-rendered web application
 draft: false
 weight: 10
 lang: en
 type: doc
 tags: [getting-started, installation, quickstart]
-keywords: [install, setup, quickstart, web framework, hello world]
+keywords: [install, setup, quickstart, python web framework, htmx, server-rendered]
 category: onboarding
 icon: rocket
 

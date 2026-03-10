@@ -1,12 +1,12 @@
 ---
 title: Guides
-description: Best practices and patterns for building accessible, secure apps
+description: Best practices and patterns for building accessible, secure, server-rendered Chirp applications
 draft: false
 weight: 105
 lang: en
 type: doc
 tags: [guides, best-practices, accessibility]
-keywords: [guides, accessibility, wcag, best-practices]
+keywords: [guides, htmx, server-rendered, accessibility, best-practices]
 category: guide
 icon: book
 

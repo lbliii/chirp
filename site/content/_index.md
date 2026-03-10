@@ -1,12 +1,12 @@
 ---
 title: Chirp
-description: A Python web framework for the modern web platform
+description: A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events
 template: home.html
 weight: 100
 type: page
 draft: false
 lang: en
-keywords: [chirp, web framework, python, htmx, fragments, streaming, sse, free-threading]
+keywords: [chirp, python web framework, htmx, html over the wire, html fragments, server-rendered, streaming, sse]
 category: home
 
 # Hero configuration
@@ -24,11 +24,13 @@ cta_buttons:
 show_recent_posts: false
 ---
 
-## HTML Over the Wire
+## Python Web Framework for HTML Over the Wire
 
-**Fragments. Streaming. SSE. Free-threading native.**
+**HTMX. Fragments. Streaming. Server-Sent Events.**
 
-Chirp is a Python web framework built from scratch for the modern web platform. It serves HTML beautifully -- full pages, fragments, streams, and real-time events -- all through its built-in template engine, [kida](https://lbliii.github.io/kida).
+Chirp is a Python web framework built from scratch for HTML-over-the-wire
+applications. It serves full pages, fragments, streams, and real-time events through
+its built-in template engine, [kida](https://lbliii.github.io/kida).
 
 ```python
 from chirp import App, Template
@@ -44,7 +46,7 @@ app.run()
 
 ---
 
-## What's good about it
+## Why Use Chirp
 
 :::{cards}
 :columns: 2
@@ -52,17 +54,20 @@ app.run()
 
 :::{card} Fragment Rendering
 :icon: layers
-Render named template blocks independently. Full page on navigation, just the fragment on htmx requests. Same template, same data, different scope.
+Render named template blocks independently. Full page on navigation, just the fragment
+on htmx requests. Same template, same data, different scope.
 :::{/card}
 
 :::{card} Streaming HTML
 :icon: zap
-Send the page shell immediately, fill in content as data arrives. Progressive rendering over chunked transfer -- no loading spinners, no skeleton screens.
+Send the page shell first, then fill in content as data arrives. Progressive
+rendering over chunked transfer.
 :::{/card}
 
 :::{card} Server-Sent Events
 :icon: radio
-Push kida-rendered HTML fragments to the browser in real-time. Combined with htmx, this enables live UI updates with zero client-side JavaScript.
+Push kida-rendered HTML fragments to the browser in real time. Combined with htmx, this
+enables live UI updates with zero client-side JavaScript.
 :::{/card}
 
 :::{card} Typed Contracts
@@ -77,10 +82,19 @@ Designed for Python 3.14t from the first line. Frozen config, frozen requests, C
 
 :::{card} Kida Built In
 :icon: code
-Same author, no seam. Fragment rendering, streaming templates, and filter registration are first-class features -- not afterthoughts bolted on via extensions.
+Same author, no seam. Fragment rendering, streaming templates, and filter registration
+are first-class features.
 :::{/card}
 
 :::{/cards}
+
+## Common Use Cases
+
+- Building HTMX-driven apps without a SPA frontend
+- Serving server-rendered pages and HTML fragments from the same templates
+- Streaming HTML for dashboards, feeds, and AI responses
+- Delivering real-time updates with Server-Sent Events
+- Using browser-native UI features instead of framework-heavy client state
 
 ---
 

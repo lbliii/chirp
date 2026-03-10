@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://pypi.org/project/bengal-chirp/)
 
-**A Python web framework for HTML over the wire.**
+**A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events.**
 
 ```python
 from chirp import App
@@ -25,12 +25,20 @@ app.run()
 
 Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Use plain Kida templates, your own CSS, or optional companion packages like `chirp-ui`. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
 
-**What's good about it:**
+**Why people pick it:**
 
 - **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries. Most of what required a JS framework is now native HTML and CSS.
 - **HTML over the wire** — Serve full pages, template fragments, streaming HTML, and SSE. Built for htmx and the modern browser.
-- **Streaming HTML** — Send the page shell immediately and fill in content as data becomes available. No loading spinners, no skeleton screens.
+- **Streaming HTML** — Send the page shell first and fill in content as data becomes available. No loading spinners, no skeleton screens.
 - **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure.
+
+## Use Chirp For
+
+- **HTMX-driven web apps** — Server-rendered UI with fragment swaps and progressive enhancement
+- **Server-rendered applications** — Full pages plus partial updates from the same templates
+- **Streaming interfaces** — Progressive HTML delivery and token-by-token responses
+- **Real-time dashboards** — SSE-powered updates without WebSocket complexity
+- **Teams avoiding heavy frontend stacks** — HTML, CSS, templates, and browser-native features
 
 ---
 
@@ -84,6 +92,8 @@ chirp new myapp && cd myapp && python app.py
 
 | Feature | Description | Docs |
 |---------|-------------|------|
+| **HTMX Patterns** | Search, inline edit, infinite scroll, modal, and fragment workflows | [htmx Patterns →](https://lbliii.github.io/chirp/docs/tutorials/htmx-patterns/) |
+| **Comparison** | When Chirp fits compared with Flask, FastAPI, and Django | [When to Use Chirp →](https://lbliii.github.io/chirp/docs/about/comparison/) |
 | **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
 | **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/routing/filesystem-routing/) |
 | **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |

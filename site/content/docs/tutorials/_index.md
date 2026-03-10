@@ -1,12 +1,12 @@
 ---
 title: Tutorials
-description: Step-by-step guides for common patterns and migrations
+description: Step-by-step guides for common HTMX patterns, framework migrations, and Chirp workflows
 draft: false
 weight: 110
 lang: en
 type: doc
 tags: [tutorials, guides, patterns]
-keywords: [tutorials, flask, htmx, patterns, migration, guide]
+keywords: [tutorials, python web framework, flask migration, htmx, patterns, server-rendered]
 category: tutorial
 icon: graduation-cap
 
