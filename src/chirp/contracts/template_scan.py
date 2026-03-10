@@ -40,7 +40,11 @@ _LEGACY_ACTION_PATTERN = re.compile(r'\baction\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]
 
 def _is_static_url_candidate(url: str) -> bool:
     return not (
-        "{{" in url or "~" in url or "{%" in url or url.startswith(("#", "javascript:")) or "://" in url
+        "{{" in url
+        or "~" in url
+        or "{%" in url
+        or url.startswith(("#", "javascript:"))
+        or "://" in url
     )
 
 

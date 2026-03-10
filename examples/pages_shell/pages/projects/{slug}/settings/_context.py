@@ -13,7 +13,12 @@ def context(slug: str, project: dict[str, str]) -> dict:
         "shell_actions": ShellActions(
             primary=ShellActionZone(
                 items=(
-                    ShellAction(id="save", label="Save", href=f"/projects/{slug}/settings", variant="primary"),
+                    ShellAction(
+                        id="save",
+                        label="Save",
+                        href=f"/projects/{slug}/settings",
+                        variant="primary",
+                    ),
                     ShellAction(id="cancel", label="Cancel", href=f"/projects/{slug}"),
                 ),
                 mode="replace",

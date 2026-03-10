@@ -41,7 +41,7 @@ class TestPagesShell:
             assert "Project settings" in response.text
             # mode=replace: topbar has Save/Cancel only (no Deploy/Metrics from parent)
             html = response.text
-            topbar_end = html.find('chirpui-app-shell__topbar-end')
+            topbar_end = html.find("chirpui-app-shell__topbar-end")
             main_start = html.find('<main id="main"')
             if topbar_end != -1 and main_start != -1:
                 topbar_section = html[topbar_end:main_start]

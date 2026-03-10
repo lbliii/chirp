@@ -24,8 +24,8 @@ from .rules_sse import (
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
-    extract_legacy_action_contracts,
     extract_fragment_island_ids,
+    extract_legacy_action_contracts,
     extract_static_ids,
     extract_targets_from_source,
     extract_template_references,

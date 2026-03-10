@@ -250,7 +250,9 @@ def hx_redirect(
     Adds both ``Location`` and ``HX-Redirect`` so a normal browser follows the
     HTTP redirect while htmx performs a full-page navigation.
     """
-    response = Response(body=body).with_status(status).with_header("Location", url).with_hx_redirect(url)
+    response = (
+        Response(body=body).with_status(status).with_header("Location", url).with_hx_redirect(url)
+    )
     if headers:
         response = response.with_headers(headers)
     return response

@@ -6,7 +6,7 @@ Reproduces the dori layout regression. Run from chirp repo root:
 
 Compares:
 - prefer_regions: use meta.regions() when available (current fix)
-- combine: regions ∪ (blocks ending _oob that aren't regions)
+- combine: regions union (blocks ending _oob that aren't regions)
 """
 
 from pathlib import Path
@@ -17,8 +17,8 @@ from chirp.pages.types import LayoutChain, LayoutInfo
 from chirp.templating.composition import PageComposition
 from chirp.templating.kida_adapter import KidaAdapter
 from chirp.templating.render_plan import (
-    OOB_BLOCK_SUFFIX,
     CHIRPUI_OOB_BLOCKS,
+    OOB_BLOCK_SUFFIX,
     build_render_plan,
 )
 
@@ -42,7 +42,7 @@ def _oob_prefer_regions(adapter, template_name: str) -> set[str]:
 
 
 def _oob_combine(adapter, template_name: str) -> set[str]:
-    """Combine: regions ∪ (blocks ending _oob that aren't regions)."""
+    """Combine: regions union (blocks ending _oob that aren't regions)."""
     meta = adapter.template_metadata(template_name)
     if meta is None:
         return set()

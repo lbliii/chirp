@@ -29,6 +29,8 @@ from chirp.contracts.rules_swap import check_swap_safety as _check_swap_safety
 from chirp.contracts.rules_swap import collect_broad_targets as _collect_broad_targets
 from chirp.contracts.template_scan import (
     extract_legacy_action_contracts as _extract_legacy_action_contracts,
+)
+from chirp.contracts.template_scan import (
     extract_targets_from_source as _extract_targets_from_source,
 )
 from chirp.contracts.template_scan import (

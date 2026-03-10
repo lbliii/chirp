@@ -7,9 +7,8 @@ from kida import Environment, FileSystemLoader
 
 from chirp.http.request import Request
 from chirp.pages.types import LayoutChain, LayoutInfo
-from chirp.templating.composition import PageComposition
+from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.kida_adapter import KidaAdapter
-from chirp.templating.composition import RegionUpdate, ViewRef
 from chirp.templating.render_plan import (
     _oob_block_names,
     build_render_plan,
@@ -245,7 +244,7 @@ class TestFullPageOobLayoutComposition:
 
         Prefer-regions only suppresses {% region *_oob %}. A regular {% block foo_oob %}
         is not an OOB swap target — suppressing it would break layout structure.
-        Combine (regions ∪ blocks ending _oob) would incorrectly suppress it.
+        Combine (regions union blocks ending _oob) would incorrectly suppress it.
         """
         adapter = KidaAdapter(kida_env)
         layout_chain = LayoutChain(
