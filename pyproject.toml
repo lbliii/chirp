@@ -293,6 +293,7 @@ dist = { shell = "rm -rf dist/ && uv build && ls -la dist/", help = "Build distr
 
 # Benchmarks
 benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask benchmarks" }
+benchmark-mixed = { cmd = "python -m benchmarks.run_mixed", help = "Mixed workload (JSON + SSE) — verifies adaptive handoff" }
 
 # Cleanup
 clean.shell = """

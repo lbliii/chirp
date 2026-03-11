@@ -23,6 +23,15 @@ if TYPE_CHECKING:
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Middleware, Next
 
+# Deprecated: these constants moved from chirp.templating.render_plan.
+# Import from chirp.ext.chirp_ui if needed. Will be removed in the next major.
+CHIRPUI_BREADCRUMBS_TARGET = "chirpui-topbar-breadcrumbs"
+CHIRPUI_SIDEBAR_TARGET = "chirpui-sidebar-nav"
+CHIRPUI_DOCUMENT_TITLE_TARGET = "chirpui-document-title"
+BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
+SIDEBAR_OOB_BLOCK = "sidebar_oob"
+TITLE_OOB_BLOCK = "title_oob"
+
 
 class _ChirpUIStrictMiddleware(Middleware):
     """Middleware that sets chirp-ui strict mode per request for variant validation."""
@@ -66,3 +75,30 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
         pass
     strict_value = strict if strict is not None else app.config.debug
     app.add_middleware(_ChirpUIStrictMiddleware(strict_value))
+
+    app.register_oob_region(
+        "breadcrumbs_oob",
+        target_id="chirpui-topbar-breadcrumbs",
+        swap="innerHTML",
+        wrap=True,
+    )
+    app.register_oob_region(
+        "sidebar_oob",
+        target_id="chirpui-sidebar-nav",
+        swap="innerHTML",
+        wrap=True,
+    )
+    app.register_oob_region(
+        "title_oob",
+        target_id="chirpui-document-title",
+        swap="true",
+        wrap=False,
+    )
+
+    app.register_fragment_target("main", fragment_block="page_root")
+    app.register_fragment_target("page-root", fragment_block="page_root_inner")
+    app.register_fragment_target(
+        "page-content-inner",
+        fragment_block="page_content",
+        triggers_shell_update=False,
+    )

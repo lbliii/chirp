@@ -68,6 +68,9 @@ Both frameworks now offload sync handlers to a thread pool. Benchmarks use per-r
 - Compile handler dispatch metadata at freeze time (avoid `inspect.signature` per request) — **Done** (InvokePlan)
 - Fast JSON path (dict/list → bytes without str round-trip) — **Done** (fused path in sync_handler)
 - Lazy request parsing (query, cookies, request_id from scope) — **Done** (_LazyQueryParams, _LazyCookies in Request.from_asgi)
+- Middleware chain compiled once — **Done** (compile_middleware_chain, ASGIRuntime caches handler)
+- httptools as default parser — **Done** (Pounce main deps; C-accelerated HTTP/1.1 parsing)
+- CPU affinity (Linux) — **Done** (`--cpu-affinity` pins workers to cores; reduces cache thrashing)
 
 ---
 

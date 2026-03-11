@@ -27,6 +27,8 @@ from chirp.server.errors import handle_http_error, handle_internal_error
 from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
 from chirp.server.negotiation import negotiate
 from chirp.server.sender import send_response, send_streaming_response
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.registry import ToolRegistry
 
 
@@ -56,6 +58,8 @@ def create_request_handler(
     debug: bool,
     providers: dict[type, Callable[..., Any]] | None,
     kida_env: Environment | None,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request."""
     async def dispatch(req: Request) -> AnyResponse:
@@ -77,6 +81,8 @@ def create_request_handler(
             providers=providers,
             validate_blocks=debug,
             force_inline_sync=force_inline_sync_var.get(),
+            oob_registry=oob_registry,
+            fragment_target_registry=fragment_target_registry,
         )
 
     return compile_middleware_chain(middleware, dispatch)
@@ -99,6 +105,8 @@ async def handle_request(
     sse_retry_ms: int | None = None,
     sse_close_event: str | None = None,
     compiled_handler: Callable[[Request], Any] | None = None,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -141,6 +149,8 @@ async def handle_request(
                     providers=providers,
                     validate_blocks=debug,
                     force_inline_sync=force_inline_sync_var.get(),
+                    oob_registry=oob_registry,
+                    fragment_target_registry=fragment_target_registry,
                 )
 
             handler = compile_middleware_chain(middleware, dispatch)
@@ -149,9 +159,25 @@ async def handle_request(
         response = await handler(request)
 
     except HTTPError as exc:
-        response = await handle_http_error(exc, request, error_handlers, kida_env, debug)
+        response = await handle_http_error(
+            exc,
+            request,
+            error_handlers,
+            kida_env,
+            debug,
+            oob_registry=oob_registry,
+            fragment_target_registry=fragment_target_registry,
+        )
     except Exception as exc:
-        response = await handle_internal_error(exc, request, error_handlers, kida_env, debug)
+        response = await handle_internal_error(
+            exc,
+            request,
+            error_handlers,
+            kida_env,
+            debug,
+            oob_registry=oob_registry,
+            fragment_target_registry=fragment_target_registry,
+        )
     finally:
         g._reset()
         request_var.reset(token)
@@ -191,6 +217,8 @@ async def _invoke_handler(
     providers: dict[type, Callable[..., Any]] | None = None,
     validate_blocks: bool = False,
     force_inline_sync: bool = False,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -246,6 +274,8 @@ async def _invoke_handler(
         kida_env=kida_env,
         request=request,
         validate_blocks=validate_blocks,
+        oob_registry=oob_registry,
+        fragment_target_registry=fragment_target_registry,
     )
 
 

@@ -6,43 +6,24 @@ Pipeline: normalize_to_composition → build_render_plan → execute_render_plan
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+_log = logging.getLogger(__name__)
+
 from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
+from chirp.pages.types import LayoutChain
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
-
-# OOB region IDs for shell updates (breadcrumbs, sidebar, title) on boosted navigation
-CHIRPUI_BREADCRUMBS_TARGET = "chirpui-topbar-breadcrumbs"
-CHIRPUI_SIDEBAR_TARGET = "chirpui-sidebar-nav"
-CHIRPUI_DOCUMENT_TITLE_TARGET = "chirpui-document-title"
-BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
-SIDEBAR_OOB_BLOCK = "sidebar_oob"
-TITLE_OOB_BLOCK = "title_oob"
-
-# Convention: blocks whose names end with _oob are suppressed during full-page composition
-OOB_BLOCK_SUFFIX = "_oob"
-
-# ChirpUI shell OOB blocks — always suppressed on full-page to avoid orphaned fragments
-# (breadcrumbs, title, sidebar appear inside app_shell slots; OOB is for HTMX swaps only)
-CHIRPUI_OOB_BLOCKS: frozenset[str] = frozenset(
-    {BREADCRUMBS_OOB_BLOCK, TITLE_OOB_BLOCK, SIDEBAR_OOB_BLOCK}
-)
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.oob_registry import OOB_BLOCK_SUFFIX, OOBRegistry
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
-    from chirp.pages.types import LayoutChain
     from chirp.templating.adapter import TemplateAdapter
 
 
 type RenderIntent = str  # "full_page" | "page_fragment" | "local_fragment"
-
-# Block name → OOB target ID mapping (well-known ChirpUI shell regions)
-_OOB_TARGET_MAP: dict[str, str] = {
-    BREADCRUMBS_OOB_BLOCK: CHIRPUI_BREADCRUMBS_TARGET,
-    SIDEBAR_OOB_BLOCK: CHIRPUI_SIDEBAR_TARGET,
-    TITLE_OOB_BLOCK: CHIRPUI_DOCUMENT_TITLE_TARGET,
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,10 +42,6 @@ class LayoutContract:
 
     template_name: str
     oob_blocks: tuple[OOBBlockInfo, ...]
-
-
-# Module-level cache: template_name → LayoutContract (built once per template)
-_layout_contract_cache: dict[str, LayoutContract] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,11 +67,66 @@ class RenderedPlan:
     region_htmls: dict[str, str] = field(default_factory=dict)
 
 
-def _fragment_block_for_request(composition: PageComposition, request: Request | None) -> str:
+# Fallback when no fragment_target_registry: targets that expect fragment_block
+_CONTENT_ONLY_TARGETS: frozenset[str] = frozenset({"page-content-inner", "page-root"})
+
+
+def _resolve_fragment_block(
+    composition: PageComposition,
+    request: Request | None,
+    *,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
+) -> str:
+    """Resolve fragment block: explicit > registry > fallback."""
+    if composition.fragment_block is not None:
+        return composition.fragment_block
+    if request and request.htmx_target and fragment_target_registry:
+        config = fragment_target_registry.get(request.htmx_target)
+        if config is not None:
+            return config.fragment_block
+        _log.debug(
+            "Unregistered HX-Target %r; falling back to page_content. "
+            "Register with app.register_fragment_target() if this target expects a different block.",
+            request.htmx_target,
+        )
+    return composition.page_block or "page_content"
+
+
+def _fragment_block_for_request(
+    composition: PageComposition,
+    request: Request | None,
+    *,
+    layout_chain: LayoutChain | None = None,
+    layout_start_index: int = 0,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
+) -> str:
     """Choose block for htmx fragment response."""
-    if request is not None and request.is_boosted:
-        return composition.page_block or composition.fragment_block
-    return composition.fragment_block
+    if request is None or not request.is_boosted:
+        return _resolve_fragment_block(
+            composition, request, fragment_target_registry=fragment_target_registry
+        )
+    if layout_chain is None or layout_start_index >= len(layout_chain.layouts):
+        return composition.page_block or composition.fragment_block or _resolve_fragment_block(
+            composition, request, fragment_target_registry=fragment_target_registry
+        )
+    target_layout = layout_chain.layouts[layout_start_index]
+    target_id = target_layout.target
+    if fragment_target_registry is not None:
+        if fragment_target_registry.is_content_target(target_id):
+            config = fragment_target_registry.get(target_id)
+            if config is not None:
+                return config.fragment_block
+        return composition.page_block or _resolve_fragment_block(
+            composition, request, fragment_target_registry=fragment_target_registry
+        )
+    # Fallback: legacy hardcoded targets
+    if target_id in _CONTENT_ONLY_TARGETS:
+        return _resolve_fragment_block(
+            composition, request, fragment_target_registry=fragment_target_registry
+        )
+    return composition.page_block or _resolve_fragment_block(
+        composition, request, fragment_target_registry=fragment_target_registry
+    )
 
 
 def _should_render_page_block(request: Request | None) -> bool:
@@ -154,6 +186,7 @@ def build_render_plan(
     composition: PageComposition,
     *,
     request: Request | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> RenderPlan:
     """Build a render plan from composition and request headers."""
     from chirp.pages.shell_actions import (
@@ -171,19 +204,27 @@ def build_render_plan(
     # Determine intent and main block
     if not _should_render_page_block(request):
         intent: RenderIntent = "local_fragment"
-        block = composition.fragment_block
+        block = _resolve_fragment_block(
+            composition, request, fragment_target_registry=fragment_target_registry
+        )
         apply_layouts = False
         layout_start_index = 0
     elif is_fragment and not is_history_restore:
         intent = "page_fragment"
-        block = _fragment_block_for_request(composition, request)
         apply_layouts = layout_chain is not None and bool(layout_chain.layouts)
         layout_start_index = _compute_layout_start_index(
             layout_chain, htmx_target, is_history_restore
         )
+        block = _fragment_block_for_request(
+            composition,
+            request,
+            layout_chain=layout_chain,
+            layout_start_index=layout_start_index,
+            fragment_target_registry=fragment_target_registry,
+        )
     else:
         intent = "full_page"
-        block = composition.page_block or composition.fragment_block
+        block = composition.page_block or composition.fragment_block or "page_root"
         apply_layouts = layout_chain is not None and bool(layout_chain.layouts)
         layout_start_index = 0
 
@@ -198,9 +239,20 @@ def build_render_plan(
     # Build region updates from composition.regions + shell_actions in context
     region_updates: list[RegionUpdate] = list(composition.regions)
 
-    # Add shell_actions as RegionUpdate when applicable (boosted fragment).
+    # Add shell_actions as RegionUpdate when applicable (page navigation fragment).
+    # Send for boosted nav (sidebar) or when target has triggers_shell_update=True.
     # Always append — when actions is None, we send empty OOB to clear shell.
-    if request and request.is_fragment and not request.is_history_restore and request.is_boosted:
+    def _target_triggers_shell_update() -> bool:
+        if not request or not request.is_fragment or request.is_history_restore:
+            return False
+        if request.is_boosted:
+            return True
+        if not request.htmx_target or not fragment_target_registry:
+            return False
+        config = fragment_target_registry.get(request.htmx_target)
+        return config is not None and config.triggers_shell_update
+
+    if _target_triggers_shell_update():
         try:
             actions = normalize_shell_actions(composition.context.get(SHELL_ACTIONS_CONTEXT_KEY))
         except TypeError:
@@ -271,12 +323,19 @@ def _oob_block_names(adapter: TemplateAdapter, template_name: str) -> set[str]:
     return {b for b in blocks if b.endswith(OOB_BLOCK_SUFFIX)}
 
 
-def build_layout_contract(adapter: TemplateAdapter, template_name: str) -> LayoutContract:
+def build_layout_contract(
+    adapter: TemplateAdapter,
+    template_name: str,
+    *,
+    oob_registry: OOBRegistry | None = None,
+) -> LayoutContract:
     """Build a LayoutContract from Kida's AST metadata for a layout template.
 
     Discovers all *_oob blocks and extracts their cache_scope and depends_on
-    from BlockMetadata. Falls back to well-known ChirpUI OOB blocks when
-    template_metadata is unavailable.
+    from BlockMetadata. Target IDs resolve through the oob_registry when
+    available, falling back to the ``block_name.removesuffix("_oob")`` convention.
+    When template_metadata is unavailable and a registry is present, registered
+    blocks are used as the fallback set.
     """
     meta = adapter.template_metadata(template_name)
     oob_blocks: list[OOBBlockInfo] = []
@@ -286,7 +345,10 @@ def build_layout_contract(adapter: TemplateAdapter, template_name: str) -> Layou
         for block_name, block_meta in blocks.items():
             if not block_name.endswith(OOB_BLOCK_SUFFIX):
                 continue
-            target_id = _OOB_TARGET_MAP.get(block_name, block_name.removesuffix(OOB_BLOCK_SUFFIX))
+            if oob_registry is not None:
+                target_id = oob_registry.resolve_target(block_name)
+            else:
+                target_id = block_name.removesuffix(OOB_BLOCK_SUFFIX)
             oob_blocks.append(
                 OOBBlockInfo(
                     block_name=block_name,
@@ -295,27 +357,18 @@ def build_layout_contract(adapter: TemplateAdapter, template_name: str) -> Layou
                     depends_on=frozenset(getattr(block_meta, "depends_on", ())),
                 )
             )
-    else:
-        for block_name, target_id in _OOB_TARGET_MAP.items():
+    elif oob_registry is not None:
+        for block_name in oob_registry.registered_blocks:
             oob_blocks.append(
                 OOBBlockInfo(
                     block_name=block_name,
-                    target_id=target_id,
+                    target_id=oob_registry.resolve_target(block_name),
                     cache_scope="unknown",
                     depends_on=frozenset(),
                 )
             )
 
     return LayoutContract(template_name=template_name, oob_blocks=tuple(oob_blocks))
-
-
-def _get_or_build_contract(adapter: TemplateAdapter, template_name: str) -> LayoutContract:
-    """Return cached LayoutContract, building on first access."""
-    contract = _layout_contract_cache.get(template_name)
-    if contract is None:
-        contract = build_layout_contract(adapter, template_name)
-        _layout_contract_cache[template_name] = contract
-    return contract
 
 
 def _validate_view_ref(adapter: TemplateAdapter, view: ViewRef) -> None:
@@ -340,6 +393,7 @@ def execute_render_plan(
     *,
     adapter: TemplateAdapter,
     validate_blocks: bool = False,
+    oob_registry: OOBRegistry | None = None,
 ) -> RenderedPlan:
     """Execute a render plan using the template adapter.
 
@@ -373,10 +427,9 @@ def execute_render_plan(
     # Apply layout chain if needed
     if plan.apply_layouts and plan.layout_chain is not None:
         layouts = plan.layout_chain.layouts[plan.layout_start_index :]
-        # Collect *_oob blocks from ALL layouts (child layouts extend root, which has the blocks)
-        # Always include ChirpUI OOB blocks as fallback — template_metadata may fail or
-        # return empty; suppressing unknown blocks is safe (no-op if layout has none)
-        oob_blocks_to_suppress: set[str] = set(CHIRPUI_OOB_BLOCKS)
+        oob_blocks_to_suppress: set[str] = set()
+        if oob_registry is not None:
+            oob_blocks_to_suppress |= set(oob_registry.registered_blocks)
         if plan.intent == "full_page":
             for layout_info in layouts:
                 oob_blocks_to_suppress |= _oob_block_names(adapter, layout_info.template_name)
@@ -395,13 +448,16 @@ def execute_render_plan(
     region_updates_list: list[RegionUpdate] = list(plan.region_updates)
     if plan.intent == "page_fragment" and plan.layout_chain and plan.layout_chain.layouts:
         root_layout = plan.layout_chain.layouts[0]
-        contract = _get_or_build_contract(adapter, root_layout.template_name)
+        if oob_registry is not None:
+            contract = oob_registry.get_or_build_contract(adapter, root_layout.template_name)
+        else:
+            contract = build_layout_contract(adapter, root_layout.template_name)
         layout_ctx = plan.layout_context
 
         for oob in contract.oob_blocks:
             if oob.cache_scope == "site":
                 continue
-            if oob.block_name == TITLE_OOB_BLOCK and "page_title" not in layout_ctx:
+            if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
                 continue
             region_updates_list.append(
                 RegionUpdate(
@@ -434,20 +490,22 @@ def execute_render_plan(
     return RenderedPlan(main_html=main_html, region_htmls=region_htmls)
 
 
-def serialize_rendered_plan(rendered: RenderedPlan) -> str:
+def serialize_rendered_plan(
+    rendered: RenderedPlan,
+    *,
+    oob_registry: OOBRegistry | None = None,
+) -> str:
     """Serialize rendered plan to final HTML with OOB fragments."""
     parts: list[str] = [rendered.main_html]
-    # innerHTML: replace content inside existing element. outerHTML (true): replace element.
-    inner_html_regions = {
-        SHELL_ACTIONS_TARGET,
-        CHIRPUI_BREADCRUMBS_TARGET,
-        CHIRPUI_SIDEBAR_TARGET,
-    }
     for region_id, html in rendered.region_htmls.items():
-        if region_id == CHIRPUI_DOCUMENT_TITLE_TARGET:
-            # title_oob outputs full <title id="..." hx-swap-oob="true">; no div wrapper
-            parts.append(html)
+        if oob_registry is not None:
+            swap, wrap = oob_registry.resolve_serialization(region_id)
+        elif region_id == SHELL_ACTIONS_TARGET:
+            swap, wrap = "innerHTML", True
         else:
-            swap = "innerHTML" if region_id in inner_html_regions else "true"
+            swap, wrap = "true", True
+        if wrap:
             parts.append(f'<div id="{region_id}" hx-swap-oob="{swap}">{html}</div>')
+        else:
+            parts.append(html)
     return "\n".join(parts)

@@ -40,6 +40,8 @@ class ASGIRuntime:
                 debug=self._config.debug,
                 providers=self._mutable.providers or None,
                 kida_env=self._runtime.kida_env,
+                oob_registry=self._runtime.oob_registry,
+                fragment_target_registry=self._runtime.fragment_target_registry,
             )
         return self._compiled_handler
 
@@ -73,4 +75,6 @@ class ASGIRuntime:
             sse_retry_ms=self._config.sse_retry_ms,
             sse_close_event=self._config.sse_close_event,
             compiled_handler=self._get_compiled_handler(),
+            oob_registry=self._runtime.oob_registry,
+            fragment_target_registry=self._runtime.fragment_target_registry,
         )

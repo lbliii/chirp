@@ -38,6 +38,7 @@ from typing import Any
 import anyio
 from kida import Environment
 
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Suspense
 
 logger = logging.getLogger("chirp.suspense")
@@ -48,13 +49,21 @@ logger = logging.getLogger("chirp.suspense")
 # ---------------------------------------------------------------------------
 
 
-def format_oob_htmx(block_html: str, target_id: str) -> str:
+def format_oob_htmx(
+    block_html: str,
+    target_id: str,
+    swap: str = "true",
+    *,
+    wrap: bool = True,
+) -> str:
     """Wrap rendered block HTML as an htmx OOB swap element.
 
     htmx scans the response body for elements with ``hx-swap-oob``
     and swaps them into the page by ``id``.
     """
-    return f'<div id="{target_id}" hx-swap-oob="true">{block_html}</div>'
+    if not wrap:
+        return block_html
+    return f'<div id="{target_id}" hx-swap-oob="{swap}">{block_html}</div>'
 
 
 def format_oob_script(block_html: str, target_id: str) -> str:
@@ -136,6 +145,7 @@ async def render_suspense(
     layout_chain: Any = None,
     layout_context: dict[str, Any] | None = None,
     request: Any = None,
+    oob_registry: OOBRegistry | None = None,
 ) -> AsyncIterator[str]:
     """Render a ``Suspense`` return value as an async chunk stream.
 
@@ -156,7 +166,7 @@ async def render_suspense(
     context = suspense.context
     template_name = suspense.template_name
     defer_map = suspense.defer_map
-    formatter = format_oob_htmx if is_htmx else format_oob_script
+    use_htmx_fmt = is_htmx
 
     layout_ctx = layout_context if layout_context is not None else {}
 
@@ -237,7 +247,14 @@ async def render_suspense(
         target_id = defer_map.get(block_name, block_name)
         try:
             block_html = template.render_block(block_name, full_ctx)
-            yield formatter(block_html, target_id)
+            if use_htmx_fmt:
+                if oob_registry is not None:
+                    swap, wrap = oob_registry.resolve_serialization(target_id)
+                else:
+                    swap, wrap = "true", True
+                yield format_oob_htmx(block_html, target_id, swap, wrap=wrap)
+            else:
+                yield format_oob_script(block_html, target_id)
         except Exception:
             logger.exception(
                 "Suspense: error rendering deferred block %r for %s",

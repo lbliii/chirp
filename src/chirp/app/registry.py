@@ -146,6 +146,7 @@ class AppRegistry:
                 methods=list(page_route.methods),
                 layout_chain=page_route.layout_chain,
                 context_providers=page_route.context_providers,
+                template_name=page_route.template_name,
             )
 
     def register_page_handler(
@@ -156,6 +157,7 @@ class AppRegistry:
         methods: list[str],
         layout_chain: Any,
         context_providers: tuple[Any, ...],
+        template_name: str | None = None,
     ) -> None:
         from chirp._internal.invoke import invoke
         from chirp.pages.context import build_cascade_context
@@ -164,6 +166,7 @@ class AppRegistry:
         _handler = handler
         _chain = layout_chain
         _providers = context_providers
+        _template = template_name
         _service_providers = self._state.providers
 
         async def page_wrapper(request: Request) -> Any:
@@ -172,7 +175,14 @@ class AppRegistry:
             )
             kwargs = await resolve_kwargs(_handler, request, cascade_ctx, _service_providers)
             result = await invoke(_handler, **kwargs)
-            return upgrade_result(result, cascade_ctx, _chain, _providers, request=request)
+            return upgrade_result(
+                result,
+                cascade_ctx,
+                _chain,
+                _providers,
+                request=request,
+                template_name=_template,
+            )
 
         self._state.pending_routes.append(
             PendingRoute(url_path, page_wrapper, methods, name=None, referenced=False)

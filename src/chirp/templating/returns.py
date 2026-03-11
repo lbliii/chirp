@@ -90,6 +90,7 @@ class Fragment:
     template_name: str
     block_name: str
     target: str | None = None
+    swap: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
     def __init__(
@@ -99,11 +100,13 @@ class Fragment:
         /,
         *,
         target: str | None = None,
+        swap: str | None = None,
         **context: Any,
     ) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "target", target)
+        object.__setattr__(self, "swap", swap)
         object.__setattr__(self, "context", context)
 
 

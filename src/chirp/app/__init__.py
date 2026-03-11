@@ -243,6 +243,50 @@ class App:
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.error(code_or_exception)
 
+    def register_oob_region(
+        self,
+        block_name: str,
+        *,
+        target_id: str,
+        swap: str = "innerHTML",
+        wrap: bool = True,
+    ) -> None:
+        """Register an OOB region for automatic layout-contract discovery.
+
+        Call during setup (before app.run()). The block_name must match a
+        ``{% region <block_name>(...) %}`` in your layout template.
+        """
+        from chirp.templating.oob_registry import OOBRegionConfig
+
+        self._check_not_frozen()
+        self._mutable_state.oob_registry.register(
+            block_name,
+            OOBRegionConfig(target_id=target_id, swap=swap, wrap=wrap),
+        )
+
+    def register_fragment_target(
+        self,
+        target_id: str,
+        *,
+        fragment_block: str,
+        triggers_shell_update: bool = True,
+    ) -> None:
+        """Register a fragment target for HTMX content-region block selection.
+
+        When HX-Target matches target_id (e.g. ``page-root``), Chirp uses
+        fragment_block instead of composition.page_block. Call during setup.
+
+        triggers_shell_update: When True (default), swapping this target triggers
+            shell_actions OOB (topbar, breadcrumbs, sidebar). Use False for narrow
+            content swaps (e.g. page-content-inner) that should not update the shell.
+        """
+        self._check_not_frozen()
+        self._mutable_state.fragment_target_registry.register(
+            target_id,
+            fragment_block=fragment_block,
+            triggers_shell_update=triggers_shell_update,
+        )
+
     def add_middleware(self, middleware: object) -> None:
         self._registry.add_middleware(middleware)
 

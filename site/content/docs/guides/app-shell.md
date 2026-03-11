@@ -279,8 +279,14 @@ When using the `app_shell()` macro (regions-based layouts), pass it explicitly:
 ### OOB Mechanism
 
 Chirp's render plan adds shell actions as an OOB fragment when serving boosted
-navigation requests. The topbar updates automatically on each page change — no
-client-side logic required. See `render_plan.py` for the implementation.
+navigation requests or when the HTMX target has `triggers_shell_update=True`
+(e.g. tab clicks targeting `#page-root`). The topbar updates automatically on
+each page change — no client-side logic required.
+
+`use_chirp_ui()` registers `main` and `page-root` with `triggers_shell_update=True`,
+and `page-content-inner` with `triggers_shell_update=False` so narrow swaps
+don't update the shell. Custom targets: `app.register_fragment_target("id",
+fragment_block="...", triggers_shell_update=True)`.
 
 ### Reference
 

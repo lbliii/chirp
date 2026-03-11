@@ -9,6 +9,8 @@ from kida import Environment
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.middleware.protocol import Middleware
 from chirp.routing.router import Router
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry
 
@@ -63,6 +65,10 @@ class MutableAppState:
     migrations_dir: str | None = None
     custom_kida_env: Environment | None = None
     tool_events: ToolEventBus = field(default_factory=ToolEventBus)
+    oob_registry: OOBRegistry = field(default_factory=OOBRegistry)
+    fragment_target_registry: FragmentTargetRegistry = field(
+        default_factory=FragmentTargetRegistry
+    )
 
 
 @dataclass(slots=True)
@@ -75,6 +81,8 @@ class RuntimeAppState:
     middleware: tuple[Callable[..., Any], ...] = ()
     kida_env: Environment | None = None
     tool_registry: ToolRegistry | None = None
+    oob_registry: OOBRegistry | None = None
+    fragment_target_registry: FragmentTargetRegistry | None = None
 
 
 @dataclass(frozen=True, slots=True)

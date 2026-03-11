@@ -163,6 +163,20 @@ class AppCompiler:
             [(t.name, t.description, t.handler) for t in self._mutable.pending_tools],
             self._mutable.tool_events,
         )
+        from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
+        from chirp.templating.oob_registry import OOBRegionConfig
+
+        if self._mutable.oob_registry.get("shell_actions_oob") is None:
+            self._mutable.oob_registry.register(
+                "shell_actions_oob",
+                OOBRegionConfig(target_id=SHELL_ACTIONS_TARGET, swap="innerHTML", wrap=True),
+            )
+        self._mutable.oob_registry.freeze()
+        self._runtime.oob_registry = self._mutable.oob_registry
+
+        self._mutable.fragment_target_registry.freeze()
+        self._runtime.fragment_target_registry = self._mutable.fragment_target_registry
+
         self._runtime.frozen = True
 
         sync_runtime_aliases()

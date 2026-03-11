@@ -48,6 +48,20 @@ def main() -> None:
         [sys.executable, "-m", "benchmarks.run", "chirp-uvicorn"],
         cwd=".",
     )
+    print("\n" + "=" * 60)
+    print("  5. Chirp+Pounce sync mode (worker_mode=sync)")
+    print("=" * 60)
+    subprocess.run(
+        [sys.executable, "-m", "benchmarks.run", "chirp-sync"],
+        cwd=".",
+    )
+    print("\n" + "=" * 60)
+    print("  6. Chirp+Pounce async mode (worker_mode=async)")
+    print("=" * 60)
+    subprocess.run(
+        [sys.executable, "-m", "benchmarks.run", "chirp-async"],
+        cwd=".",
+    )
 
     print("\n" + "=" * 60)
     print("  Experiments complete. Compare req/s across runs.")
