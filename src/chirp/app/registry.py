@@ -162,6 +162,7 @@ class AppRegistry:
                 meta_provider=page_route.meta_provider,
                 actions=page_route.actions,
                 viewmodel_provider=page_route.viewmodel_provider,
+                kind=page_route.kind,
             )
 
     def register_page_handler(
@@ -177,15 +178,18 @@ class AppRegistry:
         meta_provider: Any = None,
         actions: tuple[Any, ...] = (),
         viewmodel_provider: Any = None,
+        kind: str = "page",
     ) -> None:
         from chirp._internal.invoke import invoke
         from chirp.pages.actions import dispatch_action
         from chirp.pages.context import build_cascade_context
+        from chirp.pages.debug import build_route_debug_info, set_route_debug_metadata
         from chirp.pages.resolve import resolve_kwargs, upgrade_result
         from chirp.pages.sections import resolve_section_context
         from chirp.pages.shell_context import build_shell_context, resolve_meta
 
         _handler = handler
+        _kind = kind
         _chain = layout_chain
         _providers = context_providers
         _template = template_name
@@ -210,6 +214,20 @@ class AppRegistry:
             shell_ctx = build_shell_context(
                 request, meta_resolved, section_ctx, cascade_ctx
             )
+            route_debug = build_route_debug_info(
+                route_kind=_kind,
+                template_name=_template,
+                meta=_meta,
+                meta_provider=_meta_provider,
+                context_providers=_providers,
+                layout_chain=_chain,
+                actions=_actions,
+                viewmodel_provider=_viewmodel_provider,
+                meta_resolved=meta_resolved,
+                section_ctx=section_ctx,
+                shell_ctx=shell_ctx,
+            )
+            set_route_debug_metadata(request, route_debug)
             base_ctx = {**cascade_ctx, **section_ctx, **shell_ctx}
             viewmodel_ctx = {}
             if _viewmodel_provider:
