@@ -17,6 +17,12 @@ from .rules_htmx import (
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
+from .rules_page_shell import check_page_shell_contracts
+from .rules_route_contract import (
+    check_route_file_consistency,
+    check_section_bindings,
+    check_shell_mode_blocks,
+)
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,
@@ -55,8 +61,13 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         kida_env=app._kida_env,
         layout_chains=getattr(app, "_discovered_layout_chains", []),
         page_route_paths=getattr(app, "_page_route_paths", set()),
+        page_leaf_templates=getattr(app, "_page_leaf_templates", set()),
         page_templates=getattr(app, "_page_templates", set()),
+        fragment_target_registry=getattr(app._mutable_state, "fragment_target_registry"),
         islands_contract_strict=app.config.islands_contract_strict,
+        sections=getattr(app._mutable_state, "sections", {}),
+        route_metas=getattr(app._mutable_state, "route_metas", {}),
+        route_templates=getattr(app._mutable_state, "route_templates", {}),
     )
 
 
@@ -241,6 +252,27 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
         result.issues.extend(check_layout_chains(snapshot.layout_chains, template_sources))
+        result.issues.extend(
+            check_page_shell_contracts(
+                snapshot.page_leaf_templates,
+                snapshot.fragment_target_registry,
+                kida_env,
+            )
+        )
+        result.issues.extend(
+            check_section_bindings(snapshot.route_metas, snapshot.sections)
+        )
+        result.issues.extend(
+            check_shell_mode_blocks(
+                snapshot.route_metas,
+                snapshot.route_templates,
+                snapshot.fragment_target_registry,
+                kida_env,
+            )
+        )
+        result.issues.extend(
+            check_route_file_consistency(snapshot.route_metas, snapshot.page_route_paths)
+        )
         result.issues.extend(
             check_island_mounts(template_sources, strict=snapshot.islands_contract_strict)
         )

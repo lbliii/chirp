@@ -6,7 +6,55 @@ providers, and page routes.  Built once at app startup during discovery.
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+type RouteKind = Literal["page", "detail", "action", "redirect", "composition"]
+
+
+@dataclass(frozen=True, slots=True)
+class RouteMeta:
+    """Route metadata from ``_meta.py``.
+
+    All fields optional. Static META or meta() callable provides values.
+    """
+
+    title: str | None = None
+    section: str | None = None
+    breadcrumb_label: str | None = None
+    shell_mode: str | None = None
+    auth: str | None = None
+    cache: str | None = None
+    tags: tuple[str, ...] = ()
+
+
+type MetaProvider = Callable[..., RouteMeta | dict[str, Any] | Awaitable[RouteMeta | dict[str, Any]]]
+
+
+@dataclass(frozen=True, slots=True)
+class TabItem:
+    """A tab item for section navigation."""
+
+    label: str
+    href: str
+
+
+@dataclass(frozen=True, slots=True)
+class ActionInfo:
+    """A named action from ``_actions.py``."""
+
+    name: str
+    func: Callable[..., Any]
+
+
+@dataclass(frozen=True, slots=True)
+class Section:
+    """A named section with tab items and breadcrumb prefix."""
+
+    id: str
+    label: str
+    tab_items: tuple[TabItem, ...] = ()
+    breadcrumb_prefix: tuple[dict[str, str], ...] = ()
+    active_prefixes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,3 +154,8 @@ class PageRoute:
     context_providers: tuple[ContextProvider, ...] = ()
     template_name: str | None = None
     name: str | None = None
+    meta: RouteMeta | None = None
+    meta_provider: MetaProvider | None = None
+    actions: tuple[ActionInfo, ...] = ()
+    viewmodel_provider: Callable[..., Any] | None = None
+    kind: RouteKind = "page"

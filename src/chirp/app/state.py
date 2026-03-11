@@ -8,6 +8,7 @@ from kida import Environment
 
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.middleware.protocol import Middleware
+from chirp.pages.types import RouteMeta, Section
 from chirp.routing.router import Router
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
@@ -57,6 +58,7 @@ class MutableAppState:
     discovered_layout_chains: list[Any] = field(default_factory=list)
     lazy_pages_dir: str | None = None
     page_route_paths: set[str] = field(default_factory=set)
+    page_leaf_templates: set[str] = field(default_factory=set)
     page_templates: set[str] = field(default_factory=set)
     pending_domains: list[object] = field(default_factory=list)
     providers: dict[type, Callable[..., Any]] = field(default_factory=dict)
@@ -69,6 +71,9 @@ class MutableAppState:
     fragment_target_registry: FragmentTargetRegistry = field(
         default_factory=FragmentTargetRegistry
     )
+    sections: dict[str, Section] = field(default_factory=dict)
+    route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
+    route_templates: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -93,5 +98,10 @@ class ContractCheckSnapshot:
     kida_env: Environment | None
     layout_chains: list[Any]
     page_route_paths: set[str]
+    page_leaf_templates: set[str]
     page_templates: set[str]
+    fragment_target_registry: FragmentTargetRegistry
     islands_contract_strict: bool
+    sections: dict[str, Section] = field(default_factory=dict)
+    route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
+    route_templates: dict[str, str] = field(default_factory=dict)

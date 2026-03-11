@@ -20,7 +20,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo, PageRoute
+from chirp.pages.actions import load_actions
+from chirp.pages.types import (
+    ActionInfo,
+    ContextProvider,
+    LayoutChain,
+    LayoutInfo,
+    PageRoute,
+    RouteMeta,
+)
 
 # HTTP method names recognised as handler functions
 _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
@@ -101,6 +109,25 @@ def _walk_directory(
         if provider is not None:
             current_providers.append(provider)
 
+    # Check for _meta.py at this level (not inherited by subdirectories)
+    meta_file = directory / "_meta.py"
+    route_meta: RouteMeta | None = None
+    meta_provider = None
+    if meta_file.is_file():
+        route_meta, meta_provider = _load_meta(meta_file, root)
+
+    # Check for _actions.py at this level
+    actions_file = directory / "_actions.py"
+    route_actions: tuple[ActionInfo, ...] = ()
+    if actions_file.is_file():
+        route_actions = _load_actions(actions_file, root)
+
+    # Check for _viewmodel.py at this level
+    viewmodel_file = directory / "_viewmodel.py"
+    viewmodel_provider = None
+    if viewmodel_file.is_file():
+        viewmodel_provider = _load_viewmodel(viewmodel_file, root)
+
     # Build the layout chain and provider tuple for routes at this level
     layout_chain = LayoutChain(tuple(current_layouts))
     provider_tuple = tuple(current_providers)
@@ -121,6 +148,10 @@ def _walk_directory(
             layout_chain=layout_chain,
             context_providers=provider_tuple,
             routes=routes,
+            route_meta=route_meta,
+            meta_provider=meta_provider,
+            actions=route_actions,
+            viewmodel_provider=viewmodel_provider,
         )
 
     # Recurse into subdirectories
@@ -145,6 +176,15 @@ def _walk_directory(
         )
 
 
+def _infer_route_kind(*, has_template: bool, is_param_dir: bool) -> str:
+    """Infer route kind from file combination. Informational only."""
+    if not has_template:
+        return "action"
+    if is_param_dir:
+        return "detail"
+    return "page"
+
+
 def _parse_layout_target(layout_file: Path) -> str:
     """Extract the target element ID from a layout template.
 
@@ -156,6 +196,123 @@ def _parse_layout_target(layout_file: Path) -> str:
     if match:
         return match.group(1)
     return "body"
+
+
+def _load_viewmodel(viewmodel_file: Path, root: Path) -> Any:
+    """Load viewmodel() function from _viewmodel.py."""
+    try:
+        rel = viewmodel_file.parent.relative_to(root)
+        path_slug = (
+            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
+        )
+    except ValueError:
+        path_slug = "root"
+    module_name = f"_chirp_vm_{path_slug}"
+
+    spec = importlib.util.spec_from_file_location(module_name, viewmodel_file)
+    if spec is None or spec.loader is None:
+        return None
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+
+    func = getattr(module, "viewmodel", None)
+    if func is None or not callable(func):
+        return None
+    return func
+
+
+def _load_actions(actions_file: Path, root: Path) -> tuple[ActionInfo, ...]:
+    """Load @action decorated functions from _actions.py."""
+    try:
+        rel = actions_file.parent.relative_to(root)
+        path_slug = (
+            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
+        )
+    except ValueError:
+        path_slug = "root"
+    module_name = f"_chirp_actions_{path_slug}"
+
+    spec = importlib.util.spec_from_file_location(module_name, actions_file)
+    if spec is None or spec.loader is None:
+        return ()
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+
+    return load_actions(module)
+
+
+def _load_meta(
+    meta_file: Path, root: Path
+) -> tuple[RouteMeta | None, Any]:
+    """Load RouteMeta from a _meta.py file.
+
+    Checks for META constant first, then meta() callable.
+    Returns (meta, meta_provider) — one will be set, the other None.
+    Raises ValueError if _meta.py has neither META nor meta().
+    """
+    try:
+        rel = meta_file.parent.relative_to(root)
+        path_slug = (
+            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
+        )
+    except ValueError:
+        path_slug = "root"
+    module_name = f"_chirp_meta_{path_slug}"
+
+    spec = importlib.util.spec_from_file_location(module_name, meta_file)
+    if spec is None or spec.loader is None:
+        msg = f"Cannot load _meta.py: {meta_file}"
+        raise ValueError(msg)
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+
+    static_meta = getattr(module, "META", None)
+    meta_func = getattr(module, "meta", None)
+
+    if static_meta is not None:
+        if isinstance(static_meta, RouteMeta):
+            return (static_meta, None)
+        if isinstance(static_meta, dict):
+            return (_dict_to_route_meta(static_meta), None)
+        msg = f"_meta.py META must be RouteMeta or dict, got {type(static_meta).__name__}"
+        raise ValueError(msg)
+
+    if meta_func is not None and callable(meta_func):
+        return (None, meta_func)
+
+    msg = f"_meta.py at {meta_file} must define META or meta()"
+    raise ValueError(msg)
+
+
+def _dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
+    """Convert dict to RouteMeta, filling only provided keys."""
+    return RouteMeta(
+        title=d.get("title"),
+        section=d.get("section"),
+        breadcrumb_label=d.get("breadcrumb_label"),
+        shell_mode=d.get("shell_mode"),
+        auth=d.get("auth"),
+        cache=d.get("cache"),
+        tags=tuple(d.get("tags", ())) if isinstance(d.get("tags"), (list, tuple)) else (),
+    )
 
 
 def _load_context_provider(context_file: Path, root: Path, depth: int) -> ContextProvider | None:
@@ -204,6 +361,10 @@ def _process_route_file(
     layout_chain: LayoutChain,
     context_providers: tuple[ContextProvider, ...],
     routes: list[PageRoute],
+    route_meta: RouteMeta | None = None,
+    meta_provider: Any = None,
+    actions: tuple[ActionInfo, ...] = (),
+    viewmodel_provider: Any = None,
 ) -> None:
     """Load a route .py file and extract handler functions.
 
@@ -224,6 +385,12 @@ def _process_route_file(
     except Exception:
         sys.modules.pop(module_name, None)
         raise
+
+    # Infer route kind
+    sibling_html = file.with_suffix(".html")
+    is_param_dir = any(_PARAM_DIR_RE.match(p) for p in url_parts)
+    has_template = sibling_html.is_file()
+    route_kind = _infer_route_kind(has_template=has_template, is_param_dir=is_param_dir)
 
     # Determine URL path
     if file.stem == "page":
@@ -251,10 +418,7 @@ def _process_route_file(
 
     # Check for sibling template (same stem, .html extension).
     # Convention: page.py renders page.html in the same directory.
-    sibling_html = file.with_suffix(".html")
-    template_name: str | None = None
-    if sibling_html.is_file():
-        template_name = str(sibling_html.relative_to(root))
+    template_name = str(sibling_html.relative_to(root)) if sibling_html.is_file() else None
 
     # Register each handler
     for method, func in found_handlers.items():
@@ -266,5 +430,10 @@ def _process_route_file(
             context_providers=context_providers,
             template_name=template_name,
             name=None,
+            meta=route_meta,
+            meta_provider=meta_provider,
+            actions=actions,
+            viewmodel_provider=viewmodel_provider,
+            kind=route_kind,
         )
         routes.append(route)

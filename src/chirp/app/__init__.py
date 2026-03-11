@@ -9,6 +9,8 @@ from kida import Environment
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.errors import ConfigurationError
+from chirp.pages.types import Section
+from chirp.templating.fragment_target_registry import PageShellContract
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import Fragment, InlineTemplate, Template
 
@@ -62,6 +64,7 @@ class App:
         "_migrations_dir",
         "_mutable_state",
         "_page_route_paths",
+        "_page_leaf_templates",
         "_page_templates",
         "_pending_domains",
         "_pending_routes",
@@ -138,6 +141,7 @@ class App:
         self._discovered_layout_chains = self._mutable_state.discovered_layout_chains
         self._lazy_pages_dir = self._mutable_state.lazy_pages_dir
         self._page_route_paths = self._mutable_state.page_route_paths
+        self._page_leaf_templates = self._mutable_state.page_leaf_templates
         self._page_templates = self._mutable_state.page_templates
         self._pending_domains = self._mutable_state.pending_domains
         self._providers = self._mutable_state.providers
@@ -287,11 +291,24 @@ class App:
             triggers_shell_update=triggers_shell_update,
         )
 
+    def register_page_shell_contract(self, contract: PageShellContract) -> None:
+        """Register a named page shell contract and its fragment targets.
+
+        This makes app-shell expectations explicit and lets contract checks
+        validate required fragment blocks across page templates.
+        """
+        self._check_not_frozen()
+        self._mutable_state.fragment_target_registry.register_contract(contract)
+
     def add_middleware(self, middleware: object) -> None:
         self._registry.add_middleware(middleware)
 
     def add_reload_dir(self, path: str) -> None:
         self._registry.add_reload_dir(path)
+
+    def register_section(self, section: Section) -> None:
+        """Register a named section for route metadata resolution."""
+        self._registry.register_section(section)
 
     def template_filter(
         self,
@@ -440,6 +457,11 @@ class App:
             kida_env=self._runtime_state.kida_env,
             layout_chains=self._mutable_state.discovered_layout_chains,
             page_route_paths=self._mutable_state.page_route_paths,
+            page_leaf_templates=self._mutable_state.page_leaf_templates,
             page_templates=self._mutable_state.page_templates,
+            fragment_target_registry=self._mutable_state.fragment_target_registry,
             islands_contract_strict=self.config.islands_contract_strict,
+            sections=self._mutable_state.sections,
+            route_metas=self._mutable_state.route_metas,
+            route_templates=self._mutable_state.route_templates,
         )

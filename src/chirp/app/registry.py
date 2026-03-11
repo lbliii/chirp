@@ -1,10 +1,12 @@
 """Registration helpers for App setup APIs."""
 
+import inspect
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from chirp.http.request import Request
+from chirp.pages.types import Section
 
 from .state import MutableAppState, PendingRoute, PendingTool
 
@@ -77,6 +79,11 @@ class AppRegistry:
         self._ensure_mutable()
         self._state.reload_dirs_extra.append(str(Path(path).resolve()))
 
+    def register_section(self, section: Section) -> None:
+        """Register a named section for route metadata resolution."""
+        self._ensure_mutable()
+        self._state.sections[section.id] = section
+
     def template_filter(
         self, name: str | None
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -133,8 +140,12 @@ class AppRegistry:
         page_routes = discover_pages(pages_dir)
         for page_route in page_routes:
             self._state.page_route_paths.add(page_route.url_path)
+            self._state.route_metas[page_route.url_path] = page_route.meta
+            if page_route.template_name:
+                self._state.route_templates[page_route.url_path] = page_route.template_name
             self._state.discovered_layout_chains.append(page_route.layout_chain)
             if page_route.template_name:
+                self._state.page_leaf_templates.add(page_route.template_name)
                 self._state.page_templates.add(page_route.template_name)
             for layout in page_route.layout_chain.layouts:
                 self._state.page_templates.add(layout.template_name)
@@ -147,6 +158,10 @@ class AppRegistry:
                 layout_chain=page_route.layout_chain,
                 context_providers=page_route.context_providers,
                 template_name=page_route.template_name,
+                meta=page_route.meta,
+                meta_provider=page_route.meta_provider,
+                actions=page_route.actions,
+                viewmodel_provider=page_route.viewmodel_provider,
             )
 
     def register_page_handler(
@@ -158,26 +173,91 @@ class AppRegistry:
         layout_chain: Any,
         context_providers: tuple[Any, ...],
         template_name: str | None = None,
+        meta: Any = None,
+        meta_provider: Any = None,
+        actions: tuple[Any, ...] = (),
+        viewmodel_provider: Any = None,
     ) -> None:
         from chirp._internal.invoke import invoke
+        from chirp.pages.actions import dispatch_action
         from chirp.pages.context import build_cascade_context
         from chirp.pages.resolve import resolve_kwargs, upgrade_result
+        from chirp.pages.sections import resolve_section_context
+        from chirp.pages.shell_context import build_shell_context, resolve_meta
 
         _handler = handler
         _chain = layout_chain
         _providers = context_providers
         _template = template_name
+        _meta = meta
+        _meta_provider = meta_provider
+        _actions = actions
+        _viewmodel_provider = viewmodel_provider
+        _sections = self._state.sections
+        if template_name:
+            self._state.page_leaf_templates.add(template_name)
+            self._state.page_templates.add(template_name)
         _service_providers = self._state.providers
 
         async def page_wrapper(request: Request) -> Any:
             cascade_ctx = await build_cascade_context(
                 _providers, request.path_params, _service_providers
             )
-            kwargs = await resolve_kwargs(_handler, request, cascade_ctx, _service_providers)
+            meta_resolved = resolve_meta(
+                _meta, _meta_provider, request.path_params, _service_providers
+            )
+            section_ctx = resolve_section_context(meta_resolved, _sections)
+            shell_ctx = build_shell_context(
+                request, meta_resolved, section_ctx, cascade_ctx
+            )
+            base_ctx = {**cascade_ctx, **section_ctx, **shell_ctx}
+            viewmodel_ctx = {}
+            if _viewmodel_provider:
+                from chirp.pages.context import _call_provider
+
+                vm_result = _call_provider(
+                    _viewmodel_provider,
+                    request.path_params,
+                    base_ctx,
+                    _service_providers,
+                )
+                if inspect.isawaitable(vm_result):
+                    vm_result = await vm_result
+                if isinstance(vm_result, dict):
+                    viewmodel_ctx = vm_result
+            full_ctx = {**base_ctx, **viewmodel_ctx}
+
+            # POST with actions: check _action form field first
+            if request.method == "POST" and _actions:
+                try:
+                    form_data = dict(await request.form())
+                except Exception:
+                    form_data = {}
+                action_name = form_data.get("_action")
+                if action_name:
+                    for act in _actions:
+                        if act.name == action_name:
+                            action_result = await dispatch_action(
+                                act,
+                                request.path_params,
+                                full_ctx,
+                                _service_providers,
+                                form_data,
+                            )
+                            return upgrade_result(
+                                action_result,
+                                full_ctx,
+                                _chain,
+                                _providers,
+                                request=request,
+                                template_name=_template,
+                            )
+
+            kwargs = await resolve_kwargs(_handler, request, full_ctx, _service_providers)
             result = await invoke(_handler, **kwargs)
             return upgrade_result(
                 result,
-                cascade_ctx,
+                full_ctx,
                 _chain,
                 _providers,
                 request=request,
