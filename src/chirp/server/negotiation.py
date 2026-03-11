@@ -13,7 +13,14 @@ from typing import TYPE_CHECKING, Any
 from kida import Environment
 
 from chirp.errors import ConfigurationError
-from chirp.http.response import Redirect, RenderIntent, Response, SSEResponse, StreamingResponse
+from chirp.http.response import (
+    JSONResponse,
+    Redirect,
+    RenderIntent,
+    Response,
+    SSEResponse,
+    StreamingResponse,
+)
 from chirp.pages.shell_actions import (
     SHELL_ACTIONS_CONTEXT_KEY,
     SHELL_ACTIONS_TARGET,
@@ -323,10 +330,7 @@ def negotiate(
         case bytes():
             return Response(body=value, content_type="application/octet-stream")
         case dict() | list():
-            return Response(
-                body=json_module.dumps(value, default=str),
-                content_type="application/json; charset=utf-8",
-            )
+            return JSONResponse.from_value(value)
         case (inner, int() as status):
             response = negotiate(inner, kida_env=kida_env, request=request)
             if isinstance(response, Response):

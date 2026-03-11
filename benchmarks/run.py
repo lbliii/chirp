@@ -182,10 +182,12 @@ def aggregate_rounds(rounds: list[BenchResult]) -> BenchResult:
     )
 
 
-def run_chirp(port: int) -> subprocess.Popen[bytes]:
+def run_chirp(port: int, *, profile: bool = False) -> subprocess.Popen[bytes]:
     """Start Chirp server."""
     env = os.environ.copy()
     env["BENCH_PORT"] = str(port)
+    if profile:
+        env["POUNCE_PROFILE"] = "1"
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -198,7 +200,7 @@ def run_chirp(port: int) -> subprocess.Popen[bytes]:
         env=env,
         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=None if profile else subprocess.DEVNULL,
     )
     return proc
 
@@ -273,10 +275,11 @@ def run_framework(
     *,
     concurrency: int = CONCURRENCY,
     client_strategy: str = "shared-limits",
+    profile: bool = False,
 ) -> list[BenchResult]:
     """Start server, run benchmark rounds, stop server."""
     if name == "chirp":
-        proc = run_chirp(port)
+        proc = run_chirp(port, profile=profile)
     elif name == "chirp-uvicorn":
         proc = run_chirp_uvicorn(port)
     elif name == "fastapi":
@@ -396,6 +399,11 @@ def main() -> None:
         default="shared-limits",
         help="Client strategy: shared-limits (default) or per-request",
     )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable POUNCE_PROFILE for Chirp (logs read/parse/app/drain timings to stderr)",
+    )
     args = parser.parse_args()
 
     targets = args.targets if args.targets != ["all"] else ["chirp", "fastapi", "flask"]
@@ -416,6 +424,7 @@ def main() -> None:
             ports[name],
             concurrency=args.concurrency,
             client_strategy=args.client,
+            profile=args.profile and name == "chirp",
         )
         all_results.extend(results)
 

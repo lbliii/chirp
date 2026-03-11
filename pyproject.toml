@@ -110,7 +110,7 @@ Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 [tool.uv.sources]
-bengal-pounce = { path = "../pounce", editable = true }
+bengal-pounce = { workspace = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -20,6 +20,9 @@ python -m benchmarks.run flask
 
 # Run Chirp experiments (client strategies, Chirp+Uvicorn)
 python -m benchmarks.run_experiments
+
+# Profile Pounce (requires local pounce in PYTHONPATH)
+PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client shared-limits
 ```
 
 ## Methodology

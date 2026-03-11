@@ -1,8 +1,10 @@
 """Tests for chirp.http.response — Response chaining and Redirect."""
 
+import json
+
 import pytest
 
-from chirp.http.response import Redirect, Response, SSEResponse, hx_redirect
+from chirp.http.response import JSONResponse, Redirect, Response, SSEResponse, hx_redirect
 
 
 class TestResponse:
@@ -73,6 +75,18 @@ class TestResponse:
         r = Response(body=b"hello")
         assert r.text == "hello"
 
+    def test_json_response_serializes_compact_bytes(self) -> None:
+        r = JSONResponse.from_value({"message": "hello", "count": 42})
+        assert r.body == b'{"message":"hello","count":42}'
+        assert r.text == '{"message":"hello","count":42}'
+        assert r.json == {"message": "hello", "count": 42}
+        assert r.content_type == "application/json; charset=utf-8"
+
+    def test_json_response_with_headers_preserves_type(self) -> None:
+        r = JSONResponse.from_value({"ok": True}, headers={"X-Test": "1"})
+        assert isinstance(r, JSONResponse)
+        assert ("X-Test", "1") in r.headers
+
     def test_frozen(self) -> None:
         r = Response()
         with pytest.raises(AttributeError):
@@ -105,7 +119,6 @@ class TestHtmxResponseHeaders:
     def test_hx_location_with_target(self) -> None:
         r = Response().with_hx_location("/page", target="#main")
         header = r.header("HX-Location")
-        import json
 
         obj = json.loads(header)
         assert obj["path"] == "/page"
@@ -116,7 +129,6 @@ class TestHtmxResponseHeaders:
             "/page", target="#content", swap="innerHTML", source="#trigger"
         )
         header = r.header("HX-Location")
-        import json
 
         obj = json.loads(header)
         assert obj == {
@@ -149,7 +161,6 @@ class TestHtmxResponseHeaders:
     def test_hx_trigger_dict(self) -> None:
         r = Response().with_hx_trigger({"showToast": {"message": "Saved!"}})
         header = r.header("HX-Trigger")
-        import json
 
         obj = json.loads(header)
         assert obj == {"showToast": {"message": "Saved!"}}
@@ -161,7 +172,6 @@ class TestHtmxResponseHeaders:
     def test_hx_trigger_after_settle_dict(self) -> None:
         r = Response().with_hx_trigger_after_settle({"flash": {"level": "info"}})
         header = r.header("HX-Trigger-After-Settle")
-        import json
 
         assert json.loads(header) == {"flash": {"level": "info"}}
 
@@ -172,7 +182,6 @@ class TestHtmxResponseHeaders:
     def test_hx_trigger_after_swap_dict(self) -> None:
         r = Response().with_hx_trigger_after_swap({"animate": True})
         header = r.header("HX-Trigger-After-Swap")
-        import json
 
         assert json.loads(header) == {"animate": True}
 

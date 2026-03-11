@@ -181,13 +181,22 @@ class Request:
         receive: Receive,
         path_params: dict[str, str] | None = None,
     ) -> Request:
-        """Create a Request from an ASGI scope and receive callable."""
+        """Create a Request from an ASGI scope and receive callable.
+
+        Reuses request_id from scope["extensions"]["request_id"] when Pounce
+        (or another ASGI server) has already set it, avoiding redundant UUID generation.
+        """
         import uuid
 
         headers = Headers(tuple(scope.get("headers", ())))
         server = scope.get("server")
         client = scope.get("client")
-        request_id = headers.get("x-request-id") or str(uuid.uuid4())
+        extensions = scope.get("extensions") or {}
+        request_id = (
+            extensions.get("request_id")
+            or headers.get("x-request-id")
+            or str(uuid.uuid4())
+        )
         return cls(
             method=scope["method"],
             path=scope["path"],

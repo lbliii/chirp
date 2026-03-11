@@ -73,6 +73,21 @@ class TestRequestFromASGI:
         req = Request.from_asgi(scope, _make_receive())
         assert req.request_id == "my-correlation-id"
 
+    def test_request_id_from_scope_extensions(self) -> None:
+        """Pounce and other ASGI servers set scope['extensions']['request_id']."""
+        scope = _make_scope(extensions={"request_id": "pounce-abc123"})
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.request_id == "pounce-abc123"
+
+    def test_request_id_scope_extensions_over_header(self) -> None:
+        """Scope extensions take precedence over X-Request-ID header."""
+        scope = _make_scope(
+            headers=[(b"x-request-id", b"header-id")],
+            extensions={"request_id": "scope-id"},
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.request_id == "scope-id"
+
     def test_headers_parsed(self) -> None:
         scope = _make_scope(headers=[(b"content-type", b"application/json"), (b"accept", b"*/*")])
         req = Request.from_asgi(scope, _make_receive())

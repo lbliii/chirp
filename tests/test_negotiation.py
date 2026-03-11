@@ -533,12 +533,14 @@ class TestNegotiatePrimitives:
     def test_dict_to_json(self) -> None:
         result = negotiate({"key": "value"})
         assert "application/json" in result.content_type
+        assert result.body == b'{"key":"value"}'
         parsed = json.loads(result.text)
         assert parsed == {"key": "value"}
 
     def test_list_to_json(self) -> None:
         result = negotiate([1, 2, 3])
         assert "application/json" in result.content_type
+        assert result.body == b"[1,2,3]"
         parsed = json.loads(result.text)
         assert parsed == [1, 2, 3]
 

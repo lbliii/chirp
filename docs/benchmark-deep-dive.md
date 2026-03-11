@@ -45,7 +45,7 @@ During startup, the benchmark may hit the server before all 10 workers are ready
 | Worker model | 10 workers, 1 loop each | 10 workers, 1 loop each |
 | CPU-bound scaling | Via executor threads | Via executor threads |
 
-Both frameworks now offload sync handlers to a thread pool. Benchmarks use a shared httpx.Client for connection pooling so the harness measures server performance, not client setup churn.
+Both frameworks now offload sync handlers to a thread pool. Benchmarks use per-request httpx clients; a shared client causes severe contention.
 
 ---
 
@@ -59,9 +59,9 @@ Both frameworks now offload sync handlers to a thread pool. Benchmarks use a sha
 
 **File:** `benchmarks/apps/chirp_app.py` — `request_queue_enabled=False` for benchmark runs.
 
-### 4.3. Shared Client for Load Test (Done)
+### 4.3. Client Strategy for Load Test
 
-**File:** `benchmarks/run.py` — single `httpx.Client` with connection pooling; avoids measuring client setup/teardown per request.
+**File:** `benchmarks/run.py` — per-request `httpx.Client`. A single shared client causes severe contention (~10x throughput drop); per-request gives stable, comparable results.
 
 ### 4.4. Further Optimizations
 
@@ -77,6 +77,6 @@ Both frameworks now offload sync handlers to a thread pool. Benchmarks use a sha
 |-------|------------|-----|
 | Request failures | Queue 503s, timeouts, connection resets under load | 4.2 — disable queue for benchmarks |
 | Slow CPU throughput | (was) Sync handlers block event loop | 4.1 — run sync in thread pool (done) |
-| Client setup churn | Per-request httpx.Client creation | 4.3 — shared client with pooling (done) |
+| Client setup churn | Per-request httpx.Client creation | 4.3 — shared pooled client with explicit limits |
 
-**Measurement methodology:** The harness uses a single shared `httpx.Client` so connection setup/teardown is not measured as server latency. Benchmarks reflect server performance, not client overhead.
+**Measurement methodology:** The harness uses a shared pooled `httpx.Client`, warms each endpoint before timing, runs multiple rounds, and reports median results. Latency percentiles include failed attempts so overload still shows up in the reported numbers.
