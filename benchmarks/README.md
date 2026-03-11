@@ -18,8 +18,19 @@ python -m benchmarks.run chirp
 python -m benchmarks.run fastapi
 python -m benchmarks.run flask
 
-# Run Chirp experiments (client strategies, Chirp+Uvicorn)
+# Run Chirp experiments (client strategies, Chirp+Uvicorn, sync vs async)
 python -m benchmarks.run_experiments
+
+# Run sync vs async comparison (Phase 4a)
+python -m benchmarks.run chirp-sync
+python -m benchmarks.run chirp-async
+
+# Fused path — Chirp + Pounce with no middleware (fastest JSON/CPU)
+python -m benchmarks.run chirp-fused
+
+# Mixed workload — JSON + SSE (Phase 4b, verifies adaptive handoff)
+poe benchmark-mixed
+# or: CHIRP_WORKER_MODE=sync python -m benchmarks.run_mixed
 
 # Profile Pounce (requires local pounce in PYTHONPATH)
 PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client shared-limits
@@ -86,6 +97,24 @@ benchmarks/
     ├── fastapi_app.py  # FastAPI + Uvicorn
     └── flask_app.py    # Flask + Gunicorn
 ```
+
+## Phase 4 (Adaptive Workers)
+
+- **chirp-sync** / **chirp-async** — Compare sync vs async worker mode
+- **chirp-fused** — Fused sync path: no middleware, no ASGI; bypasses protocol layer for simple JSON/CPU handlers
+- **benchmark-mixed** — JSON + SSE in same app; verifies adaptive handoff
+
+### Target numbers (Python 3.14t, 10 workers)
+
+| Category      | Target   | How                          |
+|---------------|----------|------------------------------|
+| JSON c=10     | 5000+    | Sync worker, no asyncio       |
+| CPU c=10      | 2000+    | Inline sync, no to_thread     |
+| JSON c=100    | 2500+    | Sync + accept distributor     |
+| CPU c=100     | 1000+    | Sync workers, true parallelism|
+| SSE streaming | works    | Async pool handoff            |
+
+Run `python -m benchmarks.run chirp-sync -c 10` to validate JSON/CPU targets.
 
 ## Phase 2 (Planned)
 

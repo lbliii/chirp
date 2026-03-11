@@ -27,7 +27,7 @@ class SyncRequest:
     are lazy — only parsed when accessed.
     """
 
-    __slots__ = ("method", "path", "path_params", "_raw")
+    __slots__ = ("__dict__", "_raw", "method", "path", "path_params")
 
     def __init__(
         self,

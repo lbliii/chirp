@@ -65,9 +65,9 @@ Both frameworks now offload sync handlers to a thread pool. Benchmarks use per-r
 
 ### 4.4. Further Optimizations
 
-- Compile handler dispatch metadata at freeze time (avoid `inspect.signature` per request)
-- Fast JSON path (dict/list → bytes without str round-trip)
-- Lazy request parsing (query, cookies, request_id from scope)
+- Compile handler dispatch metadata at freeze time (avoid `inspect.signature` per request) — **Done** (InvokePlan)
+- Fast JSON path (dict/list → bytes without str round-trip) — **Done** (fused path in sync_handler)
+- Lazy request parsing (query, cookies, request_id from scope) — **Done** (_LazyQueryParams, _LazyCookies in Request.from_asgi)
 
 ---
 
