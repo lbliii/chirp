@@ -6,7 +6,7 @@ what it is: received data that doesn't change.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +17,80 @@ from chirp.http.query import QueryParams
 
 if TYPE_CHECKING:
     from chirp.http.forms import FormData
+
+
+class _LazyQueryParams(Mapping[str, str]):
+    """QueryParams that parses on first access."""
+
+    __slots__ = ("_parsed", "_raw")
+
+    def __init__(self, raw: bytes) -> None:
+        object.__setattr__(self, "_raw", raw)
+        object.__setattr__(self, "_parsed", None)
+
+    def _ensure(self) -> QueryParams:
+        parsed = object.__getattribute__(self, "_parsed")
+        if parsed is None:
+            parsed = QueryParams(object.__getattribute__(self, "_raw"))
+            object.__setattr__(self, "_parsed", parsed)
+        return parsed
+
+
+    def __getitem__(self, key: str) -> str:
+        return self._ensure()[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._ensure()
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._ensure())
+
+    def __len__(self) -> int:
+        return len(self._ensure())
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return self._ensure().get(key, default)
+
+    def get_list(self, key: str) -> list[str]:
+        return self._ensure().get_list(key)
+
+    def get_int(self, key: str, default: int | None = None) -> int | None:
+        return self._ensure().get_int(key, default)
+
+    def get_bool(self, key: str, default: bool | None = None) -> bool | None:
+        return self._ensure().get_bool(key, default)
+
+
+class _LazyCookies(Mapping[str, str]):
+    """Cookies that parse on first access."""
+
+    __slots__ = ("_cookie_header", "_parsed")
+
+    def __init__(self, cookie_header: str) -> None:
+        object.__setattr__(self, "_cookie_header", cookie_header)
+        object.__setattr__(self, "_parsed", None)
+
+    def _ensure(self) -> dict[str, str]:
+        parsed = object.__getattribute__(self, "_parsed")
+        if parsed is None:
+            parsed = parse_cookies(object.__getattribute__(self, "_cookie_header"))
+            object.__setattr__(self, "_parsed", parsed)
+        return parsed
+
+    def __getitem__(self, key: str) -> str:
+        return self._ensure()[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._ensure()
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._ensure())
+
+    def __len__(self) -> int:
+        return len(self._ensure())
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return self._ensure().get(key, default)
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,12 +107,12 @@ class Request:
     method: str
     path: str
     headers: Headers
-    query: QueryParams
+    query: QueryParams | _LazyQueryParams
     path_params: dict[str, str]
     http_version: str
     server: tuple[str, int] | None
     client: tuple[str, int] | None
-    cookies: Mapping[str, str]
+    cookies: Mapping[str, str] | _LazyCookies
     request_id: str  # X-Request-ID from header or generated UUID
 
     # Private: ASGI receive callable for body streaming
@@ -99,7 +173,11 @@ class Request:
     @property
     def url(self) -> str:
         """Full request URL (path + query string)."""
-        qs = self.query._raw
+        qs = (
+            self.query._raw
+            if isinstance(self.query, QueryParams)
+            else object.__getattribute__(self.query, "_raw")
+        )
         if qs:
             return f"{self.path}?{qs.decode('latin-1')}"
         return self.path
@@ -197,16 +275,18 @@ class Request:
             or headers.get("x-request-id")
             or str(uuid.uuid4())
         )
+        query_raw = scope.get("query_string", b"")
+        cookie_header = headers.get("cookie") or ""
         return cls(
             method=scope["method"],
             path=scope["path"],
             headers=headers,
-            query=QueryParams(scope.get("query_string", b"")),
+            query=_LazyQueryParams(query_raw),
             path_params=path_params or {},
             http_version=scope.get("http_version", "1.1"),
             server=tuple(server) if server else None,
             client=tuple(client) if client else None,
-            cookies=parse_cookies(headers.get("cookie") or ""),
+            cookies=_LazyCookies(cookie_header),
             request_id=request_id,
             _receive=receive,
         )

@@ -14,13 +14,13 @@ from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.invoke import invoke
-from chirp.context import g, request_var
+from chirp._internal.invoke_plan import InvokePlan
+from chirp.context import force_inline_sync_var, g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
-from chirp._internal.invoke_plan import InvokePlan
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
@@ -28,6 +28,58 @@ from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
 from chirp.server.negotiation import negotiate
 from chirp.server.sender import send_response, send_streaming_response
 from chirp.tools.registry import ToolRegistry
+
+
+def compile_middleware_chain(
+    middleware: tuple[Callable[..., Any], ...],
+    dispatch: Callable[[Request], Any],
+) -> Callable[[Request], Any]:
+    """Build middleware chain once. Returns async handler(req) -> Response."""
+    chain = dispatch
+    for mw in reversed(middleware):
+        inner = chain
+        mw_ref = mw
+
+        async def layer(req: Request, _mw: Any = mw_ref, _next: Next = inner) -> AnyResponse:
+            return await _mw(req, _next)
+
+        chain = layer
+    return chain
+
+
+def create_request_handler(
+    *,
+    router: Router,
+    middleware: tuple[Callable[..., Any], ...],
+    tool_registry: ToolRegistry | None,
+    mcp_path: str,
+    debug: bool,
+    providers: dict[type, Callable[..., Any]] | None,
+    kida_env: Environment | None,
+) -> Callable[[Request], Any]:
+    """Build the full middleware + dispatch chain once. Reuse per request."""
+    async def dispatch(req: Request) -> AnyResponse:
+        if debug and req.path == HTMX_DEBUG_BOOT_PATH:
+            return Response(
+                body=HTMX_DEBUG_BOOT_JS,
+                content_type="application/javascript; charset=utf-8",
+                render_intent="full_page",
+            )
+        if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
+            from chirp.tools.handler import handle_mcp_request
+
+            return await handle_mcp_request(req, tool_registry)
+        match = router.match(req.method, req.path)
+        return await _invoke_handler(
+            match,
+            req,
+            kida_env=kida_env,
+            providers=providers,
+            validate_blocks=debug,
+            force_inline_sync=force_inline_sync_var.get(),
+        )
+
+    return compile_middleware_chain(middleware, dispatch)
 
 
 async def handle_request(
@@ -46,6 +98,7 @@ async def handle_request(
     sse_heartbeat_interval: float = 15.0,
     sse_retry_ms: int | None = None,
     sse_close_event: str | None = None,
+    compiled_handler: Callable[[Request], Any] | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -54,46 +107,43 @@ async def handle_request(
     # Build Request from ASGI scope
     request = Request.from_asgi(scope, receive)
 
+    # Pounce sync workers set this so sync handlers run directly on the
+    # worker thread instead of being dispatched through asyncio.to_thread().
+    extensions = scope.get("extensions") or {}
+    force_inline_sync = bool(extensions.get("pounce.inline_sync"))
+
     # Set request and request_id context vars (reset after dispatch)
     token: Token[Request] = request_var.set(request)
     rid_token = request_id_var.set(request.request_id)
+    sync_token = force_inline_sync_var.set(force_inline_sync)
 
     try:
-        # Build the innermost handler (router dispatch + MCP)
-        async def dispatch(req: Request) -> AnyResponse:
-            # Built-in debug helper asset; loaded once per full page.
-            if debug and req.path == HTMX_DEBUG_BOOT_PATH:
-                return Response(
-                    body=HTMX_DEBUG_BOOT_JS,
-                    content_type="application/javascript; charset=utf-8",
-                    render_intent="full_page",
+        # Use pre-compiled chain or build per request
+        if compiled_handler is not None:
+            handler = compiled_handler
+        else:
+            async def dispatch(req: Request) -> AnyResponse:
+                if debug and req.path == HTMX_DEBUG_BOOT_PATH:
+                    return Response(
+                        body=HTMX_DEBUG_BOOT_JS,
+                        content_type="application/javascript; charset=utf-8",
+                        render_intent="full_page",
+                    )
+                if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
+                    from chirp.tools.handler import handle_mcp_request
+
+                    return await handle_mcp_request(req, tool_registry)
+                match = router.match(req.method, req.path)
+                return await _invoke_handler(
+                    match,
+                    req,
+                    kida_env=kida_env,
+                    providers=providers,
+                    validate_blocks=debug,
+                    force_inline_sync=force_inline_sync_var.get(),
                 )
 
-            # MCP endpoint — dispatched inside middleware so auth/CORS apply
-            if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
-                from chirp.tools.handler import handle_mcp_request
-
-                return await handle_mcp_request(req, tool_registry)
-
-            match = router.match(req.method, req.path)
-            return await _invoke_handler(
-                match,
-                req,
-                kida_env=kida_env,
-                providers=providers,
-                validate_blocks=debug,
-            )
-
-        # Wrap middleware around the dispatch
-        handler = dispatch
-        for mw in reversed(middleware):
-            outer = handler
-            mw_ref = mw
-
-            async def make_next(req: Request, _mw: Any = mw_ref, _next: Next = outer) -> Response:
-                return await _mw(req, _next)
-
-            handler = make_next
+            handler = compile_middleware_chain(middleware, dispatch)
 
         # Execute the full pipeline
         response = await handler(request)
@@ -106,6 +156,7 @@ async def handle_request(
         g._reset()
         request_var.reset(token)
         request_id_var.reset(rid_token)
+        force_inline_sync_var.reset(sync_token)
 
     # Dispatch based on response type — X-Request-ID injected at send time
     # to avoid an extra Response clone + tuple allocation per request.
@@ -139,6 +190,7 @@ async def _invoke_handler(
     kida_env: Environment | None = None,
     providers: dict[type, Callable[..., Any]] | None = None,
     validate_blocks: bool = False,
+    force_inline_sync: bool = False,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -179,10 +231,14 @@ async def _invoke_handler(
 
     # Call the handler (sync or async — invoke() handles both).
     # When a compiled plan exists, pass cached flags to skip per-request inspect.
+    # force_inline_sync overrides to_thread dispatch (set by Pounce sync workers
+    # where the event loop is single-purpose and blocking is safe).
     invoke_kw: dict[str, Any] = {}
     if plan is not None:
         invoke_kw["is_async"] = plan.is_async
-        invoke_kw["inline_sync"] = plan.inline_sync
+        invoke_kw["inline_sync"] = plan.inline_sync or force_inline_sync
+    elif force_inline_sync:
+        invoke_kw["inline_sync"] = True
     result = await invoke(handler, **invoke_kw, **kwargs)
 
     return negotiate(
