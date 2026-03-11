@@ -104,3 +104,26 @@ def test_inline_sync_false_for_async_handler() -> None:
 def test_inline_sync_default_false() -> None:
     plan = compile_invoke_plan(_no_params)
     assert plan.inline_sync is False
+
+
+def test_response_content_type_from_return_annotation() -> None:
+    def returns_dict() -> dict:
+        return {}
+
+    def returns_list() -> list:
+        return []
+
+    def returns_str() -> str:
+        return ""
+
+    def returns_bytes() -> bytes:
+        return b""
+
+    def no_annotation():
+        return "ok"
+
+    assert compile_invoke_plan(returns_dict).response_content_type_bytes == b"application/json"
+    assert compile_invoke_plan(returns_list).response_content_type_bytes == b"application/json"
+    assert compile_invoke_plan(returns_str).response_content_type_bytes == b"text/html; charset=utf-8"
+    assert compile_invoke_plan(returns_bytes).response_content_type_bytes == b"application/octet-stream"
+    assert compile_invoke_plan(no_annotation).response_content_type_bytes is None

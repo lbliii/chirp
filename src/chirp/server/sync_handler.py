@@ -55,27 +55,19 @@ def handle_sync(
     except Exception:
         return None
 
-    # Fast negotiate for common types — avoid full negotiate() overhead
+    # Fast negotiate for common types — use pre-encoded content-type when available
+    content_type = getattr(plan, "response_content_type_bytes", None)
     if isinstance(result, (dict, list)):
         body = json.dumps(result, default=str, separators=(",", ":")).encode()
-        return RawResponse(
-            200,
-            ((b"content-type", b"application/json"),),
-            body,
-        )
+        ct = content_type if content_type else b"application/json"
+        return RawResponse(200, ((b"content-type", ct),), body)
     if isinstance(result, str):
         body = result.encode()
-        return RawResponse(
-            200,
-            ((b"content-type", b"text/html; charset=utf-8"),),
-            body,
-        )
+        ct = content_type if content_type else b"text/html; charset=utf-8"
+        return RawResponse(200, ((b"content-type", ct),), body)
     if isinstance(result, bytes):
-        return RawResponse(
-            200,
-            ((b"content-type", b"application/octet-stream"),),
-            result,
-        )
+        ct = content_type if content_type else b"application/octet-stream"
+        return RawResponse(200, ((b"content-type", ct),), result)
 
     return None
 
