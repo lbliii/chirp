@@ -182,10 +182,17 @@ def aggregate_rounds(rounds: list[BenchResult]) -> BenchResult:
     )
 
 
-def run_chirp(port: int, *, profile: bool = False) -> subprocess.Popen[bytes]:
-    """Start Chirp server."""
+def run_chirp(
+    port: int,
+    *,
+    profile: bool = False,
+    worker_mode: str | None = None,
+) -> subprocess.Popen[bytes]:
+    """Start Chirp server. worker_mode: sync | async | None (auto)."""
     env = os.environ.copy()
     env["BENCH_PORT"] = str(port)
+    if worker_mode is not None:
+        env["CHIRP_WORKER_MODE"] = worker_mode
     if profile:
         env["POUNCE_PROFILE"] = "1"
     proc = subprocess.Popen(
@@ -280,6 +287,12 @@ def run_framework(
     """Start server, run benchmark rounds, stop server."""
     if name == "chirp":
         proc = run_chirp(port, profile=profile)
+    elif name == "chirp-sync":
+        proc = run_chirp(port, worker_mode="sync")  # Force sync workers
+    elif name == "chirp-fused":
+        proc = run_chirp(port, worker_mode="sync")  # Fused path auto-activates in sync mode
+    elif name == "chirp-async":
+        proc = run_chirp(port, worker_mode="async")  # Force async workers
     elif name == "chirp-uvicorn":
         proc = run_chirp_uvicorn(port)
     elif name == "fastapi":
@@ -384,7 +397,7 @@ def main() -> None:
         "targets",
         nargs="*",
         default=["all"],
-        help="chirp, fastapi, flask, chirp-uvicorn, or all",
+        help="chirp, chirp-sync, chirp-fused, chirp-async, fastapi, flask, chirp-uvicorn, or all",
     )
     parser.add_argument(
         "--concurrency",
@@ -410,7 +423,15 @@ def main() -> None:
     if "all" in targets:
         targets = ["chirp", "fastapi", "flask"]
 
-    all_frameworks = ["chirp", "chirp-uvicorn", "fastapi", "flask"]
+    all_frameworks = [
+        "chirp",
+        "chirp-sync",
+        "chirp-fused",
+        "chirp-async",
+        "chirp-uvicorn",
+        "fastapi",
+        "flask",
+    ]
     ports = {name: BASE_PORT + i for i, name in enumerate(all_frameworks)}
 
     all_results: list[BenchResult] = []

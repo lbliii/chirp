@@ -1,13 +1,21 @@
 """Chirp benchmark app — JSON and CPU workloads."""
 
+import os
+
 from chirp import App, AppConfig
 
+# worker_mode from CHIRP_WORKER_MODE (sync | async | auto) for benchmark variants
+worker_mode = os.environ.get("CHIRP_WORKER_MODE", "auto")
 # Normalized config: no request queue (avoids 503s under burst, matches FastAPI/Flask)
+# safe_target=False so fused sync path can run (no middleware)
 app = App(
     AppConfig(
         debug=False,
         workers=10,
         request_queue_enabled=False,
+        worker_mode=worker_mode,
+        safe_target=False,
+        static_dir=None,
     )
 )
 
@@ -23,7 +31,7 @@ def _cpu_work(iterations: int = 50_000) -> int:
 
 
 @app.route("/json")
-async def json_handler():
+def json_handler():
     return JSON_PAYLOAD
 
 

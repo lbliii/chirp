@@ -39,6 +39,7 @@ class InvokePlan:
     has_extract_param: bool  # True if any extract param (body needed for non-GET)
     is_async: bool = False
     inline_sync: bool = False
+    sync_eligible: bool = False  # True if: not async, no streaming, no middleware-dependent
 
 
 def compile_invoke_plan(
@@ -75,9 +76,12 @@ def compile_invoke_plan(
             params.append(ParamSpec(name, "path", annotation))
 
     handler_is_async = inspect.iscoroutinefunction(handler)
+    # Exclude extract params: POST body parsing would need async in full Request
+    sync_eligible = not handler_is_async and not has_extract_param
     return InvokePlan(
         params=tuple(params),
         has_extract_param=has_extract_param,
         is_async=handler_is_async,
         inline_sync=inline and not handler_is_async,
+        sync_eligible=sync_eligible,
     )

@@ -291,6 +291,25 @@ class App:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self._runtime.handle(scope, receive, send)
 
+    def handle_sync(self, raw: object) -> object | None:
+        """Fused sync path — bypass ASGI for simple request-response handlers.
+
+        Returns RawResponse for sync handling, or None to fall through to ASGI.
+        """
+        from pounce.sync_protocol import RawRequest
+
+        self._ensure_frozen()
+        if self._router is None:
+            return None
+        from chirp.server.sync_handler import handle_sync as _handle_sync
+
+        return _handle_sync(
+            raw=raw,  # type: ignore[arg-type]
+            router=self._router,
+            middleware=self._middleware,
+            providers=self._mutable_state.providers,
+        )
+
     async def _handle_lifespan(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self._lifecycle.handle_lifespan(scope, receive, send)
 
