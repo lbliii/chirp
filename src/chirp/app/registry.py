@@ -26,11 +26,12 @@ class AppRegistry:
         name: str | None,
         referenced: bool,
         template: str | None,
+        inline: bool,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._ensure_mutable()
             self._state.pending_routes.append(
-                PendingRoute(path, func, methods, name, referenced, template)
+                PendingRoute(path, func, methods, name, referenced, template, inline)
             )
             return func
 

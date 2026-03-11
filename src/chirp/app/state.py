@@ -26,6 +26,7 @@ class PendingRoute:
     name: str | None
     referenced: bool = False
     template: str | None = None
+    inline: bool = False
 
 
 @dataclass(slots=True)

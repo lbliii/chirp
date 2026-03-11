@@ -3,9 +3,10 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
 from chirp.routing.route import Route
-from chirp.routing.router import Router
+from chirp.routing.router import Router, parse_path
 from chirp.templating.integration import create_environment
 from chirp.tools.registry import compile_tools
 
@@ -47,8 +48,19 @@ class AppCompiler:
             self._mutable.lazy_pages_dir = None
 
         router = Router()
+        providers = self._mutable.providers
         for pending in self._mutable.pending_routes:
             methods = frozenset(m.upper() for m in (pending.methods or ["GET"]))
+            segments = parse_path(pending.path)
+            path_param_names = frozenset(
+                s.param_name for s in segments if s.is_param and s.param_name
+            )
+            invoke_plan = compile_invoke_plan(
+                pending.handler,
+                providers or None,
+                path_param_names=path_param_names,
+                inline=pending.inline,
+            )
             route = Route(
                 path=pending.path,
                 handler=pending.handler,
@@ -56,6 +68,8 @@ class AppCompiler:
                 name=pending.name,
                 referenced=pending.referenced,
                 template=pending.template,
+                invoke_plan=invoke_plan,
+                inline=pending.inline,
             )
             router.add(route)
         router.compile()

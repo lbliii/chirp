@@ -5,7 +5,6 @@ to typed Request objects, dispatches through middleware and routing,
 and sends Response back through ASGI send().
 """
 
-import inspect
 from collections.abc import Callable
 from contextvars import Token
 from dataclasses import replace
@@ -21,6 +20,7 @@ from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp._internal.invoke_plan import InvokePlan
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
@@ -107,11 +107,9 @@ async def handle_request(
         request_var.reset(token)
         request_id_var.reset(rid_token)
 
-    # Add X-Request-ID to response for correlation (Response and StreamingResponse)
-    if hasattr(response, "with_header") and not isinstance(response, SSEResponse):
-        response = response.with_header("X-Request-ID", request.request_id)
-
-    # Dispatch based on response type
+    # Dispatch based on response type — X-Request-ID injected at send time
+    # to avoid an extra Response clone + tuple allocation per request.
+    rid = request.request_id
     if isinstance(response, SSEResponse):
         from chirp.realtime.sse import handle_sse
 
@@ -129,9 +127,9 @@ async def handle_request(
             close_event=sse_close_event,
         )
     elif isinstance(response, StreamingResponse):
-        await send_streaming_response(response, send, debug=debug)
+        await send_streaming_response(response, send, debug=debug, request_id=rid)
     else:
-        await send_response(response, send)
+        await send_response(response, send, request_id=rid)
 
 
 async def _invoke_handler(
@@ -145,37 +143,47 @@ async def _invoke_handler(
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
 
-    # Inject Request into the updated request with path_params
-    # Carry over _cache so body/form data parsed by middleware isn't lost
-    request = Request(
-        method=request.method,
-        path=request.path,
-        headers=request.headers,
-        query=request.query,
-        path_params=match.path_params,
-        http_version=request.http_version,
-        server=request.server,
-        client=request.client,
-        cookies=request.cookies,
-        request_id=request.request_id,
-        _receive=request._receive,
-        _cache=request._cache,
-    )
+    # Inject path_params into Request; skip clone when already identical
+    if request.path_params != match.path_params:
+        request = Request(
+            method=request.method,
+            path=request.path,
+            headers=request.headers,
+            query=request.query,
+            path_params=match.path_params,
+            http_version=request.http_version,
+            server=request.server,
+            client=request.client,
+            cookies=request.cookies,
+            request_id=request.request_id,
+            _receive=request._receive,
+            _cache=request._cache,
+        )
 
     # Pre-read body data if any handler param needs typed extraction
-    body_data = await _read_body_if_needed(handler, request)
+    plan = getattr(match.route, "invoke_plan", None)
+    if plan is not None:
+        body_data = await _read_body_if_needed_from_plan(plan, request)
+    else:
+        body_data = await _read_body_if_needed_inspect(handler, request)
 
-    # Build kwargs from handler signature
+    # Build kwargs from compiled plan or fallback to inspection
     kwargs = _build_handler_kwargs(
         handler,
         request,
         match.path_params,
         providers,
         body_data=body_data,
+        invoke_plan=plan,
     )
 
-    # Call the handler (sync or async — invoke() handles both)
-    result = await invoke(handler, **kwargs)
+    # Call the handler (sync or async — invoke() handles both).
+    # When a compiled plan exists, pass cached flags to skip per-request inspect.
+    invoke_kw: dict[str, Any] = {}
+    if plan is not None:
+        invoke_kw["is_async"] = plan.is_async
+        invoke_kw["inline_sync"] = plan.inline_sync
+    result = await invoke(handler, **invoke_kw, **kwargs)
 
     return negotiate(
         result,
@@ -192,16 +200,65 @@ def _build_handler_kwargs(
     providers: dict[type, Callable[..., Any]] | None = None,
     *,
     body_data: dict[str, Any] | None = None,
+    invoke_plan: InvokePlan | None = None,
 ) -> dict[str, Any]:
-    """Inspect handler signature and build kwargs from request + path params.
+    """Build kwargs from request + path params using compiled plan or inspection.
 
-    Resolution order:
-    1. ``request`` parameter (by name or ``Request`` annotation)
-    2. Path parameters (by name, with type conversion)
-    3. Context cascade values (page routes only — handled in page_wrapper)
-    4. Service providers (by type annotation via ``app.provide()``)
-    5. Typed extraction (dataclass annotation → query string or body)
+    When invoke_plan is present, uses the precomputed plan (no inspect per request).
+    Falls back to _build_handler_kwargs_inspect for routes without a plan.
     """
+    if invoke_plan is not None:
+        return _build_handler_kwargs_from_plan(
+            request, path_params, providers, body_data, invoke_plan
+        )
+    return _build_handler_kwargs_inspect(handler, request, path_params, providers, body_data)
+
+
+def _build_handler_kwargs_from_plan(
+    request: Request,
+    path_params: dict[str, str],
+    providers: dict[type, Callable[..., Any]] | None,
+    body_data: dict[str, Any] | None,
+    plan: InvokePlan,
+) -> dict[str, Any]:
+    """Build kwargs using compiled InvokePlan — allocation-light fast path."""
+    from chirp.extraction import extract_dataclass
+
+    kwargs: dict[str, Any] = {}
+    for spec in plan.params:
+        if spec.source == "request":
+            kwargs[spec.name] = request
+        elif spec.source == "path" and spec.name in path_params:
+            value = path_params[spec.name]
+            if spec.annotation is not None:
+                try:
+                    kwargs[spec.name] = spec.annotation(value)
+                except (ValueError, TypeError):
+                    kwargs[spec.name] = value
+            else:
+                kwargs[spec.name] = value
+        elif spec.source == "provider" and spec.annotation and providers:
+            provider = providers.get(spec.annotation)
+            if provider is not None:
+                kwargs[spec.name] = provider()
+        elif spec.source == "extract" and spec.annotation is not None:
+            if request.method in ("GET", "HEAD"):
+                kwargs[spec.name] = extract_dataclass(spec.annotation, request.query)
+            elif body_data is not None:
+                kwargs[spec.name] = extract_dataclass(spec.annotation, body_data)
+    return kwargs
+
+
+def _build_handler_kwargs_inspect(
+    handler: Callable[..., Any],
+    request: Request,
+    path_params: dict[str, str],
+    providers: dict[type, Callable[..., Any]] | None,
+    body_data: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Fallback: inspect handler signature and build kwargs (used when no plan)."""
+    import inspect
+
     from chirp.extraction import extract_dataclass, is_extractable_dataclass
 
     sig = inspect.signature(handler, eval_str=True)
@@ -211,12 +268,11 @@ def _build_handler_kwargs(
         if name == "request" or param.annotation is Request:
             kwargs[name] = request
         elif name in path_params:
-            # Convert path param to annotated type if possible
             value = path_params[name]
             if param.annotation is not inspect.Parameter.empty:
                 try:
                     kwargs[name] = param.annotation(value)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     kwargs[name] = value
             else:
                 kwargs[name] = value
@@ -229,7 +285,6 @@ def _build_handler_kwargs(
         elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
             param.annotation
         ):
-            # Typed extraction: GET → query, POST/PUT/PATCH → body
             if request.method in ("GET", "HEAD"):
                 kwargs[name] = extract_dataclass(param.annotation, request.query)
             elif body_data is not None:
@@ -238,19 +293,36 @@ def _build_handler_kwargs(
     return kwargs
 
 
-async def _read_body_if_needed(
-    handler: Callable[..., Any],
+async def _read_body_if_needed_from_plan(
+    plan: InvokePlan | None,
     request: Request,
 ) -> dict[str, Any] | None:
     """Pre-read form/JSON body if the handler has extractable dataclass params.
 
-    Only reads the body for non-GET methods.  Returns ``None`` if no
-    extraction is needed or the method is GET/HEAD.
+    Uses compiled plan when available.
     """
     if request.method in ("GET", "HEAD"):
         return None
+    if plan is None or not plan.has_extract_param:
+        return None
+
+    ct = request.content_type or ""
+    if "json" in ct:
+        return await request.json()
+    return dict(await request.form())
+
+
+async def _read_body_if_needed_inspect(
+    handler: Callable[..., Any],
+    request: Request,
+) -> dict[str, Any] | None:
+    """Fallback: inspect handler for extractable params, read body if needed."""
+    import inspect
 
     from chirp.extraction import is_extractable_dataclass
+
+    if request.method in ("GET", "HEAD"):
+        return None
 
     sig = inspect.signature(handler, eval_str=True)
     needs_extraction = any(

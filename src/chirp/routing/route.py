@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from chirp._internal.invoke_plan import InvokePlan
+
 
 @dataclass(frozen=True, slots=True)
 class PathSegment:
@@ -33,6 +35,8 @@ class Route:
     name: str | None = None
     referenced: bool = False
     template: str | None = None
+    invoke_plan: InvokePlan | None = None
+    inline: bool = False
 
 
 @dataclass(frozen=True, slots=True)

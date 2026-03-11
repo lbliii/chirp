@@ -172,6 +172,7 @@ class App:
         name: str | None = None,
         referenced: bool = False,
         template: str | None = None,
+        inline: bool = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.route(
             path,
@@ -179,6 +180,7 @@ class App:
             name=name,
             referenced=referenced,
             template=template,
+            inline=inline,
         )
 
     def provide(self, annotation: type, factory: Callable[..., Any]) -> None:

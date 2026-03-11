@@ -19,27 +19,33 @@ import inspect
 from typing import Any
 
 
-async def invoke(handler: Any, *args: Any, **kwargs: Any) -> Any:
+async def invoke(
+    handler: Any,
+    *args: Any,
+    is_async: bool | None = None,
+    inline_sync: bool = False,
+    **kwargs: Any,
+) -> Any:
     """Call a handler and await the result if it's a coroutine.
 
-    Async handlers run on the event loop. Sync handlers run in a thread
-    pool via ``asyncio.to_thread.run_sync`` so they don't block the loop.
+    When *is_async* is provided (from a compiled InvokePlan), the per-request
+    ``inspect.iscoroutinefunction`` call is skipped entirely.
 
-    Works with both sync and async callables::
-
-        # sync — runs in thread pool, event loop stays responsive
-        @app.route("/")
-        def dashboard():
-            return Template("dashboard.html")
-
-        # async — runs on event loop
-        @app.route("/data")
-        async def data():
-            data = await fetch_data()
-            return Template("data.html", data=data)
+    When *inline_sync* is True and the handler is synchronous, it runs on the
+    event loop thread instead of ``asyncio.to_thread`` — useful for lightweight
+    handlers where the thread-dispatch overhead exceeds the work itself.
     """
-    if inspect.iscoroutinefunction(handler):
+    handler_is_async = is_async if is_async is not None else inspect.iscoroutinefunction(handler)
+
+    if handler_is_async:
         return await handler(*args, **kwargs)
+
+    if inline_sync:
+        result = handler(*args, **kwargs)
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
     result = await asyncio.to_thread(handler, *args, **kwargs)
     if inspect.isawaitable(result):
         return await result
