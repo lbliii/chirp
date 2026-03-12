@@ -23,17 +23,19 @@ import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
 from typing import Any, overload
 
 import anyio
 
 from chirp.data._mapping import map_row, map_rows
+from chirp.data.drivers import postgres as _pg_driver
+from chirp.data.drivers import sqlite as _sqlite_driver
 from chirp.data.errors import (
     DataError,
     DriverNotInstalledError,
     QueryError,
 )
+from chirp.data.types import DatabaseConfig, Notification
 
 # Per-task connection tracking (free-threading safe via ContextVar).
 # Set inside transaction() — query methods check this to reuse the
@@ -69,33 +71,6 @@ def _in_transaction() -> bool:
         return True
     except LookupError:
         return False
-
-
-@dataclass(frozen=True, slots=True)
-class DatabaseConfig:
-    """Database connection configuration.
-
-    Parsed from a URL string or constructed directly.
-    """
-
-    url: str
-    pool_size: int = 5
-    echo: bool = False
-    connect_timeout: float = 30.0
-    connect_retries: int = 0
-
-
-@dataclass(frozen=True, slots=True)
-class Notification:
-    """A notification received from PostgreSQL LISTEN/NOTIFY.
-
-    Attributes:
-        channel: The notification channel name.
-        payload: The notification payload string (may be empty).
-    """
-
-    channel: str
-    payload: str
 
 
 class Database:
@@ -586,58 +561,10 @@ def _detect_driver(url: str) -> str:
     raise DataError(msg)
 
 
-def _parse_sqlite_path(url: str) -> str:
-    """Extract the file path from a sqlite:// URL."""
-    # sqlite:///path/to/db  ->  /path/to/db
-    # sqlite:///:memory:    ->  :memory:
-    prefix = "sqlite:///"
-    if url.startswith(prefix):
-        return url[len(prefix) :]
-    prefix_short = "sqlite://"
-    if url.startswith(prefix_short):
-        return url[len(prefix_short) :]
-    msg = f"Invalid SQLite URL: {url!r}"
-    raise DataError(msg)
-
-
-# -- Pool creation --
-
-
 async def _create_pool(driver: str, config: DatabaseConfig) -> Any:
     if driver == "sqlite":
-        return await _create_sqlite_pool(config)
-    return await _create_pg_pool(config)
-
-
-async def _create_sqlite_pool(config: DatabaseConfig) -> Any:
-    import sqlite3
-
-    from chirp.data._sqlite import connect as sqlite_connect
-
-    path = _parse_sqlite_path(config.url)
-    conn = await sqlite_connect(path)
-    conn.row_factory = sqlite3.Row
-    # Enable WAL mode for better concurrent read performance
-    await conn.execute("PRAGMA journal_mode=WAL")
-    await conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
-
-async def _create_pg_pool(config: DatabaseConfig) -> Any:
-    try:
-        import asyncpg
-    except ImportError:
-        msg = (
-            "chirp.data requires 'asyncpg' for PostgreSQL databases. "
-            "Install it with: pip install chirp[data-pg]"
-        )
-        raise DriverNotInstalledError(msg) from None
-
-    return await asyncpg.create_pool(
-        config.url,
-        min_size=1,
-        max_size=config.pool_size,
-    )
+        return await _sqlite_driver.create_pool(config)
+    return await _pg_driver.create_pool(config)
 
 
 # -- Pool teardown --
