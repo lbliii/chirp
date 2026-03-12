@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-03-12
+
+### Added
+
+- **Route directory contract** — Filesystem routes now have a documented golden path around `_meta.py`, `_context.py`, `_actions.py`, and `_viewmodel.py`, plus section registration via `app.register_section()` for tabs, breadcrumbs, and shell metadata.
+- **Route introspection** — Debug builds now expose `X-Chirp-Route-*` headers and a `/__chirp/routes` explorer for inspecting discovered routes, layouts, providers, actions, and route metadata.
+- **Synthetic benchmark suite** — New `benchmark` extra, benchmark runners, and benchmark docs compare Chirp against FastAPI and Flask across JSON, CPU, fused sync, and mixed JSON+SSE workloads.
+
+### Changed
+
+- **Sync request path** — Chirp now exposes a fused sync path through `App.handle_sync()` and `SyncRequest`, with lazy query/cookie parsing and pre-encoded content types for simple request-response handlers.
+- **Filesystem route ergonomics** — Route metadata, section bindings, shell context assembly, action dispatch, and view-model wiring are now part of the route contract and validated by `app.check()`.
+- **CLI scaffolds** — `chirp new` now keeps its templates in dedicated modules, including updated shell and SSE scaffolds.
+
+### Fixed
+
+- **Sync handler execution** — Sync handlers now avoid blocking the event loop on the standard ASGI path while still enabling the faster fused path when a route is eligible.
+
+### Dependencies
+
+- `kida-templates>=0.2.7`
+- `bengal-pounce>=0.2.2`
+- `chirp-ui>=0.1.6` (optional, for `chirp[ui]`)
+
 ## [0.1.8] — 2026-03-10
 
 ### Changed
@@ -103,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
 [0.1.8]: https://github.com/lbliii/chirp/releases/tag/v0.1.8
+[0.1.9]: https://github.com/lbliii/chirp/releases/tag/v0.1.9
 [0.1.7]: https://github.com/lbliii/chirp/releases/tag/v0.1.7
 [0.1.6]: https://github.com/lbliii/chirp/releases/tag/v0.1.6
 [0.1.5]: https://github.com/lbliii/chirp/releases/tag/v0.1.5
