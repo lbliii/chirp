@@ -88,6 +88,15 @@ chirp new myapp && cd myapp && python app.py
 
 ---
 
+## New in 0.1.9
+
+- **Route-directory golden path** — Filesystem routes now have a clearer contract around `_meta.py`, `_context.py`, `_actions.py`, and `_viewmodel.py`, plus section registration for tabs, breadcrumbs, and shell metadata.
+- **Sync-path improvements** — `App.handle_sync()` and `SyncRequest` add a fused sync path for simple handlers, while the standard request path now keeps URL query values and cookies lazy until needed.
+- **Debug route introspection** — Debug builds expose `X-Chirp-Route-*` headers and a `/__chirp/routes` explorer so you can inspect route metadata, layouts, providers, and actions.
+- **Synthetic benchmarks** — A new `benchmark` extra and benchmark suite compare Chirp, FastAPI, and Flask on JSON, CPU, fused sync, and mixed JSON+SSE workloads.
+
+---
+
 ## Features
 
 | Feature | Description | Docs |
@@ -96,6 +105,8 @@ chirp new myapp && cd myapp && python app.py
 | **Comparison** | When Chirp fits compared with Flask, FastAPI, and Django | [When to Use Chirp →](https://lbliii.github.io/chirp/docs/about/comparison/) |
 | **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
 | **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/routing/filesystem-routing/) |
+| **Route directory contract** | `_meta.py`, `_context.py`, `_actions.py`, sections, shell context, and route validation | [Route Directory →](https://lbliii.github.io/chirp/docs/guides/route-directory/) |
+| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/reference/route-contract/) |
 | **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
 | **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
 | **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
@@ -108,6 +119,19 @@ chirp new myapp && cd myapp && python app.py
 | **Optional UI layer** | `chirp-ui` companion components and styles | [chirp-ui →](https://github.com/lbliii/chirp-ui) |
 
 📚 **Full documentation**: [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
+
+---
+
+## Benchmarks
+
+Chirp now ships a synthetic benchmark suite for comparing Chirp, FastAPI, and Flask across JSON and CPU workloads, plus Chirp-specific fused sync and mixed JSON+SSE scenarios.
+
+```bash
+uv sync --extra benchmark
+uv run poe benchmark
+```
+
+See [`benchmarks/README.md`](benchmarks/README.md) for how the benchmarks work, their caveats, and the available runners.
 
 ---
 
