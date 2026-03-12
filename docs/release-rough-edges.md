@@ -131,14 +131,14 @@ Same pattern as shell_context.py and actions.py (already fixed). Python 3 requir
 
 ## Summary: Release Checklist
 
-| # | Issue | Effort | Priority |
-|---|-------|--------|----------|
-| 1 | Add page_root_inner to 7 templates | 30 min | **P0** — Unblocks tests |
-| 2 | Fix dashboard format filter (4 places) | 5 min | **P0** — Unblocks tests |
-| 5 | Fix chirp_ui.py except syntax | 1 min | **P0** — Bug |
-| 3 | update-result warning | Low | P2 — Cosmetic |
-| 4 | Context provider params | Medium | P2 — Refinement |
-| 6 | _meta.py warnings | 15 min | P3 — Nice to have |
-| 7 | dashboard.html reference | TBD | P2 — Investigate |
+| # | Issue | Effort | Priority | Status |
+|---|-------|--------|----------|--------|
+| 1 | Add page_root_inner to 7 templates | 30 min | **P0** — Unblocks tests | ✅ Done |
+| 2 | Fix dashboard format filter (4 places) | 5 min | **P0** — Unblocks tests | ✅ Done |
+| 5 | Fix chirp_ui.py except syntax | 1 min | **P0** — Bug | ✅ Done |
+| 3 | update-result warning | Low | P2 — Cosmetic | Open |
+| 4 | Context provider params | Medium | P2 — Refinement | Open |
+| 6 | _meta.py warnings | 15 min | P3 — Nice to have | Open |
+| 7 | dashboard.html reference | TBD | P2 — Investigate | Open |
 
-**Recommended order:** Fix 1, 2, 5 first. That should get all example tests passing. Then address 3–7 as time allows.
+**P0 fixes complete.** All 405 example tests pass. Remaining items (3–7) are non-blocking.

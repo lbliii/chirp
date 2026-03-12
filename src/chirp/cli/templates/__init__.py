@@ -1,14 +1,20 @@
-"""Project scaffolding templates — plain Python strings for ``chirp new``.
+"""Project scaffolding templates for ``chirp new``.
 
-Backward-compatible shim. All constants live in chirp.cli.templates.
+Re-exports all template constants from submodules.
 """
 
-from chirp.cli.templates import (
+from chirp.cli.templates.full import (
     APP_PY,
     BASE_HTML,
     INDEX_HTML,
+    STYLE_CSS,
+    TEST_APP_PY,
+)
+from chirp.cli.templates.minimal import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
+)
+from chirp.cli.templates.shell import (
     SHELL_APP_PY,
     SHELL_CONTEXT_PY,
     SHELL_ITEMS_LAYOUT_HTML,
@@ -18,10 +24,12 @@ from chirp.cli.templates import (
     SHELL_LAYOUT_HTML,
     SHELL_PAGE_HTML,
     SHELL_PAGE_PY,
+)
+from chirp.cli.templates.sse import (
     SSE_APP_PY,
     SSE_INDEX_HTML,
-    STYLE_CSS,
-    TEST_APP_PY,
+)
+from chirp.cli.templates.v2 import (
     V2_APP_CHIRPUI_PY,
     V2_APP_PY,
     V2_CONFTEST_PY,
