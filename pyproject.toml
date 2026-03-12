@@ -35,7 +35,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "kida-templates>=0.2.6", # Template engine (same ecosystem, same author)
+    "kida-templates>=0.2.7", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
     "bengal-pounce>=0.2.2",  # ASGI server (same ecosystem, powers app.run())
 ]
