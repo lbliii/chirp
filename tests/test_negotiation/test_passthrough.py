@@ -7,15 +7,16 @@ from kida import Environment, FileSystemLoader
 
 from chirp.http.request import Request
 from chirp.http.response import Redirect, Response
+from chirp.realtime.events import EventStream
 from chirp.server.negotiation import negotiate
 from chirp.templating.composition import PageComposition
-from chirp.realtime.events import EventStream
 from chirp.templating.returns import (
     Fragment,
     Page,
     Stream,
     Template,
 )
+
 
 class TestNegotiatePassthrough:
     def test_response_passthrough(self) -> None:

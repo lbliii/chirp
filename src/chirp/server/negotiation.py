@@ -19,12 +19,11 @@ from chirp.http.response import (
     SSEResponse,
     StreamingResponse,
 )
+from chirp.realtime.events import EventStream
 from chirp.server.negotiation_oob import (
     append_shell_actions_oob_stream,
-    render_shell_actions_oob,
     should_append_streamed_shell_actions_oob,
 )
-from chirp.realtime.events import EventStream
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template

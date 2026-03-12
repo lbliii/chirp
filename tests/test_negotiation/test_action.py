@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 from kida import Environment
 
 from chirp.http.request import Request

@@ -3,7 +3,6 @@
 import pytest
 
 from chirp import App
-from tests.helpers.auth import extract_session_cookie
 from chirp.errors import ConfigurationError
 from chirp.middleware.sessions import (
     SessionConfig,
@@ -12,6 +11,7 @@ from chirp.middleware.sessions import (
     regenerate_session,
 )
 from chirp.testing import TestClient
+from tests.helpers.auth import extract_session_cookie
 
 
 class TestSessionConfig:

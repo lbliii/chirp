@@ -9,7 +9,6 @@ from chirp.testing import (
     assert_hx_trigger,
     assert_is_fragment,
 )
-
 from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}

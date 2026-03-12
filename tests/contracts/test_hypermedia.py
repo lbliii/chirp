@@ -4,7 +4,6 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
 from chirp.contracts.template_scan import extract_targets_from_source
-
 from tests.helpers.contract_fixtures import write_layout_page
 
 

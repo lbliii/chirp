@@ -2,8 +2,6 @@
 
 from typing import Any
 
-import pytest
-
 from chirp.http.request import Request
 from chirp.tools.schema import function_to_schema
 

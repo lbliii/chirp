@@ -18,15 +18,13 @@ def parse_sqlite_path(url: str) -> str:
     raise DataError(msg)
 
 
-async def create_pool(config: object) -> object:
+async def create_pool(config: DatabaseConfig) -> object:
     """Create a SQLite connection (pool is the single connection)."""
     import sqlite3
 
     from chirp.data._sqlite import connect as sqlite_connect
-    from chirp.data.types import DatabaseConfig
 
-    cfg = config if isinstance(config, DatabaseConfig) else config
-    path = parse_sqlite_path(cfg.url)
+    path = parse_sqlite_path(config.url)
     conn = await sqlite_connect(path)
     conn.row_factory = sqlite3.Row
     # Enable WAL mode for better concurrent read performance

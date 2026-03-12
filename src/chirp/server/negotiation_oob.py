@@ -59,7 +59,7 @@ async def append_shell_actions_oob_stream(
 
 def should_append_streamed_shell_actions_oob(
     context: dict[str, Any],
-    request: "Request | None",
+    request: Request | None,
 ) -> bool:
     """Whether a streamed layout response should refresh shell actions via OOB."""
     del context

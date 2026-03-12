@@ -7,11 +7,10 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, cast
 
-from chirp.realtime.events import EventStream
-from chirp.templating.returns import Fragment
-
 from chirp.pages.reactive.bus import ReactiveBus
 from chirp.pages.reactive.index import DependencyIndex
+from chirp.realtime.events import EventStream
+from chirp.templating.returns import Fragment
 
 
 def reactive_stream(

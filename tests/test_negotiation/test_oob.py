@@ -4,7 +4,7 @@ import pytest
 from kida import Environment
 
 from chirp.server.negotiation import negotiate
-from chirp.templating.returns import Fragment, OOB, Template
+from chirp.templating.returns import OOB, Fragment, Template
 
 
 class TestNegotiateOOB:

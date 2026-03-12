@@ -1,7 +1,6 @@
 """Tests for the sortable_reorder example."""
 
 from chirp.testing import TestClient
-
 from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}

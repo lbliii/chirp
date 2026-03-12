@@ -24,9 +24,9 @@ from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
+from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
 from chirp.server.negotiation import negotiate
-from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry

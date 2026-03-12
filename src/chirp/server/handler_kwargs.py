@@ -36,7 +36,6 @@ def _build_handler_kwargs_from_plan(
     plan: InvokePlan,
 ) -> dict[str, Any]:
     """Build kwargs using compiled InvokePlan — allocation-light fast path."""
-    import inspect
 
     from chirp.extraction import extract_dataclass
 
