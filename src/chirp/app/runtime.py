@@ -39,6 +39,7 @@ class ASGIRuntime:
 
     def _get_compiled_handler(self):
         if self._compiled_handler is None:
+            assert self._runtime.router is not None
             self._compiled_handler = create_request_handler(
                 router=self._runtime.router,
                 middleware=self._runtime.middleware,

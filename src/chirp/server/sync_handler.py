@@ -89,7 +89,7 @@ def _build_sync_kwargs(
             if spec.annotation is not None:
                 try:
                     kwargs[spec.name] = spec.annotation(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     kwargs[spec.name] = value
             else:
                 kwargs[spec.name] = value

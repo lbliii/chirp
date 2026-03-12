@@ -14,7 +14,7 @@ from .types import ContractIssue, Severity
 
 def check_section_bindings(
     route_metas: dict[str, RouteMeta | None],
-    sections: dict[str, object],
+    sections: dict[str, Section],
 ) -> list[ContractIssue]:
     """Warn if RouteMeta.section references unknown section."""
     issues: list[ContractIssue] = []

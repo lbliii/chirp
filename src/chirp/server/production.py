@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from pounce import ASGIApp
+from pounce.sync_protocol import SyncApp
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -168,5 +169,5 @@ def run_production_server(
     )
 
     # Create and run server — pass app as sync_app for fused sync path
-    server = Server(config, cast(ASGIApp, app), sync_app=app)
+    server = Server(config, cast(ASGIApp, app), sync_app=cast(SyncApp, app))
     server.run()

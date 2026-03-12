@@ -15,6 +15,12 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 sys.path.insert(0, str(ROOT_DIR))
 
+# Avoid sys.modules collision when another example (e.g. kanban_shell) ran first.
+if "store" in sys.modules:
+    _loaded = Path(sys.modules["store"].__file__).resolve()
+    if _loaded != (ROOT_DIR / "store.py").resolve():
+        del sys.modules["store"]
+
 from store import add_item, get_items, reorder_items
 
 from chirp import App, AppConfig, Fragment, Request, use_chirp_ui

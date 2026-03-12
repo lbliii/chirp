@@ -47,7 +47,7 @@ class _LazyQueryParams(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._ensure())
 
-    def get(self, key: str, default: str | None = None) -> str | None:
+    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
         return self._ensure().get(key, default)
 
     def get_list(self, key: str) -> list[str]:
@@ -88,7 +88,7 @@ class _LazyCookies(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._ensure())
 
-    def get(self, key: str, default: str | None = None) -> str | None:
+    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
         return self._ensure().get(key, default)
 
 

@@ -27,6 +27,7 @@ from chirp.pages.types import (
     LayoutChain,
     LayoutInfo,
     PageRoute,
+    RouteKind,
     RouteMeta,
 )
 
@@ -176,7 +177,7 @@ def _walk_directory(
         )
 
 
-def _infer_route_kind(*, has_template: bool, is_param_dir: bool) -> str:
+def _infer_route_kind(*, has_template: bool, is_param_dir: bool) -> RouteKind:
     """Infer route kind from file combination. Informational only."""
     if not has_template:
         return "action"
