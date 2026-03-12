@@ -499,5 +499,3 @@ class TestSessionTimeouts:
             cookie = extract_session_cookie(r1, "chirp_session")
             r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "k=none"
-
-

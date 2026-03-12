@@ -33,7 +33,5 @@ class TestSelectorSyntaxValidation:
         assert issues == []
 
     def test_allows_selector_command_prefixes(self):
-        issues = check_selector_syntax(
-            {"page.html": '<button hx-target="closest .card"></button>'}
-        )
+        issues = check_selector_syntax({"page.html": '<button hx-target="closest .card"></button>'})
         assert issues == []
