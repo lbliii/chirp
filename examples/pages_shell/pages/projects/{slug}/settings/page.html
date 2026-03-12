@@ -3,6 +3,8 @@
 {% from "chirpui/nav_link.html" import nav_link %}
 
 {% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
 <div class="example-page">
 {% call container(max_width="48rem") %}
 {% call stack(gap="lg") %}
@@ -26,4 +28,6 @@
 {% end %}
 {% end %}
 </div>
-{% endblock %}
+{% end %}
+{% end %}
+{% end %}

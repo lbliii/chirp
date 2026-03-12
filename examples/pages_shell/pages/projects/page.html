@@ -4,6 +4,7 @@
 {% from "chirpui/layout.html" import container, page_header, stack %}
 
 {% block page_root %}
+{% block page_root_inner %}
 {% call container(max_width="84rem") %}
 {% call stack(gap="lg", cls="example-page") %}
 {% call page_header(
@@ -35,6 +36,7 @@
   {% endfor %}
 </div>
 {% endblock %}
+{% end %}
 {% end %}
 {% end %}
 {% endblock %}
