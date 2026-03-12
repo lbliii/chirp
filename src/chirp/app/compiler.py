@@ -74,6 +74,7 @@ class AppCompiler:
             router.add(route)
         router.compile()
         self._runtime.router = router
+        self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
         middleware_list = list(self._mutable.middleware_list)
         if self._config.static_dir is not None:

@@ -3,7 +3,8 @@
 from pathlib import Path
 
 from chirp import App, AppConfig
-from chirp.pages.types import Section
+from chirp.contracts import check_hypermedia_surface
+from chirp.pages.types import Section, TabItem
 
 
 def test_unknown_section_produces_warning(tmp_path: Path) -> None:
@@ -38,6 +39,30 @@ def test_route_without_meta_produces_info(tmp_path: Path) -> None:
 
     # Should not raise
     app.check(warnings_as_errors=False)
+
+
+def test_section_tab_href_warning(tmp_path: Path) -> None:
+    """Section tab href that doesn't match any route produces warning."""
+    pages_dir = tmp_path / "pages"
+    pages_dir.mkdir()
+    (pages_dir / "page.py").write_text("def get(): return {}")
+    (pages_dir / "page.html").write_text("<html></html>")
+
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    app.register_section(
+        Section(
+            id="main",
+            label="Main",
+            tab_items=(TabItem(label="Home", href="/"), TabItem(label="Missing", href="/nonexistent")),
+        )
+    )
+    app.mount_pages(str(pages_dir))
+
+    result = check_hypermedia_surface(app)
+    route_issues = [i for i in result.issues if getattr(i, "category", None) == "route_contract"]
+    tab_issues = [i for i in route_issues if "tab href" in (i.message or "").lower()]
+    assert len(tab_issues) >= 1
+    assert "/nonexistent" in (tab_issues[0].message or "")
 
 
 def test_known_section_passes(tmp_path: Path) -> None:

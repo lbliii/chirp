@@ -81,3 +81,54 @@ def test_resolve_section_context_section_active_prefixes() -> None:
     result = resolve_section_context(meta, sections)
     assert "tab_items" in result
     assert result["tab_items"] == [{"label": "List", "href": "/collections"}]
+
+
+def test_section_is_active_exact_match() -> None:
+    """is_active returns True on exact prefix match."""
+    section = Section(
+        id="workspace",
+        label="Workspace",
+        active_prefixes=("/workspace",),
+    )
+    assert section.is_active("/workspace") is True
+
+
+def test_section_is_active_child_path() -> None:
+    """is_active returns True for child paths under a prefix."""
+    section = Section(
+        id="workspace",
+        label="Workspace",
+        active_prefixes=("/workspace",),
+    )
+    assert section.is_active("/workspace/logs") is True
+    assert section.is_active("/workspace/analytics/detail") is True
+
+
+def test_section_is_active_no_match() -> None:
+    """is_active returns False when path doesn't match any prefix."""
+    section = Section(
+        id="workspace",
+        label="Workspace",
+        active_prefixes=("/workspace",),
+    )
+    assert section.is_active("/settings") is False
+    assert section.is_active("/workspaces") is False
+
+
+def test_section_is_active_empty_prefixes() -> None:
+    """is_active returns False when active_prefixes is empty."""
+    section = Section(id="orphan", label="Orphan", active_prefixes=())
+    assert section.is_active("/anything") is False
+
+
+def test_section_is_active_multiple_prefixes() -> None:
+    """is_active matches any of multiple prefixes."""
+    section = Section(
+        id="settings",
+        label="Settings",
+        active_prefixes=("/settings", "/collections", "/setup"),
+    )
+    assert section.is_active("/settings") is True
+    assert section.is_active("/collections/install") is True
+    assert section.is_active("/setup") is True
+    assert section.is_active("/admin") is False

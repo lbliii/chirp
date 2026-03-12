@@ -57,6 +57,7 @@ class RenderPlan:
     layout_context: dict[str, Any] = field(default_factory=dict)
     region_updates: tuple[RegionUpdate, ...] = ()
     response_headers: dict[str, str] = field(default_factory=dict)
+    include_layout_oob: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,10 +85,13 @@ def _resolve_fragment_block(
         config = fragment_target_registry.get(request.htmx_target)
         if config is not None:
             return config.fragment_block
+        registered_targets = sorted(fragment_target_registry.registered_targets)
         _log.debug(
             "Unregistered HX-Target %r; falling back to page_content. "
-            "Register with app.register_fragment_target() if this target expects a different block.",
+            "Register with app.register_fragment_target() or app.register_page_shell_contract() "
+            "if this target expects a different block. Registered targets: %s",
             request.htmx_target,
+            registered_targets,
         )
     return composition.page_block or "page_content"
 
@@ -152,6 +156,27 @@ def _compute_layout_start_index(
     if idx is None:
         return len(layout_chain.layouts)
     return idx
+
+
+def _triggers_shell_update(
+    request: Request | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> bool:
+    """Whether this request should trigger shell OOB updates.
+
+    True for boosted navigation (sidebar clicks) and for fragment targets
+    with ``triggers_shell_update=True`` in the page shell contract (e.g.
+    tab nav targeting ``#page-root``). Returns False for history restore,
+    non-fragment requests, and narrow content swaps.
+    """
+    if not request or not request.is_fragment or request.is_history_restore:
+        return False
+    if request.is_boosted:
+        return True
+    if not request.htmx_target or not fragment_target_registry:
+        return False
+    config = fragment_target_registry.get(request.htmx_target)
+    return config is not None and config.triggers_shell_update
 
 
 def normalize_to_composition(value: Any) -> PageComposition | None:
@@ -239,20 +264,12 @@ def build_render_plan(
     # Build region updates from composition.regions + shell_actions in context
     region_updates: list[RegionUpdate] = list(composition.regions)
 
-    # Add shell_actions as RegionUpdate when applicable (page navigation fragment).
-    # Send for boosted nav (sidebar) or when target has triggers_shell_update=True.
-    # Always append — when actions is None, we send empty OOB to clear shell.
-    def _target_triggers_shell_update() -> bool:
-        if not request or not request.is_fragment or request.is_history_restore:
-            return False
-        if request.is_boosted:
-            return True
-        if not request.htmx_target or not fragment_target_registry:
-            return False
-        config = fragment_target_registry.get(request.htmx_target)
-        return config is not None and config.triggers_shell_update
+    # Shell update gate: True for boosted nav or fragment targets with
+    # triggers_shell_update=True (e.g. tab nav targeting #page-root).
+    # Controls both shell_actions OOB and layout OOB (breadcrumbs, sidebar, title).
+    triggers_shell = _triggers_shell_update(request, fragment_target_registry)
 
-    if _target_triggers_shell_update():
+    if triggers_shell:
         try:
             actions = normalize_shell_actions(composition.context.get(SHELL_ACTIONS_CONTEXT_KEY))
         except TypeError:
@@ -271,20 +288,16 @@ def build_render_plan(
                 )
             )
         else:
-            # Empty OOB to clear shell when page has no shell_actions
             region_updates.append(
                 RegionUpdate(
                     region=SHELL_ACTIONS_TARGET,
-                    view=ViewRef(
-                        template="",
-                        block="",
-                        context={},
-                    ),
+                    view=ViewRef(template="", block="", context={}),
                 )
             )
 
-    # Breadcrumbs/sidebar OOB added in execute_render_plan when layout has blocks
-    # Ensure layout_context has current_path for sidebar active state on boosted nav
+    include_layout_oob = intent == "page_fragment" or triggers_shell
+
+    # Ensure layout_context has current_path for sidebar active state
     layout_context = dict(composition.context)
     if request and layout_chain and layout_chain.layouts and "current_path" not in layout_context:
         layout_context["current_path"] = request.path
@@ -298,6 +311,7 @@ def build_render_plan(
         layout_start_index=layout_start_index,
         layout_context=layout_context,
         region_updates=tuple(region_updates),
+        include_layout_oob=include_layout_oob,
     )
 
 
@@ -444,9 +458,9 @@ def execute_render_plan(
                 plan.layout_context,
             )
 
-    # Augment region_updates with shell OOB blocks discovered via AST (fragment only)
+    # Augment region_updates with shell OOB blocks discovered via AST
     region_updates_list: list[RegionUpdate] = list(plan.region_updates)
-    if plan.intent == "page_fragment" and plan.layout_chain and plan.layout_chain.layouts:
+    if plan.include_layout_oob and plan.layout_chain and plan.layout_chain.layouts:
         root_layout = plan.layout_chain.layouts[0]
         if oob_registry is not None:
             contract = oob_registry.get_or_build_contract(adapter, root_layout.template_name)

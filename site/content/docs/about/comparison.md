@@ -23,10 +23,36 @@ than JSON-first APIs.
 - **Streaming HTML** — Send the page shell first, then fill in content as data arrives.
 - **Server-Sent Events** — Push kida-rendered HTML fragments in real-time.
 - **htmx integration** — First-class support for partial updates.
-- **Typed contracts** — `app.check()` validates hypermedia surface at startup.
+- **Typed contracts** — `app.check()` validates hypermedia surface at startup, including the route directory contract (section bindings, shell mode/block alignment, tab href validation).
 - **Kida built in** — Template engine with fragment rendering and streaming.
 - **Free-threading native** — Designed for Python 3.14t.
 - **Server-rendered by design** — Full pages, fragments, and streams come from the same templates.
+
+## Why Chirp Over Flask or FastAPI + Templates
+
+The main difference is not "Chirp has HTMX helpers." It is that Chirp treats
+server-rendered app shells and fragment navigation as first-class contracts.
+
+With a typical Flask or FastAPI plus Jinja stack, teams usually assemble this
+pattern from conventions:
+
+- one layout target for sidebar navigation
+- another target for tabs
+- hand-maintained OOB regions for title, breadcrumbs, and topbar actions
+- app-local rules for which template block each target is supposed to render
+
+That works until a target id changes, a page forgets a block, or a layout
+silently stops satisfying the navigation contract.
+
+Chirp's direction is different:
+
+- fragment targets map to explicit template blocks
+- ChirpUI primitives expose those blocks directly
+- contract checks can fail at startup or in tests (no other framework validates the server-client boundary at the route level)
+- the same templates drive full-page, boosted, and fragment responses
+
+So the value proposition is less custom glue, fewer navigation footguns, and
+much better debugging when an app shell evolves over time.
 
 ## When to Use Chirp
 

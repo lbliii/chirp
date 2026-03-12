@@ -9,6 +9,8 @@ from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import (
     FragmentTargetConfig,
     FragmentTargetRegistry,
+    PageShellContract,
+    PageShellTarget,
 )
 from chirp.templating.render_plan import (
     _fragment_block_for_request,
@@ -202,6 +204,54 @@ def test_fragment_target_config_frozen() -> None:
     assert cfg.fragment_block == "page_root_inner"
     with pytest.raises(AttributeError):
         cfg.fragment_block = "other"  # type: ignore[misc]
+
+
+def test_register_contract_registers_targets_and_required_blocks() -> None:
+    reg = FragmentTargetRegistry()
+    contract = PageShellContract(
+        name="app-shell",
+        targets=(
+            PageShellTarget(target_id="main", fragment_block="page_root"),
+            PageShellTarget(target_id="page-root", fragment_block="page_root_inner"),
+            PageShellTarget(
+                target_id="page-content-inner",
+                fragment_block="page_content",
+                triggers_shell_update=False,
+            ),
+        ),
+    )
+
+    reg.register_contract(contract)
+
+    assert reg.registered_targets == frozenset({"main", "page-root", "page-content-inner"})
+    assert reg.required_fragment_blocks == frozenset(
+        {"page_root", "page_root_inner", "page_content"}
+    )
+    assert reg.registered_contracts == (contract,)
+
+    cfg = reg.get("page-content-inner")
+    assert cfg is not None
+    assert cfg.triggers_shell_update is False
+    assert cfg.contract_name == "app-shell"
+    assert cfg.required is True
+
+
+def test_register_contract_rejects_multiple_contracts() -> None:
+    reg = FragmentTargetRegistry()
+    reg.register_contract(
+        PageShellContract(
+            name="app-shell",
+            targets=(PageShellTarget(target_id="main", fragment_block="page_root"),),
+        )
+    )
+
+    with pytest.raises(ValueError, match="Only one page shell contract"):
+        reg.register_contract(
+            PageShellContract(
+                name="secondary-shell",
+                targets=(PageShellTarget(target_id="alt-main", fragment_block="alt_root"),),
+            )
+        )
 
 
 def test_fragment_block_for_request_main_target_when_not_in_layout_chain() -> None:

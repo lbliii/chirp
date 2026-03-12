@@ -44,30 +44,56 @@ def test_build_shell_context_omits_keys_when_source_none() -> None:
     assert "tab_items" not in result
 
 
-def test_resolve_meta_returns_static_meta() -> None:
+async def test_resolve_meta_returns_static_meta() -> None:
     """resolve_meta returns static meta when provided."""
     meta = RouteMeta(title="Static")
-    result = resolve_meta(meta, None, {}, {})
+    result = await resolve_meta(meta, None, {}, {})
     assert result is meta
     assert result.title == "Static"
 
 
-def test_resolve_meta_returns_none_when_both_absent() -> None:
+async def test_resolve_meta_returns_none_when_both_absent() -> None:
     """resolve_meta returns None when meta and meta_provider both absent."""
-    result = resolve_meta(None, None, {}, {})
+    result = await resolve_meta(None, None, {}, {})
     assert result is None
 
 
-def test_resolve_meta_calls_provider_with_path_params() -> None:
-    """resolve_meta calls provider with path params and services."""
+async def test_resolve_meta_calls_provider_with_path_params() -> None:
+    """resolve_meta calls sync provider with path params."""
     def meta_provider(name: str) -> RouteMeta:
         return RouteMeta(title=f"Skill: {name}")
 
-    result = resolve_meta(
+    result = await resolve_meta(
         None, meta_provider, {"name": "foo"}, {}
     )
     assert result is not None
     assert result.title == "Skill: foo"
+
+
+async def test_resolve_meta_calls_async_provider() -> None:
+    """resolve_meta awaits async meta() provider."""
+    async def meta_provider(name: str) -> RouteMeta:
+        return RouteMeta(title=f"Async: {name}", section="discover")
+
+    result = await resolve_meta(
+        None, meta_provider, {"name": "bar"}, {}
+    )
+    assert result is not None
+    assert result.title == "Async: bar"
+    assert result.section == "discover"
+
+
+async def test_resolve_meta_async_provider_returning_dict() -> None:
+    """resolve_meta awaits async provider that returns a dict."""
+    async def meta_provider(name: str) -> dict:
+        return {"title": f"Dict: {name}", "section": "workspace"}
+
+    result = await resolve_meta(
+        None, meta_provider, {"name": "baz"}, {}
+    )
+    assert result is not None
+    assert result.title == "Dict: baz"
+    assert result.section == "workspace"
 
 
 def test_backward_compat_app_without_meta() -> None:
@@ -80,5 +106,4 @@ def test_backward_compat_app_without_meta() -> None:
 
     result = build_shell_context(request, meta, section_ctx, cascade_ctx)
 
-    # Only current_path when no meta — minimal additive change
     assert result == {"current_path": "/"}

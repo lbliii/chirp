@@ -56,6 +56,13 @@ class Section:
     breadcrumb_prefix: tuple[dict[str, str], ...] = ()
     active_prefixes: tuple[str, ...] = ()
 
+    def is_active(self, path: str) -> bool:
+        """Return True if *path* matches any of this section's active prefixes."""
+        return any(
+            path == prefix or path.startswith(prefix + "/")
+            for prefix in self.active_prefixes
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class LayoutInfo:

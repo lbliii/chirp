@@ -74,6 +74,7 @@ class MutableAppState:
     sections: dict[str, Section] = field(default_factory=dict)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
+    discovered_routes: list[Any] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -88,6 +89,7 @@ class RuntimeAppState:
     tool_registry: ToolRegistry | None = None
     oob_registry: OOBRegistry | None = None
     fragment_target_registry: FragmentTargetRegistry | None = None
+    discovered_routes: list[Any] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,3 +107,4 @@ class ContractCheckSnapshot:
     sections: dict[str, Section] = field(default_factory=dict)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
+    discovered_routes: list[Any] = field(default_factory=list)

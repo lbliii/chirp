@@ -19,8 +19,11 @@ from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
 from .rules_page_shell import check_page_shell_contracts
 from .rules_route_contract import (
+    check_context_provider_signatures,
+    check_duplicate_routes,
     check_route_file_consistency,
     check_section_bindings,
+    check_section_tab_hrefs,
     check_shell_mode_blocks,
 )
 from .rules_sse import (
@@ -68,6 +71,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         sections=getattr(app._mutable_state, "sections", {}),
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
+        discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
     )
 
 
@@ -272,6 +276,19 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         )
         result.issues.extend(
             check_route_file_consistency(snapshot.route_metas, snapshot.page_route_paths)
+        )
+        result.issues.extend(
+            check_duplicate_routes(getattr(snapshot, "discovered_routes", []))
+        )
+        result.issues.extend(
+            check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths)
+        )
+        providers = getattr(app._mutable_state, "providers", None)
+        result.issues.extend(
+            check_context_provider_signatures(
+                getattr(snapshot, "discovered_routes", []),
+                providers,
+            )
         )
         result.issues.extend(
             check_island_mounts(template_sources, strict=snapshot.islands_contract_strict)

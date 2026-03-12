@@ -138,6 +138,7 @@ class AppRegistry:
         from chirp.pages.discovery import discover_pages
 
         page_routes = discover_pages(pages_dir)
+        self._state.discovered_routes = page_routes
         for page_route in page_routes:
             self._state.page_route_paths.add(page_route.url_path)
             self._state.route_metas[page_route.url_path] = page_route.meta
@@ -207,7 +208,7 @@ class AppRegistry:
             cascade_ctx = await build_cascade_context(
                 _providers, request.path_params, _service_providers
             )
-            meta_resolved = resolve_meta(
+            meta_resolved = await resolve_meta(
                 _meta, _meta_provider, request.path_params, _service_providers
             )
             section_ctx = resolve_section_context(meta_resolved, _sections)

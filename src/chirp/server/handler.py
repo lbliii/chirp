@@ -25,6 +25,7 @@ from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
 from chirp.server.errors import handle_http_error, handle_internal_error
 from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
+from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.negotiation import negotiate
 from chirp.server.sender import send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -60,8 +61,11 @@ def create_request_handler(
     kida_env: Environment | None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    discovered_routes: list[Any] | None = None,
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request."""
+    routes = discovered_routes or []
+
     async def dispatch(req: Request) -> AnyResponse:
         if debug and req.path == HTMX_DEBUG_BOOT_PATH:
             return Response(
@@ -69,6 +73,18 @@ def create_request_handler(
                 content_type="application/javascript; charset=utf-8",
                 render_intent="full_page",
             )
+        if req.path == ROUTE_EXPLORER_PATH:
+            if debug:
+                path_filter = req.query.get("path", "")
+                html_body = render_route_explorer(routes, path_filter=path_filter or None)
+                return Response(
+                    body=html_body,
+                    content_type="text/html; charset=utf-8",
+                    render_intent="full_page",
+                )
+            from chirp.errors import NotFound
+
+            raise NotFound()
         if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
             from chirp.tools.handler import handle_mcp_request
 

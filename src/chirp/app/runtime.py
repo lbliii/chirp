@@ -42,6 +42,7 @@ class ASGIRuntime:
                 kida_env=self._runtime.kida_env,
                 oob_registry=self._runtime.oob_registry,
                 fragment_target_registry=self._runtime.fragment_target_registry,
+                discovered_routes=self._runtime.discovered_routes or [],
             )
         return self._compiled_handler
 

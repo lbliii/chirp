@@ -13,7 +13,7 @@ from chirp.http.request import Request
 from chirp.pages.types import RouteMeta
 
 
-def resolve_meta(
+async def resolve_meta(
     meta: RouteMeta | None,
     meta_provider: Any,
     path_params: dict[str, str],
@@ -21,8 +21,9 @@ def resolve_meta(
 ) -> RouteMeta | None:
     """Resolve RouteMeta from static meta or meta_provider callable.
 
-    Uses same arg resolution as _call_provider: path params, empty
-    accumulated context, and service providers.
+    Supports both sync and async meta() providers. Uses same arg
+    resolution as _call_provider: path params, empty accumulated
+    context, and service providers.
 
     Returns:
         Static meta, or result of meta_provider(), or None if both absent.
@@ -36,25 +37,27 @@ def resolve_meta(
         meta_provider, path_params, {}, service_providers
     )
     if inspect.isawaitable(result):
-        msg = "meta_provider must be sync; async meta() not yet supported"
-        raise NotImplementedError(msg)
+        result = await result
     if isinstance(result, RouteMeta):
         return result
     if isinstance(result, dict):
-        from chirp.pages.types import RouteMeta as _RouteMeta
-
-        return _RouteMeta(
-            title=result.get("title"),
-            section=result.get("section"),
-            breadcrumb_label=result.get("breadcrumb_label"),
-            shell_mode=result.get("shell_mode"),
-            auth=result.get("auth"),
-            cache=result.get("cache"),
-            tags=tuple(result.get("tags", ()))
-            if isinstance(result.get("tags"), (list, tuple))
-            else (),
-        )
+        return _dict_to_route_meta(result)
     return None
+
+
+def _dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
+    """Convert a dict returned by a meta provider to RouteMeta."""
+    return RouteMeta(
+        title=d.get("title"),
+        section=d.get("section"),
+        breadcrumb_label=d.get("breadcrumb_label"),
+        shell_mode=d.get("shell_mode"),
+        auth=d.get("auth"),
+        cache=d.get("cache"),
+        tags=tuple(d.get("tags", ()))
+        if isinstance(d.get("tags"), (list, tuple))
+        else (),
+    )
 
 
 def _call_meta_provider(
@@ -113,13 +116,18 @@ def build_shell_context(
         result["page_title"] = meta.title
 
     # breadcrumb_items: section prefix + optional meta.breadcrumb_label
-    breadcrumb_parts: list[dict[str, str]] = []
-    if section_ctx.get("breadcrumb_prefix"):
-        breadcrumb_parts.extend(section_ctx["breadcrumb_prefix"])
-    if meta is not None and meta.breadcrumb_label is not None:
-        # Use current_path as href for the leaf breadcrumb
+    # Also expose breadcrumb_prefix and breadcrumb_label for OOB blocks
+    # that render in isolation (they need to build items from context).
+    breadcrumb_prefix = section_ctx.get("breadcrumb_prefix") or []
+    breadcrumb_label = meta.breadcrumb_label if meta else None
+    if breadcrumb_prefix or breadcrumb_label is not None:
+        result["breadcrumb_prefix"] = breadcrumb_prefix
+        if breadcrumb_label is not None:
+            result["breadcrumb_label"] = breadcrumb_label
+    breadcrumb_parts: list[dict[str, str]] = list(breadcrumb_prefix)
+    if breadcrumb_label is not None:
         breadcrumb_parts.append(
-            {"label": meta.breadcrumb_label, "href": request.path}
+            {"label": breadcrumb_label, "href": request.path}
         )
     if breadcrumb_parts:
         result["breadcrumb_items"] = breadcrumb_parts

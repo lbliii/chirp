@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Middleware, Next
+from chirp.templating.fragment_target_registry import PageShellContract, PageShellTarget
 
 # Deprecated: these constants moved from chirp.templating.render_plan.
 # Import from chirp.ext.chirp_ui if needed. Will be removed in the next major.
@@ -31,6 +32,29 @@ CHIRPUI_DOCUMENT_TITLE_TARGET = "chirpui-document-title"
 BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
 SIDEBAR_OOB_BLOCK = "sidebar_oob"
 TITLE_OOB_BLOCK = "title_oob"
+
+CHIRPUI_PAGE_SHELL_CONTRACT = PageShellContract(
+    name="chirpui-app-shell",
+    description="Canonical ChirpUI page shell contract for app-shell and tabbed page layouts.",
+    targets=(
+        PageShellTarget(
+            target_id="main",
+            fragment_block="page_root",
+            description="Sidebar and boosted page navigation target.",
+        ),
+        PageShellTarget(
+            target_id="page-root",
+            fragment_block="page_root_inner",
+            description="Tabbed page shell target that keeps page-root wrappers.",
+        ),
+        PageShellTarget(
+            target_id="page-content-inner",
+            fragment_block="page_content",
+            triggers_shell_update=False,
+            description="Narrow content swap target that skips shell updates.",
+        ),
+    ),
+)
 
 
 class _ChirpUIStrictMiddleware(Middleware):
@@ -95,10 +119,4 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
         wrap=False,
     )
 
-    app.register_fragment_target("main", fragment_block="page_root")
-    app.register_fragment_target("page-root", fragment_block="page_root_inner")
-    app.register_fragment_target(
-        "page-content-inner",
-        fragment_block="page_content",
-        triggers_shell_update=False,
-    )
+    app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)

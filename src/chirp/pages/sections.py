@@ -38,9 +38,9 @@ def resolve_section_context(
 
     result: dict[str, Any] = {}
     if section.tab_items:
-        result["tab_items"] = [
-            {"label": t.label, "href": t.href} for t in section.tab_items
-        ]
+        tab_list = [{"label": t.label, "href": t.href} for t in section.tab_items]
+        result["tab_items"] = tab_list
+        result["route_tabs"] = tab_list
     if section.breadcrumb_prefix:
         result["breadcrumb_prefix"] = list(section.breadcrumb_prefix)
     return result

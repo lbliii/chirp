@@ -2,13 +2,38 @@
 
 Maps target IDs (e.g. ``page-root``) to fragment_block config. When HX-Target
 matches a registered target, Chirp uses the registry's fragment_block instead
-of composition.page_block. Apps register targets during setup; the registry
-is frozen at runtime.
+of composition.page_block. Apps can group related targets into a page shell
+contract so app-level layout expectations are explicit and contract-checkable.
+The registry is mutable during setup and frozen at runtime.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True, slots=True)
+class PageShellTarget:
+    """A single target participating in a page shell contract."""
+
+    target_id: str
+    fragment_block: str
+    triggers_shell_update: bool = True
+    required: bool = True
+    description: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PageShellContract:
+    """Named group of fragment targets defining an app shell contract."""
+
+    name: str
+    targets: tuple[PageShellTarget, ...]
+    description: str = ""
+
+    @property
+    def required_fragment_blocks(self) -> frozenset[str]:
+        return frozenset(target.fragment_block for target in self.targets if target.required)
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +48,9 @@ class FragmentTargetConfig:
 
     fragment_block: str
     triggers_shell_update: bool = True
+    contract_name: str | None = None
+    required: bool = False
+    description: str = ""
 
 
 @dataclass(slots=True)
@@ -33,6 +61,7 @@ class FragmentTargetRegistry:
     """
 
     _targets: dict[str, FragmentTargetConfig] = field(default_factory=dict)
+    _contracts: dict[str, PageShellContract] = field(default_factory=dict)
     _frozen: bool = False
 
     def register(
@@ -41,6 +70,9 @@ class FragmentTargetRegistry:
         *,
         fragment_block: str,
         triggers_shell_update: bool = True,
+        contract_name: str | None = None,
+        required: bool = False,
+        description: str = "",
     ) -> None:
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
@@ -49,7 +81,32 @@ class FragmentTargetRegistry:
         self._targets[target_id] = FragmentTargetConfig(
             fragment_block=fragment_block,
             triggers_shell_update=triggers_shell_update,
+            contract_name=contract_name,
+            required=required,
+            description=description,
         )
+
+    def register_contract(self, contract: PageShellContract) -> None:
+        """Register a named page shell contract and all of its targets."""
+        if self._frozen:
+            msg = "Cannot modify fragment target registry after app has started."
+            raise RuntimeError(msg)
+        if self._contracts and contract.name not in self._contracts:
+            msg = (
+                "Only one page shell contract can be registered per app today. "
+                "Register fragment targets directly for secondary shells."
+            )
+            raise ValueError(msg)
+        self._contracts[contract.name] = contract
+        for target in contract.targets:
+            self.register(
+                target.target_id,
+                fragment_block=target.fragment_block,
+                triggers_shell_update=target.triggers_shell_update,
+                contract_name=contract.name,
+                required=target.required,
+                description=target.description,
+            )
 
     def freeze(self) -> None:
         self._frozen = True
@@ -64,3 +121,13 @@ class FragmentTargetRegistry:
     @property
     def registered_targets(self) -> frozenset[str]:
         return frozenset(self._targets)
+
+    @property
+    def registered_contracts(self) -> tuple[PageShellContract, ...]:
+        return tuple(self._contracts.values())
+
+    @property
+    def required_fragment_blocks(self) -> frozenset[str]:
+        return frozenset(
+            config.fragment_block for config in self._targets.values() if config.required
+        )

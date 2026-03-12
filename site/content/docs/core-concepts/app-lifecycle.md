@@ -49,6 +49,8 @@ app.run()  # Compiles routes, freezes config, starts serving
 
 The transition happens when `app.run()` is called, or on the first ASGI `__call__()`. After freeze, attempting to register new routes raises an error.
 
+During setup, register sections with `app.register_section()` before `mount_pages()`. At freeze, the framework validates the route directory contract (section bindings, shell mode/block alignment, tab hrefs) and runs `app.check()` when `config.debug=True`.
+
 ## Why Freeze?
 
 Free-threading (Python 3.14t) means multiple threads handle requests concurrently. If the route table, middleware stack, or template environment could be mutated during request handling, you would need locks everywhere.

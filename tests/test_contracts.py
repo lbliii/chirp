@@ -36,6 +36,7 @@ from chirp.contracts.template_scan import (
 from chirp.contracts.template_scan import (
     extract_template_references as _extract_template_references,
 )
+from chirp.ext.chirp_ui import CHIRPUI_PAGE_SHELL_CONTRACT, use_chirp_ui
 
 
 class TestAttrToMethod:
@@ -80,7 +81,85 @@ class TestContractCheckSnapshot:
         app._ensure_frozen()
         snapshot = app._contract_check_snapshot()
         assert snapshot.router is not None
+        assert snapshot.fragment_target_registry is not None
+        assert snapshot.page_leaf_templates == set()
         assert snapshot.islands_contract_strict == app.config.islands_contract_strict
+
+
+class TestPageShellContractValidation:
+    def test_use_chirp_ui_registers_page_shell_contract(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        use_chirp_ui(app)
+
+        registry = app._mutable_state.fragment_target_registry
+        assert registry.registered_contracts == (CHIRPUI_PAGE_SHELL_CONTRACT,)
+        assert registry.required_fragment_blocks == frozenset(
+            {"page_root", "page_root_inner", "page_content"}
+        )
+
+    def test_checker_reports_missing_required_page_shell_blocks(self, tmp_path):
+        (tmp_path / "_layout.html").write_text(
+            '{# target: body #}<main id="main">{% block content %}{% endblock %}</main>',
+            encoding="utf-8",
+        )
+        (tmp_path / "page.html").write_text(
+            '{% extends "_layout.html" %}{% block content %}<p>hello</p>{% endblock %}',
+            encoding="utf-8",
+        )
+
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        use_chirp_ui(app)
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._mutable_state.page_leaf_templates.add("page.html")
+        app._mutable_state.page_templates.add("page.html")
+
+        result = check_hypermedia_surface(app)
+        page_shell_errors = [issue for issue in result.errors if issue.category == "page_shell"]
+        assert len(page_shell_errors) == 1
+        assert "page_root" in page_shell_errors[0].message
+        assert "page_root_inner" in page_shell_errors[0].message
+        assert "page_content" in page_shell_errors[0].message
+
+    def test_checker_accepts_page_shell_templates_with_required_blocks(self, tmp_path):
+        (tmp_path / "_layout.html").write_text(
+            '{# target: body #}<main id="main">{% block content %}{% endblock %}</main>',
+            encoding="utf-8",
+        )
+        (tmp_path / "_page_layout.html").write_text(
+            '{% extends "_layout.html" %}'
+            '{% block content %}'
+            '{% block page_root %}'
+            '<div id="page-root">'
+            '{% block page_root_inner %}'
+            '<div id="page-content-inner">{% block page_content %}{% endblock %}</div>'
+            '{% endblock %}'
+            "</div>"
+            '{% endblock %}'
+            '{% endblock %}',
+            encoding="utf-8",
+        )
+        (tmp_path / "page.html").write_text(
+            '{% extends "_page_layout.html" %}{% block page_content %}<p>hello</p>{% endblock %}',
+            encoding="utf-8",
+        )
+
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        use_chirp_ui(app)
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._mutable_state.page_leaf_templates.add("page.html")
+        app._mutable_state.page_templates.add("page.html")
+
+        result = check_hypermedia_surface(app)
+        page_shell_errors = [issue for issue in result.errors if issue.category == "page_shell"]
+        assert page_shell_errors == []
 
 
 class TestExtractTargets:

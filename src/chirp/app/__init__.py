@@ -464,4 +464,5 @@ class App:
             sections=self._mutable_state.sections,
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
+            discovered_routes=self._mutable_state.discovered_routes,
         )

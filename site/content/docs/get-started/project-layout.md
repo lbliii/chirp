@@ -20,12 +20,14 @@ myapp/
   models.py           # User model + password verification helpers
   pages/
     _layout.html      # Shared page layout
+    _meta.py          # (optional) Route metadata: title, section, breadcrumb
     page.py           # Home route handler
     page.html         # Home template
     login/
       page.py         # Login page handler
       page.html       # Login template
     dashboard/
+      _meta.py        # (optional) Route metadata for app-shell pages
       page.py         # Protected dashboard handler
       page.html       # Dashboard template
   static/

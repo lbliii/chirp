@@ -124,6 +124,7 @@
       isOob: false,
       elt: null,
       expanded: false,
+      route: null,
     };
     state.records.unshift(r);
     if (state.records.length > BUFFER_SIZE) state.records.pop();
@@ -161,6 +162,17 @@
       if (r.status >= 400) {
         r.failed = true;
         state.errorCount++;
+      }
+      var routeKind = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Route-Kind");
+      if (routeKind) {
+        r.route = {
+          kind: routeKind,
+          meta: xhr.getResponseHeader("X-Chirp-Route-Meta") || "",
+          files: xhr.getResponseHeader("X-Chirp-Route-Files") || "",
+          section: xhr.getResponseHeader("X-Chirp-Route-Section") || "",
+          contextChain: xhr.getResponseHeader("X-Chirp-Context-Chain") || "",
+          shellContext: xhr.getResponseHeader("X-Chirp-Shell-Context") || "",
+        };
       }
     }
   });
@@ -528,6 +540,13 @@
         if (r.elt) parts.push("Trigger: " + desc(r.elt));
         if (r.timing) {
           parts.push("Timing: config=" + (r.timing.config || "-") + " sent=" + (r.timing.sent || "-") + " response=" + (r.timing.response || "-") + " swap=" + (r.timing.afterSwap || "-") + " settle=" + (r.timing.settle || "-"));
+        }
+        if (r.route) {
+          parts.push("Route: kind=" + r.route.kind + " section=" + r.route.section);
+          if (r.route.meta) parts.push("RouteMeta: " + r.route.meta);
+          if (r.route.files) parts.push("Files: " + r.route.files);
+          if (r.route.contextChain) parts.push("Context chain: " + r.route.contextChain);
+          if (r.route.shellContext) parts.push("Shell context: " + r.route.shellContext);
         }
         if (r.elt) {
           var cfg = getEffectiveConfig(r.elt);

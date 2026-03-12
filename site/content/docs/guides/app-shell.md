@@ -160,6 +160,10 @@ use `{% region %}` instead of blocks. One definition serves both — no duplicat
 See `examples/shell_oob` for the reference implementation. The block-based
 extend pattern above remains valid for apps that don't need OOB.
 
+## Route Contract and Sections
+
+With the [route directory contract](/docs/reference/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/docs/guides/route-directory/) for recommended patterns.
+
 ## Forms Inside the Shell
 
 Forms inside `<main>` work without any special wrappers.  Since `<main>` has no
@@ -292,6 +296,34 @@ fragment_block="...", triggers_shell_update=True)`.
 
 See `examples/pages_shell` for a working cascade with `remove=` and
 `mode="replace"`.
+
+## Debugging and Introspection
+
+The most useful way to debug a shell app is to follow the contract chain:
+
+1. Which HTMX target fired? (`#main`, `#page-root`, or a narrow target)
+2. Which fragment block does Chirp map that target to?
+3. Does the leaf page template actually define that block?
+
+With `use_chirp_ui(app)`, the default mapping is:
+
+| Target | Block | Typical trigger |
+|---|---|---|
+| `#main` | `page_root` | Sidebar navigation |
+| `#page-root` | `page_root_inner` | Section tabs |
+| `#page-content-inner` | `page_content` | Narrow content mutations |
+
+If the wrong amount of HTML swaps, the target/block pair is usually the bug. If the right block is chosen but the shell does not update, check whether the target was registered with `triggers_shell_update=True`.
+
+For day-to-day debugging:
+
+- Run `app.check()` in tests or startup to catch missing shell blocks early.
+- When `config.debug=True`, response headers include `X-Chirp-Route-Kind`, `X-Chirp-Route-Meta`, `X-Chirp-Context-Chain`, and `X-Chirp-Shell-Context` for route introspection.
+- Visit `/__chirp/routes` (debug only) for a visual route explorer with per-route drill-down.
+- The HTMX debug panel's activity log shows route metadata when you expand a request entry.
+- Prefer `render_route_tabs(tab_items, current_path)` over the legacy `route_tabs(...)` alias so template names do not collide with context variables.
+- Keep one Python source of truth for tab families, breadcrumb prefixes, and sidebar state instead of recomputing them across templates and handlers.
+- When a target is unregistered, Chirp's render-plan diagnostics list the known targets; use that output to spot typos quickly.
 
 ## Content Navigation Links
 
