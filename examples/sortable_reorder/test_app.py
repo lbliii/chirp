@@ -1,33 +1,16 @@
 """Tests for the sortable_reorder example."""
 
-import re
-
 from chirp.testing import TestClient
+
+from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 
 
-def _extract_cookie(response, name: str = "chirp_session_sortable_reorder") -> str | None:
-    for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
-            return hvalue.split(";")[0].partition("=")[2]
-    return None
-
-
-def _extract_csrf(html: str) -> str | None:
-    m = re.search(
-        r'<input[^>]*name="_csrf_token"[^>]*value="([^"]+)"'
-        r'|<input[^>]*value="([^"]+)"[^>]*name="_csrf_token"'
-        r'|<meta[^>]*name="csrf-token"[^>]*content="([^"]+)"',
-        html,
-    )
-    return m.group(1) or m.group(2) or m.group(3) if m else None
-
-
-def _auth_headers(client_response) -> dict[str, str]:
+def _auth_headers(client_response) -> tuple[dict[str, str], str | None]:
     """Build headers with session cookie and CSRF for POST requests."""
-    cookie = _extract_cookie(client_response)
-    csrf = _extract_csrf(client_response.text)
+    cookie = extract_session_cookie(client_response, cookie_name="chirp_session_sortable_reorder")
+    csrf = extract_csrf_token(client_response.text)
     headers = dict(_FORM_CT)
     if cookie:
         headers["Cookie"] = f"chirp_session_sortable_reorder={cookie}"

@@ -9,6 +9,7 @@ Pre-release audit of failing examples and technical debt. Each section has root 
 **Error:** `Page template 'X' does not satisfy the registered page shell contract. Missing required block(s): page_root_inner.`
 
 **Root cause:** ChirpUI's `CHIRPUI_PAGE_SHELL_CONTRACT` requires three blocks:
+
 - `page_root` — target `#main` (sidebar + boosted nav)
 - `page_root_inner` — target `#page-root` (tabbed page shell)
 - `page_content` — target `#page-content-inner` (optional, triggers_shell_update=False)
@@ -16,6 +17,7 @@ Pre-release audit of failing examples and technical debt. Each section has root 
 Examples that use `use_chirp_ui(app)` must provide all required blocks. Several have `page_root` and `page_content` but omit `page_root_inner`.
 
 **Fix pattern (from sortable_reorder):**
+
 ```html
 {% block page_root %}
 {% block page_root_inner %}
@@ -26,15 +28,17 @@ Examples that use `use_chirp_ui(app)` must provide all required blocks. Several 
 
 **Affected files:**
 
-| Example | Template | Current | Fix |
-|---------|----------|---------|-----|
-| contacts_shell | contacts/page.html | page_root, page_content | Add `{% block page_root_inner %}` wrapping content inside page_root |
-| islands_shell | page.html | page_root, page_content | Add page_root_inner |
-| islands_shell | about/page.html | page_root, page_content | Add page_root_inner |
-| islands_shell | dashboard/page.html | page_root, page_content | Add page_root_inner |
-| pages_shell | projects/page.html | page_root, page_content | Add page_root_inner |
-| pages_shell | projects/{slug}/page.html | **none** | Add page_root, page_root_inner, page_content (wraps entire content) |
-| pages_shell | projects/{slug}/settings/page.html | page_root only | Add page_root_inner, page_content |
+
+| Example        | Template                           | Current                 | Fix                                                                 |
+| -------------- | ---------------------------------- | ----------------------- | ------------------------------------------------------------------- |
+| contacts_shell | contacts/page.html                 | page_root, page_content | Add `{% block page_root_inner %}` wrapping content inside page_root |
+| islands_shell  | page.html                          | page_root, page_content | Add page_root_inner                                                 |
+| islands_shell  | about/page.html                    | page_root, page_content | Add page_root_inner                                                 |
+| islands_shell  | dashboard/page.html                | page_root, page_content | Add page_root_inner                                                 |
+| pages_shell    | projects/page.html                 | page_root, page_content | Add page_root_inner                                                 |
+| pages_shell    | projects/{slug}/page.html          | **none**                | Add page_root, page_root_inner, page_content (wraps entire content) |
+| pages_shell    | projects/{slug}/settings/page.html | page_root only          | Add page_root_inner, page_content                                   |
+
 
 **Effort:** ~30 min. Wrap existing content in the missing block(s).
 
@@ -47,10 +51,12 @@ Examples that use `use_chirp_ui(app)` must provide all required blocks. Several 
 **Root cause:** Kida's `format` filter uses Python `str.format()` with `{}` placeholders. The `%`-style (`"%.2f"`) is not supported.
 
 **Fix:** Replace `"%.2f" | format(x)` with either:
+
 - `{{ "{:.2f}" | format(x) }}` — str.format style
 - `{{ x | format_number(2) }}` — Kida numeric helper
 
 **Affected lines in `examples/dashboard_live/templates/dashboard.html`:**
+
 - Line 94: `${{ "%.2f" | format(stats.total_revenue) }}`
 - Line 102: `${{ "%.2f" | format(stats.avg_order) }}`
 - Line 134: `${{ "%.2f" | format(order.amount) }}`
@@ -67,6 +73,7 @@ Examples that use `use_chirp_ui(app)` must provide all required blocks. Several 
 **Root cause:** `fragment_island_with_result` in chirp-ui creates a div with `mutation_result_id` (e.g. `"update-result"`) for forms that target it. The contract checker scans templates for hx-target attributes and warns when the target ID doesn't exist. The `#update-result` is referenced in component docs/examples but not all apps that use fragment_island provide it.
 
 **Options:**
+
 1. **Ignore** — It's a warning (▲), not an error. Apps that don't use `fragment_island_with_result` won't have this element; that's fine.
 2. **ChirpUI** — If fragment_island.html or a shared layout defines a default `#update-result` placeholder, the warning goes away. Check if chirp-ui's fragment_island macro should add it.
 3. **Contract checker** — Only warn for hx-target when the target is clearly app-specific (e.g. not from fragment_island_with_result pattern).
@@ -82,6 +89,7 @@ Examples that use `use_chirp_ui(app)` must provide all required blocks. Several 
 **Root cause:** Nested routes inherit parent context. The checker flags `projects` and `project` as "not path param or provider" because they're provided by parent context providers, not by the route's own _context.py.
 
 **Options:**
+
 1. **Relax checker** — Allow params that exist in `cascade_ctx` from parent discovery.
 2. **Add _context.py** — Each nested route could declare it receives `projects`/`project` from parent (redundant but satisfies checker).
 3. **Document** — Add a note that this is expected for nested routes; treat as informational.
@@ -111,6 +119,7 @@ Same pattern as shell_context.py and actions.py (already fixed). Python 3 requir
 **Root cause:** Contract checker suggests _meta.py for SEO and shell context. Examples often omit it for brevity.
 
 **Options:**
+
 1. **Add _meta.py** to each example route dir — improves examples as reference.
 2. **Downgrade to hint** — Make it a suggestion, not a warning.
 3. **Leave as-is** — Warnings are informational; examples still work.
@@ -131,14 +140,16 @@ Same pattern as shell_context.py and actions.py (already fixed). Python 3 requir
 
 ## Summary: Release Checklist
 
-| # | Issue | Effort | Priority | Status |
-|---|-------|--------|----------|--------|
-| 1 | Add page_root_inner to 7 templates | 30 min | **P0** — Unblocks tests | ✅ Done |
-| 2 | Fix dashboard format filter (4 places) | 5 min | **P0** — Unblocks tests | ✅ Done |
-| 5 | Fix chirp_ui.py except syntax | 1 min | **P0** — Bug | ✅ Done |
-| 3 | update-result warning | Low | P2 — Cosmetic | Open |
-| 4 | Context provider params | Medium | P2 — Refinement | Open |
-| 6 | _meta.py warnings | 15 min | P3 — Nice to have | Open |
-| 7 | dashboard.html reference | TBD | P2 — Investigate | Open |
 
-**P0 fixes complete.** All 405 example tests pass. Remaining items (3–7) are non-blocking.
+| #   | Issue                                  | Effort | Priority                | Status |
+| --- | -------------------------------------- | ------ | ----------------------- | ------ |
+| 1   | Add page_root_inner to 7 templates     | 30 min | **P0** — Unblocks tests | ✅ Done |
+| 2   | Fix dashboard format filter (4 places) | 5 min  | **P0** — Unblocks tests | ✅ Done |
+| 5   | Fix chirp_ui.py except syntax          | 1 min  | **P0** — Bug            | ✅ Done |
+| 3   | update-result warning                  | Low    | P2 — Cosmetic           | ✅ Done |
+| 4   | Context provider params                | Medium | P2 — Refinement         | ✅ Done |
+| 6   | _meta.py warnings                      | 15 min | P3 — Nice to have       | ✅ Done |
+| 7   | dashboard.html reference               | TBD    | P2 — Investigate        | ✅ Done |
+
+
+**All items complete.** All 405 example tests pass. Chirp check reports "All clear" for dashboard_live and pages_shell.

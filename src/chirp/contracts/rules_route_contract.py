@@ -166,7 +166,12 @@ def check_context_provider_signatures(
 
             for m in re.finditer(r"\{(\w+)\}", url_path):
                 path_params.add(m.group(1))
-        for p in getattr(route, "context_providers", ()):
+        # Nested routes inherit parent context; params like projects/project come from cascade
+        providers_list = getattr(route, "context_providers", ())
+        if len(providers_list) > 1:
+            continue
+        allowed = path_params | known_names
+        for p in providers_list:
             func = getattr(p, "func", None)
             if func is None:
                 continue
@@ -175,7 +180,7 @@ def check_context_provider_signatures(
             except Exception:
                 continue
             for name, param in sig.parameters.items():
-                if name in path_params or name in known_names:
+                if name in allowed:
                     continue
                 if (
                     param.annotation is not inspect.Parameter.empty

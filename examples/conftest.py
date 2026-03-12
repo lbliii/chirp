@@ -7,9 +7,15 @@ with clean state (e.g. the todo list is empty).
 """
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
+
+# Ensure project root is on path so tests.helpers is importable
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 
 
 @pytest.fixture
