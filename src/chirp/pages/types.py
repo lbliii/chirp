@@ -60,9 +60,11 @@ class Section:
 
     def is_active(self, path: str) -> bool:
         """Return True if *path* matches any of this section's active prefixes."""
-        return any(
-            path == prefix or path.startswith(prefix + "/") for prefix in self.active_prefixes
-        )
+        for prefix in self.active_prefixes:
+            norm = prefix.rstrip("/") if prefix != "/" else "/"
+            if path == norm or (norm != "/" and path.startswith(norm + "/")):
+                return True
+        return False
 
 
 @dataclass(frozen=True, slots=True)

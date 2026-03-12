@@ -5,6 +5,7 @@ Handles both standard single-body responses and chunked streaming responses.
 
 import logging
 from collections.abc import AsyncIterator
+from types import MappingProxyType
 from typing import cast
 
 from chirp._internal.asgi import Send
@@ -12,14 +13,17 @@ from chirp.http.response import Response, StreamingResponse
 
 logger = logging.getLogger("chirp.server")
 
-_CT_PREENCODED: dict[str, bytes] = {
-    "text/html; charset=utf-8": b"text/html; charset=utf-8",
-    "application/json; charset=utf-8": b"application/json; charset=utf-8",
-    "application/octet-stream": b"application/octet-stream",
-    "text/plain; charset=utf-8": b"text/plain; charset=utf-8",
-    "application/javascript; charset=utf-8": b"application/javascript; charset=utf-8",
-    "text/css; charset=utf-8": b"text/css; charset=utf-8",
-}
+# Immutable mapping for free-threading (no module-level mutable dicts)
+_CT_PREENCODED: MappingProxyType[str, bytes] = MappingProxyType(
+    {
+        "text/html; charset=utf-8": b"text/html; charset=utf-8",
+        "application/json; charset=utf-8": b"application/json; charset=utf-8",
+        "application/octet-stream": b"application/octet-stream",
+        "text/plain; charset=utf-8": b"text/plain; charset=utf-8",
+        "application/javascript; charset=utf-8": b"application/javascript; charset=utf-8",
+        "text/css; charset=utf-8": b"text/css; charset=utf-8",
+    }
+)
 
 
 def _encode_content_type(ct: str) -> bytes:

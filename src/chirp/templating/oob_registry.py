@@ -10,6 +10,7 @@ as target ID, ``outerHTML`` swap, and wrapper div.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -44,6 +45,7 @@ class OOBRegistry:
     _regions: dict[str, OOBRegionConfig] = field(default_factory=dict)
     _frozen: bool = False
     _contract_cache: dict[str, LayoutContract] = field(default_factory=dict)
+    _contract_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def register(self, block_name: str, config: OOBRegionConfig) -> None:
         if self._frozen:
@@ -83,8 +85,9 @@ class OOBRegistry:
         """Return cached LayoutContract, building on first access."""
         from chirp.templating.render_plan import build_layout_contract
 
-        contract = self._contract_cache.get(template_name)
-        if contract is None:
-            contract = build_layout_contract(adapter, template_name, oob_registry=self)
-            self._contract_cache[template_name] = contract
-        return contract
+        with self._contract_lock:
+            contract = self._contract_cache.get(template_name)
+            if contract is None:
+                contract = build_layout_contract(adapter, template_name, oob_registry=self)
+                self._contract_cache[template_name] = contract
+            return contract

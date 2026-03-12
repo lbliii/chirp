@@ -99,8 +99,7 @@ class Request:
     Metadata (method, path, headers, etc.) is frozen at creation.
     Body is accessed asynchronously via ``.body()``, ``.json()``, ``.form()``.
 
-    Cookies are parsed once at creation time (in ``from_asgi``) and stored
-    as a frozen field — not re-parsed on every access.
+    Query params and cookies are parsed lazily on first access (not at creation).
     """
 
     method: str
