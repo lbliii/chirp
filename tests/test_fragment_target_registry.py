@@ -192,9 +192,7 @@ def test_build_render_plan_local_fragment_uses_registry_when_fragment_block_none
         receive=_receive,
     )
 
-    plan = build_render_plan(
-        comp, request=request, fragment_target_registry=reg
-    )
+    plan = build_render_plan(comp, request=request, fragment_target_registry=reg)
     assert plan.intent == "local_fragment"
     assert plan.main_view.block == "page_root_inner"
 
@@ -313,8 +311,6 @@ def test_build_render_plan_main_target_boosted_returns_page_root() -> None:
         receive=_receive,
     )
 
-    plan = build_render_plan(
-        comp, request=request, fragment_target_registry=reg
-    )
+    plan = build_render_plan(comp, request=request, fragment_target_registry=reg)
     assert plan.intent == "page_fragment"
     assert plan.main_view.block == "page_root"

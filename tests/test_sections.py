@@ -27,9 +27,7 @@ def test_resolve_section_context_with_matching_section() -> None:
             TabItem(label="Guide", href="/docs/guide"),
             TabItem(label="API", href="/docs/api"),
         ),
-        breadcrumb_prefix=(
-            {"label": "Docs", "href": "/docs"},
-        ),
+        breadcrumb_prefix=({"label": "Docs", "href": "/docs"},),
     )
     sections = {"docs": section}
     meta = RouteMeta(section="docs", title="Guide")

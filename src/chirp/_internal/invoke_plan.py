@@ -14,7 +14,6 @@ from typing import Any, Literal, get_origin
 
 from chirp.http.request import Request
 
-
 type ParamSource = Literal["request", "path", "provider", "extract"]
 
 

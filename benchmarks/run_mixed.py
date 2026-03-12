@@ -57,12 +57,14 @@ def run_json_load(url: str, num: int, concurrency: int) -> tuple[int, int, float
         except Exception:
             return False
 
-    with httpx.Client(timeout=30.0, limits=limits) as client:
-        with ThreadPoolExecutor(max_workers=concurrency) as ex:
-            futures = [ex.submit(worker, client) for _ in range(num)]
-            for f in as_completed(futures):
-                if f.result():
-                    ok += 1
+    with (
+        httpx.Client(timeout=30.0, limits=limits) as client,
+        ThreadPoolExecutor(max_workers=concurrency) as ex,
+    ):
+        futures = [ex.submit(worker, client) for _ in range(num)]
+        for f in as_completed(futures):
+            if f.result():
+                ok += 1
     elapsed = time.perf_counter() - start
     return ok, num - ok, ok / elapsed if elapsed else 0.0
 
@@ -73,15 +75,12 @@ def run_stream_smoke(url: str, num: int, concurrency: int) -> tuple[int, int]:
 
     def one_request() -> bool:
         try:
-            with httpx.Client(timeout=10.0) as client:
-                with client.stream("GET", url) as r:
-                    if r.status_code != 200:
-                        return False
-                    count = 0
-                    for _ in r.iter_lines():
-                        count += 1
-                        if count >= 10:  # Read a few events then stop
-                            break
+            with httpx.Client(timeout=10.0) as client, client.stream("GET", url) as r:
+                if r.status_code != 200:
+                    return False
+                for count, _ in enumerate(r.iter_lines()):
+                    if count >= 9:  # Read a few events then stop
+                        break
             return True
         except Exception:
             return False
@@ -123,16 +122,20 @@ def main() -> None:
 
         print("=" * 60)
         print(f"  Mixed workload (JSON + SSE) | worker_mode={worker_mode}")
-        print(f"  {NUM_JSON_REQUESTS} JSON + {NUM_STREAM_REQUESTS} stream | {CONCURRENCY} concurrent")
+        print(
+            f"  {NUM_JSON_REQUESTS} JSON + {NUM_STREAM_REQUESTS} stream | {CONCURRENCY} concurrent"
+        )
         print("=" * 60)
 
         json_ok, json_failed, json_rps = 0, 0, 0.0
         stream_ok, stream_failed = 0, 0
-        for rnd in range(ROUNDS):
+        for _ in range(ROUNDS):
             # Run JSON and stream concurrently
             with ThreadPoolExecutor(max_workers=2) as ex:
                 j_f = ex.submit(run_json_load, f"{base}/json", NUM_JSON_REQUESTS, CONCURRENCY)
-                s_f = ex.submit(run_stream_smoke, f"{base}/stream", NUM_STREAM_REQUESTS, CONCURRENCY)
+                s_f = ex.submit(
+                    run_stream_smoke, f"{base}/stream", NUM_STREAM_REQUESTS, CONCURRENCY
+                )
                 jo, jf, jr = j_f.result()
                 so, sf = s_f.result()
             json_ok += jo
@@ -148,7 +151,9 @@ def main() -> None:
         stream_failed //= ROUNDS
 
         print()
-        print(f"  JSON:  {json_ok}/{NUM_JSON_REQUESTS} ok, {json_failed} failed, {json_rps:.1f} req/s")
+        print(
+            f"  JSON:  {json_ok}/{NUM_JSON_REQUESTS} ok, {json_failed} failed, {json_rps:.1f} req/s"
+        )
         print(f"  Stream: {stream_ok}/{NUM_STREAM_REQUESTS} ok, {stream_failed} failed")
         print()
         if stream_failed > 0:

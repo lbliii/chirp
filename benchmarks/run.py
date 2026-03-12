@@ -17,6 +17,7 @@ Install: uv sync --extra benchmark  (or pip install chirp[benchmark])
 """
 
 import argparse
+import contextlib
 import os
 import statistics
 import subprocess
@@ -128,14 +129,16 @@ def run_load_test(
                 return False, elapsed
 
         start = time.perf_counter()
-        with httpx.Client(timeout=30.0, limits=limits) as client:
-            with ThreadPoolExecutor(max_workers=concurrency) as ex:
-                futures = [ex.submit(worker, client) for _ in range(num_requests)]
-                for f in as_completed(futures):
-                    success, lat = f.result()
-                    latencies.append(lat)
-                    if success:
-                        ok += 1
+        with (
+            httpx.Client(timeout=30.0, limits=limits) as client,
+            ThreadPoolExecutor(max_workers=concurrency) as ex,
+        ):
+            futures = [ex.submit(worker, client) for _ in range(num_requests)]
+            for f in as_completed(futures):
+                success, lat = f.result()
+                latencies.append(lat)
+                if success:
+                    ok += 1
         elapsed = time.perf_counter() - start
 
     latencies.sort()
@@ -158,10 +161,8 @@ def warmup_endpoint(url: str, attempts: int = 10) -> None:
     """Warm an endpoint with keep-alive requests before timing."""
     with httpx.Client(timeout=5.0) as client:
         for _ in range(attempts):
-            try:
+            with contextlib.suppress(Exception):
                 client.get(url)
-            except Exception:
-                pass
             time.sleep(0.05)
 
 
@@ -439,7 +440,9 @@ def main() -> None:
         if name not in ports:
             print(f"Unknown framework: {name}", file=sys.stderr)
             continue
-        print(f"Running {name} (concurrency={args.concurrency}, client={args.client})...", flush=True)
+        print(
+            f"Running {name} (concurrency={args.concurrency}, client={args.client})...", flush=True
+        )
         results = run_framework(
             name,
             ports[name],

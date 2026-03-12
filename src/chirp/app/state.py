@@ -68,9 +68,7 @@ class MutableAppState:
     custom_kida_env: Environment | None = None
     tool_events: ToolEventBus = field(default_factory=ToolEventBus)
     oob_registry: OOBRegistry = field(default_factory=OOBRegistry)
-    fragment_target_registry: FragmentTargetRegistry = field(
-        default_factory=FragmentTargetRegistry
-    )
+    fragment_target_registry: FragmentTargetRegistry = field(default_factory=FragmentTargetRegistry)
     sections: dict[str, Section] = field(default_factory=dict)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)

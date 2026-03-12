@@ -29,7 +29,9 @@ def get():
     return Page("page.html", "content")
 """
     )
-    (pages / "page.html").write_text('{% block page_root %}{% block content %}home{% end %}{% end %}')
+    (pages / "page.html").write_text(
+        "{% block page_root %}{% block content %}home{% end %}{% end %}"
+    )
     skills = pages / "skills"
     skills.mkdir()
     (skills / "_meta.py").write_text(
@@ -46,7 +48,7 @@ def get():
 """
     )
     (skills / "page.html").write_text(
-        '{% block page_root %}{% block content %}skills{% end %}{% end %}'
+        "{% block page_root %}{% block content %}skills{% end %}{% end %}"
     )
     return pages
 

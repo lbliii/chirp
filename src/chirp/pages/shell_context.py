@@ -33,9 +33,7 @@ async def resolve_meta(
     if meta_provider is None or not callable(meta_provider):
         return None
 
-    result = _call_meta_provider(
-        meta_provider, path_params, {}, service_providers
-    )
+    result = _call_meta_provider(meta_provider, path_params, {}, service_providers)
     if inspect.isawaitable(result):
         result = await result
     if isinstance(result, RouteMeta):
@@ -54,9 +52,7 @@ def _dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
         shell_mode=d.get("shell_mode"),
         auth=d.get("auth"),
         cache=d.get("cache"),
-        tags=tuple(d.get("tags", ()))
-        if isinstance(d.get("tags"), (list, tuple))
-        else (),
+        tags=tuple(d.get("tags", ())) if isinstance(d.get("tags"), (list, tuple)) else (),
     )
 
 
@@ -126,9 +122,7 @@ def build_shell_context(
             result["breadcrumb_label"] = breadcrumb_label
     breadcrumb_parts: list[dict[str, str]] = list(breadcrumb_prefix)
     if breadcrumb_label is not None:
-        breadcrumb_parts.append(
-            {"label": breadcrumb_label, "href": request.path}
-        )
+        breadcrumb_parts.append({"label": breadcrumb_label, "href": request.path})
     if breadcrumb_parts:
         result["breadcrumb_items"] = breadcrumb_parts
 

@@ -77,7 +77,9 @@ def post():
     return Page("page.html", "content", msg="post")
 """
     )
-    (pages_dir / "page.html").write_text('{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}')
+    (pages_dir / "page.html").write_text(
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
+    )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))
     app.mount_pages(str(pages_dir))
@@ -116,16 +118,18 @@ def test_action(name: str, shared: str):
 """
     )
     (child / "page.py").write_text(
-        '''
+        """
 from chirp import Page
 
 def get(name: str):
     return Page("{name}/page.html", "content", msg="get")
 def post(name: str):
     return Page("{name}/page.html", "content", msg="post")
-'''
+"""
     )
-    (child / "page.html").write_text('{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}')
+    (child / "page.html").write_text(
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
+    )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))
     app.mount_pages(str(pages_dir))
@@ -164,7 +168,9 @@ def post():
     return Page("page.html", "content", msg="from-post")
 """
     )
-    (pages_dir / "page.html").write_text('{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}')
+    (pages_dir / "page.html").write_text(
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
+    )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))
     app.mount_pages(str(pages_dir))

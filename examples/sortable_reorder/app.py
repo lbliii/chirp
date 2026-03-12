@@ -15,11 +15,11 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 sys.path.insert(0, str(ROOT_DIR))
 
+from store import add_item, get_items, reorder_items
+
 from chirp import App, AppConfig, Fragment, Request, use_chirp_ui
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-
-from store import add_item, get_items, reorder_items
 
 PAGES_DIR = Path(__file__).parent / "pages"
 

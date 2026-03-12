@@ -27,7 +27,9 @@ class RouteMeta:
     tags: tuple[str, ...] = ()
 
 
-type MetaProvider = Callable[..., RouteMeta | dict[str, Any] | Awaitable[RouteMeta | dict[str, Any]]]
+type MetaProvider = Callable[
+    ..., RouteMeta | dict[str, Any] | Awaitable[RouteMeta | dict[str, Any]]
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,8 +61,7 @@ class Section:
     def is_active(self, path: str) -> bool:
         """Return True if *path* matches any of this section's active prefixes."""
         return any(
-            path == prefix or path.startswith(prefix + "/")
-            for prefix in self.active_prefixes
+            path == prefix or path.startswith(prefix + "/") for prefix in self.active_prefixes
         )
 
 

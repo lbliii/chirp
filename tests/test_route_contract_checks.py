@@ -53,7 +53,10 @@ def test_section_tab_href_warning(tmp_path: Path) -> None:
         Section(
             id="main",
             label="Main",
-            tab_items=(TabItem(label="Home", href="/"), TabItem(label="Missing", href="/nonexistent")),
+            tab_items=(
+                TabItem(label="Home", href="/"),
+                TabItem(label="Missing", href="/nonexistent"),
+            ),
         )
     )
     app.mount_pages(str(pages_dir))

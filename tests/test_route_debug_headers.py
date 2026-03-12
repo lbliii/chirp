@@ -47,7 +47,7 @@ def get(extra):
 """
     )
     (pages / "page.html").write_text(
-        '{% block page_root %}{% block content %}{{ extra }}{% end %}{% end %}'
+        "{% block page_root %}{% block content %}{{ extra }}{% end %}{% end %}"
     )
     return pages
 

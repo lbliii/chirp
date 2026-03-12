@@ -35,7 +35,6 @@ class _LazyQueryParams(Mapping[str, str]):
             object.__setattr__(self, "_parsed", parsed)
         return parsed
 
-
     def __getitem__(self, key: str) -> str:
         return self._ensure()[key]
 
@@ -271,9 +270,7 @@ class Request:
         client = scope.get("client")
         extensions = scope.get("extensions") or {}
         request_id = (
-            extensions.get("request_id")
-            or headers.get("x-request-id")
-            or str(uuid.uuid4())
+            extensions.get("request_id") or headers.get("x-request-id") or str(uuid.uuid4())
         )
         query_raw = scope.get("query_string", b"")
         cookie_header = headers.get("cookie") or ""

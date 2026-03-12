@@ -61,7 +61,7 @@ def get(items, from_vm):
 """
     )
     (pages_dir / "page.html").write_text(
-        '{% block page_root %}{% block content %}items={{ items }} vm={{ from_vm }}{% end %}{% end %}'
+        "{% block page_root %}{% block content %}items={{ items }} vm={{ from_vm }}{% end %}{% end %}"
     )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))
@@ -98,15 +98,15 @@ def viewmodel(name, shared):
 """
     )
     (child / "page.py").write_text(
-        '''
+        """
 from chirp import Page
 
 def get(name, msg):
     return Page("{name}/page.html", "content", msg=msg)
-'''
+"""
     )
     (child / "page.html").write_text(
-        '{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}'
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
     )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))

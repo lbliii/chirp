@@ -5,7 +5,9 @@ from pounce.sync_protocol import RawRequest
 from chirp.http.sync_request import SyncRequest
 
 
-def _raw(method: bytes = b"GET", path: bytes = b"/", query: bytes = b"", headers: tuple = ()) -> RawRequest:
+def _raw(
+    method: bytes = b"GET", path: bytes = b"/", query: bytes = b"", headers: tuple = ()
+) -> RawRequest:
     return RawRequest(
         method=method,
         path=path + (b"?" + query if query else b""),

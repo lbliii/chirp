@@ -95,7 +95,10 @@ async def handle_http_error(
     handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
     if handler is not None:
         response = await call_error_handler(
-            handler, request, exc, kida_env,
+            handler,
+            request,
+            exc,
+            kida_env,
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
         )
@@ -137,7 +140,10 @@ async def handle_internal_error(
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:
         return await call_error_handler(
-            handler, request, exc, kida_env,
+            handler,
+            request,
+            exc,
+            kida_env,
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
         )

@@ -9,7 +9,7 @@ def get_items() -> list[str]:
 
 def add_item(name: str) -> None:
     global _items
-    _items = _items + [name]
+    _items = [*_items, name]
 
 
 def reorder_items(from_idx: int, to_idx: int) -> None:

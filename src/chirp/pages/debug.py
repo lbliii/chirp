@@ -66,7 +66,11 @@ def build_route_debug_info(
         mod_path = getattr(p, "module_path", "")
         if mod_path:
             path = Path(mod_path)
-            short = f"{path.parent.name}/_context.py({depth})" if path.parent.name else f"_context.py({depth})"
+            short = (
+                f"{path.parent.name}/_context.py({depth})"
+                if path.parent.name
+                else f"_context.py({depth})"
+            )
         else:
             short = f"_context.py({depth})"
         files.append(short)
@@ -91,9 +95,7 @@ def build_route_debug_info(
         }
     route_meta = json.dumps({k: v for k, v in meta_dict.items() if v is not None})
 
-    route_section = (
-        getattr(meta_resolved, "section", None) if meta_resolved else None
-    ) or "none"
+    route_section = (getattr(meta_resolved, "section", None) if meta_resolved else None) or "none"
 
     chain_parts: list[str] = []
     for p in context_providers:

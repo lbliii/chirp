@@ -16,7 +16,7 @@ import sys
 
 
 def run(cmd: list[str], label: str) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {label}")
     print("=" * 60)
     subprocess.run(

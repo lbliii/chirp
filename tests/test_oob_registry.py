@@ -149,7 +149,9 @@ class TestBuildLayoutContractWithRegistry:
         reg.register("sidebar_oob", OOBRegionConfig(target_id="custom-sidebar"))
         adapter = KidaAdapter(kida_env)
         contract = build_layout_contract(
-            adapter, "oob_layout/_layout.html", oob_registry=reg,
+            adapter,
+            "oob_layout/_layout.html",
+            oob_registry=reg,
         )
         targets = {b.block_name: b.target_id for b in contract.oob_blocks}
         assert targets["sidebar_oob"] == "custom-sidebar"
@@ -166,12 +168,22 @@ class TestSerializeWithRegistry:
         from chirp.templating.render_plan import RenderedPlan
 
         reg = OOBRegistry()
-        reg.register("title_oob", OOBRegionConfig(
-            target_id="doc-title", swap="true", wrap=False,
-        ))
-        reg.register("sidebar_oob", OOBRegionConfig(
-            target_id="sidebar-nav", swap="innerHTML", wrap=True,
-        ))
+        reg.register(
+            "title_oob",
+            OOBRegionConfig(
+                target_id="doc-title",
+                swap="true",
+                wrap=False,
+            ),
+        )
+        reg.register(
+            "sidebar_oob",
+            OOBRegionConfig(
+                target_id="sidebar-nav",
+                swap="innerHTML",
+                wrap=True,
+            ),
+        )
 
         rendered = RenderedPlan(
             main_html="<main>content</main>",
@@ -203,15 +215,17 @@ class TestFullPipelineWithRegistry:
     def test_custom_oob_region_in_full_pipeline(self, kida_env: Environment) -> None:
         """Registry-configured regions flow through execute -> serialize correctly."""
         reg = OOBRegistry()
-        reg.register("sidebar_oob", OOBRegionConfig(
-            target_id="custom-sidebar", swap="innerHTML",
-        ))
+        reg.register(
+            "sidebar_oob",
+            OOBRegionConfig(
+                target_id="custom-sidebar",
+                swap="innerHTML",
+            ),
+        )
 
         adapter = KidaAdapter(kida_env)
         layout_chain = LayoutChain(
-            layouts=(
-                LayoutInfo(template_name="oob_layout/_layout.html", target="body", depth=0),
-            )
+            layouts=(LayoutInfo(template_name="oob_layout/_layout.html", target="body", depth=0),)
         )
         comp = PageComposition(
             template="oob_layout/page.html",

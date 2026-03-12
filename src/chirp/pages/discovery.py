@@ -202,9 +202,7 @@ def _load_viewmodel(viewmodel_file: Path, root: Path) -> Any:
     """Load viewmodel() function from _viewmodel.py."""
     try:
         rel = viewmodel_file.parent.relative_to(root)
-        path_slug = (
-            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
-        )
+        path_slug = "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
     except ValueError:
         path_slug = "root"
     module_name = f"_chirp_vm_{path_slug}"
@@ -231,9 +229,7 @@ def _load_actions(actions_file: Path, root: Path) -> tuple[ActionInfo, ...]:
     """Load @action decorated functions from _actions.py."""
     try:
         rel = actions_file.parent.relative_to(root)
-        path_slug = (
-            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
-        )
+        path_slug = "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
     except ValueError:
         path_slug = "root"
     module_name = f"_chirp_actions_{path_slug}"
@@ -253,9 +249,7 @@ def _load_actions(actions_file: Path, root: Path) -> tuple[ActionInfo, ...]:
     return load_actions(module)
 
 
-def _load_meta(
-    meta_file: Path, root: Path
-) -> tuple[RouteMeta | None, Any]:
+def _load_meta(meta_file: Path, root: Path) -> tuple[RouteMeta | None, Any]:
     """Load RouteMeta from a _meta.py file.
 
     Checks for META constant first, then meta() callable.
@@ -264,9 +258,7 @@ def _load_meta(
     """
     try:
         rel = meta_file.parent.relative_to(root)
-        path_slug = (
-            "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
-        )
+        path_slug = "_".join(rel.parts).replace("{", "_").replace("}", "_") if rel.parts else "root"
     except ValueError:
         path_slug = "root"
     module_name = f"_chirp_meta_{path_slug}"

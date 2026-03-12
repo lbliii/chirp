@@ -131,15 +131,15 @@ class TestPageShellContractValidation:
         )
         (tmp_path / "_page_layout.html").write_text(
             '{% extends "_layout.html" %}'
-            '{% block content %}'
-            '{% block page_root %}'
+            "{% block content %}"
+            "{% block page_root %}"
             '<div id="page-root">'
-            '{% block page_root_inner %}'
+            "{% block page_root_inner %}"
             '<div id="page-content-inner">{% block page_content %}{% endblock %}</div>'
-            '{% endblock %}'
+            "{% endblock %}"
             "</div>"
-            '{% endblock %}'
-            '{% endblock %}',
+            "{% endblock %}"
+            "{% endblock %}",
             encoding="utf-8",
         )
         (tmp_path / "page.html").write_text(

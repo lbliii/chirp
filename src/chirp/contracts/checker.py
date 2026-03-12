@@ -66,7 +66,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         page_route_paths=getattr(app, "_page_route_paths", set()),
         page_leaf_templates=getattr(app, "_page_leaf_templates", set()),
         page_templates=getattr(app, "_page_templates", set()),
-        fragment_target_registry=getattr(app._mutable_state, "fragment_target_registry"),
+        fragment_target_registry=app._mutable_state.fragment_target_registry,
         islands_contract_strict=app.config.islands_contract_strict,
         sections=getattr(app._mutable_state, "sections", {}),
         route_metas=getattr(app._mutable_state, "route_metas", {}),
@@ -263,9 +263,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 kida_env,
             )
         )
-        result.issues.extend(
-            check_section_bindings(snapshot.route_metas, snapshot.sections)
-        )
+        result.issues.extend(check_section_bindings(snapshot.route_metas, snapshot.sections))
         result.issues.extend(
             check_shell_mode_blocks(
                 snapshot.route_metas,
@@ -277,12 +275,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(
             check_route_file_consistency(snapshot.route_metas, snapshot.page_route_paths)
         )
-        result.issues.extend(
-            check_duplicate_routes(getattr(snapshot, "discovered_routes", []))
-        )
-        result.issues.extend(
-            check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths)
-        )
+        result.issues.extend(check_duplicate_routes(getattr(snapshot, "discovered_routes", [])))
+        result.issues.extend(check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths))
         providers = getattr(app._mutable_state, "providers", None)
         result.issues.extend(
             check_context_provider_signatures(

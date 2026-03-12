@@ -5,7 +5,6 @@ and produces the appropriate Response. isinstance-based dispatch,
 no magic, fully predictable.
 """
 
-import json as json_module
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
@@ -29,9 +28,9 @@ from chirp.pages.shell_actions import (
 )
 from chirp.realtime.events import EventStream
 from chirp.templating.composition import PageComposition
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.kida_adapter import KidaAdapter
-from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.render_plan import (
     build_render_plan,
@@ -204,7 +203,9 @@ def negotiate(
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
             rendered = execute_render_plan(
-                plan, adapter=adapter, validate_blocks=validate_blocks,
+                plan,
+                adapter=adapter,
+                validate_blocks=validate_blocks,
                 oob_registry=oob_registry,
             )
             html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
@@ -225,7 +226,9 @@ def negotiate(
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
             rendered = execute_render_plan(
-                plan, adapter=adapter, validate_blocks=validate_blocks,
+                plan,
+                adapter=adapter,
+                validate_blocks=validate_blocks,
                 oob_registry=oob_registry,
             )
             html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
@@ -277,9 +280,7 @@ def negotiate(
                 if swap_attr is None:
                     swap_attr = "true"
                 if wrap:
-                    parts.append(
-                        f'<div id="{target_id}" hx-swap-oob="{swap_attr}">{html}</div>'
-                    )
+                    parts.append(f'<div id="{target_id}" hx-swap-oob="{swap_attr}">{html}</div>')
                 else:
                     parts.append(html)
             body = "\n".join(parts)

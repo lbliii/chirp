@@ -124,6 +124,11 @@ def test_response_content_type_from_return_annotation() -> None:
 
     assert compile_invoke_plan(returns_dict).response_content_type_bytes == b"application/json"
     assert compile_invoke_plan(returns_list).response_content_type_bytes == b"application/json"
-    assert compile_invoke_plan(returns_str).response_content_type_bytes == b"text/html; charset=utf-8"
-    assert compile_invoke_plan(returns_bytes).response_content_type_bytes == b"application/octet-stream"
+    assert (
+        compile_invoke_plan(returns_str).response_content_type_bytes == b"text/html; charset=utf-8"
+    )
+    assert (
+        compile_invoke_plan(returns_bytes).response_content_type_bytes
+        == b"application/octet-stream"
+    )
     assert compile_invoke_plan(no_annotation).response_content_type_bytes is None

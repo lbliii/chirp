@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pounce.sync_protocol import RawRequest, RawResponse
+
 from chirp._internal.invoke_plan import InvokePlan
 from chirp.errors import MethodNotAllowed, NotFound
 from chirp.http.sync_request import SyncRequest
 from chirp.routing.router import Router
-from pounce.sync_protocol import RawRequest, RawResponse
 
 
 def handle_sync(

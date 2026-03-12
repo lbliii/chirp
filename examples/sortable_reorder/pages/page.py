@@ -1,6 +1,6 @@
-from chirp import Page
-
 from store import get_items
+
+from chirp import Page
 
 
 def get() -> Page:

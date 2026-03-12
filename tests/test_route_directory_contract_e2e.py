@@ -56,9 +56,9 @@ def post():
 """
     )
     (pages_dir / "page.html").write_text(
-        '{% block page_root %}{% block content %}'
+        "{% block page_root %}{% block content %}"
         '{{ page_title or "no-title" }}|{{ items }}|{{ app }}{% if msg | default("") %}|{{ msg }}{% end %}'
-        '{% end %}{% end %}'
+        "{% end %}{% end %}"
     )
     return pages_dir
 
@@ -134,16 +134,20 @@ def get():
     return Page("page.html", "content", msg="hello")
 """
     )
-    (pages_dir / "page.html").write_text('{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}')
+    (pages_dir / "page.html").write_text(
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
+    )
 
     app = App(AppConfig(template_dir=str(pages_dir), debug=True))
     app.mount_pages(str(pages_dir))
 
     # No _meta, _actions, _viewmodel — should work as before
     import asyncio
+
     async def _():
         async with TestClient(app) as client:
             r = await client.get("/")
             assert r.status == 200
             assert "hello" in r.body.decode("utf-8")
+
     asyncio.run(_())

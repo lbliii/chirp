@@ -10,13 +10,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-_log = logging.getLogger(__name__)
-
 from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.pages.types import LayoutChain
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOB_BLOCK_SUFFIX, OOBRegistry
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
@@ -110,8 +110,12 @@ def _fragment_block_for_request(
             composition, request, fragment_target_registry=fragment_target_registry
         )
     if layout_chain is None or layout_start_index >= len(layout_chain.layouts):
-        return composition.page_block or composition.fragment_block or _resolve_fragment_block(
-            composition, request, fragment_target_registry=fragment_target_registry
+        return (
+            composition.page_block
+            or composition.fragment_block
+            or _resolve_fragment_block(
+                composition, request, fragment_target_registry=fragment_target_registry
+            )
         )
     target_layout = layout_chain.layouts[layout_start_index]
     target_id = target_layout.target
@@ -372,15 +376,15 @@ def build_layout_contract(
                 )
             )
     elif oob_registry is not None:
-        for block_name in oob_registry.registered_blocks:
-            oob_blocks.append(
-                OOBBlockInfo(
-                    block_name=block_name,
-                    target_id=oob_registry.resolve_target(block_name),
-                    cache_scope="unknown",
-                    depends_on=frozenset(),
-                )
+        oob_blocks.extend(
+            OOBBlockInfo(
+                block_name=block_name,
+                target_id=oob_registry.resolve_target(block_name),
+                cache_scope="unknown",
+                depends_on=frozenset(),
             )
+            for block_name in oob_registry.registered_blocks
+        )
 
     return LayoutContract(template_name=template_name, oob_blocks=tuple(oob_blocks))
 

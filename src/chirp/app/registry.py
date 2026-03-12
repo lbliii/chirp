@@ -212,9 +212,7 @@ class AppRegistry:
                 _meta, _meta_provider, request.path_params, _service_providers
             )
             section_ctx = resolve_section_context(meta_resolved, _sections)
-            shell_ctx = build_shell_context(
-                request, meta_resolved, section_ctx, cascade_ctx
-            )
+            shell_ctx = build_shell_context(request, meta_resolved, section_ctx, cascade_ctx)
             route_debug = build_route_debug_info(
                 route_kind=_kind,
                 template_name=_template,

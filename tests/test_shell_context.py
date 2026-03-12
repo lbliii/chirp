@@ -60,24 +60,22 @@ async def test_resolve_meta_returns_none_when_both_absent() -> None:
 
 async def test_resolve_meta_calls_provider_with_path_params() -> None:
     """resolve_meta calls sync provider with path params."""
+
     def meta_provider(name: str) -> RouteMeta:
         return RouteMeta(title=f"Skill: {name}")
 
-    result = await resolve_meta(
-        None, meta_provider, {"name": "foo"}, {}
-    )
+    result = await resolve_meta(None, meta_provider, {"name": "foo"}, {})
     assert result is not None
     assert result.title == "Skill: foo"
 
 
 async def test_resolve_meta_calls_async_provider() -> None:
     """resolve_meta awaits async meta() provider."""
+
     async def meta_provider(name: str) -> RouteMeta:
         return RouteMeta(title=f"Async: {name}", section="discover")
 
-    result = await resolve_meta(
-        None, meta_provider, {"name": "bar"}, {}
-    )
+    result = await resolve_meta(None, meta_provider, {"name": "bar"}, {})
     assert result is not None
     assert result.title == "Async: bar"
     assert result.section == "discover"
@@ -85,12 +83,11 @@ async def test_resolve_meta_calls_async_provider() -> None:
 
 async def test_resolve_meta_async_provider_returning_dict() -> None:
     """resolve_meta awaits async provider that returns a dict."""
+
     async def meta_provider(name: str) -> dict:
         return {"title": f"Dict: {name}", "section": "workspace"}
 
-    result = await resolve_meta(
-        None, meta_provider, {"name": "baz"}, {}
-    )
+    result = await resolve_meta(None, meta_provider, {"name": "baz"}, {})
     assert result is not None
     assert result.title == "Dict: baz"
     assert result.section == "workspace"

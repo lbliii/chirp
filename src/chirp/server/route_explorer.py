@@ -42,19 +42,21 @@ def _route_to_dict(route: Any) -> dict[str, Any]:
             "breadcrumb_label": meta.breadcrumb_label,
             "shell_mode": meta.shell_mode,
         }
-    layouts = []
-    for lay in getattr(route.layout_chain, "layouts", ()):
-        layouts.append({
+    layouts = [
+        {
             "template": getattr(lay, "template_name", ""),
             "target": getattr(lay, "target", ""),
             "depth": getattr(lay, "depth", 0),
-        })
-    providers = []
-    for p in getattr(route, "context_providers", ()):
-        providers.append({
+        }
+        for lay in getattr(route.layout_chain, "layouts", ())
+    ]
+    providers = [
+        {
             "path": getattr(p, "module_path", ""),
             "depth": getattr(p, "depth", 0),
-        })
+        }
+        for p in getattr(route, "context_providers", ())
+    ]
     actions = [{"name": getattr(a, "name", "")} for a in getattr(route, "actions", ())]
     handler_sig = ""
     try:
