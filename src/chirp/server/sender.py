@@ -5,12 +5,29 @@ Handles both standard single-body responses and chunked streaming responses.
 
 import logging
 from collections.abc import AsyncIterator
+from types import MappingProxyType
 from typing import cast
 
 from chirp._internal.asgi import Send
 from chirp.http.response import Response, StreamingResponse
 
 logger = logging.getLogger("chirp.server")
+
+# Immutable mapping for free-threading (no module-level mutable dicts)
+_CT_PREENCODED: MappingProxyType[str, bytes] = MappingProxyType(
+    {
+        "text/html; charset=utf-8": b"text/html; charset=utf-8",
+        "application/json; charset=utf-8": b"application/json; charset=utf-8",
+        "application/octet-stream": b"application/octet-stream",
+        "text/plain; charset=utf-8": b"text/plain; charset=utf-8",
+        "application/javascript; charset=utf-8": b"application/javascript; charset=utf-8",
+        "text/css; charset=utf-8": b"text/css; charset=utf-8",
+    }
+)
+
+
+def _encode_content_type(ct: str) -> bytes:
+    return _CT_PREENCODED.get(ct) or ct.encode("latin-1")
 
 
 def _body_allowed(status: int) -> bool:
@@ -19,17 +36,24 @@ def _body_allowed(status: int) -> bool:
     return not (100 <= status < 200 or status in {204, 304})
 
 
-async def send_response(response: Response, send: Send) -> None:
+async def send_response(
+    response: Response,
+    send: Send,
+    *,
+    request_id: str | None = None,
+) -> None:
     """Translate a chirp Response into ASGI send() calls."""
-    # Build raw headers
+    # Build raw headers — pre-encoded content-type skips .encode() for common types
     raw_headers: list[tuple[bytes, bytes]] = [
-        (b"content-type", response.content_type.encode("latin-1")),
+        (b"content-type", _encode_content_type(response.content_type)),
     ]
     for name, value in response.headers:
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
     raw_headers.extend(
         (b"set-cookie", cookie.to_header_value().encode("latin-1")) for cookie in response.cookies
     )
+    if request_id is not None:
+        raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
 
     body = response.body_bytes if _body_allowed(response.status) else b""
 
@@ -55,6 +79,7 @@ async def send_streaming_response(
     send: Send,
     *,
     debug: bool = False,
+    request_id: str | None = None,
 ) -> None:
     """Send a streaming response via chunked transfer encoding.
 
@@ -63,11 +88,13 @@ async def send_streaming_response(
     On mid-stream error, emits an HTML comment and closes.
     """
     raw_headers: list[tuple[bytes, bytes]] = [
-        (b"content-type", response.content_type.encode("latin-1")),
+        (b"content-type", _encode_content_type(response.content_type)),
         (b"transfer-encoding", b"chunked"),
     ]
     for name, value in response.headers:
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
+    if request_id is not None:
+        raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
 
     # No content-length — chunked transfer encoding signals body boundaries
     await send(

@@ -6,6 +6,7 @@ import pytest
 from kida import Environment, FileSystemLoader
 
 from chirp.http.request import Request
+from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.pages.types import LayoutChain, LayoutInfo
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.kida_adapter import KidaAdapter
@@ -322,6 +323,98 @@ class TestPageFragmentOobRegions:
         # Boosted fragment always gets shell_actions; layout OOB added when cache_scope != site
         assert len(rendered.region_htmls) >= 1
 
+    def test_tab_click_includes_shell_actions_oob(self, kida_env: Environment) -> None:
+        """Tab click (hx-target=#page-root, not boosted) gets shell_actions OOB when target has triggers_shell_update."""
+        from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+        adapter = KidaAdapter(kida_env)
+        reg = FragmentTargetRegistry()
+        reg.register("page-root", fragment_block="page_root_inner", triggers_shell_update=True)
+        reg.freeze()
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        tab_click_request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/chains",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-target", b"#page-root"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        comp = PageComposition(
+            template="oob_layout/page.html",
+            fragment_block="content",
+            page_block="content",
+            context={},
+        )
+        plan = build_render_plan(
+            comp,
+            request=tab_click_request,
+            fragment_target_registry=reg,
+        )
+        rendered = execute_render_plan(plan, adapter=adapter)
+
+        assert SHELL_ACTIONS_TARGET in rendered.region_htmls
+
+    def test_narrow_swap_omits_shell_actions_oob(self, kida_env: Environment) -> None:
+        """Target with triggers_shell_update=False does not get shell_actions OOB."""
+        from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+        adapter = KidaAdapter(kida_env)
+        reg = FragmentTargetRegistry()
+        reg.register(
+            "page-content-inner",
+            fragment_block="page_content",
+            triggers_shell_update=False,
+        )
+        reg.freeze()
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        narrow_request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/item/123",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-target", b"#page-content-inner"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        comp = PageComposition(
+            template="oob_layout/page.html",
+            fragment_block="content",
+            page_block="content",
+            context={},
+        )
+        plan = build_render_plan(
+            comp,
+            request=narrow_request,
+            fragment_target_registry=reg,
+        )
+        rendered = execute_render_plan(plan, adapter=adapter)
+
+        assert SHELL_ACTIONS_TARGET not in rendered.region_htmls
+
     def test_serialize_appends_oob_fragments(self, kida_env: Environment) -> None:
         """Serialized fragment response includes hx-swap-oob divs for region updates."""
         adapter = KidaAdapter(kida_env)
@@ -343,7 +436,7 @@ class TestPageFragmentOobRegions:
 
 
 class TestLayoutWithNoOobBlocks:
-    """Layout without {% region *_oob %} — CHIRPUI_OOB_BLOCKS fallback still suppresses."""
+    """Layout without {% region *_oob %} — registered OOB blocks still suppressed."""
 
     def test_simple_layout_composes_correctly(self, kida_env: Environment) -> None:
         """Layout with no OOB regions composes; content block injected; no crash."""

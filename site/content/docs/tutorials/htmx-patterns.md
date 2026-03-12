@@ -185,6 +185,44 @@ def delete_item(id: int):
     return ""  # Empty response removes the element
 ```
 
+## Reorder List (Drag-and-Drop)
+
+Reorder items in a list with native HTML5 drag-and-drop. Use a **hidden form** for reliable form submission — populate it on drop and trigger `htmx.trigger(form, 'submit')`. The server returns a `Fragment` with the updated list; use `hx-select` to extract the target element when the response is a full page.
+
+**Template** (with chirp-ui `sortable_list`):
+
+```html
+<div id="step-list">
+<form id="reorder-form" method="post" action="/steps/reorder"
+      hx-post="/steps/reorder" hx-target="#step-list" hx-select="#step-list" hx-swap="outerHTML"
+      style="display:none">
+  <input type="hidden" name="from_idx" value="">
+  <input type="hidden" name="to_idx" value="">
+</form>
+{% call sortable_list() %}
+  {% for step in steps %}
+  {% call sortable_item(attrs='draggable="true" @dragstart="..." @drop="..."') %}
+    {{ step.name }}
+  {% end %}
+  {% end %}
+{% end %}
+</div>
+```
+
+**Handler**:
+
+```python
+@app.route("/steps/reorder", methods=["POST"])
+async def reorder_steps(request: Request):
+    form = await request.form()
+    from_idx = int(form.get("from_idx", 0))
+    to_idx = int(form.get("to_idx", 0))
+    updated = reorder(steps, from_idx, to_idx)
+    return Fragment("steps.html", "step_list", steps=updated)
+```
+
+See chirp-ui's [DND-FRAGMENT-ISLAND](https://github.com/lbliii/chirp-ui/blob/main/docs/DND-FRAGMENT-ISLAND.md) for the full Alpine wiring (dataset for source index, per-item overCount for flicker-free drop indicator, form trigger on drop).
+
 ## Form Validation
 
 Submit a form and show inline errors:

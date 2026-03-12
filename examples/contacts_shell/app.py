@@ -21,7 +21,7 @@ PAGES_DIR = ROOT_DIR / "pages"
 sys.path.insert(0, str(ROOT_DIR))
 sys.modules.pop("contacts_shell_store", None)
 
-from contacts_shell_store import reset_store  # noqa: E402
+from contacts_shell_store import reset_store
 
 config = AppConfig(template_dir=PAGES_DIR, debug=True)
 app = App(config=config)

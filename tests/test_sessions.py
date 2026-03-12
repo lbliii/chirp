@@ -11,6 +11,7 @@ from chirp.middleware.sessions import (
     regenerate_session,
 )
 from chirp.testing import TestClient
+from tests.helpers.auth import extract_session_cookie
 
 
 class TestSessionConfig:
@@ -65,7 +66,7 @@ class TestSessionBasicOperations:
             assert set_resp.status == 200
 
             # Extract session cookie from Set-Cookie header
-            cookie_value = _extract_session_cookie(set_resp, "chirp_session")
+            cookie_value = extract_session_cookie(set_resp, "chirp_session")
             assert cookie_value is not None
 
             # Read session (send cookie back)
@@ -104,12 +105,12 @@ class TestSessionBasicOperations:
             # First visit
             r1 = await client.get("/count")
             assert r1.text == "visits=1"
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # Second visit with cookie
             r2 = await client.get("/count", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "visits=2"
-            cookie2 = _extract_session_cookie(r2, "chirp_session")
+            cookie2 = extract_session_cookie(r2, "chirp_session")
 
             # Third visit with updated cookie
             r3 = await client.get("/count", headers={"Cookie": f"chirp_session={cookie2}"})
@@ -146,7 +147,7 @@ class TestSessionSecurity:
 
         async with TestClient(app1) as client:
             r = await client.get("/set")
-            cookie = _extract_session_cookie(r, "chirp_session")
+            cookie = extract_session_cookie(r, "chirp_session")
 
         # Different app with different secret
         app2 = App()
@@ -186,7 +187,7 @@ class TestSessionDataTypes:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get("/get", headers={"Cookie": f"chirp_session={cookie}"})
             assert "name=alice" in r2.text
@@ -212,7 +213,7 @@ class TestSessionDataTypes:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get("/remove", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "keys=['keep']"
@@ -230,7 +231,7 @@ class TestSessionDataTypes:
         async with TestClient(app) as client:
             response = await client.get("/empty")
             assert response.status == 200
-            cookie = _extract_session_cookie(response, "chirp_session")
+            cookie = extract_session_cookie(response, "chirp_session")
             assert cookie is not None
 
 
@@ -254,7 +255,7 @@ class TestSessionCookieAttributes:
 
         async with TestClient(app) as client:
             response = await client.get("/set")
-            cookie = _extract_session_cookie(response, "my_session")
+            cookie = extract_session_cookie(response, "my_session")
             assert cookie is not None
 
 
@@ -282,7 +283,7 @@ class TestRegenerateSession:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/regenerate",
@@ -308,13 +309,13 @@ class TestRegenerateSession:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie_before = _extract_session_cookie(r1, "chirp_session")
+            cookie_before = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/regenerate",
                 headers={"Cookie": f"chirp_session={cookie_before}"},
             )
-            cookie_after = _extract_session_cookie(r2, "chirp_session")
+            cookie_after = extract_session_cookie(r2, "chirp_session")
             assert cookie_after is not None
             assert cookie_before != cookie_after
 
@@ -342,14 +343,14 @@ class TestRegenerateSession:
         async with TestClient(app) as client:
             # Set session data
             r1 = await client.get("/set")
-            old_cookie = _extract_session_cookie(r1, "chirp_session")
+            old_cookie = extract_session_cookie(r1, "chirp_session")
 
             # Regenerate (discard data)
             r2 = await client.get(
                 "/regenerate",
                 headers={"Cookie": f"chirp_session={old_cookie}"},
             )
-            new_cookie = _extract_session_cookie(r2, "chirp_session")
+            new_cookie = extract_session_cookie(r2, "chirp_session")
 
             # Old cookie still loads (signature valid) but data is gone
             # because itsdangerous timestamps differ and we cleared in-place.
@@ -390,14 +391,14 @@ class TestSessionRegenerationOnAuth:
         async with TestClient(app) as client:
             # Set some pre-login data
             r1 = await client.get("/pre-session")
-            cookie_before = _extract_session_cookie(r1, "chirp_session")
+            cookie_before = extract_session_cookie(r1, "chirp_session")
 
             # Login — should regenerate
             r2 = await client.get(
                 "/login",
                 headers={"Cookie": f"chirp_session={cookie_before}"},
             )
-            cookie_after = _extract_session_cookie(r2, "chirp_session")
+            cookie_after = extract_session_cookie(r2, "chirp_session")
 
             # Pre-login data should be gone
             assert r2.text == "pre_login=gone"
@@ -435,14 +436,14 @@ class TestSessionRegenerationOnAuth:
         async with TestClient(app) as client:
             # Login and set extra session data
             r1 = await client.get("/login")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # Logout — should clear everything
             r2 = await client.get(
                 "/logout",
                 headers={"Cookie": f"chirp_session={cookie}"},
             )
-            new_cookie = _extract_session_cookie(r2, "chirp_session")
+            new_cookie = extract_session_cookie(r2, "chirp_session")
 
             # Verify session is empty via new cookie
             r3 = await client.get(
@@ -472,7 +473,7 @@ class TestSessionTimeouts:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "k=none"
 
@@ -495,20 +496,6 @@ class TestSessionTimeouts:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set")
-            cookie = _extract_session_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "k=none"
-
-
-# -- Helpers --
-
-
-def _extract_session_cookie(response, cookie_name: str) -> str | None:
-    """Extract a specific Set-Cookie value from response headers."""
-    for name, value in response.headers:
-        if name == "set-cookie" and value.startswith(f"{cookie_name}="):
-            # Parse "name=value; Path=/; ..."
-            cookie_part = value.split(";")[0]
-            _, _, cookie_value = cookie_part.partition("=")
-            return cookie_value
-    return None

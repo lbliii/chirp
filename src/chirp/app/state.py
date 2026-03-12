@@ -8,7 +8,10 @@ from kida import Environment
 
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.middleware.protocol import Middleware
+from chirp.pages.types import RouteMeta, Section
 from chirp.routing.router import Router
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry
 
@@ -26,6 +29,7 @@ class PendingRoute:
     name: str | None
     referenced: bool = False
     template: str | None = None
+    inline: bool = False
 
 
 @dataclass(slots=True)
@@ -54,6 +58,7 @@ class MutableAppState:
     discovered_layout_chains: list[Any] = field(default_factory=list)
     lazy_pages_dir: str | None = None
     page_route_paths: set[str] = field(default_factory=set)
+    page_leaf_templates: set[str] = field(default_factory=set)
     page_templates: set[str] = field(default_factory=set)
     pending_domains: list[object] = field(default_factory=list)
     providers: dict[type, Callable[..., Any]] = field(default_factory=dict)
@@ -62,6 +67,12 @@ class MutableAppState:
     migrations_dir: str | None = None
     custom_kida_env: Environment | None = None
     tool_events: ToolEventBus = field(default_factory=ToolEventBus)
+    oob_registry: OOBRegistry = field(default_factory=OOBRegistry)
+    fragment_target_registry: FragmentTargetRegistry = field(default_factory=FragmentTargetRegistry)
+    sections: dict[str, Section] = field(default_factory=dict)
+    route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
+    route_templates: dict[str, str] = field(default_factory=dict)
+    discovered_routes: list[Any] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -74,6 +85,9 @@ class RuntimeAppState:
     middleware: tuple[Callable[..., Any], ...] = ()
     kida_env: Environment | None = None
     tool_registry: ToolRegistry | None = None
+    oob_registry: OOBRegistry | None = None
+    fragment_target_registry: FragmentTargetRegistry | None = None
+    discovered_routes: list[Any] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,5 +98,11 @@ class ContractCheckSnapshot:
     kida_env: Environment | None
     layout_chains: list[Any]
     page_route_paths: set[str]
+    page_leaf_templates: set[str]
     page_templates: set[str]
+    fragment_target_registry: FragmentTargetRegistry
     islands_contract_strict: bool
+    sections: dict[str, Section] = field(default_factory=dict)
+    route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
+    route_templates: dict[str, str] = field(default_factory=dict)
+    discovered_routes: list[Any] = field(default_factory=list)

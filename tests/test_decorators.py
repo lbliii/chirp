@@ -7,6 +7,7 @@ from chirp.middleware.auth import AuthConfig, AuthMiddleware, get_user, login
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.security.decorators import login_required, requires
 from chirp.testing import TestClient
+from tests.helpers.auth import extract_session_cookie
 
 # ---------------------------------------------------------------------------
 # Test user models
@@ -55,13 +56,6 @@ async def _verify_token(token: str) -> FakeUser | None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _extract_cookie(response, name: str) -> str | None:
-    for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
-            return hvalue.split(";")[0].partition("=")[2]
-    return None
 
 
 def _get_header(response, name: str) -> str | None:
@@ -150,7 +144,7 @@ class TestLoginRequiredBrowser:
         app = _make_app()
         async with TestClient(app) as client:
             r1 = await client.get("/do-login/1")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/dashboard",

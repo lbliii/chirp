@@ -10,6 +10,7 @@
 {% end %}
 
 {% block page_root %}
+{% block page_root_inner %}
 {% call container(max_width="84rem") %}
 {% call stack(gap="lg") %}
 {% call page_header(
@@ -207,6 +208,7 @@
   });
 })();
 </script>
+{% end %}
 {% end %}
 {% end %}
 {% endblock %}

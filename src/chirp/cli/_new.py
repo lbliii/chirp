@@ -11,7 +11,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from chirp.cli._templates import (
+from chirp.cli.templates import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
     SHELL_APP_PY,

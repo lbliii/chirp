@@ -24,6 +24,7 @@ Conventions:
           edit.py        # POST /documents/{doc_id}/edit
 """
 
+from chirp.pages.actions import action
 from chirp.pages.discovery import discover_pages
 from chirp.pages.reactive import (
     BlockRef,
@@ -33,7 +34,7 @@ from chirp.pages.reactive import (
     reactive_stream,
 )
 from chirp.pages.renderer import render_with_layouts
-from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo, PageRoute
+from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo, PageRoute, RouteMeta
 
 __all__ = [
     "BlockRef",
@@ -44,6 +45,8 @@ __all__ = [
     "LayoutInfo",
     "PageRoute",
     "ReactiveBus",
+    "RouteMeta",
+    "action",
     "discover_pages",
     "reactive_stream",
     "render_with_layouts",

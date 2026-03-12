@@ -5,25 +5,30 @@ and produces the appropriate Response. isinstance-based dispatch,
 no magic, fully predictable.
 """
 
-import json as json_module
 import logging
-from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
 from chirp.errors import ConfigurationError
-from chirp.http.response import Redirect, RenderIntent, Response, SSEResponse, StreamingResponse
-from chirp.pages.shell_actions import (
-    SHELL_ACTIONS_CONTEXT_KEY,
-    SHELL_ACTIONS_TARGET,
-    normalize_shell_actions,
-    shell_actions_fragment,
+from chirp.http.response import (
+    JSONResponse,
+    Redirect,
+    RenderIntent,
+    Response,
+    SSEResponse,
+    StreamingResponse,
 )
 from chirp.realtime.events import EventStream
+from chirp.server.negotiation_oob import (
+    append_shell_actions_oob_stream,
+    should_append_streamed_shell_actions_oob,
+)
 from chirp.templating.composition import PageComposition
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.kida_adapter import KidaAdapter
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.render_plan import (
     build_render_plan,
     execute_render_plan,
@@ -98,6 +103,8 @@ def negotiate(
     kida_env: Environment | None = None,
     request: Request | None = None,
     validate_blocks: bool = False,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Convert a route handler's return value to a Response.
 
@@ -185,11 +192,20 @@ def negotiate(
             if composition is None:
                 msg = f"Cannot normalize {type(value).__name__} to composition"
                 raise TypeError(msg)
-            plan = build_render_plan(composition, request=request)
+            plan = build_render_plan(
+                composition,
+                request=request,
+                fragment_target_registry=fragment_target_registry,
+            )
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
-            html = serialize_rendered_plan(rendered)
+            rendered = execute_render_plan(
+                plan,
+                adapter=adapter,
+                validate_blocks=validate_blocks,
+                oob_registry=oob_registry,
+            )
+            html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
             intent = "fragment" if plan.intent != "full_page" else "full_page"
             return _html_response(html, intent=intent)
         case PageComposition():
@@ -199,11 +215,20 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            plan = build_render_plan(value, request=request)
+            plan = build_render_plan(
+                value,
+                request=request,
+                fragment_target_registry=fragment_target_registry,
+            )
             _set_layout_debug_from_plan(plan, request)
             adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(plan, adapter=adapter, validate_blocks=validate_blocks)
-            html = serialize_rendered_plan(rendered)
+            rendered = execute_render_plan(
+                plan,
+                adapter=adapter,
+                validate_blocks=validate_blocks,
+                oob_registry=oob_registry,
+            )
+            html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
             intent = "fragment" if plan.intent != "full_page" else "full_page"
             return _html_response(html, intent=intent)
         case Action():
@@ -233,14 +258,28 @@ def negotiate(
                     "Ensure a template_dir is configured in AppConfig."
                 )
                 raise ConfigurationError(msg)
-            # Render the primary fragment/template
-            main_response = negotiate(value.main, kida_env=kida_env, request=request)
+            main_response = negotiate(
+                value.main,
+                kida_env=kida_env,
+                request=request,
+                oob_registry=oob_registry,
+                fragment_target_registry=fragment_target_registry,
+            )
             parts: list[str] = [main_response.text if isinstance(main_response, Response) else ""]
-            # Render each OOB fragment and wrap with hx-swap-oob
             for frag in value.oob_fragments:
                 html = render_fragment(kida_env, frag)
                 target_id = frag.target if frag.target is not None else frag.block_name
-                parts.append(f'<div id="{target_id}" hx-swap-oob="true">{html}</div>')
+                swap_attr = getattr(frag, "swap", None)
+                if swap_attr is None and oob_registry is not None:
+                    swap_attr, wrap = oob_registry.resolve_serialization(target_id)
+                else:
+                    wrap = True
+                if swap_attr is None:
+                    swap_attr = "true"
+                if wrap:
+                    parts.append(f'<div id="{target_id}" hx-swap-oob="{swap_attr}">{html}</div>')
+                else:
+                    parts.append(html)
             body = "\n".join(parts)
             return _html_response(body, intent="fragment")
         case Stream():
@@ -293,9 +332,10 @@ def negotiate(
                 layout_chain=value.layout_chain,
                 layout_context=value.context,
                 request=req,
+                oob_registry=oob_registry,
             )
-            if _should_append_streamed_shell_actions_oob(value.context, req):
-                chunks = _append_shell_actions_oob_stream(chunks, value.context, kida_env)
+            if should_append_streamed_shell_actions_oob(value.context, req):
+                chunks = append_shell_actions_oob_stream(chunks, value.context, kida_env)
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
@@ -308,7 +348,7 @@ def negotiate(
                 )
                 raise ConfigurationError(msg)
             is_htmx = request is not None and request.is_fragment
-            chunks = render_suspense(kida_env, value, is_htmx=is_htmx)
+            chunks = render_suspense(kida_env, value, is_htmx=is_htmx, oob_registry=oob_registry)
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
@@ -323,17 +363,26 @@ def negotiate(
         case bytes():
             return Response(body=value, content_type="application/octet-stream")
         case dict() | list():
-            return Response(
-                body=json_module.dumps(value, default=str),
-                content_type="application/json; charset=utf-8",
-            )
+            return JSONResponse.from_value(value)
         case (inner, int() as status):
-            response = negotiate(inner, kida_env=kida_env, request=request)
+            response = negotiate(
+                inner,
+                kida_env=kida_env,
+                request=request,
+                oob_registry=oob_registry,
+                fragment_target_registry=fragment_target_registry,
+            )
             if isinstance(response, Response):
                 return response.with_status(status)
             return response
         case (inner, int() as status, dict() as headers):
-            response = negotiate(inner, kida_env=kida_env, request=request)
+            response = negotiate(
+                inner,
+                kida_env=kida_env,
+                request=request,
+                oob_registry=oob_registry,
+                fragment_target_registry=fragment_target_registry,
+            )
             if isinstance(response, Response):
                 return response.with_status(status).with_headers(headers)
             return response
@@ -344,53 +393,3 @@ def negotiate(
                 f"TemplateStream, Action, Stream, EventStream, Response, or Redirect."
             )
             raise TypeError(msg)
-
-
-def _render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
-    """Render shell action OOB markup for boosted layout navigations."""
-    from kida.environment.exceptions import TemplateNotFoundError
-
-    actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
-    fragment = shell_actions_fragment(actions)
-    if fragment is None or actions is None:
-        target = SHELL_ACTIONS_TARGET
-        html = ""
-    else:
-        template_name, block_name, target = fragment
-        try:
-            html = render_fragment(
-                kida_env,
-                Fragment(template_name, block_name, shell_actions=actions),
-            )
-        except TemplateNotFoundError:
-            html = ""
-    return f'<div id="{target}" hx-swap-oob="innerHTML">{html}</div>'
-
-
-async def _append_shell_actions_oob_stream(
-    chunks: AsyncIterator[str],
-    context: dict[str, Any],
-    kida_env: Environment,
-) -> AsyncIterator[str]:
-    """Append shell action OOB markup to the first streamed chunk."""
-    first_chunk = True
-    oob = _render_shell_actions_oob(context, kida_env)
-    async for chunk in chunks:
-        if first_chunk:
-            yield "\n".join((chunk, oob))
-            first_chunk = False
-            continue
-        yield chunk
-    if first_chunk:
-        yield oob
-
-
-def _should_append_streamed_shell_actions_oob(
-    context: dict[str, Any],
-    request: Request | None,
-) -> bool:
-    """Whether a streamed layout response should refresh shell actions via OOB."""
-    del context
-    if request is None:
-        return False
-    return request.is_fragment and not request.is_history_restore and request.is_boosted

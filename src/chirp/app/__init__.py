@@ -9,6 +9,8 @@ from kida import Environment
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.errors import ConfigurationError
+from chirp.pages.types import Section
+from chirp.templating.fragment_target_registry import PageShellContract
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import Fragment, InlineTemplate, Template
 
@@ -61,6 +63,7 @@ class App:
         "_middleware_list",
         "_migrations_dir",
         "_mutable_state",
+        "_page_leaf_templates",
         "_page_route_paths",
         "_page_templates",
         "_pending_domains",
@@ -138,6 +141,7 @@ class App:
         self._discovered_layout_chains = self._mutable_state.discovered_layout_chains
         self._lazy_pages_dir = self._mutable_state.lazy_pages_dir
         self._page_route_paths = self._mutable_state.page_route_paths
+        self._page_leaf_templates = self._mutable_state.page_leaf_templates
         self._page_templates = self._mutable_state.page_templates
         self._pending_domains = self._mutable_state.pending_domains
         self._providers = self._mutable_state.providers
@@ -172,6 +176,7 @@ class App:
         name: str | None = None,
         referenced: bool = False,
         template: str | None = None,
+        inline: bool = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.route(
             path,
@@ -179,6 +184,7 @@ class App:
             name=name,
             referenced=referenced,
             template=template,
+            inline=inline,
         )
 
     def provide(self, annotation: type, factory: Callable[..., Any]) -> None:
@@ -241,11 +247,68 @@ class App:
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.error(code_or_exception)
 
+    def register_oob_region(
+        self,
+        block_name: str,
+        *,
+        target_id: str,
+        swap: str = "innerHTML",
+        wrap: bool = True,
+    ) -> None:
+        """Register an OOB region for automatic layout-contract discovery.
+
+        Call during setup (before app.run()). The block_name must match a
+        ``{% region <block_name>(...) %}`` in your layout template.
+        """
+        from chirp.templating.oob_registry import OOBRegionConfig
+
+        self._check_not_frozen()
+        self._mutable_state.oob_registry.register(
+            block_name,
+            OOBRegionConfig(target_id=target_id, swap=swap, wrap=wrap),
+        )
+
+    def register_fragment_target(
+        self,
+        target_id: str,
+        *,
+        fragment_block: str,
+        triggers_shell_update: bool = True,
+    ) -> None:
+        """Register a fragment target for HTMX content-region block selection.
+
+        When HX-Target matches target_id (e.g. ``page-root``), Chirp uses
+        fragment_block instead of composition.page_block. Call during setup.
+
+        triggers_shell_update: When True (default), swapping this target triggers
+            shell_actions OOB (topbar, breadcrumbs, sidebar). Use False for narrow
+            content swaps (e.g. page-content-inner) that should not update the shell.
+        """
+        self._check_not_frozen()
+        self._mutable_state.fragment_target_registry.register(
+            target_id,
+            fragment_block=fragment_block,
+            triggers_shell_update=triggers_shell_update,
+        )
+
+    def register_page_shell_contract(self, contract: PageShellContract) -> None:
+        """Register a named page shell contract and its fragment targets.
+
+        This makes app-shell expectations explicit and lets contract checks
+        validate required fragment blocks across page templates.
+        """
+        self._check_not_frozen()
+        self._mutable_state.fragment_target_registry.register_contract(contract)
+
     def add_middleware(self, middleware: object) -> None:
         self._registry.add_middleware(middleware)
 
     def add_reload_dir(self, path: str) -> None:
         self._registry.add_reload_dir(path)
+
+    def register_section(self, section: Section) -> None:
+        """Register a named section for route metadata resolution."""
+        self._registry.register_section(section)
 
     def template_filter(
         self,
@@ -288,6 +351,25 @@ class App:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self._runtime.handle(scope, receive, send)
+
+    def handle_sync(self, raw: object) -> object | None:
+        """Fused sync path — bypass ASGI for simple request-response handlers.
+
+        Returns RawResponse for sync handling, or None to fall through to ASGI.
+        """
+        from pounce.sync_protocol import RawRequest
+
+        self._ensure_frozen()
+        if self._router is None:
+            return None
+        from chirp.server.sync_handler import handle_sync as _handle_sync
+
+        return _handle_sync(
+            raw=raw,  # type: ignore[arg-type]
+            router=self._router,
+            middleware=self._middleware,
+            providers=self._mutable_state.providers,
+        )
 
     async def _handle_lifespan(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self._lifecycle.handle_lifespan(scope, receive, send)
@@ -375,6 +457,12 @@ class App:
             kida_env=self._runtime_state.kida_env,
             layout_chains=self._mutable_state.discovered_layout_chains,
             page_route_paths=self._mutable_state.page_route_paths,
+            page_leaf_templates=self._mutable_state.page_leaf_templates,
             page_templates=self._mutable_state.page_templates,
+            fragment_target_registry=self._mutable_state.fragment_target_registry,
             islands_contract_strict=self.config.islands_contract_strict,
+            sections=self._mutable_state.sections,
+            route_metas=self._mutable_state.route_metas,
+            route_templates=self._mutable_state.route_templates,
+            discovered_routes=self._mutable_state.discovered_routes,
         )

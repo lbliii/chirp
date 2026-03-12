@@ -6,6 +6,7 @@ from chirp import App
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware, get_csrf_token
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.testing import TestClient
+from tests.helpers.auth import extract_session_cookie
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -61,14 +62,6 @@ def _make_app() -> App:
     return app
 
 
-def _extract_cookie(response, name: str) -> str | None:
-    """Extract a Set-Cookie value from response headers."""
-    for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
-            return hvalue.split(";")[0].partition("=")[2]
-    return None
-
-
 class TestCSRFTokenGeneration:
     async def test_token_generated_on_get(self) -> None:
         app = _make_app()
@@ -83,7 +76,7 @@ class TestCSRFTokenGeneration:
         app = _make_app()
         async with TestClient(app) as client:
             r1 = await client.get("/form")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             token1 = r1.text.split("=", 1)[1]
 
             r2 = await client.get("/form", headers={"Cookie": f"chirp_session={cookie}"})
@@ -98,7 +91,7 @@ class TestCSRFValidation:
         async with TestClient(app) as client:
             # Get session cookie first
             r1 = await client.get("/form")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # POST without CSRF token
             r2 = await client.post(
@@ -116,7 +109,7 @@ class TestCSRFValidation:
         async with TestClient(app) as client:
             # Get token and session cookie
             r1 = await client.get("/form")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             token = r1.text.split("=", 1)[1]
 
             # POST with CSRF token in form body
@@ -137,7 +130,7 @@ class TestCSRFValidation:
         async with TestClient(app) as client:
             # Get token and session cookie
             r1 = await client.get("/form")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             token = r1.text.split("=", 1)[1]
 
             # POST with CSRF token in header
@@ -157,7 +150,7 @@ class TestCSRFValidation:
         app = _make_app()
         async with TestClient(app) as client:
             r1 = await client.get("/form")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.post(
                 "/submit",

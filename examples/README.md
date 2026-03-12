@@ -204,6 +204,17 @@ pip install chirp[ui]
 cd examples/kanban_shell && python app.py
 ```
 
+### `sortable_reorder/` — Drag-and-Drop Reorder with Alpine + HTMX
+
+Native HTML5 drag-and-drop without Sortable.js. Uses chirp-ui `sortable_list`,
+Alpine.js for visual feedback (`dataset.draggingIdx`, `overCount`), and HTMX form
+submission for reorder. Demonstrates the Fragment + form + `hx-select` pattern.
+
+```bash
+pip install chirp[ui]
+cd examples/sortable_reorder && python app.py
+```
+
 ### `ollama/` — Local LLM Chat with Ollama
 
 A chat interface powered by a local Ollama instance. Streaming AI responses via SSE,

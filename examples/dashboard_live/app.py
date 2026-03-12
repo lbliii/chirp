@@ -149,7 +149,7 @@ async def create_random_order() -> Order:
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", template="dashboard.html")
 async def index():
     """Full dashboard page — shell renders instantly, data streams in.
 

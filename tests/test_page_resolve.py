@@ -373,6 +373,31 @@ class TestUpgradeResult:
         result = upgrade_result({"key": "val"}, {}, layout_chain=None, context_providers=())
         assert result == {"key": "val"}
 
+    def test_dict_with_template_name_becomes_page_composition(self) -> None:
+        """Dict + template_name yields PageComposition with merged context."""
+        result = {"page_title": "Analytics", "summary": 42}
+        cascade_ctx = {"nav": "main", "breadcrumb": "Home"}
+        chain = LayoutChain(layouts=())
+
+        upgraded = upgrade_result(
+            result,
+            cascade_ctx,
+            layout_chain=chain,
+            context_providers=(),
+            template_name="workspace/analytics/page.html",
+        )
+
+        from chirp.templating.composition import PageComposition
+
+        assert isinstance(upgraded, PageComposition)
+        assert upgraded.template == "workspace/analytics/page.html"
+        assert upgraded.fragment_block is None
+        assert upgraded.page_block is None
+        assert upgraded.context["page_title"] == "Analytics"
+        assert upgraded.context["summary"] == 42
+        assert upgraded.context["nav"] == "main"
+        assert upgraded.context["breadcrumb"] == "Home"
+
     def test_none_passes_through(self) -> None:
         result = upgrade_result(None, {}, layout_chain=None, context_providers=())
         assert result is None

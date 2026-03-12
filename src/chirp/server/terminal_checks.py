@@ -186,10 +186,16 @@ def format_check_result(
     warnings = [i for i in result.issues if i.severity == Severity.WARNING]
     infos = [i for i in result.issues if i.severity == Severity.INFO]
 
+    route_shown = False
     for issue_group in (errors, warnings, infos):
+        route_in_group = [i for i in issue_group if getattr(i, "category", "") == "route_contract"]
+        if route_in_group and not route_shown:
+            lines.append(f"  {c.cyan}Route contract{c.reset}")
+            lines.append("")
+            route_shown = True
         for issue in issue_group:
             lines.extend(_format_issue(issue, c))
-            lines.append("")  # blank line between issues
+            lines.append("")
 
     # ── Summary line ────────────────────────────────────────
     if not errors and not warnings:

@@ -91,7 +91,7 @@
     </div>
     <div class="stat-card">
       <div class="label">Revenue</div>
-      <div class="value revenue">${{ "%.2f" | format(stats.total_revenue) }}</div>
+      <div class="value revenue">${{ stats.total_revenue | format_number(2) }}</div>
     </div>
     <div class="stat-card">
       <div class="label">Pending</div>
@@ -99,7 +99,7 @@
     </div>
     <div class="stat-card">
       <div class="label">Avg Order</div>
-      <div class="value">${{ "%.2f" | format(stats.avg_order) }}</div>
+      <div class="value">${{ stats.avg_order | format_number(2) }}</div>
     </div>
     {% else %}
     <div class="stat-card"><div class="label">Total Orders</div><div class="value">—</div></div>
@@ -131,7 +131,7 @@
           <td>{{ order.id }}</td>
           <td>{{ order.customer }}</td>
           <td>{{ order.product }}</td>
-          <td class="amount">${{ "%.2f" | format(order.amount) }}</td>
+          <td class="amount">${{ order.amount | format_number(2) }}</td>
           <td><span class="badge {{ order.status }}">{{ order.status }}</span></td>
           <td>{{ order.created_at }}</td>
         </tr>
@@ -152,7 +152,7 @@
     <td>{{ order.id }}</td>
     <td>{{ order.customer }}</td>
     <td>{{ order.product }}</td>
-    <td class="amount">${{ "%.2f" | format(order.amount) }}</td>
+    <td class="amount">${{ order.amount | format_number(2) }}</td>
     <td><span class="badge {{ order.status }}">{{ order.status }}</span></td>
     <td>{{ order.created_at }}</td>
   </tr>

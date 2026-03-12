@@ -155,6 +155,7 @@ def upgrade_result(
     layout_chain: LayoutChain | None,
     context_providers: tuple[ContextProvider, ...],
     request: Request | None = None,
+    template_name: str | None = None,
 ) -> Any:
     """Upgrade a Page result to a LayoutPage with layout chain metadata.
 
@@ -212,6 +213,7 @@ def upgrade_result(
             layout_chain,
             context_providers,
             request=request,
+            template_name=template_name,
         )
         if upgraded_main is result.main:
             return result
@@ -234,6 +236,15 @@ def upgrade_result(
                 else result.context_providers,
             )
         return result
+
+    if isinstance(result, dict) and template_name is not None:
+        merged_ctx = _merge_result_context(cascade_ctx, result)
+        return PageComposition(
+            template=template_name,
+            context=merged_ctx,
+            layout_chain=layout_chain,
+            context_providers=context_providers,
+        )
 
     return result
 

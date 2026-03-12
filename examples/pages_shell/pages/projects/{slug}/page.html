@@ -2,6 +2,9 @@
 {% from "chirpui/card.html" import card %}
 {% from "chirpui/layout.html" import container, page_header, stack, grid %}
 
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
 {% call container(max_width="76rem") %}
 {% call stack(gap="lg", cls="example-page") %}
 {% from "chirpui/nav_link.html" import nav_link %}
@@ -56,6 +59,9 @@
     </div>
   {% end %}
   {% endblock %}
+{% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

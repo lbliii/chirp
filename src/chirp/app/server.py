@@ -72,6 +72,7 @@ class ServerLauncher:
             lifecycle_logging=self._config.lifecycle_logging,
             log_format=self._config.log_format,
             log_level=self._config.log_level,
+            worker_mode=self._config.worker_mode,
             max_connections=self._config.max_connections,
             backlog=self._config.backlog,
             keep_alive_timeout=self._config.keep_alive_timeout,

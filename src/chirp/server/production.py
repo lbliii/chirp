@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from pounce import ASGIApp
+from pounce.sync_protocol import SyncApp
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -19,6 +20,7 @@ def run_production_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     workers: int = 0,  # 0 = auto-detect from CPU count
+    worker_mode: str = "auto",  # "auto" | "sync" | "async"
     *,
     # Phase 6.1: Prometheus Metrics
     metrics_enabled: bool = True,
@@ -127,6 +129,7 @@ def run_production_server(
         host=host,
         port=port,
         workers=workers,
+        worker_mode=worker_mode,
         # Phase 6.1: Prometheus Metrics
         metrics_enabled=metrics_enabled,
         metrics_path=metrics_path,
@@ -165,6 +168,6 @@ def run_production_server(
         health_check_path=None,  # Let chirp app handle health checks
     )
 
-    # Create and run server
-    server = Server(config, cast(ASGIApp, app))
+    # Create and run server — pass app as sync_app for fused sync path
+    server = Server(config, cast(ASGIApp, app), sync_app=cast(SyncApp, app))
     server.run()

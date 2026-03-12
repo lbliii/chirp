@@ -23,6 +23,13 @@ def test_htmx_debug_js_loads() -> None:
     assert "htmx:oobBeforeSwap" in HTMX_DEBUG_BOOT_JS
 
 
+def test_htmx_debug_js_parses_route_headers() -> None:
+    """HTMX debug script parses X-Chirp-Route-* headers for activity log."""
+    assert "X-Chirp-Route-Kind" in HTMX_DEBUG_BOOT_JS
+    assert "getResponseHeader" in HTMX_DEBUG_BOOT_JS
+    assert "r.route" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_valid_syntax() -> None:
     """HTMX debug script is valid JavaScript (catches escaping/quote errors).
 

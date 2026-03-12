@@ -91,8 +91,6 @@ from chirp.templating.composition import PageComposition
 def get(request: Request) -> PageComposition:
     return PageComposition(
         template="settings/page.html",
-        fragment_block="page_content",
-        page_block="page_root",
         context={
             "current_path": request.path,
             "page_title": "Settings",
@@ -104,6 +102,8 @@ def get(request: Request) -> PageComposition:
         },
     )
 ```
+
+With ChirpUI, `fragment_block` and `page_block` are optional — the FragmentTargetRegistry resolves from `HX-Target` (`#main`, `#page-root`, `#page-content-inner`).
 
 | Key | Purpose | Used by |
 |-----|---------|---------|
@@ -117,8 +117,6 @@ For dynamic pages, use the entity name:
 def get(request: Request, skill: Skill) -> PageComposition:
     return PageComposition(
         template="skill/{name}/page.html",
-        fragment_block="page_content",
-        page_block="page_root",
         context={
             "current_path": request.path,
             "page_title": skill.name,
@@ -146,8 +144,11 @@ Page templates define two nested blocks:
 {% end %}
 ```
 
-- `page_root` — outer block for full page composition (`page_block` in handler)
-- `page_content` — inner block for HTMX fragment rendering (`fragment_block` in handler)
+- `page_root` — outer block for full page composition and sidebar nav (`hx-target="#main"`)
+- `page_root_inner` — inner block for tab clicks (`hx-target="#page-root"`)
+- `page_content` — narrow block for content-only swaps (`hx-target="#page-content-inner"`)
+
+ChirpUI registers these via `use_chirp_ui()`. `main` and `page-root` have `triggers_shell_update=True` so shell_actions (topbar, breadcrumbs, title) update on sidebar and tab clicks; `page-content-inner` has `triggers_shell_update=False` so narrow swaps don't update the shell. Custom targets: `app.register_fragment_target("id", fragment_block="...", triggers_shell_update=True)`.
 
 ## Context Cascade with _context.py
 

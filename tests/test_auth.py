@@ -17,6 +17,7 @@ from chirp.middleware.auth import (
 )
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session
 from chirp.testing import TestClient
+from tests.helpers.auth import extract_session_cookie
 
 # ---------------------------------------------------------------------------
 # Test user model
@@ -56,14 +57,6 @@ async def _verify_token(token: str) -> FakeUser | None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _extract_cookie(response, name: str) -> str | None:
-    """Extract a Set-Cookie value from response headers."""
-    for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
-            return hvalue.split(";")[0].partition("=")[2]
-    return None
 
 
 def _make_session_app(**auth_kwargs) -> App:
@@ -189,7 +182,7 @@ class TestAuthMiddlewareSessionAuth:
             # Login (sets session)
             r1 = await client.get("/login")
             assert r1.status == 200
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             assert cookie is not None
 
             # Access with session cookie
@@ -216,7 +209,7 @@ class TestAuthMiddlewareSessionAuth:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set-bad")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/whoami",
@@ -334,7 +327,7 @@ class TestAuthMiddlewareDualMode:
         async with TestClient(app) as client:
             # Set session for alice (id=1)
             r1 = await client.get("/set-session")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # Request with both token (bob) and session cookie (alice)
             r2 = await client.get(
@@ -362,7 +355,7 @@ class TestAuthMiddlewareDualMode:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set-session")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/whoami",
@@ -411,7 +404,7 @@ class TestAuthMiddlewareExcludePaths:
 
         async with TestClient(app) as client:
             r1 = await client.get("/set-session")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             r2 = await client.get(
                 "/whoami",
@@ -445,7 +438,7 @@ class TestLoginLogout:
         async with TestClient(app) as client:
             r1 = await client.get("/do-login")
             assert r1.text == "id=1"
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # Session should persist
             r2 = await client.get(
@@ -476,7 +469,7 @@ class TestLoginLogout:
         async with TestClient(app) as client:
             # Login
             r1 = await client.get("/do-login")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
 
             # Logout
             r2 = await client.get(
@@ -484,7 +477,7 @@ class TestLoginLogout:
                 headers={"Cookie": f"chirp_session={cookie}"},
             )
             assert r2.text == "auth=False"
-            cookie2 = _extract_cookie(r2, "chirp_session")
+            cookie2 = extract_session_cookie(r2, "chirp_session")
 
             # Verify session is cleared
             r3 = await client.get(
@@ -566,7 +559,7 @@ class TestSessionVersioning:
 
         async with TestClient(app) as client:
             r1 = await client.get("/do-login")
-            cookie = _extract_cookie(r1, "chirp_session")
+            cookie = extract_session_cookie(r1, "chirp_session")
             assert cookie is not None
 
             # Session initially valid.

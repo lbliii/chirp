@@ -23,6 +23,9 @@ from chirp.http.request import Request
 request_var: ContextVar[Request] = ContextVar("chirp_request")
 """The current request. Set by the ASGI handler before dispatch."""
 
+force_inline_sync_var: ContextVar[bool] = ContextVar("chirp_force_inline_sync", default=False)
+"""Pounce sync workers set this so handlers run inline instead of to_thread."""
+
 
 def get_request() -> Request:
     """Return the current request.

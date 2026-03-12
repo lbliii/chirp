@@ -8,6 +8,9 @@ from .utils import closest_id
 
 _HTMX_EXTENDED_PREFIXES = frozenset({"closest", "find", "next", "previous"})
 _HTMX_SPECIAL_TARGETS = frozenset({"this", "body", "window", "document"})
+# ChirpUI fragment_island_with_result creates a div with mutation_result_id; docstring examples
+# reference it. Skip warning when target is this known pattern ID in chirpui templates.
+_CHIRPUI_PATTERN_IDS = frozenset({"update-result"})
 _HX_INDICATOR_PATTERN = re.compile(r'hx-indicator\s*=\s*(["\'])(.*?)\1')
 _HX_BOOST_PATTERN = re.compile(r'hx-boost\s*=\s*(["\'])(.*?)\1')
 _SELECTOR_ATTR_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -44,6 +47,8 @@ def check_hx_target_selectors(
                 if not target_id:
                     continue
                 validated += 1
+                if target_id in _CHIRPUI_PATTERN_IDS and template_name.startswith("chirpui/"):
+                    continue
                 if target_id not in all_ids:
                     suggestion = closest_id(target_id, all_ids)
                     hint = f' Did you mean "#{suggestion}"?' if suggestion else ""

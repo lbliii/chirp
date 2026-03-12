@@ -230,6 +230,31 @@ class Response:
 
 
 @dataclass(frozen=True, slots=True)
+class JSONResponse(Response):
+    """A compact JSON response serialized directly to bytes."""
+
+    body: bytes = b""
+    content_type: str = "application/json; charset=utf-8"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: Any,
+        *,
+        status: int = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> JSONResponse:
+        """Serialize *value* once and return a JSONResponse."""
+        response = cls(
+            body=json_module.dumps(value, default=str, separators=(",", ":")).encode("utf-8"),
+            status=status,
+        )
+        if headers:
+            return replace(response, headers=tuple(headers.items()))
+        return response
+
+
+@dataclass(frozen=True, slots=True)
 class Redirect:
     """A redirect response."""
 

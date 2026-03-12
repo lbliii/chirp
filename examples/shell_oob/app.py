@@ -3,6 +3,10 @@
 Demonstrates automatic OOB updates for sidebar, breadcrumbs, and title
 on hx-boost navigation using Kida's AST metadata.
 
+use_chirp_ui() registers fragment targets (main, page-root, page-content-inner)
+with triggers_shell_update so shell_actions update on sidebar and tab clicks.
+Custom targets: app.register_fragment_target("id", fragment_block="...", triggers_shell_update=False)
+
 Run:
     python app.py
 """

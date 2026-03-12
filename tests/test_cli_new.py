@@ -7,6 +7,14 @@ import pytest
 from chirp.cli import main
 
 
+def test_templates_shim_import() -> None:
+    """chirp.cli._templates re-exports from chirp.cli.templates for backward compat."""
+    from chirp.cli._templates import STYLE_CSS, V2_APP_PY
+
+    assert "box-sizing" in STYLE_CSS
+    assert "App(" in V2_APP_PY
+
+
 class TestChirpNewDefaultV2:
     def test_creates_expected_v2_tree(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

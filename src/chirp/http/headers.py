@@ -6,6 +6,18 @@ Stores raw byte pairs from the ASGI scope; decodes on access.
 
 from collections.abc import Iterator, Mapping
 
+# Headers whose values should be masked in debug output
+SENSITIVE_HEADER_NAMES: frozenset[str] = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "set-cookie",
+        "x-api-key",
+        "x-auth-token",
+        "proxy-authorization",
+    }
+)
+
 
 class Headers(Mapping[str, str]):
     """Immutable, case-insensitive HTTP headers.

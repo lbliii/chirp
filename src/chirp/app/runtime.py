@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
-from chirp.server.handler import handle_request
+from chirp.server.handler import create_request_handler, handle_request
 
 from .lifecycle import LifecycleCoordinator
 from .state import MutableAppState, RuntimeAppState
@@ -13,7 +13,14 @@ from .state import MutableAppState, RuntimeAppState
 class ASGIRuntime:
     """Dispatches ASGI scopes to lifecycle or request handling."""
 
-    __slots__ = ("_config", "_ensure_frozen", "_lifecycle", "_mutable", "_runtime")
+    __slots__ = (
+        "_compiled_handler",
+        "_config",
+        "_ensure_frozen",
+        "_lifecycle",
+        "_mutable",
+        "_runtime",
+    )
 
     def __init__(
         self,
@@ -28,6 +35,24 @@ class ASGIRuntime:
         self._runtime = runtime_state
         self._lifecycle = lifecycle
         self._ensure_frozen = ensure_frozen
+        self._compiled_handler = None
+
+    def _get_compiled_handler(self):
+        if self._compiled_handler is None:
+            assert self._runtime.router is not None
+            self._compiled_handler = create_request_handler(
+                router=self._runtime.router,
+                middleware=self._runtime.middleware,
+                tool_registry=self._runtime.tool_registry,
+                mcp_path=self._config.mcp_path,
+                debug=self._config.debug,
+                providers=self._mutable.providers or None,
+                kida_env=self._runtime.kida_env,
+                oob_registry=self._runtime.oob_registry,
+                fragment_target_registry=self._runtime.fragment_target_registry,
+                discovered_routes=self._runtime.discovered_routes or [],
+            )
+        return self._compiled_handler
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -58,4 +83,7 @@ class ASGIRuntime:
             sse_heartbeat_interval=self._config.sse_heartbeat_interval,
             sse_retry_ms=self._config.sse_retry_ms,
             sse_close_event=self._config.sse_close_event,
+            compiled_handler=self._get_compiled_handler(),
+            oob_registry=self._runtime.oob_registry,
+            fragment_target_registry=self._runtime.fragment_target_registry,
         )

@@ -15,6 +15,8 @@ from chirp.errors import HTTPError
 from chirp.http.request import Request
 from chirp.http.response import Response, SSEResponse, StreamingResponse
 from chirp.server.negotiation import negotiate
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.oob_registry import OOBRegistry
 
 logger = logging.getLogger("chirp.server")
 
@@ -46,6 +48,8 @@ async def call_error_handler(
     request: Request,
     exc: Exception,
     kida_env: Environment | None,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Invoke a user-registered error handler with introspected arguments.
 
@@ -67,7 +71,12 @@ async def call_error_handler(
 
     if isinstance(result, Response):
         return result
-    return negotiate(result, kida_env=kida_env)
+    return negotiate(
+        result,
+        kida_env=kida_env,
+        oob_registry=oob_registry,
+        fragment_target_registry=fragment_target_registry,
+    )
 
 
 async def handle_http_error(
@@ -76,6 +85,8 @@ async def handle_http_error(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Map an HTTPError to a Response using registered error handlers."""
     logger.debug("%d %s %s — %s", exc.status, request.method, request.path, exc.detail)
@@ -83,7 +94,14 @@ async def handle_http_error(
     # Try exact exception type, then status code
     handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
     if handler is not None:
-        response = await call_error_handler(handler, request, exc, kida_env)
+        response = await call_error_handler(
+            handler,
+            request,
+            exc,
+            kida_env,
+            oob_registry=oob_registry,
+            fragment_target_registry=fragment_target_registry,
+        )
         # Preserve the HTTP status from the exception unless the handler
         # explicitly returned a Response/StreamingResponse with its own status.
         # SSEResponse has no status attr; its with_status is a no-op.
@@ -111,6 +129,8 @@ async def handle_internal_error(
     error_handlers: dict[int | type, Callable[..., Any]],
     kida_env: Environment | None,
     debug: bool,
+    oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Handle unexpected exceptions as 500 errors."""
     from chirp.server.terminal_errors import log_error
@@ -119,7 +139,14 @@ async def handle_internal_error(
 
     handler = error_handlers.get(500) or error_handlers.get(type(exc))
     if handler is not None:
-        return await call_error_handler(handler, request, exc, kida_env)
+        return await call_error_handler(
+            handler,
+            request,
+            exc,
+            kida_env,
+            oob_registry=oob_registry,
+            fragment_target_registry=fragment_target_registry,
+        )
 
     if debug:
         from chirp.server.debug_page import render_debug_page

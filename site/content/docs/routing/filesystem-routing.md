@@ -30,10 +30,15 @@ The discovery system walks the `pages/` directory and treats specific files as r
 |------|---------|
 | `page.py` | Route handler for the directory URL (e.g. `documents/page.py` → `GET /documents`) |
 | `edit.py`, `create.py`, etc. | Route handlers that append to the path (e.g. `edit.py` → `GET /documents/edit`) |
+| `_meta.py` | Route metadata (title, section, breadcrumb_label, shell_mode). See [Route Contract](/docs/reference/route-contract/). |
 | `_layout.html` | Layout shell with `{% block content %}` and `{# target: element_id #}` |
 | `_context.py` | Context provider that cascades to child routes |
+| `_actions.py` | Mutation handlers with `@action` decorator |
+| `_viewmodel.py` | View assembly for complex context merging |
 
 Directories whose names are wrapped in `{braces}` become path parameters (e.g. `{doc_id}/` → `/documents/{doc_id}`).
+
+See the [Route Directory Contract](/docs/reference/route-contract/) for the full reserved file vocabulary and [Route Directory Golden Path](/docs/guides/route-directory/) for recommended patterns.
 
 ## Example Structure
 

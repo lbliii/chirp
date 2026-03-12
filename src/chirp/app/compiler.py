@@ -3,9 +3,10 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
 from chirp.routing.route import Route
-from chirp.routing.router import Router
+from chirp.routing.router import Router, parse_path
 from chirp.templating.integration import create_environment
 from chirp.tools.registry import compile_tools
 
@@ -47,8 +48,19 @@ class AppCompiler:
             self._mutable.lazy_pages_dir = None
 
         router = Router()
+        providers = self._mutable.providers
         for pending in self._mutable.pending_routes:
             methods = frozenset(m.upper() for m in (pending.methods or ["GET"]))
+            segments = parse_path(pending.path)
+            path_param_names = frozenset(
+                s.param_name for s in segments if s.is_param and s.param_name
+            )
+            invoke_plan = compile_invoke_plan(
+                pending.handler,
+                providers or None,
+                path_param_names=path_param_names,
+                inline=pending.inline,
+            )
             route = Route(
                 path=pending.path,
                 handler=pending.handler,
@@ -56,10 +68,13 @@ class AppCompiler:
                 name=pending.name,
                 referenced=pending.referenced,
                 template=pending.template,
+                invoke_plan=invoke_plan,
+                inline=pending.inline,
             )
             router.add(route)
         router.compile()
         self._runtime.router = router
+        self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
         middleware_list = list(self._mutable.middleware_list)
         if self._config.static_dir is not None:
@@ -149,6 +164,20 @@ class AppCompiler:
             [(t.name, t.description, t.handler) for t in self._mutable.pending_tools],
             self._mutable.tool_events,
         )
+        from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
+        from chirp.templating.oob_registry import OOBRegionConfig
+
+        if self._mutable.oob_registry.get("shell_actions_oob") is None:
+            self._mutable.oob_registry.register(
+                "shell_actions_oob",
+                OOBRegionConfig(target_id=SHELL_ACTIONS_TARGET, swap="innerHTML", wrap=True),
+            )
+        self._mutable.oob_registry.freeze()
+        self._runtime.oob_registry = self._mutable.oob_registry
+
+        self._mutable.fragment_target_registry.freeze()
+        self._runtime.fragment_target_registry = self._mutable.fragment_target_registry
+
         self._runtime.frozen = True
 
         sync_runtime_aliases()

@@ -1,6 +1,5 @@
 """Tests for the kanban_shell example — auth, board rendering, CRUD, move, filter, SSE."""
 
-import re
 from unittest.mock import AsyncMock, patch
 
 from chirp.testing import (
@@ -10,6 +9,7 @@ from chirp.testing import (
     assert_hx_trigger,
     assert_is_fragment,
 )
+from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -19,39 +19,15 @@ _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 # ---------------------------------------------------------------------------
 
 
-def _extract_cookie(response, name: str = "chirp_session_kanban_shell") -> str | None:
-    """Extract a Set-Cookie value from response headers."""
-    for hname, hvalue in response.headers:
-        if hname == "set-cookie" and hvalue.startswith(f"{name}="):
-            return hvalue.split(";")[0].partition("=")[2]
-    return None
-
-
-def _extract_csrf_token(html: str) -> str | None:
-    """Extract CSRF token from a rendered form (hidden input) or meta tag."""
-    patterns = (
-        r'<input[^>]*name="_csrf_token"[^>]*value="([^"]+)"',
-        r'<input[^>]*value="([^"]+)"[^>]*name="_csrf_token"',
-        r'<meta[^>]*name="csrf-token"[^>]*content="([^"]+)"',
-        r'<meta[^>]*content="([^"]+)"[^>]*name="csrf-token"',
-    )
-    for pattern in patterns:
-        match = re.search(pattern, html)
-        if match:
-            return match.group(1)
-    return None
-
-
-def _extract_csrf_meta(html: str) -> str | None:
-    """Extract CSRF token from a meta tag (for htmx requests)."""
-    return _extract_csrf_token(html)
+def _cookie(response) -> str | None:
+    return extract_session_cookie(response, cookie_name="chirp_session_kanban_shell")
 
 
 async def _login(client, username: str = "alice") -> dict[str, str]:
     """Log in (CSRF-aware) and return auth + CSRF headers for subsequent requests."""
     page = await client.get("/login")
-    session_cookie = _extract_cookie(page)
-    csrf_token = _extract_csrf_token(page.text)
+    session_cookie = _cookie(page)
+    csrf_token = extract_csrf_token(page.text)
 
     headers = {**_FORM_CT}
     if session_cookie:
@@ -62,12 +38,12 @@ async def _login(client, username: str = "alice") -> dict[str, str]:
         body += f"&_csrf_token={csrf_token}"
 
     r = await client.post("/login", body=body.encode(), headers=headers)
-    cookie = _extract_cookie(r) or session_cookie
+    cookie = _cookie(r) or session_cookie
     assert cookie is not None, f"Login failed for {username}"
 
     board = await client.get("/", headers={"Cookie": f"chirp_session_kanban_shell={cookie}"})
-    board_cookie = _extract_cookie(board) or cookie
-    fresh_csrf = _extract_csrf_meta(board.text) or csrf_token
+    board_cookie = _cookie(board) or cookie
+    fresh_csrf = extract_csrf_token(board.text) or csrf_token
 
     auth_headers: dict[str, str] = {"Cookie": f"chirp_session_kanban_shell={board_cookie}"}
     if fresh_csrf:
@@ -100,8 +76,8 @@ class TestAuth:
     async def test_valid_login_redirects(self, example_app) -> None:
         async with TestClient(example_app) as client:
             page = await client.get("/login")
-            session = _extract_cookie(page)
-            csrf = _extract_csrf_token(page.text)
+            session = _cookie(page)
+            csrf = extract_csrf_token(page.text)
             headers = {**_FORM_CT}
             if session:
                 headers["Cookie"] = f"chirp_session_kanban_shell={session}"
@@ -115,8 +91,8 @@ class TestAuth:
     async def test_invalid_login_shows_error(self, example_app) -> None:
         async with TestClient(example_app) as client:
             page = await client.get("/login")
-            session = _extract_cookie(page)
-            csrf = _extract_csrf_token(page.text)
+            session = _cookie(page)
+            csrf = extract_csrf_token(page.text)
             headers = {**_FORM_CT}
             if session:
                 headers["Cookie"] = f"chirp_session_kanban_shell={session}"
@@ -143,8 +119,8 @@ class TestAuth:
         async with TestClient(example_app) as client:
             for name in ("alice", "bob", "carol"):
                 page = await client.get("/login")
-                session = _extract_cookie(page)
-                csrf = _extract_csrf_token(page.text)
+                session = _cookie(page)
+                csrf = extract_csrf_token(page.text)
                 headers = {**_FORM_CT}
                 if session:
                     headers["Cookie"] = f"chirp_session_kanban_shell={session}"
@@ -153,7 +129,7 @@ class TestAuth:
                     body += f"&_csrf_token={csrf}"
                 r = await client.post("/login", body=body.encode(), headers=headers)
                 assert r.status == 302, f"{name} login failed"
-                assert _extract_cookie(r) is not None or session is not None
+                assert _cookie(r) is not None or session is not None
 
     async def test_current_user_shown_in_header(self, example_app) -> None:
         """Board shows logged-in user's name in the header."""

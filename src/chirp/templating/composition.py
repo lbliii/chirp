@@ -45,7 +45,8 @@ class PageComposition:
     """Explicit page composition with fragment, page block, and regions.
 
     Replaces Page/LayoutPage block_name/page_block_name with:
-    - fragment_block: narrow block for non-boosted fragment requests
+    - fragment_block: narrow block for non-boosted fragment requests.
+      When None, resolved from FragmentTargetRegistry via HX-Target.
     - page_block: wider root for boosted navigation (or full page)
     - regions: shell actions, badges, and other persistent-region refreshes
 
@@ -70,7 +71,7 @@ class PageComposition:
     """
 
     template: str
-    fragment_block: str
+    fragment_block: str | None = None
     page_block: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
     regions: tuple[RegionUpdate, ...] = ()
