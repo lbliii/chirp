@@ -1,0 +1,67 @@
+{% imports %}
+  {% from "chirpui/sortable_list.html" import sortable_list, sortable_item %}
+  {% from "chirpui/button.html" import btn %}
+  {% from "chirpui/forms.html" import text_field %}
+  {% from "chirpui/layout.html" import container, stack, page_header %}
+{% end %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% call container(max_width="42rem") %}
+{% call stack(gap="lg") %}
+{% call page_header(
+  "Reorder list",
+  subtitle="Drag items to reorder. Uses native HTML5 DnD + Alpine + HTMX — no Sortable.js.",
+  meta="chirp-ui sortable_list, dataset.draggingIdx, overCount for drop indicator, hidden form + htmx.trigger"
+) %}
+{% end %}
+
+{% block page_content %}
+{% block item_list %}
+<div id="item-list" class="chirpui-fragment-island" hx-disinherit="hx-select hx-target hx-swap">
+<form id="reorder-form" method="post" action="/reorder"
+      hx-post="/reorder" hx-target="#item-list" hx-select="#item-list" hx-swap="outerHTML"
+      style="display:none">
+  <input type="hidden" name="from_idx" value="">
+  <input type="hidden" name="to_idx" value="">
+  {{ csrf_field() }}
+</form>
+
+<form id="add-form" class="chirpui-form" method="post" action="/items"
+      hx-post="/items" hx-target="#item-list" hx-swap="outerHTML"
+      style="margin-bottom: 1rem;">
+  {{ csrf_field() }}
+  <div class="chirpui-cluster chirpui-cluster--sm" style="align-items: flex-end; gap: 0.5rem;">
+    {{ text_field("name", label="Add item", placeholder="New item name", required=true) }}
+    {{ btn("Add", variant="primary", type="submit") }}
+  </div>
+</form>
+
+{% call sortable_list(attrs='x-data
+    @dragend="delete $el.dataset.draggingIdx; $el.querySelectorAll(\'.chirpui-sortable__item--dragging, .chirpui-sortable__item--over\').forEach(el => el.classList.remove(\'chirpui-sortable__item--dragging\', \'chirpui-sortable__item--over\'))"') %}
+{% if items %}
+  {% for item in items %}
+  {% call sortable_item(attrs='x-data="{ overCount: 0 }" draggable="true"
+      @dragstart="$el.closest(\'.chirpui-sortable\').dataset.draggingIdx = \'' ~ loop.index0 ~ '\'; $el.classList.add(\'chirpui-sortable__item--dragging\')"
+      @dragover.prevent
+      @dragenter="overCount++; if (overCount === 1) $el.classList.add(\'chirpui-sortable__item--over\')"
+      @dragleave="overCount--; if (overCount === 0) $el.classList.remove(\'chirpui-sortable__item--over\')"
+      @drop.prevent="overCount = 0; $el.classList.remove(\'chirpui-sortable__item--over\');
+          const list = $el.closest(\'.chirpui-sortable\');
+          const form = document.getElementById(\'reorder-form\');
+          if (form) { form.elements[\'from_idx\'].value = list.dataset.draggingIdx; form.elements[\'to_idx\'].value = \'' ~ loop.index0 ~ '\'; htmx.trigger(form, \'submit\'); }"') %}
+    <span class="chirpui-sortable__handle">&#x2630;</span>
+    <div class="chirpui-sortable__content">{{ item }}</div>
+  {% end %}
+  {% end %}
+{% else %}
+  <p class="chirpui-text-muted chirpui-font-sm" style="padding: 1rem;">No items yet. Add one above.</p>
+{% end %}
+{% end %}
+</div>
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}
