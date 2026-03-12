@@ -109,8 +109,8 @@ Documentation = "https://lbliii.github.io/chirp/"
 Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
-[tool.uv.sources]
-bengal-pounce = { workspace = true }
+# tool.uv.sources: omitted — workspace root (b-stack) provides bengal-pounce override
+# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.2.2).
 
 [tool.setuptools.packages.find]
 where = ["src"]
