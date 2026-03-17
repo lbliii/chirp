@@ -3,6 +3,8 @@
 {% block content %}
 {% from "chirpui/layout.html" import container, grid, stack %}
 {% from "chirpui/empty.html" import empty_state %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/forms.html" import form_actions %}
 
 {% call container() %}
 {% call stack() %}
@@ -16,10 +18,14 @@
   </p>
 </header>
 
+{#- hx-disinherit="hx-select" prevents inheriting hx-select="#page-content" from the boost
+    shell (#main). Without it, the fragment response from /ask would be matched against
+    "#page-content" which doesn't exist in the fragment → blank swap. #}
 <form class="chirpui-stack chirpui-stack--lg"
       hx-post="/ask"
       hx-target="#results"
       hx-swap="innerHTML"
+      hx-disinherit="hx-select"
       aria-label="Compare models">
   <div class="chirpui-grid chirpui-grid--cols-2" style="gap: var(--chirpui-spacing);">
     <div class="chirpui-field">
@@ -46,10 +52,12 @@
     <textarea class="chirpui-field__input" id="prompt" name="prompt" rows="4"
               placeholder="Ask anything. Both models will race to answer." required></textarea>
   </div>
-  <button type="submit">Compare</button>
+  {% call form_actions() %}
+    {{ btn("Compare", variant="primary", type="submit") }}
+  {% end %}
 </form>
 
-<section id="results" aria-label="Model comparison" hx-disinherit="hx-target hx-swap">
+<section id="results" aria-label="Model comparison" hx-disinherit="hx-target hx-swap hx-select">
   {% call empty_state(icon="◇", title="Ready to compare") %}
   <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
   {% end %}

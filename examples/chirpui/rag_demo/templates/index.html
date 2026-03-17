@@ -18,6 +18,7 @@
       hx-post="/ask"
       hx-target="#conversation"
       hx-swap="afterbegin transition:true"
+      hx-disinherit="hx-select"
       aria-label="Ask a question about the docs"
       hx-on::before-request="var sw=this.querySelector('.compare-switch');if(sw&&sw.getAttribute('aria-checked')==='true'){this.querySelector('input[name=compare]').checked=true}"
       hx-on::after-request="if(event.detail.successful){this.querySelector('[name=question]').value='';document.querySelector('#conversation .chirpui-card')?.scrollIntoView({behavior:'smooth',block:'start'})}">
@@ -62,7 +63,7 @@
 </form>
 
 <section id="results" aria-label="Questions and answers">
-  <div id="conversation" hx-disinherit="hx-target hx-swap">
+  <div id="conversation" hx-disinherit="hx-target hx-swap hx-select">
     <div class="conversation-placeholder">
       Ask a question about the docs…
     </div>
