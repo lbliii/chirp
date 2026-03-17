@@ -25,33 +25,31 @@ body {
   background-attachment: fixed;
 }
 
-/* Primary button — gold gradient CTA */
-button[type="submit"] {
-  padding: var(--chirpui-spacing-sm) var(--chirpui-spacing-lg);
+/* Primary button — gold gradient CTA.
+   Scoped to chirpui-btn--primary so it layers on top of the base class
+   without fighting plain <button> elements elsewhere. */
+.chirpui-btn--primary[type="submit"],
+.chirpui-form-actions .chirpui-btn--primary {
   background: linear-gradient(
     135deg,
-    var(--chirpui-color-gold),
-    var(--chirpui-color-radiant)
+    var(--chirpui-accent),
+    var(--chirpui-accent-bright)
   );
   color: var(--chirpui-bg);
-  border: none;
-  border-radius: var(--chirpui-radius);
-  font-weight: 600;
-  cursor: pointer;
-  transition: box-shadow var(--chirpui-transition), transform var(--chirpui-transition);
 }
 
-button[type="submit"]:hover {
+.chirpui-btn--primary[type="submit"]:hover,
+.chirpui-form-actions .chirpui-btn--primary:hover {
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
 }
 
 /* Model card accents — A = gold, B = void-indigo */
 .chirpui-model-card--a .chirpui-card__header {
-  border-left: 3px solid var(--chirpui-color-gold);
+  border-left: 3px solid var(--chirpui-accent);
 }
 
 .chirpui-model-card--b .chirpui-card__header {
-  border-left: 3px solid var(--chirpui-color-void-indigo);
+  border-left: 3px solid var(--chirpui-warning);
 }
 
 /* Results fade-in */
