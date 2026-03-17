@@ -169,18 +169,20 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {# Fragment blocks for OOB #}
 {% fragment header_stats_oob %}
 {% if all_tasks is defined %}
-<div id="board-stats" class="kanban-stats">
   <span><strong>{{ all_tasks | length }}</strong> tasks</span>
   <span><strong>{{ all_tasks | selectattr("priority", "equalto", "high") | list | length }}</strong> high priority</span>
   {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
   <span><strong>{{ assignees | length }}</strong> people</span>
-</div>
 {% end %}
 {% endfragment %}
 
-{% fragment column_block %}
+{% fragment column_innards %}
 {% if column_id is defined %}
-{% call column(column_id, column_name, tasks | length, oob=false) %}
+  <div class="kanban-column__header">
+    <h3>{{ column_name }}</h3>
+    <span class="kanban-column__count">{{ tasks | length }}</span>
+  </div>
+  <div class="kanban-column__body" data-status="{{ column_id }}">
   {% unless tasks %}
     <p class="kanban-empty">No tasks.</p>
   {% end %}
@@ -189,7 +191,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
     {{ task_card(task, me=current_user) }}
   </div>
   {% end %}
-{% end %}
+  </div>
 {% end %}
 {% endfragment %}
 

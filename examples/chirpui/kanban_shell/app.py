@@ -134,6 +134,7 @@ def _empty_main() -> Fragment:
 
 
 def _column_fragment(column_id: str, tasks: list | None = None) -> Fragment:
+    """Column innards via innerHTML swap — avoids duplicate-ID nesting."""
     from store import COLUMNS
 
     if tasks is None:
@@ -142,18 +143,26 @@ def _column_fragment(column_id: str, tasks: list | None = None) -> Fragment:
     column_name = dict(COLUMNS).get(column_id, column_id)
     return Fragment(
         "page.html",
-        "column_block",
+        "column_innards",
         target=f"column-{column_id}",
+        swap="innerHTML",
         column_id=column_id,
         column_name=column_name,
         tasks=column_tasks,
+        current_user=get_user(),
     )
 
 
 def _stats_fragment(tasks: list | None = None) -> Fragment:
     if tasks is None:
         tasks = get_tasks()
-    return Fragment("page.html", "header_stats_oob", target="board-stats", all_tasks=tasks)
+    return Fragment(
+        "page.html",
+        "header_stats_oob",
+        target="board-stats",
+        swap="innerHTML",
+        all_tasks=tasks,
+    )
 
 
 def _column_sse_fragment(

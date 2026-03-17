@@ -371,8 +371,8 @@ class TestMoveTask:
             auth = await _login(client)
             response = await client.post("/tasks/1/move/review", headers=auth)
             assert response.status == 200
-            assert 'id="column-done" hx-swap-oob="true"' in response.text
-            assert 'id="column-review" hx-swap-oob="true"' in response.text
+            assert 'id="column-done" hx-swap-oob="innerHTML"' in response.text
+            assert 'id="column-review" hx-swap-oob="innerHTML"' in response.text
 
     async def test_move_invalid_status(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -398,7 +398,7 @@ class TestMoveTask:
         async with TestClient(example_app) as client:
             auth = await _login(client)
             response = await client.post("/tasks/1/move/review", headers=auth)
-            assert 'id="board-stats" hx-swap-oob="true"' in response.text
+            assert 'id="board-stats" hx-swap-oob="innerHTML"' in response.text
 
 
 # ---------------------------------------------------------------------------
