@@ -15,7 +15,8 @@
   </div>
   <h4 class="kanban-card__title"
       hx-get="/tasks/{{ task.id }}/edit"
-      hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
+      hx-target="#task-{{ task.id }}" hx-swap="outerHTML"
+      role="button" tabindex="0">
     {{ task.title }}
   </h4>
   {% if task.description %}

@@ -6,7 +6,6 @@ ShellActions, toast, filter sidebar, OOB swaps, and SSE.
 
 import asyncio
 import os
-import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,10 +26,11 @@ from store import (
     delete_task,
     get_task,
     get_tasks,
-    random_move,
+    notify,
     tasks_by_column,
     update_task,
     validate_task,
+    wait_for_event,
 )
 
 from chirp import (
@@ -185,7 +185,7 @@ def _stats_sse_fragment(tasks: list | None = None) -> Fragment:
 # App setup
 # ---------------------------------------------------------------------------
 
-config = AppConfig(template_dir=PAGES_DIR)
+config = AppConfig(template_dir=PAGES_DIR, debug=True)
 app = App(config=config)
 
 use_chirp_ui(app)
@@ -237,6 +237,7 @@ async def add_task_route(request: Request):
         )
 
     add_task(f.title, f.description, f.status, f.priority, assignee, tags)
+    notify((f.status,))
     tasks = get_tasks()
     return OOB(
         _empty_main(),
@@ -295,6 +296,7 @@ async def save_task_route(request: Request, task_id: int):
     if updated is None:
         return ("Task not found", 404)
 
+    notify((updated.status,))
     tasks = get_tasks()
     return OOB(
         Fragment("page.html", "task_card_block", task=updated, current_user=get_user()),
@@ -319,6 +321,7 @@ def move_task_route(task_id: int, new_status: str):
         return ("Already in that column", 400)
 
     update_task(task_id, status=new_status)
+    notify((old_status, new_status))
     tasks = get_tasks()
 
     return OOB(
@@ -338,6 +341,7 @@ def delete_task_route(task_id: int):
 
     column = task.status
     delete_task(task_id)
+    notify((column,))
     tasks = get_tasks()
 
     toast_frag = Fragment(
@@ -393,14 +397,12 @@ def events_route():
 
     async def generate():
         while True:
-            result = random_move()
-            if result is not None:
-                moved_task, old_status = result
+            event = await asyncio.to_thread(wait_for_event, 15.0)
+            if event is not None:
                 tasks = get_tasks()
-                yield _column_sse_fragment(old_status, tasks, current_user=user)
-                yield _column_sse_fragment(moved_task.status, tasks, current_user=user)
+                for col in event.affected_columns:
+                    yield _column_sse_fragment(col, tasks, current_user=user)
                 yield _stats_sse_fragment(tasks)
-            await asyncio.sleep(random.uniform(1.0, 4.0))
 
     return EventStream(generate())
 

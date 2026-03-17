@@ -38,7 +38,7 @@
   {% call sidebar_section("Pages") %}
     {{ sidebar_link("/", "Home", icon="home", active=current_path == "/") }}
     {{ sidebar_link("/dashboard", "Dashboard", icon="grid", active=current_path.startswith("/dashboard")) }}
-    {{ sidebar_link("/about", "About", icon="info", active=current_path.startswith("/about")) }}
+    {{ sidebar_link("/about", "About", icon="alert", active=current_path.startswith("/about")) }}
   {% end %}
 {% end %}
 {% end %}

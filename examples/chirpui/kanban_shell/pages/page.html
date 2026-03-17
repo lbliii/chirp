@@ -2,9 +2,11 @@
   {% from "components/_task_card.html" import task_card %}
   {% from "components/_column.html" import column %}
   {% from "components/_field.html" import field %}
+  {% from "chirp/sse.html" import sse_scope %}
 {% end %}
 
 {% block page_root %}
+{% block page_root_inner %}
 {% block page_content %}
 <div class="kanban-page">
   <div class="kanban-page__header">
@@ -121,9 +123,7 @@
   </div>
 </div>
 
-<div hx-ext="sse" sse-connect="/events">
-  <div sse-swap="fragment" style="display:none;"></div>
-</div>
+{{ sse_scope("/events") }}
 
 <script>
 document.body.addEventListener("htmx:configRequest", function(event) {
@@ -159,6 +159,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
   document.body.addEventListener("htmx:oobAfterSwap", setupColumns);
 })();
 </script>
+{% end %}
 {% end %}
 {% end %}
 

@@ -13,7 +13,7 @@ kanban and kanban_shell on the same host/port without session collision.
 - **mount_pages + @app.route** — Board and login via filesystem routing; API endpoints via explicit routes
 - **Filter sidebar** — Priority, assignee, and tag filters with htmx partial updates
 - **OOB swaps** — Add, edit, move, delete update columns and stats without full reload
-- **SSE** — Simulated live activity from other users
+- **SSE** — Real-time board updates broadcast to all connected clients
 - **Toast** — Delete notifications via chirpui toast container
 
 ## Run

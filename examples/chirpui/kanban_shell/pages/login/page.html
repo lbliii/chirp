@@ -1,5 +1,7 @@
 {% from "chirpui/forms.html" import form, text_field, password_field %}
 
+{% block page_root %}
+{% block page_root_inner %}
 {% block page_content %}
 <div class="kanban-login">
   <div class="kanban-login__card">
@@ -28,4 +30,6 @@
     </div>
   </div>
 </div>
+{% end %}
+{% end %}
 {% end %}

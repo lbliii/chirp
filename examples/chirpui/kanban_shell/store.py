@@ -1,10 +1,11 @@
 """Shared data model and storage for kanban_shell.
 
-Used by app.py and pages/ handlers. Thread-safe in-memory storage.
+Used by app.py and pages/ handlers. Thread-safe in-memory storage
+with an event bus for SSE broadcasts.
 """
 
-import random
 import threading
+from collections import deque
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
@@ -16,13 +17,6 @@ COLUMNS: list[tuple[str, str]] = [
 ]
 
 COLUMN_IDS: set[str] = {col_id for col_id, _ in COLUMNS}
-
-_ADJACENT: dict[str, list[str]] = {
-    "backlog": ["in_progress"],
-    "in_progress": ["backlog", "review"],
-    "review": ["in_progress", "done"],
-    "done": ["review"],
-}
 
 PRIORITIES: list[str] = ["high", "medium", "low"]
 
@@ -156,6 +150,7 @@ def reseed() -> None:
     with _lock:
         _tasks.clear()
         _next_id = 1
+    _event_queue.clear()
     _seed()
 
 
@@ -223,20 +218,33 @@ def tasks_by_column(tasks: list[Task] | None = None) -> dict[str, list[Task]]:
     return board
 
 
-def random_move() -> tuple[Task, str] | None:
-    with _lock:
-        if not _tasks:
-            return None
-        task = random.choice(_tasks)
-        adjacent = _ADJACENT.get(task.status, [])
-        if not adjacent:
-            return None
-        new_status = random.choice(adjacent)
-        old_status = task.status
-        updated = replace(task, status=new_status)
-        idx = _tasks.index(task)
-        _tasks[idx] = updated
-        return (updated, old_status)
+@dataclass(frozen=True, slots=True)
+class BoardEvent:
+    """A change that SSE subscribers should broadcast."""
+
+    affected_columns: tuple[str, ...]
+
+
+_event_condition = threading.Condition()
+_event_queue: deque[BoardEvent] = deque(maxlen=64)
+
+
+def notify(affected_columns: tuple[str, ...]) -> None:
+    """Push an event so SSE subscribers re-render the affected columns."""
+    with _event_condition:
+        _event_queue.append(BoardEvent(affected_columns=affected_columns))
+        _event_condition.notify_all()
+
+
+def wait_for_event(timeout: float = 15.0) -> BoardEvent | None:
+    """Block until an event is available or timeout. Returns None on timeout."""
+    with _event_condition:
+        if _event_queue:
+            return _event_queue.popleft()
+        _event_condition.wait(timeout=timeout)
+        if _event_queue:
+            return _event_queue.popleft()
+        return None
 
 
 def validate_task(title: str, status: str, priority: str) -> dict[str, list[str]]:

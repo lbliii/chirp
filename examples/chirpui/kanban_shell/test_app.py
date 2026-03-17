@@ -1,7 +1,5 @@
 """Tests for the kanban_shell example — auth, board rendering, CRUD, move, filter, SSE."""
 
-from unittest.mock import AsyncMock, patch
-
 from chirp.testing import (
     TestClient,
     assert_fragment_contains,
@@ -490,45 +488,25 @@ class TestSSE:
     """GET /events — live updates via Server-Sent Events."""
 
     async def test_sse_returns_events(self, example_app) -> None:
-        """SSE stream emits fragment events with OOB swaps."""
-        with (
-            patch("app.random_move") as mock_move,
-            patch("app.asyncio.sleep", new_callable=AsyncMock),
-        ):
-            from dataclasses import replace
+        """SSE stream emits fragment events when board changes are notified."""
+        from store import notify
 
-            from store import COLUMNS, get_tasks
-
-            tasks = get_tasks()
-            if tasks:
-                t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
-                mock_move.return_value = (replace(t, status=new_status), t.status)
-            async with TestClient(example_app) as client:
-                auth = await _login(client)
-                result = await client.sse("/events", max_events=3, headers=auth)
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            notify(("backlog", "in_progress"))
+            result = await client.sse("/events", max_events=3, headers=auth)
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 3
 
     async def test_sse_events_all_named_fragment(self, example_app) -> None:
         """All SSE events are named 'fragment' so sse-swap='fragment' receives them."""
-        with (
-            patch("app.random_move") as mock_move,
-            patch("app.asyncio.sleep", new_callable=AsyncMock),
-        ):
-            from dataclasses import replace
+        from store import notify
 
-            from store import COLUMNS, get_tasks
-
-            tasks = get_tasks()
-            if tasks:
-                t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
-                mock_move.return_value = (replace(t, status=new_status), t.status)
-            async with TestClient(example_app) as client:
-                auth = await _login(client)
-                result = await client.sse("/events", max_events=3, headers=auth)
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            notify(("backlog", "in_progress"))
+            result = await client.sse("/events", max_events=3, headers=auth)
         html_events = [e for e in result.events if e.data]
         assert len(html_events) >= 3
         for evt in html_events:
@@ -538,21 +516,11 @@ class TestSSE:
 
     async def test_sse_includes_oob_swaps(self, example_app) -> None:
         """SSE fragment events include hx-swap-oob for targeted updates."""
-        with (
-            patch("app.random_move") as mock_move,
-            patch("app.asyncio.sleep", new_callable=AsyncMock),
-        ):
-            from dataclasses import replace
+        from store import notify
 
-            from store import COLUMNS, get_tasks
-
-            tasks = get_tasks()
-            if tasks:
-                t = tasks[0]
-                new_status = next((s for s in dict(COLUMNS) if s != t.status), t.status)
-                mock_move.return_value = (replace(t, status=new_status), t.status)
-            async with TestClient(example_app) as client:
-                auth = await _login(client)
-                result = await client.sse("/events", max_events=3, headers=auth)
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            notify(("backlog", "in_progress"))
+            result = await client.sse("/events", max_events=3, headers=auth)
         oob_events = [e for e in result.events if e.data and "hx-swap-oob" in e.data]
         assert len(oob_events) >= 3

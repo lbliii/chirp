@@ -20,7 +20,7 @@
 <div class="kanban-user-info">
   <span class="kanban-avatar">{{ current_user.name | first | upper }}</span>
   <span class="kanban-name">{{ current_user.name }}</span>
-  <form method="post" action="/logout" style="margin:0;display:inline">
+  <form method="post" action="/logout" hx-boost="false" style="margin:0;display:inline">
     {{ csrf_field() }}
     <button type="submit" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm">Logout</button>
   </form>
