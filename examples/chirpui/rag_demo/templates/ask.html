@@ -1,6 +1,7 @@
 {# Blocks for RAG demo — sources, answer, ask_result, empty_question
    Uses chirp-ui container, grid, card, streaming_block.
-   Custom SSE: sources + answer + share_link swap targets. hx-disinherit isolates from boost. #}
+   Custom SSE: sources + answer + share_link swap targets.
+   hx-disinherit="hx-target hx-swap" on sse-connect articles isolates streamed swaps. #}
 {% from "chirpui/layout.html" import container, grid %}
 
 {% block sources %}

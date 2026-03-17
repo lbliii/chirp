@@ -26,7 +26,7 @@ class TestNegotiateValidationError:
         # Should be a fragment, not the full page
         assert "<html>" not in result.text
 
-    def test_without_retarget_has_no_hx_header(self, kida_env: Environment) -> None:
+    def test_without_retarget_has_no_hx_retarget_header(self, kida_env: Environment) -> None:
         result = negotiate(
             ValidationError("form.html", "form_body", errors={}),
             kida_env=kida_env,
@@ -34,7 +34,9 @@ class TestNegotiateValidationError:
         assert result.status == 422
         header_names = {name for name, _ in result.headers}
         assert "HX-Retarget" not in header_names
-        assert "HX-Reselect" not in header_names
+        # Fragment responses always include HX-Reselect: :scope > * so HTMX uses
+        # the response content as-is, regardless of any inherited hx-select.
+        assert ("HX-Reselect", ":scope > *") in result.headers
 
     def test_with_retarget_sets_header(self, kida_env: Environment) -> None:
         result = negotiate(

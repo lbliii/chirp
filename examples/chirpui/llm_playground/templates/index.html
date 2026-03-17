@@ -18,14 +18,10 @@
   </p>
 </header>
 
-{#- hx-disinherit="hx-select" prevents inheriting hx-select="#page-content" from the boost
-    shell (#main). Without it, the fragment response from /ask would be matched against
-    "#page-content" which doesn't exist in the fragment → blank swap. #}
 <form class="chirpui-stack chirpui-stack--lg"
       hx-post="/ask"
       hx-target="#results"
       hx-swap="innerHTML"
-      hx-disinherit="hx-select"
       aria-label="Compare models">
   <div class="chirpui-grid chirpui-grid--cols-2" style="gap: var(--chirpui-spacing);">
     <div class="chirpui-field">
@@ -57,7 +53,7 @@
   {% end %}
 </form>
 
-<section id="results" aria-label="Model comparison" hx-disinherit="hx-target hx-swap hx-select">
+<section id="results" aria-label="Model comparison">
   {% call empty_state(icon="◇", title="Ready to compare") %}
   <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
   {% end %}

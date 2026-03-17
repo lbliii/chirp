@@ -78,7 +78,10 @@ def check_layout_chains(
                         category="layout_chain",
                         message=(
                             f"Layout {layout.template_name} uses hx-disinherit. "
-                            "Prefer hx-select on parent for shell layouts."
+                            "If hx-disinherit is protecting against inherited hx-select "
+                            "or hx-target from a broad container, the underlying cause is "
+                            "likely a layout mismatch. Fragment-returning routes should use "
+                            "shell.html (no global hx-select) rather than boost.html."
                         ),
                         template=layout.template_name,
                     )

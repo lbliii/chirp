@@ -78,6 +78,25 @@ def _html_response(body: str, *, intent: RenderIntent) -> Response:
     )
 
 
+def _fragment_response(body: str) -> Response:
+    """Build a text/html response for fragment-returning endpoints.
+
+    Adds ``HX-Reselect: :scope > *`` so HTMX selects the direct children of
+    the response fragment (i.e., the whole content), regardless of any
+    ``hx-select`` the client inherited from a parent layout such as boost.html.
+
+    This makes ``Fragment`` / ``OOB`` / ``ValidationError`` / ``FormAction``
+    responses self-asserting: the server knows it is returning a fragment and
+    owns the selection contract, so client-side layout inheritance cannot silently
+    produce an empty swap.
+
+    Callers that need an explicit client-side select can still override this
+    per-response by returning ``(Fragment(...), 200, {"HX-Reselect": "..."})``
+    via the tuple form of negotiate().
+    """
+    return _html_response(body, intent="fragment").with_hx_reselect(":scope > *")
+
+
 def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environment:
     """Raise ConfigurationError if kida_env is None (template return types need it)."""
     if kida_env is None:
@@ -189,7 +208,7 @@ def negotiate(
                 if value.fragments and kida_env is not None:
                     parts = [render_fragment(kida_env, frag) for frag in value.fragments]
                     html = "\n".join(parts)
-                    response = _html_response(html, intent="fragment")
+                    response = _fragment_response(html)
                     if value.trigger:
                         response = response.with_hx_trigger(value.trigger)
                     return response
@@ -213,7 +232,7 @@ def negotiate(
         case Fragment():
             kida_env = _require_kida_env(kida_env, "Fragment")
             html = render_fragment(kida_env, value)
-            return _html_response(html, intent="fragment")
+            return _fragment_response(html)
         case Page() | LayoutPage():
             kida_env = _require_kida_env(kida_env, "Page/LayoutPage")
             composition = normalize_to_composition(value)
@@ -249,7 +268,7 @@ def negotiate(
             kida_env = _require_kida_env(kida_env, "ValidationError")
             frag = Fragment(value.template_name, value.block_name, **value.context)
             html = render_fragment(kida_env, frag)
-            response = _html_response(html, intent="fragment").with_status(422)
+            response = _fragment_response(html).with_status(422)
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
@@ -278,7 +297,7 @@ def negotiate(
                 else:
                     parts.append(html)
             body = "\n".join(parts)
-            return _html_response(body, intent="fragment")
+            return _fragment_response(body)
         case Stream():
             kida_env = _require_kida_env(kida_env, "Stream")
             if has_async_context(value.context):
