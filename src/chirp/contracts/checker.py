@@ -311,8 +311,15 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 kida_env,
             )
         )
+        action_route_paths = {
+            r.url_path
+            for r in getattr(snapshot, "discovered_routes", [])
+            if getattr(r, "kind", None) == "action"
+        }
         result.issues.extend(
-            check_route_file_consistency(snapshot.route_metas, snapshot.page_route_paths)
+            check_route_file_consistency(
+                snapshot.route_metas, snapshot.page_route_paths, action_route_paths
+            )
         )
         result.issues.extend(check_duplicate_routes(getattr(snapshot, "discovered_routes", [])))
         result.issues.extend(check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths))

@@ -49,7 +49,7 @@
   <button type="submit">Compare</button>
 </form>
 
-<section id="results" aria-label="Model comparison">
+<section id="results" aria-label="Model comparison" hx-disinherit="hx-target hx-swap">
   {% call empty_state(icon="◇", title="Ready to compare") %}
   <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
   {% end %}
