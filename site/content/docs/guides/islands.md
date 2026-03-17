@@ -264,9 +264,9 @@ fails, the SSR fallback remains visible and functional.
 - Clarify the distinction between `data-island` and `fragment_island`
 - Add ownership-language docs for server-owned vs client-owned surfaces
 - Connect islands guidance directly to app-shell and SSE docs
-- Add one end-to-end no-build example using `island_attrs(...)` — see `examples/islands/`
-- Islands + app shell: `examples/islands_shell/`
-- Islands + htmx fragment swap: `examples/islands_swap/`
+- Add one end-to-end no-build example using `island_attrs(...)` — see `examples/standalone/islands/`
+- Islands + app shell: `examples/chirpui/islands_shell/`
+- Islands + htmx fragment swap: `examples/standalone/islands_swap/`
 
 ### V2: Render-Pipeline Alignment
 

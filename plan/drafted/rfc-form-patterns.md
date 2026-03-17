@@ -46,7 +46,7 @@ except FormBindingError as e:
     return ValidationError("form.html", "form_body", errors=e.errors)
 ```
 
-**Re-populating form values is manual** (`examples/kanban/app.py:510-513`):
+**Re-populating form values is manual** (`examples/standalone/kanban/app.py:510-513`):
 When validation fails, the handler must manually reconstruct a `form` dict from
 the dataclass fields to re-populate the template. This is error-prone and
 verbose.
@@ -153,7 +153,7 @@ async def add_task(request: Request) -> Page | ValidationError:
 
 When `ValidationError` is returned, the template needs the form values to
 re-populate inputs. Currently this requires manually constructing a dict
-(`examples/kanban/app.py:510-513`).
+(`examples/standalone/kanban/app.py:510-513`).
 
 Add a `form_values()` utility that converts a dataclass or `FormData` to a
 template-friendly dict:

@@ -1,0 +1,36 @@
+{% extends "chirp/layouts/boost.html" %}
+{% block title %}Boundary Test — Chirp + ChirpUI{% end %}
+{% block head %}
+<link rel="stylesheet" href="/static/chirpui.css">
+{% end %}
+{% block content %}
+<div id="app" data-client="{{ client_value }}">
+  <h1>Boundary Test</h1>
+
+  <form id="chat-form"
+        hx-post="/chat"
+        hx-target="#messages"
+        hx-swap="beforeend"
+        hx-disinherit="hx-boost hx-target hx-swap">
+    <input type="text" name="message" placeholder="Type here..." required>
+    <button type="submit">Send</button>
+  </form>
+
+  <div id="messages"></div>
+
+  <div id="activity"
+       hx-ext="sse"
+       sse-connect="/stream"
+       sse-swap="fragment"
+       hx-swap="afterbegin">
+    <p>Waiting for events…</p>
+  </div>
+</div>
+{% end %}
+
+{% block chat_response %}
+<div class="response" data-contextvar="{{ contextvar }}">
+  <p>{{ message }}</p>
+  <small>client={{ contextvar }}</small>
+</div>
+{% end %}

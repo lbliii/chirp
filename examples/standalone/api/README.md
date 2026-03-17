@@ -1,0 +1,17 @@
+# API
+
+A pure JSON Chirp app with no HTML templates. It demonstrates CRUD-style routes,
+JSON request parsing, JSON responses, status-code tuples, path parameters, and
+CORS for browser or third-party consumers.
+
+## Run
+
+```bash
+PYTHONPATH=src python examples/standalone/api/app.py
+```
+
+## Test
+
+```bash
+pytest examples/standalone/api/
+```

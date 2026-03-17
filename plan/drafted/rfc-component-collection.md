@@ -21,10 +21,10 @@ UI — even for a prototype.
 
 ### Evidence
 
-**Examples use inline styles** (`examples/kanban/templates/base.html`):
+**Examples use inline styles** (`examples/standalone/kanban/templates/base.html`):
 Custom CSS is embedded in `<style>` tags per project.
 
-**Components are per-project** (`examples/kanban/templates/components/`):
+**Components are per-project** (`examples/standalone/kanban/templates/components/`):
 `_card.html`, `_badge.html`, `_column.html` — all project-specific, not
 reusable across projects.
 

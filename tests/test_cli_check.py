@@ -54,9 +54,15 @@ class TestChirpCheck:
 
     def test_hackernews_app_passes_check(self) -> None:
         """Hacker News example (boost layout + SSE) passes chirp check."""
-        app_path = Path(__file__).resolve().parent.parent / "examples" / "hackernews" / "app.py"
+        app_path = (
+            Path(__file__).resolve().parent.parent
+            / "examples"
+            / "standalone"
+            / "hackernews"
+            / "app.py"
+        )
         if not app_path.exists():
-            pytest.skip("examples/hackernews not found")
+            pytest.skip("examples/standalone/hackernews not found")
         spec = importlib.util.spec_from_file_location("hackernews_app", app_path)
         assert spec is not None
         assert spec.loader is not None

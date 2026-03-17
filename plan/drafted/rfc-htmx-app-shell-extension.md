@@ -184,4 +184,4 @@ Success looks like:
 - [htmx inheritance issue discussion](https://github.com/bigskysoftware/htmx/issues/2865)
 - `src/chirp/server/negotiation.py`
 - `tests/test_negotiation.py`
-- `examples/kanban_shell/test_app.py`
+- `examples/chirpui/kanban_shell/test_app.py`

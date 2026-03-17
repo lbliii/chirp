@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "kida-templates>=0.2.7", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.2.2",  # ASGI server (same ecosystem, powers app.run())
+    "bengal-pounce>=0.3.0",  # ASGI server (same ecosystem, powers app.run())
 ]
 
 [project.optional-dependencies]
@@ -110,7 +110,7 @@ Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 # tool.uv.sources: omitted — workspace root (b-stack) provides bengal-pounce override
-# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.2.2).
+# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.2.0).
 
 [tool.setuptools.packages.find]
 where = ["src"]

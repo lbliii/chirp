@@ -46,7 +46,12 @@ def collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
     return broad_targets
 
 
-def check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
+def check_swap_safety(
+    template_sources: dict[str, str],
+    *,
+    all_ids: set[str] | None = None,
+    all_ids_with_disinherit: set[str] | None = None,
+) -> list[ContractIssue]:
     """Warn when mutating swaps may inherit broad container targets."""
     issues: list[ContractIssue] = []
     broad_targets = collect_broad_targets(template_sources)
@@ -129,11 +134,14 @@ def check_swap_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
             )
             break
 
-    all_ids: set[str] = set()
-    all_ids_with_disinherit: set[str] = set()
-    for source in template_sources.values():
-        all_ids.update(extract_static_ids(source))
-        all_ids_with_disinherit.update(extract_ids_with_disinherit(source))
+    if all_ids is None:
+        all_ids = set()
+        for source in template_sources.values():
+            all_ids.update(extract_static_ids(source))
+    if all_ids_with_disinherit is None:
+        all_ids_with_disinherit = set()
+        for source in template_sources.values():
+            all_ids_with_disinherit.update(extract_ids_with_disinherit(source))
 
     seen_fragment_issues: set[tuple[str, str]] = set()
     for template_name, source in template_sources.items():

@@ -3,6 +3,11 @@
 from chirp.routing.router import Router
 
 
+def _normalize_path(path: str) -> str:
+    """Normalize path for lookup (strip slashes, empty becomes '')."""
+    return path.strip("/") or ""
+
+
 def attr_to_method(attr: str, method_override: str | None = None) -> str:
     """Map a URL-bearing template attribute name to HTTP method."""
     if attr == "action":
@@ -37,3 +42,38 @@ def path_matches_route(url: str, route_path: str) -> bool:
         if url_seg != route_seg:
             return False
     return True
+
+
+def build_route_index(
+    route_paths: dict[str, frozenset[str]],
+) -> tuple[dict[str, tuple[str, frozenset[str]]], list[tuple[str, frozenset[str]]]]:
+    """Pre-segment routes for O(1) static and O(parametric) URL matching.
+
+    Returns (static_routes, parametric_routes). For static URLs use dict lookup;
+    for parametric URLs scan only parametric_routes.
+    """
+    static_routes: dict[str, tuple[str, frozenset[str]]] = {}
+    parametric_routes: list[tuple[str, frozenset[str]]] = []
+    for path, methods in route_paths.items():
+        entry = (path, methods)
+        if "{" in path:
+            parametric_routes.append(entry)
+        else:
+            static_routes[_normalize_path(path)] = entry
+    return static_routes, parametric_routes
+
+
+def find_matching_route(
+    url: str,
+    static_routes: dict[str, tuple[str, frozenset[str]]],
+    parametric_routes: list[tuple[str, frozenset[str]]],
+) -> tuple[str, frozenset[str]] | None:
+    """Find route matching URL. O(1) for static, O(parametric) for parametric."""
+    path_only = url.split("?")[0] if "?" in url else url
+    normalized = _normalize_path(path_only)
+    if normalized in static_routes:
+        return static_routes[normalized]
+    for route_path, methods in parametric_routes:
+        if path_matches_route(url, route_path):
+            return (route_path, methods)
+    return None

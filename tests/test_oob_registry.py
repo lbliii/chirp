@@ -10,6 +10,7 @@ from chirp.pages.types import LayoutChain, LayoutInfo
 from chirp.templating.composition import PageComposition
 from chirp.templating.kida_adapter import KidaAdapter
 from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
+from chirp.server.negotiation_oob import compute_shell_region_updates
 from chirp.templating.render_plan import (
     build_layout_contract,
     build_render_plan,
@@ -234,7 +235,9 @@ class TestFullPipelineWithRegistry:
             context={},
             layout_chain=layout_chain,
         )
-        plan = build_render_plan(comp, request=_htmx_boosted_request())
+        req = _htmx_boosted_request()
+        shell_updates = compute_shell_region_updates(comp, req, None)
+        plan = build_render_plan(comp, request=req, shell_region_updates=shell_updates)
         rendered = execute_render_plan(plan, adapter=adapter, oob_registry=reg)
         html = serialize_rendered_plan(rendered, oob_registry=reg)
 

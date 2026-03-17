@@ -1,0 +1,352 @@
+<html>
+<head>
+  <title>Ollama Chat &mdash; Chirp</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    code { font-family: "SF Mono", Menlo, monospace; font-size: 0.85em; }
+
+    /* Header */
+    .site-header {
+      background: #1e293b; border-bottom: 2px solid #8b5cf6;
+      padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;
+    }
+    .site-header h1 { font-size: 0.95rem; font-weight: 600; color: #f8fafc; }
+    .site-header .model-select {
+      font-size: 0.7rem; color: #a78bfa; background: rgba(139,92,246,0.15);
+      padding: 0.2rem 0.4rem; border-radius: 0.25rem; border: 1px solid rgba(139,92,246,0.3);
+      font-family: "SF Mono", Menlo, monospace; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23a78bfa' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.35rem center;
+      padding-right: 1.2rem;
+    }
+    .site-header .model-select:focus { outline: none; border-color: #8b5cf6; }
+    .site-header .model-select option { background: #1e293b; color: #e2e8f0; }
+    .site-header .model-badge {
+      font-size: 0.7rem; color: #a78bfa; background: rgba(139,92,246,0.15);
+      padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-family: "SF Mono", Menlo, monospace;
+    }
+    .site-header .tagline { font-size: 0.75rem; color: #64748b; margin-left: auto; }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.7rem; color: #4ade80; margin-left: 0.75rem;
+    }
+    .live-dot {
+      width: 6px; height: 6px; background: #4ade80;
+      border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Layout */
+    .columns {
+      flex: 1; display: grid; grid-template-columns: 1fr 320px;
+      overflow: hidden;
+    }
+    @media (max-width: 768px) {
+      .columns { grid-template-columns: 1fr; }
+      .activity-panel { display: none; }
+    }
+
+    /* Chat panel */
+    .chat-panel { display: flex; flex-direction: column; overflow: hidden; }
+
+    .messages {
+      flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
+      display: flex; flex-direction: column; gap: 0.75rem;
+    }
+
+    .msg { max-width: 80%; font-size: 0.875rem; line-height: 1.5; }
+    .msg-user {
+      align-self: flex-end; background: #3b82f6; color: #fff;
+      padding: 0.6rem 0.9rem; border-radius: 1rem 1rem 0.25rem 1rem;
+    }
+    .msg-assistant {
+      align-self: flex-start; background: #1e293b; color: #e2e8f0;
+      padding: 0.6rem 0.9rem; border-radius: 1rem 1rem 1rem 0.25rem;
+    }
+    .msg-tools {
+      align-self: flex-start; font-size: 0.7rem; color: #a78bfa;
+      padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.08);
+      border-radius: 0.375rem; font-family: "SF Mono", Menlo, monospace;
+    }
+    .msg-cleared {
+      align-self: center; font-size: 0.75rem; color: #64748b;
+      font-style: italic;
+    }
+
+    /* Streaming assistant bubble — tokens append as inline spans */
+    .msg-streaming {
+      align-self: flex-start; background: #1e293b; color: #e2e8f0;
+      padding: 0.6rem 0.9rem; border-radius: 1rem 1rem 1rem 0.25rem;
+      max-width: 80%; font-size: 0.875rem; line-height: 1.5;
+      white-space: pre-wrap;
+      min-height: 1.5em;
+    }
+    .msg-streaming .cursor {
+      display: inline-block; width: 2px; height: 1em;
+      background: #8b5cf6; margin-left: 1px;
+      animation: blink 0.8s step-end infinite;
+      vertical-align: text-bottom;
+    }
+
+    /* Input bar */
+    .input-bar {
+      padding: 0.75rem 1.25rem; background: #1e293b;
+      border-top: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .input-bar input[type="text"] {
+      flex: 1; background: #0f172a; border: 1px solid #334155;
+      border-radius: 0.5rem; color: #e2e8f0; padding: 0.6rem 0.9rem;
+      font-size: 0.875rem;
+    }
+    .input-bar input[type="text"]::placeholder { color: #64748b; }
+    .input-bar input[type="text"]:focus { outline: none; border-color: #8b5cf6; }
+    .input-bar button {
+      background: #8b5cf6; color: #fff; border: none; border-radius: 0.5rem;
+      padding: 0.6rem 1.2rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+    }
+    .input-bar button:hover { background: #7c3aed; }
+    .input-bar .clear-btn {
+      background: transparent; color: #64748b; font-size: 0.75rem;
+      padding: 0.6rem 0.75rem; border: 1px solid #334155; border-radius: 0.5rem;
+    }
+    .input-bar .clear-btn:hover { color: #e2e8f0; border-color: #64748b; }
+
+    /* Stream toggle */
+    .stream-toggle {
+      display: flex; align-items: center; gap: 0.35rem;
+      cursor: pointer; user-select: none; font-size: 0.7rem; color: #64748b;
+      white-space: nowrap;
+    }
+    .stream-toggle input { display: none; }
+    .toggle-track {
+      width: 28px; height: 16px; background: #334155;
+      border-radius: 8px; position: relative; transition: background 0.2s;
+    }
+    .toggle-thumb {
+      width: 12px; height: 12px; background: #64748b;
+      border-radius: 50%; position: absolute; top: 2px; left: 2px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .stream-toggle input:checked + .toggle-track {
+      background: rgba(139,92,246,0.3);
+    }
+    .stream-toggle input:checked + .toggle-track .toggle-thumb {
+      transform: translateX(12px); background: #8b5cf6;
+    }
+
+    /* Loading indicator (non-streaming mode) */
+    .htmx-request .htmx-indicator { display: inline-block; }
+    .htmx-indicator { display: none; }
+    .spinner {
+      font-size: 0.75rem; color: #64748b; padding: 0.5rem 0;
+      align-self: flex-start;
+    }
+    .spinner::after {
+      content: ""; display: inline-block; width: 12px; height: 12px;
+      border: 2px solid #475569; border-top-color: #8b5cf6;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      margin-left: 0.4rem; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Activity panel */
+    .activity-panel {
+      background: #1e293b; border-left: 1px solid #334155;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .activity-panel h2 {
+      font-size: 0.8rem; color: #94a3b8; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0.75rem 1rem; border-bottom: 1px solid #334155;
+    }
+    .activity-feed { flex: 1; overflow-y: auto; padding: 0.5rem; }
+
+    .activity-item {
+      padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.75rem; animation: fade-in 0.3s ease;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-header { display: flex; align-items: center; gap: 0.4rem; }
+    .tool-name { color: #f97316; font-weight: 600; font-family: "SF Mono", Menlo, monospace; }
+    .call-time { color: #475569; font-size: 0.65rem; font-family: "SF Mono", Menlo, monospace; }
+    .call-args { color: #64748b; font-size: 0.7rem; margin-top: 0.1rem; font-family: "SF Mono", Menlo, monospace; }
+
+    .empty { color: #475569; font-size: 0.8rem; font-style: italic; padding: 0.75rem; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Prose — markdown rendered content in assistant bubbles */
+    .msg-assistant.prose p { margin-bottom: 0.5em; line-height: 1.5; }
+    .msg-assistant.prose p:last-child { margin-bottom: 0; }
+    .msg-assistant.prose h1, .msg-assistant.prose h2, .msg-assistant.prose h3 {
+      margin: 0.75em 0 0.3em; font-weight: 600; color: #f1f5f9;
+    }
+    .msg-assistant.prose h1 { font-size: 1.1rem; }
+    .msg-assistant.prose h2 { font-size: 1rem; }
+    .msg-assistant.prose h3 { font-size: 0.9rem; }
+    .msg-assistant.prose h1:first-child, .msg-assistant.prose h2:first-child,
+    .msg-assistant.prose h3:first-child { margin-top: 0; }
+    .msg-assistant.prose ul, .msg-assistant.prose ol { margin-bottom: 0.5em; padding-left: 1.25em; }
+    .msg-assistant.prose li { margin-bottom: 0.15em; }
+    .msg-assistant.prose code {
+      font-size: 0.85em; background: rgba(255,255,255,0.1); padding: 0.1em 0.3em; border-radius: 3px;
+    }
+    .msg-assistant.prose pre {
+      margin: 0.5em 0; padding: 0.6rem; background: rgba(0,0,0,0.3);
+      border-radius: 0.375rem; overflow-x: auto;
+    }
+    .msg-assistant.prose pre code { background: none; padding: 0; font-size: 0.8rem; }
+    .msg-assistant.prose blockquote {
+      margin: 0.5em 0; padding: 0.4rem 0.75rem;
+      border-left: 2px solid #8b5cf6; color: #94a3b8;
+    }
+    .msg-assistant.prose strong { font-weight: 600; color: #f1f5f9; }
+    .msg-assistant.prose a { color: #8b5cf6; text-decoration: underline; }
+
+    footer {
+      text-align: center; padding: 0.5rem; font-size: 0.65rem;
+      color: #334155; background: #0f172a;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <h1>Ollama Chat</h1>
+    {% if models %}
+    <select class="model-select" name="model" id="model-selector"
+            hx-post="/model" hx-target="#model-confirm" hx-swap="innerHTML">
+      {% for m in models %}
+      <option value="{{ m }}" {% if m == model %}selected{% end %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    <span id="model-confirm"></span>
+    {% else %}
+    <span class="model-badge">{{ model }}</span>
+    {% end %}
+    <span class="tagline">
+      Local LLM with tool calling
+      <span class="live-badge"><span class="live-dot"></span> LIVE</span>
+    </span>
+  </div>
+
+  <div class="columns">
+    <!-- Chat panel -->
+    <div class="chat-panel">
+      <div class="messages" id="messages">
+
+        {% for msg in history %}
+        {% if msg.role == "user" %}
+        <div class="msg msg-user">{{ msg.content }}</div>
+        {% elif msg.role == "assistant" and msg.content %}
+        <div class="msg msg-assistant prose">{{ msg.content | markdown }}</div>
+        {% end %}
+        {% endfor %}
+
+        {% if not history %}
+        <div class="empty" id="welcome">
+          Say something &mdash; the model can manage notes, tell the time, and do math.
+        </div>
+        {% end %}
+      </div>
+
+      <form class="input-bar" hx-post="/chat" hx-target="#messages" hx-swap="beforeend"
+            hx-indicator="#thinking"
+            hx-on::after-request="this.reset(); document.getElementById('welcome')?.remove()">
+        <input type="text" name="message" placeholder="Ask me anything..." required autocomplete="off" autofocus>
+        <label class="stream-toggle" title="Token-by-token streaming">
+          <input type="checkbox" name="stream" value="1" checked>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          Stream
+        </label>
+        <button type="submit">Send</button>
+        <button type="button" class="clear-btn"
+                hx-post="/clear" hx-target="#messages" hx-swap="innerHTML">Clear</button>
+      </form>
+      <div class="spinner htmx-indicator" id="thinking">Thinking</div>
+    </div>
+
+    <!-- Activity panel -->
+    <div class="activity-panel">
+      <h2>Tool Activity</h2>
+      <div class="activity-feed" id="activity"
+           hx-ext="sse" sse-connect="/feed" sse-swap="fragment" hx-swap="afterbegin">
+        <p class="empty">Waiting for tool calls&hellip;</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>Chirp + Ollama &middot; MCP Tools &middot; Server-Sent Events &middot; htmx &middot; Free-threading</footer>
+
+  {# --- Fragments: non-streaming mode --- #}
+
+  {% block chat_response %}
+  {% if user_content is defined %}
+  <div class="msg msg-user">{{ user_content }}</div>
+  {% if tools_used %}<div class="msg msg-tools">used: {{ tools_used | join(", ") }}</div>{% end %}
+  <div class="msg msg-assistant prose">{{ assistant_content | markdown }}</div>
+  {% end %}
+  {% end %}
+
+  {# --- Fragments: streaming mode --- #}
+
+  {% block stream_start %}
+  {% if user_content is defined %}
+  <div class="msg msg-user">{{ user_content }}</div>
+  <div class="msg-streaming"
+       hx-ext="sse"
+       sse-connect="/chat/stream"
+       sse-swap="fragment"
+       hx-swap="beforeend"
+       sse-close="done"><span class="cursor"></span></div>
+  {% end %}
+  {% end %}
+
+  {%- block stream_token -%}
+  {%- if token is defined %}{{ token }}{% end -%}
+  {%- end -%}
+
+  {# --- Fragments: shared --- #}
+
+  {% block activity_row %}
+  {% if event is defined %}
+  <div class="activity-item">
+    <div class="activity-header">
+      <span class="tool-name">{{ event.tool_name }}</span>
+      <span class="call-time">{{ event.timestamp | format_time }}</span>
+    </div>
+    <div class="call-args">{{ event.arguments | format_args }}</div>
+  </div>
+  {% end %}
+  {% end %}
+
+  {% block chat_cleared %}
+  <div class="msg msg-cleared">Conversation cleared.</div>
+  {% end %}
+
+  {% block model_updated %}
+  {% if model is defined %}
+  <span style="font-size:0.65rem;color:#4ade80;">&#10003;</span>
+  {% end %}
+  {% end %}
+
+  {% block empty_response %}
+  {% end %}
+</body>
+</html>

@@ -142,40 +142,12 @@ async def handle_request(
     rid_token = request_id_var.set(request.request_id)
     sync_token = force_inline_sync_var.set(force_inline_sync)
 
+    if compiled_handler is None:
+        msg = "compiled_handler is required; ASGIRuntime always provides it"
+        raise RuntimeError(msg)
+
     try:
-        # Use pre-compiled chain or build per request
-        if compiled_handler is not None:
-            handler = compiled_handler
-        else:
-
-            async def dispatch(req: Request) -> AnyResponse:
-                if debug and req.path == HTMX_DEBUG_BOOT_PATH:
-                    return Response(
-                        body=HTMX_DEBUG_BOOT_JS,
-                        content_type="application/javascript; charset=utf-8",
-                        render_intent="full_page",
-                    )
-                if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
-                    from chirp.tools.handler import handle_mcp_request
-
-                    return await handle_mcp_request(req, tool_registry)
-                match = router.match(req.method, req.path)
-                return await _invoke_handler(
-                    match,
-                    req,
-                    kida_env=kida_env,
-                    providers=providers,
-                    validate_blocks=debug,
-                    force_inline_sync=force_inline_sync_var.get(),
-                    oob_registry=oob_registry,
-                    fragment_target_registry=fragment_target_registry,
-                )
-
-            handler = compile_middleware_chain(middleware, dispatch)
-
-        # Execute the full pipeline
-        response = await handler(request)
-
+        response = await compiled_handler(request)
     except HTTPError as exc:
         response = await handle_http_error(
             exc,

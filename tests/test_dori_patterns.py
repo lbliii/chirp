@@ -89,9 +89,15 @@ class TestDoriPatterns:
 
     def test_form_get_example_passes_check(self) -> None:
         """form_get example (plain form action + method=get) passes chirp check."""
-        app_path = Path(__file__).resolve().parent.parent / "examples" / "form_get" / "app.py"
+        app_path = (
+            Path(__file__).resolve().parent.parent
+            / "examples"
+            / "standalone"
+            / "form_get"
+            / "app.py"
+        )
         if not app_path.exists():
-            pytest.skip("examples/form_get not found")
+            pytest.skip("examples/standalone/form_get not found")
         spec = importlib.util.spec_from_file_location("form_get_app", app_path)
         assert spec is not None
         assert spec.loader is not None
