@@ -73,6 +73,8 @@ def check_swap_safety(
                 continue
             if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
                 continue
+            if re.search(r'hx-boost\s*=\s*["\']false["\']', attrs_lower):
+                continue
             issues.append(
                 ContractIssue(
                     severity=Severity.WARNING,
