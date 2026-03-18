@@ -79,22 +79,8 @@ def _html_response(body: str, *, intent: RenderIntent) -> Response:
 
 
 def _fragment_response(body: str) -> Response:
-    """Build a text/html response for fragment-returning endpoints.
-
-    Adds ``HX-Reselect: :scope > *`` so HTMX selects the direct children of
-    the response fragment (i.e., the whole content), regardless of any
-    ``hx-select`` the client inherited from a parent layout such as boost.html.
-
-    This makes ``Fragment`` / ``OOB`` / ``ValidationError`` / ``FormAction``
-    responses self-asserting: the server knows it is returning a fragment and
-    owns the selection contract, so client-side layout inheritance cannot silently
-    produce an empty swap.
-
-    Callers that need an explicit client-side select can still override this
-    per-response by returning ``(Fragment(...), 200, {"HX-Reselect": "..."})``
-    via the tuple form of negotiate().
-    """
-    return _html_response(body, intent="fragment").with_hx_reselect(":scope > *")
+    """Build a text/html response for fragment-returning endpoints."""
+    return _html_response(body, intent="fragment")
 
 
 def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environment:
