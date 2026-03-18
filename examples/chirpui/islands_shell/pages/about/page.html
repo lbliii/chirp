@@ -1,12 +1,16 @@
+{% from "chirpui/layout.html" import container, stack %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
+{% call container() %}
+{% call stack(gap="lg") %}
   <h1>About</h1>
   <p>This page has no island — server-rendered only. Click "Home" or "Dashboard"
   to see islands again. The sidebar, breadcrumbs, and title update via OOB while
   the main content swaps.</p>
-</div>
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

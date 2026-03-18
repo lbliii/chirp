@@ -12,7 +12,7 @@
       document.documentElement.setAttribute('data-style',s);
     })();
   </script>
-  <title id="chirpui-document-title">{{ page_title | default("Islands Shell") }}</title>
+  <title id="chirpui-document-title">{{ page_title ?? "Islands Shell" }}</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
   <script src="/static/chirpui.js"></script>
@@ -45,7 +45,7 @@
 
 {% call app_shell(brand="Islands Shell", sidebar_collapsible=true) %}
   {% slot topbar %}
-  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items | default([{"label":"Home","href":"/"}])) }}
+  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
   {% end %}
 
   {% slot topbar_end %}
@@ -53,7 +53,7 @@
   {% end %}
 
   {% slot sidebar %}
-  {{ sidebar_oob(current_path=current_path | default("/")) }}
+  {{ sidebar_oob(current_path=current_path ?? "/") }}
   {% end %}
 
   {% block content %}{% end %}

@@ -1,12 +1,16 @@
+{% from "chirpui/layout.html" import container, stack %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
+{% call container() %}
+{% call stack(gap="lg") %}
   <h1>About</h1>
   <p>This is the about page. The sidebar should show "About" as active,
   breadcrumbs should show "Home &gt; About", and the document title should
   read "About".</p>
-</div>
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

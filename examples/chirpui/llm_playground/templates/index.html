@@ -5,18 +5,21 @@
 {% from "chirpui/empty.html" import empty_state %}
 {% from "chirpui/button.html" import btn %}
 {% from "chirpui/forms.html" import form_actions %}
+{% from "chirpui/surface.html" import surface %}
 
 {% call container() %}
 {% call stack() %}
+{% call surface(variant="muted") %}
 <header class="chirpui-stack chirpui-stack--sm">
   <h1>LLM Playground</h1>
-  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted);">
+  <p class="chirpui-text-muted">
     Two models. One prompt. Zero JavaScript.
   </p>
-  <p class="chirpui-text-muted" style="color: var(--chirpui-text-muted); font-size: var(--chirpui-font-sm);">
+  <p class="chirpui-text-muted chirpui-font-sm">
     Streaming responses side-by-side. Built with chirp-ui — HTML over the wire, CSS without apology.
   </p>
 </header>
+{% end %}
 
 <form class="chirpui-stack chirpui-stack--lg"
       hx-post="/ask"

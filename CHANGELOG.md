@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies
+
+- `kida-templates>=0.2.8`
+- `chirp-ui>=0.2.0`
+
 ## [0.1.9] — 2026-03-12
 
 ### Added

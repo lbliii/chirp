@@ -1,19 +1,24 @@
+{% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/surface.html" import surface %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
+{% call container() %}
+{% call stack(gap="lg") %}
   <h1>Dashboard</h1>
   <p>This page also has a counter island. Navigate away and back — the island
   remounts with fresh state each time (no persistence across navigations).</p>
 
-  <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1.5rem;margin:1rem 0;">
+  {% call surface(variant="muted") %}
     <p><strong>Counter island</strong></p>
     <div{{ island_attrs("counter", props={"initial_count": 0}, mount_id="counter-root", src="/static/counter.js") }}>
       <p>Count: <span id="counter-value">0</span></p>
       <button type="button" disabled>Enable JavaScript to interact</button>
     </div>
-  </div>
-</div>
+  {% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

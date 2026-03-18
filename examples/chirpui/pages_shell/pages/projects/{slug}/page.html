@@ -1,6 +1,9 @@
 {% from "chirpui/badge.html" import badge %}
 {% from "chirpui/card.html" import card %}
 {% from "chirpui/layout.html" import container, page_header, stack, grid %}
+{% from "chirpui/entity_header.html" import entity_header %}
+{% from "chirpui/description_list.html" import description_list, description_item %}
+{% from "chirpui/metric_grid.html" import metric_grid, metric_card %}
 
 {% block page_root %}
 {% block page_root_inner %}
@@ -8,9 +11,8 @@
 {% call container(max_width="76rem") %}
 {% call stack(gap="lg", cls="example-page") %}
 {% from "chirpui/nav_link.html" import nav_link %}
-{% call page_header(
-  project.name,
-  subtitle=project.summary,
+{% call entity_header(
+  title=project.name,
   meta="Nested route with shell-action overrides and Suspense placeholders."
 ) %}
 {% slot actions %}
@@ -25,19 +27,21 @@
   {% end %}
 
   {% call card(title="Routing notes", subtitle="Why this route exists") %}
-    <div class="example-list">
-      <p>Parent context provides the project catalog.</p>
-      <p>Child context resolves a single project by slug.</p>
-      <p>Boosted navigation refreshes shell actions out-of-band.</p>
-    </div>
+    {% call description_list(variant="stacked") %}
+      {{ description_item("Parent context", "Provides the project catalog") }}
+      {{ description_item("Child context", "Resolves a single project by slug") }}
+      {{ description_item("Navigation", "Boosted nav refreshes shell actions out-of-band") }}
+    {% end %}
   {% end %}
 
   {% block stats %}
   {% call card(title="Build stats", subtitle="Deferred block", cls="chirpui-block--span-full") %}
-    <div id="project-stats" class="example-list">
-      {% if stats %}
-        {% for item in stats %}
-        <p><strong>{{ item.label }}:</strong> {{ item.value }}</p>
+    <div id="project-stats">
+      {% if (stats ?? none) %}
+        {% call metric_grid(cols=3, gap="sm") %}
+          {% for item in stats %}
+          {{ metric_card(value=item.value, label=item.label) }}
+          {% end %}
         {% end %}
       {% else %}
       <p>Loading build stats...</p>
@@ -49,7 +53,7 @@
   {% block activity %}
   {% call card(title="Recent activity", subtitle="Deferred block", cls="chirpui-block--span-full") %}
     <div id="project-activity" class="example-list">
-      {% if activity %}
+      {% if (activity ?? none) %}
         {% for item in activity %}
         <p>{{ item }}</p>
         {% end %}

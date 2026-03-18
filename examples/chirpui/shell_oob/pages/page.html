@@ -1,17 +1,22 @@
+{% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/description_list.html" import description_list, description_item %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
+{% call container() %}
+{% call stack(gap="lg") %}
   <h1>Home</h1>
   <p>Welcome to the Shell OOB prototype.</p>
   <p>Click the sidebar links to navigate. On each navigation:</p>
-  <ul>
-    <li>Sidebar active state should update</li>
-    <li>Breadcrumbs should update</li>
-    <li>Document title should update</li>
-    <li>Theme toggle state should be preserved</li>
-  </ul>
-</div>
+  {% call description_list(variant="stacked") %}
+    {{ description_item("Sidebar", "Active state updates") }}
+    {{ description_item("Breadcrumbs", "Path updates") }}
+    {{ description_item("Title", "Document title updates") }}
+    {{ description_item("Theme", "Toggle state is preserved") }}
+  {% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

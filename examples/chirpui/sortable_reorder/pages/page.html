@@ -55,7 +55,10 @@
   {% end %}
   {% end %}
 {% else %}
-  <p class="chirpui-text-muted chirpui-font-sm" style="padding: 1rem;">No items yet. Add one above.</p>
+  {% from "chirpui/empty.html" import empty_state %}
+  {% call empty_state(icon="☰", title="No items yet") %}
+  <p>Add your first item above.</p>
+  {% end %}
 {% end %}
 {% end %}
 </div>

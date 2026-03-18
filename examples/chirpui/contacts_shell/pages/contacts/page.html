@@ -7,6 +7,7 @@
   {% from "chirpui/forms.html" import hidden_field, text_field %}
   {% from "chirpui/layout.html" import container, grid, page_header, stack, cluster %}
   {% from "chirpui/table.html" import table %}
+  {% from "chirpui/empty.html" import empty_state %}
 {% end %}
 
 {% block page_root %}
@@ -171,7 +172,9 @@
             {% unless contacts %}
             <tr class="chirpui-table__row">
               <td class="chirpui-table__td" colspan="3">
-                No contacts match this query.
+                {% call empty_state(icon="⌕", title="No matches") %}
+                <p>No contacts match this query.</p>
+                {% end %}
               </td>
             </tr>
             {% end %}

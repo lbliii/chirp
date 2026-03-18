@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/empty.html" import empty_state %}
+{% from "chirpui/chat_layout.html" import chat_layout %}
 
 {% block content %}
 {% call container() %}
@@ -63,9 +65,9 @@
 
 <section id="results" aria-label="Questions and answers">
   <div id="conversation">
-    <div class="conversation-placeholder">
-      Ask a question about the docs…
-    </div>
+    {% call empty_state(icon="◇", title="Ask a question") %}
+    <p>Type a question about the docs and hit Ask. Streaming AI answers with cited sources.</p>
+    {% end %}
   </div>
   <div class="conversation-actions">
     <a href="/">Start over</a>
