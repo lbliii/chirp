@@ -10,7 +10,14 @@ def get(request) -> Page:
     from app import get_users
 
     next_url = request.query.get("next", "/")
-    return Page("login/page.html", "page_content", error="", users=get_users(), next_url=next_url)
+    return Page(
+        "login/page.html",
+        "page_content",
+        page_block_name="page_root",
+        error="",
+        users=get_users(),
+        next_url=next_url,
+    )
 
 
 async def post(request) -> Page | Redirect:
@@ -34,6 +41,7 @@ async def post(request) -> Page | Redirect:
     return Page(
         "login/page.html",
         "page_content",
+        page_block_name="page_root",
         error="Invalid username or password",
         users=users,
         next_url=next_url or "/",
