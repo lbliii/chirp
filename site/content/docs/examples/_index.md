@@ -25,18 +25,18 @@ cascade:
 The flagship Chirp example: fragments, SSE, event delegation, and free-threading.
 :::{/card}
 
-:::{card} Production Stack
-:icon: shield
-:link: ../../examples/standalone/production/
-:description: SecurityHeadersMiddleware, SessionMiddleware, CSRFMiddleware, contact form
-Production-ready security stack with CSRF protection and security header tests.
+:::{card} Contacts Shell
+:icon: users
+:link: https://github.com/lbliii/chirp/tree/main/examples/chirpui/contacts_shell
+:description: CRUD contacts with chirp-ui app shell, sidebar navigation, and full test coverage
+Full CRUD app with app shell, boosted navigation, and fragment swaps.
 :::{/card}
 
-:::{card} API
-:icon: code
-:link: ../../examples/standalone/api/
-:description: Pure JSON REST API — dict returns, path params, request.json(), CORS
-API-only Chirp app with CRUD, no HTML.
+:::{card} Kanban Shell
+:icon: layout
+:link: https://github.com/lbliii/chirp/tree/main/examples/chirpui/kanban_shell
+:description: Drag-and-drop Kanban board with OOB swaps, SSE, and toast notifications
+Real-time board with multi-fragment updates and SSE live sync.
 :::{/card}
 
 :::{/cards}

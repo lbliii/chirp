@@ -42,7 +42,7 @@ to prevent double-submits.
 **htmx ref:** [hx-indicator](https://htmx.org/attributes/hx-indicator/),
 [hx-disabled-elt](https://htmx.org/attributes/hx-disabled-elt/)
 
-**Chirp example:** `examples/standalone/kanban/templates/board.html`, `examples/standalone/todo/templates/index.html`
+**Chirp example:** `examples/chirpui/kanban_shell/pages/page.html`
 
 ---
 
@@ -94,7 +94,7 @@ form is submitted.
 
 **htmx ref:** [hx-sync](https://htmx.org/attributes/hx-sync/)
 
-**Chirp example:** `examples/standalone/contacts/templates/contacts.html`, `examples/standalone/chat/templates/chat.html`
+**Chirp example:** `examples/chirpui/contacts_shell/pages/contacts/page.html`
 
 ---
 
@@ -140,7 +140,7 @@ async def step1(request: Request):
 
 **htmx ref:** [hx-boost](https://htmx.org/attributes/hx-boost/)
 
-**Chirp example:** `examples/standalone/wizard/`, `examples/standalone/hackernews/`
+**Chirp example:** `examples/chirpui/contacts_shell/`, `examples/chirpui/pages_shell/`
 
 ---
 
@@ -174,7 +174,7 @@ async def register(request: Request):
 
 **htmx ref:** [hx-validate](https://htmx.org/attributes/hx-validate/)
 
-**Chirp example:** `examples/standalone/wizard/templates/step1.html`, `examples/standalone/contacts/templates/contacts.html`
+**Chirp example:** `examples/chirpui/contacts_shell/pages/contacts/page.html`
 
 ---
 
@@ -230,7 +230,7 @@ async def add_contact(form: ContactForm):
 return FormAction("/dashboard")
 ```
 
-**Chirp example:** `examples/standalone/contacts/app.py`, `examples/standalone/kanban/app.py`
+**Chirp example:** `examples/chirpui/contacts_shell/app.py`, `examples/chirpui/kanban_shell/app.py`
 
 ---
 
@@ -292,7 +292,7 @@ is more flexible (server doesn't need to know about the htmx swap).
 **htmx ref:** [hx-select](https://htmx.org/attributes/hx-select/),
 [hx-select-oob](https://htmx.org/attributes/hx-select-oob/)
 
-**Chirp example:** `examples/standalone/pokedex/templates/pokedex.html`
+**Chirp example:** `examples/chirpui/sortable_reorder/pages/page.html`
 
 ---
 
@@ -344,7 +344,7 @@ stable pattern.
 
 **htmx ref:** [View Transitions](https://htmx.org/docs/#view-transitions)
 
-**Chirp example:** `examples/standalone/hackernews/templates/hackernews.html`
+**Chirp example:** `examples/chirpui/islands_shell/pages/page.html`
 
 ---
 
@@ -396,7 +396,7 @@ Send additional parameters without hidden inputs.
 
 **htmx ref:** [hx-vals](https://htmx.org/attributes/hx-vals/)
 
-**Chirp example:** `examples/standalone/pokedex/templates/pokedex.html`
+**Chirp example:** `examples/chirpui/kanban_shell/pages/page.html`
 
 ---
 
@@ -453,4 +453,4 @@ For scroll-triggered loading, prefer `hx-trigger="revealed"` instead.
 
 **htmx ref:** [htmx API](https://htmx.org/api/)
 
-**Chirp example:** `examples/standalone/kanban/templates/board.html`
+**Chirp example:** `examples/chirpui/kanban_shell/pages/page.html`

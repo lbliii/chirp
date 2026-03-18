@@ -14,6 +14,25 @@ category: guide
 
 Chirp templates use Kida's block system: `{% extends %}`, `{% block %}`, `{% include %}`, and `{% call %}`. This guide covers patterns for block-heavy layouts and when to use each construct.
 
+## Choosing a Layout
+
+Pick the right base layout before writing any templates.
+
+| Scenario | Layout |
+|---|---|
+| App shell with sidebar navigation | `chirpui/app_shell_layout.html` |
+| htmx-boosted multi-page app | `chirp/layouts/boost.html` |
+| Fragment-only app (LLM, RAG, forms only) | `chirp/layouts/shell.html` |
+| Custom layout from scratch | Write your own `_layout.html` |
+
+The critical distinction is whether your app includes a global `hx-select` on the main container:
+
+- **`boost.html`** sets `hx-select="#page-content"` on `<main>`. Every response is filtered through this selector — which is correct for boosted navigation but silently discards fragment responses that don't contain `#page-content`.
+- **`shell.html`** sets no `hx-select`. Fragment responses flow exactly where their `hx-target` says, with no filtering.
+- **`app_shell_layout.html`** uses per-link `hx-boost` on sidebar links rather than a container-level `hx-select`, so it avoids the issue entirely for navigation while leaving fragment forms unaffected.
+
+`chirp check` detects the mismatch automatically via the `select_inheritance` rule and warns when a mutating element may silently discard its response due to inherited `hx-select`.
+
 ## Boost Layout
 
 The `chirp/layouts/boost.html` layout is the recommended base for htmx-boost + SSE apps:
@@ -38,6 +57,53 @@ The `chirp/layouts/boost.html` layout is the recommended base for htmx-boost + S
 - `body_after` — scripts, analytics
 
 **Important:** Put `sse_scope` outside `#main`. If it's inside `content`, it gets replaced on navigation and live updates stop.
+
+## Shell Layout
+
+The `chirp/layouts/shell.html` layout is the base for **fragment-only apps** — pages where interactions trigger targeted fragment swaps rather than full-page boosted navigation:
+
+```html
+{% extends "chirp/layouts/shell.html" %}
+{% block title %}My App{% end %}
+{% block content %}
+  <p>Page content goes here.</p>
+{% end %}
+{% block body_after %}
+  <script>/* app-specific JS */</script>
+{% end %}
+```
+
+Unlike `boost.html`, `shell.html` sets **no** `hx-select` on `<main>`. Forms, SSE connections, and buttons can target any element on the page without interference.
+
+Use `shell.html` when your app:
+
+- Returns `Fragment`, `OOB`, or `ValidationError` to specific named targets
+- Does **not** use htmx-boosted sidebar navigation
+- Is an LLM playground, RAG UI, dashboard form, or other targeted-swap UI
+
+**Blocks:** `title`, `head`, `body_before`, `content`, `sse_scope`, `body_after` — identical to `boost.html` for easy migration.
+
+### The `hx-select` Inheritance Sharp Edge
+
+When using `boost.html`, the global `hx-select="#page-content"` on `<main>` silently discards fragment responses that don't contain a `#page-content` element. The server returns 200 OK, htmx processes the response, finds no match for the selector, and swaps in nothing. The debug panel will report "Empty hx-select."
+
+**Symptoms:**
+
+- Form submits return 200 OK but the UI never updates
+- The HTMX debug overlay shows "Empty hx-select" for the triggering element
+- Changing `hx-target` has no effect
+
+**Fix:** Switch fragment-only apps to `shell.html`. This is a one-line change in your base template:
+
+```html
+{# Before: global hx-select causes silent empty swaps for forms #}
+{% extends "chirp/layouts/boost.html" %}
+
+{# After: no global hx-select, fragments flow where hx-target says #}
+{% extends "chirp/layouts/shell.html" %}
+```
+
+Once on `shell.html`, remove any defensive `hx-disinherit="hx-select"` attributes that were working around the inherited selector — they are no longer needed.
 
 ## Outer vs Inner Content
 
@@ -87,4 +153,5 @@ Child templates override blocks by redefining them:
 ## Next Steps
 
 - [[docs/templates/fragments|Fragments]] — Block-level rendering for htmx
-- [[docs/examples/rag-demo|RAG Demo]] — Full layout example with SSE
+- [[docs/guides/app-shell|App Shells]] — Persistent sidebar layout with SPA navigation
+- [[docs/examples/rag-demo|RAG Demo]] — Full layout example with SSE and `shell.html`

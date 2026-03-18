@@ -269,7 +269,7 @@ For argon2id, install the `auth` extra: `pip install bengal-chirp[auth]`. Withou
 | `exclude_paths` | `frozenset()` | Paths that skip auth entirely |
 
 :::{tip}
-See the [`auth` example](https://github.com/your-org/chirp/tree/main/examples/standalone/auth) for a complete working app with login, logout, and protected routes.
+See the [`kanban_shell` example](https://github.com/lbliii/chirp/tree/main/examples/chirpui/kanban_shell) for a complete working app with login, session-based auth, and protected routes.
 :::
 
 ## CSRFMiddleware
