@@ -3,6 +3,6 @@
 
 def context() -> dict:
     return {
-        "page_title": "Shell OOB Demo",
-        "breadcrumb_items": [{"label": "Home", "href": "/"}],
+        "page_title": "Settings Console",
+        "breadcrumb_items": [{"label": "Dashboard", "href": "/"}],
     }

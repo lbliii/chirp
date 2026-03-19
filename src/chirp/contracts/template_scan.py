@@ -36,7 +36,7 @@ _MUTATING_WITH_TARGET = re.compile(
     r'[^>]*\bhx-target\s*=\s*["\']#([^"\'\s]+)["\']',
     re.IGNORECASE,
 )
-_LEGACY_ACTION_PATTERN = re.compile(r'\baction\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
+_LEGACY_ACTION_PATTERN = re.compile(r'(?<![-\w])action\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
 
 
 def _is_static_url_candidate(url: str) -> bool:

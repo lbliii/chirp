@@ -21,7 +21,7 @@ class TestPagesShell:
             )
             assert response.status == 200
             assert "Apollo" in response.text
-            assert "Loading build stats..." in response.text
+            assert "project-stats" in response.text
 
     async def test_detail_page_overrides_shell_actions(self, example_app) -> None:
         async with TestClient(example_app) as client:

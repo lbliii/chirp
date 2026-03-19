@@ -1,21 +1,24 @@
 {# target: body #}
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
 
-{% block title %}Sortable List{% end %}
+{% block title %}Recipe Builder{% end %}
 
-{% block brand %}Sortable Reorder{% end %}
+{% block brand %}Recipe Builder{% end %}
 
 {% block topbar_center %}
 <span class="chirpui-text-muted chirpui-font-sm">
-  Alpine + HTMX drag-and-drop — no Sortable.js
+  Drag-and-drop step builder — Alpine + HTMX, no Sortable.js
 </span>
 {% end %}
 
+{% block topbar_end %}{{ theme_toggle() }}{% end %}
+
 {% block sidebar %}
 {% call sidebar() %}
-  {% call sidebar_section("Example") %}
-    {{ sidebar_link("/", "Reorder list", icon="grid", active=true) }}
+  {% call sidebar_section("Recipe") %}
+    {{ sidebar_link("/", "Builder", icon="grid", active=true) }}
   {% end %}
 {% end %}
 {% end %}

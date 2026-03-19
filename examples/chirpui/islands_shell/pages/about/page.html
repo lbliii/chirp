@@ -1,12 +1,40 @@
+{% from "chirpui/layout.html" import container, stack, section_header %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/description_list.html" import description_list, description_item %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
-  <h1>About</h1>
-  <p>This page has no island — server-rendered only. Click "Home" or "Dashboard"
-  to see islands again. The sidebar, breadcrumbs, and title update via OOB while
-  the main content swaps.</p>
-</div>
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>How Islands Work</h1>
+  <p>This page has no islands — it's server-rendered only. Navigate to Overview or Watchlist to see islands in action.</p>
+
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header("Islands Architecture") }}
+    <p class="chirpui-text-muted">Chirp islands are framework-agnostic interactive components that coexist with server-rendered HTML and htmx navigation.</p>
+    {% call description_list(variant="stacked") %}
+      {{ description_item("Mount", "Each island exports a mount(payload, api) function that initializes interactivity") }}
+      {{ description_item("Unmount", "Before htmx swaps, islands receive unmount — cleanup timers, listeners, state") }}
+      {{ description_item("Remount", "After swap, islands in the new content auto-mount with fresh or restored state") }}
+      {{ description_item("No build step", "Islands are plain ES modules loaded via script tags — no bundler needed") }}
+      {{ description_item("Props", "Server passes data to islands via island_attrs() — rendered as data attributes") }}
+    {% end %}
+  {% end %}
+  {% end %}
+
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header("Islands in This Example") }}
+    {% call description_list(variant="stacked") %}
+      {{ description_item("Ticker", "Simulates live stock price updates with a 2-second interval timer — cleans up on unmount") }}
+      {{ description_item("Counter", "Simple click counter showing the mount/unmount lifecycle — state resets on navigation") }}
+    {% end %}
+  {% end %}
+  {% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

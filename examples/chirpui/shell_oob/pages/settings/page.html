@@ -1,12 +1,35 @@
+{% from "chirpui/layout.html" import container, stack, section_header %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/config_row.html" import config_row_list, config_row_toggle %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
+{% call container() %}
+{% call stack(gap="lg") %}
   <h1>Settings</h1>
-  <p>This is the settings page. The sidebar should show "Settings" as active,
-  breadcrumbs should show "Home &gt; Settings", and the document title should
-  read "Settings".</p>
-</div>
+  <p class="chirpui-text-muted">Toggle settings below. Changes take effect immediately. Navigate to Dashboard to see updated stats via OOB.</p>
+
+  {% for category, items in categories.items() %}
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header(category) }}
+    {% call config_row_list() %}
+      {% for s in items %}
+      {{ config_row_toggle(
+        s.key,
+        s.label ~ " — " ~ s.description,
+        checked=s.enabled,
+        form_action="/settings",
+        attrs_map={"hx-post": "/settings", "hx-target": "#page-root", "hx-swap": "innerHTML"}
+      ) }}
+      {% end %}
+    {% end %}
+  {% end %}
+  {% end %}
+  {% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

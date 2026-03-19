@@ -1,19 +1,24 @@
 {% from "chirpui/badge.html" import badge %}
 {% from "chirpui/button.html" import btn %}
 {% from "chirpui/card.html" import resource_card %}
-{% from "chirpui/layout.html" import container, page_header, stack %}
+{% from "chirpui/layout.html" import container, page_header, stack, cluster, grid %}
+{% from "chirpui/stat.html" import stat %}
 
 {% block page_root %}
 {% block page_root_inner %}
 {% call container(max_width="84rem") %}
 {% call stack(gap="lg", cls="example-page") %}
 {% call page_header(
-  "Projects",
-  subtitle="Mounted pages with a fragment-safe page root for boosted navigation.",
-  meta="Each project detail route inherits this shell and contributes its own shell actions."
+  "Documentation Hub",
+  subtitle="Browse project documentation, API references, and changelogs.",
+  meta="Each project has tabs for Overview, API, and Changelog — powered by mounted pages and shell actions."
 ) %}
 {% slot actions %}
-{{ badge((projects | length) ~ " examples", variant="info") }}
+{% call cluster(gap="sm") %}
+  {{ stat(value=projects | length, label="Projects") }}
+  {{ stat(value=projects | selectattr("status", "equalto", "shipping") | list | length, label="Shipping") }}
+  {{ stat(value=projects | selectattr("status", "equalto", "active") | list | length, label="Active") }}
+{% end %}
 {% end %}
 {% end %}
 
@@ -24,13 +29,13 @@
     "/projects/" ~ project.slug,
     project.name,
     description=project.summary,
-    top_meta=project.owner
+    top_meta=project.owner ~ " · v" ~ project.version
   ) %}
     {% slot badges %}
-    {{ badge(project.status, variant="success" if project.status == "shipping" else "warning") }}
+    {{ badge(project.status, variant="success" if project.status == "shipping" else ("warning" if project.status == "active" else "muted")) }}
     {% end %}
     {% slot footer %}
-    {{ btn("Open", href="/projects/" ~ project.slug, variant="ghost", size="sm") }}
+    {{ btn("Open docs", href="/projects/" ~ project.slug, variant="ghost", size="sm") }}
     {% end %}
   {% end %}
   {% endfor %}

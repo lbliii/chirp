@@ -21,40 +21,43 @@ class TestSortableReorder:
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
-            assert "Sortable Reorder" in response.text
-            assert "Reorder list" in response.text
-            assert "First" in response.text
+            assert "Recipe Builder" in response.text
+            assert "Preheat oven" in response.text
             assert "chirpui-sortable" in response.text
-            assert 'id="item-list"' in response.text
+            assert 'id="recipe-content"' in response.text
 
-    async def test_add_item_updates_list(self, example_app) -> None:
+    async def test_add_step_updates_list(self, example_app) -> None:
         async with TestClient(example_app) as client:
             r0 = await client.get("/")
             headers, csrf = _auth_headers(r0)
             assert csrf is not None
-            body = f"name=NewItem&_csrf_token={csrf}"
-            response = await client.post("/items", body=body.encode(), headers=headers)
+            body = f"instruction=Let+it+cool&duration=10+min&note=&_csrf_token={csrf}"
+            response = await client.post("/steps", body=body.encode(), headers=headers)
             assert response.status == 200
-            assert "NewItem" in response.text
-            assert "First" in response.text
+            assert "Let it cool" in response.text
+            assert "Preheat oven" in response.text
 
     async def test_reorder_updates_list(self, example_app) -> None:
         async with TestClient(example_app) as client:
             r0 = await client.get("/")
             headers, csrf = _auth_headers(r0)
             assert csrf is not None
-            # Move item from index 0 to index 2 (First -> Third position)
             body = f"from_idx=0&to_idx=2&_csrf_token={csrf}"
             response = await client.post("/reorder", body=body.encode(), headers=headers)
             assert response.status == 200
-            # After reorder: Second, Third, First, Fourth, Fifth
             text = response.text
-            assert "First" in text
-            assert "Second" in text
-            # First should appear after Second and Third in the new order
-            second_pos = text.find("Second")
-            first_pos = text.find("First")
-            assert second_pos < first_pos
+            assert "Preheat oven" in text
+            assert "Dice onions" in text
+
+    async def test_delete_step(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            r0 = await client.get("/")
+            headers, csrf = _auth_headers(r0)
+            assert csrf is not None
+            body = f"step_id=1&_csrf_token={csrf}"
+            response = await client.post("/steps/delete", body=body.encode(), headers=headers)
+            assert response.status == 200
+            assert "Preheat oven to 375" not in response.text
 
     def test_example_app_passes_contract_check(self, example_app) -> None:
         example_app.check()

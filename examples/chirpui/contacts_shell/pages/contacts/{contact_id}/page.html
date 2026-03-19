@@ -1,0 +1,57 @@
+{% imports %}
+  {% from "chirpui/avatar.html" import avatar %}
+  {% from "chirpui/badge.html" import badge %}
+  {% from "chirpui/button.html" import btn %}
+  {% from "chirpui/description_list.html" import description_list, description_item %}
+  {% from "chirpui/layout.html" import container, stack, cluster, section_header %}
+  {% from "chirpui/entity_header.html" import entity_header %}
+  {% from "chirpui/surface.html" import surface %}
+  {% from "chirpui/stat.html" import stat %}
+{% end %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+{% call container(max_width="52rem") %}
+{% call stack(gap="lg") %}
+
+{{ btn("← Back to directory", variant="ghost", size="sm", href="/contacts", attrs_map={"hx-boost": "true"}) }}
+
+{% call entity_header(
+  title=contact.name,
+  meta=contact.role ~ " · " ~ contact.group
+) %}
+{% slot actions %}
+{{ badge(contact.group, variant=group_badge_variants.get(contact.group, "muted")) }}
+{{ btn("Edit", variant="primary", size="sm",
+       href="/contacts/" ~ contact.id ~ "/edit",
+       attrs_map={"hx-boost": "true"}) }}
+{% end %}
+{% end %}
+
+{% call cluster(gap="sm") %}
+  {{ avatar(initials=contact.name | first | upper, size="lg") }}
+  {% call cluster(gap="sm") %}
+    {{ stat(value=contact.group, label="Team") }}
+    {{ stat(value=contact.email, label="Email") }}
+  {% end %}
+{% end %}
+
+{% call surface(variant="elevated") %}
+{% call stack(gap="sm") %}
+{{ section_header("Contact Details") }}
+{% call description_list(variant="horizontal") %}
+  {{ description_item("Name", contact.name) }}
+  {{ description_item("Email", contact.email) }}
+  {{ description_item("Phone", contact.phone or "—") }}
+  {{ description_item("Role", contact.role or "—") }}
+  {{ description_item("Group", contact.group) }}
+{% end %}
+{% end %}
+{% end %}
+
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}

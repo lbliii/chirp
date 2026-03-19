@@ -1,6 +1,7 @@
 {# target: body #}
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
 
 {% block title %}Kanban{% end %}
 
@@ -16,7 +17,8 @@
 {% end %}
 
 {% block topbar_end %}
-{% if current_user is defined and current_user %}
+{{ theme_toggle() }}
+{% if (current_user ?? none) %}
 <div class="kanban-user-info">
   <span class="kanban-avatar">{{ current_user.name | first | upper }}</span>
   <span class="kanban-name">{{ current_user.name }}</span>
@@ -32,7 +34,7 @@
 {% call sidebar() %}
   {% call sidebar_section("Boards") %}
     {{ sidebar_link("/", "Board", icon="grid", active=true) }}
-    {% if not (current_user is defined and current_user) %}
+    {% if not ((current_user ?? none)) %}
     {{ sidebar_link("/login", "Login", icon="user") }}
     {% end %}
   {% end %}

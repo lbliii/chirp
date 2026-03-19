@@ -46,9 +46,11 @@ async def index() -> Template:
     default = DEFAULT_MODEL if DEFAULT_MODEL in models else (models[0] if models else "llama3.2")
     # model_b defaults to second model if available (avoid same as model_a)
     default_b = models[1] if len(models) > 1 else default
+    model_options = [{"value": m, "label": m} for m in models]
     return Template(
         "index.html",
         models=models,
+        model_options=model_options,
         default_model=default,
         default_model_b=default_b,
     )

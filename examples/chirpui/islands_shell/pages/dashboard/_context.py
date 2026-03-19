@@ -1,11 +1,11 @@
-"""Dashboard context — breadcrumbs and page title."""
+"""Watchlist context — breadcrumbs and page title."""
 
 
 def context() -> dict:
     return {
-        "page_title": "Dashboard",
+        "page_title": "Watchlist",
         "breadcrumb_items": [
-            {"label": "Home", "href": "/"},
-            {"label": "Dashboard"},
+            {"label": "Overview", "href": "/"},
+            {"label": "Watchlist"},
         ],
     }

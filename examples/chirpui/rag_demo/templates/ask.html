@@ -2,21 +2,26 @@
    Uses chirp-ui container, grid, card, streaming_block.
    Custom SSE: sources + answer + share_link swap targets.
    hx-disinherit="hx-target hx-swap" on sse-connect articles isolates streamed swaps. #}
-{% from "chirpui/layout.html" import container, grid %}
+{% from "chirpui/message_bubble.html" import message_bubble %}
+{% from "chirpui/typing_indicator.html" import typing_indicator %}
+{% from "chirpui/copy_button.html" import copy_button %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/layout.html" import container, grid, stack %}
+{% from "chirpui/accordion.html" import accordion, accordion_item %}
 
 {% block sources %}
 <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
   <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
   {% if sources %}
-  <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
-  <div class="sources-list chirpui-stack chirpui-stack--sm">
-  {% for doc in sources %}
-  <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
-    <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-    <p class="source-snippet chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
-  </div>
+  <p class="chirpui-text-muted">{{ sources | length }} articles retrieved and passed to the model:</p>
+  {% call accordion(name="sources") %}
+    {% for doc in sources %}
+    {% call accordion_item(doc.title, open=loop.first, name="sources") %}
+    <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(300) }}</p>
+    {% if doc.url %}<a href="{{ doc.url }}" target="_blank" rel="noopener" class="chirpui-link chirpui-font-sm">View source →</a>{% end %}
+    {% end %}
+    {% end %}
   {% end %}
-  </div>
   {% else %}
   <p class="sources-empty chirpui-text-muted">No matching docs found.</p>
   {% end %}
@@ -24,20 +29,20 @@
 {% end %}
 
 {% block answer %}
-<div class="answer-body chirpui-streaming-block{% if streaming %} chirpui-streaming-block--active{% end %}"
-     {% if not streaming %}data-copy-text="{{ text | e }}"{% end %}
+<div class="answer-body chirpui-streaming-block{% if streaming ?? none %} chirpui-streaming-block--active{% end %}"
+     {% if not (streaming ?? none) %}data-copy-text="{{ (text ?? "") | e }}"{% end %}
      aria-live="polite" aria-atomic="true">
-  {% if streaming %}
-  {% if rendered_html is defined %}
+  {% if streaming ?? none %}
+  {% if rendered_html ?? none %}
   <div class="chirpui-prose">{{ rendered_html | safe }}</div>
-  {% if in_progress %}<span class="streaming-raw">{{ in_progress | e }}</span>{% end %}
+  {% if in_progress ?? none %}<span class="streaming-raw">{{ in_progress | e }}</span>{% end %}
   {% else %}
-  <pre class="streaming-text">{{ text | e }}</pre>
+  <pre class="streaming-text">{{ (text ?? "") | e }}</pre>
   {% end %}
-  <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+  {{ typing_indicator() }}
   {% else %}
-  <div class="chirpui-prose">{{ text | markdown | cite(sources) | safe(reason="patitas output") }}</div>
-  <button type="button" class="chirpui-copy-btn" data-copy-text="{{ text | e }}">Copy</button>
+  <div class="chirpui-prose">{{ (text ?? "") | markdown | cite(sources ?? none) | safe(reason="patitas output") }}</div>
+  {{ copy_button((text ?? ""), label="Copy") }}
   {% end %}
 </div>
 {% end %}
@@ -51,30 +56,32 @@
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
   <header class="chirpui-card__header">
+    {% call message_bubble(align="right", role="user") %}
     <span class="chirpui-text-muted chirpui-font-sm">Question</span>
     <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
     <button type="button" class="chirpui-copy-btn" title="Refine this question"
             hx-on::click="var q=this.closest('.chirpui-card').querySelector('p');if(q){document.getElementById('question-input').value=q.textContent;document.getElementById('question-input').focus()}">
       Refine
     </button>
+    {% end %}
   </header>
   <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
     {% block sources %}{% end %}
-    <div>
+    {% call message_bubble(align="left", role="assistant") %}
       <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
       <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Searching docs and generating answer…</span>
-        <span class="chirpui-streaming-block__cursor" aria-hidden="true"></span>
+        {{ typing_indicator() }}
       </div>
       <div sse-swap="share_link" hx-target="this"></div>
-    </div>
+    {% end %}
   </div>
 </article>
 {% end %}
 {% end %}
 
 {% block share_link %}
-{% if share_id and share_url %}
+{% if (share_id ?? none) and (share_url ?? none) %}
 <a href="{{ share_url }}" target="_blank" rel="noopener" class="share-link">Share this Q&A</a>
 {% end %}
 {% end %}

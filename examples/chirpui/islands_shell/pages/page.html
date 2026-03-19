@@ -1,20 +1,60 @@
+{% from "chirpui/layout.html" import container, stack, grid, section_header_inline %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/metric_grid.html" import metric_grid, metric_card %}
+{% from "chirpui/stat.html" import stat %}
+{% from "chirpui/badge.html" import badge %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/skeleton.html" import skeleton %}
+
 {% block page_root %}
 {% block page_root_inner %}
 {% block page_content %}
-<div style="padding: 2rem;">
-  <h1>Home</h1>
-  <p>This page has a counter island. Click the sidebar to navigate — the island
-  unmounts before the swap and remounts when the new content loads. Open the
-  console to see <code>chirp:island:unmount</code> and <code>chirp:island:remount</code>.</p>
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>Market Overview</h1>
+  <p class="chirpui-text-muted">Server-rendered stock data with a client-side price ticker island. The ticker auto-updates via JavaScript while the rest of the page is static HTML.</p>
 
-  <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1.5rem;margin:1rem 0;">
-    <p><strong>Counter island</strong> — client-managed, survives navigation via remount.</p>
-    <div{{ island_attrs("counter", props={"initial_count": 0}, mount_id="counter-root", src="/static/counter.js") }}>
-      <p>Count: <span id="counter-value">0</span></p>
-      <button type="button" disabled>Enable JavaScript to interact</button>
+  {# Server-rendered stock cards #}
+  {% call metric_grid(cols=3) %}
+    {% for stock in stocks %}
+    {{ metric_card(
+      value="$" ~ stock.price,
+      label=stock.symbol ~ " · " ~ stock.name,
+      trend="up" if stock.change > 0 else "down",
+      hint=(("+" if stock.change > 0 else "") ~ stock.change ~ " · Vol " ~ stock.volume)
+    ) }}
+    {% end %}
+  {% end %}
+
+  {# Client-side ticker island #}
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header_inline("Live Price Ticker") }} {{ badge("Island", variant="info") }}
+    <p class="chirpui-text-muted chirpui-font-sm">This island simulates live price updates — it mounts, runs a timer, and unmounts cleanly on navigation.</p>
+    <div{{ island_attrs("ticker", props={"stocks": stocks}, mount_id="ticker-root", src="/static/ticker.js") }}>
+      <div id="ticker-display" class="chirpui-cluster chirpui-cluster--sm">
+        {% for stock in stocks[:4] %}
+        <span>{{ stock.symbol }}: ${{ stock.price }}</span>
+        {% end %}
+      </div>
+      <p class="chirpui-text-muted chirpui-font-sm">Enable JavaScript for live updates</p>
     </div>
-  </div>
-</div>
+  {% end %}
+  {% end %}
+
+  {# Counter island #}
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header_inline("Trade Counter") }} {{ badge("Island", variant="info") }}
+    <p class="chirpui-text-muted chirpui-font-sm">Track how many trades you've reviewed this session. State resets on navigation.</p>
+    <div{{ island_attrs("counter", props={"initial_count": 0}, mount_id="counter-root", src="/static/counter.js") }}>
+      <p>Trades reviewed: <span id="counter-value">0</span></p>
+      {{ btn("Enable JavaScript to interact", type="button", disabled=true) }}
+    </div>
+  {% end %}
+  {% end %}
+{% end %}
+{% end %}
 {% end %}
 {% end %}
 {% end %}

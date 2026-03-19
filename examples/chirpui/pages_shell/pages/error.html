@@ -1,0 +1,26 @@
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/ascii_error.html" import ascii_error %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/layout.html" import container %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+
+{% block title %}{{ error_code }} — Docs Hub{% end %}
+
+{% block brand_link %}<a href="/projects" class="chirpui-app-shell__brand">Docs Hub</a>{% end %}
+
+{% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Documentation") %}
+    {{ sidebar_link("/projects", "All Projects", icon="grid") }}
+  {% end %}
+{% end %}
+{% end %}
+
+{% block page_root %}
+{% call container() %}
+{% call ascii_error(code=error_code, heading=error_heading, description=error_description) %}
+  {{ btn("Back to projects", href="/projects", variant="primary") }}
+{% end %}
+{% end %}
+{% end %}

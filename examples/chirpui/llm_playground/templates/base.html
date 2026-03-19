@@ -1,5 +1,5 @@
 {% extends "chirp/layouts/shell.html" %}
-{% block title %}{{ title | default("LLM Playground") }}{% end %}
+{% block title %}{{ title ?? "LLM Playground" }}{% end %}
 {% block head %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -9,8 +9,9 @@ def context() -> dict[str, object]:
                     ShellAction(
                         id="new-contact",
                         label="New contact",
-                        href="#contact-add-form",
+                        action="new-contact",
                         variant="primary",
+                        icon="add",
                     ),
                 )
             ),

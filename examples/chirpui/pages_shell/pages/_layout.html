@@ -1,10 +1,11 @@
 {# target: body #}
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
 
-{% block title %}Pages Shell{% end %}
+{% block title %}Docs Hub{% end %}
 
-{% block brand_link %}<a href="/projects" class="chirpui-app-shell__brand">Pages Shell</a>{% end %}
+{% block brand_link %}<a href="/projects" class="chirpui-app-shell__brand">Docs Hub</a>{% end %}
 
 {% block head_extra %}
 <style>
@@ -17,22 +18,24 @@
     gap: 1rem;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   }
-
-  .example-list {
-    display: grid;
-    gap: 0.75rem;
-  }
 </style>
 {% end %}
 
+{% block topbar_end %}{{ theme_toggle() }}{% end %}
+
 {% block topbar_center %}
-<span class="chirpui-text-muted chirpui-font-sm">Mounted pages + shell actions + suspense</span>
+<span class="chirpui-text-muted chirpui-font-sm">Mounted pages + shell actions + suspense + nav tree</span>
 {% end %}
 
 {% block sidebar %}
 {% call sidebar() %}
-  {% call sidebar_section("Pages") %}
-    {{ sidebar_link("/projects", "Projects", icon="grid", active=true) }}
+  {% call sidebar_section("Documentation") %}
+    {{ sidebar_link("/projects", "All Projects", icon="grid", active=true) }}
+  {% end %}
+  {% call sidebar_section("Projects") %}
+    {% for p in (projects ?? ()) %}
+    {{ sidebar_link("/projects/" ~ p.slug, p.name, icon="link") }}
+    {% end %}
   {% end %}
 {% end %}
 {% end %}

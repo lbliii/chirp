@@ -1,8 +1,7 @@
-"""Sortable List Reorder — Alpine + HTMX drag-and-drop without Sortable.js.
+"""Recipe Builder — Alpine + HTMX drag-and-drop without Sortable.js.
 
 Demonstrates native HTML5 drag-and-drop with chirp-ui sortable_list,
-Alpine.js for visual feedback (dataset.draggingIdx, overCount), and
-HTMX form submission for reorder. No Sortable.js — pure Alpine + HTMX.
+structured recipe steps, and split layout with live preview.
 
 Run:
     pip install chirp[ui]
@@ -15,24 +14,18 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 sys.path.insert(0, str(ROOT_DIR))
 
-# Avoid sys.modules collision when another example (e.g. kanban_shell) ran first.
 if "store" in sys.modules:
     _loaded = Path(sys.modules["store"].__file__).resolve()
     if _loaded != (ROOT_DIR / "store.py").resolve():
         del sys.modules["store"]
 
-from store import add_item, get_items, reorder_items
+from store import add_step, get_steps, remove_step, reorder_steps, reset
 
 from chirp import App, AppConfig, Fragment, Request, use_chirp_ui
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 PAGES_DIR = Path(__file__).parent / "pages"
-
-
-# ---------------------------------------------------------------------------
-# App setup
-# ---------------------------------------------------------------------------
 
 config = AppConfig(template_dir=PAGES_DIR, alpine=True, debug=True)
 app = App(config=config)
@@ -47,21 +40,30 @@ app.add_middleware(
 )
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
+reset()
 app.mount_pages(str(PAGES_DIR))
 
 
-@app.route("/items", methods=["POST"])
-async def add_item_route(request: Request):
+@app.route("/steps", methods=["POST"])
+async def add_step_route(request: Request):
     form = await request.form()
-    name = (form.get("name") or "").strip()
-    if name:
-        add_item(name)
-    items = get_items()
-    return Fragment("page.html", "item_list", items=items)
+    instruction = (form.get("instruction") or "").strip()
+    duration = (form.get("duration") or "").strip()
+    note = (form.get("note") or "").strip()
+    if instruction:
+        add_step(instruction, duration, note)
+    steps = get_steps()
+    return Fragment("page.html", "recipe_content", steps=steps)
+
+
+@app.route("/steps/delete", methods=["POST"])
+async def delete_step_route(request: Request):
+    form = await request.form()
+    step_id = int(form.get("step_id") or "0")
+    if step_id:
+        remove_step(step_id)
+    steps = get_steps()
+    return Fragment("page.html", "recipe_content", steps=steps)
 
 
 @app.route("/reorder", methods=["POST"])
@@ -69,9 +71,9 @@ async def reorder_route(request: Request):
     form = await request.form()
     from_idx = int(form.get("from_idx") or "0")
     to_idx = int(form.get("to_idx") or "0")
-    reorder_items(from_idx, to_idx)
-    items = get_items()
-    return Fragment("page.html", "item_list", items=items)
+    reorder_steps(from_idx, to_idx)
+    steps = get_steps()
+    return Fragment("page.html", "recipe_content", steps=steps)
 
 
 if __name__ == "__main__":

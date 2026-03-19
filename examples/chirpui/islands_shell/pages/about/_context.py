@@ -3,9 +3,9 @@
 
 def context() -> dict:
     return {
-        "page_title": "About",
+        "page_title": "How Islands Work",
         "breadcrumb_items": [
-            {"label": "Home", "href": "/"},
-            {"label": "About"},
+            {"label": "Overview", "href": "/"},
+            {"label": "How Islands Work"},
         ],
     }
