@@ -56,9 +56,7 @@ def run_server(args: argparse.Namespace) -> None:
         raise
 
 
-def _run_production(
-    app: App, args: argparse.Namespace, host: str, port: int
-) -> None:
+def _run_production(app: App, args: argparse.Namespace, host: str, port: int) -> None:
     from chirp.server.production import run_production_server
 
     run_production_server(
@@ -95,9 +93,7 @@ def _run_production(
     )
 
 
-def _run_dev(
-    app: App, args: argparse.Namespace, host: str, port: int
-) -> None:
+def _run_dev(app: App, args: argparse.Namespace, host: str, port: int) -> None:
     from chirp.server.dev import run_dev_server
 
     run_dev_server(

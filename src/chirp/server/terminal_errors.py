@@ -230,11 +230,7 @@ def format_startup_error(exc: BaseException, *, cli: bool = False) -> str | None
     if isinstance(exc, OSError) and not isinstance(exc, PounceError):
         if exc.errno == errno.EADDRINUSE or "already in use" in str(exc):
             hint = "    chirp run myapp:app --port 8001" if cli else "    app.run(port=8001)"
-            return (
-                f"Error: {exc}\n\n"
-                f"  Kill the other process or use a different port:\n"
-                f"{hint}"
-            )
+            return f"Error: {exc}\n\n  Kill the other process or use a different port:\n{hint}"
         if exc.errno == errno.EACCES:
             return f"Error: {exc}\n\n  Try a port above 1024, or run with elevated privileges."
         return f"Error: {exc}"

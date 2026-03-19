@@ -167,7 +167,10 @@ class TestServerLauncherErrorHandling:
 
     @patch("chirp.server.dev.run_dev_server")
     def test_full_traceback_skips_formatted_message(
-        self, mock_dev: MagicMock, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+        self,
+        mock_dev: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """CHIRP_TRACEBACK=full should re-raise without printing the formatted message."""
         monkeypatch.setenv("CHIRP_TRACEBACK", "full")
@@ -212,7 +215,10 @@ class TestCliRunErrorHandling:
         monkeypatch.setitem(__import__("sys").modules, "_startup_err_test_app", mod)
         return app
 
-    @patch("chirp.server.dev.run_dev_server", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
+    @patch(
+        "chirp.server.dev.run_dev_server",
+        side_effect=OSError(errno.EADDRINUSE, "Address already in use"),
+    )
     def test_cli_shows_cli_hint(
         self, mock_dev: MagicMock, fake_app: object, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -234,7 +240,10 @@ class TestCliRunErrorHandling:
         with pytest.raises(RuntimeError, match="unexpected"):
             main(["run", "_startup_err_test_app:app"])
 
-    @patch("chirp.server.dev.run_dev_server", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
+    @patch(
+        "chirp.server.dev.run_dev_server",
+        side_effect=OSError(errno.EADDRINUSE, "Address already in use"),
+    )
     def test_cli_full_traceback_skips_message(
         self,
         mock_dev: MagicMock,
