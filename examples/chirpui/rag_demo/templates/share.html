@@ -1,9 +1,14 @@
 {% extends "base.html" %}
+{% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/surface.html" import surface %}
 
 {% block content %}
-<header class="page-header">
+{% call container(max_width="42rem") %}
+{% call stack(gap="lg") %}
+
+<header>
   <h1>Shared Q&A</h1>
-  <p class="tagline">Read-only view of a previous question and answer.</p>
+  <p class="chirpui-text-muted">Read-only view of a previous question and answer.</p>
 </header>
 
 <article class="qa-card">
@@ -37,4 +42,7 @@
 <div class="conversation-actions">
   <a href="/">Ask a new question</a>
 </div>
+
+{% end %}
+{% end %}
 {% end %}

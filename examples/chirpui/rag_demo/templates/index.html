@@ -1,20 +1,10 @@
 {% extends "base.html" %}
 {% from "chirpui/layout.html" import container, stack %}
 {% from "chirpui/empty.html" import empty_state %}
-{% from "chirpui/chat_layout.html" import chat_layout %}
 
 {% block content %}
-{% call container() %}
+{% call container(max_width="42rem") %}
 {% call stack(gap="lg") %}
-{% call stack(gap="sm") %}
-  <div class="header-row">
-    <div>
-      <h1>Documentation</h1>
-      <p class="tagline">Ask anything — streaming AI answers with cited sources. Keyword search (not semantic).</p>
-    </div>
-    <button type="button" class="theme-toggle" aria-label="Toggle dark mode">☽</button>
-  </div>
-{% end %}
 
 <form class="search-form"
       hx-post="/ask"
@@ -64,7 +54,7 @@
 </form>
 
 <section id="results" aria-label="Questions and answers">
-  <div id="conversation">
+  <div id="conversation" hx-disinherit="*">
     {% call empty_state(icon="◇", title="Ask a question") %}
     <p>Type a question about the docs and hit Ask. Streaming AI answers with cited sources.</p>
     {% end %}

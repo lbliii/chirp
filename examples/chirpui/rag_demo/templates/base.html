@@ -1,53 +1,22 @@
-{% extends "chirp/layouts/shell.html" %}
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
 {% block title %}{{ title ?? "Docs" }}{% end %}
-{% block head %}
+
+{% block head_extra %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/chirpui.css">
-<link rel="stylesheet" href="/static/chirpui-transitions.css">
-<link rel="stylesheet" href="/static/rag.css">
-<script src="/static/chirpui.js"></script>
-<script>
-(function(){var t=localStorage.getItem("chirpui-theme")||"system";var s=localStorage.getItem("chirpui-style")||"default";document.documentElement.setAttribute("data-theme",t);document.documentElement.setAttribute("data-style",s);})();
-</script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
-<script>
-document.addEventListener("alpine:init",function(){
-  Alpine.store("modals",{});
-  Alpine.store("trays",{});
-  Alpine.effect(function(){
-    var any=Object.values(Alpine.store("modals")).some(Boolean)||Object.values(Alpine.store("trays")).some(Boolean);
-    document.body.style.overflow=any?"hidden":"";
-  });
-});
-</script>
+<link rel="stylesheet" href="/static/rag/rag.css">
 {% end %}
-{% block body_after %}
-<script>
-(function(){
-  function applyTheme(){
-    var t=localStorage.getItem('theme');
-    if(t) document.documentElement.dataset.theme=t;
-  }
-  function updateButtons(){
-    var dark=document.documentElement.dataset.theme==='dark'||
-      (!document.documentElement.dataset.theme&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent=dark?'☀':'☽'; });
-  }
-  function toggleTheme(){
-    var html=document.documentElement;
-    var next=html.dataset.theme==='dark'?'light':'dark';
-    html.dataset.theme=next;
-    localStorage.setItem('theme',next);
-    updateButtons();
-  }
-  document.addEventListener('click',function(e){
-    if(e.target.closest('.theme-toggle')){ e.preventDefault(); toggleTheme(); }
-  });
-  document.addEventListener('DOMContentLoaded',function(){ applyTheme(); updateButtons(); });
-  document.addEventListener('htmx:afterSettle',function(){ updateButtons(); });
-  if(document.readyState!=='loading'){ applyTheme(); updateButtons(); }
-})();
-</script>
+
+{% block brand %}Documentation{% end %}
+
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">
+  Streaming AI answers with cited sources — keyword search (not semantic)
+</span>
 {% end %}
+
+{% block topbar_end %}{{ theme_toggle() }}{% end %}
