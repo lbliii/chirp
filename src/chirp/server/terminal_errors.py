@@ -6,7 +6,7 @@ that highlight the useful information.
 
 For startup errors:
     Maps known startup exceptions (port conflicts, TLS misconfiguration,
-    lifespan failures, config validation) to clean, actionable one-liners
+    lifespan failures, config validation) to clean, actionable messages
     via ``format_startup_error()``.  Returns ``None`` for unrecognised
     errors so the caller can fall back to the default traceback.
 
@@ -221,14 +221,14 @@ def format_startup_error(exc: BaseException, *, cli: bool = False) -> str | None
     Returns ``None`` if the exception is not a recognised startup error
     (caller should re-raise or fall back to default handling).
     """
-    from pounce._errors import PounceError
+    from pounce import PounceError
 
     from chirp.errors import ConfigurationError
 
     # OSError from socket binding (port in use, permission denied).
     # Check PounceError first — some subclasses may also inherit OSError.
     if isinstance(exc, OSError) and not isinstance(exc, PounceError):
-        if exc.errno == errno.EADDRINUSE or "already in use" in str(exc):
+        if exc.errno == errno.EADDRINUSE or "already in use" in str(exc).lower():
             hint = "    chirp run myapp:app --port 8001" if cli else "    app.run(port=8001)"
             return f"Error: {exc}\n\n  Kill the other process or use a different port:\n{hint}"
         if exc.errno == errno.EACCES:

@@ -51,7 +51,7 @@ class TestFormatStartupError:
         assert "Error:" in msg
 
     def test_pounce_error(self) -> None:
-        from pounce._errors import LifespanError
+        from pounce import LifespanError
 
         exc = LifespanError("startup hook failed")
         msg = format_startup_error(exc)
@@ -59,7 +59,7 @@ class TestFormatStartupError:
         assert "startup hook failed" in msg
 
     def test_pounce_tls_error(self) -> None:
-        from pounce._errors import TLSError
+        from pounce import TLSError
 
         exc = TLSError("bad cert")
         msg = format_startup_error(exc)
@@ -67,7 +67,7 @@ class TestFormatStartupError:
         assert "bad cert" in msg
 
     def test_pounce_error_with_cause(self) -> None:
-        from pounce._errors import LifespanError
+        from pounce import LifespanError
 
         cause = ConnectionRefusedError("DB refused connection on port 5432")
         exc = LifespanError("Application startup failed")
@@ -80,7 +80,7 @@ class TestFormatStartupError:
         assert "5432" in msg
 
     def test_pounce_error_without_cause_has_no_caused_by(self) -> None:
-        from pounce._errors import LifespanError
+        from pounce import LifespanError
 
         exc = LifespanError("startup hook failed")
         msg = format_startup_error(exc)
@@ -114,7 +114,7 @@ class TestFormatStartupError:
     def test_pounce_oserror_not_treated_as_socket_error(self) -> None:
         """PounceError subclasses that also inherit OSError should go
         through the PounceError branch, not the OSError branch."""
-        from pounce._errors import PounceError
+        from pounce import PounceError
 
         class SocketPounceError(PounceError, OSError):
             pass
