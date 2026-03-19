@@ -1,17 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% from "chirpui/layout.html" import container, grid, stack, section_header %}
+{% from "chirpui/layout.html" import container, grid, stack, cluster, section_header %}
 {% from "chirpui/empty.html" import empty_state %}
 {% from "chirpui/button.html" import btn %}
 {% from "chirpui/forms.html" import form_actions, select_field, textarea_field %}
 {% from "chirpui/surface.html" import surface %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
 
 {% call container() %}
 {% call stack(gap="lg") %}
 {% call surface(variant="muted") %}
 {% call stack(gap="sm") %}
-  <h1>LLM Playground</h1>
+  {% call cluster(gap="sm") %}
+  <h1 style="flex:1;">LLM Playground</h1>
+  {{ theme_toggle() }}
+  {% end %}
   <p class="chirpui-text-muted">
     Two models. One prompt. Zero JavaScript.
   </p>
