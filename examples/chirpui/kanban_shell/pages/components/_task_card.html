@@ -13,12 +13,11 @@
       {% end %}
     </span>
   </div>
-  <h4 class="kanban-card__title"
-      hx-get="/tasks/{{ task.id }}/edit"
-      hx-target="#task-{{ task.id }}" hx-swap="outerHTML"
-      role="button" tabindex="0">
+  <button class="kanban-card__title"
+          hx-get="/tasks/{{ task.id }}/edit"
+          hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
     {{ task.title }}
-  </h4>
+  </button>
   {% if task.description %}
   <p class="kanban-card__desc">{{ task.description | truncate(80) }}</p>
   {% end %}

@@ -109,6 +109,10 @@
       <h1>Send feedback</h1>
 
       <div aria-live="polite" aria-atomic="true">
+        {% set success = success ?? false %}
+        {% set name = name ?? '' %}
+        {% set errors = errors ?? {} %}
+        {% set form = form ?? None %}
         {% if success %}
         <p>Thank you, {{ name }}! We received your feedback.</p>
         {% else %}
@@ -121,10 +125,10 @@
             name="name"
             value="{{ form?.name ?? '' }}"
             aria-describedby="name-validation"
-            aria-invalid="{{ 'true' if 'name' in (errors ?? {}) else 'false' }}"
+            aria-invalid="{{ 'true' if 'name' in errors else 'false' }}"
           >
           <div id="name-validation" role="alert" aria-live="polite">
-            {% for msg in (errors ?? {}).get("name", []) %}
+            {% for msg in errors.get("name", []) %}
             {{ msg }}
             {% end %}
           </div>
@@ -134,10 +138,10 @@
             id="message-input"
             name="message"
             aria-describedby="message-validation"
-            aria-invalid="{{ 'true' if 'message' in (errors ?? {}) else 'false' }}"
+            aria-invalid="{{ 'true' if 'message' in errors else 'false' }}"
           >{{ form?.message ?? '' }}</textarea>
           <div id="message-validation" role="alert" aria-live="polite">
-            {% for msg in (errors ?? {}).get("message", []) %}
+            {% for msg in errors.get("message", []) %}
             {{ msg }}
             {% end %}
           </div>

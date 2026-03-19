@@ -12,7 +12,7 @@ They are the reference point for:
 ## Run From Repo Root
 
 ```bash
-cd /Users/llane/Documents/github/python/b-stack/chirp
+# From the repo root:
 source .venv/bin/activate
 PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 ```

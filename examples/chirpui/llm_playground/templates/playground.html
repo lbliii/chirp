@@ -19,7 +19,7 @@
       <p class="chirpui-model-card__title" style="margin: 0;">{{ model_a }}</p>
     </header>
     <div class="chirpui-card__body">
-      {% call message_bubble(align="left", role="assistant") %}
+      {% call message_bubble(align="left") %}
       <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Generating…</span>
         {{ typing_indicator() }}
@@ -38,7 +38,7 @@
       <p class="chirpui-model-card__title" style="margin: 0;">{{ model_b }}</p>
     </header>
     <div class="chirpui-card__body">
-      {% call message_bubble(align="left", role="assistant") %}
+      {% call message_bubble(align="left") %}
       <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Generating…</span>
         {{ typing_indicator() }}

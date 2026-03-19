@@ -42,10 +42,10 @@ Click story:
 
 ## Run
 
-From the b-stack workspace root:
+From the repo root:
 
 ```bash
-uv run python chirp/examples/standalone/hackernews/app.py
+uv run python examples/standalone/hackernews/app.py
 ```
 
 Or from this directory:

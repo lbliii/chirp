@@ -11,19 +11,22 @@
         hx-post="/chat"
         hx-target="#messages"
         hx-swap="beforeend"
-        hx-disinherit="hx-boost hx-target hx-swap">
+        hx-disinherit="hx-boost hx-target hx-swap hx-select">
     <input type="text" name="message" placeholder="Type here..." required>
     <button type="submit">Send</button>
   </form>
 
   <div id="messages"></div>
 
-  <div id="activity"
-       hx-ext="sse"
+  <div hx-ext="sse"
        sse-connect="/stream"
-       sse-swap="fragment"
-       hx-swap="afterbegin">
-    <p>Waiting for events…</p>
+       hx-target="this"
+       hx-disinherit="hx-target hx-swap hx-select">
+    <div id="activity"
+         sse-swap="fragment"
+         hx-swap="afterbegin">
+      <p>Waiting for events…</p>
+    </div>
   </div>
 </div>
 {% end %}

@@ -86,7 +86,7 @@ def _collect_builtin_middleware(
 
 def _compile_routes(
     pending_routes: list,
-    providers: dict[type, Callable[..., Any]],
+    providers: dict[type, Callable[..., Any]] | None,
 ) -> Router:
     """Build router from pending routes."""
     router = Router()

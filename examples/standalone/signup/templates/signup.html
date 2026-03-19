@@ -6,15 +6,17 @@
 <h1>Create an account</h1>
 
 {% block signup_form %}
+{% set errors = errors ?? {} %}
+{% set form = form ?? None %}
 <form method="post" action="/signup">
   {{ csrf_field() }}
 
   <label for="username">Username</label>
   <input type="text" id="username" name="username"
          value="{{ form?.username ?? '' }}"
-         class="{{ 'error' if 'username' in (errors ?? {}) else '' }}"
+         class="{{ 'error' if 'username' in errors else '' }}"
          placeholder="janedoe">
-  {% for msg in (errors ?? {}).get("username", []) %}
+  {% for msg in errors.get("username", []) %}
     <p class="field-error">{{ msg }}</p>
   {% end %}
   <p class="hint">3–30 characters. Letters, numbers, underscores.</p>
@@ -22,25 +24,25 @@
   <label for="email">Email</label>
   <input type="email" id="email" name="email"
          value="{{ form?.email ?? '' }}"
-         class="{{ 'error' if 'email' in (errors ?? {}) else '' }}"
+         class="{{ 'error' if 'email' in errors else '' }}"
          placeholder="jane@example.com">
-  {% for msg in (errors ?? {}).get("email", []) %}
+  {% for msg in errors.get("email", []) %}
     <p class="field-error">{{ msg }}</p>
   {% end %}
 
   <label for="password">Password</label>
   <input type="password" id="password" name="password"
-         class="{{ 'error' if 'password' in (errors ?? {}) else '' }}"
+         class="{{ 'error' if 'password' in errors else '' }}"
          placeholder="At least 8 characters">
-  {% for msg in (errors ?? {}).get("password", []) %}
+  {% for msg in errors.get("password", []) %}
     <p class="field-error">{{ msg }}</p>
   {% end %}
 
   <label for="confirm_password">Confirm password</label>
   <input type="password" id="confirm_password" name="confirm_password"
-         class="{{ 'error' if 'confirm_password' in (errors ?? {}) else '' }}"
+         class="{{ 'error' if 'confirm_password' in errors else '' }}"
          placeholder="Type your password again">
-  {% for msg in (errors ?? {}).get("confirm_password", []) %}
+  {% for msg in errors.get("confirm_password", []) %}
     <p class="field-error">{{ msg }}</p>
   {% end %}
 

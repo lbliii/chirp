@@ -54,8 +54,9 @@
       {% end %}
     </div>
     {% end %}
-    {% set user = current_user() %}
+    {% block header_user %}
     <div class="user-info">
+      {% set user = current_user() %}
       <span class="avatar">{{ user.name | first | upper }}</span>
       <span class="name">{{ user.name }}</span>
       <form method="post" action="/logout" style="margin:0">
@@ -63,11 +64,13 @@
         <button type="submit" class="btn-logout">Logout</button>
       </form>
     </div>
+    {% end %}
   </header>
 
   {# ================================================================
-     Filter sidebar — {% let %}, | map, | compact, | unique, | sort
+     Filter sidebar — {% set %}, | map, | compact, | unique, | sort
      ================================================================ #}
+  {% block sidebar %}
   <aside class="sidebar">
     <h3>Priority</h3>
     {% for p in ["high", "medium", "low"] %}
@@ -110,6 +113,7 @@
       </label>
     {% end %}
   </aside>
+  {% end %}
 
   {# ================================================================
      Main content — board + add form
@@ -141,6 +145,7 @@
 
     {# --- Quick-add form --- #}
     {% block add_form %}
+    {% set errors = errors ?? {} %}
     <form class="add-form" hx-post="/tasks" hx-swap="none"
           hx-indicator="#board-spinner" hx-disabled-elt="find button">
       {{ field("title", "Task", placeholder="What needs doing?") }}
@@ -166,7 +171,7 @@
       {{ field("tags", "Tags", placeholder="Comma-separated", required=false) }}
       <button type="submit">Add Task</button>
     </form>
-    {% if (errors ?? {}) %}
+    {% if errors %}
     <ul class="form-errors">
       {% for fld, msgs in errors.items() %}
         {% for msg in msgs %}

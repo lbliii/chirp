@@ -194,7 +194,8 @@ def _stats_sse_fragment(tasks: list | None = None) -> Fragment:
 # App setup
 # ---------------------------------------------------------------------------
 
-config = AppConfig(template_dir=PAGES_DIR, debug=True)
+_debug = os.environ.get("CHIRP_DEBUG", "").lower() in ("1", "true")
+config = AppConfig(template_dir=PAGES_DIR, debug=_debug)
 app = App(config=config)
 
 use_chirp_ui(app)

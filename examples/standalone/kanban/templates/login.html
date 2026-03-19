@@ -93,6 +93,7 @@
     <h1>Kanban Board</h1>
     <p class="subtitle">Sign in to your workspace</p>
 
+    {% set error = error ?? '' %}
     {% if error %}
     <div class="error">{{ error }}</div>
     {% end %}
