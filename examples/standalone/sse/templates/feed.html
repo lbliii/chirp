@@ -27,7 +27,7 @@
   <p id="placeholder">Waiting for events...</p>
 </div>
 {% block notification %}
-{% if title is defined %}
+{% if (title ?? '') %}
 <div class="notification">
   <strong>{{ title }}</strong>
   <p>{{ message }}</p>

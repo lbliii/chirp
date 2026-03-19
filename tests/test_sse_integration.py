@@ -504,7 +504,7 @@ class TestSSEPerEventErrorBoundary:
 
     async def test_bad_fragment_sends_targeted_error_in_debug(self) -> None:
         """In debug mode, error HTML replaces the specific block."""
-        app = _app(debug=True)
+        app = _app(debug=True, skip_contract_checks=True)
 
         @app.route("/submit", methods=["POST"])
         def submit():

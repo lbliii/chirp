@@ -43,10 +43,10 @@
 {% end %}
 
 {% call cluster(gap="sm") %}
-  {% let tabs = [("All", "/contacts"), ("Engineering", "/contacts?group=Engineering"), ("Design", "/contacts?group=Design"), ("Marketing", "/contacts?group=Marketing"), ("Leadership", "/contacts?group=Leadership")] %}
+  {% set tabs = [("All", "/contacts"), ("Engineering", "/contacts?group=Engineering"), ("Design", "/contacts?group=Design"), ("Marketing", "/contacts?group=Marketing"), ("Leadership", "/contacts?group=Leadership")] %}
   {% for tab_label, tab_href in tabs %}
-  {% let is_active = (tab_label == active_group) or (tab_label == "All" and not active_group) %}
-  {% let tab_count = total_count if tab_label == "All" else group_counts.get(tab_label, 0) %}
+  {% set is_active = (tab_label == active_group) or (tab_label == "All" and not active_group) %}
+  {% set tab_count = total_count if tab_label == "All" else group_counts.get(tab_label, 0) %}
   {{ btn(
     tab_label ~ " (" ~ tab_count ~ ")",
     variant="primary" if is_active else "ghost", size="sm",

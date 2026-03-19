@@ -147,7 +147,7 @@
   {{ sse_scope("/events") }}
 
   {% block order_row %}
-  {% if order is defined %}
+  {% if (order ?? none) %}
   <tr id="order-{{ order.id }}" class="new-order" hx-swap-oob="afterbegin:#orders">
     <td>{{ order.id }}</td>
     <td>{{ order.customer }}</td>

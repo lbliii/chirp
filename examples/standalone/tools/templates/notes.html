@@ -143,7 +143,7 @@
   </div>
 
   {% block activity_row %}
-  {% if event is defined %}
+  {% if (event ?? none) %}
   <div class="activity-item">
     <div class="activity-header">
       <span class="tool-name">{{ event.tool_name }}</span>

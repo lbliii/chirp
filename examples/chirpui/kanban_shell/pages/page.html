@@ -19,7 +19,7 @@
     <div id="board-stats" class="kanban-stats chirpui-cluster chirpui-cluster--sm">
       {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
       {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
-      {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+      {% set assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
       {{ stat(value=assignees | length, label="People", icon="user") }}
     </div>
     {% end %}
@@ -39,7 +39,7 @@
       {% end %}
 
       <h3>Assignee</h3>
-      {% let all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
+      {% set all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
       {% unless all_assignees %}
       <p class="chirpui-text-muted">No assignees.</p>
       {% end %}
@@ -54,7 +54,7 @@
       {% end %}
 
       <h3>Tags</h3>
-      {% let all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
+      {% set all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
       {% unless all_tags %}
       <p class="chirpui-text-muted">No tags yet.</p>
       {% end %}
@@ -73,7 +73,7 @@
       {% block board %}
       <div id="board" class="kanban-board">
         {% for col_id, col_name in columns %}
-          {% let col_tasks = board.get(col_id, []) %}
+          {% set col_tasks = board.get(col_id, []) %}
           {% call column(col_id, col_name, col_tasks | length, oob=false) %}
             {% unless col_tasks %}
               {% call empty_state(icon="◇", title="No tasks") %}
@@ -91,7 +91,7 @@
       {% end %}
 
       {% block add_form %}
-      {% let form_errors = errors ?? none %}
+      {% set form_errors = errors ?? none %}
       {% call modal("new-task-modal", title="New Task") %}
       <form id="add-form" class="chirpui-stack chirpui-stack--sm" hx-post="/tasks" hx-swap="none"
             hx-indicator="#board-spinner" hx-disabled-elt="find button"
@@ -185,16 +185,16 @@ document.body.addEventListener("click", function(event) {
 
 {# Fragment blocks for OOB #}
 {% fragment header_stats_oob %}
-{% if all_tasks is defined %}
+{% if (all_tasks ?? none) %}
   {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
   {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
-  {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+  {% set assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
   {{ stat(value=assignees | length, label="People", icon="user") }}
 {% end %}
 {% endfragment %}
 
 {% fragment column_innards %}
-{% if column_id is defined %}
+{% if (column_id ?? none) %}
   <div class="kanban-column__header">
     <h3>{{ column_name }}</h3>
     <span class="kanban-column__count">{{ tasks | length }}</span>
@@ -215,7 +215,7 @@ document.body.addEventListener("click", function(event) {
 {% endfragment %}
 
 {% fragment task_card_block %}
-{% if task is defined %}
+{% if (task ?? none) %}
 {{ task_card(task, oob=true, me=current_user) }}
 {% end %}
 {% endfragment %}
@@ -224,7 +224,7 @@ document.body.addEventListener("click", function(event) {
    so they can be yielded without a Fragment target and still route
    correctly via the sse-swap="fragment" listener. #}
 {% fragment column_block_oob %}
-{% if column_id is defined %}
+{% if (column_id ?? none) %}
 {% call column(column_id, column_name, tasks | length, oob=true) %}
   {% unless tasks %}
     {% call empty_state(icon="◇", title="No tasks") %}
@@ -241,11 +241,11 @@ document.body.addEventListener("click", function(event) {
 {% endfragment %}
 
 {% fragment stats_block_oob %}
-{% if all_tasks is defined %}
+{% if (all_tasks ?? none) %}
 <div id="board-stats" class="kanban-stats chirpui-cluster chirpui-cluster--sm" hx-swap-oob="true">
   {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
   {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
-  {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+  {% set assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
   {{ stat(value=assignees | length, label="People", icon="user") }}
 </div>
 {% end %}

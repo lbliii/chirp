@@ -98,7 +98,7 @@
 {% endblock %}
 
 {% block contact_row %}
-{% if contact is defined %}
+{% if (contact ?? none) %}
 <tr id="contact-{{ contact.id }}">
   <td>{{ contact.name }}</td>
   <td>{{ contact.email }}</td>
@@ -112,7 +112,7 @@
 
 {% block edit_row %}
 {% set errors = errors ?? {} %}
-{% if contact is defined %}
+{% if (contact ?? none) %}
 <tr id="contact-{{ contact.id }}">
   <td>
     <input type="text" name="name" value="{{ contact.name }}" form="edit-{{ contact.id }}">

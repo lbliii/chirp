@@ -1,7 +1,7 @@
 {% from "chirpui/forms.html" import text_field, textarea_field, select_field %}
 
 {% block edit_form %}
-{% let form_errors = errors ?? none %}
+{% set form_errors = errors ?? none %}
 <form id="task-{{ task.id }}" class="kanban-edit-form"
       hx-put="/tasks/{{ task.id }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
   {{ text_field("title", value=task.title, label="Title", errors=form_errors, required=true) }}

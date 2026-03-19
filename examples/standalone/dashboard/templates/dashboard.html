@@ -78,7 +78,7 @@
   {{ sse_scope("/events") }}
 
   {% block sensor_card %}
-  {% if reading is defined %}
+  {% if (reading ?? none) %}
   <div id="sensor-{{ reading.sensor_id }}" class="card" hx-swap-oob="outerHTML">
     <h3>{{ reading.location }}</h3>
     <div class="temp">{{ reading.temp_c | round(1) }}&deg;C</div>

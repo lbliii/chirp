@@ -1,6 +1,8 @@
 """Hypermedia contracts checker orchestration."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from kida import Environment
 
 from chirp.routing.router import _route_path_has_flask_syntax
 
@@ -56,7 +58,7 @@ if TYPE_CHECKING:
 
 def _route_prepass(
     router: object,
-    kida_env: Any,
+    kida_env: Environment | None,
     result: CheckResult,
 ) -> tuple[set[str], set[str]]:
     """Single pass over router.routes. Returns (referenced_templates, referenced_route_paths)."""

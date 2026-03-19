@@ -153,8 +153,8 @@
 {% end %}
 
 {% def stat_bar(label, val) %}
-{% let pct = val * 100 // 160 %}
-{% let color = "" %}
+{% set pct = val * 100 // 160 %}
+{% set color = "" %}
 {% match true %}
   {% case val >= 100 %}{% set color = "#e94560" %}
   {% case val >= 70 %}{% set color = "#f8d030" %}
@@ -204,14 +204,14 @@
             hx-get="/" hx-target="#main" hx-push-url="true"
             hx-vals='{"view": "list"}'>List View</button>
   </div>
-  <span class="count">{{ total ?? "" }}{{ " Pokemon" if total is defined else "" }}</span>
+  <span class="count">{{ total ?? "" }}{{ " Pokemon" if (total ?? none) else "" }}</span>
 </div>
 
 <div id="main">
 {# ── Detail view ────────────────────────────────────────────────── #}
 
 {% block pokemon_detail %}
-{% if detail is defined and detail %}
+{% if (detail ?? none) %}
 <div class="grid-container" style="margin-top: 1.5rem;">
   <a href="/" class="back-link" hx-get="/" hx-target="#main" hx-push-url="true">&larr; Back to all</a>
   <div class="detail">
@@ -288,7 +288,7 @@
   </div>
 
   {% if total_pages > 1 %}
-  {% let base = "" %}
+  {% set base = "" %}
   {% if current_type %}{% set base = "&type=" + current_type %}{% end %}
   {% if search %}{% set base = base + "&q=" + search %}{% end %}
 
