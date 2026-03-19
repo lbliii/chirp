@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
@@ -87,7 +88,7 @@ def _collect_builtin_middleware(
 
 def _compile_routes(
     pending_routes: list,
-    providers: object,
+    providers: dict[type, Callable[..., Any]] | None,
 ) -> Router:
     """Build router from pending routes."""
     router = Router()
@@ -99,7 +100,7 @@ def _compile_routes(
         )
         invoke_plan = compile_invoke_plan(
             pending.handler,
-            providers or None,
+            providers,
             path_param_names=path_param_names,
             inline=pending.inline,
         )

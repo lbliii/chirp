@@ -7,10 +7,10 @@ from kida import Environment, FileSystemLoader
 
 from chirp.http.request import Request
 from chirp.pages.types import LayoutChain, LayoutInfo
+from chirp.server.negotiation_oob import compute_shell_region_updates
 from chirp.templating.composition import PageComposition
 from chirp.templating.kida_adapter import KidaAdapter
 from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
-from chirp.server.negotiation_oob import compute_shell_region_updates
 from chirp.templating.render_plan import (
     build_layout_contract,
     build_render_plan,

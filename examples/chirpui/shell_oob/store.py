@@ -1,7 +1,7 @@
 """In-memory store for the settings console example."""
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -85,7 +85,7 @@ def dashboard_stats() -> dict[str, object]:
     with _lock:
         total = len(_settings)
         enabled = sum(1 for s in _settings if s.enabled)
-        categories = len(set(s.category for s in _settings))
+        categories = len({s.category for s in _settings})
         return {
             "total_settings": total,
             "enabled_count": enabled,

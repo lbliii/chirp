@@ -24,5 +24,5 @@ PYTHONPATH=src python examples/chirpui/sortable_reorder/app.py
 ## Pattern
 
 See [chirp-ui DND-FRAGMENT-ISLAND.md](https://github.com/b-stack/chirp-ui/blob/main/docs/DND-FRAGMENT-ISLAND.md)
-and Chirp's [htmx-patterns.md](../../site/content/docs/tutorials/htmx-patterns.md)
+and Chirp's [htmx-patterns.md](../../../site/content/docs/tutorials/htmx-patterns.md)
 for the full pattern.

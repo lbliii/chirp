@@ -3,6 +3,7 @@
 -#}
 
 {% block edit_form %}
+{% set errors = errors ?? {} %}
 {% from "components/_field.html" import field %}
 <form id="task-{{ task.id }}" class="card edit-mode"
       hx-put="/tasks/{{ task.id }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
@@ -24,7 +25,7 @@
   {{ field("assignee", "Assignee", value=task?.assignee ?? "", placeholder="Name (optional)", required=false) }}
   {{ field("tags", "Tags", value=task.tags | join(", "), placeholder="Comma-separated", required=false) }}
 
-  {% if errors is defined and errors %}
+  {% if errors %}
   <ul class="form-errors">
     {% for fld, msgs in errors.items() %}
       {% for msg in msgs %}

@@ -26,7 +26,7 @@ Use `examples/chirpui` when you want to learn or validate:
 Run examples from the repo root so local `src/chirp` is always used:
 
 ```bash
-cd /Users/llane/Documents/github/python/b-stack/chirp
+# From the repo root:
 source .venv/bin/activate
 PYTHONPATH=src python examples/standalone/hello/app.py
 ```
@@ -34,7 +34,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 For ChirpUI examples:
 
 ```bash
-cd /Users/llane/Documents/github/python/b-stack/chirp
+# From the repo root:
 source .venv/bin/activate
 PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 ```
@@ -42,8 +42,7 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 If you also need the local `pounce` checkout rather than an installed package:
 
 ```bash
-PYTHONPATH=src:/Users/llane/Documents/github/python/b-stack/pounce/src \
-  PYTHONPATH=src python examples/standalone/ollama/app.py
+PYTHONPATH=src:../pounce/src python examples/standalone/ollama/app.py
 ```
 
 ## Pairings

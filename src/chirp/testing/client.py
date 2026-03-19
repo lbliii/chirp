@@ -25,9 +25,8 @@ async def _worker_lifecycle_receive() -> dict[str, Any]:
     return {"type": "http.disconnect"}
 
 
-async def _worker_lifecycle_send(message: dict[str, Any]) -> None:
+async def _worker_lifecycle_send(message: MutableMapping[str, Any]) -> None:
     """No-op send for worker startup/shutdown."""
-    pass
 
 
 class TestClient:

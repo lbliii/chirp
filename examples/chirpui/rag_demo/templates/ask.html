@@ -56,7 +56,7 @@
          hx-disinherit="hx-target hx-swap"
          aria-label="Question and answer">
   <header class="chirpui-card__header">
-    {% call message_bubble(align="right", role="user") %}
+    {% call message_bubble(align="right") %}
     <span class="chirpui-text-muted chirpui-font-sm">Question</span>
     <p class="chirpui-font-lg" style="margin: 0;">{{ question }}</p>
     <button type="button" class="chirpui-copy-btn" title="Refine this question"
@@ -67,7 +67,7 @@
   </header>
   <div class="chirpui-card__body chirpui-stack chirpui-stack--lg">
     {% block sources %}{% end %}
-    {% call message_bubble(align="left", role="assistant") %}
+    {% call message_bubble(align="left") %}
       <span class="chirpui-text-muted chirpui-font-sm">Answer</span>
       <div sse-swap="answer" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Searching docs and generating answer…</span>

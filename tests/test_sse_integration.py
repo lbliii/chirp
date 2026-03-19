@@ -510,6 +510,15 @@ class TestSSEPerEventErrorBoundary:
         def submit():
             return "ok"
 
+        # Stub routes to satisfy chirp check scanning boundary/chirpui_index.html
+        @app.route("/chat", methods=["POST"])
+        def chat():
+            return "ok"
+
+        @app.route("/stream")
+        def stream():
+            return "ok"
+
         @app.route("/events")
         def events():
             async def gen():

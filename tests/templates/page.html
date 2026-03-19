@@ -2,7 +2,8 @@
 <head><title>{{ title }}</title></head>
 <body>
 <h1>{{ title }}</h1>
-{% if items is defined and items %}
+{% set items = items | default([]) %}
+{% if items %}
 <ul>
 {% for item in items %}
   <li>{{ item }}</li>

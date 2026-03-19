@@ -53,6 +53,8 @@
 
 <div id="form-section">
 {% block contact_form %}
+{% set errors = errors ?? {} %}
+{% set form = form ?? None %}
 <form class="add-form" hx-post="/contacts" hx-target="#contact-table" hx-swap="outerHTML"
       hx-validate="true" hx-disabled-elt="find button"
       hx-on::after-request="if(event.detail.successful) this.reset()">
@@ -60,7 +62,7 @@
   <input type="email" name="email" placeholder="Email" value="{{ form?.email ?? '' }}">
   <button type="submit">Add</button>
 </form>
-{% for field, msgs in (errors ?? {}).items() %}
+{% for field, msgs in errors.items() %}
   {% for msg in msgs %}
   <ul class="errors"><li>{{ field }}: {{ msg }}</li></ul>
   {% end %}
@@ -109,17 +111,18 @@
 {% endblock %}
 
 {% block edit_row %}
+{% set errors = errors ?? {} %}
 {% if contact is defined %}
 <tr id="contact-{{ contact.id }}">
   <td>
     <input type="text" name="name" value="{{ contact.name }}" form="edit-{{ contact.id }}">
-    {% for msg in (errors ?? {}).get("name", []) %}
+    {% for msg in errors.get("name", []) %}
     <ul class="errors"><li>{{ msg }}</li></ul>
     {% end %}
   </td>
   <td>
     <input type="email" name="email" value="{{ contact.email }}" form="edit-{{ contact.id }}">
-    {% for msg in (errors ?? {}).get("email", []) %}
+    {% for msg in errors.get("email", []) %}
     <ul class="errors"><li>{{ msg }}</li></ul>
     {% end %}
   </td>

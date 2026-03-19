@@ -150,7 +150,9 @@ def reseed() -> None:
     with _lock:
         _tasks.clear()
         _next_id = 1
-    _event_queue.clear()
+    with _event_condition:
+        _event_queue.clear()
+        _event_condition.notify_all()
     _seed()
 
 
@@ -238,13 +240,16 @@ def notify(affected_columns: tuple[str, ...]) -> None:
 
 def wait_for_event(timeout: float = 15.0) -> BoardEvent | None:
     """Block until an event is available or timeout. Returns None on timeout."""
+    import time
+
+    deadline = time.monotonic() + timeout
     with _event_condition:
-        if _event_queue:
-            return _event_queue.popleft()
-        _event_condition.wait(timeout=timeout)
-        if _event_queue:
-            return _event_queue.popleft()
-        return None
+        while not _event_queue:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            _event_condition.wait(timeout=remaining)
+        return _event_queue.popleft()
 
 
 def validate_task(title: str, status: str, priority: str) -> dict[str, list[str]]:

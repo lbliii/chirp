@@ -47,8 +47,7 @@ def _extends_ancestors(start: str, template_sources: dict[str, str]) -> set[str]
         if name in ancestors or name not in template_sources:
             continue
         ancestors.add(name)
-        for m in _EXTENDS_PATTERN.finditer(template_sources[name]):
-            queue.append(m.group(1))
+        queue.extend(m.group(1) for m in _EXTENDS_PATTERN.finditer(template_sources[name]))
     return ancestors
 
 
@@ -131,8 +130,7 @@ def check_swap_safety(
             relevant_selects: list[str] = []
             for ancestor, selects in broad_selects_map.items():
                 if ancestor in ancestors:
-                    for sel in selects:
-                        relevant_selects.append(f'"{sel}" ({ancestor})')
+                    relevant_selects.extend(f'"{sel}" ({ancestor})' for sel in selects)
             if not relevant_selects:
                 continue
             selects_text = ", ".join(sorted(relevant_selects))

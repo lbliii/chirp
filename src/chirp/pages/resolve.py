@@ -30,7 +30,7 @@ from chirp.pages.shell_actions import (
 
 def _invoke_provider_factory(
     factory: Callable[..., Any],
-    request: Request,
+    request: object,
     cascade_ctx: dict[str, Any],
 ) -> Any:
     """Call a service provider factory, injecting request/cascade_ctx if requested."""
