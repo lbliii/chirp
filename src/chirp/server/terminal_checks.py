@@ -192,7 +192,10 @@ def format_check_result(
 
     route_shown = False
     for issue_group in (errors, warnings, infos):
-        if any(getattr(i, "category", "") == "route_contract" for i in issue_group) and not route_shown:
+        if (
+            any(getattr(i, "category", "") == "route_contract" for i in issue_group)
+            and not route_shown
+        ):
             lines.append(f"  {c.cyan}Route contract{c.reset}")
             lines.append("")
             route_shown = True

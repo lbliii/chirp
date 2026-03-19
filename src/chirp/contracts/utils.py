@@ -19,9 +19,7 @@ def closest_match(target: str, values: set[str], *, max_dist: int) -> str | None
     """Return closest string within max_dist, or None."""
     if not values:
         return None
-    best_dist, best = min(
-        (edit_distance(target, c), c) for c in values
-    )
+    best_dist, best = min((edit_distance(target, c), c) for c in values)
     return best if best_dist <= max_dist else None
 
 

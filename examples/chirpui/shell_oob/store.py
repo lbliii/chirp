@@ -22,14 +22,62 @@ class ActivityEntry:
 
 
 _SEED_SETTINGS = [
-    Setting("dark_mode", "Dark Mode", "Enable dark theme across the app", enabled=True, category="Appearance"),
-    Setting("notifications", "Email Notifications", "Receive email alerts for team changes", enabled=True, category="Notifications"),
-    Setting("slack_alerts", "Slack Alerts", "Post activity to #team-updates channel", enabled=False, category="Notifications"),
-    Setting("two_factor", "Two-Factor Auth", "Require 2FA for all team members", enabled=True, category="Security"),
-    Setting("audit_log", "Audit Logging", "Log all admin actions for compliance", enabled=True, category="Security"),
-    Setting("api_access", "API Access", "Allow external API integrations", enabled=False, category="Integrations"),
-    Setting("auto_backup", "Auto Backup", "Daily automatic data backups", enabled=True, category="General"),
-    Setting("maintenance", "Maintenance Mode", "Show maintenance banner to users", enabled=False, category="General"),
+    Setting(
+        "dark_mode",
+        "Dark Mode",
+        "Enable dark theme across the app",
+        enabled=True,
+        category="Appearance",
+    ),
+    Setting(
+        "notifications",
+        "Email Notifications",
+        "Receive email alerts for team changes",
+        enabled=True,
+        category="Notifications",
+    ),
+    Setting(
+        "slack_alerts",
+        "Slack Alerts",
+        "Post activity to #team-updates channel",
+        enabled=False,
+        category="Notifications",
+    ),
+    Setting(
+        "two_factor",
+        "Two-Factor Auth",
+        "Require 2FA for all team members",
+        enabled=True,
+        category="Security",
+    ),
+    Setting(
+        "audit_log",
+        "Audit Logging",
+        "Log all admin actions for compliance",
+        enabled=True,
+        category="Security",
+    ),
+    Setting(
+        "api_access",
+        "API Access",
+        "Allow external API integrations",
+        enabled=False,
+        category="Integrations",
+    ),
+    Setting(
+        "auto_backup",
+        "Auto Backup",
+        "Daily automatic data backups",
+        enabled=True,
+        category="General",
+    ),
+    Setting(
+        "maintenance",
+        "Maintenance Mode",
+        "Show maintenance banner to users",
+        enabled=False,
+        category="General",
+    ),
 ]
 
 _lock = threading.Lock()
@@ -40,9 +88,13 @@ _activity: list[ActivityEntry] = []
 def reset() -> None:
     with _lock:
         _settings.clear()
-        _settings.extend(Setting(s.key, s.label, s.description, s.enabled, s.category) for s in _SEED_SETTINGS)
+        _settings.extend(
+            Setting(s.key, s.label, s.description, s.enabled, s.category) for s in _SEED_SETTINGS
+        )
         _activity.clear()
-        _activity.append(ActivityEntry("System initialized", datetime.now().strftime("%H:%M"), icon="star"))
+        _activity.append(
+            ActivityEntry("System initialized", datetime.now().strftime("%H:%M"), icon="star")
+        )
 
 
 def get_settings() -> list[Setting]:

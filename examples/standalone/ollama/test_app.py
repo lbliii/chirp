@@ -82,7 +82,7 @@ class TestRoutes:
     async def test_index_model_selector_avoids_js_hx_vals(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")
-            assert 'hx-vals=' not in response.text
+            assert "hx-vals=" not in response.text
 
     async def test_clear_resets_conversation(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -358,6 +358,7 @@ class TestChatNonStreaming:
                 headers={"content-type": "application/x-www-form-urlencoded"},
             )
             assert "get_current_time" in response.text
+
 
 # -------------------------------------------------------------------------
 # Streaming chat tests

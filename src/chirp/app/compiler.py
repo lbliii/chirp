@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
@@ -25,9 +26,7 @@ def _collect_builtin_middleware(
             from chirp.middleware.static import StaticFiles
 
             prefix = config.static_url.strip("/") or "static"
-            middleware_list.append(
-                StaticFiles(directory=str(static_path), prefix=f"/{prefix}")
-            )
+            middleware_list.append(StaticFiles(directory=str(static_path), prefix=f"/{prefix}"))
     if config.safe_target:
         from chirp.middleware.inject import HTMLInject
         from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET
@@ -87,19 +86,17 @@ def _collect_builtin_middleware(
 
 def _compile_routes(
     pending_routes: list,
-    providers: object,
+    providers: dict[type, Callable[..., Any]],
 ) -> Router:
     """Build router from pending routes."""
     router = Router()
     for pending in pending_routes:
         methods = frozenset(m.upper() for m in (pending.methods or ["GET"]))
         segments = parse_path(pending.path)
-        path_param_names = frozenset(
-            s.param_name for s in segments if s.is_param and s.param_name
-        )
+        path_param_names = frozenset(s.param_name for s in segments if s.is_param and s.param_name)
         invoke_plan = compile_invoke_plan(
             pending.handler,
-            providers if providers else None,
+            providers,
             path_param_names=path_param_names,
             inline=pending.inline,
         )
