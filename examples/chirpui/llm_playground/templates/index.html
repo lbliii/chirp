@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from "chirpui/layout.html" import container, grid, stack, cluster, section_header %}
+{% from "chirpui/empty.html" import empty_state %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/forms.html" import form_actions, select_field, textarea_field %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% call container() %}
+{% call stack(gap="lg") %}
+{% call surface(variant="muted") %}
+{% call stack(gap="sm") %}
+  {% call cluster(gap="sm") %}
+  <h1 style="flex:1;">LLM Playground</h1>
+  {{ theme_toggle() }}
+  {% end %}
+  <p class="chirpui-text-muted">
+    Two models. One prompt. Zero JavaScript.
+  </p>
+  <p class="chirpui-text-muted chirpui-font-sm">
+    Streaming responses side-by-side. Built with chirp-ui — HTML over the wire, CSS without apology.
+  </p>
+{% end %}
+{% end %}
+
+{% call surface(variant="elevated") %}
+{% call stack(gap="lg") %}
+<form class="chirpui-form"
+      hx-post="/ask"
+      hx-target="#results"
+      hx-swap="innerHTML"
+      aria-label="Compare models">
+  {% call stack(gap="lg") %}
+  {{ section_header("Choose Models") }}
+  {% call grid(cols=2, gap="md") %}
+    {{ select_field("model_a", model_options, selected=default_model, label="Model A", required=true) }}
+    {{ select_field("model_b", model_options, selected=(default_model_b ?? ""), label="Model B", required=true) }}
+  {% end %}
+  {{ textarea_field("prompt", label="Prompt", rows=4, placeholder="Ask anything. Both models will race to answer.", required=true) }}
+  {% call form_actions() %}
+    {{ btn("Compare", variant="primary", type="submit") }}
+  {% end %}
+  {% end %}
+</form>
+{% end %}
+{% end %}
+
+<section id="results" aria-label="Model comparison">
+  {% call empty_state(icon="◇", title="Ready to compare") %}
+  <p>Pick two models, enter a prompt, and hit Compare. Watch them stream side-by-side.</p>
+  {% end %}
+</section>
+{% end %}
+{% end %}
+{% end %}

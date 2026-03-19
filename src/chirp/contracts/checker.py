@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING
 from chirp.routing.router import _route_path_has_flask_syntax
 
 from .declarations import FragmentContract, SSEContract
-from .routes import attr_to_method, collect_route_paths, path_matches_route
+from .routes import (
+    attr_to_method,
+    build_route_index,
+    collect_route_paths,
+    find_matching_route,
+)
 from .rules_accessibility import check_accessibility
 from .rules_forms import validate_form_contracts
 from .rules_htmx import (
@@ -31,9 +36,10 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
-from .rules_swap import check_swap_safety, collect_broad_targets
+from .rules_swap import check_swap_safety, collect_broad_selects, collect_broad_targets
 from .template_scan import (
     extract_fragment_island_ids,
+    extract_ids_with_disinherit,
     extract_legacy_action_contracts,
     extract_static_ids,
     extract_targets_from_source,
@@ -46,6 +52,109 @@ from .types import CheckResult, ContractIssue, Severity
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
+
+
+def _route_prepass(
+    router: object,
+    kida_env: object,
+    result: CheckResult,
+) -> tuple[set[str], set[str]]:
+    """Single pass over router.routes. Returns (referenced_templates, referenced_route_paths)."""
+    referenced_templates: set[str] = set()
+    referenced_route_paths: set[str] = set()
+    routes = getattr(router, "routes", [])
+
+    for route in routes:
+        path = getattr(route, "path", "")
+        if _route_path_has_flask_syntax(path):
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="routing",
+                    message=(
+                        f"Route path uses '<param>' but Chirp expects '{{param}}'. "
+                        f"Got: {path!r}. See docs/routing/routes.md"
+                    ),
+                    route=path,
+                )
+            )
+        if getattr(route, "referenced", False):
+            referenced_route_paths.add(path)
+        template = getattr(route, "template", None)
+        if template is not None:
+            referenced_templates.add(template)
+        contract = getattr(route.handler, "_chirp_contract", None)
+        if contract is None:
+            continue
+        returns = getattr(contract, "returns", None)
+        if isinstance(returns, FragmentContract):
+            referenced_templates.add(returns.template)
+            if kida_env is not None:
+                try:
+                    tmpl = kida_env.get_template(returns.template)
+                    blocks = tmpl.block_metadata()
+                    if returns.block not in blocks:
+                        result.issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="fragment",
+                                message=(
+                                    f"Route '{path}' declares fragment "
+                                    f"block '{returns.block}' but template "
+                                    f"'{returns.template}' has no such block."
+                                ),
+                                route=path,
+                                template=returns.template,
+                            )
+                        )
+                except Exception:
+                    result.issues.append(
+                        ContractIssue(
+                            severity=Severity.ERROR,
+                            category="fragment",
+                            message=(
+                                f"Route '{path}' references template "
+                                f"'{returns.template}' which could not be loaded."
+                            ),
+                            route=path,
+                            template=returns.template,
+                        )
+                    )
+        elif isinstance(returns, SSEContract) and kida_env is not None:
+            for frag in returns.fragments:
+                referenced_templates.add(frag.template)
+                result.sse_fragments_validated += 1
+                try:
+                    tmpl = kida_env.get_template(frag.template)
+                    blocks = tmpl.block_metadata()
+                    if frag.block not in blocks:
+                        result.issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="sse",
+                                message=(
+                                    f"SSE route '{path}' yields Fragment "
+                                    f"'{frag.template}':'{frag.block}' "
+                                    "but block doesn't exist."
+                                ),
+                                route=path,
+                                template=frag.template,
+                            )
+                        )
+                except Exception:
+                    result.issues.append(
+                        ContractIssue(
+                            severity=Severity.ERROR,
+                            category="sse",
+                            message=(
+                                f"SSE route '{path}' yields Fragment "
+                                f"'{frag.template}' which could not be loaded."
+                            ),
+                            route=path,
+                            template=frag.template,
+                        )
+                    )
+    return referenced_templates, referenced_route_paths
 
 
 def _build_snapshot(app: App) -> ContractCheckSnapshot:
@@ -95,97 +204,21 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     route_paths = collect_route_paths(router)
     result.routes_checked = len(route_paths)
 
-    for route in router.routes:
-        if _route_path_has_flask_syntax(route.path):
-            result.issues.append(
-                ContractIssue(
-                    severity=Severity.ERROR,
-                    category="routing",
-                    message=(
-                        f"Route path uses '<param>' but Chirp expects '{{param}}'. "
-                        f"Got: {route.path!r}. See docs/routing/routes.md"
-                    ),
-                    route=route.path,
-                )
-            )
-
-    for route in router.routes:
-        contract = getattr(route.handler, "_chirp_contract", None)
-        if contract is None:
-            continue
-        if isinstance(contract.returns, FragmentContract):
-            fragment_contract = contract.returns
-            if kida_env is not None:
-                try:
-                    template = kida_env.get_template(fragment_contract.template)
-                    blocks = template.block_metadata()
-                    if fragment_contract.block not in blocks:
-                        result.issues.append(
-                            ContractIssue(
-                                severity=Severity.ERROR,
-                                category="fragment",
-                                message=(
-                                    f"Route '{route.path}' declares fragment "
-                                    f"block '{fragment_contract.block}' but template "
-                                    f"'{fragment_contract.template}' has no such block."
-                                ),
-                                route=route.path,
-                                template=fragment_contract.template,
-                            )
-                        )
-                except Exception:
-                    result.issues.append(
-                        ContractIssue(
-                            severity=Severity.ERROR,
-                            category="fragment",
-                            message=(
-                                f"Route '{route.path}' references template "
-                                f"'{fragment_contract.template}' which could not be loaded."
-                            ),
-                            route=route.path,
-                            template=fragment_contract.template,
-                        )
-                    )
-        elif isinstance(contract.returns, SSEContract) and kida_env is not None:
-            for fragment_contract in contract.returns.fragments:
-                result.sse_fragments_validated += 1
-                try:
-                    template = kida_env.get_template(fragment_contract.template)
-                    blocks = template.block_metadata()
-                    if fragment_contract.block not in blocks:
-                        result.issues.append(
-                            ContractIssue(
-                                severity=Severity.ERROR,
-                                category="sse",
-                                message=(
-                                    f"SSE route '{route.path}' yields Fragment "
-                                    f"'{fragment_contract.template}':'{fragment_contract.block}' "
-                                    "but block doesn't exist."
-                                ),
-                                route=route.path,
-                                template=fragment_contract.template,
-                            )
-                        )
-                except Exception:
-                    result.issues.append(
-                        ContractIssue(
-                            severity=Severity.ERROR,
-                            category="sse",
-                            message=(
-                                f"SSE route '{route.path}' yields Fragment "
-                                f"'{fragment_contract.template}' which could not be loaded."
-                            ),
-                            route=route.path,
-                            template=fragment_contract.template,
-                        )
-                    )
-
+    referenced_templates_from_routes, referenced_route_paths = _route_prepass(
+        router, kida_env, result
+    )
     check_inline_templates(router, result)
 
     if kida_env is not None and kida_env.loader is not None:
         template_sources = load_template_sources(kida_env)
         result.templates_scanned = len(template_sources)
         referenced_paths: set[str] = set()
+        static_routes, parametric_routes = build_route_index(route_paths)
+
+        all_ids: set[str] = set()
+        static_ids: set[str] = set()
+        ids_with_disinherit: set[str] = set()
+        referenced_templates_from_sources: set[str] = set()
 
         for template_name, source in template_sources.items():
             if template_name.startswith("chirpui/"):
@@ -209,27 +242,25 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 if attr_name == "action" and not url.startswith("/"):
                     continue
                 method = attr_to_method(attr_name, method_override)
-                matched = False
-                for route_path, methods in route_paths.items():
-                    if path_matches_route(url, route_path):
-                        referenced_paths.add(route_path)
-                        if method not in methods:
-                            result.issues.append(
-                                ContractIssue(
-                                    severity=Severity.ERROR,
-                                    category="method",
-                                    message=(
-                                        f"'{attr_name}=\"{url}\"' uses {method} "
-                                        f"but route '{route_path}' only allows "
-                                        f"{', '.join(sorted(methods))}."
-                                    ),
-                                    template=template_name,
-                                    route=route_path,
-                                )
+                match = find_matching_route(url, static_routes, parametric_routes)
+                if match is not None:
+                    matched_route, methods = match
+                    referenced_paths.add(matched_route)
+                    if method not in methods:
+                        result.issues.append(
+                            ContractIssue(
+                                severity=Severity.ERROR,
+                                category="method",
+                                message=(
+                                    f"'{attr_name}=\"{url}\"' uses {method} "
+                                    f"but route '{matched_route}' only allows "
+                                    f"{', '.join(sorted(methods))}."
+                                ),
+                                template=template_name,
+                                route=matched_route,
                             )
-                        matched = True
-                        break
-                if not matched:
+                        )
+                else:
                     result.issues.append(
                         ContractIssue(
                             severity=Severity.ERROR,
@@ -238,19 +269,27 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                             template=template_name,
                         )
                     )
-
-        all_ids: set[str] = set()
-        for source in template_sources.values():
-            all_ids.update(extract_static_ids(source))
+            s = extract_static_ids(source)
+            static_ids.update(s)
+            all_ids.update(s)
             all_ids.update(extract_fragment_island_ids(source))
             all_ids.update(extract_wizard_form_ids(source))
+            ids_with_disinherit.update(extract_ids_with_disinherit(source))
+            referenced_templates_from_sources.update(extract_template_references(source))
+
         hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
         result.issues.extend(check_selector_syntax(template_sources))
         result.issues.extend(check_hx_boost(template_sources))
-        result.issues.extend(check_swap_safety(template_sources))
+        result.issues.extend(
+            check_swap_safety(
+                template_sources,
+                all_ids=static_ids,
+                all_ids_with_disinherit=ids_with_disinherit,
+            )
+        )
         result.issues.extend(check_sse_self_swap(template_sources))
         broad_targets = collect_broad_targets(template_sources)
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
@@ -272,8 +311,15 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 kida_env,
             )
         )
+        action_route_paths = {
+            r.url_path
+            for r in getattr(snapshot, "discovered_routes", [])
+            if getattr(r, "kind", None) == "action"
+        }
         result.issues.extend(
-            check_route_file_consistency(snapshot.route_metas, snapshot.page_route_paths)
+            check_route_file_consistency(
+                snapshot.route_metas, snapshot.page_route_paths, action_route_paths
+            )
         )
         result.issues.extend(check_duplicate_routes(getattr(snapshot, "discovered_routes", [])))
         result.issues.extend(check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths))
@@ -295,9 +341,6 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(validate_form_contracts(result, router, template_sources))
 
         page_route_paths = snapshot.page_route_paths
-        referenced_route_paths: set[str] = {
-            route.path for route in router.routes if getattr(route, "referenced", False)
-        }
         for route_path in route_paths:
             if route_path in referenced_paths or route_path == "/":
                 continue
@@ -318,22 +361,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             )
 
         all_template_names = set(template_sources)
-        referenced_templates: set[str] = set()
-        for route in router.routes:
-            template = getattr(route, "template", None)
-            if template is not None:
-                referenced_templates.add(template)
-            route_contract = getattr(route.handler, "_chirp_contract", None)
-            if route_contract is None:
-                continue
-            if isinstance(route_contract.returns, FragmentContract):
-                referenced_templates.add(route_contract.returns.template)
-            elif isinstance(route_contract.returns, SSEContract):
-                for fragment_contract in route_contract.returns.fragments:
-                    referenced_templates.add(fragment_contract.template)
-        for source in template_sources.values():
-            referenced_templates.update(extract_template_references(source))
-        referenced_templates.update(snapshot.page_templates)
+        referenced_templates = (
+            referenced_templates_from_routes
+            | referenced_templates_from_sources
+            | snapshot.page_templates
+        )
 
         dead = sorted(all_template_names - referenced_templates)
         for template_name in dead:

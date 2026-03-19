@@ -1,0 +1,27 @@
+{% from "chirpui/forms.html" import text_field, textarea_field, select_field %}
+
+{% block edit_form %}
+{% let form_errors = errors ?? none %}
+<form id="task-{{ task.id }}" class="kanban-edit-form"
+      hx-put="/tasks/{{ task.id }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
+  {{ text_field("title", value=task.title, label="Title", errors=form_errors, required=true) }}
+  {{ textarea_field("description", value=task.description or "", label="Description", rows=2, required=false) }}
+  {{ select_field("priority", options=[{"value": "low", "label": "Low"}, {"value": "medium", "label": "Medium"}, {"value": "high", "label": "High"}], selected=task.priority, label="Priority") }}
+  {{ text_field("assignee", value=task.assignee or "", label="Assignee", required=false, placeholder="Optional") }}
+  {{ text_field("tags", value=task.tags | join(", "), label="Tags", required=false, placeholder="Comma-separated") }}
+  {% if form_errors %}
+  <ul class="chirpui-form-errors">
+    {% for fld, msgs in form_errors.items() %}
+      {% for msg in msgs %}
+      <li>{{ fld | capitalize }}: {{ msg }}</li>
+      {% end %}
+    {% end %}
+  </ul>
+  {% end %}
+  <div class="kanban-edit-actions">
+    <button type="submit" class="chirpui-btn chirpui-btn--primary chirpui-btn--sm">Save</button>
+    <button type="button" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm"
+            hx-get="/filter" hx-target="#board" hx-swap="outerHTML" hx-include=".sidebar input">Cancel</button>
+  </div>
+</form>
+{% end %}

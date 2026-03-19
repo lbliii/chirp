@@ -1,0 +1,46 @@
+{% from "chirpui/layout.html" import container, stack, section_header_inline %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/badge.html" import badge %}
+{% from "chirpui/table.html" import table, row %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>Watchlist</h1>
+  <p class="chirpui-text-muted">Your tracked stocks. The ticker island below shows live prices — navigate away and back to see it remount with fresh state.</p>
+
+  {% call surface(variant="elevated") %}
+  {% call table(headers=["Symbol", "Name", "Price", "Change", "Volume"], striped=true) %}
+    {% for stock in stocks %}
+    {{ row(
+      "<strong>" ~ stock.symbol ~ "</strong>",
+      stock.name,
+      "$" ~ stock.price,
+      badge(("+" if stock.change > 0 else "") ~ stock.change, variant="success" if stock.change > 0 else "danger"),
+      stock.volume
+    ) }}
+    {% end %}
+  {% end %}
+  {% end %}
+
+  {% call surface(variant="elevated") %}
+  {% call stack(gap="sm") %}
+    {{ section_header_inline("Live Ticker") }} {{ badge("Island", variant="info") }}
+    <div{{ island_attrs("ticker", props={"stocks": stocks}, mount_id="ticker-root", src="/static/ticker.js") }}>
+      <div id="ticker-display" class="chirpui-cluster chirpui-cluster--sm">
+        {% for stock in stocks[:4] %}
+        <span>{{ stock.symbol }}: ${{ stock.price }}</span>
+        {% end %}
+      </div>
+      <p class="chirpui-text-muted chirpui-font-sm">Enable JavaScript for live updates</p>
+    </div>
+  {% end %}
+  {% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}

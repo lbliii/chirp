@@ -23,8 +23,8 @@ src/chirp/app.py:267-271 — shutdown hooks run inside _handle_lifespan()
 **The hackernews example demonstrates the problem:**
 
 ```
-examples/hackernews/app.py:232 — httpx.AsyncClient created in on_startup
-examples/hackernews/app.py:153 — worker uses client → RuntimeError (wrong loop)
+examples/standalone/hackernews/app.py:232 — httpx.AsyncClient created in on_startup
+examples/standalone/hackernews/app.py:153 — worker uses client → RuntimeError (wrong loop)
 ```
 
 ### Impact

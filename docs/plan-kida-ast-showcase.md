@@ -68,7 +68,7 @@ Chirp already uses Kida's `template_metadata()` in several places:
 | # | Task | File(s) | Effort |
 |---|------|---------|--------|
 | 2.1 | Use `meta.regions()` when available for OOB discovery | `src/chirp/templating/render_plan.py` | S |
-| 2.2 | Add `--show-metadata` or debug endpoint to shell_oob example | `examples/shell_oob/` | S |
+| 2.2 | Add `--show-metadata` or debug endpoint to shell_oob example | `examples/chirpui/shell_oob/` | S |
 
 ### Phase 3: Cross-Project
 

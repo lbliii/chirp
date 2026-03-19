@@ -10,8 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
-from chirp.pages.types import LayoutChain
+from chirp.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOB_BLOCK_SUFFIX, OOBRegistry
@@ -20,6 +19,7 @@ _log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
+    from chirp.pages.types import LayoutChain
     from chirp.templating.adapter import TemplateAdapter
 
 
@@ -85,7 +85,11 @@ def _resolve_fragment_block(
         config = fragment_target_registry.get(request.htmx_target)
         if config is not None:
             return config.fragment_block
-        registered_targets = sorted(fragment_target_registry.registered_targets)
+        registered_targets = (
+            sorted(fragment_target_registry.registered_targets)
+            if _log.isEnabledFor(logging.DEBUG)
+            else ()
+        )
         _log.debug(
             "Unregistered HX-Target %r; falling back to page_content. "
             "Register with app.register_fragment_target() or app.register_page_shell_contract() "
@@ -162,27 +166,6 @@ def _compute_layout_start_index(
     return idx
 
 
-def _triggers_shell_update(
-    request: Request | None,
-    fragment_target_registry: FragmentTargetRegistry | None,
-) -> bool:
-    """Whether this request should trigger shell OOB updates.
-
-    True for boosted navigation (sidebar clicks) and for fragment targets
-    with ``triggers_shell_update=True`` in the page shell contract (e.g.
-    tab nav targeting ``#page-root``). Returns False for history restore,
-    non-fragment requests, and narrow content swaps.
-    """
-    if not request or not request.is_fragment or request.is_history_restore:
-        return False
-    if request.is_boosted:
-        return True
-    if not request.htmx_target or not fragment_target_registry:
-        return False
-    config = fragment_target_registry.get(request.htmx_target)
-    return config is not None and config.triggers_shell_update
-
-
 def normalize_to_composition(value: Any) -> PageComposition | None:
     """Convert Page, LayoutPage, or PageComposition to PageComposition.
 
@@ -216,15 +199,9 @@ def build_render_plan(
     *,
     request: Request | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_region_updates: tuple[RegionUpdate, ...] = (),
 ) -> RenderPlan:
     """Build a render plan from composition and request headers."""
-    from chirp.pages.shell_actions import (
-        SHELL_ACTIONS_CONTEXT_KEY,
-        SHELL_ACTIONS_TARGET,
-        normalize_shell_actions,
-        shell_actions_fragment,
-    )
-
     layout_chain = composition.layout_chain
     htmx_target = request.htmx_target if request else None
     is_history_restore = request.is_history_restore if request else False
@@ -265,40 +242,11 @@ def build_render_plan(
         context=composition.context,
     )
 
-    # Build region updates from composition.regions + shell_actions in context
-    region_updates: list[RegionUpdate] = list(composition.regions)
+    # Build region updates from composition.regions + pre-computed shell updates
+    region_updates = tuple(list(composition.regions) + list(shell_region_updates))
 
-    # Shell update gate: True for boosted nav or fragment targets with
-    # triggers_shell_update=True (e.g. tab nav targeting #page-root).
-    # Controls both shell_actions OOB and layout OOB (breadcrumbs, sidebar, title).
-    triggers_shell = _triggers_shell_update(request, fragment_target_registry)
-
-    if triggers_shell:
-        try:
-            actions = normalize_shell_actions(composition.context.get(SHELL_ACTIONS_CONTEXT_KEY))
-        except TypeError:
-            actions = None
-        frag = shell_actions_fragment(actions) if actions is not None else None
-        if frag is not None:
-            template_name, block_name, target = frag
-            region_updates.append(
-                RegionUpdate(
-                    region=target,
-                    view=ViewRef(
-                        template=template_name,
-                        block=block_name,
-                        context={SHELL_ACTIONS_CONTEXT_KEY: actions},
-                    ),
-                )
-            )
-        else:
-            region_updates.append(
-                RegionUpdate(
-                    region=SHELL_ACTIONS_TARGET,
-                    view=ViewRef(template="", block="", context={}),
-                )
-            )
-
+    # Include layout OOB for page_fragment or when shell updates were added
+    triggers_shell = bool(shell_region_updates)
     include_layout_oob = intent == "page_fragment" or triggers_shell
 
     # Ensure layout_context has current_path for sidebar active state

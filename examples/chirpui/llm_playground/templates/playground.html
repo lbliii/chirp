@@ -1,0 +1,61 @@
+{#- LLM Playground fragments — compare_result, response, empty #}
+{% from "chirpui/layout.html" import container, grid %}
+{% from "chirpui/empty.html" import empty_state %}
+{% from "chirpui/message_bubble.html" import message_bubble %}
+{% from "chirpui/typing_indicator.html" import typing_indicator %}
+{% from "chirpui/surface.html" import surface %}
+
+{% block compare_result %}
+{% call container() %}
+<div class="chirpui-grid chirpui-grid--cols-2">
+  <article class="chirpui-card chirpui-model-card chirpui-model-card--a"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_a }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model response A">
+    <header class="chirpui-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">A</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ model_a }}</p>
+    </header>
+    <div class="chirpui-card__body">
+      {% call message_bubble(align="left", role="assistant") %}
+      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Generating…</span>
+        {{ typing_indicator() }}
+      </div>
+      {% end %}
+    </div>
+  </article>
+  <article class="chirpui-card chirpui-model-card chirpui-model-card--b"
+           hx-ext="sse"
+           sse-connect="{{ stream_url_b }}"
+           sse-close="done"
+           hx-disinherit="hx-target hx-swap"
+           aria-label="Model response B">
+    <header class="chirpui-card__header">
+      <span class="chirpui-text-muted chirpui-font-sm">B</span>
+      <p class="chirpui-model-card__title" style="margin: 0;">{{ model_b }}</p>
+    </header>
+    <div class="chirpui-card__body">
+      {% call message_bubble(align="left", role="assistant") %}
+      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+        <span class="chirpui-text-muted">Generating…</span>
+        {{ typing_indicator() }}
+      </div>
+      {% end %}
+    </div>
+  </article>
+</div>
+{% end %}
+{% end %}
+
+{% block response %}
+<div class="chirpui-prose">{{ (text ?? "") | markdown | safe }}</div>
+{% end %}
+
+{% block empty %}
+{% call empty_state(icon="◇", title="Please enter a prompt") %}
+<p>Type something above and hit Compare to see both models respond.</p>
+{% end %}
+{% end %}

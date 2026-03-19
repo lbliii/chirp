@@ -218,7 +218,7 @@ Minimal layout example:
 {% end %}
 ```
 
-ChirpUI's `breadcrumbs_oob`, `sidebar_oob`, and `title_oob` map to `chirpui-topbar-breadcrumbs`, `chirpui-sidebar-nav`, and `chirpui-document-title` automatically. See [[docs/templates/kida-integration|Kida Integration]] for the full flow and `examples/shell_oob` for a complete reference.
+ChirpUI's `breadcrumbs_oob`, `sidebar_oob`, and `title_oob` map to `chirpui-topbar-breadcrumbs`, `chirpui-sidebar-nav`, and `chirpui-document-title` automatically. See [[docs/templates/kida-integration|Kida Integration]] for the full flow and `examples/chirpui/shell_oob` for a complete reference.
 
 ## Block-Heavy Layouts
 

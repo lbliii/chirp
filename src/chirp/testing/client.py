@@ -2,6 +2,11 @@
 
 Uses the same Request and Response types as production.
 No wrapper translation layer.
+
+Runs on_worker_startup / on_worker_shutdown so tests exercise the same
+code paths as production (Pounce). Without this, apps that use
+on_worker_startup for per-worker DB connections or httpx clients would
+fail at runtime (e.g. rag_demo _db_var, ollama _client_var).
 """
 
 import asyncio
@@ -13,6 +18,16 @@ from typing import Any
 from chirp.app import App
 from chirp.http.response import Response
 from chirp.testing.sse import SSETestResult, parse_sse_frames
+
+
+async def _worker_lifecycle_receive() -> dict[str, Any]:
+    """Dummy receive for worker startup/shutdown — returns disconnect immediately."""
+    return {"type": "http.disconnect"}
+
+
+async def _worker_lifecycle_send(message: dict[str, Any]) -> None:
+    """No-op send for worker startup/shutdown."""
+    pass
 
 
 class TestClient:
@@ -54,9 +69,23 @@ class TestClient:
             result = hook()
             if inspect.isawaitable(result):
                 await result
+
+        # Run worker startup so on_worker_startup hooks run (e.g. rag_demo _db_var,
+        # ollama _client_var). Matches production Pounce behaviour.
+        await self.app(
+            {"type": "pounce.worker.startup", "worker_id": 0},
+            _worker_lifecycle_receive,
+            _worker_lifecycle_send,
+        )
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        # Run worker shutdown before app shutdown so hooks are cleaned up.
+        await self.app(
+            {"type": "pounce.worker.shutdown", "worker_id": 0},
+            _worker_lifecycle_receive,
+            _worker_lifecycle_send,
+        )
         for hook in self.app._shutdown_hooks:
             result = hook()
             if inspect.isawaitable(result):
@@ -385,15 +414,17 @@ class TestClient:
         body_bytes = b"".join(response_body_parts)
 
         # Extract content-type from headers
-        content_type = "text/html; charset=utf-8"
-        extra_headers: list[tuple[str, str]] = []
-        for name_b, value_b in response_headers:
-            name_str = name_b.decode("latin-1")
-            value_str = value_b.decode("latin-1")
-            if name_str == "content-type":
-                content_type = value_str
-            elif name_str != "content-length":
-                extra_headers.append((name_str, value_str))
+        decoded = [
+            (name_b.decode("latin-1"), value_b.decode("latin-1"))
+            for name_b, value_b in response_headers
+        ]
+        content_type = next(
+            (v for n, v in decoded if n == "content-type"),
+            "text/html; charset=utf-8",
+        )
+        extra_headers = [
+            (n, v) for n, v in decoded if n != "content-type" and n != "content-length"
+        ]
 
         return Response(
             body=body_bytes,

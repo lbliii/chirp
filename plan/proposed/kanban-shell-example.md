@@ -13,7 +13,7 @@ Create a new, separate Chirp example `kanban_shell/` that reimplements the kanba
 
 ## Current Kanban Analysis
 
-### Architecture (`examples/kanban/`)
+### Architecture (`examples/standalone/kanban/`)
 
 | Aspect | Current Implementation |
 |--------|------------------------|
@@ -47,7 +47,7 @@ Create a new, separate Chirp example `kanban_shell/` that reimplements the kanba
 ### Directory Structure
 
 ```text
-examples/kanban_shell/
+examples/chirpui/kanban_shell/
   app.py                    # App setup, middleware, API routes
   README.md
   test_app.py
@@ -187,9 +187,9 @@ Auth routes (`/login` GET/POST, `/logout`) can stay as `@app.route` since they'r
 
 ## References
 
-- `examples/kanban/` — current implementation
-- `examples/pages_shell/` — app shell pattern, mount_pages, _context cascade
-- `examples/contacts/` — htmx CRUD, ValidationError, OOB
+- `examples/standalone/kanban/` — current implementation
+- `examples/chirpui/pages_shell/` — app shell pattern, mount_pages, _context cascade
+- `examples/standalone/contacts/` — htmx CRUD, ValidationError, OOB
 - chirp-ui: `dnd.html`, `card.html`, `badge.html`, `filter_bar.html`, `toast.html`, `forms.html`
 - chirp: `site/content/docs/routing/filesystem-routing.md`
 - kida: `plan/rfc-list-comprehensions.md` (future)

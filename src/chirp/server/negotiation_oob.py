@@ -11,11 +11,61 @@ from chirp.pages.shell_actions import (
     normalize_shell_actions,
     shell_actions_fragment,
 )
+from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment
 from chirp.templating.returns import Fragment
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
+
+
+def _triggers_shell_update(
+    request: Request | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> bool:
+    """Whether this request should trigger shell OOB updates."""
+    if not request or not request.is_fragment or request.is_history_restore:
+        return False
+    if request.is_boosted:
+        return True
+    if not request.htmx_target or not fragment_target_registry:
+        return False
+    config = fragment_target_registry.get(request.htmx_target)
+    return config is not None and config.triggers_shell_update
+
+
+def compute_shell_region_updates(
+    composition: PageComposition,
+    request: Request | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> tuple[RegionUpdate, ...]:
+    """Compute shell OOB region updates for boosted/fragment requests."""
+    if not _triggers_shell_update(request, fragment_target_registry):
+        return ()
+    try:
+        actions = normalize_shell_actions(composition.context.get(SHELL_ACTIONS_CONTEXT_KEY))
+    except TypeError:
+        actions = None
+    frag = shell_actions_fragment(actions) if actions is not None else None
+    if frag is not None:
+        template_name, block_name, target = frag
+        return (
+            RegionUpdate(
+                region=target,
+                view=ViewRef(
+                    template=template_name,
+                    block=block_name,
+                    context={SHELL_ACTIONS_CONTEXT_KEY: actions},
+                ),
+            ),
+        )
+    return (
+        RegionUpdate(
+            region=SHELL_ACTIONS_TARGET,
+            view=ViewRef(template="", block="", context={}),
+        ),
+    )
 
 
 def render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:

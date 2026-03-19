@@ -1,400 +1,64 @@
 # Chirp Examples
 
-Working examples that demonstrate chirp's core capabilities. Each is self-contained
-and runnable — start the dev server or run the tests.
+Examples are now organized by runtime layer so the support matrix is obvious:
 
-## Examples
+- [`examples/standalone`](examples/standalone/README.md): baseline Chirp without `chirp_ui`
+- [`examples/chirpui`](examples/chirpui/README.md): app-shell and component-driven examples using ChirpUI
 
-### `hello/` — The Basics
+## Which Bucket To Use
 
-Routes, return-value content negotiation, path parameters, Response chaining, error handlers.
-No templates. Pure Python. Chirp in ~30 lines.
+Use `examples/standalone` when you want to learn or validate:
 
-```bash
-cd examples/hello && python app.py
-```
+- raw `Template` / `Fragment` / `EventStream`
+- plain HTMX forms, fragments, and SSE
+- standalone Chirp behavior without `delegation=True`
+- data, auth, middleware, and API examples without ChirpUI dependencies
 
-### `todo/` — htmx Fragments + Database Persistence
+Use `examples/chirpui` when you want to learn or validate:
 
-The killer feature, now with persistence. A todo list backed by `chirp.data` (SQLite) where
-the same template renders as a full page or a fragment, depending on whether the request
-came from htmx. Add, toggle, and delete items with partial page updates — zero client-side
-JavaScript. Empty submissions return a `ValidationError` with a 422 status and an inline
-error message. Restart the server and your todos are still there.
+- `use_chirp_ui(app)`
+- app-shell layouts and boosted navigation
+- `delegation=True` and shell-aware swaps
+- richer component-driven examples built on the newer UI layer
 
-Uses `App(db=..., migrations=...)` for zero-boilerplate database setup, a frozen `Todo`
-dataclass that flows from SQL query through to template, a reusable `Query` builder for
-typed reads, and a single migration file for the schema.
+## Running Examples
 
-```bash
-pip install chirp[data]
-cd examples/todo && python app.py
-```
-
-### `contacts/` — htmx CRUD with Validation
-
-The canonical htmx demo: a contacts list with add, inline edit, delete, and search. Exercises
-every htmx ergonomic feature in one app — `ValidationError` for 422 form errors, `OOB` for
-multi-fragment updates (table + count badge), `HX-Trigger` for toast notifications on delete,
-and `HX-Push-Url` for bookmarkable edit URLs. Tests use all `assert_hx_*` helpers.
+Run examples from the repo root so local `src/chirp` is always used:
 
 ```bash
-cd examples/contacts && python app.py
+cd /Users/llane/Documents/github/python/b-stack/chirp
+source .venv/bin/activate
+PYTHONPATH=src python examples/standalone/hello/app.py
 ```
 
-### `contacts_shell/` — chirp-ui App Shell CRUD
-
-A shell-first companion to the vanilla contacts demo. Shows `use_chirp_ui(app)`,
-`app.mount_pages()`, `chirpui/app_shell_layout.html`, route-scoped `ShellActions`,
-query-backed filtering, and inline row editing that always re-renders the current
-filtered view from the server.
+For ChirpUI examples:
 
 ```bash
-cd examples/contacts_shell && python app.py
+cd /Users/llane/Documents/github/python/b-stack/chirp
+source .venv/bin/activate
+PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 ```
 
-### `pages_shell/` — Filesystem Routing + Shell Actions
-
-A focused mounted-pages example for Chirp's current routing story. Shows
-`app.mount_pages()`, co-located `page.py` / `page.html`, `_context.py`
-cascade, route-scoped shell actions, `page_root` for boosted list navigation,
-and `Suspense` on a nested detail page.
+If you also need the local `pounce` checkout rather than an installed package:
 
 ```bash
-cd examples/pages_shell && python app.py
+PYTHONPATH=src:/Users/llane/Documents/github/python/b-stack/pounce/src \
+  PYTHONPATH=src python examples/standalone/ollama/app.py
 ```
 
-### `sse/` — Real-Time Events
+## Pairings
 
-Server-Sent Events pushing HTML fragments to the browser in real-time. The async generator
-yields strings, structured SSEEvent objects, and kida-rendered Fragment objects — demonstrating
-all three SSE payload types.
+Some examples intentionally come in pairs so you can compare the baseline and app-shell lanes:
 
-```bash
-cd examples/sse && python app.py
-```
+- `examples/standalone/contacts` and `examples/chirpui/contacts_shell`
+- `examples/standalone/kanban` and `examples/chirpui/kanban_shell`
+- `examples/standalone/islands` and `examples/chirpui/islands_shell`
 
-### `streaming/` — Stream() with Async Context
+## Notes
 
-`return Stream("page.html", stats=..., feed=...)` where context values are awaitables.
-Chirp resolves them concurrently, then streams the template via Kida's `render_stream()` —
-chunks sent as they're rendered for faster TTFB.
-
-```bash
-cd examples/streaming && python app.py
-```
-
-### `llm_streaming_kida/` — TemplateStream + {% async for %}
-
-`return TemplateStream("response.html", stream=..., prompt=...)` where the template
-contains `{% async for token in stream %}`. Kida's `render_stream_async` yields chunks
-as the template iterates — O(n) work, not Fragment-per-token re-renders.
-
-```bash
-cd examples/llm_streaming_kida && python app.py
-```
-
-### `dashboard/` — Full Stack Showcase
-
-The complete Pounce + Chirp + Kida pipeline. A weather station with 6 live sensors:
-streaming initial render, fragment caching, SSE-driven updates, and multi-worker
-free-threading. Open your browser and watch the data change.
-
-```bash
-cd examples/dashboard && python app.py
-```
-
-### `hackernews/` — Hacker News Live Reader
-
-A live Hacker News reader consuming the real HN Firebase API. Stories load from the
-live API, scores and comment counts update in real-time via SSE, and comment trees
-render recursively using kida's `{% def %}`. View Transitions animate between the
-story list and detail pages. Zero client-side JavaScript beyond htmx.
-
-```bash
-pip install httpx  # or pip install chirp[all]
-cd examples/hackernews && python app.py
-```
-
-### `dashboard_live/` — Live Sales Dashboard with chirp.data
-
-The data layer flagship. A real-time sales dashboard powered by `chirp.data`:
-`App(db=..., migrations=...)` for zero-boilerplate database setup, `Query` builder
-for typed reads, atomic transactions for order creation, and SSE fragments that
-push live updates to the browser. New orders appear every few
-seconds — stats update in real-time. Zero client-side JavaScript beyond htmx.
-
-With PostgreSQL, swap the polling loop for `db.listen("new_orders")` —
-same pattern, real database triggers.
-
-```bash
-pip install chirp[data]
-cd examples/dashboard_live && python app.py
-```
-
-### `rag_demo/` — RAG with Streaming AI Answers
-
-A documentation site with AI-powered Q&A. SQLite stores docs, Claude streams answers
-with cited sources. Demonstrates per-worker lifecycle hooks — global `on_startup` for
-schema migration, `on_worker_startup` / `on_worker_shutdown` for per-worker database
-connections via `ContextVar`. Multi-worker Pounce for free-threading. Uses
-`AppConfig(delegation=True)` for copy-btn and compare-switch on SSE-swapped content,
-and `referenced=True` on dynamic routes (`/share/{slug}`, `/ask/stream`). Includes
-`SessionMiddleware` + `CSRFMiddleware` for form protection.
-
-```bash
-pip install chirp[ai,data,sessions]
-export ANTHROPIC_API_KEY="sk-..."
-cd examples/rag_demo && python app.py
-```
-
-### `static_site/` — Static Site Serving with Live Reload
-
-Serves a pre-built static site from a `public/` directory with `StaticFiles` at the root
-prefix, custom 404 pages, and `HTMLInject` for injecting a live-reload SSE client into every
-HTML response. An SSE endpoint (`/__reload__`) signals the browser when files change. Shows
-how chirp can replace a traditional dev server for static site generators.
-
-```bash
-cd examples/static_site && python app.py
-```
-
-### `theming/` — Dark/Light Mode with CSS Custom Properties
-
-Theme switching using only the web platform: CSS custom properties, `prefers-color-scheme`
-media query (automatic OS preference), and a `data-theme` attribute override with
-`localStorage` persistence. Anti-FOUC inline script in `<head>`. No framework magic.
-
-```bash
-cd examples/theming && python app.py
-```
-
-### `auth/` — Session Auth with Protected Routes
-
-The most basic authentication example. A login form, a protected dashboard, and logout.
-Hardcoded credentials (`admin` / `password`) with password hashing. Shows the full
-`SessionMiddleware` → `AuthMiddleware` → `@login_required` pipeline, `login()` / `logout()`
-helpers (both regenerate the session automatically), `current_user()` in templates,
-`hash_password` / `verify_password`, and `is_safe_url()` for validating `?next=` redirects.
-
-```bash
-cd examples/auth && python app.py
-```
-
-### `kanban/` — Kanban Board with Auth and Live Updates
-
-A full-featured task board with Session + Auth + CSRF. Three demo accounts (Alice, Bob, Carol)
-share a single board — the logged-in user's cards are highlighted. OOB multi-fragment swaps
-update source column, dest column, and stats in one response. SSE simulates live activity from
-other users. Kida patterns: `{% match %}`, `{% embed %}`, optional chaining (`?.`), null
-coalescing (`??`), component imports, fragment caching.
-
-```bash
-cd examples/kanban && python app.py
-```
-
-### `kanban_shell/` — Kanban with App Shell and mount_pages
-
-Same kanban features (auth, CRUD, OOB, SSE, filtering) using the app shell pattern,
-chirp-ui components, and `mount_pages` routing. Demonstrates mixing filesystem
-routing with explicit `@app.route` API endpoints, filter sidebar, and toast notifications.
-
-```bash
-pip install chirp[ui]
-cd examples/kanban_shell && python app.py
-```
-
-### `sortable_reorder/` — Drag-and-Drop Reorder with Alpine + HTMX
-
-Native HTML5 drag-and-drop without Sortable.js. Uses chirp-ui `sortable_list`,
-Alpine.js for visual feedback (`dataset.draggingIdx`, `overCount`), and HTMX form
-submission for reorder. Demonstrates the Fragment + form + `hx-select` pattern.
-
-```bash
-pip install chirp[ui]
-cd examples/sortable_reorder && python app.py
-```
-
-### `ollama/` — Local LLM Chat with Ollama
-
-A chat interface powered by a local Ollama instance. Streaming AI responses via SSE,
-conversation history, and model selection. Demonstrates real-world LLM integration
-without cloud API keys.
-
-```bash
-# Requires ollama running locally
-cd examples/ollama && python app.py
-```
-
-### `tools/` — MCP Tools with Live Activity Feed
-
-Registers Python functions as MCP tools alongside normal HTTP routes. A browser UI
-shows notes and a live SSE activity feed — when an MCP client calls a tool, the call
-appears in real-time. Demonstrates `@app.tool()` for dual-interface endpoints (human
-form + AI agent JSON-RPC), `app.tool_events.subscribe()` for streaming tool call events,
-and `ToolCallEvent`.
-
-```bash
-cd examples/tools && python app.py
-```
-
-### `signup/` — Registration Form with Validation & CSRF
-
-The chirp forms showcase. A registration form with `validate()` and built-in rules
-(`required`, `min_length`, `max_length`, `email`, `matches`), a custom validator
-for password confirmation, `CSRFMiddleware` for token protection, and `ValidationError`
-for re-rendering with per-field errors. Sessions store the username for the welcome page.
-
-```bash
-cd examples/signup && python app.py
-```
-
-### `upload/` — Photo Gallery with File Uploads
-
-Multipart form handling from end to end. Upload photos with title and description,
-validate file type and size, save to disk with `UploadFile.save()`, and browse the
-gallery. Serves uploaded images via `StaticFiles` middleware. Shows `form.files.get()`,
-`enctype="multipart/form-data"`, and file metadata (`.filename`, `.content_type`, `.size`).
-
-```bash
-pip install chirp[forms]  # python-multipart
-cd examples/upload && python app.py
-```
-
-### `survey/` — Multi-Field Survey with Checkboxes & Radios
-
-Every HTML form input type in one app. Text, number, checkboxes (`get_list()`), radio
-buttons, `<select>`, and `<textarea>`. Validates with `required`, `one_of`, `integer`,
-and a custom age-range rule. Demonstrates multi-value field handling — the part of form
-parsing that `get()` alone can't cover.
-
-```bash
-cd examples/survey && python app.py
-```
-
-### `wizard/` — Multi-Step Checkout Form
-
-A 3-step form wizard with session-persisted data: personal info → shipping address →
-review & confirm. Each step validates independently with `validate()`, redirects forward
-on success, and guards against skipping steps. The review page reads back all collected
-data, and confirmation clears the session. Back navigation preserves previously entered values.
-
-```bash
-cd examples/wizard && python app.py
-```
-
-### `search/` — Book Search with GET Forms & htmx
-
-GET-based forms — no POST, no CSRF. A book catalog with text search, genre filtering, and
-sort controls. Uses `request.query` for reading query parameters and `Page` for automatic
-full-page vs fragment rendering. htmx drives search-as-you-type with `hx-get`, `hx-push-url`,
-and `hx-include` so the URL always reflects the current search state.
-
-```bash
-cd examples/search && python app.py
-```
-
-### `islands/` — No-Build Client-Managed Surfaces
-
-Chirp's islands runtime for isolated client-owned widgets. Uses `AppConfig(islands=True)`,
-`island_attrs()` for mount metadata, and a plain ES module adapter loaded via `data-island-src`.
-Server renders the fallback; the adapter mounts and owns the DOM. No bundler required.
-
-```bash
-cd examples/islands && python app.py
-```
-
-### `islands_shell/` — Islands + App Shell
-
-Islands inside ChirpUI shells with htmx-boosted navigation. Sidebar links swap `#main`;
-islands unmount before the swap and remount after. OOB updates for breadcrumbs and title.
-
-```bash
-pip install chirp[ui]
-cd examples/islands_shell && python app.py
-```
-
-### `islands_swap/` — Islands + htmx Fragment Swap
-
-Island inside dynamically swapped content. A "Load widget" button fetches a fragment
-containing an island; the runtime unmounts before the swap and mounts after.
-
-```bash
-cd examples/islands_swap && python app.py
-```
-
-### `chat/` — Real-Time Chat via SSE + POST
-
-A multi-user chat room proving you don't need WebSocket. POST to send messages,
-SSE to receive them — bidirectional communication over plain HTTP. `ChatBus` (modeled
-on `ToolEventBus`) broadcasts messages via `asyncio.Queue` per subscriber with a
-`threading.Lock` for the subscriber set. Session-based usernames, bounded message
-history in a thread-safe `deque`, and htmx's SSE extension for zero-JavaScript
-real-time updates.
-
-```bash
-cd examples/chat && python app.py
-```
-
-### `pokedex/` — Browseable Pokedex + JSON API
-
-A dark-themed Pokedex UI with a JSON REST API behind it. Browse Pokemon cards with
-type-colored badges and stat bars in the browser, or consume the same data as JSON.
-Same frozen dataclasses flow from SQLite through `Query` builder to kida templates
-(humans) or `dict` returns (API consumers). Search-as-you-type, type filter buttons,
-pagination, detail views — all htmx. API routes protected by custom API key middleware,
-browser routes open. 36 seeded Pokemon across Gen 1-4.
-
-```bash
-pip install chirp[data]
-cd examples/pokedex && python app.py
-```
-
-### `production/` — Production-Ready Security Stack
-
-A minimal contact form app demonstrating the full security stack: `SecurityHeadersMiddleware`,
-`SessionMiddleware`, and `CSRFMiddleware`. Shows `csrf_field()` in templates, `get_session()`
-for flash messages, and the `url` filter for user-supplied links (`| url(fallback="#")`).
-Tests assert security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`)
-and CSRF protection.
-
-```bash
-cd examples/production && python app.py
-```
-
-### `custom_middleware/` — Custom Middleware Patterns
-
-Runnable version of the custom middleware docs. Two middlewares: a function-based timing
-middleware that adds `X-Response-Time`, and a class-based per-IP rate limiter (5 req/min)
-returning 429 when exceeded. Uses `threading.Lock` for thread safety. Routes include
-`/slow` to verify the timing header.
-
-```bash
-cd examples/custom_middleware && python app.py
-```
-
-### `accessibility/` — Accessible Form Patterns
-
-Demonstrates accessibility guide patterns in a real feedback form: semantic HTML
-(`header`, `main`, `nav`, `footer`), skip link, `label` + `for`/`id`, `aria-describedby`
-for validation messages, `aria-invalid` when errors, `aria-live="polite"` on success
-region, and visible focus styles. Uses `validate()` and `ValidationError` for form
-validation.
-
-```bash
-cd examples/accessibility && python app.py
-```
-
-### `api/` — Pure JSON REST API
-
-API-only Chirp app — no HTML. CRUD for a simple "items" resource with in-memory
-storage. Demonstrates `dict`/`list` returns as JSON, path parameters, `request.json()`
-for POST/PUT, `(dict, status)` for 404/400/201, and `CORSMiddleware` for cross-origin
-consumers.
-
-```bash
-cd examples/api && python app.py
-```
+- `examples/AUDIT.md` remains a shared cross-example document.
+- `examples/conftest.py` remains shared so example tests can still reuse common fixtures.
+- `examples/__init__.py` remains at the root because the examples tree is still treated as one test/import surface.
 
 ## Patterns
 
@@ -481,14 +145,17 @@ using chirp's `TestClient`. No HTTP server required.
 # All examples
 pytest examples/
 
-# One example
-pytest examples/hello/
+# One standalone example
+pytest examples/standalone/hello/
+
+# One chirpui example
+pytest examples/chirpui/pages_shell/
 ```
 
 ## What Each Example Exercises
 
 | Feature | hello | todo | contacts | sse | streaming | llm_streaming_kida | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | llm_playground | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | | |
 | Path parameters | x | x | x | | | | x | | | | | | | | | | x | | x | | | x | | | | x | | |
 | String returns | x | | | | | | | | | | | | | | | | | | | | | | | | | | | |

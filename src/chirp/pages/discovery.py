@@ -133,10 +133,17 @@ def _walk_directory(
     layout_chain = LayoutChain(tuple(current_layouts))
     provider_tuple = tuple(current_providers)
 
+    # Single iterdir pass: partition into files and dirs
+    files: list[Path] = []
+    dirs: list[Path] = []
+    for item in directory.iterdir():
+        if item.is_file():
+            files.append(item)
+        elif item.is_dir():
+            dirs.append(item)
+
     # Process .py route files at this level
-    for item in sorted(directory.iterdir()):
-        if not item.is_file():
-            continue
+    for item in sorted(files):
         if item.suffix != ".py":
             continue
         if item.name.startswith("_"):
@@ -156,9 +163,7 @@ def _walk_directory(
         )
 
     # Recurse into subdirectories
-    for item in sorted(directory.iterdir()):
-        if not item.is_dir():
-            continue
+    for item in sorted(dirs):
         if item.name.startswith("_") or item.name.startswith("."):
             continue
 

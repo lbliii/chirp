@@ -95,13 +95,13 @@ All examples upgraded for consistency and S-tier DX:
 
 ### 5. Run instructions (pip vs uv)
 
-**Pattern**: Many examples use `pip install chirp[...]` + `cd examples/X && python app.py`.  
-**Preferred** (from b-stack root): `uv run python chirp/examples/X/app.py`
+**Pattern**: Many examples used `pip install chirp[...]` + `cd examples/X && python app.py`.  
+**Preferred** (from repo root): `PYTHONPATH=src python examples/<bucket>/X/app.py`
 
 | Example       | Current | Notes |
 |---------------|---------|-------|
 | hackernews    | `uv run python app.py` | ✅ Updated |
-| examples/README | `cd examples/X && python app.py` | Consider adding uv option |
+| examples/README | `PYTHONPATH=src python examples/<bucket>/X/app.py` | Updated to repo-root commands |
 | Most others   | `pip install` + `python app.py` | Works when chirp installed |
 
 ## Patterns to Apply

@@ -234,14 +234,12 @@ async def render_suspense(
     deferred_keys = set(pending.keys())
     key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
 
-    # Collect unique blocks to avoid rendering the same block twice
-    seen_blocks: set[str] = set()
-    blocks_to_render: list[str] = []
-    for key in deferred_keys:
-        for block_name in key_to_blocks.get(key, []):
-            if block_name not in seen_blocks:
-                seen_blocks.add(block_name)
-                blocks_to_render.append(block_name)
+    # Collect unique blocks (order-preserving dedup)
+    blocks_to_render = list(
+        dict.fromkeys(
+            b for key in deferred_keys for b in key_to_blocks.get(key, [])
+        )
+    )
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)

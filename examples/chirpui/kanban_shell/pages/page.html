@@ -1,0 +1,252 @@
+{% imports %}
+  {% from "components/_task_card.html" import task_card %}
+  {% from "components/_column.html" import column %}
+  {% from "components/_field.html" import field %}
+  {% from "chirp/sse.html" import sse_scope %}
+  {% from "chirpui/stat.html" import stat %}
+  {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/modal.html" import modal %}
+{% end %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+<div class="kanban-page">
+  <div class="kanban-page__header">
+    <h1>Kanban Board</h1>
+    <img id="board-spinner" class="htmx-indicator" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' stroke='%23888' stroke-width='3' fill='none' stroke-dasharray='31.4' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='0.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E" alt="" style="width:1.2rem;height:1.2rem;">
+    {% block header_stats %}
+    <div id="board-stats" class="kanban-stats chirpui-cluster chirpui-cluster--sm">
+      {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
+      {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
+      {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+      {{ stat(value=assignees | length, label="People", icon="user") }}
+    </div>
+    {% end %}
+  </div>
+
+  <div class="kanban-board-layout">
+    <aside class="kanban-sidebar sidebar">
+      <h3>Priority</h3>
+      {% for p in ["high", "medium", "low"] %}
+      <label>
+        <input type="checkbox" name="priority" value="{{ p }}"
+               {{ "checked" if p in active_filters.priority else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ p | capitalize }}
+      </label>
+      {% end %}
+
+      <h3>Assignee</h3>
+      {% let all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
+      {% unless all_assignees %}
+      <p class="chirpui-text-muted">No assignees.</p>
+      {% end %}
+      {% for person in all_assignees %}
+      <label>
+        <input type="checkbox" name="assignee" value="{{ person }}"
+               {{ "checked" if person in active_filters.assignee else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ person }}
+      </label>
+      {% end %}
+
+      <h3>Tags</h3>
+      {% let all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
+      {% unless all_tags %}
+      <p class="chirpui-text-muted">No tags yet.</p>
+      {% end %}
+      {% for tag in all_tags %}
+      <label>
+        <input type="checkbox" name="tag" value="{{ tag }}"
+               {{ "checked" if tag in active_filters.tag else "" }}
+               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-include=".sidebar input">
+        {{ tag }}
+      </label>
+      {% end %}
+    </aside>
+
+    <div class="kanban-main">
+      {% block board %}
+      <div id="board" class="kanban-board">
+        {% for col_id, col_name in columns %}
+          {% let col_tasks = board.get(col_id, []) %}
+          {% call column(col_id, col_name, col_tasks | length, oob=false) %}
+            {% unless col_tasks %}
+              {% call empty_state(icon="◇", title="No tasks") %}
+              <p>Nothing in {{ col_name | lower }} yet.</p>
+              {% end %}
+            {% end %}
+            {% for task in col_tasks | sort(attribute="created_at") %}
+            <div class="kanban-card-wrapper">
+              {{ task_card(task, me=current_user) }}
+            </div>
+            {% end %}
+          {% end %}
+        {% end %}
+      </div>
+      {% end %}
+
+      {% block add_form %}
+      {% let form_errors = errors ?? none %}
+      {% call modal("new-task-modal", title="New Task") %}
+      <form id="add-form" class="chirpui-stack chirpui-stack--sm" hx-post="/tasks" hx-swap="none"
+            hx-indicator="#board-spinner" hx-disabled-elt="find button"
+            hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
+        {{ field("title", "Task", placeholder="What needs doing?") }}
+        <div class="chirpui-field">
+          <label class="chirpui-field__label" for="field-status">Column</label>
+          <select id="field-status" name="status" class="chirpui-field__input">
+            {% for col_id, col_name in columns %}
+            <option value="{{ col_id }}">{{ col_name }}</option>
+            {% end %}
+          </select>
+        </div>
+        <div class="chirpui-field">
+          <label class="chirpui-field__label" for="field-priority">Priority</label>
+          <select id="field-priority" name="priority" class="chirpui-field__input">
+            {% for p in ["low", "medium", "high"] %}
+            <option value="{{ p }}" {{ "selected" if p == "medium" else "" }}>{{ p | capitalize }}</option>
+            {% end %}
+          </select>
+        </div>
+        {{ field("assignee", "Assignee", placeholder="Name (optional)", required=false) }}
+        {{ field("tags", "Tags", placeholder="Comma-separated", required=false) }}
+        <div class="chirpui-form-actions chirpui-form-actions--end">
+          <button type="button" class="chirpui-btn chirpui-btn--ghost" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="chirpui-btn chirpui-btn--primary">Add Task</button>
+        </div>
+      </form>
+      {% if form_errors %}
+      <ul class="chirpui-form-errors">
+        {% for fld, msgs in form_errors.items() %}
+          {% for msg in msgs %}
+          <li>{{ fld | capitalize }}: {{ msg }}</li>
+          {% end %}
+        {% end %}
+      </ul>
+      {% end %}
+      {% end %}
+      {% end %}
+    </div>
+  </div>
+</div>
+
+{{ sse_scope("/events") }}
+
+<script>
+document.body.addEventListener("htmx:configRequest", function(event) {
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) { event.detail.headers["X-CSRF-Token"] = meta.content; }
+});
+
+document.body.addEventListener("click", function(event) {
+  var btn = event.target.closest('[data-action="new-task"]');
+  if (btn) { document.getElementById("new-task-modal")?.showModal(); }
+});
+
+(function initSortable() {
+  function setupColumns() {
+    document.querySelectorAll(".kanban-column__body").forEach(function(el) {
+      if (el._sortable) return;
+      el._sortable = new Sortable(el, {
+        group: "kanban",
+        animation: 150,
+        ghostClass: "kanban-card--ghost",
+        dragClass: "kanban-card--drag",
+        draggable: ".kanban-card-wrapper",
+        handle: ".kanban-card__header, .kanban-card__desc, .kanban-card__tags, .kanban-card__time",
+        onEnd: function(evt) {
+          if (evt.from === evt.to) return;
+          var card = evt.item.querySelector(".kanban-card");
+          if (!card) return;
+          var taskId = card.dataset.taskId;
+          var newStatus = evt.to.dataset.status;
+          if (!taskId || !newStatus) return;
+          htmx.ajax("POST", "/tasks/" + taskId + "/move/" + newStatus, {swap: "none"});
+        }
+      });
+    });
+  }
+  setupColumns();
+  document.body.addEventListener("htmx:afterSwap", setupColumns);
+  document.body.addEventListener("htmx:oobAfterSwap", setupColumns);
+})();
+</script>
+{% end %}
+{% end %}
+{% end %}
+
+{# Empty main for hx-swap="none" OOB routes #}
+{% fragment empty %}{% endfragment %}
+
+{# Fragment blocks for OOB #}
+{% fragment header_stats_oob %}
+{% if all_tasks is defined %}
+  {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
+  {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
+  {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+  {{ stat(value=assignees | length, label="People", icon="user") }}
+{% end %}
+{% endfragment %}
+
+{% fragment column_innards %}
+{% if column_id is defined %}
+  <div class="kanban-column__header">
+    <h3>{{ column_name }}</h3>
+    <span class="kanban-column__count">{{ tasks | length }}</span>
+  </div>
+  <div class="kanban-column__body" data-status="{{ column_id }}">
+  {% unless tasks %}
+    {% call empty_state(icon="◇", title="No tasks") %}
+    <p>Drop a task here.</p>
+    {% end %}
+  {% end %}
+  {% for task in tasks | sort(attribute="created_at") %}
+  <div class="kanban-card-wrapper">
+    {{ task_card(task, me=current_user) }}
+  </div>
+  {% end %}
+  </div>
+{% end %}
+{% endfragment %}
+
+{% fragment task_card_block %}
+{% if task is defined %}
+{{ task_card(task, oob=true, me=current_user) }}
+{% end %}
+{% endfragment %}
+
+{# OOB-aware fragments for SSE — hx-swap-oob is baked into the HTML
+   so they can be yielded without a Fragment target and still route
+   correctly via the sse-swap="fragment" listener. #}
+{% fragment column_block_oob %}
+{% if column_id is defined %}
+{% call column(column_id, column_name, tasks | length, oob=true) %}
+  {% unless tasks %}
+    {% call empty_state(icon="◇", title="No tasks") %}
+    <p>Drop a task here.</p>
+    {% end %}
+  {% end %}
+  {% for task in tasks | sort(attribute="created_at") %}
+  <div class="kanban-card-wrapper">
+    {{ task_card(task, me=current_user) }}
+  </div>
+  {% end %}
+{% end %}
+{% end %}
+{% endfragment %}
+
+{% fragment stats_block_oob %}
+{% if all_tasks is defined %}
+<div id="board-stats" class="kanban-stats chirpui-cluster chirpui-cluster--sm" hx-swap-oob="true">
+  {{ stat(value=all_tasks | length, label="Tasks", icon="grid") }}
+  {{ stat(value=all_tasks | selectattr("priority", "equalto", "high") | list | length, label="High priority", icon="alert") }}
+  {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+  {{ stat(value=assignees | length, label="People", icon="user") }}
+</div>
+{% end %}
+{% endfragment %}

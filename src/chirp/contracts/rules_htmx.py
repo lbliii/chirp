@@ -33,6 +33,8 @@ def check_hx_target_selectors(
     issues: list[ContractIssue] = []
     validated = 0
     for template_name, source in template_sources.items():
+        if template_name.startswith(("chirp/", "chirpui/")):
+            continue
         selectors = extract_hx_target_selectors(source)
         for selector in selectors:
             first_word = selector.split()[0] if selector else ""

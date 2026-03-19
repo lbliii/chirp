@@ -74,35 +74,13 @@ def _build_handler_kwargs_inspect(
     """Fallback: inspect handler signature and build kwargs (used when no plan)."""
     import inspect
 
-    from chirp.extraction import extract_dataclass, is_extractable_dataclass
+    from chirp._internal.kwargs_resolve import build_base_kwargs
 
     sig = inspect.signature(handler, eval_str=True)
-    kwargs: dict[str, Any] = {}
-
-    for name, param in sig.parameters.items():
-        if name == "request" or param.annotation is Request:
-            kwargs[name] = request
-        elif name in path_params:
-            value = path_params[name]
-            if param.annotation is not inspect.Parameter.empty:
-                try:
-                    kwargs[name] = param.annotation(value)
-                except ValueError, TypeError:
-                    kwargs[name] = value
-            else:
-                kwargs[name] = value
-        elif (
-            providers
-            and param.annotation is not inspect.Parameter.empty
-            and param.annotation in providers
-        ):
-            kwargs[name] = providers[param.annotation]()
-        elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
-            param.annotation
-        ):
-            if request.method in ("GET", "HEAD"):
-                kwargs[name] = extract_dataclass(param.annotation, request.query)
-            elif body_data is not None:
-                kwargs[name] = extract_dataclass(param.annotation, body_data)
-
-    return kwargs
+    return build_base_kwargs(
+        sig,
+        request,
+        path_params,
+        body_data,
+        providers=providers,
+    )

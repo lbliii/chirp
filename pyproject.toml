@@ -35,9 +35,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "kida-templates>=0.2.7", # Template engine (same ecosystem, same author)
+    "kida-templates>=0.2.8", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.2.2,<0.4",  # ASGI server (same ecosystem, powers app.run())
+    "bengal-pounce>=0.3.0",  # ASGI server (same ecosystem, powers app.run())
 ]
 
 [project.optional-dependencies]
@@ -63,7 +63,7 @@ ai = ["httpx>=0.27.0"]
 markdown = ["patitas[syntax]>=0.3.5"]
 
 # chirp-ui component library (CSS, themes, layout macros)
-ui = ["chirp-ui>=0.1.6,<0.2"]
+ui = ["chirp-ui>=0.2.0"]
 
 # Config from env (python-dotenv for local .env loading)
 config = ["python-dotenv>=1.0.0"]
@@ -110,7 +110,7 @@ Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 # tool.uv.sources: omitted — workspace root (b-stack) provides bengal-pounce override
-# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.2.2).
+# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.2.0).
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -248,7 +248,7 @@ dev = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
-    "chirp-ui>=0.1.6,<0.2",          # Layout macros for llm_playground example tests
+    "chirp-ui>=0.2.0",          # Layout macros for llm_playground example tests
 ]
 
 # =============================================================================

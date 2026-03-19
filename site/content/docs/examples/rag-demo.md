@@ -14,7 +14,7 @@ category: tutorial
 
 The RAG (Retrieval Augmented Generation) demo is Chirp's most comprehensive example. It showcases fragments, Server-Sent Events, dual-model streaming, event delegation, and free-threading — all with zero client-side JavaScript frameworks.
 
-**Location:** `examples/rag_demo/`
+**Location:** `examples/chirpui/rag_demo/`
 
 ## What It Demonstrates
 
@@ -66,7 +66,7 @@ A `role="switch"` button toggles `aria-checked` and enables/disables the second 
 ```bash
 pip install chirp[ai,data]
 ollama serve   # Start Ollama first
-cd examples/rag_demo && python app.py
+PYTHONPATH=src python examples/chirpui/rag_demo/app.py
 ```
 
 Open http://127.0.0.1:8000 and ask a question about the docs.

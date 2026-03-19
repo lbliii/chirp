@@ -20,7 +20,7 @@ import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from chirp.extraction import extract_dataclass, is_extractable_dataclass
+from chirp.extraction import is_extractable_dataclass
 from chirp.pages.shell_actions import (
     SHELL_ACTIONS_CONTEXT_KEY,
     merge_shell_actions,
@@ -91,15 +91,15 @@ async def resolve_kwargs(
     Returns:
         A dict of keyword arguments ready to pass to *handler*.
     """
-    from chirp.http.request import Request as RequestType
+    from chirp._internal.kwargs_resolve import build_base_kwargs
 
-    # Pre-read body for typed extraction (non-GET only)
+    sig = inspect.signature(handler, eval_str=True)
+
     body_data: dict[str, Any] | None = None
     if request.method not in ("GET", "HEAD"):
-        sig_check = inspect.signature(handler, eval_str=True)
         needs_body = any(
             p.annotation is not inspect.Parameter.empty and is_extractable_dataclass(p.annotation)
-            for p in sig_check.parameters.values()
+            for p in sig.parameters.values()
         )
         if needs_body:
             ct = request.content_type or ""
@@ -108,45 +108,15 @@ async def resolve_kwargs(
             else:
                 body_data = dict(await request.form())
 
-    # Build kwargs from handler signature
-    sig = inspect.signature(handler, eval_str=True)
-    kwargs: dict[str, Any] = {}
-
-    for name, param in sig.parameters.items():
-        if name == "request" or param.annotation is RequestType:
-            kwargs[name] = request
-        elif name in request.path_params:
-            value = request.path_params[name]
-            if param.annotation is not inspect.Parameter.empty:
-                try:
-                    kwargs[name] = param.annotation(value)
-                except ValueError, TypeError:
-                    kwargs[name] = value
-            else:
-                kwargs[name] = value
-        elif name in cascade_ctx:
-            kwargs[name] = cascade_ctx[name]
-        elif (
-            param.annotation is not inspect.Parameter.empty
-            and param.annotation in service_providers
-        ):
-            factory = service_providers[param.annotation]
-            kwargs[name] = _invoke_provider_factory(factory, request, cascade_ctx)
-        elif param.annotation is not inspect.Parameter.empty and is_extractable_dataclass(
-            param.annotation
-        ):
-            if request.method in ("GET", "HEAD"):
-                kwargs[name] = extract_dataclass(
-                    param.annotation,
-                    request.query,
-                )
-            elif body_data is not None:
-                kwargs[name] = extract_dataclass(
-                    param.annotation,
-                    body_data,
-                )
-
-    return kwargs
+    return build_base_kwargs(
+        sig,
+        request,
+        request.path_params,
+        body_data,
+        cascade_ctx=cascade_ctx,
+        providers=service_providers,
+        invoke_provider=_invoke_provider_factory,
+    )
 
 
 def upgrade_result(

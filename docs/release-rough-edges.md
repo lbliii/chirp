@@ -55,7 +55,7 @@ Examples that use `use_chirp_ui(app)` must provide all required blocks. Several 
 - `{{ "{:.2f}" | format(x) }}` — str.format style
 - `{{ x | format_number(2) }}` — Kida numeric helper
 
-**Affected lines in `examples/dashboard_live/templates/dashboard.html`:**
+**Affected lines in `examples/standalone/dashboard_live/templates/dashboard.html`:**
 
 - Line 94: `${{ "%.2f" | format(stats.total_revenue) }}`
 - Line 102: `${{ "%.2f" | format(stats.avg_order) }}`
