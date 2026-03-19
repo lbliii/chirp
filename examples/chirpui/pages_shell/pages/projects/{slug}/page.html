@@ -27,7 +27,7 @@
 {% end %}
 
 {# Tab navigation #}
-{% let tab = (active_tab ?? "overview") %}
+{% set tab = (active_tab ?? "overview") %}
 {% call cluster(gap="sm") %}
   {{ btn("Overview", variant="primary" if tab == "overview" else "ghost", size="sm",
          href="/projects/" ~ project.slug,

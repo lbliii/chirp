@@ -88,7 +88,7 @@
 
 {# Tabs — tab list + panel slot; caller provides panel content with x-show per tab #}
 {% def tabs(tab_names, default=none, tab_list_class="", panel_class="") %}
-{% let default_tab = default ?? tab_names[0] if tab_names else "" %}
+{% set default_tab = default ?? tab_names[0] if tab_names else "" %}
 <div class="chirp-tabs" x-id="['tab', 'tabpanel']"
      x-data="{ active: '{{ default_tab }}' }">
   <div role="tablist" class="chirp-tab-list{{ " " + tab_list_class if tab_list_class else "" }}">

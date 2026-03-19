@@ -6,7 +6,7 @@
 {% from "components/_badge.html" import priority_badge, tag_badge %}
 
 {% def task_card(task) %}
-{% let me = current_user() %}
+{% set me = current_user() %}
 <div id="task-{{ task.id }}" class="card priority-{{ task.priority }}{{ " is-mine" if me.name is eq(task?.assignee) else "" }}"
      draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
   <div class="card-header">

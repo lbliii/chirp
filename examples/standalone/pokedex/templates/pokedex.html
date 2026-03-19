@@ -153,8 +153,8 @@
 {% end %}
 
 {% def stat_bar(label, val) %}
-{% let pct = val * 100 // 160 %}
-{% let color = "" %}
+{% set pct = val * 100 // 160 %}
+{% set color = "" %}
 {% match true %}
   {% case val >= 100 %}{% set color = "#e94560" %}
   {% case val >= 70 %}{% set color = "#f8d030" %}
@@ -288,7 +288,7 @@
   </div>
 
   {% if total_pages > 1 %}
-  {% let base = "" %}
+  {% set base = "" %}
   {% if current_type %}{% set base = "&type=" + current_type %}{% end %}
   {% if search %}{% set base = base + "&q=" + search %}{% end %}
 

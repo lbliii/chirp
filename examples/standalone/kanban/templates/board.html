@@ -5,7 +5,7 @@
     - {% fragment %}        — OOB-only blocks, skipped during full page render
     - {% from...import %}   — component imports from separate templates
     - {% call %} + {% slot %} — column component with caller content
-    - {% let %}             — scoped computed variables
+    - {% set %}             — scoped computed variables
     - {% unless %}          — negated conditionals
     - {% cache %}           — fragment caching for stats
     - | selectattr          — filter by attribute
@@ -49,12 +49,12 @@
       {% cache "board-stats", ttl=30 %}
       <span><strong>{{ all_tasks | length }}</strong> tasks</span>
       <span><strong>{{ all_tasks | selectattr("priority", "equalto", "high") | list | length }}</strong> high priority</span>
-      {% let assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
+      {% set assignees = all_tasks | map(attribute="assignee") | compact | unique | list %}
       <span><strong>{{ assignees | length }}</strong> people</span>
       {% end %}
     </div>
     {% end %}
-    {% let user = current_user() %}
+    {% set user = current_user() %}
     <div class="user-info">
       <span class="avatar">{{ user.name | first | upper }}</span>
       <span class="name">{{ user.name }}</span>
@@ -81,7 +81,7 @@
     {% end %}
 
     <h3>Assignee</h3>
-    {% let all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
+    {% set all_assignees = all_tasks | map(attribute="assignee") | compact | unique | sort | list %}
     {% unless all_assignees %}
       <p class="muted">No assignees.</p>
     {% end %}
@@ -96,7 +96,7 @@
     {% end %}
 
     <h3>Tags</h3>
-    {% let all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
+    {% set all_tags = all_tasks | map(attribute="tags") | sum(start=()) | unique | sort | list %}
     {% unless all_tags %}
       <p class="muted">No tags yet.</p>
     {% end %}
@@ -120,7 +120,7 @@
     {% block board %}
     <div id="board" class="board">
       {% for col_id, col_name in columns %}
-        {% let col_tasks = board.get(col_id, []) %}
+        {% set col_tasks = board.get(col_id, []) %}
         {% call column(col_id, col_name, col_tasks | length, oob=false) %}
           {% unless col_tasks %}
             <p class="empty">No tasks in {{ col_name | lower }}.</p>

@@ -143,7 +143,7 @@ def _unique_filename(original: str) -> str:
 def gallery():
     """Show the photo gallery with upload form."""
     photos = _get_photos()
-    return Template("gallery.html", photos=photos)
+    return Template("gallery.html", photos=photos, errors={}, form={})
 
 
 @app.route("/upload", methods=["POST"])

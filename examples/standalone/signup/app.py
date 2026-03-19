@@ -85,7 +85,7 @@ def index():
 @app.route("/signup")
 def signup_page():
     """Show the registration form."""
-    return Template("signup.html")
+    return Template("signup.html", errors={}, form={})
 
 
 @app.route("/signup", methods=["POST"])

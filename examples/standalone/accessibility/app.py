@@ -22,7 +22,7 @@ app = App(config=config)
 @app.route("/")
 def index():
     """Show the feedback form."""
-    return Template("index.html", success=False)
+    return Template("index.html", success=False, errors={}, name="", form={})
 
 
 @app.route("/feedback", methods=["POST"])

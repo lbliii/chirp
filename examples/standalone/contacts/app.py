@@ -117,7 +117,9 @@ _CONTACT_RULES = {
 def index(request: Request):
     """Full page or fragment depending on htmx request."""
     contacts = _get_contacts()
-    return Page("contacts.html", "contact_table", contacts=contacts, count=len(contacts))
+    return Page(
+        "contacts.html", "contact_table", contacts=contacts, count=len(contacts), errors={}, form={}
+    )
 
 
 @app.route("/contacts", methods=["POST"])
