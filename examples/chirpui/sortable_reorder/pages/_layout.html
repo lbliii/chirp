@@ -1,0 +1,28 @@
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% block title %}Recipe Builder{% end %}
+
+{% block brand %}Recipe Builder{% end %}
+
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">
+  Drag-and-drop step builder — Alpine + HTMX, no Sortable.js
+</span>
+{% end %}
+
+{% block topbar_end %}{{ theme_toggle() }}{% end %}
+
+{% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Recipe") %}
+    {{ sidebar_link("/", "Builder", icon="grid", active=true) }}
+  {% end %}
+{% end %}
+{% end %}
+
+{% block content %}
+{% block page_root %}{% end %}
+{% end %}

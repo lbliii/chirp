@@ -36,19 +36,27 @@
       "hx-target", "hx-swap", "hx-select", "hx-trigger", "hx-push-url",
     ];
     var result = {};
-    var node = elt;
-    while (node && node !== document.body) {
-      var disinherit = (node.getAttribute && node.getAttribute("hx-disinherit")) || "";
-      for (var i = 0; i < attrs.length; i++) {
-        var a = attrs[i];
-        if (disinherit && new RegExp(a.replace("hx-", "")).test(disinherit)) continue;
-        var v = node.getAttribute && node.getAttribute(a);
-        if (v !== null && result[a] === undefined) result[a] = v;
+    // Mirror HTMX 2 getClosestAttributeValue: walk up from element, set value when
+    // found, then clear it if a non-start ancestor has hx-disinherit for that attr.
+    for (var ai = 0; ai < attrs.length; ai++) {
+      var attrName = attrs[ai];
+      var attrShort = attrName.replace("hx-", "");
+      var found = null;
+      var node = elt;
+      while (node && node !== document.body) {
+        if (found === null && node.hasAttribute && node.hasAttribute(attrName)) {
+          found = node.getAttribute(attrName);
+        }
+        if (found !== null && node !== elt) {
+          var disinherit = (node.getAttribute && node.getAttribute("hx-disinherit")) || "";
+          if (disinherit && (disinherit === "*" || new RegExp("\\b" + attrShort + "\\b").test(disinherit))) {
+            found = null;
+            break;
+          }
+        }
+        node = node.parentElement;
       }
-      node = node.parentElement;
-    }
-    for (var j = 0; j < attrs.length; j++) {
-      if (result[attrs[j]] === undefined) result[attrs[j]] = "(default)";
+      result[attrName] = found !== null ? found : "(default)";
     }
     return result;
   }
@@ -129,6 +137,7 @@
     state.records.unshift(r);
     if (state.records.length > BUFFER_SIZE) state.records.pop();
     state.requestCount++;
+    updatePill();
     return r;
   }
 
@@ -218,6 +227,7 @@
     state.oobRecords.unshift(r);
     if (state.oobRecords.length > 50) state.oobRecords.pop();
     state.requestCount++;
+    updatePill();
   });
 
   document.body.addEventListener("htmx:oobAfterSwap", function(evt) {
@@ -743,13 +753,24 @@
     toast("Load Handler Error", String(d.error || "(unknown)"), COLORS.warning);
   });
 
+  function getEffectiveSelect(startElt) {
+    var node = startElt;
+    while (node && node !== document.body) {
+      var disinherit = node.getAttribute && node.getAttribute("hx-disinherit");
+      if (disinherit && (/\bhx-select\b/.test(disinherit) || disinherit.trim() === "*")) return null;
+      var s = node.getAttribute && node.getAttribute("hx-select");
+      if (s) return s.trim();
+      node = node.parentElement;
+    }
+    return null;
+  }
+
   document.body.addEventListener("htmx:beforeSwap", function(evt) {
     var d = evt.detail || {};
     var xhr = d.xhr;
     var elt = d.elt;
     if (!xhr || !xhr.responseText || !elt) return;
-    var sel = (elt.getAttribute && elt.getAttribute("hx-select")) ||
-      (elt.closest && elt.closest("[hx-select]") && elt.closest("[hx-select]").getAttribute("hx-select"));
+    var sel = getEffectiveSelect(elt);
     if (!sel || typeof sel !== "string") return;
     sel = sel.trim();
     if (sel.indexOf("#") !== 0 || sel.indexOf(" ") >= 0) return;

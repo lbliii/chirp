@@ -8,6 +8,7 @@ from kida import Environment, FileSystemLoader
 from chirp.http.request import Request
 from chirp.pages.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.pages.types import LayoutChain, LayoutInfo
+from chirp.server.negotiation_oob import compute_shell_region_updates
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.kida_adapter import KidaAdapter
 from chirp.templating.render_plan import (
@@ -317,7 +318,9 @@ class TestPageFragmentOobRegions:
             context={},
             layout_chain=layout_chain,
         )
-        plan = build_render_plan(comp, request=_htmx_boosted_request())
+        req = _htmx_boosted_request()
+        shell_updates = compute_shell_region_updates(comp, req, None)
+        plan = build_render_plan(comp, request=req, shell_region_updates=shell_updates)
         rendered = execute_render_plan(plan, adapter=adapter)
 
         # Boosted fragment always gets shell_actions; layout OOB added when cache_scope != site
@@ -358,10 +361,12 @@ class TestPageFragmentOobRegions:
             page_block="content",
             context={},
         )
+        shell_updates = compute_shell_region_updates(comp, tab_click_request, reg)
         plan = build_render_plan(
             comp,
             request=tab_click_request,
             fragment_target_registry=reg,
+            shell_region_updates=shell_updates,
         )
         rendered = execute_render_plan(plan, adapter=adapter)
 
@@ -406,10 +411,12 @@ class TestPageFragmentOobRegions:
             page_block="content",
             context={},
         )
+        shell_updates = compute_shell_region_updates(comp, narrow_request, reg)
         plan = build_render_plan(
             comp,
             request=narrow_request,
             fragment_target_registry=reg,
+            shell_region_updates=shell_updates,
         )
         rendered = execute_render_plan(plan, adapter=adapter)
 
@@ -428,7 +435,9 @@ class TestPageFragmentOobRegions:
             context={},
             layout_chain=layout_chain,
         )
-        plan = build_render_plan(comp, request=_htmx_boosted_request())
+        req = _htmx_boosted_request()
+        shell_updates = compute_shell_region_updates(comp, req, None)
+        plan = build_render_plan(comp, request=req, shell_region_updates=shell_updates)
         rendered = execute_render_plan(plan, adapter=adapter)
         html = serialize_rendered_plan(rendered)
 
@@ -482,7 +491,9 @@ class TestExplicitRegionUpdates:
                 ),
             ),
         )
-        plan = build_render_plan(comp, request=_htmx_boosted_request())
+        req = _htmx_boosted_request()
+        shell_updates = compute_shell_region_updates(comp, req, None)
+        plan = build_render_plan(comp, request=req, shell_region_updates=shell_updates)
         rendered = execute_render_plan(plan, adapter=adapter)
 
         assert "custom-badge" in rendered.region_htmls
@@ -547,7 +558,8 @@ class TestLayoutStartIndex:
             layout_chain=layout_chain,
         )
         request = _htmx_boosted_request(htmx_target="#app-content")
-        plan = build_render_plan(comp, request=request)
+        shell_updates = compute_shell_region_updates(comp, request, None)
+        plan = build_render_plan(comp, request=request, shell_region_updates=shell_updates)
 
         assert plan.layout_start_index == 1
 

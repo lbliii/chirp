@@ -1,0 +1,31 @@
+{% from "chirpui/layout.html" import container, stack %}
+{% from "chirpui/timeline.html" import timeline, timeline_item %}
+{% from "chirpui/empty.html" import empty_state %}
+{% from "chirpui/surface.html" import surface %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>Activity Log</h1>
+  <p class="chirpui-text-muted">All configuration changes are logged here. Toggle settings on the Settings page to see new entries appear.</p>
+
+  {% call surface(variant="elevated") %}
+  {% if activity %}
+  {% call timeline() %}
+    {% for entry in activity %}
+    {% call timeline_item(entry.message, entry.timestamp) %}{% end %}
+    {% end %}
+  {% end %}
+  {% else %}
+  {% call empty_state(icon="◇", title="No activity yet") %}
+  <p>Toggle a setting to see activity appear here.</p>
+  {% end %}
+  {% end %}
+  {% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}

@@ -27,7 +27,8 @@ Example output (with color)::
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from chirp.contracts import CheckResult, ContractIssue, Severity
@@ -182,14 +183,19 @@ def format_check_result(
         lines.append("")
 
     # ── Issues (errors first, then warnings, then info) ─────
-    errors = [i for i in result.issues if i.severity == Severity.ERROR]
-    warnings = [i for i in result.issues if i.severity == Severity.WARNING]
-    infos = [i for i in result.issues if i.severity == Severity.INFO]
+    by_severity: dict[Any, list[Any]] = defaultdict(list)
+    for i in result.issues:
+        by_severity[i.severity].append(i)
+    errors = by_severity[Severity.ERROR]
+    warnings = by_severity[Severity.WARNING]
+    infos = by_severity[Severity.INFO]
 
     route_shown = False
     for issue_group in (errors, warnings, infos):
-        route_in_group = [i for i in issue_group if getattr(i, "category", "") == "route_contract"]
-        if route_in_group and not route_shown:
+        if (
+            any(getattr(i, "category", "") == "route_contract" for i in issue_group)
+            and not route_shown
+        ):
             lines.append(f"  {c.cyan}Route contract{c.reset}")
             lines.append("")
             route_shown = True

@@ -1,0 +1,64 @@
+{# target: body #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (function(){
+      var t=localStorage.getItem('chirpui-theme')||'system';
+      var s=localStorage.getItem('chirpui-style')||'default';
+      document.documentElement.setAttribute('data-theme',t);
+      document.documentElement.setAttribute('data-style',s);
+    })();
+  </script>
+  <title id="chirpui-document-title">{{ page_title ?? "Stock Ticker" }}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script src="/static/chirpui.js"></script>
+  <link rel="stylesheet" href="/static/chirpui.css">
+  <link rel="stylesheet" href="/static/chirpui-transitions.css">
+</head>
+<body>
+{% from "chirpui/app_shell.html" import app_shell %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_section, sidebar_link %}
+{% from "chirpui/breadcrumbs.html" import breadcrumbs %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
+{{ breadcrumbs(breadcrumb_items) }}
+{% end %}
+
+{% region title_oob(page_title="Stock Ticker") %}
+<title id="chirpui-document-title" hx-swap-oob="true">{{ page_title }}</title>
+{% end %}
+
+{% region sidebar_oob(current_path="/") %}
+{% call sidebar() %}
+  {% call sidebar_section("Markets") %}
+    {{ sidebar_link("/", "Overview", icon="grid", active=current_path == "/") }}
+    {{ sidebar_link("/dashboard", "Watchlist", icon="star", active=current_path.startswith("/dashboard")) }}
+  {% end %}
+  {% call sidebar_section("Info") %}
+    {{ sidebar_link("/about", "How Islands Work", icon="alert", active=current_path.startswith("/about")) }}
+  {% end %}
+{% end %}
+{% end %}
+
+{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true) %}
+  {% slot topbar %}
+  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
+  {% end %}
+
+  {% slot topbar_end %}
+  {{ theme_toggle() }}
+  {% end %}
+
+  {% slot sidebar %}
+  {{ sidebar_oob(current_path=current_path ?? "/") }}
+  {% end %}
+
+  {% block content %}{% end %}
+{% end %}
+</body>
+</html>

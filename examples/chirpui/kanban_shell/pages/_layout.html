@@ -1,0 +1,42 @@
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% block title %}Kanban{% end %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/board.css">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+{% end %}
+
+{% block brand %}Kanban{% end %}
+
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">App shell + chirp-ui + mount_pages</span>
+{% end %}
+
+{% block topbar_end %}
+{{ theme_toggle() }}
+{% if (current_user ?? none) %}
+<div class="kanban-user-info">
+  <span class="kanban-avatar">{{ current_user.name | first | upper }}</span>
+  <span class="kanban-name">{{ current_user.name }}</span>
+  <form method="post" action="/logout" hx-boost="false" style="margin:0;display:inline">
+    {{ csrf_field() }}
+    <button type="submit" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm">Logout</button>
+  </form>
+</div>
+{% end %}
+{% end %}
+
+{% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Boards") %}
+    {{ sidebar_link("/", "Board", icon="grid", active=true) }}
+    {% if not ((current_user ?? none)) %}
+    {{ sidebar_link("/login", "Login", icon="user") }}
+    {% end %}
+  {% end %}
+{% end %}
+{% end %}

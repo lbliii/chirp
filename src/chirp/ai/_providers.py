@@ -7,11 +7,15 @@ Supported providers:
     - ``anthropic`` — Claude models (Messages API)
     - ``openai`` — GPT models (Chat Completions API)
     - ``ollama`` — Local models via Ollama (OpenAI-compatible API)
+    - ``lmstudio`` — Local models via LM Studio (OpenAI-compatible API)
+    - ``localai`` — Local models via LocalAI (OpenAI-compatible API)
 
 Provider string format: ``provider:model``
     - ``anthropic:claude-sonnet-4-20250514``
     - ``openai:gpt-4o``
     - ``ollama:llama3.2`` (uses OLLAMA_BASE env, default http://localhost:11434)
+    - ``lmstudio:model-id`` (uses LMSTUDIO_BASE env, default http://localhost:1234)
+    - ``localai:model-id`` (uses LOCALAI_BASE env, default http://localhost:8080)
 """
 
 import json
@@ -78,7 +82,25 @@ def parse_provider(provider_string: str, /, *, api_key: str | None = None) -> Pr
             base_url=base,
         )
 
-    msg = f"Unsupported provider: {provider!r}. Supported: anthropic, openai, ollama"
+    if provider == "lmstudio":
+        base = os.environ.get("LMSTUDIO_BASE", "http://localhost:1234").rstrip("/")
+        return ProviderConfig(
+            provider="lmstudio",
+            model=model,
+            api_key=api_key or "lmstudio",  # Required by API but ignored
+            base_url=base,
+        )
+
+    if provider == "localai":
+        base = os.environ.get("LOCALAI_BASE", "http://localhost:8080").rstrip("/")
+        return ProviderConfig(
+            provider="localai",
+            model=model,
+            api_key=api_key or "localai",  # Required by API but ignored
+            base_url=base,
+        )
+
+    msg = f"Unsupported provider: {provider!r}. Supported: anthropic, openai, ollama, lmstudio, localai"
     raise ValueError(msg)
 
 
@@ -91,6 +113,20 @@ def _get_httpx() -> Any:
     except ImportError:
         msg = "chirp.ai requires 'httpx' for LLM API calls. Install it with: pip install chirp[ai]"
         raise ProviderNotInstalledError(msg) from None
+
+
+async def _iter_sse_events(response: Any) -> AsyncIterator[dict[str, Any]]:
+    """Parse SSE events from response stream. Yields parsed JSON event dicts."""
+    async for line in response.aiter_lines():
+        if not line.startswith("data: "):
+            continue
+        payload = line[6:]
+        if payload.strip() == "[DONE]":
+            break
+        try:
+            yield json.loads(payload)
+        except json.JSONDecodeError:
+            continue
 
 
 # =============================================================================
@@ -176,17 +212,7 @@ async def anthropic_stream(
             text = await response.aread()
             raise ProviderError("anthropic", response.status_code, text.decode())
 
-        async for line in response.aiter_lines():
-            if not line.startswith("data: "):
-                continue
-            payload = line[6:]
-            if payload.strip() == "[DONE]":
-                break
-            try:
-                event = json.loads(payload)
-            except json.JSONDecodeError:
-                continue
-
+        async for event in _iter_sse_events(response):
             if event.get("type") == "content_block_delta":
                 delta = event.get("delta", {})
                 text = delta.get("text", "")
@@ -269,17 +295,7 @@ async def openai_stream(
             text = await response.aread()
             raise ProviderError("openai", response.status_code, text.decode())
 
-        async for line in response.aiter_lines():
-            if not line.startswith("data: "):
-                continue
-            payload = line[6:]
-            if payload.strip() == "[DONE]":
-                break
-            try:
-                event = json.loads(payload)
-            except json.JSONDecodeError:
-                continue
-
+        async for event in _iter_sse_events(response):
             choices = event.get("choices", [])
             if choices:
                 delta = choices[0].get("delta", {})

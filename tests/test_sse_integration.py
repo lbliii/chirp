@@ -504,10 +504,19 @@ class TestSSEPerEventErrorBoundary:
 
     async def test_bad_fragment_sends_targeted_error_in_debug(self) -> None:
         """In debug mode, error HTML replaces the specific block."""
-        app = _app(debug=True)
+        app = _app(debug=True, skip_contract_checks=True)
 
         @app.route("/submit", methods=["POST"])
         def submit():
+            return "ok"
+
+        # Stub routes to satisfy chirp check scanning boundary/chirpui_index.html
+        @app.route("/chat", methods=["POST"])
+        def chat():
+            return "ok"
+
+        @app.route("/stream")
+        def stream():
             return "ok"
 
         @app.route("/events")

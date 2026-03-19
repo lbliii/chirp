@@ -39,9 +39,9 @@ src/chirp/app.py:171-186 — __call__ passes all scopes to handle_request
 
 1. **Deadlock with pounce** — pounce sends `lifespan.startup` and waits for `startup.complete`. Chirp returns silently. Pounce blocks forever. Server never accepts HTTP requests. (Fixed on pounce side but still architecturally wrong on chirp side.)
 
-2. **No startup/shutdown hooks** — The `@app.on_startup` and `@app.on_shutdown` decorators are already used in the rag_demo example (`examples/rag_demo/app.py:97-122`) but are not implemented. Running the example would fail with `AttributeError`.
+2. **No startup/shutdown hooks** — The `@app.on_startup` and `@app.on_shutdown` decorators are already used in the rag_demo example (`examples/chirpui/rag_demo/app.py:97-122`) but are not implemented. Running the example would fail with `AttributeError`.
 
-3. **Resource lifecycle gap** — `Database` (`src/chirp/data/database.py:189-229`) has explicit `connect()`/`disconnect()` methods designed for lifespan integration. Without lifespan support, apps must either lazy-connect on first query (adds latency, hides errors) or seed at module import time (like the dashboard example at `examples/dashboard/app.py:87`).
+3. **Resource lifecycle gap** — `Database` (`src/chirp/data/database.py:189-229`) has explicit `connect()`/`disconnect()` methods designed for lifespan integration. Without lifespan support, apps must either lazy-connect on first query (adds latency, hides errors) or seed at module import time (like the dashboard example at `examples/standalone/dashboard/app.py:87`).
 
 4. **Freeze timing** — `_ensure_frozen()` runs on the first HTTP request (`src/chirp/app.py:173`), adding compilation latency to the first user's response. Under free-threading, multiple workers race to freeze. Moving this to the lifespan startup phase would eliminate both issues.
 
@@ -141,7 +141,7 @@ async def _handle_lifespan(self, scope, receive, send):
 
 **Pros**:
 - Matches chirp's existing decorator pattern (`@app.route`, `@app.error`, `@app.template_filter`)
-- Matches the API already used in `examples/rag_demo/app.py:97-122`
+- Matches the API already used in `examples/chirpui/rag_demo/app.py:97-122`
 - Simple and approachable — no new concepts for users
 - Supports both sync and async hooks via `inspect.isawaitable`
 
@@ -203,7 +203,7 @@ async def lifespan(app):
 **Recommendation**: Option A (Decorator Hooks)
 
 **Reasoning**:
-1. The API is already designed and used in `examples/rag_demo/app.py:97-122` — this implements what users already expect
+1. The API is already designed and used in `examples/chirpui/rag_demo/app.py:97-122` — this implements what users already expect
 2. Matches every other registration pattern in chirp: `@app.route`, `@app.error`, `@app.template_filter`, `@app.template_global` — all decorators stored in lists, compiled at freeze time
 3. The context manager API (Option B) can be added in a future RFC without breaking changes
 4. Solves all five pain points identified in the problem statement
@@ -276,6 +276,6 @@ async def lifespan(app):
 
 - **Pounce fix**: `pounce/asgi/lifespan.py` — `_run_app()` now handles silent returns in `finally`
 - **ASGI Lifespan Spec**: https://asgi.readthedocs.io/en/latest/specs/lifespan.html
-- **Existing API usage**: `examples/rag_demo/app.py:97-122` — `@app.on_startup` / `@app.on_shutdown`
+- **Existing API usage**: `examples/chirpui/rag_demo/app.py:97-122` — `@app.on_startup` / `@app.on_shutdown`
 - **Database lifecycle**: `src/chirp/data/database.py:189-229` — `connect()`/`disconnect()` methods
-- **Dashboard workaround**: `examples/dashboard/app.py:87` — module-level `_seed_readings()` call
+- **Dashboard workaround**: `examples/standalone/dashboard/app.py:87` — module-level `_seed_readings()` call

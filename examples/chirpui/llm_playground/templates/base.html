@@ -1,0 +1,26 @@
+{% extends "chirp/layouts/shell.html" %}
+{% block title %}{{ title ?? "LLM Playground" }}{% end %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/chirpui.css">
+<link rel="stylesheet" href="/static/chirpui-transitions.css">
+<link rel="stylesheet" href="/static/themes/holy-light.css">
+<link rel="stylesheet" href="/static/playground/playground.css">
+<script src="/static/chirpui.js"></script>
+<script>
+(function(){var t=localStorage.getItem("chirpui-theme")||"system";var s=localStorage.getItem("chirpui-style")||"default";document.documentElement.setAttribute("data-theme",t);document.documentElement.setAttribute("data-style",s);})();
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+<script>
+document.addEventListener("alpine:init",function(){
+  Alpine.store("modals",{});
+  Alpine.store("trays",{});
+  Alpine.effect(function(){
+    var any=Object.values(Alpine.store("modals")).some(Boolean)||Object.values(Alpine.store("trays")).some(Boolean);
+    document.body.style.overflow=any?"hidden":"";
+  });
+});
+</script>
+{% end %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Developer Survey{% endblock %}
+
+{% block content %}
+<h1>Developer Survey</h1>
+<p class="subtitle">Tell us about yourself and your interests.</p>
+
+{% block survey_form %}
+{% set errors = errors ?? {} %}
+{% set form = form ?? None %}
+{% set selected_interests = selected_interests ?? [] %}
+<form method="post" action="/submit">
+
+  <label for="name">Full name</label>
+  <input type="text" id="name" name="name"
+         value="{{ form?.name ?? '' }}"
+         class="{{ 'error' if 'name' in errors else '' }}"
+         placeholder="Jane Doe">
+  {% if 'name' in errors %}
+    {% for msg in errors['name'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <label for="age">Age</label>
+  <input type="number" id="age" name="age" min="1" max="150"
+         value="{{ form?.age ?? '' }}"
+         class="{{ 'error' if 'age' in errors else '' }}"
+         placeholder="25">
+  {% if 'age' in errors %}
+    {% for msg in errors['age'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <label>Interests <span class="hint">(select all that apply)</span></label>
+  <div class="checkbox-group">
+    {% for key, label in interests %}
+    <label>
+      <input type="checkbox" name="interests" value="{{ key }}"
+             {{ 'checked' if key in selected_interests else '' }}>
+      {{ label }}
+    </label>
+    {% end %}
+  </div>
+  {% if 'interests' in errors %}
+    {% for msg in errors['interests'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <label>Experience level</label>
+  <div class="radio-group">
+    {% for key, label in experience_levels %}
+    <label>
+      <input type="radio" name="experience" value="{{ key }}"
+             {{ 'checked' if form?.experience == key else '' }}>
+      {{ label }}
+    </label>
+    {% end %}
+  </div>
+  {% if 'experience' in errors %}
+    {% for msg in errors['experience'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <label for="country">Country</label>
+  <select id="country" name="country"
+          class="{{ 'error' if 'country' in errors else '' }}">
+    {% for key, label in countries %}
+    <option value="{{ key }}"
+            {{ 'selected' if form?.country == key else '' }}>
+      {{ label }}
+    </option>
+    {% end %}
+  </select>
+  {% if 'country' in errors %}
+    {% for msg in errors['country'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <label for="comments">Comments <span class="hint">(optional)</span></label>
+  <textarea id="comments" name="comments"
+            class="{{ 'error' if 'comments' in errors else '' }}"
+            placeholder="Anything else you'd like to share?">{{ form?.comments ?? '' }}</textarea>
+  {% if 'comments' in errors %}
+    {% for msg in errors['comments'] %}
+    <p class="field-error">{{ msg }}</p>
+    {% end %}
+  {% end %}
+
+  <button type="submit">Submit survey</button>
+</form>
+{% endblock %}
+{% endblock %}

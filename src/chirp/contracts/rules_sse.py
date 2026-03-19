@@ -5,7 +5,7 @@ import re
 from chirp.routing.router import Router
 
 from .declarations import SSEContract
-from .routes import path_matches_route
+from .routes import build_route_index, find_matching_route
 from .types import ContractIssue, Severity
 
 _SSE_CONNECT_TAG_PATTERN = re.compile(
@@ -106,6 +106,10 @@ def check_sse_event_crossref(
     if not sse_routes:
         return issues
 
+    # Pre-segment for O(1) static / O(parametric) URL matching
+    route_paths = {path: frozenset() for path in sse_routes}
+    static_routes, parametric_routes = build_route_index(route_paths)
+
     for template_name, source in template_sources.items():
         swap_values = extract_sse_swap_values(source)
         if not swap_values:
@@ -113,15 +117,11 @@ def check_sse_event_crossref(
         for connect_match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
             raw_url = connect_match.group("url")
             url = normalize_sse_url(raw_url)
-            matched_route: str | None = None
-            matched_contract: SSEContract | None = None
-            for route_path, sse_contract in sse_routes.items():
-                if path_matches_route(url, route_path):
-                    matched_route = route_path
-                    matched_contract = sse_contract
-                    break
-            if matched_contract is None or matched_route is None:
+            match = find_matching_route(url, static_routes, parametric_routes)
+            if match is None:
                 continue
+            matched_route, _ = match
+            matched_contract = sse_routes[matched_route]
 
             declared = matched_contract.event_types
             undeclared = swap_values - declared

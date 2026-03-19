@@ -9,10 +9,27 @@ replace an entire zone.
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-SHELL_ACTIONS_CONTEXT_KEY = "shell_actions"
-SHELL_ACTIONS_TARGET = "chirp-shell-actions"
-SHELL_ACTIONS_TEMPLATE = "chirp/shell_actions.html"
-SHELL_ACTIONS_BLOCK = "content"
+from chirp.shell_actions import (
+    SHELL_ACTIONS_BLOCK,
+    SHELL_ACTIONS_CONTEXT_KEY,
+    SHELL_ACTIONS_TARGET,
+    SHELL_ACTIONS_TEMPLATE,
+)
+
+__all__ = [
+    "SHELL_ACTIONS_BLOCK",
+    "SHELL_ACTIONS_CONTEXT_KEY",
+    "SHELL_ACTIONS_TARGET",
+    "SHELL_ACTIONS_TEMPLATE",
+    "ShellAction",
+    "ShellActionZone",
+    "ShellActions",
+    "ShellMenuItem",
+    "merge_shell_actions",
+    "normalize_shell_actions",
+    "shell_actions_fragment",
+    "validate_shell_actions",
+]
 
 type ShellActionKind = Literal["link", "button", "menu"]
 type ShellActionVariant = Literal["default", "primary", "secondary", "danger"]

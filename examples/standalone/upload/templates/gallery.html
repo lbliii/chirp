@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Photo Gallery{% endblock %}
+
+{% block content %}
+<h1>Photo Gallery</h1>
+
+{% block upload_form %}
+{% set errors = errors ?? {} %}
+{% set form = form ?? None %}
+<form method="post" action="/upload" enctype="multipart/form-data">
+  {{ csrf_field() }}
+
+  <label for="title">Title</label>
+  <input type="text" id="title" name="title"
+         value="{{ form?.title ?? '' }}"
+         class="{{ 'error' if 'title' in errors else '' }}"
+         placeholder="A name for your photo">
+  {% for msg in errors.get("title", []) %}
+    <p class="field-error">{{ msg }}</p>
+  {% end %}
+
+  <label for="description">Description <span class="hint">(optional)</span></label>
+  <textarea id="description" name="description"
+            class="{{ 'error' if 'description' in errors else '' }}"
+            placeholder="Tell us about this photo">{{ form?.description ?? '' }}</textarea>
+  {% for msg in errors.get("description", []) %}
+    <p class="field-error">{{ msg }}</p>
+  {% end %}
+
+  <label for="photo">Photo</label>
+  <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/gif,image/webp">
+  {% for msg in errors.get("photo", []) %}
+    <p class="field-error">{{ msg }}</p>
+  {% end %}
+  <p class="hint">JPEG, PNG, GIF, or WebP. Max 5 MB.</p>
+
+  <button type="submit" style="margin-top: 1rem;">Upload photo</button>
+</form>
+{% endblock %}
+
+<hr>
+
+{% unless photos %}
+<p class="empty">No photos yet. Upload one above!</p>
+{% else %}
+<div class="grid">
+  {% for photo in photos %}
+  <a href="/photos/{{ photo.id }}" class="card" style="text-decoration: none; color: inherit;">
+    <img src="/uploads/{{ photo.filename }}" alt="{{ photo.title }}">
+    <div class="card-body">
+      <h3>{{ photo.title }}</h3>
+      <p>{{ photo.size | filesizeformat }}</p>
+    </div>
+  </a>
+  {% end %}
+</div>
+{% end %}
+{% endblock %}

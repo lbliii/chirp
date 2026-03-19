@@ -146,7 +146,9 @@ class TestLayoutPageSlotContext:
             "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
-        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+        env = create_environment(
+            AppConfig(template_dir=tmp_path), filters={}, globals_={"shell_actions": None}
+        )
 
         result = negotiate(Template("page.html"), kida_env=env)
 
@@ -166,7 +168,9 @@ class TestLayoutPageSlotContext:
             "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
-        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+        env = create_environment(
+            AppConfig(template_dir=tmp_path), filters={}, globals_={"shell_actions": None}
+        )
 
         result = negotiate(Template("page.html"), kida_env=env)
 

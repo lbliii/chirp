@@ -269,6 +269,10 @@ def primitive_attrs(
 BUILTIN_GLOBALS: dict[str, Any] = {
     "island_attrs": island_attrs,
     "primitive_attrs": primitive_attrs,
+    # Always expose shell_actions so chirp-ui's ``shell_actions is defined``
+    # check (kida 0.2.8 strict undefined variables) works even when no route
+    # contributes shell actions. Per-request context overrides this None default.
+    "shell_actions": None,
 }
 
 

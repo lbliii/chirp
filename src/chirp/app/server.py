@@ -1,5 +1,7 @@
 """Server launch orchestration for App."""
 
+import os
+import sys
 from typing import TYPE_CHECKING
 
 from chirp.config import AppConfig
@@ -31,14 +33,36 @@ class ServerLauncher:
     ) -> None:
         resolved_host = host or self._config.host
         resolved_port = port or self._config.port
+        try:
+            self._launch(app, resolved_host, resolved_port, lifecycle_collector)
+        except KeyboardInterrupt:
+            pass
+        except Exception as exc:
+            from chirp.server.terminal_errors import format_startup_error
+
+            msg = format_startup_error(exc)
+            if msg is not None:
+                if os.environ.get("CHIRP_TRACEBACK", "").lower() == "full":
+                    raise
+                print(msg, file=sys.stderr)
+                raise SystemExit(1) from exc
+            raise
+
+    def _launch(
+        self,
+        app: App,
+        host: str,
+        port: int,
+        lifecycle_collector: LifecycleCollector | None,
+    ) -> None:
         if self._config.debug:
             from chirp.server.dev import run_dev_server
 
             reload_dirs = (*self._config.reload_dirs, *self._mutable.reload_dirs_extra)
             run_dev_server(
                 app,
-                resolved_host,
-                resolved_port,
+                host,
+                port,
                 reload=self._config.debug,
                 reload_include=self._config.reload_include,
                 reload_dirs=reload_dirs,
@@ -50,8 +74,8 @@ class ServerLauncher:
 
         run_production_server(
             app,
-            host=resolved_host,
-            port=resolved_port,
+            host=host,
+            port=port,
             workers=self._config.workers,
             metrics_enabled=self._config.metrics_enabled,
             metrics_path=self._config.metrics_path,

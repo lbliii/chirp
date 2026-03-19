@@ -1,0 +1,127 @@
+{% from "chirpui/badge.html" import badge %}
+{% from "chirpui/card.html" import card %}
+{% from "chirpui/layout.html" import container, stack, grid, cluster %}
+{% from "chirpui/entity_header.html" import entity_header %}
+{% from "chirpui/description_list.html" import description_list, description_item %}
+{% from "chirpui/metric_grid.html" import metric_grid, metric_card %}
+{% from "chirpui/nav_link.html" import nav_link %}
+{% from "chirpui/timeline.html" import timeline, timeline_item %}
+{% from "chirpui/table.html" import table, row %}
+{% from "chirpui/button.html" import btn %}
+{% from "chirpui/skeleton.html" import skeleton %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+{% call container(max_width="76rem") %}
+{% call stack(gap="lg", cls="example-page") %}
+
+{% call entity_header(
+  title=project.name ~ " Documentation",
+  meta=project.owner ~ " · v" ~ project.version
+) %}
+{% slot actions %}
+{{ badge(project.status, variant="info") }}
+{{ nav_link("/projects/" ~ project.slug ~ "/settings", "Settings") }}
+{% end %}
+{% end %}
+
+{# Tab navigation #}
+{% set tab = (active_tab ?? "overview") %}
+{% call cluster(gap="sm") %}
+  {{ btn("Overview", variant="primary" if tab == "overview" else "ghost", size="sm",
+         href="/projects/" ~ project.slug,
+         hx_get="/projects/" ~ project.slug, hx_target="#page-root", hx_swap="innerHTML",
+         attrs_map={"hx-push-url": "true"}) }}
+  {{ btn("API Reference", variant="primary" if tab == "api" else "ghost", size="sm",
+         href="/projects/" ~ project.slug ~ "?tab=api",
+         hx_get="/projects/" ~ project.slug ~ "?tab=api", hx_target="#page-root", hx_swap="innerHTML",
+         attrs_map={"hx-push-url": "true"}) }}
+  {{ btn("Changelog", variant="primary" if tab == "changelog" else "ghost", size="sm",
+         href="/projects/" ~ project.slug ~ "?tab=changelog",
+         hx_get="/projects/" ~ project.slug ~ "?tab=changelog", hx_target="#page-root", hx_swap="innerHTML",
+         attrs_map={"hx-push-url": "true"}) }}
+{% end %}
+
+{% if (active_tab ?? "overview") == "overview" %}
+{% call grid(cols=2, gap="lg") %}
+  {% call card(title="Overview", subtitle=project.owner) %}
+    <p>{{ project.summary }}</p>
+    {% call description_list(variant="stacked") %}
+      {{ description_item("Version", project.version) }}
+      {{ description_item("Status", project.status) }}
+      {{ description_item("Owner", project.owner) }}
+      {{ description_item("API endpoints", project.api_endpoints | length ~ " endpoints") }}
+    {% end %}
+  {% end %}
+
+  {% call card(title="Architecture", subtitle="How this route works") %}
+    {% call description_list(variant="stacked") %}
+      {{ description_item("Parent context", "Provides the project catalog") }}
+      {{ description_item("Child context", "Resolves a single project by slug") }}
+      {{ description_item("Navigation", "Boosted nav refreshes shell actions out-of-band") }}
+      {{ description_item("Tabs", "Query param switches between Overview / API / Changelog") }}
+    {% end %}
+  {% end %}
+
+  {% block stats %}
+  {% call card(title="Build stats", subtitle="Deferred via Suspense", cls="chirpui-block--span-full") %}
+    <div id="project-stats">
+      {% if (stats ?? none) %}
+        {% call metric_grid(cols=3, gap="sm") %}
+          {% for item in stats %}
+          {{ metric_card(value=item.value, label=item.label) }}
+          {% end %}
+        {% end %}
+      {% else %}
+      {{ skeleton(variant="text", lines=2) }}
+      {% end %}
+    </div>
+  {% end %}
+  {% endblock %}
+
+  {% block activity %}
+  {% call card(title="Recent activity", subtitle="Deferred via Suspense", cls="chirpui-block--span-full") %}
+    <div id="project-activity">
+      {% if (activity ?? none) %}
+        {% call timeline() %}
+          {% for item in activity %}
+          {% call timeline_item(item, "just now") %}{% end %}
+          {% end %}
+        {% end %}
+      {% else %}
+      {{ skeleton(variant="text", lines=3) }}
+      {% end %}
+    </div>
+  {% end %}
+  {% endblock %}
+{% end %}
+
+{% elif (active_tab ?? "overview") == "api" %}
+{% call card(title="API Reference", subtitle=project.api_endpoints | length ~ " endpoints") %}
+  {% call table(headers=["Method", "Path", "Description"], striped=true) %}
+    {% for ep in project.api_endpoints %}
+    {{ row(
+      badge(ep.method, variant="info" if ep.method == "GET" else ("success" if ep.method == "POST" else ("warning" if ep.method == "PUT" else "danger"))),
+      "<code>" ~ ep.path ~ "</code>",
+      ep.description
+    ) }}
+    {% end %}
+  {% end %}
+{% end %}
+
+{% elif (active_tab ?? "overview") == "changelog" %}
+{% call card(title="Changelog") %}
+  {% call timeline() %}
+    {% for entry in project.changelog %}
+    {% call timeline_item(entry.version ~ " — " ~ entry.description, entry.date) %}{% end %}
+    {% end %}
+  {% end %}
+{% end %}
+{% end %}
+
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}

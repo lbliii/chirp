@@ -211,7 +211,7 @@ class LLM:
                 temperature=temperature,
                 system=system,
             )
-        if self._config.provider in ("openai", "ollama"):
+        if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
             # OpenAI and Ollama use system message in messages array
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
@@ -244,7 +244,7 @@ class LLM:
                 yield token
             return
 
-        if self._config.provider in ("openai", "ollama"):
+        if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
             if system:
                 messages = [{"role": "system", "content": system}, *messages]
             async for token in openai_stream(

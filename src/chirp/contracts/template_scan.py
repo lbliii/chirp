@@ -1,6 +1,7 @@
 """Template source scanners used by contracts checker."""
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 # \baction\b avoids matching "action" inside form_action, data-action, etc.
@@ -35,7 +36,7 @@ _MUTATING_WITH_TARGET = re.compile(
     r'[^>]*\bhx-target\s*=\s*["\']#([^"\'\s]+)["\']',
     re.IGNORECASE,
 )
-_LEGACY_ACTION_PATTERN = re.compile(r'\baction\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
+_LEGACY_ACTION_PATTERN = re.compile(r'(?<![-\w])action\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
 
 
 def _is_static_url_candidate(url: str) -> bool:
@@ -65,11 +66,16 @@ def _is_kida_expression_continued(source: str, match_end: int) -> bool:
 
 def get_form_method(source: str, action_pos: int) -> str | None:
     """Return POST only when form has method='post', otherwise GET."""
+    from collections import deque
+
     before = source[:action_pos]
-    form_matches = list(re.finditer(r"<form\b", before, re.IGNORECASE))
-    if not form_matches:
+    last_match = next(
+        iter(deque(re.finditer(r"<form\b", before, re.IGNORECASE), maxlen=1)),
+        None,
+    )
+    if last_match is None:
         return None
-    form_start = form_matches[-1].start()
+    form_start = last_match.start()
     tag_end = source.find(">", form_start)
     if tag_end == -1 or tag_end < action_pos:
         return None
@@ -204,8 +210,17 @@ def extract_mutation_target_ids(source: str) -> set[str]:
     return ids
 
 
+def _load_one(loader: Any, name: str) -> tuple[str, str] | None:
+    """Load a single template; returns (name, source) or None on error."""
+    try:
+        source, _ = loader.get_source(name)
+        return (name, source)
+    except Exception:
+        return None
+
+
 def load_template_sources(kida_env: Any) -> dict[str, str]:
-    """Load all template sources from environment loader."""
+    """Load all template sources from environment loader (parallel disk reads)."""
     sources: dict[str, str] = {}
     loader = kida_env.loader
     if loader is None:
@@ -214,15 +229,15 @@ def load_template_sources(kida_env: Any) -> dict[str, str]:
     if list_fn is None:
         return sources
     try:
-        names = list_fn()
-        for name in names:
-            if not name.endswith(_TEMPLATE_SOURCE_SUFFIXES):
-                continue
-            try:
-                source, _ = loader.get_source(name)
-                sources[name] = source
-            except Exception:
-                pass
+        names = [n for n in list_fn() if n.endswith(_TEMPLATE_SOURCE_SUFFIXES)]
+        if not names:
+            return sources
+        with ThreadPoolExecutor(max_workers=min(8, len(names))) as pool:
+            futures = {pool.submit(_load_one, loader, name): name for name in names}
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    sources[result[0]] = result[1]
     except Exception:
         pass
     return sources

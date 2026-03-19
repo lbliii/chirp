@@ -296,5 +296,6 @@ See [[docs/examples/rag-demo|RAG demo]] for the full implementation.
 | `sse_scope` | ERROR | `sse-connect` inside broad `hx-target` without mitigation |
 | `swap_safety` | WARNING | `sse-swap` element inheriting a broad `hx-target` |
 | `swap_safety` | INFO | `sse-swap` without `hx-target="this"` (suggests adding it for robustness) |
+| `select_inheritance` | WARNING | Mutating htmx element may inherit a broad `hx-select` from a layout ancestor; fragment responses may be silently discarded (see [[docs/templates/layout-patterns|Layout Patterns]]) |
 
 Run `chirp check myapp:app` during development to catch these before runtime.

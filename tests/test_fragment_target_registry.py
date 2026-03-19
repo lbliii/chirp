@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from chirp.http.request import Request
+from chirp.server.negotiation_oob import compute_shell_region_updates
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import (
     FragmentTargetConfig,
@@ -311,6 +312,12 @@ def test_build_render_plan_main_target_boosted_returns_page_root() -> None:
         receive=_receive,
     )
 
-    plan = build_render_plan(comp, request=request, fragment_target_registry=reg)
+    shell_updates = compute_shell_region_updates(comp, request, reg)
+    plan = build_render_plan(
+        comp,
+        request=request,
+        fragment_target_registry=reg,
+        shell_region_updates=shell_updates,
+    )
     assert plan.intent == "page_fragment"
     assert plan.main_view.block == "page_root"

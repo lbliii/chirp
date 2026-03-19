@@ -1,0 +1,34 @@
+{% from "chirpui/card.html" import card %}
+{% from "chirpui/layout.html" import container, page_header, stack %}
+{% from "chirpui/nav_link.html" import nav_link %}
+{% from "chirpui/description_list.html" import description_list, description_item %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+<div class="example-page">
+{% call container(max_width="48rem") %}
+{% call stack(gap="lg") %}
+{% call page_header(
+  "Project settings",
+  subtitle=project.name,
+  meta="Form page with mode='replace' — replaces parent shell actions entirely."
+) %}
+{% slot actions %}
+{{ nav_link("/projects/" ~ slug, "← Back to project") }}
+{% end %}
+{% end %}
+
+{% call card(title="Settings", subtitle="Shell actions override demo") %}
+  {% call description_list(variant="stacked") %}
+    {{ description_item("Mode", "mode=\"replace\" on all zones") }}
+    {{ description_item("Topbar", "Shows only Save and Cancel — no inherited actions") }}
+    {{ description_item("Pattern", "Use for wizard steps, install flows, or settings forms") }}
+  {% end %}
+{% end %}
+{% end %}
+{% end %}
+</div>
+{% end %}
+{% end %}
+{% end %}

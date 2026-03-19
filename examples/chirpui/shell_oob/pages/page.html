@@ -1,0 +1,49 @@
+{% from "chirpui/layout.html" import container, stack, grid, section_header %}
+{% from "chirpui/metric_grid.html" import metric_grid, metric_card %}
+{% from "chirpui/timeline.html" import timeline, timeline_item %}
+{% from "chirpui/surface.html" import surface %}
+{% from "chirpui/settings_row.html" import settings_row_list, settings_row %}
+
+{% block page_root %}
+{% block page_root_inner %}
+{% block page_content %}
+{% call container() %}
+{% call stack(gap="lg") %}
+  <h1>Dashboard</h1>
+  <p class="chirpui-text-muted">Overview of your team configuration. Toggle settings on the Settings page — stats update via OOB on navigation.</p>
+
+  {% call metric_grid(cols=4) %}
+    {{ metric_card(value=stats.total_settings, label="Total Settings", icon="settings") }}
+    {{ metric_card(value=stats.enabled_count, label="Enabled", icon="check", trend="up") }}
+    {{ metric_card(value=stats.disabled_count, label="Disabled", icon="close") }}
+    {{ metric_card(value=stats.categories, label="Categories", icon="grid") }}
+  {% end %}
+
+  {% call grid(cols=2, gap="lg") %}
+    {% call surface(variant="elevated") %}
+    {% call stack(gap="sm") %}
+      {{ section_header("Quick Status") }}
+      {% call settings_row_list() %}
+        {% for s in settings[:5] %}
+        {{ settings_row(s.label, status="Enabled" if s.enabled else "Disabled", detail=s.category, status_variant="success" if s.enabled else "muted") }}
+        {% end %}
+      {% end %}
+    {% end %}
+    {% end %}
+
+    {% call surface(variant="elevated") %}
+    {% call stack(gap="sm") %}
+      {{ section_header("Recent Activity") }}
+      {% call timeline() %}
+        {% for entry in activity %}
+        {% call timeline_item(entry.message, entry.timestamp) %}{% end %}
+        {% end %}
+      {% end %}
+    {% end %}
+    {% end %}
+  {% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}
+{% end %}

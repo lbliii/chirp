@@ -1,0 +1,22 @@
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% block title %}{{ title ?? "Docs" }}{% end %}
+
+{% block head_extra %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/rag/rag.css">
+{% end %}
+
+{% block brand %}Documentation{% end %}
+
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">
+  Streaming AI answers with cited sources — keyword search (not semantic)
+</span>
+{% end %}
+
+{% block topbar_end %}{{ theme_toggle() }}{% end %}

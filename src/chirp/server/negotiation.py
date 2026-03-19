@@ -22,6 +22,7 @@ from chirp.http.response import (
 from chirp.realtime.events import EventStream
 from chirp.server.negotiation_oob import (
     append_shell_actions_oob_stream,
+    compute_shell_region_updates,
     should_append_streamed_shell_actions_oob,
 )
 from chirp.templating.composition import PageComposition
@@ -75,6 +76,51 @@ def _html_response(body: str, *, intent: RenderIntent) -> Response:
         content_type="text/html; charset=utf-8",
         render_intent=intent,
     )
+
+
+def _fragment_response(body: str) -> Response:
+    """Build a text/html response for fragment-returning endpoints."""
+    return _html_response(body, intent="fragment")
+
+
+def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environment:
+    """Raise ConfigurationError if kida_env is None (template return types need it)."""
+    if kida_env is None:
+        msg = (
+            f"{return_type} return type requires kida integration. "
+            "Ensure a template_dir is configured in AppConfig."
+        )
+        raise ConfigurationError(msg)
+    return kida_env
+
+
+def _render_composition(
+    composition: PageComposition,
+    request: Request | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+    kida_env: Environment,
+    validate_blocks: bool,
+    oob_registry: OOBRegistry | None,
+) -> Response:
+    """Shared 5-step pipeline: shell updates → plan → execute → serialize → response."""
+    shell_updates = compute_shell_region_updates(composition, request, fragment_target_registry)
+    plan = build_render_plan(
+        composition,
+        request=request,
+        fragment_target_registry=fragment_target_registry,
+        shell_region_updates=shell_updates,
+    )
+    _set_layout_debug_from_plan(plan, request)
+    adapter = KidaAdapter(kida_env)
+    rendered = execute_render_plan(
+        plan,
+        adapter=adapter,
+        validate_blocks=validate_blocks,
+        oob_registry=oob_registry,
+    )
+    html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
+    intent = "fragment" if plan.intent != "full_page" else "full_page"
+    return _html_response(html, intent=intent)
 
 
 def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:
@@ -146,7 +192,7 @@ def negotiate(
                 if value.fragments and kida_env is not None:
                     parts = [render_fragment(kida_env, frag) for frag in value.fragments]
                     html = "\n".join(parts)
-                    response = _html_response(html, intent="fragment")
+                    response = _fragment_response(html)
                     if value.trigger:
                         response = response.with_hx_trigger(value.trigger)
                     return response
@@ -159,12 +205,7 @@ def negotiate(
                     .with_header("Location", value.redirect)
                 )
         case Template():
-            if kida_env is None:
-                msg = (
-                    "Template return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "Template")
             html = render_template(kida_env, value)
             return _html_response(html, intent="full_page")
         case InlineTemplate():
@@ -173,64 +214,33 @@ def negotiate(
             html = tmpl.render(value.context)
             return _html_response(html, intent="full_page")
         case Fragment():
-            if kida_env is None:
-                msg = (
-                    "Fragment return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "Fragment")
             html = render_fragment(kida_env, value)
-            return _html_response(html, intent="fragment")
+            return _fragment_response(html)
         case Page() | LayoutPage():
-            if kida_env is None:
-                msg = (
-                    "Page/LayoutPage return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "Page/LayoutPage")
             composition = normalize_to_composition(value)
             if composition is None:
                 msg = f"Cannot normalize {type(value).__name__} to composition"
                 raise TypeError(msg)
-            plan = build_render_plan(
+            return _render_composition(
                 composition,
-                request=request,
-                fragment_target_registry=fragment_target_registry,
+                request,
+                fragment_target_registry,
+                kida_env,
+                validate_blocks,
+                oob_registry,
             )
-            _set_layout_debug_from_plan(plan, request)
-            adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(
-                plan,
-                adapter=adapter,
-                validate_blocks=validate_blocks,
-                oob_registry=oob_registry,
-            )
-            html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
-            intent = "fragment" if plan.intent != "full_page" else "full_page"
-            return _html_response(html, intent=intent)
         case PageComposition():
-            if kida_env is None:
-                msg = (
-                    "PageComposition return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
-            plan = build_render_plan(
+            kida_env = _require_kida_env(kida_env, "PageComposition")
+            return _render_composition(
                 value,
-                request=request,
-                fragment_target_registry=fragment_target_registry,
+                request,
+                fragment_target_registry,
+                kida_env,
+                validate_blocks,
+                oob_registry,
             )
-            _set_layout_debug_from_plan(plan, request)
-            adapter = KidaAdapter(kida_env)
-            rendered = execute_render_plan(
-                plan,
-                adapter=adapter,
-                validate_blocks=validate_blocks,
-                oob_registry=oob_registry,
-            )
-            html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
-            intent = "fragment" if plan.intent != "full_page" else "full_page"
-            return _html_response(html, intent=intent)
         case Action():
             response = Response(body="").with_status(value.status)
             if value.trigger is not None:
@@ -239,25 +249,15 @@ def negotiate(
                 response = response.with_hx_refresh()
             return response
         case ValidationError():
-            if kida_env is None:
-                msg = (
-                    "ValidationError return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "ValidationError")
             frag = Fragment(value.template_name, value.block_name, **value.context)
             html = render_fragment(kida_env, frag)
-            response = _html_response(html, intent="fragment").with_status(422)
+            response = _fragment_response(html).with_status(422)
             if value.retarget is not None:
                 response = response.with_hx_retarget(value.retarget)
             return response
         case OOB():
-            if kida_env is None:
-                msg = (
-                    "OOB return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "OOB")
             main_response = negotiate(
                 value.main,
                 kida_env=kida_env,
@@ -281,14 +281,9 @@ def negotiate(
                 else:
                     parts.append(html)
             body = "\n".join(parts)
-            return _html_response(body, intent="fragment")
+            return _fragment_response(body)
         case Stream():
-            if kida_env is None:
-                msg = (
-                    "Stream return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "Stream")
             if has_async_context(value.context):
                 # Async sources detected — resolve concurrently, then stream
                 chunks = render_stream_async(kida_env, value)
@@ -304,12 +299,7 @@ def negotiate(
                 content_type="text/html; charset=utf-8",
             )
         case TemplateStream():
-            if kida_env is None:
-                msg = (
-                    "TemplateStream return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "TemplateStream")
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream_async(**value.context)
             return StreamingResponse(
@@ -317,12 +307,7 @@ def negotiate(
                 content_type="text/html; charset=utf-8",
             )
         case LayoutSuspense():
-            if kida_env is None:
-                msg = (
-                    "LayoutSuspense return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "LayoutSuspense")
             req = value.request if value.request is not None else request
             is_htmx = bool(req and req.is_fragment)
             chunks = render_suspense(
@@ -341,12 +326,7 @@ def negotiate(
                 content_type="text/html; charset=utf-8",
             )
         case Suspense():
-            if kida_env is None:
-                msg = (
-                    "Suspense return type requires kida integration. "
-                    "Ensure a template_dir is configured in AppConfig."
-                )
-                raise ConfigurationError(msg)
+            kida_env = _require_kida_env(kida_env, "Suspense")
             is_htmx = request is not None and request.is_fragment
             chunks = render_suspense(kida_env, value, is_htmx=is_htmx, oob_registry=oob_registry)
             return StreamingResponse(

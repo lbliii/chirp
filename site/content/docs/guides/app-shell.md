@@ -157,7 +157,7 @@ use `{% region %}` instead of blocks. One definition serves both — no duplicat
 {% end %}
 ```
 
-See `examples/shell_oob` for the reference implementation. The block-based
+See `examples/chirpui/shell_oob` for the reference implementation. The block-based
 extend pattern above remains valid for apps that don't need OOB.
 
 ## Route Contract and Sections
@@ -294,7 +294,7 @@ fragment_block="...", triggers_shell_update=True)`.
 
 ### Reference
 
-See `examples/pages_shell` for a working cascade with `remove=` and
+See `examples/chirpui/pages_shell` for a working cascade with `remove=` and
 `mode="replace"`.
 
 ## Debugging and Introspection
@@ -373,7 +373,7 @@ rules:
 3. **No wrapper div inside `<main>`** — content renders directly; the server's
    `page_block` response is the raw content for `#main`
 
-See `examples/kanban_shell` for a working custom shell and `examples/shell_oob` for
+See `examples/chirpui/kanban_shell` for a working custom shell and `examples/chirpui/shell_oob` for
 regions-based OOB.
 
 ## Gotchas for Interactive Shells
@@ -477,4 +477,4 @@ the HTML):
 {%- endfragment -%}
 ```
 
-See `examples/kanban_shell` for a working example of all four patterns.
+See `examples/chirpui/kanban_shell` for a working example of all four patterns.
