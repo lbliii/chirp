@@ -4,6 +4,12 @@ Provides structured, human-readable error output for the terminal during
 ``chirp run``. Replaces raw ``logger.exception()`` with clean diagnostics
 that highlight the useful information.
 
+For startup errors:
+    Maps known startup exceptions (port conflicts, TLS misconfiguration,
+    lifespan failures, config validation) to clean, actionable one-liners
+    via ``format_startup_error()``.  Returns ``None`` for unrecognised
+    errors so the caller can fall back to the default traceback.
+
 For Kida template errors:
     Calls ``exc.format_compact()`` and adds Chirp-specific context (route,
     method, path). Produces output like::
@@ -27,6 +33,7 @@ For non-template errors:
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import traceback as _traceback
@@ -201,3 +208,58 @@ def log_error(exc: BaseException, request: Request | None = None) -> None:
             prefix,
             format_compact_traceback(exc),
         )
+
+
+def format_startup_error(exc: BaseException, *, cli: bool = False) -> str | None:
+    """Map a startup exception to a clean, actionable terminal message.
+
+    Args:
+        exc: The exception raised during startup.
+        cli: When ``True``, hints reference ``chirp run --port`` instead of
+            ``app.run(port=...)``.
+
+    Returns ``None`` if the exception is not a recognised startup error
+    (caller should re-raise or fall back to default handling).
+    """
+    from pounce._errors import PounceError
+
+    from chirp.errors import ConfigurationError
+
+    # OSError from socket binding (port in use, permission denied).
+    # Check PounceError first — some subclasses may also inherit OSError.
+    if isinstance(exc, OSError) and not isinstance(exc, PounceError):
+        if exc.errno == errno.EADDRINUSE or "already in use" in str(exc):
+            if cli:
+                hint = "    chirp run myapp:app --port 8001"
+            else:
+                hint = "    app.run(port=8001)"
+            return (
+                f"Error: {exc}\n\n"
+                f"  Kill the other process or use a different port:\n"
+                f"{hint}"
+            )
+        if exc.errno == errno.EACCES:
+            return f"Error: {exc}\n\n  Try a port above 1024, or run with elevated privileges."
+        return f"Error: {exc}"
+
+    # Pounce structured errors (LifespanError, TLSError, SupervisorError, …)
+    if isinstance(exc, PounceError):
+        return _with_cause(f"Error: {exc}", exc)
+
+    # Chirp configuration errors
+    if isinstance(exc, ConfigurationError):
+        return f"Configuration error: {exc}"
+
+    # Generic ValueError from config validation
+    if isinstance(exc, ValueError):
+        return f"Configuration error: {exc}"
+
+    return None
+
+
+def _with_cause(msg: str, exc: BaseException) -> str:
+    """Append ``__cause__`` context when present (e.g. LifespanError wrapping a DB error)."""
+    cause = exc.__cause__
+    if cause is not None:
+        return f"{msg}\n  Caused by: {type(cause).__name__}: {cause}"
+    return msg
