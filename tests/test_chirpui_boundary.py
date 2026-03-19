@@ -18,17 +18,24 @@ If both pass → issue is in app code or external services, not framework.
 
 import contextvars
 import json
-from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 chirp_ui = pytest.importorskip("chirp_ui", reason="chirp-ui not installed")
 
-from chirp import App, AppConfig, EventStream, Fragment, Request, Response, SSEEvent, Template
-from chirp.ext.chirp_ui import use_chirp_ui
-from chirp.testing import TestClient
+from chirp import (  # noqa: E402
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    Request,
+    Response,
+    SSEEvent,
+    Template,
+)
+from chirp.ext.chirp_ui import use_chirp_ui  # noqa: E402
+from chirp.testing import TestClient  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Shared ContextVar (simulates the httpx client pattern in all AI examples)

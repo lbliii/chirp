@@ -99,7 +99,7 @@ def _compile_routes(
         )
         invoke_plan = compile_invoke_plan(
             pending.handler,
-            providers or None,
+            providers if providers else None,
             path_param_names=path_param_names,
             inline=pending.inline,
         )

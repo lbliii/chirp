@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING
 
+from kida import Environment
+
 from chirp.routing.router import _route_path_has_flask_syntax
 
 from .declarations import FragmentContract, SSEContract
@@ -36,7 +38,7 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
-from .rules_swap import check_swap_safety, collect_broad_selects, collect_broad_targets
+from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
     extract_fragment_island_ids,
     extract_ids_with_disinherit,
@@ -56,7 +58,7 @@ if TYPE_CHECKING:
 
 def _route_prepass(
     router: object,
-    kida_env: object,
+    kida_env: Environment | None,
     result: CheckResult,
 ) -> tuple[set[str], set[str]]:
     """Single pass over router.routes. Returns (referenced_templates, referenced_route_paths)."""
