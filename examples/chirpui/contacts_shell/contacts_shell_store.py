@@ -59,7 +59,14 @@ class ContactStore:
             self._next_id = 1
             for name, email, group, role, phone in _SEED_CONTACTS:
                 self._contacts.append(
-                    Contact(id=self._next_id, name=name, email=email, group=group, role=role, phone=phone)
+                    Contact(
+                        id=self._next_id,
+                        name=name,
+                        email=email,
+                        group=group,
+                        role=role,
+                        phone=phone,
+                    )
                 )
                 self._next_id += 1
 
@@ -74,9 +81,13 @@ class ContactStore:
                     return contact
         return None
 
-    def add(self, name: str, email: str, group: str = "Engineering", role: str = "", phone: str = "") -> Contact:
+    def add(
+        self, name: str, email: str, group: str = "Engineering", role: str = "", phone: str = ""
+    ) -> Contact:
         with self._lock:
-            contact = Contact(id=self._next_id, name=name, email=email, group=group, role=role, phone=phone)
+            contact = Contact(
+                id=self._next_id, name=name, email=email, group=group, role=role, phone=phone
+            )
             self._next_id += 1
             self._contacts.append(contact)
             return contact
@@ -123,7 +134,8 @@ def filter_contacts(query: str = "", group: str = "") -> list[Contact]:
     if query:
         normalized = query.casefold()
         contacts = [
-            c for c in contacts
+            c
+            for c in contacts
             if normalized in c.name.casefold()
             or normalized in c.email.casefold()
             or normalized in c.role.casefold()

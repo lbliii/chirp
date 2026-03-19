@@ -11,7 +11,15 @@ def context() -> dict:
         "columns": COLUMNS,
         "shell_actions": ShellActions(
             primary=ShellActionZone(
-                items=(ShellAction(id="new-task", label="New task", action="new-task", variant="primary", icon="add"),)
+                items=(
+                    ShellAction(
+                        id="new-task",
+                        label="New task",
+                        action="new-task",
+                        variant="primary",
+                        icon="add",
+                    ),
+                )
             ),
             overflow=ShellActionZone(
                 items=(ShellAction(id="filter", label="Filter", href="#board"),)

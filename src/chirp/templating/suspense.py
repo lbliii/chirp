@@ -236,9 +236,7 @@ async def render_suspense(
 
     # Collect unique blocks (order-preserving dedup)
     blocks_to_render = list(
-        dict.fromkeys(
-            b for key in deferred_keys for b in key_to_blocks.get(key, [])
-        )
+        dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
     )
 
     for block_name in blocks_to_render:

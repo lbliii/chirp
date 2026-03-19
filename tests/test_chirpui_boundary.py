@@ -82,11 +82,13 @@ def _make_chirp_only_app() -> App:
         form = await request.form()
         message = form.get("message", "")
         value = _api_client_var.get()
-        body = json.dumps({
-            "message": message,
-            "contextvar": value,
-            "source": "chirp-only",
-        })
+        body = json.dumps(
+            {
+                "message": message,
+                "contextvar": value,
+                "source": "chirp-only",
+            }
+        )
         return Response(body=body, content_type="application/json")
 
     @app.route("/stream")

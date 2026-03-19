@@ -103,9 +103,7 @@ def _render_composition(
     oob_registry: OOBRegistry | None,
 ) -> Response:
     """Shared 5-step pipeline: shell updates → plan → execute → serialize → response."""
-    shell_updates = compute_shell_region_updates(
-        composition, request, fragment_target_registry
-    )
+    shell_updates = compute_shell_region_updates(composition, request, fragment_target_registry)
     plan = build_render_plan(
         composition,
         request=request,
