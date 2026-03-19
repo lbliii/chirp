@@ -6,21 +6,22 @@
 {% from "chirpui/typing_indicator.html" import typing_indicator %}
 {% from "chirpui/copy_button.html" import copy_button %}
 {% from "chirpui/surface.html" import surface %}
-{% from "chirpui/layout.html" import container, grid %}
+{% from "chirpui/layout.html" import container, grid, stack %}
+{% from "chirpui/accordion.html" import accordion, accordion_item %}
 
 {% block sources %}
 <div class="sources chirpui-stack chirpui-stack--sm" sse-swap="sources" hx-target="this">
   <h2 class="chirpui-font-lg">Sources used to draft this answer</h2>
   {% if sources %}
-  <p class="chirpui-text-muted">Similar articles retrieved and passed to the model:</p>
-  <div class="sources-list chirpui-stack chirpui-stack--sm">
-  {% for doc in sources %}
-  <div class="source-item chirpui-card" style="padding: var(--chirpui-spacing);">
-    <a href="{{ doc.url }}" target="_blank" rel="noopener" class="source-link">{{ doc.title }}</a>
-    <p class="source-snippet chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(150) }}</p>
-  </div>
+  <p class="chirpui-text-muted">{{ sources | length }} articles retrieved and passed to the model:</p>
+  {% call accordion(name="sources") %}
+    {% for doc in sources %}
+    {% call accordion_item(doc.title, open=loop.first, name="sources") %}
+    <p class="chirpui-text-muted chirpui-font-sm">{{ doc.content | truncate(300) }}</p>
+    {% if doc.url %}<a href="{{ doc.url }}" target="_blank" rel="noopener" class="chirpui-link chirpui-font-sm">View source →</a>{% end %}
+    {% end %}
+    {% end %}
   {% end %}
-  </div>
   {% else %}
   <p class="sources-empty chirpui-text-muted">No matching docs found.</p>
   {% end %}

@@ -1,11 +1,11 @@
-"""About context — override breadcrumbs and page title."""
+"""Activity context — override breadcrumbs and page title."""
 
 
 def context() -> dict:
     return {
-        "page_title": "About",
+        "page_title": "Activity",
         "breadcrumb_items": [
-            {"label": "Home", "href": "/"},
-            {"label": "About"},
+            {"label": "Dashboard", "href": "/"},
+            {"label": "Activity"},
         ],
     }

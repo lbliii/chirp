@@ -12,7 +12,7 @@
       document.documentElement.setAttribute('data-style',s);
     })();
   </script>
-  <title id="chirpui-document-title">{{ page_title ?? "Shell OOB Demo" }}</title>
+  <title id="chirpui-document-title">{{ page_title ?? "Settings Console" }}</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
   <script src="/static/chirpui.js"></script>
@@ -25,29 +25,25 @@
 {% from "chirpui/breadcrumbs.html" import breadcrumbs %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 
-{# Regions: one definition for both app shell slots AND OOB render_block (RFC: kida-regions)
-   Chirp discovers these via template_metadata().regions() → *_oob blocks.
-   build_layout_contract() extracts cache_scope, depends_on from BlockMetadata. #}
-
 {% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
 {{ breadcrumbs(breadcrumb_items) }}
 {% end %}
 
-{% region title_oob(page_title="Shell OOB Demo") %}
+{% region title_oob(page_title="Settings Console") %}
 <title id="chirpui-document-title" hx-swap-oob="true">{{ page_title }}</title>
 {% end %}
 
 {% region sidebar_oob(current_path="/") %}
 {% call sidebar() %}
-  {% call sidebar_section("Pages") %}
-    {{ sidebar_link("/", "Home", icon="home", active=current_path == "/") }}
+  {% call sidebar_section("Console") %}
+    {{ sidebar_link("/", "Dashboard", icon="grid", active=current_path == "/") }}
     {{ sidebar_link("/settings", "Settings", icon="settings", active=current_path.startswith("/settings")) }}
-    {{ sidebar_link("/about", "About", icon="alert", active=current_path.startswith("/about")) }}
+    {{ sidebar_link("/about", "Activity", icon="alert", active=current_path.startswith("/about")) }}
   {% end %}
 {% end %}
 {% end %}
 
-{% call app_shell(brand="Shell OOB", sidebar_collapsible=true) %}
+{% call app_shell(brand="Settings Console", sidebar_collapsible=true) %}
   {% slot topbar %}
   {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
   {% end %}

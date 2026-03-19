@@ -209,7 +209,7 @@ class TestBoard:
             response = await client.get("/", headers=auth)
             assert 'id="board-stats"' in response.text
             assert "tasks" in response.text
-            assert "high priority" in response.text
+            assert "High priority" in response.text
 
     async def test_index_contains_filter_sidebar(self, example_app) -> None:
         async with TestClient(example_app) as client:

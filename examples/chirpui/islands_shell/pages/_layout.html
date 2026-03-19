@@ -12,7 +12,7 @@
       document.documentElement.setAttribute('data-style',s);
     })();
   </script>
-  <title id="chirpui-document-title">{{ page_title ?? "Islands Shell" }}</title>
+  <title id="chirpui-document-title">{{ page_title ?? "Stock Ticker" }}</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
   <script src="/static/chirpui.js"></script>
@@ -29,21 +29,23 @@
 {{ breadcrumbs(breadcrumb_items) }}
 {% end %}
 
-{% region title_oob(page_title="Islands Shell") %}
+{% region title_oob(page_title="Stock Ticker") %}
 <title id="chirpui-document-title" hx-swap-oob="true">{{ page_title }}</title>
 {% end %}
 
 {% region sidebar_oob(current_path="/") %}
 {% call sidebar() %}
-  {% call sidebar_section("Pages") %}
-    {{ sidebar_link("/", "Home", icon="home", active=current_path == "/") }}
-    {{ sidebar_link("/dashboard", "Dashboard", icon="grid", active=current_path.startswith("/dashboard")) }}
-    {{ sidebar_link("/about", "About", icon="alert", active=current_path.startswith("/about")) }}
+  {% call sidebar_section("Markets") %}
+    {{ sidebar_link("/", "Overview", icon="grid", active=current_path == "/") }}
+    {{ sidebar_link("/dashboard", "Watchlist", icon="star", active=current_path.startswith("/dashboard")) }}
+  {% end %}
+  {% call sidebar_section("Info") %}
+    {{ sidebar_link("/about", "How Islands Work", icon="alert", active=current_path.startswith("/about")) }}
   {% end %}
 {% end %}
 {% end %}
 
-{% call app_shell(brand="Islands Shell", sidebar_collapsible=true) %}
+{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true) %}
   {% slot topbar %}
   {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
   {% end %}

@@ -1,21 +1,22 @@
-"""Shell OOB — prototype for AST-powered shell updates.
+"""Shell OOB — Team Settings Console.
 
-Demonstrates automatic OOB updates for sidebar, breadcrumbs, and title
-on hx-boost navigation using Kida's AST metadata.
-
-use_chirp_ui() registers fragment targets (main, page-root, page-content-inner)
-with triggers_shell_update so shell_actions update on sidebar and tab clicks.
-Custom targets: app.register_fragment_target("id", fragment_block="...", triggers_shell_update=False)
+Demonstrates automatic OOB updates for sidebar, breadcrumbs, title,
+and cross-page state via regions. Toggle a setting on /settings and
+see the dashboard stats update when you navigate back.
 
 Run:
     python app.py
 """
 
+import sys
 from pathlib import Path
 
 from chirp import App, AppConfig, use_chirp_ui
 
-PAGES_DIR = Path(__file__).parent / "pages"
+ROOT_DIR = Path(__file__).parent
+PAGES_DIR = ROOT_DIR / "pages"
+
+sys.path.insert(0, str(ROOT_DIR))
 
 app = App(AppConfig(template_dir=PAGES_DIR, debug=True))
 use_chirp_ui(app)
