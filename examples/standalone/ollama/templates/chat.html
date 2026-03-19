@@ -297,7 +297,7 @@
   {# --- Fragments: non-streaming mode --- #}
 
   {% block chat_response %}
-  {% if user_content is defined %}
+  {% if (user_content ?? none) %}
   <div class="msg msg-user">{{ user_content }}</div>
   {% if tools_used %}<div class="msg msg-tools">used: {{ tools_used | join(", ") }}</div>{% end %}
   <div class="msg msg-assistant prose">{{ assistant_content | markdown }}</div>
@@ -307,7 +307,7 @@
   {# --- Fragments: streaming mode --- #}
 
   {% block stream_start %}
-  {% if user_content is defined %}
+  {% if (user_content ?? none) %}
   <div class="msg msg-user">{{ user_content }}</div>
   <div class="msg-streaming"
        hx-ext="sse"
@@ -319,13 +319,13 @@
   {% end %}
 
   {%- block stream_token -%}
-  {%- if token is defined %}{{ token }}{% end -%}
+  {%- if (token ?? none) %}{{ token }}{% end -%}
   {%- end -%}
 
   {# --- Fragments: shared --- #}
 
   {% block activity_row %}
-  {% if event is defined %}
+  {% if (event ?? none) %}
   <div class="activity-item">
     <div class="activity-header">
       <span class="tool-name">{{ event.tool_name }}</span>
@@ -341,7 +341,7 @@
   {% end %}
 
   {% block model_updated %}
-  {% if model is defined %}
+  {% if (model ?? none) %}
   <span style="font-size:0.65rem;color:#4ade80;">&#10003;</span>
   {% end %}
   {% end %}

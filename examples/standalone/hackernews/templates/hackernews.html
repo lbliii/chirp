@@ -464,7 +464,7 @@
   Must include the same htmx attributes as the story list so that
   OOB-swapped meta lines preserve htmx navigation behavior. #}
   {% block story_meta %}
-  {% if story is defined %}
+  {% if (story ?? none) %}
   <div class="story-meta-line" id="meta-{{ story.id }}" hx-swap-oob="outerHTML">
     <span class="score">{{ story.score | pluralize("point") }}</span>
     <span>by {{ story.by }}</span>

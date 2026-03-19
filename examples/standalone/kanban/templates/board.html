@@ -166,7 +166,7 @@
       {{ field("tags", "Tags", placeholder="Comma-separated", required=false) }}
       <button type="submit">Add Task</button>
     </form>
-    {% if errors is defined and errors %}
+    {% if (errors ?? {}) %}
     <ul class="form-errors">
       {% for fld, msgs in errors.items() %}
         {% for msg in msgs %}
@@ -229,7 +229,7 @@
 
 {# Single column — rendered for OOB swaps when tasks move #}
 {% fragment column_block %}
-{% if column_id is defined %}
+{% if (column_id ?? '') %}
 {% call column(column_id, column_name, tasks | length) %}
   {% unless tasks %}
     <p class="empty">No tasks.</p>
@@ -249,7 +249,7 @@
 
 {# Single task card — rendered for OOB swap after edit #}
 {% fragment task_card_block %}
-{% if task is defined %}
+{% if (task ?? none) %}
 <div id="task-{{ task.id }}" hx-swap-oob="outerHTML">
   {{ task_card(task) }}
 </div>

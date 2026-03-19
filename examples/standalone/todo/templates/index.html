@@ -48,7 +48,7 @@
 </form>
 {% block todo_list %}
 <ul id="todo-list">
-  {% if error is defined and error %}
+  {% if (error ?? '') %}
   <li class="error" style="color: #dc2626; font-size: 0.85rem;">{{ error }}</li>
   {% end %}
   {% for todo in todos %}
