@@ -229,10 +229,7 @@ def format_startup_error(exc: BaseException, *, cli: bool = False) -> str | None
     # Check PounceError first — some subclasses may also inherit OSError.
     if isinstance(exc, OSError) and not isinstance(exc, PounceError):
         if exc.errno == errno.EADDRINUSE or "already in use" in str(exc):
-            if cli:
-                hint = "    chirp run myapp:app --port 8001"
-            else:
-                hint = "    app.run(port=8001)"
+            hint = "    chirp run myapp:app --port 8001" if cli else "    app.run(port=8001)"
             return (
                 f"Error: {exc}\n\n"
                 f"  Kill the other process or use a different port:\n"

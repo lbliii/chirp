@@ -8,7 +8,6 @@ import pytest
 
 from chirp.server.terminal_errors import format_startup_error
 
-
 # ---------------------------------------------------------------------------
 # Unit tests: format_startup_error
 # ---------------------------------------------------------------------------
@@ -175,7 +174,7 @@ class TestServerLauncherErrorHandling:
         mock_dev.side_effect = OSError(errno.EADDRINUSE, "Address already in use")
         launcher = self._make_launcher()
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="Address already in use"):
             launcher.run(MagicMock(), host=None, port=None, lifecycle_collector=None)
 
         captured = capsys.readouterr()
@@ -215,7 +214,7 @@ class TestCliRunErrorHandling:
 
     @patch("chirp.server.dev.run_dev_server", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
     def test_cli_shows_cli_hint(
-        self, _mock: MagicMock, fake_app: object, capsys: pytest.CaptureFixture[str]
+        self, mock_dev: MagicMock, fake_app: object, capsys: pytest.CaptureFixture[str]
     ) -> None:
         from chirp.cli import main
 
@@ -229,7 +228,7 @@ class TestCliRunErrorHandling:
         assert "app.run(" not in captured.err
 
     @patch("chirp.server.dev.run_dev_server", side_effect=RuntimeError("unexpected"))
-    def test_cli_unknown_error_re_raises(self, _mock: MagicMock, fake_app: object) -> None:
+    def test_cli_unknown_error_re_raises(self, mock_dev: MagicMock, fake_app: object) -> None:
         from chirp.cli import main
 
         with pytest.raises(RuntimeError, match="unexpected"):
@@ -238,7 +237,7 @@ class TestCliRunErrorHandling:
     @patch("chirp.server.dev.run_dev_server", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
     def test_cli_full_traceback_skips_message(
         self,
-        _mock: MagicMock,
+        mock_dev: MagicMock,
         fake_app: object,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
@@ -246,7 +245,7 @@ class TestCliRunErrorHandling:
         monkeypatch.setenv("CHIRP_TRACEBACK", "full")
         from chirp.cli import main
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="Address already in use"):
             main(["run", "_startup_err_test_app:app"])
 
         captured = capsys.readouterr()
