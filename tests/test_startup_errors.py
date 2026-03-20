@@ -5,6 +5,7 @@ import types
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pounce import LifespanError, PounceError, TLSError
 
 from chirp.server.terminal_errors import format_startup_error
 
@@ -51,28 +52,23 @@ class TestFormatStartupError:
         assert "Error:" in msg
 
     def test_pounce_error(self) -> None:
-        from pounce._errors import LifespanError
-
         exc = LifespanError("startup hook failed")
         msg = format_startup_error(exc)
         assert msg is not None
         assert "startup hook failed" in msg
 
     def test_pounce_tls_error(self) -> None:
-        from pounce._errors import TLSError
-
         exc = TLSError("bad cert")
         msg = format_startup_error(exc)
         assert msg is not None
         assert "bad cert" in msg
 
     def test_pounce_error_with_cause(self) -> None:
-        from pounce._errors import LifespanError
-
         cause = ConnectionRefusedError("DB refused connection on port 5432")
-        exc = LifespanError("Application startup failed")
-        exc.__cause__ = cause
-        msg = format_startup_error(exc)
+        try:
+            raise LifespanError("Application startup failed") from cause
+        except LifespanError as exc:
+            msg = format_startup_error(exc)
         assert msg is not None
         assert "Application startup failed" in msg
         assert "Caused by:" in msg
@@ -80,8 +76,6 @@ class TestFormatStartupError:
         assert "5432" in msg
 
     def test_pounce_error_without_cause_has_no_caused_by(self) -> None:
-        from pounce._errors import LifespanError
-
         exc = LifespanError("startup hook failed")
         msg = format_startup_error(exc)
         assert msg is not None
@@ -114,7 +108,6 @@ class TestFormatStartupError:
     def test_pounce_oserror_not_treated_as_socket_error(self) -> None:
         """PounceError subclasses that also inherit OSError should go
         through the PounceError branch, not the OSError branch."""
-        from pounce._errors import PounceError
 
         class SocketPounceError(PounceError, OSError):
             pass
