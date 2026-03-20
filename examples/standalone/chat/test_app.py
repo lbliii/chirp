@@ -1,5 +1,7 @@
 """Tests for the chat example — SSE + POST bidirectional communication."""
 
+import asyncio
+
 from chirp.testing import TestClient
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -128,6 +130,24 @@ class TestSendMessage:
             assert response.status == 401
 
 
+class TestLogout:
+    """POST /logout — session clearing."""
+
+    async def test_logout_clears_session(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            response = await client.post("/logout", headers=auth)
+            assert response.status == 302
+            assert "/login" in response.header("location", "")
+
+    async def test_logout_button_in_chat_page(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+            response = await client.get("/chat", headers=auth)
+            assert 'action="/logout"' in response.text
+            assert "Logout" in response.text
+
+
 class TestSSEStream:
     """GET /chat/events — SSE message stream."""
 
@@ -137,3 +157,24 @@ class TestSSEStream:
             result = await client.sse("/chat/events", max_events=0, timeout=0.5)
             assert result.status == 200
             assert result.headers.get("content-type") == "text/event-stream"
+
+    async def test_sse_delivers_messages(self, example_app) -> None:
+        """Messages sent via POST appear in the SSE stream."""
+        async with TestClient(example_app) as client:
+            auth = await _login(client)
+
+            sse_task = asyncio.create_task(
+                client.sse("/chat/events", max_events=1)
+            )
+            await asyncio.sleep(0.2)
+
+            await client.post(
+                "/chat/send",
+                body=b"message=hello+world",
+                headers={**_FORM_CT, **auth},
+            )
+
+            result = await asyncio.wait_for(sse_task, timeout=3.0)
+            assert len(result.events) == 1
+            assert result.events[0].event == "fragment"
+            assert "hello world" in result.events[0].data

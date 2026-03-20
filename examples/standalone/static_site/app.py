@@ -15,12 +15,12 @@ Run:
 import asyncio
 from pathlib import Path
 
-from chirp import App, EventStream, SSEEvent
+from chirp import App, AppConfig, EventStream, SSEEvent
 from chirp.middleware import HTMLInject, StaticFiles
 
 PUBLIC_DIR = Path(__file__).parent / "public"
 
-app = App()
+app = App(config=AppConfig(worker_mode="async"))
 
 # ---------------------------------------------------------------------------
 # SSE reload endpoint — clients listen here for reload signals

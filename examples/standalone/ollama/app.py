@@ -38,7 +38,7 @@ DEFAULT_MODEL = "llama3.2:3b"
 _model: str = DEFAULT_MODEL
 _model_lock = threading.Lock()
 
-config = AppConfig(template_dir=TEMPLATES_DIR)
+config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
 app = App(config=config)
 register_markdown_filter(app)
 

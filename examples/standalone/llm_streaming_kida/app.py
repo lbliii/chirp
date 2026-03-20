@@ -20,7 +20,7 @@ from chirp import App, AppConfig, Request, Template, TemplateStream
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
-config = AppConfig(template_dir=TEMPLATES_DIR)
+config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
 app = App(config=config)
 
 USE_OLLAMA = os.environ.get("USE_OLLAMA", "0") in ("1", "true", "yes")

@@ -160,6 +160,26 @@ All other blocks on the page keep updating normally. The next change event that 
 
 For reactive streams, if the `context_builder()` function itself raises (e.g., a deleted record), the entire event is skipped and the stream waits for the next change. See [[docs/reference/errors|Error Reference]] for the full error hierarchy.
 
+## Worker Mode
+
+SSE connections are long-lived -- the server holds the HTTP connection open and streams events as they arrive. This has implications for worker configuration.
+
+**Use `worker_mode="async"`** for any app that uses SSE or streaming responses:
+
+```python
+config = AppConfig(worker_mode="async")
+```
+
+The default `worker_mode="auto"` selects sync workers on Python 3.14t (free-threading). Sync workers block one thread per SSE connection, preventing that worker from handling other requests. With async workers, SSE streams and request handlers run as concurrent tasks in the same event loop.
+
+This is especially important for bidirectional patterns (SSE + POST) where in-memory pub-sub uses `asyncio.Queue` -- the subscriber and emitter must share the same event loop.
+
+| Mode | SSE support | When to use |
+|------|-------------|-------------|
+| `"async"` | Full | Apps with SSE, streaming, or long-lived connections |
+| `"auto"` | Falls back to ASGI | Simple request-response apps (no SSE) |
+| `"sync"` | Falls back to ASGI | CPU-bound sync handlers only |
+
 ## Connection Lifecycle
 
 Chirp manages the SSE connection lifecycle automatically:

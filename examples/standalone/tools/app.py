@@ -24,7 +24,7 @@ from chirp import App, AppConfig, EventStream, Fragment, Request, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
-config = AppConfig(template_dir=TEMPLATES_DIR)
+config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
 app = App(config=config)
 
 # ---------------------------------------------------------------------------
