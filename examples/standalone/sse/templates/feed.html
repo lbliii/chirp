@@ -23,9 +23,20 @@
 </head>
 <body>
 <h1>Live Feed</h1>
-<div id="feed" hx-ext="sse" sse-connect="/events" sse-swap="fragment" hx-swap="beforeend">
-  <p id="placeholder">Waiting for events...</p>
+<div id="feed">
+  <div hx-ext="sse" sse-connect="/events" style="display: contents">
+    <p id="placeholder">Waiting for events...</p>
+    <div sse-swap="fragment" hx-swap="beforeend"></div>
+  </div>
 </div>
+<script>
+  const feed = document.getElementById("feed");
+  new MutationObserver(() => {
+    if (feed.querySelector(".notification")) {
+      document.getElementById("placeholder")?.remove();
+    }
+  }).observe(feed, { childList: true, subtree: true });
+</script>
 {% block notification %}
 {% if (title ?? '') %}
 <div class="notification">

@@ -51,18 +51,18 @@
 <h1>Chat Room</h1>
 <p class="info">Logged in as <strong>{{ username ?? 'Anonymous' }}</strong></p>
 
-<div id="messages"
-     hx-ext="sse"
-     sse-connect="/chat/events"
-     sse-swap="fragment"
-     hx-swap="beforeend">
-  {% unless messages %}
-  <p class="empty-chat">No messages yet. Say something!</p>
-  {% else %}
-  {% for msg in messages %}
-  {{ chat_message(msg) }}
-  {% end %}
-  {% end %}
+<div id="messages">
+  {# sse-swap must be a child of sse-connect — querySelectorAll excludes the root #}
+  <div hx-ext="sse" sse-connect="/chat/events" style="display: contents">
+    {% unless messages %}
+    <p class="empty-chat">No messages yet. Say something!</p>
+    {% else %}
+    {% for msg in messages %}
+    {{ chat_message(msg) }}
+    {% end %}
+    {% end %}
+    <div sse-swap="fragment" hx-swap="beforeend"></div>
+  </div>
 </div>
 
 <form id="send-form"
@@ -82,7 +82,7 @@
     const empty = el.querySelector(".empty-chat");
     if (empty) empty.remove();
     el.scrollTop = el.scrollHeight;
-  }).observe(el, { childList: true });
+  }).observe(el, { childList: true, subtree: true });
 </script>
 {% block message %}
 {% if (msg ?? none) %}
