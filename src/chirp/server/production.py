@@ -47,7 +47,7 @@ def run_production_server(
     websocket_max_message_size: int = 10_485_760,  # 10 MB
     # Production settings
     lifecycle_logging: bool = True,
-    log_format: str = "json",
+    log_format: str = "auto",
     log_level: str = "info",
     max_connections: int = 1000,
     backlog: int = 2048,
@@ -89,7 +89,8 @@ def run_production_server(
         websocket_max_message_size: Maximum WebSocket message size (bytes).
 
         lifecycle_logging: Enable structured lifecycle event logging.
-        log_format: Log format ("json" or "text").
+        log_format: Pounce log format — "auto" (TTY pretty / piped JSON),
+            "text", or "json".
         log_level: Log level (debug, info, warning, error, critical).
 
         max_connections: Maximum concurrent connections.
