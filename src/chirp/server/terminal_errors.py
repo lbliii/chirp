@@ -78,26 +78,25 @@ def _is_app_frame(filename: str) -> bool:
 
 
 def format_template_error(exc: BaseException, request: Request | None = None) -> str:
-    """Format a Kida template error for terminal display.
+    """Format a Kida template error for logging (plain text, no ANSI).
 
-    Uses ``exc.format_compact()`` and wraps it with a banner and
-    request context (when available).
+    Uses the same compact body as :func:`_plain_error_message` — Kida's
+    ``format_compact()`` with ANSI stripped so JSON/structured logs stay readable.
 
     Args:
         exc: A Kida template exception (TemplateError subclass).
         request: The request that triggered the error (optional).
 
     Returns:
-        Formatted multi-line string for terminal output.
+        Formatted multi-line string for log output.
     """
     parts: list[str] = []
 
     # Banner
     parts.append(f"-- Template Error {'-' * (_BANNER_WIDTH - 18)}")
 
-    # Compact error from Kida
-    fmt = getattr(exc, "format_compact", None)
-    parts.append(fmt() if fmt is not None else str(exc))
+    # Compact error from Kida (no ANSI; matches HTTP/SSE error bodies)
+    parts.append(_plain_error_message(exc))
 
     # Request context (when available)
     if request is not None:
