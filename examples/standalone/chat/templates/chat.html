@@ -4,7 +4,7 @@
 <div class="msg">
   <span class="msg-user">{{ msg.username | capitalize }}</span>
   <span class="msg-text">{{ msg.text }}</span>
-  <span class="msg-time">{{ msg.timestamp | timeago }}</span>
+  <span class="msg-time" data-ts="{{ msg.timestamp }}">{{ msg.timestamp | timeago }}</span>
 </div>
 {% end %}
 {% end %}
@@ -76,12 +76,35 @@
 </form>
 
 <script>
-  {# Auto-scroll + remove empty placeholder on first message #}
+  // Mirrors chirp timeago filter — server HTML is static until this runs.
+  function formatTimeAgo(ts) {
+    const delta = Math.floor(Date.now() / 1000 - Number(ts));
+    if (delta < 60) return "just now";
+    if (delta < 3600) {
+      const m = Math.floor(delta / 60);
+      return m + " minute" + (m === 1 ? "" : "s") + " ago";
+    }
+    if (delta < 86400) {
+      const h = Math.floor(delta / 3600);
+      return h + " hour" + (h === 1 ? "" : "s") + " ago";
+    }
+    const d = Math.floor(delta / 86400);
+    return d + " day" + (d === 1 ? "" : "s") + " ago";
+  }
+  function tickTimeAgo() {
+    document.querySelectorAll(".msg-time[data-ts]").forEach((node) => {
+      node.textContent = formatTimeAgo(node.getAttribute("data-ts"));
+    });
+  }
+  tickTimeAgo();
+  setInterval(tickTimeAgo, 60_000);
+
   const el = document.getElementById("messages");
   new MutationObserver(() => {
     const empty = el.querySelector(".empty-chat");
     if (empty) empty.remove();
     el.scrollTop = el.scrollHeight;
+    tickTimeAgo();
   }).observe(el, { childList: true, subtree: true });
 </script>
 {% block message %}
