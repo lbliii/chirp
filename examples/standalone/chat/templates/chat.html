@@ -60,9 +60,7 @@
   <p class="empty-chat">No messages yet. Say something!</p>
   {% else %}
   {% for msg in messages %}
-  {% block message %}
   {{ chat_message(msg) }}
-  {% endblock %}
   {% end %}
   {% end %}
 </div>
@@ -86,5 +84,10 @@
     el.scrollTop = el.scrollHeight;
   }).observe(el, { childList: true });
 </script>
+{% block message %}
+{% if (msg ?? none) %}
+{{ chat_message(msg) }}
+{% end %}
+{% endblock %}
 </body>
 </html>
