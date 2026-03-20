@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `kida-templates>=0.2.8`
 - `chirp-ui>=0.2.0`
+- `bengal-pounce>=0.3.1` (public `PounceError` / lifespan error exports)
 
 ## [0.1.9] — 2026-03-12
 
