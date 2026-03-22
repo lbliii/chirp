@@ -112,13 +112,13 @@
   setInterval(tickTimeAgo, 60_000);
 
   const el = document.getElementById("messages");
-  // Do not call tickTimeAgo() here — updating .msg-time text fires subtree
-  // mutations and re-enters this observer (infinite loop / tab freeze).
-  new MutationObserver(() => {
+  new MutationObserver((mutations) => {
+    const hasNewNodes = mutations.some((m) => m.addedNodes.length > 0);
+    if (!hasNewNodes) return;
     const empty = el.querySelector(".empty-chat");
     if (empty) empty.remove();
     el.scrollTop = el.scrollHeight;
-  }).observe(el, { childList: true, subtree: true });
+  }).observe(el, { childList: true });
 </script>
 {% block message %}
 {% if (msg ?? none) %}

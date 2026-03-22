@@ -183,7 +183,7 @@ class AppConfig:
         loads ``.env`` from the current directory before reading env.
 
         Env vars (with CHIRP_ prefix):
-            SECRET_KEY, SESSION_SECRET_KEY, DEBUG, ENV, HOST, PORT,
+            SECRET_KEY, DEBUG, ENV, HOST, PORT,
             LOG_FORMAT (auto|text|json — forwarded to Pounce),
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
             REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
