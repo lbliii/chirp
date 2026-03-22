@@ -32,7 +32,7 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
 
-config = AppConfig(template_dir=TEMPLATES_DIR)
+config = AppConfig(template_dir=TEMPLATES_DIR, workers=1, worker_mode="async")
 app = App(config=config)
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 
@@ -149,6 +149,14 @@ async def do_login(request: Request):
     session = get_session()
     session["username"] = username
     return Redirect("/chat")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    """Clear the session and redirect to login."""
+    session = get_session()
+    session.clear()
+    return Redirect("/login")
 
 
 @app.route("/chat")

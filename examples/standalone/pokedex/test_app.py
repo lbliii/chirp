@@ -22,8 +22,8 @@ class TestBrowserUI:
     async def test_index_shows_pokemon_cards(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")
-            assert "pikachu" in response.text.lower()
-            assert "charizard" in response.text.lower()
+            assert "bulbasaur" in response.text.lower()
+            assert "charmander" in response.text.lower()
 
     async def test_type_filter(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -128,8 +128,8 @@ class TestListPokemon:
             data = response.json
             assert len(data["data"]) == 5
             assert data["meta"]["per_page"] == 5
-            assert data["meta"]["total"] == 36
-            assert data["meta"]["pages"] == 8
+            assert data["meta"]["total"] == 220
+            assert data["meta"]["pages"] == 44
 
     async def test_page_2(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -222,7 +222,7 @@ class TestStats:
             response = await client.get("/api/stats", headers=_AUTH)
             assert response.status == 200
             data = response.json["data"]
-            assert data["total"] == 36
+            assert data["total"] == 220
             assert data["legendary_count"] > 0
             assert "averages" in data
             assert "types" in data

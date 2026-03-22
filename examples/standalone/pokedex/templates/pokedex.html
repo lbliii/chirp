@@ -1,6 +1,7 @@
 <html>
 <head>
   <title>Pokedex</title>
+  <meta name="view-transition" content="same-origin">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
     :root {
@@ -62,18 +63,28 @@
     }
 
     .card {
-      background: var(--card); border-radius: var(--radius);
+      border-radius: var(--radius);
       padding: 1.25rem; cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
       position: relative; overflow: hidden;
     }
     .card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .card-sprite {
+      position: absolute; top: 0.5rem; right: 0.25rem;
+      width: 80px; height: 80px;
+      opacity: 0.9;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .card:hover .card-sprite { transform: scale(1.15); opacity: 1; }
     .card-id {
       position: absolute; top: 0.75rem; right: 0.75rem;
-      color: rgba(255,255,255,0.2); font-size: 1.5rem; font-weight: 800;
+      color: rgba(255,255,255,0.12); font-size: 2.5rem; font-weight: 800;
+      z-index: 0;
     }
-    .card-name { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .card-types { display: flex; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .card-name { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.4rem; position: relative; z-index: 1; }
+    .card-types { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; position: relative; z-index: 1; }
     .type-badge {
       padding: 0.2rem 0.55rem; border-radius: 999px;
       font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
@@ -81,7 +92,8 @@
     }
     .card-stats {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 0.25rem 0.75rem; font-size: 0.8rem;
+      gap: 0.2rem 0.75rem; font-size: 0.78rem;
+      position: relative; z-index: 1;
     }
     .stat { display: flex; justify-content: space-between; }
     .stat-label { color: var(--muted); }
@@ -108,12 +120,22 @@
     .page-btn.current { background: var(--accent); border-color: var(--accent); font-weight: 600; }
     .page-info { color: var(--muted); font-size: 0.85rem; }
 
+    /* Detail view */
+    .detail-container { max-width: 520px; margin: 2rem auto; padding: 0 1.5rem; }
     .detail {
-      max-width: 500px; margin: 2rem auto;
       background: var(--card); border-radius: var(--radius); padding: 2rem;
+      position: relative; overflow: hidden;
+    }
+    .detail-artwork-wrap {
+      text-align: center; margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .detail-artwork {
+      width: 220px; height: 220px; object-fit: contain;
+      filter: drop-shadow(0 4px 20px rgba(0,0,0,0.5));
     }
     .detail-header {
-      display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 1rem;
+      display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem;
     }
     .detail-name { font-size: 2rem; font-weight: 800; }
     .detail-id { color: var(--muted); font-size: 1.1rem; }
@@ -121,23 +143,80 @@
     .detail-types .type-badge { font-size: 0.85rem; padding: 0.3rem 0.75rem; }
     .stat-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem; }
     .stat-row-label {
-      width: 70px; font-size: 0.8rem; color: var(--muted);
+      width: 70px; font-size: 0.75rem; color: var(--muted);
       text-transform: uppercase; letter-spacing: 0.04em;
     }
     .stat-bar-bg {
       flex: 1; height: 10px; background: rgba(255,255,255,0.1);
       border-radius: 999px; overflow: hidden;
     }
-    .stat-bar { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
-    .stat-row-val { width: 35px; text-align: right; font-weight: 700; font-size: 0.9rem; }
-    .back-link {
-      display: inline-block; margin-bottom: 1rem;
-      color: var(--accent); font-weight: 600; font-size: 0.9rem;
+    .stat-bar {
+      height: 100%; border-radius: 999px;
+      transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
-    .back-link:hover { text-decoration: underline; }
+    .stat-row-val { width: 35px; text-align: right; font-weight: 700; font-size: 0.9rem; }
+    .detail-gen {
+      margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted);
+    }
+
+    .detail-nav {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .detail-nav a, .detail-nav button {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.4rem 0.8rem; border-radius: var(--radius);
+      background: var(--surface); color: var(--text); border: 2px solid #333;
+      cursor: pointer; font-size: 0.82rem; font-family: inherit;
+      transition: all 0.15s; text-decoration: none;
+    }
+    .detail-nav a:hover, .detail-nav button:hover { border-color: var(--accent); color: var(--accent); }
+    .detail-nav .nav-spacer { flex: 1; }
+    .back-link { color: var(--accent); font-weight: 600; }
+
+    /* List view */
+    .pokemon-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .list-row {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0.6rem 1rem; border-radius: var(--radius);
+      transition: transform 0.1s, box-shadow 0.1s;
+      cursor: pointer;
+    }
+    .list-row:hover { transform: translateX(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .list-row-sprite {
+      width: 48px; height: 48px; image-rendering: pixelated; flex-shrink: 0;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
+    }
+    .list-row-id { color: var(--muted); font-size: 0.8rem; width: 3rem; text-align: right; flex-shrink: 0; }
+    .list-row-name { font-weight: 700; font-size: 0.95rem; min-width: 120px; }
+    .list-row-types { display: flex; gap: 0.3rem; min-width: 140px; }
+    .list-row-types .type-badge { font-size: 0.65rem; padding: 0.15rem 0.45rem; }
+    .list-row-stats {
+      display: flex; gap: 0.75rem; font-size: 0.78rem; color: var(--muted);
+      margin-left: auto; flex-shrink: 0;
+    }
+    .list-row-stats span { white-space: nowrap; }
+    .list-row-stats strong { color: var(--text); }
+
     .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
     .empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .htmx-request .pokemon-grid { opacity: 0.5; transition: opacity 0.15s; }
+    .htmx-request .pokemon-grid, .htmx-request .pokemon-list { opacity: 0.5; transition: opacity 0.15s; }
+
+    /* View Transitions */
+    @view-transition { navigation: auto; }
+    ::view-transition-old(page-content) {
+      animation: vt-fade-out 0.15s ease-out;
+    }
+    ::view-transition-new(page-content) {
+      animation: vt-fade-in 0.2s ease-in;
+    }
+    @keyframes vt-fade-out {
+      to { opacity: 0; transform: translateY(-4px); }
+    }
+    @keyframes vt-fade-in {
+      from { opacity: 0; transform: translateY(4px); }
+    }
+    #main { view-transition-name: page-content; }
   </style>
 </head>
 <body>
@@ -163,17 +242,18 @@
 <div class="stat-row">
   <span class="stat-row-label">{{ label }}</span>
   <div class="stat-bar-bg">
-    <div class="stat-bar" style="width: {{ pct }}%; background: {{ color }};"></div>
+    <div class="stat-bar" style="width: 0%; background: {{ color }};" data-width="{{ pct }}%"></div>
   </div>
   <span class="stat-row-val">{{ val }}</span>
 </div>
 {% end %}
 
 {% def pokemon_card(p) %}
-<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true"
-   hx-select="#main">
-<div class="card">
+{% set primary_type = p.types.split(",")[0] %}
+<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
+<div class="card" style="background: linear-gradient(135deg, {{ primary_type | type_color }}25, var(--card) 55%)">
   <span class="card-id">#{{ p.id }}</span>
+  <img class="card-sprite" src="{{ p.id | sprite }}" alt="{{ p.name }}" width="80" height="80" loading="lazy">
   <div class="card-name">
     {{ p.name | capitalize }}
     {% if p.legendary %}<span class="legendary-badge">Legendary</span>{% end %}
@@ -190,19 +270,43 @@
 </a>
 {% end %}
 
+{% def pokemon_row(p) %}
+{% set primary_type = p.types.split(",")[0] %}
+<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
+<div class="list-row" style="background: linear-gradient(90deg, {{ primary_type | type_color }}18, var(--card) 40%)">
+  <img class="list-row-sprite" src="{{ p.id | sprite }}" alt="{{ p.name }}" width="48" height="48" loading="lazy">
+  <span class="list-row-id">#{{ p.id }}</span>
+  <span class="list-row-name">
+    {{ p.name | capitalize }}
+    {% if p.legendary %}<span class="legendary-badge">Legendary</span>{% end %}
+  </span>
+  <span class="list-row-types">
+    {% for t in p.types.split(",") %}{{ type_badge(t) }}{% end %}
+  </span>
+  <span class="list-row-stats">
+    <span>HP <strong>{{ p.hp }}</strong></span>
+    <span>ATK <strong>{{ p.attack }}</strong></span>
+    <span>DEF <strong>{{ p.defense }}</strong></span>
+    <span>SPD <strong>{{ p.speed }}</strong></span>
+  </span>
+</div>
+</a>
+{% end %}
+
 {% end %}{# globals #}
 
 {# ── Header ─────────────────────────────────────────────────────── #}
 
 <div class="header">
   <h1><span>Poke</span>dex</h1>
+  {% set current_view = view ?? "grid" %}
   <div class="view-controls" style="display:flex;gap:0.4rem;margin-left:1rem;">
-    <button class="type-btn" style="background:#555;"
-            hx-get="/" hx-target="#main" hx-push-url="true"
-            hx-vals='{"view": "grid"}'>Grid View</button>
-    <button class="type-btn" style="background:#555;"
-            hx-get="/" hx-target="#main" hx-push-url="true"
-            hx-vals='{"view": "list"}'>List View</button>
+    <button class="type-btn {{ 'active' if current_view == 'grid' else '' }}" style="background:#555;"
+            hx-get="/?view=grid" hx-target="#main" hx-push-url="true"
+            hx-include="[name=q],[name=type]">Grid</button>
+    <button class="type-btn {{ 'active' if current_view == 'list' else '' }}" style="background:#555;"
+            hx-get="/?view=list" hx-target="#main" hx-push-url="true"
+            hx-include="[name=q],[name=type]">List</button>
   </div>
   <span class="count">{{ total ?? "" }}{{ " Pokemon" if (total ?? none) else "" }}</span>
 </div>
@@ -212,9 +316,21 @@
 
 {% block pokemon_detail %}
 {% if (detail ?? none) %}
-<div class="grid-container" style="margin-top: 1.5rem;">
-  <a href="/" class="back-link" hx-get="/" hx-target="#main" hx-push-url="true">&larr; Back to all</a>
-  <div class="detail">
+<div class="detail-container">
+  <div class="detail-nav">
+    <a href="/" hx-get="/" hx-target="#main" hx-push-url="true" class="back-link">&larr; All Pokemon</a>
+    <div class="nav-spacer"></div>
+    {% if (prev_id ?? none) %}
+    <a href="/pokemon/{{ prev_id }}" hx-get="/pokemon/{{ prev_id }}" hx-target="#main" hx-push-url="true">&larr; #{{ prev_id }}</a>
+    {% end %}
+    {% if (next_id ?? none) %}
+    <a href="/pokemon/{{ next_id }}" hx-get="/pokemon/{{ next_id }}" hx-target="#main" hx-push-url="true">#{{ next_id }} &rarr;</a>
+    {% end %}
+  </div>
+  <div class="detail" style="background: linear-gradient(180deg, {{ detail.types.split(',')[0] | type_color }}30, var(--card) 40%)">
+    <div class="detail-artwork-wrap">
+      <img class="detail-artwork" src="{{ detail.id | sprite('artwork') }}" alt="{{ detail.name }}">
+    </div>
     <div class="detail-header">
       <span class="detail-name">{{ detail.name | capitalize }}</span>
       <span class="detail-id">#{{ detail.id }}</span>
@@ -225,20 +341,31 @@
     <div class="detail-types">
       {% for t in detail.types.split(",") %}{{ type_badge(t) }}{% end %}
     </div>
-    {% for label, val in [("HP", detail.hp), ("Attack", detail.attack), ("Defense", detail.defense), ("Speed", detail.speed)] %}
+    {% for label, val in [("HP", detail.hp), ("Attack", detail.attack), ("Defense", detail.defense), ("Sp. Atk", detail.sp_attack), ("Sp. Def", detail.sp_defense), ("Speed", detail.speed)] %}
     {{ stat_bar(label, val) }}
     {% end %}
-    <div style="margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted);">
+    <div class="detail-gen">
       Generation {{ detail.generation }}
     </div>
   </div>
 </div>
+<script>
+requestAnimationFrame(function() {
+  requestAnimationFrame(function() {
+    document.querySelectorAll('.stat-bar[data-width]').forEach(function(bar) {
+      bar.style.width = bar.dataset.width;
+    });
+  });
+});
+</script>
 {% end %}
 {% endblock %}
 
 {# ── Grid view ──────────────────────────────────────────────────── #}
 
 {% block pokemon_grid %}
+{% set v = view ?? "grid" %}
+<input type="hidden" name="view" value="{{ v }}">
 <div class="controls">
   <div class="search-bar">
     <input type="search"
@@ -249,17 +376,16 @@
            hx-target="#main"
            hx-trigger="input changed delay:300ms, search"
            hx-push-url="true"
-           hx-include=".type-btn.active"
+           hx-include=".type-btn.active,[name=view]"
            autocomplete="off">
   </div>
-  {% cache "type-filters" %}
   <div class="type-filters">
     <button class="type-btn {{ 'active' if not current_type else '' }}"
             style="background: #555;"
             hx-get="/"
             hx-target="#main"
             hx-push-url="true"
-            hx-include="[name=q]">All</button>
+            hx-include="[name=q],[name=view]">All</button>
     {% for t in all_types %}
     <button class="type-btn {{ 'active' if current_type == t else '' }}"
             name="type"
@@ -268,10 +394,9 @@
             hx-get="/?type={{ t }}"
             hx-target="#main"
             hx-push-url="true"
-            hx-include="[name=q]">{{ t }}</button>
+            hx-include="[name=q],[name=view]">{{ t }}</button>
     {% end %}
   </div>
-  {% end %}{# cache #}
 </div>
 
 <div class="grid-container">
@@ -281,21 +406,27 @@
     <p>No Pokemon found{% if search %} matching "{{ search }}"{% end %}{% if current_type %} of type {{ current_type }}{% end %}.</p>
   </div>
   {% else %}
+
+  {% if v == "list" %}
+  <div class="pokemon-list">
+    {% for p in pokemon %}
+    {{ pokemon_row(p) }}
+    {% end %}
+  </div>
+  {% else %}
   <div class="pokemon-grid">
     {% for p in pokemon %}
     {{ pokemon_card(p) }}
     {% end %}
   </div>
+  {% end %}
 
   {% if total_pages > 1 %}
-  {% set base = "" %}
-  {% if current_type %}{% set base = "&type=" + current_type %}{% end %}
+  {% set base = "&view=" + v %}
+  {% if current_type %}{% set base = base + "&type=" + current_type %}{% end %}
   {% if search %}{% set base = base + "&q=" + search %}{% end %}
 
-  {# Infinite scroll sentinel — loads next page when scrolled into view.
-     Uses hx-trigger="revealed" (htmx's native infinite scroll pattern).
-     Falls back to manual pagination buttons below for accessibility. #}
-  {% if page < total_pages %}
+  {% if page < total_pages and v == "grid" %}
   <div hx-get="/?page={{ page + 1 }}{{ base }}"
        hx-trigger="revealed"
        hx-target=".pokemon-grid"

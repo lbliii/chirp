@@ -30,7 +30,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 DB_PATH = Path(os.environ.get("CHIRP_DASHBOARD_DB", str(Path(__file__).parent / "dashboard.db")))
 
 app = App(
-    config=AppConfig(template_dir=TEMPLATES_DIR, debug=True),
+    config=AppConfig(template_dir=TEMPLATES_DIR, debug=True, worker_mode="async"),
     db=f"sqlite:///{DB_PATH}",
     migrations=str(MIGRATIONS_DIR),
 )

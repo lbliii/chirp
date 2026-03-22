@@ -36,6 +36,22 @@ PYTHONPATH=src python examples/standalone/chat/app.py
 Open http://127.0.0.1:8000 in two browser tabs. Pick different usernames.
 Messages from either tab appear in both — in real-time.
 
+## Worker mode
+
+SSE connections are long-lived — the server holds the connection open and
+streams events as they arrive. This requires `worker_mode="async"` so that
+SSE streams and POST handlers run as concurrent tasks in the same event loop.
+
+The default `worker_mode="auto"` selects sync workers on Python 3.14t
+(free-threading), which block one worker thread per SSE connection and
+isolate each request in a separate event loop. That breaks in-memory
+pub-sub patterns like `ChatBus` (the `asyncio.Queue` subscriber in one
+thread's event loop can't be woken by `put_nowait` from another).
+
+```python
+config = AppConfig(template_dir=TEMPLATES_DIR, workers=1, worker_mode="async")
+```
+
 ## Why not WebSocket?
 
 SSE handles server-to-client push. `hx-post` handles client-to-server commands.

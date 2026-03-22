@@ -35,6 +35,14 @@ def _env_float(key: str, default: float) -> float:
         return default
 
 
+def _env_log_format(key: str, default: str) -> str:
+    """Read log format from env; invalid values fall back to default."""
+    val = (os.environ.get(key) or "").lower().strip()
+    if val in ("auto", "text", "json"):
+        return val
+    return default
+
+
 @dataclass(frozen=True, slots=True)
 class AppConfig:
     """Application configuration. Immutable after creation.
@@ -142,7 +150,8 @@ class AppConfig:
 
     # Production settings
     lifecycle_logging: bool = True
-    log_format: str = "json"
+    # Pounce: "auto" = compact colored lines on a TTY, JSON when piped (same as pounce CLI)
+    log_format: str = "auto"
     log_level: str = "info"
     max_connections: int = 1000
     backlog: int = 2048
@@ -174,7 +183,8 @@ class AppConfig:
         loads ``.env`` from the current directory before reading env.
 
         Env vars (with CHIRP_ prefix):
-            SECRET_KEY, SESSION_SECRET_KEY, DEBUG, ENV, HOST, PORT,
+            SECRET_KEY, DEBUG, ENV, HOST, PORT,
+            LOG_FORMAT (auto|text|json — forwarded to Pounce),
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
             REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
             HTTP_TIMEOUT, HTTP_RETRIES,
@@ -199,6 +209,7 @@ class AppConfig:
         return cls(
             host=os.environ.get(f"{p}HOST", "127.0.0.1"),
             port=_env_int(f"{p}PORT", 8000),
+            log_format=_env_log_format(f"{p}LOG_FORMAT", "auto"),
             debug=debug,
             secret_key=os.environ.get(f"{p}SECRET_KEY", ""),
             env=env_val,

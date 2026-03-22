@@ -112,7 +112,7 @@ async def load_user(user_id: str) -> User | None:
 # App setup
 # ---------------------------------------------------------------------------
 
-config = AppConfig(template_dir=TEMPLATES_DIR)
+config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
 app = App(config=config)
 
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))

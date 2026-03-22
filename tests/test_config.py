@@ -97,6 +97,7 @@ class TestAppConfig:
             assert cfg.redis_url is None
             assert cfg.http_timeout == 30.0
             assert cfg.http_retries == 0
+            assert cfg.log_format == "auto"
         finally:
             os.environ.update(env_backup)
 
@@ -112,6 +113,7 @@ class TestAppConfig:
             os.environ["CHIRP_REDIS_URL"] = "redis://localhost"
             os.environ["CHIRP_HTTP_TIMEOUT"] = "60"
             os.environ["CHIRP_HTTP_RETRIES"] = "3"
+            os.environ["CHIRP_LOG_FORMAT"] = "json"
             cfg = AppConfig.from_env()
             assert cfg.host == "0.0.0.0"
             assert cfg.port == 3000
@@ -121,6 +123,17 @@ class TestAppConfig:
             assert cfg.redis_url == "redis://localhost"
             assert cfg.http_timeout == 60.0
             assert cfg.http_retries == 3
+            assert cfg.log_format == "json"
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_invalid_log_format_ignored(self) -> None:
+        """Invalid CHIRP_LOG_FORMAT falls back to default."""
+        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        try:
+            os.environ["CHIRP_LOG_FORMAT"] = "xml"
+            cfg = AppConfig.from_env()
+            assert cfg.log_format == "auto"
         finally:
             os.environ.update(env_backup)
 
