@@ -170,8 +170,7 @@
 {% end %}
 
 {% def pokemon_card(p) %}
-<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true"
-   hx-select="#main">
+<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
 <div class="card">
   <span class="card-id">#{{ p.id }}</span>
   <div class="card-name">
