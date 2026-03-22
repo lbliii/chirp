@@ -76,6 +76,8 @@ class Pokemon:
     hp: int
     attack: int
     defense: int
+    sp_attack: int
+    sp_defense: int
     speed: int
     generation: int
     legendary: int  # SQLite stores booleans as 0/1
@@ -88,6 +90,9 @@ class _TypeRow:
     types: str
 
 
+SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
+
+
 def _pokemon_to_dict(p: Pokemon) -> dict:
     """Convert a Pokemon dataclass to a JSON-friendly dict."""
     return {
@@ -97,9 +102,13 @@ def _pokemon_to_dict(p: Pokemon) -> dict:
         "hp": p.hp,
         "attack": p.attack,
         "defense": p.defense,
+        "sp_attack": p.sp_attack,
+        "sp_defense": p.sp_defense,
         "speed": p.speed,
         "generation": p.generation,
         "legendary": bool(p.legendary),
+        "sprite": f"{SPRITE_BASE}/{p.id}.png",
+        "artwork": f"{SPRITE_BASE}/other/official-artwork/{p.id}.png",
     }
 
 
@@ -239,6 +248,14 @@ def type_color(type_name: str) -> str:
     return TYPE_COLORS.get(type_name.lower(), "#777")
 
 
+@app.template_filter("sprite")
+def sprite_url(pokemon_id: int, variant: str = "default") -> str:
+    """Return the PokeAPI sprite URL for a Pokemon ID."""
+    if variant == "artwork":
+        return f"{SPRITE_BASE}/other/official-artwork/{pokemon_id}.png"
+    return f"{SPRITE_BASE}/{pokemon_id}.png"
+
+
 # ---------------------------------------------------------------------------
 # Error handlers — JSON for API, HTML for browser
 # ---------------------------------------------------------------------------
@@ -265,6 +282,9 @@ async def index(request: Request):
     page = max(request.query.get_int("page", default=1) or 1, 1)
     type_filter = (request.query.get("type") or "").strip().lower()
     search = (request.query.get("q") or "").strip().lower()
+    view = (request.query.get("view") or "grid").strip().lower()
+    if view not in ("grid", "list"):
+        view = "grid"
 
     results, total, total_pages = await _query_pokemon(
         page=page,
@@ -281,6 +301,7 @@ async def index(request: Request):
         all_types=all_types,
         current_type=type_filter,
         search=search,
+        view=view,
         page=page,
         total=total,
         total_pages=total_pages,
@@ -289,15 +310,24 @@ async def index(request: Request):
 
 @app.route("/pokemon/{pokemon_id}")
 async def pokemon_detail(pokemon_id: int, request: Request):
-    """Single Pokemon detail view."""
+    """Single Pokemon detail view with prev/next navigation."""
     pokemon = await Query(Pokemon, "pokemon").where("id = ?", pokemon_id).fetch_one(app.db)
     if pokemon is None:
         return ({"error": "Pokemon not found", "status": 404}, 404)
+
+    prev_id = await app.db.fetch_val(
+        "SELECT id FROM pokemon WHERE id < ? ORDER BY id DESC LIMIT 1", pokemon_id
+    )
+    next_id = await app.db.fetch_val(
+        "SELECT id FROM pokemon WHERE id > ? ORDER BY id ASC LIMIT 1", pokemon_id
+    )
 
     return Page(
         "pokedex.html",
         "pokemon_detail",
         detail=pokemon,
+        prev_id=prev_id,
+        next_id=next_id,
         pokemon=[],
         all_types=[],
         current_type="",
@@ -367,6 +397,8 @@ async def api_stats():
     avg_hp = await app.db.fetch_val("SELECT ROUND(AVG(hp), 1) FROM pokemon") or 0
     avg_attack = await app.db.fetch_val("SELECT ROUND(AVG(attack), 1) FROM pokemon") or 0
     avg_defense = await app.db.fetch_val("SELECT ROUND(AVG(defense), 1) FROM pokemon") or 0
+    avg_sp_attack = await app.db.fetch_val("SELECT ROUND(AVG(sp_attack), 1) FROM pokemon") or 0
+    avg_sp_defense = await app.db.fetch_val("SELECT ROUND(AVG(sp_defense), 1) FROM pokemon") or 0
     avg_speed = await app.db.fetch_val("SELECT ROUND(AVG(speed), 1) FROM pokemon") or 0
     legendary_count = await Query(Pokemon, "pokemon").where("legendary = ?", 1).count(app.db)
 
@@ -385,6 +417,8 @@ async def api_stats():
                 "hp": float(avg_hp),
                 "attack": float(avg_attack),
                 "defense": float(avg_defense),
+                "sp_attack": float(avg_sp_attack),
+                "sp_defense": float(avg_sp_defense),
                 "speed": float(avg_speed),
             },
             "types": dict(sorted(type_counts.items())),

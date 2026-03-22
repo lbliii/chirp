@@ -5,6 +5,8 @@ CREATE TABLE pokemon (
     hp         INTEGER NOT NULL,
     attack     INTEGER NOT NULL,
     defense    INTEGER NOT NULL,
+    sp_attack  INTEGER NOT NULL DEFAULT 0,
+    sp_defense INTEGER NOT NULL DEFAULT 0,
     speed      INTEGER NOT NULL,
     generation INTEGER NOT NULL DEFAULT 1,
     legendary  INTEGER NOT NULL DEFAULT 0
