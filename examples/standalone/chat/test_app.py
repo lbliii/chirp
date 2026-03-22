@@ -163,9 +163,7 @@ class TestSSEStream:
         async with TestClient(example_app) as client:
             auth = await _login(client)
 
-            sse_task = asyncio.create_task(
-                client.sse("/chat/events", max_events=1)
-            )
+            sse_task = asyncio.create_task(client.sse("/chat/events", max_events=1))
             await asyncio.sleep(0.2)
 
             await client.post(
