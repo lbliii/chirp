@@ -56,4 +56,11 @@ How Chirp makes data races structurally impossible.
 All seven projects in the reactive Python stack.
 :::{/card}
 
+:::{card} Maturity & Value
+:icon: activity
+:link: ./maturity
+:description: Stability and value assessment
+Where Chirp stands today, what is production-ready, and what it delivers.
+:::{/card}
+
 :::{/cards}
