@@ -54,7 +54,7 @@ async def send_response(
     )
     if request_id is not None:
         raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
-    # HTMX debug tray + proxies: fragment vs full-page intent (HTML only)
+    # Chirp DevTools tray + proxies: fragment vs full-page intent (HTML only)
     if response.content_type.startswith("text/html"):
         raw_headers.append(
             (b"x-chirp-render-intent", response.render_intent.encode("latin-1"))

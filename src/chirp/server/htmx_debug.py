@@ -1,15 +1,15 @@
-"""HTMX debug bootstrap assets for development mode.
+"""Chirp DevTools (⌁⌁) — debug overlay for development mode.
 
 The app injects a single script tag on full-page responses. The script itself
 is served from an internal route and is idempotent, so it can be included on
 multiple navigations without duplicating listeners or toast containers.
 
-The tray logs HTMX requests with timings (RTT, swap, settle), Chirp response
-headers (``X-Chirp-Route-*``, ``X-Chirp-Layout-*``, ``X-Chirp-Render-Intent``,
-``X-Request-Id`` when present), and optional element inspector. Shortcuts: Ctrl+Shift+D toggles the
-drawer; Ctrl+Shift+K toggles the inspector (opens the drawer if needed). Set
-``localStorage`` key ``chirp-debug-verbose`` to ``1`` to log boot to the
-console.
+Despite the ``htmx_debug`` module name (kept for backwards compatibility), the
+overlay monitors far more than HTMX: SSE connections, View Transitions, render
+plans, layout chains, route metadata, DOM diffs, and element inspector.
+
+Shortcuts: Ctrl+Shift+D toggles the drawer; Ctrl+Shift+K toggles the inspector.
+Set ``localStorage`` key ``chirp-debug-verbose`` to ``1`` to log boot to console.
 
 Features (v3):
 

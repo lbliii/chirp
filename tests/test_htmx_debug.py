@@ -1,4 +1,4 @@
-"""Tests for chirp.server.htmx_debug — debug script loading and syntax."""
+"""Tests for chirp.server.htmx_debug — Chirp DevTools (⌁⌁) script loading and syntax."""
 
 import os
 import shutil
@@ -11,7 +11,7 @@ from chirp.server.htmx_debug import HIGHLIGHT_PATH, HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_loads() -> None:
-    """HTMX debug script loads and contains expected content."""
+    """Chirp DevTools script loads and contains expected content."""
     assert "__chirpHtmxDebugBooted" in HTMX_DEBUG_BOOT_JS
     assert "htmx:targetError" in HTMX_DEBUG_BOOT_JS
     assert "Co-locate the target with the mutating element" in HTMX_DEBUG_BOOT_JS
@@ -21,6 +21,13 @@ def test_htmx_debug_js_loads() -> None:
     assert "chirp-dbg-pill" in HTMX_DEBUG_BOOT_JS
     assert "getEffectiveConfig" in HTMX_DEBUG_BOOT_JS
     assert "htmx:oobBeforeSwap" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_chirp_branding() -> None:
+    """Pill shows ⌁⌁ Chirp logo, not 'HTMX'."""
+    assert "\\u2301\\u2301" in HTMX_DEBUG_BOOT_JS
+    assert "Chirp DevTools" in HTMX_DEBUG_BOOT_JS
+    assert "chirp devtools active" in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_parses_route_headers() -> None:

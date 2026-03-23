@@ -856,9 +856,9 @@
     togglePill.className = "chirp-dbg-pill";
     togglePill.setAttribute(
       "title",
-      "Chirp HTMX debug — Click to open drawer. Shortcuts: Ctrl+Shift+D toggle drawer, Ctrl+Shift+K inspector, Esc close."
+      "Chirp DevTools — Click to open drawer. Shortcuts: Ctrl+Shift+D toggle drawer, Ctrl+Shift+K inspector, Esc close."
     );
-    togglePill.innerHTML = "<span>HTMX</span><span class='chirp-dbg-badge'>0</span>";
+    togglePill.innerHTML = "<span style='letter-spacing:-1px'>\u2301\u2301</span><span class='chirp-dbg-badge'>0</span>";
     if (state.errorCount > 0) {
       var eb = document.createElement("span");
       eb.className = "chirp-dbg-badge err";
@@ -1715,7 +1715,7 @@
 
   try {
     if (localStorage.getItem(STORAGE_KEYS.verbose) === "1") {
-      console.log("chirp htmx debug overlay active (v3 — sse, waterfall, vt, diff, render plan, highlight)");
+      console.log("\u2301\u2301 chirp devtools active (v3 — sse, waterfall, vt, diff, render plan, highlight)");
     }
   } catch (err) {}
 })();
