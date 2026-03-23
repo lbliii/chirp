@@ -63,7 +63,7 @@ def test_stash_and_read_roundtrip() -> None:
 
     r = R()
     r._cache = {}
-    stash_render_debug_for_request(plan, r)  # type: ignore[arg-type]
+    stash_render_debug_for_request(plan, r, debug=True)  # type: ignore[arg-type]
     got = read_render_debug_from_request(r)
     assert got is not None
     assert got["main_view"]["template"] == "page.html"
