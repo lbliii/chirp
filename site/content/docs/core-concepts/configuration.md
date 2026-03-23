@@ -44,8 +44,8 @@ app = App(config=config)
 | `safe_target` | `bool` | `True` | Auto-add `hx-target="this"` to event-driven elements |
 | `sse_lifecycle` | `bool` | `True` | Inject SSE connection status (`data-sse-state`) and custom events |
 | `view_transitions` | `bool` | `True` | Auto-inject View Transitions API meta tag, CSS defaults, and htmx config |
-| `alpine` | `bool` | `False` | Enable Alpine.js script injection for local UI state |
-| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (unpkg CDN) |
+| `alpine` | `bool` | `False` | Enable Alpine.js script injection (`use_chirp_ui` sets this to `True` automatically) |
+| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (jsdelivr CDN) |
 | `alpine_csp` | `bool` | `False` | Use CSP-safe Alpine build for strict Content-Security-Policy |
 | `islands` | `bool` | `False` | Inject framework-agnostic islands runtime lifecycle hooks |
 | `islands_version` | `str` | `"1"` | Version tag exposed in `data-island-version` and runtime events |

@@ -80,6 +80,30 @@ class HTMLInject:
         return replace(response, body=body)
 
 
+class AlpineInject(HTMLInject):
+    """HTMLInject that skips when Alpine is already present in the page.
+
+    Checks for ``data-chirp="alpine"`` in the response body before injecting.
+    This prevents double-loading when chirp-ui's ``app_shell_layout.html``
+    (or any other source) has already included Alpine.
+    """
+
+    __slots__ = ()
+
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        response = await next(request)
+        if not isinstance(response, Response):
+            return response
+        if "text/html" not in response.content_type:
+            return response
+        body = response.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        if 'data-chirp="alpine"' in body:
+            return response
+        return await super().__call__(request, next)
+
+
 class ViewTransitionCssDebugWarning:
     """Log when the response body uses View Transition CSS but VT injection is off.
 

@@ -43,11 +43,11 @@ def _collect_builtin_middleware(
 
         middleware_list.append(HTMLInject(DELEGATION_SNIPPET, full_page_only=True))
     if config.alpine:
-        from chirp.middleware.inject import HTMLInject
+        from chirp.middleware.inject import AlpineInject
         from chirp.server.alpine import alpine_snippet
 
         middleware_list.append(
-            HTMLInject(
+            AlpineInject(
                 alpine_snippet(config.alpine_version, config.alpine_csp),
                 full_page_only=True,
             )
@@ -77,10 +77,10 @@ def _collect_builtin_middleware(
     if config.debug:
         from chirp.middleware.inject import HTMLInject
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
-        from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
+        from chirp.server.devtools import DEVTOOLS_BOOT_SNIPPET
 
         middleware_list.append(LayoutDebugMiddleware())
-        middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
+        middleware_list.append(HTMLInject(DEVTOOLS_BOOT_SNIPPET))
         if not config.view_transitions:
             from chirp.middleware.inject import ViewTransitionCssDebugWarning
 
