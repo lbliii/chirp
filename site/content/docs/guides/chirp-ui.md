@@ -166,8 +166,10 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
   </aside>
   <main id="main" class="chirpui-app-shell__main" tabindex="-1"
         hx-boost="true" hx-target="#main"
-        hx-swap="outerHTML" hx-select="#main">
-    {% block content %}{% end %}
+        hx-swap="innerHTML" hx-select="#page-content">
+    <div id="page-content">
+      {% block content %}{% end %}
+    </div>
   </main>
 </div>
 

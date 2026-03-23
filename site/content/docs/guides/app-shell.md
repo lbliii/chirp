@@ -31,9 +31,12 @@ Fragment request   → server renders just the targeted block
 ### The Navigation Model
 
 `app_shell_layout.html` puts `hx-boost="true"`, `hx-target="#main"`,
-`hx-swap="outerHTML"`, and `hx-select="#main"` directly on `<main id="main">`.
-All links inside `#main` inherit these attributes automatically — plain
-`<a href="...">` tags get SPA navigation with no extra markup.
+`hx-swap="innerHTML"`, and `hx-select="#page-content"` directly on `<main id="main">`.
+Content is wrapped in `<div id="page-content">` inside `#main`. All links inside
+`#main` inherit these attributes automatically — plain `<a href="...">` tags get
+SPA navigation with no extra markup. Because `#main` uses `innerHTML` (not
+`outerHTML`), it persists in the DOM and its `view-transition-name` is never
+duplicated during swaps.
 
 Sidebar links (outside `#main`) carry their own htmx attributes via
 `sidebar_link()`, which emits `hx-boost`, `hx-target`, and `hx-select`.
@@ -250,6 +253,38 @@ def context() -> dict:
 - **controls** — Secondary actions (e.g. "Metrics", filters)
 - **overflow** — Dropdown menu (e.g. "More" with Archive, Export, Docs)
 
+### Form actions (`kind="form"`)
+
+Use **`kind="form"`** for POST actions that need CSRF, hidden fields, and optional HTMX
+attributes on the `<form>`. Chirp-ui renders the form in the shell target; OOB updates
+refresh it on navigation like other shell actions.
+
+- Put form actions in **primary** or **controls** only (not **overflow**).
+- Set **`form_action`**, **`label`** (submit button), and optional **`hidden_fields`** as
+  `tuple[tuple[str, str], ...]`.
+- **`include_csrf`** (default `True`) renders `{{ csrf_field() }}` inside the form.
+- HTMX: set **`hx_post`**, **`hx_target`**, **`hx_swap`**, **`hx_disinherit`** as needed.
+- **`submit_surface`**: `"btn"` | `"shimmer"` | `"pulsing"` (ChirpUI submit control).
+
+For link/button actions that need extra attributes (e.g. `hx-boost` on a shell link),
+set **`attrs`** on `ShellAction` (string passed through to `btn`).
+
+```python
+ShellAction(
+    id="add-to-party",
+    kind="form",
+    label="Add Bulbasaur to party",
+    variant="primary",
+    form_action="/team/add",
+    hidden_fields=(("pokemon_id", "1"),),
+    hx_post="/team/add",
+    hx_target="#party-toast",
+    hx_swap="innerHTML",
+    hx_disinherit="hx-select",
+    submit_surface="shimmer",
+)
+```
+
 ```python
 ShellActions(
     primary=ShellActionZone(items=(ShellAction(id="new", label="New", href="/new"),)),
@@ -395,13 +430,15 @@ the built-in defaults on your `<main>` element:
 
 ```html
 <main id="main" class="my-shell__main" tabindex="-1"
-      hx-boost="true" hx-target="#main" hx-swap="outerHTML" hx-select="#main">
-  {% block content %}{% end %}
+      hx-boost="true" hx-target="#main" hx-swap="innerHTML" hx-select="#page-content">
+  <div id="page-content">
+    {% block content %}{% end %}
+  </div>
 </main>
 ```
 
-Sidebar links (outside `#main`) need their own `hx-target="#main"` since they
-don't inherit from the `<main>` element.
+Sidebar links (outside `#main`) need their own `hx-target="#main"` and
+`hx-select="#page-content"` since they don't inherit from the `<main>` element.
 
 See `examples/chirpui/kanban_shell` for a working custom shell and `examples/chirpui/shell_oob` for
 regions-based OOB.
