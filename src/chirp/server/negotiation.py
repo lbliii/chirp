@@ -6,7 +6,6 @@ no magic, fully predictable.
 """
 
 import logging
-from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
@@ -105,14 +104,14 @@ def _with_current_path_in_context(
     Avoids mutating a shared ``context`` dict when handlers reuse a frozen
     ``Template``/``Page``/``LayoutPage`` across requests.
 
-    ``Page``/``LayoutPage`` use custom ``__init__`` — build fresh instances instead
-    of ``dataclasses.replace`` (which does not reconstruct them correctly).
+    ``Template``/``Page``/``LayoutPage`` use custom ``__init__`` — construct fresh
+    instances instead of ``dataclasses.replace`` (which does not pass ``name``).
     """
     if request is None or "current_path" in value.context:
         return value
     new_ctx = {**value.context, "current_path": request.path}
     if isinstance(value, Template):
-        return replace(value, context=new_ctx)
+        return Template(value.name, **new_ctx)
     if isinstance(value, Page):
         return Page(
             value.name,
