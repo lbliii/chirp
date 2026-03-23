@@ -11,6 +11,8 @@
     error: "#f7768e",
     info: "#7aa2f7",
     oob: "#bb9af7",
+    sse: "#2ac3de",
+    vt: "#ff9e64",
   };
   var BUFFER_SIZE = 200;
   var STORAGE_KEYS = {
@@ -23,6 +25,7 @@
     pause: "chirp-debug-pause",
     redactCurl: "chirp-debug-redact-curl",
   };
+  var HIGHLIGHT_PATH = "/__chirp/debug/highlight";
 
   // --- Helpers ---
   function desc(el) {
@@ -39,8 +42,6 @@
       "hx-target", "hx-swap", "hx-select", "hx-trigger", "hx-push-url",
     ];
     var result = {};
-    // Mirror HTMX 2 getClosestAttributeValue: walk up from element, set value when
-    // found, then clear it if a non-start ancestor has hx-disinherit for that attr.
     for (var ai = 0; ai < attrs.length; ai++) {
       var attrName = attrs[ai];
       var attrShort = attrName.replace("hx-", "");
@@ -133,6 +134,130 @@
     } catch (e) {}
   }
 
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // --- Client-side Syntax Highlighting (Tokyo Night palette) ---
+  var HL = {
+    str: "#9ece6a",
+    num: "#ff9e64",
+    bool: "#bb9af7",
+    key: "#7aa2f7",
+    tag: "#f7768e",
+    attr: "#bb9af7",
+    comment: "#565f89",
+    add: "rgba(158,206,106,.15)",
+    del: "rgba(247,118,142,.15)",
+    header: "#7aa2f7",
+  };
+
+  function hlJSON(s) {
+    return s.replace(
+      /("(?:[^"\\]|\\.)*")\s*:/g,
+      '<span style="color:' + HL.key + '">$1</span>:'
+    ).replace(
+      /:\s*("(?:[^"\\]|\\.)*")/g,
+      ': <span style="color:' + HL.str + '">$1</span>'
+    ).replace(
+      /:\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+      ': <span style="color:' + HL.num + '">$1</span>'
+    ).replace(
+      /:\s*(true|false|null)\b/g,
+      ': <span style="color:' + HL.bool + '">$1</span>'
+    );
+  }
+
+  function hlHeaders(s) {
+    return s.split("\n").map(function(line) {
+      var idx = line.indexOf(":");
+      if (idx < 1) return esc(line);
+      var name = line.slice(0, idx);
+      var val = line.slice(idx + 1);
+      return '<span style="color:' + HL.header + '">' + esc(name) + '</span>:' + esc(val);
+    }).join("\n");
+  }
+
+  function hlDiff(lines) {
+    return lines.map(function(l) {
+      if (l.charAt(0) === "+") return '<span style="background:' + HL.add + ';display:block">' + esc(l) + '</span>';
+      if (l.charAt(0) === "-") return '<span style="background:' + HL.del + ';display:block">' + esc(l) + '</span>';
+      if (l.charAt(0) === "@") return '<span style="color:' + HL.bool + '">' + esc(l) + '</span>';
+      return esc(l);
+    }).join("\n");
+  }
+
+  // --- Simple line-based diff ---
+  function diffLines(a, b) {
+    var aLines = a.split("\n");
+    var bLines = b.split("\n");
+    if (aLines.length > 500 || bLines.length > 500) {
+      return ["@@ diff too large (" + aLines.length + " vs " + bLines.length + " lines) @@"];
+    }
+    var aSet = {};
+    var bSet = {};
+    for (var i = 0; i < aLines.length; i++) aSet[aLines[i]] = (aSet[aLines[i]] || 0) + 1;
+    for (var j = 0; j < bLines.length; j++) bSet[bLines[j]] = (bSet[bLines[j]] || 0) + 1;
+
+    var result = [];
+    var added = 0, removed = 0;
+    for (var k = 0; k < aLines.length; k++) {
+      if (!bSet[aLines[k]] || bSet[aLines[k]] <= 0) {
+        result.push("- " + aLines[k]);
+        removed++;
+      } else {
+        bSet[aLines[k]]--;
+        result.push("  " + aLines[k]);
+      }
+    }
+    for (var m = 0; m < bLines.length; m++) {
+      var found = false;
+      for (var n = 0; n < aLines.length; n++) {
+        if (aLines[n] === bLines[m]) { aLines[n] = null; found = true; break; }
+      }
+      if (!found) {
+        result.push("+ " + bLines[m]);
+        added++;
+      }
+    }
+    if (added === 0 && removed === 0) return ["(no changes)"];
+    result.unshift("@@ -" + (aLines.length - added) + " +" + (bLines.length - removed) + " @@ " + added + " added, " + removed + " removed");
+    return result;
+  }
+
+  // --- Render plan decoder ---
+  function decodeRenderPlan(encoded) {
+    try {
+      var json = atob(encoded);
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function formatRenderPlan(plan) {
+    if (!plan) return "(no render plan)";
+    var parts = [];
+    parts.push("Intent: " + (plan.intent || "unknown"));
+    if (plan.template) parts.push("Template: " + plan.template);
+    if (plan.block) parts.push("Block: " + plan.block);
+    if (plan.layouts_applied && plan.layouts_applied.length) {
+      parts.push("Layouts applied (start=" + (plan.layout_start || 0) + "):");
+      plan.layouts_applied.forEach(function(l) { parts.push("  " + l); });
+    }
+    if (plan.regions && plan.regions.length) {
+      parts.push("Shell region updates:");
+      plan.regions.forEach(function(r) {
+        parts.push("  " + r.region + " ← " + r.template + (r.block ? ":" + r.block : "") + " [" + r.mode + "]");
+      });
+    }
+    if (plan.context_keys && plan.context_keys.length) {
+      parts.push("Context keys (" + plan.context_keys.length + "): " + plan.context_keys.join(", "));
+    }
+    if (plan.include_layout_oob) parts.push("include_layout_oob: true");
+    return parts.join("\n");
+  }
+
   // --- State ---
   var state = {
     open: false,
@@ -148,6 +273,9 @@
     errors: [],
     oobRecords: [],
     pinnedScroll: false,
+    sseConnections: [],
+    sseEvents: [],
+    vtEvents: [],
   };
 
   function loadState() {
@@ -183,6 +311,141 @@
 
   loadState();
 
+  // --- SSE Monitor (monkey-patch EventSource) ---
+  var OriginalEventSource = window.EventSource;
+  if (OriginalEventSource) {
+    window.EventSource = function ChirpTrackedEventSource(url, opts) {
+      var es = new OriginalEventSource(url, opts);
+      var conn = {
+        id: "sse-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+        url: url,
+        openedAt: null,
+        closedAt: null,
+        readyState: es.readyState,
+        eventCount: 0,
+        errorCount: 0,
+        lastEventAt: null,
+      };
+      state.sseConnections.unshift(conn);
+      if (state.sseConnections.length > 20) state.sseConnections.pop();
+
+      es.addEventListener("open", function() {
+        conn.openedAt = Date.now();
+        conn.readyState = es.readyState;
+        state.sseEvents.unshift({
+          connId: conn.id, type: "open", url: url, ts: Date.now(), data: null,
+        });
+        if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+        refreshSsePanel();
+      });
+
+      es.addEventListener("error", function() {
+        conn.errorCount++;
+        conn.readyState = es.readyState;
+        state.sseEvents.unshift({
+          connId: conn.id, type: "error", url: url, ts: Date.now(),
+          data: "readyState=" + es.readyState,
+        });
+        if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+        refreshSsePanel();
+      });
+
+      var origAddListener = es.addEventListener.bind(es);
+      es.addEventListener = function(type, fn, opts2) {
+        if (type !== "open" && type !== "error") {
+          var wrapped = function(evt) {
+            conn.eventCount++;
+            conn.lastEventAt = Date.now();
+            conn.readyState = es.readyState;
+            var preview = evt.data ? String(evt.data).slice(0, 200) : "";
+            state.sseEvents.unshift({
+              connId: conn.id, type: type, url: url, ts: Date.now(), data: preview,
+            });
+            if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+            refreshSsePanel();
+            return fn.call(es, evt);
+          };
+          return origAddListener(type, wrapped, opts2);
+        }
+        return origAddListener(type, fn, opts2);
+      };
+
+      var origOnMessage = null;
+      Object.defineProperty(es, "onmessage", {
+        get: function() { return origOnMessage; },
+        set: function(fn) {
+          origOnMessage = fn;
+          origAddListener("message", function(evt) {
+            conn.eventCount++;
+            conn.lastEventAt = Date.now();
+            conn.readyState = es.readyState;
+            var preview = evt.data ? String(evt.data).slice(0, 200) : "";
+            state.sseEvents.unshift({
+              connId: conn.id, type: "message", url: url, ts: Date.now(), data: preview,
+            });
+            if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+            refreshSsePanel();
+            if (fn) fn.call(es, evt);
+          });
+        },
+      });
+
+      var origClose = es.close.bind(es);
+      es.close = function() {
+        conn.closedAt = Date.now();
+        conn.readyState = 2;
+        state.sseEvents.unshift({
+          connId: conn.id, type: "close", url: url, ts: Date.now(), data: null,
+        });
+        if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+        refreshSsePanel();
+        return origClose();
+      };
+
+      return es;
+    };
+    window.EventSource.CONNECTING = 0;
+    window.EventSource.OPEN = 1;
+    window.EventSource.CLOSED = 2;
+  }
+
+  // --- View Transition tracking ---
+  if (document.startViewTransition) {
+    var origStartVT = document.startViewTransition.bind(document);
+    document.startViewTransition = function(cb) {
+      var vtRecord = {
+        id: "vt-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+        startedAt: Date.now(),
+        readyAt: null,
+        finishedAt: null,
+        skipped: false,
+      };
+      state.vtEvents.unshift(vtRecord);
+      if (state.vtEvents.length > 50) state.vtEvents.pop();
+
+      var vt = origStartVT(cb);
+      if (vt && vt.ready) {
+        vt.ready.then(function() {
+          vtRecord.readyAt = Date.now();
+          refreshActivityPanel();
+        }).catch(function() {
+          vtRecord.skipped = true;
+          refreshActivityPanel();
+        });
+      }
+      if (vt && vt.finished) {
+        vt.finished.then(function() {
+          vtRecord.finishedAt = Date.now();
+          refreshActivityPanel();
+        }).catch(function() {
+          vtRecord.skipped = true;
+          refreshActivityPanel();
+        });
+      }
+      return vt;
+    };
+  }
+
   // --- Event Collector ---
   function findPendingRecord(hasSent, hasResponse) {
     for (var i = 0; i < state.records.length; i++) {
@@ -217,6 +480,10 @@
       renderIntent: "",
       bodyPreview: "",
       contentType: "",
+      renderPlan: null,
+      domBefore: null,
+      domAfter: null,
+      domDiff: null,
     };
     state.records.unshift(r);
     if (state.records.length > BUFFER_SIZE) state.records.pop();
@@ -298,11 +565,19 @@
       r.contentType = rh["content-type"] || "";
       r.renderIntent = rh["x-chirp-render-intent"] || "";
       r.hxPairs = filterHxAndChirpHeaders(rh);
-      if (xhr.status >= 400 && xhr.responseText) {
+
+      // Render plan header (base64-encoded JSON)
+      var rpHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Render-Plan");
+      if (rpHeader) {
+        r.renderPlan = decodeRenderPlan(rpHeader);
+      }
+
+      // Body preview (all responses for expanded detail, not just errors)
+      if (xhr.responseText) {
         var txt = String(xhr.responseText);
         r.bodyPreview =
-          txt.length > 2048
-            ? txt.slice(0, 2048) + "\n… (truncated, " + txt.length + " bytes total)"
+          txt.length > 4096
+            ? txt.slice(0, 4096) + "\n… (truncated, " + txt.length + " bytes total)"
             : txt;
       }
       firePlugin("onResponse", r);
@@ -317,6 +592,13 @@
     r.target = (t && t.id) ? "#" + t.id : (t && t.className && String(t.className).trim()) ? "." + String(t.className).split(/\s+/)[0] : (t ? "this" : "");
     r.swap = (d.swapStyle && d.swapStyle) || "innerHTML";
     r.timing.beforeSwap = Date.now();
+
+    // DOM diff: capture "before" snapshot
+    if (t) {
+      try {
+        r.domBefore = t.innerHTML.slice(0, 8192);
+      } catch (e) {}
+    }
   });
 
   document.body.addEventListener("htmx:afterSwap", function(evt) {
@@ -325,6 +607,16 @@
     if (!r) return;
     r.timing.afterSwap = Date.now();
     if (state.flash && d.target) flashTarget(d.target, r.failed ? "error" : "normal");
+
+    // DOM diff: capture "after" snapshot and compute diff
+    if (d.target && r.domBefore != null) {
+      try {
+        r.domAfter = d.target.innerHTML.slice(0, 8192);
+        if (r.domBefore !== r.domAfter) {
+          r.domDiff = diffLines(r.domBefore, r.domAfter);
+        }
+      } catch (e) {}
+    }
   });
 
   document.body.addEventListener("htmx:afterSettle", function(evt) {
@@ -372,11 +664,12 @@
     var style = document.createElement("style");
     style.id = "chirp-debug-styles";
     style.textContent = [
-      "#chirp-debug{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:99998;font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:14px;line-height:1.5;--chirp-bg:" + COLORS.bg + ";--chirp-text:" + COLORS.text + ";--chirp-success:" + COLORS.success + ";--chirp-warning:" + COLORS.warning + ";--chirp-error:" + COLORS.error + ";--chirp-info:" + COLORS.info + ";--chirp-oob:" + COLORS.oob + "}",
+      "#chirp-debug{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:99998;font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:14px;line-height:1.5;--chirp-bg:" + COLORS.bg + ";--chirp-text:" + COLORS.text + ";--chirp-success:" + COLORS.success + ";--chirp-warning:" + COLORS.warning + ";--chirp-error:" + COLORS.error + ";--chirp-info:" + COLORS.info + ";--chirp-oob:" + COLORS.oob + ";--chirp-sse:" + COLORS.sse + ";--chirp-vt:" + COLORS.vt + "}",
       ".chirp-dbg-pill{position:fixed;bottom:16px;right:16px;z-index:99998;background:var(--chirp-bg);color:var(--chirp-text);border:1px solid var(--chirp-info);border-radius:20px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.3)}",
       ".chirp-dbg-pill:hover{background:#252530}",
       ".chirp-dbg-pill .chirp-dbg-badge{background:var(--chirp-info);color:var(--chirp-bg);border-radius:10px;padding:2px 6px;font-size:10px}",
       ".chirp-dbg-pill .chirp-dbg-badge.err{background:var(--chirp-error)}",
+      ".chirp-dbg-pill .chirp-dbg-badge.sse{background:var(--chirp-sse)}",
       ".chirp-dbg-drawer{position:fixed;bottom:0;left:0;right:0;height:280px;max-height:80vh;z-index:99997;background:var(--chirp-bg);border-top:1px solid #333;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .2s ease}",
       ".chirp-dbg-drawer.open{transform:translateY(0)}",
       ".chirp-dbg-resize{height:4px;cursor:ns-resize;background:#333;flex-shrink:0}",
@@ -386,6 +679,7 @@
       ".chirp-dbg-tab:hover{background:#252530}",
       ".chirp-dbg-tab.active{border-bottom-color:var(--chirp-info);color:var(--chirp-info)}",
       ".chirp-dbg-tab .badge{background:var(--chirp-error);color:var(--chirp-bg);border-radius:8px;padding:1px 5px;font-size:10px;margin-left:4px}",
+      ".chirp-dbg-tab .badge-sse{background:var(--chirp-sse);color:var(--chirp-bg);border-radius:8px;padding:1px 5px;font-size:10px;margin-left:4px}",
       ".chirp-dbg-help{padding:6px 16px;font-size:11px;color:#7c8396;border-bottom:1px solid #2a2e3a;background:#15161f;flex-shrink:0;line-height:1.4}",
       ".chirp-dbg-help kbd{display:inline-block;padding:1px 5px;border:1px solid #444;border-radius:3px;background:#0d0e14;font-size:10px;color:#a9b1d6}",
       ".chirp-dbg-layout-hint{font-size:11px;color:#7aa2f7;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
@@ -415,6 +709,29 @@
       ".chirp-dbg-err-row:hover{background:#252530}",
       ".chirp-dbg-err-row .chirp-dbg-err-title{font-weight:bold;color:var(--chirp-error);font-size:14px}",
       ".chirp-dbg-err-row .chirp-dbg-err-body{color:var(--chirp-text);white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.5}",
+      // Waterfall bar
+      ".chirp-dbg-waterfall{display:inline-flex;align-items:center;height:10px;min-width:80px;max-width:200px;border-radius:2px;overflow:hidden;background:#1e1f2e;flex-shrink:0}",
+      ".chirp-dbg-wf-seg{height:100%;min-width:1px}",
+      // SSE panel
+      ".chirp-dbg-sse-conn{padding:10px 12px;border-radius:4px;margin-bottom:6px;background:#1e1f2e;border-left:3px solid var(--chirp-sse)}",
+      ".chirp-dbg-sse-conn .url{color:var(--chirp-sse);font-weight:bold}",
+      ".chirp-dbg-sse-conn .meta{color:#7c8396;font-size:12px}",
+      ".chirp-dbg-sse-evt{padding:6px 12px;margin-bottom:2px;font-size:13px;border-radius:3px}",
+      ".chirp-dbg-sse-evt:hover{background:#252530}",
+      ".chirp-dbg-sse-evt .evt-type{font-weight:bold;min-width:60px;display:inline-block}",
+      // View Transition badge
+      ".chirp-dbg-vt-row{padding:8px 12px;border-radius:4px;margin-bottom:4px;display:flex;align-items:center;gap:10px;background:#1e1f2e;border-left:3px solid var(--chirp-vt)}",
+      ".chirp-dbg-vt-row .vt-label{color:var(--chirp-vt);font-weight:bold}",
+      // Collapsible sections in detail
+      ".chirp-dbg-section{margin:8px 0}",
+      ".chirp-dbg-section-header{cursor:pointer;color:var(--chirp-info);font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:4px 0;user-select:none}",
+      ".chirp-dbg-section-header:hover{color:#9bb8ff}",
+      ".chirp-dbg-section-header::before{content:'▸ ';font-size:10px}",
+      ".chirp-dbg-section-header.open::before{content:'▾ '}",
+      ".chirp-dbg-section-body{display:none;padding:8px 0}",
+      ".chirp-dbg-section-body.open{display:block}",
+      // Highlighted code
+      ".chirp-dbg-hl{background:#0d0e14;border-radius:4px;padding:10px 12px;overflow-x:auto;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word}",
       "@keyframes chirp-dbg-flash{0%{outline-color:var(--chirp-info);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
       "@keyframes chirp-dbg-flash-oob{0%{outline-color:var(--chirp-oob);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
       "@keyframes chirp-dbg-flash-err{0%{outline-color:var(--chirp-error);outline-width:3px}100%{outline-color:transparent;outline-width:0}}",
@@ -473,8 +790,58 @@
     setTimeout(function() { el.remove(); }, 12000);
   }
 
+  // --- Waterfall SVG ---
+  function renderWaterfall(t) {
+    if (!t || !t.config) return "";
+    var total = (t.settle || t.afterSwap || t.response || t.sent || t.config) - t.config;
+    if (total <= 0) return "";
+    var segments = [];
+    if (t.sent) segments.push({ start: 0, end: t.sent - t.config, color: COLORS.info, label: "prep" });
+    if (t.sent && t.response) segments.push({ start: t.sent - t.config, end: t.response - t.config, color: COLORS.success, label: "rtt" });
+    if (t.response && t.afterSwap) segments.push({ start: t.response - t.config, end: t.afterSwap - t.config, color: COLORS.warning, label: "swap" });
+    if (t.afterSwap && t.settle) segments.push({ start: t.afterSwap - t.config, end: t.settle - t.config, color: "#565f89", label: "settle" });
+    if (segments.length === 0) return "";
+
+    var w = 120;
+    var bars = segments.map(function(s) {
+      var x = (s.start / total) * w;
+      var bw = Math.max(1, ((s.end - s.start) / total) * w);
+      return '<div class="chirp-dbg-wf-seg" style="width:' + bw + 'px;background:' + s.color + '" title="' + s.label + ' ' + (s.end - s.start) + 'ms"></div>';
+    }).join("");
+    return '<div class="chirp-dbg-waterfall">' + bars + '</div>';
+  }
+
+  // --- Collapsible section helper ---
+  function makeSection(title, contentHTML, startOpen) {
+    var sec = document.createElement("div");
+    sec.className = "chirp-dbg-section";
+    var hdr = document.createElement("div");
+    hdr.className = "chirp-dbg-section-header" + (startOpen ? " open" : "");
+    hdr.textContent = title;
+    var body = document.createElement("div");
+    body.className = "chirp-dbg-section-body" + (startOpen ? " open" : "");
+    body.innerHTML = contentHTML;
+    hdr.addEventListener("click", function() {
+      hdr.classList.toggle("open");
+      body.classList.toggle("open");
+    });
+    sec.appendChild(hdr);
+    sec.appendChild(body);
+    return sec;
+  }
+
   // --- Panel DOM ---
-  var panelRoot, drawer, togglePill, activityPanel, errorsPanel, inspectorPanel;
+  var panelRoot, drawer, togglePill, activityPanel, errorsPanel, inspectorPanel, ssePanel;
+  var tabsEl, tabNames;
+
+  function refreshActivityPanel() {
+    if (activityPanel && state.tab === "activity") renderActivityLog();
+  }
+
+  function refreshSsePanel() {
+    if (ssePanel && state.tab === "sse") renderSseLog();
+    updatePill();
+  }
 
   function renderPanel() {
     if (panelRoot) return;
@@ -497,6 +864,12 @@
       eb.className = "chirp-dbg-badge err";
       eb.textContent = state.errorCount;
       togglePill.appendChild(eb);
+    }
+    if (state.sseConnections.length > 0) {
+      var sb = document.createElement("span");
+      sb.className = "chirp-dbg-badge sse";
+      sb.textContent = "SSE " + state.sseConnections.length;
+      togglePill.appendChild(sb);
     }
     togglePill.addEventListener("click", toggleDrawer);
     togglePill.style.pointerEvents = "auto";
@@ -527,18 +900,24 @@
     document.addEventListener("mouseup", function() { resizing = false; });
     drawer.appendChild(resize);
 
-    var tabs = document.createElement("div");
-    tabs.className = "chirp-dbg-tabs";
-    var tabNames = ["activity", "inspector", "errors"];
+    tabsEl = document.createElement("div");
+    tabsEl.className = "chirp-dbg-tabs";
+    tabNames = ["activity", "sse", "inspector", "errors"];
     tabNames.forEach(function(name) {
       var t = document.createElement("div");
       t.className = "chirp-dbg-tab" + (state.tab === name ? " active" : "");
-      t.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      t.textContent = name === "sse" ? "SSE" : name.charAt(0).toUpperCase() + name.slice(1);
       if (name === "errors" && state.errors.length > 0) {
         var b = document.createElement("span");
         b.className = "badge";
         b.textContent = state.errors.length;
         t.appendChild(b);
+      }
+      if (name === "sse" && state.sseConnections.length > 0) {
+        var sb2 = document.createElement("span");
+        sb2.className = "badge-sse";
+        sb2.textContent = state.sseConnections.length;
+        t.appendChild(sb2);
       }
       t.addEventListener("click", function() {
         state.tab = name;
@@ -546,9 +925,9 @@
         renderTabs();
         renderPanelContent();
       });
-      tabs.appendChild(t);
+      tabsEl.appendChild(t);
     });
-    drawer.appendChild(tabs);
+    drawer.appendChild(tabsEl);
 
     var helpBar = document.createElement("div");
     helpBar.className = "chirp-dbg-help";
@@ -566,6 +945,10 @@
     activityPanel.className = "chirp-dbg-panel";
     activityPanel.style.display = state.tab === "activity" ? "block" : "none";
 
+    ssePanel = document.createElement("div");
+    ssePanel.className = "chirp-dbg-panel";
+    ssePanel.style.display = state.tab === "sse" ? "block" : "none";
+
     inspectorPanel = document.createElement("div");
     inspectorPanel.className = "chirp-dbg-panel";
     inspectorPanel.style.display = state.tab === "inspector" ? "block" : "none";
@@ -582,6 +965,7 @@
     errorsPanel.style.display = state.tab === "errors" ? "block" : "none";
 
     drawer.appendChild(activityPanel);
+    drawer.appendChild(ssePanel);
     drawer.appendChild(inspectorPanel);
     drawer.appendChild(errorsPanel);
 
@@ -627,7 +1011,14 @@
       if (exportBtn) {
         exportBtn.addEventListener("click", function() {
           var payload = JSON.stringify(
-            { exportedAt: new Date().toISOString(), records: state.records, errors: state.errors },
+            {
+              exportedAt: new Date().toISOString(),
+              records: state.records,
+              errors: state.errors,
+              sseConnections: state.sseConnections,
+              sseEvents: state.sseEvents,
+              vtEvents: state.vtEvents,
+            },
             null,
             2
           );
@@ -645,10 +1036,11 @@
     } catch (e) {}
 
     function renderTabs() {
-      var ts = tabs.querySelectorAll(".chirp-dbg-tab");
+      var ts = tabsEl.querySelectorAll(".chirp-dbg-tab");
       tabNames.forEach(function(name, i) {
         ts[i].className = "chirp-dbg-tab" + (state.tab === name ? " active" : "");
         var badge = ts[i].querySelector(".badge");
+        var sseBadge = ts[i].querySelector(".badge-sse");
         if (name === "errors" && state.errors.length > 0) {
           if (!badge) {
             badge = document.createElement("span");
@@ -657,6 +1049,14 @@
           }
           badge.textContent = state.errors.length;
         } else if (badge) badge.remove();
+        if (name === "sse" && state.sseConnections.length > 0) {
+          if (!sseBadge) {
+            sseBadge = document.createElement("span");
+            sseBadge.className = "badge-sse";
+            ts[i].appendChild(sseBadge);
+          }
+          sseBadge.textContent = state.sseConnections.length;
+        } else if (sseBadge) sseBadge.remove();
       });
     }
 
@@ -666,10 +1066,12 @@
 
   function renderPanelContent() {
     activityPanel.style.display = state.tab === "activity" ? "block" : "none";
+    ssePanel.style.display = state.tab === "sse" ? "block" : "none";
     inspectorPanel.style.display = state.tab === "inspector" ? "block" : "none";
     errorsPanel.style.display = state.tab === "errors" ? "block" : "none";
 
     if (state.tab === "activity") renderActivityLog();
+    if (state.tab === "sse") renderSseLog();
     if (state.tab === "errors") renderErrorHistory();
   }
 
@@ -695,21 +1097,25 @@
     document.getElementById("chirp-dbg-clear").addEventListener("click", function() {
       state.records = [];
       state.oobRecords = [];
+      state.vtEvents = [];
       filterText = "";
       filterErrorsOnly = false;
       renderActivityLog();
       updatePill();
     });
 
-    var all = state.records.concat(state.oobRecords);
-    all.sort(function(a, b) {
-      var ta = (a.timing && a.timing.config) || 0;
-      var tb = (b.timing && b.timing.config) || 0;
-      return tb - ta;
-    });
+    // Interleave HTMX records, OOB records, and View Transition events
+    var all = state.records.concat(state.oobRecords).map(function(r) {
+      return { type: "htmx", data: r, ts: (r.timing && r.timing.config) || 0 };
+    }).concat(state.vtEvents.map(function(v) {
+      return { type: "vt", data: v, ts: v.startedAt || 0 };
+    }));
+    all.sort(function(a, b) { return b.ts - a.ts; });
 
     var lower = filterText.toLowerCase();
-    var filtered = all.filter(function(r) {
+    var filtered = all.filter(function(item) {
+      if (item.type === "vt") return !filterErrorsOnly && (!lower || "view transition".indexOf(lower) >= 0);
+      var r = item.data;
       if (filterErrorsOnly) {
         var isErr = r.failed || (r.status != null && r.status >= 400);
         if (!isErr) return false;
@@ -726,7 +1132,23 @@
       return hay.toLowerCase().indexOf(lower) >= 0;
     });
 
-    filtered.forEach(function(r) {
+    filtered.forEach(function(item) {
+      if (item.type === "vt") {
+        var v = item.data;
+        var vtRow = document.createElement("div");
+        vtRow.className = "chirp-dbg-vt-row";
+        var readyMs = v.readyAt ? (v.readyAt - v.startedAt) + "ms ready" : "pending";
+        var finMs = v.finishedAt ? (v.finishedAt - v.startedAt) + "ms total" : "";
+        vtRow.innerHTML =
+          "<span class='vt-label'>[VT]</span>" +
+          "<span>View Transition</span>" +
+          "<span style='color:#7c8396'>" + readyMs + (finMs ? " · " + finMs : "") + "</span>" +
+          (v.skipped ? "<span style='color:" + COLORS.error + "'>skipped</span>" : "");
+        activityPanel.appendChild(vtRow);
+        return;
+      }
+
+      var r = item.data;
       var row = document.createElement("div");
       row.className = "chirp-dbg-log-row" + (r.expanded ? " expanded" : "");
       var statusColor = r.status === null ? "#666" : r.status >= 500 ? COLORS.error : r.status >= 400 ? COLORS.warning : r.status >= 300 ? COLORS.info : COLORS.success;
@@ -745,8 +1167,8 @@
         if (r.layout.mode) layoutHint = r.layout.mode;
         if (r.layout.chain) {
           var ch = r.layout.chain;
-          if (ch.length > 42) ch = ch.slice(0, 40) + "…";
-          layoutHint = layoutHint ? layoutHint + " · " + ch : ch;
+          if (ch.length > 42) ch = ch.slice(0, 40) + "\u2026";
+          layoutHint = layoutHint ? layoutHint + " \u00b7 " + ch : ch;
         }
       }
       row.innerHTML =
@@ -758,13 +1180,11 @@
               String(r.renderIntent).replace(/</g, "&lt;") +
             "</span>"
           : "<span style='min-width:0'></span>") +
+        renderWaterfall(t) +
         "<span class='time'>" + time + "</span>" +
         (layoutHint
           ? "<span class='chirp-dbg-layout-hint' title='" +
-              layoutHint.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") +
-              "'>" +
-              layoutHint.replace(/&/g, "&amp;").replace(/</g, "&lt;") +
-              "</span>"
+              esc(layoutHint) + "'>" + esc(layoutHint) + "</span>"
           : "") +
         "<span class='target'>" + (r.target ? "-> " + r.target + " " + r.swap : "") + "</span>";
       row.addEventListener("click", function() {
@@ -772,71 +1192,104 @@
         renderActivityLog();
       });
       if (r.expanded) {
-        var detail = document.createElement("div");
-        detail.className = "chirp-dbg-log-detail";
-        var parts = ["Path: " + r.path, "Method: " + r.method, "Target: " + r.target, "Swap: " + r.swap];
-        if (r.requestId) parts.push("X-Request-Id: " + r.requestId);
-        if (r.elt) parts.push("Trigger: " + desc(r.elt));
-        if (r.timing) {
+        var detailContainer = document.createElement("div");
+        detailContainer.style.cssText = "width:100%";
+
+        // --- Core info (always open) ---
+        var coreLines = ["Path: " + r.path, "Method: " + r.method, "Target: " + r.target, "Swap: " + r.swap];
+        if (r.requestId) coreLines.push("X-Request-Id: " + r.requestId);
+        if (r.elt) coreLines.push("Trigger: " + desc(r.elt));
+        var coreDetail = document.createElement("div");
+        coreDetail.className = "chirp-dbg-log-detail";
+        coreDetail.textContent = coreLines.join("\n");
+        detailContainer.appendChild(coreDetail);
+
+        // --- Timing section ---
+        if (r.timing && r.timing.config) {
           var tm = r.timing;
-          parts.push(
-            "Timestamps (epoch ms): config=" + (tm.config || "-") + " sent=" + (tm.sent || "-") +
-              " response=" + (tm.response || "-") + " afterSwap=" + (tm.afterSwap || "-") + " settle=" + (tm.settle || "-")
-          );
-          if (tm.sent && tm.response) {
-            parts.push("RTT (sent→response): " + (tm.response - tm.sent) + "ms");
-          }
-          if (tm.response && tm.afterSwap) {
-            parts.push("Swap (response→afterSwap): " + (tm.afterSwap - tm.response) + "ms");
-          }
-          if (tm.afterSwap && tm.settle) {
-            parts.push("Settle (afterSwap→settle): " + (tm.settle - tm.afterSwap) + "ms");
-          }
+          var timingLines = [];
+          timingLines.push("config=" + (tm.config || "-") + " sent=" + (tm.sent || "-") +
+            " response=" + (tm.response || "-") + " afterSwap=" + (tm.afterSwap || "-") + " settle=" + (tm.settle || "-"));
+          if (tm.sent && tm.response) timingLines.push("RTT (sent\u2192response): " + (tm.response - tm.sent) + "ms");
+          if (tm.response && tm.afterSwap) timingLines.push("Swap (response\u2192afterSwap): " + (tm.afterSwap - tm.response) + "ms");
+          if (tm.afterSwap && tm.settle) timingLines.push("Settle (afterSwap\u2192settle): " + (tm.settle - tm.afterSwap) + "ms");
+          detailContainer.appendChild(makeSection("Timing", '<div class="chirp-dbg-hl">' + esc(timingLines.join("\n")) + '</div>', false));
         }
+
+        // --- Layout section ---
         if (r.layout) {
-          parts.push("Layout chain: " + (r.layout.chain || "(empty)"));
-          parts.push("Layout match: " + (r.layout.match || "(empty)"));
-          parts.push("Layout mode: " + (r.layout.mode || "(empty)"));
+          var layoutLines = [];
+          layoutLines.push("Chain: " + (r.layout.chain || "(empty)"));
+          layoutLines.push("Match: " + (r.layout.match || "(empty)"));
+          layoutLines.push("Mode: " + (r.layout.mode || "(empty)"));
+          detailContainer.appendChild(makeSection("Layout", '<div class="chirp-dbg-hl">' + esc(layoutLines.join("\n")) + '</div>', false));
         }
+
+        // --- Route section ---
         if (r.route) {
-          parts.push("Route: kind=" + r.route.kind + " section=" + r.route.section);
-          if (r.route.meta) parts.push("RouteMeta: " + r.route.meta);
-          if (r.route.files) parts.push("Files: " + r.route.files);
-          if (r.route.contextChain) parts.push("Context chain: " + r.route.contextChain);
-          if (r.route.shellContext) parts.push("Shell context: " + r.route.shellContext);
+          var routeLines = [];
+          routeLines.push("kind=" + r.route.kind + " section=" + r.route.section);
+          if (r.route.meta) routeLines.push("meta: " + r.route.meta);
+          if (r.route.files) routeLines.push("files: " + r.route.files);
+          if (r.route.contextChain) routeLines.push("context chain: " + r.route.contextChain);
+          if (r.route.shellContext) routeLines.push("shell context: " + r.route.shellContext);
+          detailContainer.appendChild(makeSection("Route", '<div class="chirp-dbg-hl">' + esc(routeLines.join("\n")) + '</div>', false));
         }
-        if (r.renderIntent) parts.push("Chirp render intent (X-Chirp-Render-Intent): " + r.renderIntent);
-        if (r.contentType) parts.push("Content-Type: " + r.contentType);
+
+        // --- Render Plan section ---
+        if (r.renderPlan) {
+          var rpText = formatRenderPlan(r.renderPlan);
+          detailContainer.appendChild(makeSection("Render Plan", '<div class="chirp-dbg-hl">' + esc(rpText) + '</div>', false));
+        }
+
+        // --- Headers section ---
         if (r.hxPairs && r.hxPairs.length) {
-          parts.push("HX / X-Chirp response headers:");
-          for (var hi = 0; hi < r.hxPairs.length; hi++) {
-            parts.push("  " + r.hxPairs[hi][0] + ": " + r.hxPairs[hi][1]);
-          }
+          var headerText = r.hxPairs.map(function(p) { return p[0] + ": " + p[1]; }).join("\n");
+          detailContainer.appendChild(makeSection("HX / X-Chirp Headers", '<div class="chirp-dbg-hl">' + hlHeaders(headerText) + '</div>', false));
         }
+
+        // --- Body Preview section (with syntax highlighting) ---
         if (r.bodyPreview) {
-          parts.push("Response body (preview, status >= 400):");
-          parts.push(r.bodyPreview);
+          var bodyHtml;
+          var ct = r.contentType || "";
+          if (ct.indexOf("json") >= 0) {
+            bodyHtml = hlJSON(esc(r.bodyPreview));
+          } else {
+            bodyHtml = esc(r.bodyPreview);
+          }
+          var label = r.status >= 400 ? "Response Body (error)" : "Response Body";
+          detailContainer.appendChild(makeSection(label, '<div class="chirp-dbg-hl">' + bodyHtml + '</div>', r.status >= 400));
         }
+
+        // --- DOM Diff section ---
+        if (r.domDiff && r.domDiff.length > 0) {
+          var diffHtml = hlDiff(r.domDiff);
+          detailContainer.appendChild(makeSection("DOM Diff (swap)", '<div class="chirp-dbg-hl">' + diffHtml + '</div>', false));
+        }
+
+        // --- Curl section ---
         var curlLine = buildCurl(r);
-        parts.push("Replay (approximate curl — uses captured request headers):");
-        parts.push(curlLine);
+        detailContainer.appendChild(makeSection("Replay (curl)", '<div class="chirp-dbg-hl">' + esc(curlLine) + '</div>', false));
+
+        // --- Effective hx-* ---
         if (r.elt) {
           var cfg = getEffectiveConfig(r.elt);
-          parts.push("Effective hx-* on trigger:\n" + formatConfig(cfg));
+          detailContainer.appendChild(makeSection("Effective hx-*", '<div class="chirp-dbg-hl">' + esc(formatConfig(cfg)) + '</div>', false));
         }
-        detail.textContent = parts.join("\n");
+
+        // --- Action buttons ---
         var btnRow = document.createElement("div");
         btnRow.setAttribute("style", "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px");
         var copyBtn = document.createElement("button");
         copyBtn.type = "button";
-        copyBtn.textContent = "Copy details";
+        copyBtn.textContent = "Copy all";
         copyBtn.setAttribute(
           "style",
           "padding:4px 10px;background:#333;border:none;border-radius:4px;color:var(--chirp-text);cursor:pointer;font-size:12px"
         );
         copyBtn.addEventListener("click", function(ev) {
           ev.stopPropagation();
-          navigator.clipboard.writeText(detail.textContent || "").catch(function() {});
+          navigator.clipboard.writeText(detailContainer.textContent || "").catch(function() {});
         });
         var curlBtn = document.createElement("button");
         curlBtn.type = "button";
@@ -849,12 +1302,90 @@
           ev.stopPropagation();
           navigator.clipboard.writeText(curlLine).catch(function() {});
         });
+
+        // Rosettes server-side highlight button (optional enhancement)
+        var hlBtn = document.createElement("button");
+        hlBtn.type = "button";
+        hlBtn.textContent = "\u2728 Rosettes highlight";
+        hlBtn.setAttribute(
+          "style",
+          "padding:4px 10px;background:#1e3a5f;border:none;border-radius:4px;color:var(--chirp-info);cursor:pointer;font-size:12px"
+        );
+        hlBtn.addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          if (!r.bodyPreview) return;
+          var lang = "html";
+          if ((r.contentType || "").indexOf("json") >= 0) lang = "json";
+          var encoded = btoa(unescape(encodeURIComponent(r.bodyPreview)));
+          fetch(HIGHLIGHT_PATH + "?code=" + encodeURIComponent(encoded) + "&lang=" + lang)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (data && data.html) {
+                var existing = detailContainer.querySelector("[data-rosettes-body]");
+                if (existing) existing.remove();
+                var hlDiv = document.createElement("div");
+                hlDiv.setAttribute("data-rosettes-body", "1");
+                hlDiv.className = "chirp-dbg-hl";
+                hlDiv.innerHTML = data.html;
+                detailContainer.insertBefore(hlDiv, btnRow);
+              }
+            })
+            .catch(function() {});
+        });
+
         btnRow.appendChild(copyBtn);
         btnRow.appendChild(curlBtn);
-        row.appendChild(detail);
-        row.appendChild(btnRow);
+        if (r.bodyPreview) btnRow.appendChild(hlBtn);
+        detailContainer.appendChild(btnRow);
+        row.appendChild(detailContainer);
       }
       activityPanel.appendChild(row);
+    });
+  }
+
+  // --- SSE Panel ---
+  function renderSseLog() {
+    ssePanel.innerHTML = "";
+    if (state.sseConnections.length === 0 && state.sseEvents.length === 0) {
+      ssePanel.innerHTML = "<p style='color:#7c8396'>No SSE connections detected yet. EventSource connections will appear here automatically.</p>";
+      return;
+    }
+
+    // Connection cards
+    state.sseConnections.forEach(function(conn) {
+      var card = document.createElement("div");
+      card.className = "chirp-dbg-sse-conn";
+      var stateLabel = conn.readyState === 0 ? "CONNECTING" : conn.readyState === 1 ? "OPEN" : "CLOSED";
+      var stateColor = conn.readyState === 1 ? COLORS.success : conn.readyState === 0 ? COLORS.warning : "#7c8396";
+      card.innerHTML =
+        "<div class='url'>" + esc(conn.url) + "</div>" +
+        "<div class='meta'>" +
+        "<span style='color:" + stateColor + "'>" + stateLabel + "</span> · " +
+        conn.eventCount + " events · " +
+        conn.errorCount + " errors" +
+        (conn.lastEventAt ? " · last: " + new Date(conn.lastEventAt).toLocaleTimeString() : "") +
+        "</div>";
+      ssePanel.appendChild(card);
+    });
+
+    // Recent events
+    var evtHeader = document.createElement("div");
+    evtHeader.style.cssText = "color:#7c8396;font-size:12px;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px";
+    evtHeader.textContent = "Recent Events (" + state.sseEvents.length + ")";
+    ssePanel.appendChild(evtHeader);
+
+    var shown = state.sseEvents.slice(0, 50);
+    shown.forEach(function(evt) {
+      var evtRow = document.createElement("div");
+      evtRow.className = "chirp-dbg-sse-evt";
+      var typeColor = evt.type === "error" ? COLORS.error : evt.type === "open" ? COLORS.success : evt.type === "close" ? "#7c8396" : COLORS.sse;
+      var timeStr = new Date(evt.ts).toLocaleTimeString();
+      evtRow.innerHTML =
+        "<span class='evt-type' style='color:" + typeColor + "'>" + esc(evt.type) + "</span>" +
+        "<span style='color:#7c8396;font-size:12px'>" + timeStr + "</span> " +
+        "<span style='color:#565f89;font-size:12px'>" + esc(evt.url).slice(0, 40) + "</span>" +
+        (evt.data ? "<div style='color:" + COLORS.text + ";font-size:12px;margin-top:2px;white-space:pre-wrap'>" + esc(evt.data).slice(0, 120) + "</div>" : "");
+      ssePanel.appendChild(evtRow);
     });
   }
 
@@ -917,6 +1448,16 @@
       }
       errBadge.textContent = state.errorCount;
     } else if (errBadge) errBadge.remove();
+
+    var sseBadge = togglePill.querySelector(".chirp-dbg-badge.sse");
+    if (state.sseConnections.length > 0) {
+      if (!sseBadge) {
+        sseBadge = document.createElement("span");
+        sseBadge.className = "chirp-dbg-badge sse";
+        togglePill.appendChild(sseBadge);
+      }
+      sseBadge.textContent = "SSE " + state.sseConnections.length;
+    } else if (sseBadge) sseBadge.remove();
   }
 
   // --- Element Inspector ---
@@ -1139,12 +1680,24 @@
 
   // --- Public API (onRequest / onResponse hooks + helpers) ---
   var CH = (window.ChirpHtmxDebug = window.ChirpHtmxDebug || {});
-  CH.version = 2;
+  CH.version = 3;
   CH.getState = function() {
     return state;
   };
   CH.exportRecordsJson = function() {
-    return JSON.stringify({ records: state.records, errors: state.errors }, null, 2);
+    return JSON.stringify({
+      records: state.records,
+      errors: state.errors,
+      sseConnections: state.sseConnections,
+      sseEvents: state.sseEvents,
+      vtEvents: state.vtEvents,
+    }, null, 2);
+  };
+  CH.getSSEConnections = function() {
+    return state.sseConnections;
+  };
+  CH.getViewTransitions = function() {
+    return state.vtEvents;
   };
 
   // --- Boot ---
@@ -1162,7 +1715,7 @@
 
   try {
     if (localStorage.getItem(STORAGE_KEYS.verbose) === "1") {
-      console.log("chirp htmx debug overlay active (verbose)");
+      console.log("chirp htmx debug overlay active (v3 — sse, waterfall, vt, diff, render plan, highlight)");
     }
   } catch (err) {}
 })();

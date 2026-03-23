@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS
+from chirp.server.htmx_debug import HIGHLIGHT_PATH, HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_loads() -> None:
@@ -42,9 +42,9 @@ def test_htmx_debug_js_enhanced_ui_strings() -> None:
     """Tray exposes shortcuts, help strip, copy, and optional verbose logging."""
     assert "chirp-dbg-help" in HTMX_DEBUG_BOOT_JS
     assert "chirp-debug-verbose" in HTMX_DEBUG_BOOT_JS
-    assert "Copy details" in HTMX_DEBUG_BOOT_JS
+    assert "Copy all" in HTMX_DEBUG_BOOT_JS
     assert "RTT (sent" in HTMX_DEBUG_BOOT_JS
-    assert "Layout chain:" in HTMX_DEBUG_BOOT_JS
+    assert "Layout" in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_s_tier_features() -> None:
@@ -59,6 +59,53 @@ def test_htmx_debug_js_s_tier_features() -> None:
     assert "Pause capture" in HTMX_DEBUG_BOOT_JS
     assert "Redact curl" in HTMX_DEBUG_BOOT_JS
     assert "Copy curl" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_sse_monitor() -> None:
+    """V3: SSE/EventSource monkey-patch and monitor tab."""
+    assert "EventSource" in HTMX_DEBUG_BOOT_JS
+    assert "sseConnections" in HTMX_DEBUG_BOOT_JS
+    assert "sseEvents" in HTMX_DEBUG_BOOT_JS
+    assert "renderSseLog" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_waterfall() -> None:
+    """V3: Network waterfall inline bars."""
+    assert "renderWaterfall" in HTMX_DEBUG_BOOT_JS
+    assert "chirp-dbg-waterfall" in HTMX_DEBUG_BOOT_JS
+    assert "chirp-dbg-wf-seg" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_view_transitions() -> None:
+    """V3: View Transition lifecycle tracking."""
+    assert "startViewTransition" in HTMX_DEBUG_BOOT_JS
+    assert "vtEvents" in HTMX_DEBUG_BOOT_JS
+    assert "chirp-dbg-vt-row" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_dom_diff() -> None:
+    """V3: DOM diff captures before/after swap state."""
+    assert "domBefore" in HTMX_DEBUG_BOOT_JS
+    assert "domAfter" in HTMX_DEBUG_BOOT_JS
+    assert "domDiff" in HTMX_DEBUG_BOOT_JS
+    assert "diffLines" in HTMX_DEBUG_BOOT_JS
+    assert "hlDiff" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_render_plan() -> None:
+    """V3: Render plan inspector decodes X-Chirp-Render-Plan header."""
+    assert "X-Chirp-Render-Plan" in HTMX_DEBUG_BOOT_JS
+    assert "decodeRenderPlan" in HTMX_DEBUG_BOOT_JS
+    assert "formatRenderPlan" in HTMX_DEBUG_BOOT_JS
+    assert "renderPlan" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_v3_syntax_highlight() -> None:
+    """V3: Client-side syntax highlighting for JSON, headers, diffs."""
+    assert "hlJSON" in HTMX_DEBUG_BOOT_JS
+    assert "hlHeaders" in HTMX_DEBUG_BOOT_JS
+    assert "hlDiff" in HTMX_DEBUG_BOOT_JS
+    assert HIGHLIGHT_PATH in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_valid_syntax() -> None:
