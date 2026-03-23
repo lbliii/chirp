@@ -236,19 +236,21 @@ Before shipping an app that uses htmx-boost + View Transitions + OOB/SSE:
 
 ## When You Don't Have OOB
 
-If your app has **no** OOB swaps (no SSE live updates, no multi-fragment form responses), you can use the simpler pattern:
+If your app has **no** OOB swaps (no SSE live updates, no multi-fragment form responses), the `app_shell_layout.html` defaults handle everything automatically. `chirpui-transitions.css` applies `view-transition-name: page-content` to `#main`, suppresses root animations, and suppresses VT on `.chirpui-fragment-island` elements:
 
 ```html
-<div id="main" hx-boost="true" hx-target="#main" hx-swap="innerHTML transition:true">
-  {% block content %}{% endblock %}
-</div>
+{% extends "chirpui/app_shell_layout.html" %}
+{% block content %}
+  <a href="/page-2">Next page</a>  {# SPA navigation inherited from #main #}
+{% end %}
 ```
+
+No per-link attributes needed. No custom VT CSS needed. `chirpui-transitions.css` provides the default crossfade. Override it in your app CSS to customize the animation:
 
 ```css
-#main { view-transition-name: page-content; }
+::view-transition-old(page-content) { animation: my-fade-out 0.15s ease; }
+::view-transition-new(page-content) { animation: my-fade-in 0.2s ease; }
 ```
-
-No nav links need `hx-swap` overrides. The container can have `transition:true` and `view-transition-name` because nothing will trigger transitions except user clicks.
 
 ## Summary
 

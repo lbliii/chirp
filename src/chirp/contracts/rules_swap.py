@@ -37,6 +37,12 @@ _SSE_CONNECT_TAG_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_BROAD_CONTAINER_TAGS = frozenset({
+    "body", "main", "div", "section", "article", "aside", "nav",
+    "header", "footer", "form", "details", "dialog", "fieldset",
+    "figure", "hgroup", "search",
+})
+
 
 def _extends_ancestors(start: str, template_sources: dict[str, str]) -> set[str]:
     """Return all templates reachable upward from *start* via {% extends %} chains."""
@@ -63,6 +69,8 @@ def _collect_broad_selects_map(
     for template_name, source in template_sources.items():
         for match in _TAG_WITH_SELECT_PATTERN.finditer(source):
             tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
             attrs = match.group("attrs")
             select = match.group("select")
             if "{{" in select or "{%" in select:
@@ -94,6 +102,8 @@ def collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
     for template_name, source in template_sources.items():
         for match in _TAG_WITH_TARGET_PATTERN.finditer(source):
             tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
             attrs = match.group("attrs")
             target = match.group("target")
             if "{{" in target or "{%" in target:

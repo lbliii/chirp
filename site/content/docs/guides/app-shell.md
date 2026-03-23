@@ -30,21 +30,22 @@ Fragment request   → server renders just the targeted block
 
 ### The Navigation Model
 
-Sidebar links carry explicit htmx attributes via `sidebar_link(boost=true)`:
+`app_shell_layout.html` puts `hx-boost="true"`, `hx-target="#main"`,
+`hx-swap="outerHTML"`, and `hx-select="#main"` directly on `<main id="main">`.
+All links inside `#main` inherit these attributes automatically — plain
+`<a href="...">` tags get SPA navigation with no extra markup.
 
-```html
-<a href="/contacts"
-   hx-boost="true"
-   hx-target="#main"
-   hx-swap="innerHTML transition:true">Contacts</a>
-```
+Sidebar links (outside `#main`) carry their own htmx attributes via
+`sidebar_link()`, which emits `hx-boost`, `hx-target`, and `hx-select`.
 
-`hx-boost` on the link itself sends the `HX-Boosted` header, which tells
-Chirp to render the `page_block` (the wider, self-contained root).  The
-response is swapped directly into `#main`.
+When a boosted link fires, the `HX-Boosted` header tells Chirp to render
+the `page_block` (the wider, self-contained root). The response is swapped
+into `#main`.
 
-**Nothing inside `<main>` inherits htmx attributes.**  Forms, buttons, and
-interactive regions work without defensive wrappers.
+Forms and fragment targets with explicit `hx-target` (e.g.
+`hx-target="#contacts-list"`) override the inherited value naturally.
+Use `fragment_island` or `hx-disinherit` only when a region needs to
+opt out of the inherited shell attributes entirely.
 
 ### Active State
 
@@ -113,8 +114,9 @@ The developer doesn't think about `is_fragment` or `is_boosted`.  Return
 {% end %}
 ```
 
-`app_shell_layout.html` provides the topbar, sidebar slot, and `<main id="main">`.
-Sidebar links get SPA navigation by default (`boost=true`).
+`app_shell_layout.html` provides the topbar, sidebar slot, and `<main id="main">`
+with built-in `hx-boost`, `hx-target`, `hx-swap`, and `hx-select`. Links inside
+`#main` inherit SPA navigation automatically.
 
 ### 2. Structure Your Page Template
 
@@ -186,8 +188,8 @@ With the [route directory contract](/docs/reference/route-contract/), sections, 
 
 ## Forms Inside the Shell
 
-Forms inside `<main>` work without any special wrappers.  Since `<main>` has no
-inherited htmx attributes, form submissions target exactly what you specify:
+Forms with explicit `hx-target` override the inherited shell attributes
+naturally. No defensive wrappers needed:
 
 ```html
 <form hx-post="/contacts/create"
@@ -198,7 +200,8 @@ inherited htmx attributes, form submissions target exactly what you specify:
 </form>
 ```
 
-No `fragment_island`, no `hx-disinherit`, no `beforeSwap` handler needed.
+Use `fragment_island` or `hx-disinherit` only when a region needs to fully
+opt out of the inherited boost/target/swap/select chain.
 
 ### Validation Errors
 
@@ -347,20 +350,23 @@ For day-to-day debugging:
 
 ## Content Navigation Links
 
-Sidebar links get SPA transitions automatically.  For links inside page
-content that should also use SPA navigation (pagination, breadcrumbs,
-interlinked pages), use the `nav_link` macro:
+Since `<main id="main">` carries `hx-boost="true"`, all `<a>` tags inside
+page content get SPA navigation automatically — no special attributes needed.
+
+```html
+<a href="/page-2">Next page</a>
+<a href="/details">View details</a>
+```
+
+For links that need extra htmx attributes (e.g. `hx-push-url`), use the
+`nav_link` macro:
 
 ```html
 {% from "chirpui/nav_link.html" import nav_link %}
-
-{{ nav_link("/page-2", "Next page") }}
-
-{% call nav_link("/details") %}View details{% end %}
+{{ nav_link("/page-2", "Next page", push_url=true) }}
 ```
 
-Plain `<a>` tags work fine and do full-page loads.  Use `nav_link` only
-when you want the smooth SPA transition within the shell.
+To opt a link out of SPA navigation, add `hx-boost="false"`.
 
 ## Fragment Regions (Optional)
 
@@ -384,14 +390,18 @@ region needs its own `hx-target` / `hx-swap` defaults:
 
 ## Custom Shells
 
-If you need a custom shell instead of `app_shell_layout.html`, follow these
-rules:
+If you need a custom shell instead of `app_shell_layout.html`, replicate
+the built-in defaults on your `<main>` element:
 
-1. **No `hx-boost` on `<main>`** — put it on individual nav links instead
-2. **Use `sidebar_link(boost=true)`** or add `hx-boost="true" hx-target="#main"
-   hx-swap="innerHTML transition:true"` on each nav link
-3. **No wrapper div inside `<main>`** — content renders directly; the server's
-   `page_block` response is the raw content for `#main`
+```html
+<main id="main" class="my-shell__main" tabindex="-1"
+      hx-boost="true" hx-target="#main" hx-swap="outerHTML" hx-select="#main">
+  {% block content %}{% end %}
+</main>
+```
+
+Sidebar links (outside `#main`) need their own `hx-target="#main"` since they
+don't inherit from the `<main>` element.
 
 See `examples/chirpui/kanban_shell` for a working custom shell and `examples/chirpui/shell_oob` for
 regions-based OOB.

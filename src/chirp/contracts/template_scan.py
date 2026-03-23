@@ -37,6 +37,9 @@ _MUTATING_WITH_TARGET = re.compile(
     re.IGNORECASE,
 )
 _LEGACY_ACTION_PATTERN = re.compile(r'(?<![-\w])action\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
+_HREF_ATTR_PATTERN = re.compile(r'href\s*=\s*["\']([^"\']*)["\']')
+_MACRO_URL_ARG_PATTERN = re.compile(r"""(?:href|url|search_url|action_url)\s*=\s*["'](/[^"']*?)["']""")
+_POSITIONAL_URL_ARG_PATTERN = re.compile(r"""\(\s*["'](/[a-zA-Z][a-zA-Z0-9_/{}-]*)["']""")
 
 
 def _is_static_url_candidate(url: str) -> bool:
@@ -121,6 +124,27 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
         _append_target("confirm_url", url, method_override)
 
     return targets
+
+
+def extract_href_references(source: str) -> set[str]:
+    """Extract URL paths from href= attributes and macro keyword arguments.
+
+    Used for orphan-route detection: catches ``<a href="/team">``, macro calls
+    like ``sidebar_link("/team", ...)``, and keyword args like ``href="/login"``.
+    Returns base paths (query strings and fragments stripped).
+    """
+    urls: set[str] = set()
+    for pattern in (_HREF_ATTR_PATTERN, _MACRO_URL_ARG_PATTERN, _POSITIONAL_URL_ARG_PATTERN):
+        for m in pattern.finditer(source):
+            url = m.group(1)
+            if not _is_static_url_candidate(url):
+                continue
+            if not url.startswith("/"):
+                continue
+            base = url.split("?")[0].split("#")[0]
+            if base:
+                urls.add(base)
+    return urls
 
 
 def extract_legacy_action_contracts(source: str) -> set[str]:

@@ -1,8 +1,12 @@
 """Hypermedia contracts checker orchestration."""
 
+import inspect
+import re
 from typing import TYPE_CHECKING
 
 from kida import Environment
+
+_TEMPLATE_CALL_PATTERN = re.compile(r'(?:Template|Fragment)\s*\(\s*["\']([^"\']+\.html)["\']')
 
 from chirp.routing.router import _route_path_has_flask_syntax
 
@@ -41,6 +45,7 @@ from .rules_sse import (
 from .rules_swap import check_swap_safety, collect_broad_targets
 from .template_scan import (
     extract_fragment_island_ids,
+    extract_href_references,
     extract_ids_with_disinherit,
     extract_legacy_action_contracts,
     extract_static_ids,
@@ -85,7 +90,14 @@ def _route_prepass(
         template = getattr(route, "template", None)
         if template is not None:
             referenced_templates.add(template)
-        contract = getattr(route.handler, "_chirp_contract", None)
+        handler = route.handler
+        try:
+            src = inspect.getsource(handler)
+            for m in _TEMPLATE_CALL_PATTERN.finditer(src):
+                referenced_templates.add(m.group(1))
+        except (TypeError, OSError):
+            pass
+        contract = getattr(handler, "_chirp_contract", None)
         if contract is None:
             continue
         returns = getattr(contract, "returns", None)
@@ -278,6 +290,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             all_ids.update(extract_wizard_form_ids(source))
             ids_with_disinherit.update(extract_ids_with_disinherit(source))
             referenced_templates_from_sources.update(extract_template_references(source))
+            for href_url in extract_href_references(source):
+                href_match = find_matching_route(
+                    href_url, static_routes, parametric_routes
+                )
+                if href_match is not None:
+                    referenced_paths.add(href_match[0])
 
         hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
         result.hx_targets_validated = hx_validated

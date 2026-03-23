@@ -15,7 +15,7 @@
 {% call container(max_width="52rem") %}
 {% call stack(gap="lg") %}
 
-{{ btn("← Back to directory", variant="ghost", size="sm", href="/contacts", attrs_map={"hx-boost": "true"}) }}
+{{ btn("← Back to directory", variant="ghost", size="sm", href="/contacts") }}
 
 {% call entity_header(
   title=contact.name,
@@ -24,8 +24,7 @@
 {% slot actions %}
 {{ badge(contact.group, variant=group_badge_variants.get(contact.group, "muted")) }}
 {{ btn("Edit", variant="primary", size="sm",
-       href="/contacts/" ~ contact.id ~ "/edit",
-       attrs_map={"hx-boost": "true"}) }}
+       href="/contacts/" ~ contact.id ~ "/edit") }}
 {% end %}
 {% end %}
 
