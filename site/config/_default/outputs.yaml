@@ -1,5 +1,8 @@
 # Output Configuration
 # ====================
+# Legacy HTML/JSON/TXT toggles. Machine-readable and AI-facing artifacts
+# (index.json, index.txt, llm-full.txt, llms.txt, agent.json, etc.) are
+# controlled by `seo.yaml` → `output_formats` (Bengal 0.2.6+).
 
 outputs:
   # HTML output for all pages

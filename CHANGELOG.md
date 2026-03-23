@@ -7,11 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-03-23
+
+### Added
+
+- **Chirp devtools** — Modular debug overlay (inspector, activity, errors, swap highlight) with a split JS bundle under `chirp/server/devtools/`, replacing the monolithic injected debug script path.
+- **View Transitions dev tooling** — Development helpers for debugging View Transitions alongside htmx navigation.
+- **Browser dev reload** — Optional `AppConfig.dev_browser_reload`: SSE-driven browser refresh when watched files change (pairs with `reload_include` / `reload_dirs`).
+- **Render plan snapshots** — Debug snapshot path for render plans (`server/debug/render_plan_snapshot`) for tests and diagnostics.
+- **`ShellSubmitSurface`** — Exported type for shell action submit surfaces (`chirp` public API).
+- **Shell regions** — Shell region metadata and related shell-action wiring updates.
+- **Middleware** — `inject` middleware; layout-debug helpers for development.
+- **SSE and logging** — SSE lifecycle and logging improvements aligned with Pounce.
+- **Startup and terminal errors** — Clearer formatted messages for startup failures and terminal error output.
+- **CLI** — `chirp new` / `chirp run` refinements and scaffold template modules.
+- **Examples** — Reorganized into `examples/chirpui/` (chirp-ui apps) and `examples/standalone/` (minimal Chirp); updated `examples/README.md` and per-example docs.
+- **Docs** — App shell, UI layers, SSE/streaming guides, layout patterns, and tutorial cross-links.
+
+### Changed
+
+- **Defaults** — `AppConfig.view_transitions` now defaults to `True` (was `False`). Set `view_transitions=False` for API-only apps or tests that require responses without injected View Transition markup/CSS.
+- **Defaults** — `AppConfig.log_format` now defaults to `auto` (compact colored lines on a TTY, JSON when piped; aligned with Pounce). Use `CHIRP_LOG_FORMAT` with `auto`, `text`, or `json`.
+- **htmx debug** — Wired through the new devtools implementation; large legacy debug script removed from the tree.
+- **Contracts and negotiation** — Broader swap/layout/SSE/route-contract checks, template scanning, and content negotiation (including OOB-related paths).
+- **Alpine server injection** — Adjustments to Alpine injection and related tests.
+- **AI providers** — Internal provider wiring updates.
+
 ### Dependencies
 
-- `kida-templates>=0.2.8`
-- `chirp-ui>=0.2.0`
-- `bengal-pounce>=0.3.1` (public `PounceError` / lifespan error exports)
+- `kida-templates>=0.2.9`
+- `bengal-pounce>=0.3.1` (public `PounceError` and related lifespan error exports)
+- `chirp-ui>=0.2.1` (optional, for `chirp[ui]`)
 
 ## [0.1.9] — 2026-03-12
 
@@ -134,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.8]: https://github.com/lbliii/chirp/releases/tag/v0.1.8
 [0.1.9]: https://github.com/lbliii/chirp/releases/tag/v0.1.9
+[0.2.0]: https://github.com/lbliii/chirp/releases/tag/v0.2.0
 [0.1.7]: https://github.com/lbliii/chirp/releases/tag/v0.1.7
 [0.1.6]: https://github.com/lbliii/chirp/releases/tag/v0.1.6
 [0.1.5]: https://github.com/lbliii/chirp/releases/tag/v0.1.5
