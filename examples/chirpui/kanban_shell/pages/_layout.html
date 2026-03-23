@@ -33,7 +33,7 @@
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Boards") %}
-    {{ sidebar_link("/", "Board", icon="grid", active=true) }}
+    {{ sidebar_link("/", "Board", icon="grid", match="exact") }}
     {% if not ((current_user ?? none)) %}
     {{ sidebar_link("/login", "Login", icon="user") }}
     {% end %}

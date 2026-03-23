@@ -1,24 +1,17 @@
-"""HTMX debug bootstrap assets for development mode.
+"""Backwards-compatibility shim — re-exports from ``chirp.server.devtools``.
 
-The app injects a single script tag on full-page responses. The script itself
-is served from an internal route and is idempotent, so it can be included on
-multiple navigations without duplicating listeners or toast containers.
-
-The script lives in htmx_debug.js (not embedded in Python) to avoid
-Python string escaping footguns when editing JavaScript.
+All new code should import from ``chirp.server.devtools`` directly.
+This module exists so existing imports continue to work.
 """
 
-from importlib.resources import files
-
-HTMX_DEBUG_BOOT_PATH = "/__chirp/debug/htmx.js"
-
-HTMX_DEBUG_BOOT_SNIPPET = (
-    f'<script src="{HTMX_DEBUG_BOOT_PATH}" data-chirp-debug="htmx" defer></script>'
+from chirp.server.devtools import (  # noqa: F401
+    DEVTOOLS_BOOT_JS,
+    DEVTOOLS_BOOT_PATH,
+    DEVTOOLS_BOOT_SNIPPET,
+    HIGHLIGHT_PATH,
+    HTMX_DEBUG_BOOT_JS,
+    HTMX_DEBUG_BOOT_PATH,
+    HTMX_DEBUG_BOOT_SNIPPET,
+    handle_highlight_request,
+    highlight_code,
 )
-
-
-def _load_htmx_debug_js() -> str:
-    return (files("chirp.server") / "htmx_debug.js").read_text(encoding="utf-8")
-
-
-HTMX_DEBUG_BOOT_JS = _load_htmx_debug_js()

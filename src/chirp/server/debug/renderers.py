@@ -6,6 +6,7 @@ from typing import Any
 
 from chirp.server.debug.editor import _editor_url
 from chirp.server.debug.frames import _collapse_framework_frames, _extract_frames
+from chirp.server.debug.render_plan_snapshot import read_render_debug_from_request
 from chirp.server.debug.request_context import _extract_request_context
 from chirp.server.debug.styles import _CSS, _TOGGLE_JS
 from chirp.server.debug.template_context import _extract_template_context
@@ -177,6 +178,96 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     return "".join(parts)
 
 
+def _render_render_plan_panel(snapshot: dict[str, Any]) -> str:
+    """Render stashed :class:`~chirp.templating.render_plan.RenderPlan` snapshot."""
+    parts: list[str] = []
+    parts.append('<div class="request-panel render-plan-panel">')
+    parts.append(
+        '<div class="request-line"><span class="label">Intent</span>'
+        f'<span class="val">{_esc(snapshot.get("intent", ""))}</span></div>'
+    )
+    flags = (
+        f"render_full_template={snapshot.get('render_full_template')!r}, "
+        f"apply_layouts={snapshot.get('apply_layouts')!r}, "
+        f"layout_start_index={snapshot.get('layout_start_index')!r}, "
+        f"include_layout_oob={snapshot.get('include_layout_oob')!r}"
+    )
+    parts.append(
+        f'<div class="request-line"><span class="label">Flags</span>'
+        f'<span class="val">{_esc(flags)}</span></div>'
+    )
+
+    main = snapshot.get("main_view") or {}
+    mt = main.get("template", "")
+    mb = main.get("block", "")
+    parts.append(
+        '<div class="request-line"><span class="label">Main view</span>'
+        f'<span class="val">{_esc(mt)} block {_esc(mb)}</span></div>'
+    )
+
+    preview = main.get("context_preview") or []
+    if preview:
+        parts.append('<div class="template-values"><strong>Main context</strong>')
+        for name, value in preview:
+            parts.append(
+                f'<div class="local-var"><span class="name">{_esc(name)}</span>'
+                f'<span class="value">{_esc(value)}</span></div>'
+            )
+        parts.append("</div>")
+
+    chain = snapshot.get("layout_chain") or []
+    if chain:
+        parts.append("<h3>Layout chain (outer → inner)</h3>")
+        parts.append('<div class="template-values">')
+        for i, lay in enumerate(chain):
+            tn = lay.get("template_name", "")
+            tgt = lay.get("target", "")
+            depth = lay.get("depth", "")
+            parts.append(
+                f'<div class="local-var"><span class="name">{i}</span>'
+                f'<span class="value">{_esc(tn)} — target #{_esc(tgt)} (depth {_esc(depth)})</span></div>'
+            )
+        parts.append("</div>")
+
+    applied = snapshot.get("layouts_applied") or []
+    if applied:
+        joined = " → ".join(str(x) for x in applied)
+        parts.append(
+            '<div class="request-line"><span class="label">Layouts applied</span>'
+            f'<span class="val">{_esc(joined)}</span></div>'
+        )
+
+    lctx = snapshot.get("layout_context_preview") or []
+    if lctx:
+        parts.append('<div class="template-values"><strong>Layout context</strong>')
+        for name, value in lctx:
+            parts.append(
+                f'<div class="local-var"><span class="name">{_esc(name)}</span>'
+                f'<span class="value">{_esc(value)}</span></div>'
+            )
+        parts.append("</div>")
+
+    regions = snapshot.get("region_updates") or []
+    if regions:
+        parts.append("<h3>Region updates</h3>")
+        parts.append('<div class="template-values">')
+        for ru in regions:
+            line = (
+                f'{ru.get("region", "")}: {ru.get("template", "")}'
+                f'#{ru.get("block", "")} ({ru.get("mode", "")})'
+            )
+            parts.append(f'<div class="local-var"><span class="value">{_esc(line)}</span></div>')
+        parts.append("</div>")
+
+    parts.append(
+        '<div class="exc-chain" style="margin-top:0.75rem">'
+        "Snapshot taken after build_render_plan, before execute_render_plan."
+        "</div>"
+    )
+    parts.append("</div>")
+    return "".join(parts)
+
+
 def _render_request_panel(request: Any) -> str:
     """Render request context panel."""
     ctx = _extract_request_context(request)
@@ -285,6 +376,11 @@ def render_debug_page(
     # Template error panel (before traceback for prominence)
     if template_ctx:
         sections.append(_render_template_panel(template_ctx))
+
+    render_snap = read_render_debug_from_request(request)
+    if render_snap:
+        sections.append("<h2>Render plan</h2>")
+        sections.append(_render_render_plan_panel(render_snap))
 
     # Traceback (with framework frame collapsing)
     if frames:

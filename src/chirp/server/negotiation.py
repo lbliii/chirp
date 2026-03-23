@@ -20,6 +20,7 @@ from chirp.http.response import (
     StreamingResponse,
 )
 from chirp.realtime.events import EventStream
+from chirp.server.debug.render_plan_snapshot import stash_render_debug_for_request
 from chirp.server.negotiation_oob import (
     append_shell_actions_oob_stream,
     compute_shell_region_updates,
@@ -94,6 +95,16 @@ def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environ
     return kida_env
 
 
+def _inject_current_path(context: dict[str, Any], request: Request | None) -> None:
+    """Inject current_path into template context when not already set.
+
+    Ensures nav components (sidebar_link, navbar_link with match=) can
+    compare the current URL path without manual threading from every handler.
+    """
+    if request is not None and "current_path" not in context:
+        context["current_path"] = request.path
+
+
 def _render_composition(
     composition: PageComposition,
     request: Request | None,
@@ -110,6 +121,7 @@ def _render_composition(
         fragment_target_registry=fragment_target_registry,
         shell_region_updates=shell_updates,
     )
+    stash_render_debug_for_request(plan, request, debug=validate_blocks)
     _set_layout_debug_from_plan(plan, request)
     adapter = KidaAdapter(kida_env)
     rendered = execute_render_plan(
@@ -206,6 +218,7 @@ def negotiate(
                 )
         case Template():
             kida_env = _require_kida_env(kida_env, "Template")
+            _inject_current_path(value.context, request)
             html = render_template(kida_env, value)
             return _html_response(html, intent="full_page")
         case InlineTemplate():
@@ -219,6 +232,7 @@ def negotiate(
             return _fragment_response(html)
         case Page() | LayoutPage():
             kida_env = _require_kida_env(kida_env, "Page/LayoutPage")
+            _inject_current_path(value.context, request)
             composition = normalize_to_composition(value)
             if composition is None:
                 msg = f"Cannot normalize {type(value).__name__} to composition"

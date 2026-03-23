@@ -108,13 +108,10 @@ This also matters for View Transitions — `view-transition-name` must be unique
 per page. Applying it to a class that matches multiple elements triggers a
 browser warning and breaks the transition animation.
 
-```css
-/* Bad: every .container gets the same transition name */
-.container { view-transition-name: page-content; }
-
-/* Good: only the content area transitions */
-#main { view-transition-name: page-content; }
-```
+When using `app_shell_layout.html`, `chirpui-transitions.css` automatically
+applies `view-transition-name: page-content` to `#main` and suppresses the
+root transition so the shell stays frozen. No custom VT CSS needed for the
+common case.
 
 **OOB + View Transitions**: If `#main` (or similar) is a parent of elements
 that receive OOB swaps (e.g. `hx-swap-oob`), three things can go wrong:

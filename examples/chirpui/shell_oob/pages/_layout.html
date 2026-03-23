@@ -36,9 +36,9 @@
 {% region sidebar_oob(current_path="/") %}
 {% call sidebar() %}
   {% call sidebar_section("Console") %}
-    {{ sidebar_link("/", "Dashboard", icon="grid", active=current_path == "/") }}
-    {{ sidebar_link("/settings", "Settings", icon="settings", active=current_path.startswith("/settings")) }}
-    {{ sidebar_link("/about", "Activity", icon="alert", active=current_path.startswith("/about")) }}
+    {{ sidebar_link("/", "Dashboard", icon="grid", match="exact") }}
+    {{ sidebar_link("/settings", "Settings", icon="settings", match="prefix") }}
+    {{ sidebar_link("/about", "Activity", icon="alert", match="prefix") }}
   {% end %}
 {% end %}
 {% end %}

@@ -121,13 +121,27 @@
     .page-info { color: var(--muted); font-size: 0.85rem; }
 
     /* Detail view */
-    .detail-container { max-width: 520px; margin: 2rem auto; padding: 0 1.5rem; }
+    /* Same structural idea as chirp-ui frame(variant="hero"): media | body (two columns) */
+    .detail-container { max-width: 56rem; margin: 2rem auto; padding: 0 1.5rem; }
     .detail {
       background: var(--card); border-radius: var(--radius); padding: 2rem;
       position: relative; overflow: hidden;
     }
+    .detail-hero {
+      display: grid;
+      grid-template-columns: minmax(min(220px, 100%), 1fr) minmax(0, 1.25fr);
+      gap: 1.5rem 2rem;
+      align-items: center;
+      min-width: 0;
+    }
+    .detail-hero > * { min-width: 0; }
+    .detail-hero-media {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .detail-artwork-wrap {
-      text-align: center; margin-bottom: 1.5rem;
+      text-align: center;
       position: relative;
     }
     .detail-artwork {
@@ -136,6 +150,7 @@
     }
     .detail-header {
       display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem;
+      flex-wrap: wrap;
     }
     .detail-name { font-size: 2rem; font-weight: 800; }
     .detail-id { color: var(--muted); font-size: 1.1rem; }
@@ -157,6 +172,15 @@
     .stat-row-val { width: 35px; text-align: right; font-weight: 700; font-size: 0.9rem; }
     .detail-gen {
       margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted);
+    }
+    @media (max-width: 48rem) {
+      .detail-hero {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+      }
+      .detail-header { justify-content: center; }
+      .detail-types { justify-content: center; }
     }
 
     .detail-nav {
@@ -328,24 +352,30 @@
     {% end %}
   </div>
   <div class="detail" style="background: linear-gradient(180deg, {{ detail.types.split(',')[0] | type_color }}30, var(--card) 40%)">
-    <div class="detail-artwork-wrap">
-      <img class="detail-artwork" src="{{ detail.id | sprite('artwork') }}" alt="{{ detail.name }}">
-    </div>
-    <div class="detail-header">
-      <span class="detail-name">{{ detail.name | capitalize }}</span>
-      <span class="detail-id">#{{ detail.id }}</span>
-      {% if detail.legendary %}
-      <span class="legendary-badge">Legendary</span>
-      {% end %}
-    </div>
-    <div class="detail-types">
-      {% for t in detail.types.split(",") %}{{ type_badge(t) }}{% end %}
-    </div>
-    {% for label, val in [("HP", detail.hp), ("Attack", detail.attack), ("Defense", detail.defense), ("Sp. Atk", detail.sp_attack), ("Sp. Def", detail.sp_defense), ("Speed", detail.speed)] %}
-    {{ stat_bar(label, val) }}
-    {% end %}
-    <div class="detail-gen">
-      Generation {{ detail.generation }}
+    <div class="detail-hero">
+      <div class="detail-hero-media">
+        <div class="detail-artwork-wrap">
+          <img class="detail-artwork" src="{{ detail.id | sprite('artwork') }}" alt="{{ detail.name }}">
+        </div>
+      </div>
+      <div class="detail-hero-body">
+        <div class="detail-header">
+          <span class="detail-name">{{ detail.name | capitalize }}</span>
+          <span class="detail-id">#{{ detail.id }}</span>
+          {% if detail.legendary %}
+          <span class="legendary-badge">Legendary</span>
+          {% end %}
+        </div>
+        <div class="detail-types">
+          {% for t in detail.types.split(",") %}{{ type_badge(t) }}{% end %}
+        </div>
+        {% for label, val in [("HP", detail.hp), ("Attack", detail.attack), ("Defense", detail.defense), ("Sp. Atk", detail.sp_attack), ("Sp. Def", detail.sp_defense), ("Speed", detail.speed)] %}
+        {{ stat_bar(label, val) }}
+        {% end %}
+        <div class="detail-gen">
+          Generation {{ detail.generation }}
+        </div>
+      </div>
     </div>
   </div>
 </div>

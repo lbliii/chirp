@@ -39,6 +39,13 @@ Complement htmx with Alpine for client-only interactivity.
 Sidebar, topbar, and fragment regions with zero client JS.
 :::{/card}
 
+:::{card} UI layers & shell regions
+:icon: layers
+:link: ./ui-layers
+:description: Glossary — app shell, page chrome, surface chrome, OOB ids
+One vocabulary for Chirp + chirp-ui layouts and ``chirp.shell_regions``.
+:::{/card}
+
 :::{card} chirp-ui
 :icon: palette
 :link: ./chirp-ui

@@ -164,10 +164,9 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
       {% end %}
     {% end %}
   </aside>
-  <main id="main" class="chirpui-app-shell__main"
+  <main id="main" class="chirpui-app-shell__main" tabindex="-1"
         hx-boost="true" hx-target="#main"
-        hx-swap="innerHTML transition:true"
-        hx-select="#page-content">
+        hx-swap="innerHTML" hx-select="#page-content">
     <div id="page-content">
       {% block content %}{% end %}
     </div>
@@ -182,9 +181,9 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 **Why standalone?** Chirp's `render_with_blocks({"content": ...})` replaces `{% block content %}` entirely. If you extend `boost.html` and put the shell inside `{% block content %}`, it gets overwritten. A standalone layout puts the shell outside the content block so it always renders. See [[docs/routing/filesystem-routing|Filesystem Routing]] for the full explanation.
 
-**Why `hx-select`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-select="#page-content"` tells htmx to parse the response and extract only `#page-content` — the shell stays untouched.
+**Why `hx-select="#main"`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-select="#main"` tells htmx to parse the response and extract only `#main` — the shell stays untouched.
 
-**Why no `hx-disinherit`?** Boosted links inside the content area need to inherit `hx-target="#main"`, `hx-swap`, and `hx-select` from the `<main>` element. If you add `hx-disinherit`, boosted links fall back to targeting `body`, which replaces everything. Fragment requests with explicit `hx-target` (e.g. `hx-target="#compare-result"`) override the inherited value naturally.
+**Why `hx-boost` on `<main>`?** All links inside `#main` inherit `hx-boost`, `hx-target`, `hx-swap`, and `hx-select` — plain `<a href="...">` tags get SPA navigation automatically. No per-link attributes needed. Fragment requests with explicit `hx-target` (e.g. `hx-target="#compare-result"`) override the inherited value naturally. Use `hx-disinherit` or `fragment_island` only when a region needs to fully opt out.
 
 ## Component categories
 

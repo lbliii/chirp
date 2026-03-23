@@ -18,7 +18,7 @@
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Recipe") %}
-    {{ sidebar_link("/", "Builder", icon="grid", active=true) }}
+    {{ sidebar_link("/", "Builder", icon="grid", match="exact") }}
   {% end %}
 {% end %}
 {% end %}

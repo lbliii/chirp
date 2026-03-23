@@ -40,10 +40,14 @@ class PageShellContract:
 class FragmentTargetConfig:
     """Block config for a single fragment target.
 
+    **Layers (see UI layers guide):** targets that swap **page content** inside
+    ``#page-content`` may still set ``triggers_shell_update`` so **shell regions**
+    (topbar ``shell_actions``, title, etc.) refresh via OOB after the primary swap.
+
     fragment_block: Block to render when HX-Target matches (e.g. page_root_inner).
-    triggers_shell_update: When True, swapping this target triggers shell_actions OOB
-        (breadcrumbs, sidebar, topbar actions). Use False for narrow content swaps
-        (e.g. page-content-inner) that should not update the shell.
+    triggers_shell_update: When True, this swap participates in shell negotiation
+        (e.g. ``shell_actions`` OOB). Use False for **narrow** in-page swaps
+        (e.g. ``#page-content-inner``) that must not refresh the app shell.
     """
 
     fragment_block: str

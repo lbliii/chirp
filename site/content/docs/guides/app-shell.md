@@ -10,6 +10,8 @@ keywords: [app-shell, sidebar, navigation, fragment, page, boost, htmx]
 category: guide
 ---
 
+Also read: **[UI layers & shell regions](./ui-layers.md)** — glossary (app shell vs page chrome vs surface chrome) and stable OOB element ids (`chirp.shell_regions`).
+
 ## What Is an App Shell?
 
 An app shell is a persistent layout — topbar, sidebar, footer — that stays on
@@ -30,21 +32,45 @@ Fragment request   → server renders just the targeted block
 
 ### The Navigation Model
 
-Sidebar links carry explicit htmx attributes via `sidebar_link(boost=true)`:
+`app_shell_layout.html` puts `hx-boost="true"`, `hx-target="#main"`,
+`hx-swap="innerHTML"`, and `hx-select="#page-content"` directly on `<main id="main">`.
+Content is wrapped in `<div id="page-content">` inside `#main`. All links inside
+`#main` inherit these attributes automatically — plain `<a href="...">` tags get
+SPA navigation with no extra markup. Because `#main` uses `innerHTML` (not
+`outerHTML`), it persists in the DOM and its `view-transition-name` is never
+duplicated during swaps.
+
+Sidebar links (outside `#main`) carry their own htmx attributes via
+`sidebar_link()`, which emits `hx-boost`, `hx-target`, and `hx-select`.
+
+When a boosted link fires, the `HX-Boosted` header tells Chirp to render
+the `page_block` (the wider, self-contained root). The response is swapped
+into `#main`.
+
+Forms and fragment targets with explicit `hx-target` (e.g.
+`hx-target="#contacts-list"`) override the inherited value naturally.
+Use `fragment_island` or `hx-disinherit` only when a region needs to
+opt out of the inherited shell attributes entirely.
+
+### Active State
+
+ChirpUI sidebar and navbar links support a `match=` parameter for automatic
+path-based highlighting:
 
 ```html
-<a href="/contacts"
-   hx-boost="true"
-   hx-target="#main"
-   hx-swap="innerHTML transition:true">Contacts</a>
+{{ sidebar_link("/", "Home", icon="◉", match="exact") }}
+{{ sidebar_link("/contacts", "Contacts", icon="◎", match="prefix") }}
 ```
 
-`hx-boost` on the link itself sends the `HX-Boosted` header, which tells
-Chirp to render the `page_block` (the wider, self-contained root).  The
-response is swapped directly into `#main`.
+`match="exact"` activates on exact URL match; `match="prefix"` activates when the
+URL starts with the href.  Chirp auto-injects `current_path` into template context
+for `Template(...)` and `Page(...)` returns, so `match=` works without manually
+passing `nav=` or `current_path=` from every handler.
 
-**Nothing inside `<main>` inherits htmx attributes.**  Forms, buttons, and
-interactive regions work without defensive wrappers.
+After htmx navigation, `app_shell_layout.html` runs a client-side sync that
+updates active classes and `aria-current="page"` based on `location.pathname`.
+This covers the gap where `hx-boost` swaps `#main` but the sidebar DOM is
+not re-rendered.
 
 ### The Rendering Rule
 
@@ -93,8 +119,9 @@ The developer doesn't think about `is_fragment` or `is_boosted`.  Return
 {% end %}
 ```
 
-`app_shell_layout.html` provides the topbar, sidebar slot, and `<main id="main">`.
-Sidebar links get SPA navigation by default (`boost=true`).
+`app_shell_layout.html` provides the topbar, sidebar slot, and `<main id="main">`
+with built-in `hx-boost`, `hx-target`, `hx-swap`, and `hx-select`. Links inside
+`#main` inherit SPA navigation automatically.
 
 ### 2. Structure Your Page Template
 
@@ -166,8 +193,8 @@ With the [route directory contract](/docs/reference/route-contract/), sections, 
 
 ## Forms Inside the Shell
 
-Forms inside `<main>` work without any special wrappers.  Since `<main>` has no
-inherited htmx attributes, form submissions target exactly what you specify:
+Forms with explicit `hx-target` override the inherited shell attributes
+naturally. No defensive wrappers needed:
 
 ```html
 <form hx-post="/contacts/create"
@@ -178,7 +205,8 @@ inherited htmx attributes, form submissions target exactly what you specify:
 </form>
 ```
 
-No `fragment_island`, no `hx-disinherit`, no `beforeSwap` handler needed.
+Use `fragment_island` or `hx-disinherit` only when a region needs to fully
+opt out of the inherited boost/target/swap/select chain.
 
 ### Validation Errors
 
@@ -226,6 +254,38 @@ def context() -> dict:
 - **primary** — Main buttons/links (e.g. "New project", "Deploy")
 - **controls** — Secondary actions (e.g. "Metrics", filters)
 - **overflow** — Dropdown menu (e.g. "More" with Archive, Export, Docs)
+
+### Form actions (`kind="form"`)
+
+Use **`kind="form"`** for POST actions that need CSRF, hidden fields, and optional HTMX
+attributes on the `<form>`. Chirp-ui renders the form in the shell target; OOB updates
+refresh it on navigation like other shell actions.
+
+- Put form actions in **primary** or **controls** only (not **overflow**).
+- Set **`form_action`**, **`label`** (submit button), and optional **`hidden_fields`** as
+  `tuple[tuple[str, str], ...]`.
+- **`include_csrf`** (default `True`) renders `{{ csrf_field() }}` inside the form.
+- HTMX: set **`hx_post`**, **`hx_target`**, **`hx_swap`**, **`hx_disinherit`** as needed.
+- **`submit_surface`**: `"btn"` | `"shimmer"` | `"pulsing"` (ChirpUI submit control).
+
+For link/button actions that need extra attributes (e.g. `hx-boost` on a shell link),
+set **`attrs`** on `ShellAction` (string passed through to `btn`).
+
+```python
+ShellAction(
+    id="add-to-party",
+    kind="form",
+    label="Add Bulbasaur to party",
+    variant="primary",
+    form_action="/team/add",
+    hidden_fields=(("pokemon_id", "1"),),
+    hx_post="/team/add",
+    hx_target="#party-toast",
+    hx_swap="innerHTML",
+    hx_disinherit="hx-select",
+    submit_surface="shimmer",
+)
+```
 
 ```python
 ShellActions(
@@ -327,20 +387,23 @@ For day-to-day debugging:
 
 ## Content Navigation Links
 
-Sidebar links get SPA transitions automatically.  For links inside page
-content that should also use SPA navigation (pagination, breadcrumbs,
-interlinked pages), use the `nav_link` macro:
+Since `<main id="main">` carries `hx-boost="true"`, all `<a>` tags inside
+page content get SPA navigation automatically — no special attributes needed.
+
+```html
+<a href="/page-2">Next page</a>
+<a href="/details">View details</a>
+```
+
+For links that need extra htmx attributes (e.g. `hx-push-url`), use the
+`nav_link` macro:
 
 ```html
 {% from "chirpui/nav_link.html" import nav_link %}
-
-{{ nav_link("/page-2", "Next page") }}
-
-{% call nav_link("/details") %}View details{% end %}
+{{ nav_link("/page-2", "Next page", push_url=true) }}
 ```
 
-Plain `<a>` tags work fine and do full-page loads.  Use `nav_link` only
-when you want the smooth SPA transition within the shell.
+To opt a link out of SPA navigation, add `hx-boost="false"`.
 
 ## Fragment Regions (Optional)
 
@@ -364,14 +427,20 @@ region needs its own `hx-target` / `hx-swap` defaults:
 
 ## Custom Shells
 
-If you need a custom shell instead of `app_shell_layout.html`, follow these
-rules:
+If you need a custom shell instead of `app_shell_layout.html`, replicate
+the built-in defaults on your `<main>` element:
 
-1. **No `hx-boost` on `<main>`** — put it on individual nav links instead
-2. **Use `sidebar_link(boost=true)`** or add `hx-boost="true" hx-target="#main"
-   hx-swap="innerHTML transition:true"` on each nav link
-3. **No wrapper div inside `<main>`** — content renders directly; the server's
-   `page_block` response is the raw content for `#main`
+```html
+<main id="main" class="my-shell__main" tabindex="-1"
+      hx-boost="true" hx-target="#main" hx-swap="innerHTML" hx-select="#page-content">
+  <div id="page-content">
+    {% block content %}{% end %}
+  </div>
+</main>
+```
+
+Sidebar links (outside `#main`) need their own `hx-target="#main"` and
+`hx-select="#page-content"` since they don't inherit from the `<main>` element.
 
 See `examples/chirpui/kanban_shell` for a working custom shell and `examples/chirpui/shell_oob` for
 regions-based OOB.

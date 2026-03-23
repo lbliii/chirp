@@ -60,6 +60,8 @@ def index():
 
 The first argument is the template path (relative to your `template_dir`). Everything else becomes template context.
 
+**Auto-injected context:** Chirp automatically adds `current_path` (set to `request.path`) to the template context when it is not already present. This means ChirpUI navigation components like `sidebar_link(..., match="prefix")` and `navbar_link(..., match="exact")` work without manually passing `current_path` or `nav=` strings from every handler.
+
 ## Fragment
 
 Renders a named block from a template, without rendering the full page:

@@ -34,6 +34,9 @@ class TestChirpNewDefaultV2:
         assert (project / "pages" / "dashboard" / "page.py").is_file()
         assert (project / "pages" / "dashboard" / "page.html").is_file()
         assert (project / "static" / "style.css").is_file()
+        assert (project / "static" / "theme.css").is_file()
+        assert (project / "pyproject.toml").is_file()
+        assert (project / "migrations" / ".gitkeep").is_file()
         assert (project / "tests" / "conftest.py").is_file()
         assert (project / "tests" / "test_app.py").is_file()
 
@@ -128,6 +131,8 @@ class TestChirpNewShell:
         assert (project / "pages" / "items" / "_layout.html").is_file()
         assert (project / "pages" / "items" / "page.py").is_file()
         assert (project / "pages" / "items" / "page.html").is_file()
+        assert (project / "pyproject.toml").is_file()
+        assert (project / "static" / "theme.css").is_file()
 
     def test_shell_app_is_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

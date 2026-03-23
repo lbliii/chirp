@@ -4,6 +4,10 @@ Nested filesystem routes can contribute actions for persistent shell regions
 such as the global top bar. Child routes inherit parent contributions by
 default, may override actions by stable ``id``, remove inherited actions, or
 replace an entire zone.
+
+Stable DOM id for the actions slot: import ``SHELL_ACTIONS_TARGET`` from
+``chirp.shell_actions`` or ``chirp.shell_regions`` (same constant). See the
+UI layers guide in ``site/content/docs/guides/ui-layers.md``.
 """
 
 from dataclasses import dataclass, field
@@ -25,16 +29,18 @@ __all__ = [
     "ShellActionZone",
     "ShellActions",
     "ShellMenuItem",
+    "ShellSubmitSurface",
     "merge_shell_actions",
     "normalize_shell_actions",
     "shell_actions_fragment",
     "validate_shell_actions",
 ]
 
-type ShellActionKind = Literal["link", "button", "menu"]
+type ShellActionKind = Literal["link", "button", "menu", "form"]
 type ShellActionVariant = Literal["default", "primary", "secondary", "danger"]
 type ShellActionZoneName = Literal["primary", "controls", "overflow"]
 type ShellActionZoneMode = Literal["merge", "replace"]
+type ShellSubmitSurface = Literal["btn", "shimmer", "pulsing"]
 
 SHELL_ACTION_ZONE_NAMES: tuple[ShellActionZoneName, ...] = ("primary", "controls", "overflow")
 
@@ -70,6 +76,19 @@ class ShellAction:
     size: str = "sm"
     disabled: bool = False
     menu_items: tuple[ShellMenuItem, ...] = ()
+    # kind="form": POST form with optional HTMX attributes (rendered by chirp-ui).
+    form_action: str | None = None
+    form_method: str = "post"
+    hidden_fields: tuple[tuple[str, str], ...] = ()
+    include_csrf: bool = True
+    hx_post: str | None = None
+    hx_target: str | None = None
+    hx_swap: str | None = None
+    hx_disinherit: str | None = None
+    submit_surface: ShellSubmitSurface = "btn"
+    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX),
+    #: or for ``kind="form"`` (merged onto the ``<form>`` tag, e.g. ``style`` for themed CTAs).
+    attrs: str = ""
 
     def as_menu_item(self) -> ShellMenuItem:
         """Convert a button/link action to a dropdown-compatible menu item."""
@@ -165,6 +184,8 @@ def validate_shell_actions(actions: ShellActions) -> None:
             msg = f"shell_actions.{zone_name} cannot set remove= when mode='replace'"
             raise ValueError(msg)
         _ensure_unique_ids(zone.items, zone_name)
+        for item in zone.items:
+            _validate_shell_action_item(item, zone_name)
         if zone.mode == "replace":
             continue
         for action_id in zone.remove:
@@ -190,6 +211,42 @@ def _merge_zone(
     merged = ShellActionZone(items=tuple(inherited.values()))
     _ensure_unique_ids(merged.items, zone_name)
     return merged
+
+
+def _validate_shell_action_item(item: ShellAction, zone_name: str) -> None:
+    """Reject invalid field combinations for each action kind."""
+    if item.kind == "form":
+        if zone_name == "overflow":
+            msg = "shell_actions.overflow cannot use kind='form' (use primary or controls)"
+            raise ValueError(msg)
+        if not item.form_action:
+            msg = f"shell_actions.{zone_name} action {item.id!r} kind=form requires form_action"
+            raise ValueError(msg)
+        if item.form_method.lower() != "post":
+            msg = f"shell_actions.{zone_name} action {item.id!r}: only form_method='post' is supported"
+            raise ValueError(msg)
+        return
+    if item.form_action is not None:
+        msg = f"shell_actions.{zone_name} action {item.id!r}: form_action is only valid for kind='form'"
+        raise ValueError(msg)
+    if item.hidden_fields:
+        msg = f"shell_actions.{zone_name} action {item.id!r}: hidden_fields is only valid for kind='form'"
+        raise ValueError(msg)
+    if not item.include_csrf:
+        msg = f"shell_actions.{zone_name} action {item.id!r}: include_csrf is only meaningful for kind='form'"
+        raise ValueError(msg)
+    if item.hx_post is not None or item.hx_target is not None or item.hx_swap is not None:
+        msg = f"shell_actions.{zone_name} action {item.id!r}: HTMX fields are only valid for kind='form'"
+        raise ValueError(msg)
+    if item.hx_disinherit is not None:
+        msg = f"shell_actions.{zone_name} action {item.id!r}: hx_disinherit is only valid for kind='form'"
+        raise ValueError(msg)
+    if item.submit_surface != "btn":
+        msg = f"shell_actions.{zone_name} action {item.id!r}: submit_surface is only valid for kind='form'"
+        raise ValueError(msg)
+    if item.attrs and item.kind not in ("link", "button"):
+        msg = f"shell_actions.{zone_name} action {item.id!r}: attrs is only valid for kind='link' or 'button'"
+        raise ValueError(msg)
 
 
 def _ensure_unique_ids(items: tuple[ShellAction, ...], zone_name: str) -> None:

@@ -113,10 +113,4 @@ All examples upgraded for consistency and S-tier DX:
 
 ## Examples README Guidance
 
-The `examples/README.md` View Transitions section (lines 280–291) recommends:
-
-```css
-#main { view-transition-name: page-content; }
-```
-
-**Update**: Add a warning that if `#main` (or similar) is a parent of OOB targets, this can cause the whole-page-erase bug. Prefer scoping to elements that change only on full navigation.
+The `examples/README.md` View Transitions section previously recommended manually adding `view-transition-name: page-content` to `#main`. This is now handled automatically by `chirpui-transitions.css` (included when using `app_shell_layout.html`). The stylesheet also suppresses root transitions and disables VT on `.chirpui-fragment-island` elements. Apps that use OOB swaps inside `#main` should still scope `view-transition-name` to nav-only content (not parents of OOB targets) — see the standalone hackernews example for this pattern.

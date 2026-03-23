@@ -1,29 +1,6 @@
-{#- Chirp shell layout — base for persistent app shells
-
-   Use this instead of boost.html for apps with a persistent shell (topbar,
-   sidebar) that stays fixed while only #main swaps on navigation.
-
-   Key differences from boost.html:
-   - No hx-boost on <main> — navigation is driven by explicit hx-boost
-     on sidebar/nav links (see sidebar_link and nav_link macros)
-   - {% block shell %} — override to wrap main with topbar/sidebar; child
-     templates add structure AROUND main, not inside {% block content %}
-   - {% block scripts %} — centralizes htmx CDN; override to change versions
-
-   Usage:
-       {% extends "chirp/layouts/shell.html" %}
-       {% block shell %}
-         <header>...</header>
-         <main id="main" class="...">
-           {% block content %}{% end %}
-         </main>
-       {% end %}
-       {% block sse_scope %}
-         {% from "chirp/sse.html" import sse_scope %}
-         {{ sse_scope("/events") }}
-       {% end %}
-
-   For ChirpUI apps, extend chirpui/app_shell_layout.html instead.
+{#- Chirp shell layout — base for persistent app shells (topbar/sidebar, main id=main).
+    ChirpUI apps should extend chirpui/app_shell_layout.html.
+    Doc text avoids literal template tags so Kida does not parse examples inside comments.
 -#}
 {# target: body #}
 <!DOCTYPE html>

@@ -1,123 +1,92 @@
-"""Tests for route-scoped shell action models and context cascade."""
+"""Tests for route-scoped shell action models."""
 
 import pytest
 
-from chirp.pages.context import build_cascade_context
-from chirp.pages.shell_actions import (
-    ShellAction,
-    ShellActions,
-    ShellActionZone,
-    merge_shell_actions,
-    shell_actions_fragment,
-)
-from chirp.pages.types import ContextProvider
+from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
 
 
-class TestShellActionMerging:
-    def test_merge_overrides_and_removes_by_id(self) -> None:
-        parent = ShellActions(
+def test_shell_action_form_requires_action() -> None:
+    with pytest.raises(ValueError, match="form_action"):
+        ShellActions(
             primary=ShellActionZone(
                 items=(
-                    ShellAction(id="new-thread", label="New thread", href="/threads/new"),
-                    ShellAction(id="follow", label="Follow", action="follow"),
-                )
-            )
-        )
-        child = ShellActions(
-            primary=ShellActionZone(
-                items=(ShellAction(id="reply", label="Reply", href="/threads/1/reply"),),
-                remove=("new-thread",),
-            ),
-            controls=ShellActionZone(
-                items=(ShellAction(id="sort", label="Sort", action="sort"),),
+                    ShellAction(
+                        id="x",
+                        label="y",
+                        kind="form",
+                        form_action="",
+                    ),
+                ),
             ),
         )
 
-        merged = merge_shell_actions(parent, child)
 
-        assert merged is not None
-        assert [item.id for item in merged.primary.items] == ["follow", "reply"]
-        assert [item.id for item in merged.controls.items] == ["sort"]
-
-    def test_merge_replaces_zone(self) -> None:
-        parent = ShellActions(
+def test_shell_action_form_rejected_in_overflow() -> None:
+    with pytest.raises(ValueError, match="overflow"):
+        ShellActions(
             overflow=ShellActionZone(
-                items=(ShellAction(id="archive", label="Archive", action="archive"),)
-            )
-        )
-        child = ShellActions(
-            overflow=ShellActionZone(
-                items=(ShellAction(id="delete", label="Delete", action="delete"),),
-                mode="replace",
-            )
+                items=(
+                    ShellAction(
+                        id="x",
+                        label="y",
+                        kind="form",
+                        form_action="/post",
+                    ),
+                ),
+            ),
         )
 
-        merged = merge_shell_actions(parent, child)
 
-        assert merged is not None
-        assert [item.id for item in merged.overflow.items] == ["delete"]
-
-    def test_empty_replace_still_represents_a_clear(self) -> None:
-        parent = ShellActions(
+def test_shell_action_link_rejects_form_fields() -> None:
+    with pytest.raises(ValueError, match="form_action"):
+        ShellActions(
             primary=ShellActionZone(
-                items=(ShellAction(id="new-thread", label="New thread", href="/threads/new"),)
-            )
-        )
-        child = ShellActions(primary=ShellActionZone(mode="replace"))
-
-        merged = merge_shell_actions(parent, child)
-
-        assert merged is not None
-        assert merged.has_items is False
-        assert shell_actions_fragment(merged) is not None
-
-    def test_duplicate_ids_raise(self) -> None:
-        with pytest.raises(ValueError, match="Duplicate shell action id"):
-            ShellActions(
-                primary=ShellActionZone(
-                    items=(
-                        ShellAction(id="duplicate", label="One", href="/a"),
-                        ShellAction(id="duplicate", label="Two", href="/b"),
-                    )
-                )
-            )
-
-
-class TestBuildCascadeContext:
-    @pytest.mark.asyncio
-    async def test_shell_actions_merge_across_context_providers(self) -> None:
-        def root_context() -> dict[str, object]:
-            return {
-                "shell_actions": ShellActions(
-                    primary=ShellActionZone(
-                        items=(
-                            ShellAction(id="new-thread", label="New thread", href="/threads/new"),
-                        )
-                    )
+                items=(
+                    ShellAction(
+                        id="x",
+                        label="y",
+                        href="/z",
+                        form_action="/oops",
+                    ),
                 ),
-                "title": "Forum",
-            }
-
-        def thread_context(shell_actions: ShellActions) -> dict[str, object]:
-            assert [item.id for item in shell_actions.primary.items] == ["new-thread"]
-            return {
-                "shell_actions": ShellActions(
-                    primary=ShellActionZone(
-                        items=(ShellAction(id="reply", label="Reply", href="/threads/1/reply"),),
-                        remove=("new-thread",),
-                    )
-                ),
-                "title": "Thread",
-            }
-
-        providers = (
-            ContextProvider(module_path="root", func=root_context, depth=0),
-            ContextProvider(module_path="thread", func=thread_context, depth=1),
+            ),
         )
 
-        ctx = await build_cascade_context(providers, path_params={})
 
-        assert ctx["title"] == "Thread"
-        shell_actions = ctx["shell_actions"]
-        assert isinstance(shell_actions, ShellActions)
-        assert [item.id for item in shell_actions.primary.items] == ["reply"]
+def test_shell_action_form_rejects_attrs() -> None:
+    with pytest.raises(ValueError, match="attrs"):
+        ShellActions(
+            primary=ShellActionZone(
+                items=(
+                    ShellAction(
+                        id="x",
+                        label="y",
+                        kind="form",
+                        form_action="/a",
+                        attrs=' class="x"',
+                    ),
+                ),
+            ),
+        )
+
+
+def test_shell_action_form_accepts_primary_zone() -> None:
+    actions = ShellActions(
+        primary=ShellActionZone(
+            items=(
+                ShellAction(
+                    id="add",
+                    label="Add",
+                    kind="form",
+                    form_action="/team/add",
+                    hidden_fields=(("pokemon_id", "2"),),
+                    hx_post="/team/add",
+                    hx_target="#toast",
+                    hx_swap="innerHTML",
+                    hx_disinherit="hx-select",
+                    submit_surface="shimmer",
+                ),
+            ),
+        ),
+    )
+    assert actions.primary.items[0].kind == "form"

@@ -52,4 +52,5 @@ class TestSendResponseNoBodyStatuses:
 
         headers = dict(messages[0]["headers"])
         assert headers[b"content-length"] == b"2"
+        assert headers[b"x-chirp-render-intent"] == b"unknown"
         assert messages[1]["body"] == b"ok"
