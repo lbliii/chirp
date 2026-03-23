@@ -30,7 +30,7 @@
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Documentation") %}
-    {{ sidebar_link("/projects", "All Projects", icon="grid", active=true) }}
+    {{ sidebar_link("/projects", "All Projects", icon="grid", match="prefix") }}
   {% end %}
   {% call sidebar_section("Projects") %}
     {% for p in (projects ?? ()) %}

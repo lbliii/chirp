@@ -36,11 +36,11 @@
 {% region sidebar_oob(current_path="/") %}
 {% call sidebar() %}
   {% call sidebar_section("Markets") %}
-    {{ sidebar_link("/", "Overview", icon="grid", active=current_path == "/") }}
-    {{ sidebar_link("/dashboard", "Watchlist", icon="star", active=current_path.startswith("/dashboard")) }}
+    {{ sidebar_link("/", "Overview", icon="grid", match="exact") }}
+    {{ sidebar_link("/dashboard", "Watchlist", icon="star", match="prefix") }}
   {% end %}
   {% call sidebar_section("Info") %}
-    {{ sidebar_link("/about", "How Islands Work", icon="alert", active=current_path.startswith("/about")) }}
+    {{ sidebar_link("/about", "How Islands Work", icon="alert", match="prefix") }}
   {% end %}
 {% end %}
 {% end %}
