@@ -168,6 +168,22 @@ class App:
             self._runtime_state.router is not None
         )
 
+    def bind_config(self, config: AppConfig) -> None:
+        """Set ``config`` on the app and mirror it into internal subsystems.
+
+        The compiler, ASGI runtime, server launcher, lifecycle coordinator, and
+        contract checker each hold their own reference from construction.
+        Reassigning ``app.config`` alone leaves those stale — use this after
+        ``App()`` when CLI helpers or extensions replace fields (e.g. ``debug``,
+        ``alpine``, ``dev_browser_reload``) before ``run()``/freeze.
+        """
+        self.config = config
+        self._compiler._config = config
+        self._runtime._config = config
+        self._server._config = config
+        self._lifecycle._config = config
+        self._contract_checks._config = config
+
     def route(
         self,
         path: str,

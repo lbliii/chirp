@@ -97,11 +97,18 @@ async def _reload_event_stream(
     if not suffixes:
         return
     mtimes: dict[str, float] = {}
+    tracked_files: list[Path] = []
+    tick = 0
+    # Re-scan the tree periodically so new files are picked up; avoid rglob every tick.
+    rescan_every = 48  # ~21s at 0.45s sleep
 
     while True:
         await asyncio.sleep(0.45)
+        tick += 1
+        if tick % rescan_every == 1 or not tracked_files:
+            tracked_files = _iter_tracked_files(roots, suffixes)
         changed = False
-        for path in _iter_tracked_files(roots, suffixes):
+        for path in tracked_files:
             key = str(path.resolve())
             try:
                 m = path.stat().st_mtime

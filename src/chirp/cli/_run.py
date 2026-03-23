@@ -32,8 +32,11 @@ def run_server(args: argparse.Namespace) -> None:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
-    if getattr(args, "dev_browser_reload", False):
-        app.config = replace(app.config, dev_browser_reload=True)
+    cmd = getattr(args, "command", None)
+    if cmd == "dev":
+        app.bind_config(replace(app.config, debug=True, dev_browser_reload=True))
+    elif getattr(args, "dev_browser_reload", False):
+        app.bind_config(replace(app.config, dev_browser_reload=True))
 
     host = args.host or app.config.host
     port = args.port or app.config.port

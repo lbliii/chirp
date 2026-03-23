@@ -103,9 +103,11 @@ form is submitted.
 Convert standard links and forms into AJAX-powered navigation with a
 single attribute.
 
-**App shell (recommended):** `app_shell_layout.html` puts `hx-boost="true"`,
-`hx-target="#main"`, `hx-swap="outerHTML"`, and `hx-select="#main"` on
-`<main id="main">`. All links inside inherit SPA navigation automatically.
+**App shell (ChirpUI):** `app_shell_layout.html` uses `hx-boost="true"`,
+`hx-target="#main"`, `hx-swap="innerHTML"`, and `hx-select="#page-content"` on
+`<main id="main">` with a `#page-content` wrapper inside. All links inside inherit SPA navigation automatically.
+
+**App shell (standalone, no chirp-ui):** use `hx-swap="outerHTML"` and `hx-select="#main"` on the same element you target for a full-main swap.
 
 **Standalone (no chirp-ui):**
 

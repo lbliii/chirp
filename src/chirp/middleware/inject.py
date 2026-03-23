@@ -101,7 +101,16 @@ class AlpineInject(HTMLInject):
             body = body.decode("utf-8", errors="replace")
         if 'data-chirp="alpine"' in body:
             return response
-        return await super().__call__(request, next)
+        # Reuse the fetched response — do not call ``next`` again via super().
+        target = self._target
+        snippet = self._snippet
+        if target in body:
+            body = body.replace(target, snippet + target, 1)
+        elif self._full_page_only:
+            return response
+        else:
+            body = body + snippet
+        return replace(response, body=body)
 
 
 class ViewTransitionCssDebugWarning:

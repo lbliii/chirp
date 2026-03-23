@@ -6,6 +6,7 @@ no magic, fully predictable.
 """
 
 import logging
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment
@@ -95,14 +96,38 @@ def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environ
     return kida_env
 
 
-def _inject_current_path(context: dict[str, Any], request: Request | None) -> None:
-    """Inject current_path into template context when not already set.
+def _with_current_path_in_context(
+    value: Template | Page | LayoutPage,
+    request: Request | None,
+) -> Template | Page | LayoutPage:
+    """Return *value* with ``current_path`` merged into context (copy-on-write).
 
-    Ensures nav components (sidebar_link, navbar_link with match=) can
-    compare the current URL path without manual threading from every handler.
+    Avoids mutating a shared ``context`` dict when handlers reuse a frozen
+    ``Template``/``Page``/``LayoutPage`` across requests.
+
+    ``Page``/``LayoutPage`` use custom ``__init__`` — build fresh instances instead
+    of ``dataclasses.replace`` (which does not reconstruct them correctly).
     """
-    if request is not None and "current_path" not in context:
-        context["current_path"] = request.path
+    if request is None or "current_path" in value.context:
+        return value
+    new_ctx = {**value.context, "current_path": request.path}
+    if isinstance(value, Template):
+        return replace(value, context=new_ctx)
+    if isinstance(value, Page):
+        return Page(
+            value.name,
+            value.block_name,
+            page_block_name=value.page_block_name,
+            **new_ctx,
+        )
+    return LayoutPage(
+        value.name,
+        value.block_name,
+        page_block_name=value.page_block_name,
+        layout_chain=value.layout_chain,
+        context_providers=value.context_providers,
+        **new_ctx,
+    )
 
 
 def _render_composition(
@@ -218,8 +243,7 @@ def negotiate(
                 )
         case Template():
             kida_env = _require_kida_env(kida_env, "Template")
-            _inject_current_path(value.context, request)
-            html = render_template(kida_env, value)
+            html = render_template(kida_env, _with_current_path_in_context(value, request))
             return _html_response(html, intent="full_page")
         case InlineTemplate():
             env = kida_env or _minimal_kida_env()
@@ -232,7 +256,7 @@ def negotiate(
             return _fragment_response(html)
         case Page() | LayoutPage():
             kida_env = _require_kida_env(kida_env, "Page/LayoutPage")
-            _inject_current_path(value.context, request)
+            value = _with_current_path_in_context(value, request)
             composition = normalize_to_composition(value)
             if composition is None:
                 msg = f"Cannot normalize {type(value).__name__} to composition"

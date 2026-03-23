@@ -86,8 +86,8 @@ class ShellAction:
     hx_swap: str | None = None
     hx_disinherit: str | None = None
     submit_surface: ShellSubmitSurface = "btn"
-    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX),
-    #: or for ``kind="form"`` (merged onto the ``<form>`` tag, e.g. ``style`` for themed CTAs).
+    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX).
+    #: Not used for ``kind="form"`` (form actions use dedicated fields).
     attrs: str = ""
 
     def as_menu_item(self) -> ShellMenuItem:

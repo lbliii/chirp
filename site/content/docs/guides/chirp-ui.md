@@ -181,7 +181,7 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 
 **Why standalone?** Chirp's `render_with_blocks({"content": ...})` replaces `{% block content %}` entirely. If you extend `boost.html` and put the shell inside `{% block content %}`, it gets overwritten. A standalone layout puts the shell outside the content block so it always renders. See [[docs/routing/filesystem-routing|Filesystem Routing]] for the full explanation.
 
-**Why `hx-select="#main"`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-select="#main"` tells htmx to parse the response and extract only `#main` — the shell stays untouched.
+**Why `hx-select="#page-content"`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-target="#main"` with `hx-swap="innerHTML"` and `hx-select="#page-content"` parses the response, extracts the inner fragment, and swaps it into `<main>` — the shell chrome stays untouched and avoids duplicate `view-transition-name` on the outer `<main>` node.
 
 **Why `hx-boost` on `<main>`?** All links inside `#main` inherit `hx-boost`, `hx-target`, `hx-swap`, and `hx-select` — plain `<a href="...">` tags get SPA navigation automatically. No per-link attributes needed. Fragment requests with explicit `hx-target` (e.g. `hx-target="#compare-result"`) override the inherited value naturally. Use `hx-disinherit` or `fragment_island` only when a region needs to fully opt out.
 
