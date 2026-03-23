@@ -55,3 +55,7 @@ curl -H "Authorization: Bearer demo-key-change-me" \
 curl -H "Authorization: Bearer demo-key-change-me" \
      "http://127.0.0.1:8000/api/pokemon?q=char"
 ```
+
+## See also
+
+- **[chirp-demo-pokedex](https://github.com/lbliii/chirp-demo-pokedex)** (separate repo) — full ChirpUI app shell with **`filter_chips.html`** (`filter_group` / `filter_chip`), **`register_colors`**, and **`badge`** for type styling. This standalone example stays minimal (no chirp-ui dependency).
