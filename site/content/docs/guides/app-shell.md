@@ -10,6 +10,8 @@ keywords: [app-shell, sidebar, navigation, fragment, page, boost, htmx]
 category: guide
 ---
 
+Also read: **[UI layers & shell regions](./ui-layers.md)** — glossary (app shell vs page chrome vs surface chrome) and stable OOB element ids (`chirp.shell_regions`).
+
 ## What Is an App Shell?
 
 An app shell is a persistent layout — topbar, sidebar, footer — that stays on

@@ -4,6 +4,10 @@ Nested filesystem routes can contribute actions for persistent shell regions
 such as the global top bar. Child routes inherit parent contributions by
 default, may override actions by stable ``id``, remove inherited actions, or
 replace an entire zone.
+
+Stable DOM id for the actions slot: import ``SHELL_ACTIONS_TARGET`` from
+``chirp.shell_actions`` or ``chirp.shell_regions`` (same constant). See the
+UI layers guide in ``site/content/docs/guides/ui-layers.md``.
 """
 
 from dataclasses import dataclass, field
@@ -82,7 +86,8 @@ class ShellAction:
     hx_swap: str | None = None
     hx_disinherit: str | None = None
     submit_surface: ShellSubmitSurface = "btn"
-    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX).
+    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX),
+    #: or for ``kind="form"`` (merged onto the ``<form>`` tag, e.g. ``style`` for themed CTAs).
     attrs: str = ""
 
     def as_menu_item(self) -> ShellMenuItem:
@@ -219,9 +224,6 @@ def _validate_shell_action_item(item: ShellAction, zone_name: str) -> None:
             raise ValueError(msg)
         if item.form_method.lower() != "post":
             msg = f"shell_actions.{zone_name} action {item.id!r}: only form_method='post' is supported"
-            raise ValueError(msg)
-        if item.attrs:
-            msg = f"shell_actions.{zone_name} action {item.id!r}: attrs is not supported for kind='form'"
             raise ValueError(msg)
         return
     if item.form_action is not None:
