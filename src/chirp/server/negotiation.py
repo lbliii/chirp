@@ -6,7 +6,7 @@ no magic, fully predictable.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from kida import Environment
 
@@ -93,6 +93,17 @@ def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environ
         )
         raise ConfigurationError(msg)
     return kida_env
+
+
+@overload
+def _with_current_path_in_context(value: Template, request: Request | None) -> Template: ...
+
+
+@overload
+def _with_current_path_in_context(
+    value: Page | LayoutPage,
+    request: Request | None,
+) -> Page | LayoutPage: ...
 
 
 def _with_current_path_in_context(

@@ -103,7 +103,7 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
         chirp_ui_root = Path(chirp_ui.__file__).resolve().parent
         if "chirp-ui" in str(chirp_ui_root):
             app.add_reload_dir(str(chirp_ui_root))
-    except (AttributeError, OSError):
+    except AttributeError, OSError:
         pass
     strict_value = strict if strict is not None else app.config.debug
     app.add_middleware(_ChirpUIStrictMiddleware(strict_value))

@@ -95,7 +95,7 @@ def _route_prepass(
             src = inspect.getsource(handler)
             for m in _TEMPLATE_CALL_PATTERN.finditer(src):
                 referenced_templates.add(m.group(1))
-        except (TypeError, OSError):
+        except TypeError, OSError:
             pass
         contract = getattr(handler, "_chirp_contract", None)
         if contract is None:
