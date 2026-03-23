@@ -46,6 +46,26 @@ response is swapped directly into `#main`.
 **Nothing inside `<main>` inherits htmx attributes.**  Forms, buttons, and
 interactive regions work without defensive wrappers.
 
+### Active State
+
+ChirpUI sidebar and navbar links support a `match=` parameter for automatic
+path-based highlighting:
+
+```html
+{{ sidebar_link("/", "Home", icon="◉", match="exact") }}
+{{ sidebar_link("/contacts", "Contacts", icon="◎", match="prefix") }}
+```
+
+`match="exact"` activates on exact URL match; `match="prefix"` activates when the
+URL starts with the href.  Chirp auto-injects `current_path` into template context
+for `Template(...)` and `Page(...)` returns, so `match=` works without manually
+passing `nav=` or `current_path=` from every handler.
+
+After htmx navigation, `app_shell_layout.html` runs a client-side sync that
+updates active classes and `aria-current="page"` based on `location.pathname`.
+This covers the gap where `hx-boost` swaps `#main` but the sidebar DOM is
+not re-rendered.
+
 ### The Rendering Rule
 
 Handlers return `Page` and Chirp auto-detects rendering scope:
