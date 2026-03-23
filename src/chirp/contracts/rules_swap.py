@@ -41,11 +41,26 @@ _SSE_CONNECT_TAG_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-_BROAD_CONTAINER_TAGS = frozenset({
-    "body", "main", "div", "section", "article", "aside", "nav",
-    "header", "footer", "form", "details", "dialog", "fieldset",
-    "figure", "hgroup", "search",
-})
+_BROAD_CONTAINER_TAGS = frozenset(
+    {
+        "body",
+        "main",
+        "div",
+        "section",
+        "article",
+        "aside",
+        "nav",
+        "header",
+        "footer",
+        "form",
+        "details",
+        "dialog",
+        "fieldset",
+        "figure",
+        "hgroup",
+        "search",
+    }
+)
 
 
 def _extends_ancestors(start: str, template_sources: dict[str, str]) -> set[str]:

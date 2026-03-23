@@ -58,7 +58,5 @@ def alpine_snippet(version: str, csp: bool = False) -> str:
         HTML: safeData helper + plugins + Alpine.js script tag.
     """
     pkg = "alpinejs" if not csp else "alpinejs/dist/cdn/csp"
-    script = (
-        f'<script defer src="{_CDN}/{pkg}@{version}" data-chirp="alpine"></script>'
-    )
+    script = f'<script defer src="{_CDN}/{pkg}@{version}" data-chirp="alpine"></script>'
     return SAFE_DATA_HELPER + PLUGINS + script

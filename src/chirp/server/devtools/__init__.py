@@ -26,6 +26,7 @@ import time into a single IIFE. No build step required.
 
 import html
 import json
+from collections.abc import Mapping
 from importlib.resources import files
 
 DEVTOOLS_BOOT_PATH = "/__chirp/debug/htmx.js"
@@ -57,7 +58,7 @@ def highlight_code(code: str, language: str) -> str:
     return f'<pre class="chirp-hl-fallback"><code>{escaped}</code></pre>'
 
 
-def handle_highlight_request(query_params: dict[str, str]) -> str:
+def handle_highlight_request(query_params: Mapping[str, str]) -> str:
     """Handle GET /__chirp/debug/highlight — returns JSON ``{"html": "..."}``."""
     import base64
 

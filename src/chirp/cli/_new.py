@@ -81,8 +81,7 @@ def create_project(args: argparse.Namespace) -> None:
     """
     if getattr(args, "with_chirpui", False) and not _has_chirpui():
         print(
-            "Error: --with-chirpui requires chirp-ui "
-            "(pip install 'chirp[ui]' or chirp-ui)",
+            "Error: --with-chirpui requires chirp-ui (pip install 'chirp[ui]' or chirp-ui)",
             file=sys.stderr,
         )
         raise SystemExit(1)

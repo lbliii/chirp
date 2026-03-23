@@ -253,8 +253,8 @@ def _render_render_plan_panel(snapshot: dict[str, Any]) -> str:
         parts.append('<div class="template-values">')
         for ru in regions:
             line = (
-                f'{ru.get("region", "")}: {ru.get("template", "")}'
-                f'#{ru.get("block", "")} ({ru.get("mode", "")})'
+                f"{ru.get('region', '')}: {ru.get('template', '')}"
+                f"#{ru.get('block', '')} ({ru.get('mode', '')})"
             )
             parts.append(f'<div class="local-var"><span class="value">{_esc(line)}</span></div>')
         parts.append("</div>")

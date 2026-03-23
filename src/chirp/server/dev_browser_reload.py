@@ -80,9 +80,11 @@ def _iter_tracked_files(roots: list[Path], suffixes: tuple[str, ...]) -> list[Pa
     files: list[Path] = []
     for root in roots:
         for suffix in suffixes:
-            for p in root.rglob(f"*{suffix}"):
-                if not any(part in _SKIP_DIRS for part in p.parts):
-                    files.append(p)
+            files.extend(
+                p
+                for p in root.rglob(f"*{suffix}")
+                if not any(part in _SKIP_DIRS for part in p.parts)
+            )
     return files
 
 

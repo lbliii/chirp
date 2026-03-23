@@ -19,7 +19,7 @@ def _preview_value(value: Any) -> str:
     except Exception as exc:
         return f"<repr failed: {type(exc).__name__}>"
     if len(s) > _MAX_REPR_LEN:
-        return f"{s[:_MAX_REPR_LEN - 3]}..."
+        return f"{s[: _MAX_REPR_LEN - 3]}..."
     return s
 
 

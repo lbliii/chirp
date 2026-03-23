@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING
 
 from kida import Environment
 
-_TEMPLATE_CALL_PATTERN = re.compile(r'(?:Template|Fragment)\s*\(\s*["\']([^"\']+\.html)["\']')
-
 from chirp.routing.router import _route_path_has_flask_syntax
 
 from .declarations import FragmentContract, SSEContract
@@ -56,6 +54,8 @@ from .template_scan import (
 )
 from .types import CheckResult, ContractIssue, Severity
 
+_TEMPLATE_CALL_PATTERN = re.compile(r'(?:Template|Fragment)\s*\(\s*["\']([^"\']+\.html)["\']')
+
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
@@ -95,7 +95,7 @@ def _route_prepass(
             src = inspect.getsource(handler)
             for m in _TEMPLATE_CALL_PATTERN.finditer(src):
                 referenced_templates.add(m.group(1))
-        except (TypeError, OSError):
+        except TypeError, OSError:
             pass
         contract = getattr(handler, "_chirp_contract", None)
         if contract is None:
@@ -291,9 +291,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             ids_with_disinherit.update(extract_ids_with_disinherit(source))
             referenced_templates_from_sources.update(extract_template_references(source))
             for href_url in extract_href_references(source):
-                href_match = find_matching_route(
-                    href_url, static_routes, parametric_routes
-                )
+                href_match = find_matching_route(href_url, static_routes, parametric_routes)
                 if href_match is not None:
                     referenced_paths.add(href_match[0])
 

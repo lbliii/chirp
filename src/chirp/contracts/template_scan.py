@@ -38,7 +38,9 @@ _MUTATING_WITH_TARGET = re.compile(
 )
 _LEGACY_ACTION_PATTERN = re.compile(r'(?<![-\w])action\s*=\s*["\']([A-Za-z][A-Za-z0-9_-]*)["\']')
 _HREF_ATTR_PATTERN = re.compile(r'href\s*=\s*["\']([^"\']*)["\']')
-_MACRO_URL_ARG_PATTERN = re.compile(r"""(?:href|url|search_url|action_url)\s*=\s*["'](/[^"']*?)["']""")
+_MACRO_URL_ARG_PATTERN = re.compile(
+    r"""(?:href|url|search_url|action_url)\s*=\s*["'](/[^"']*?)["']"""
+)
 _POSITIONAL_URL_ARG_PATTERN = re.compile(r"""\(\s*["'](/[a-zA-Z][a-zA-Z0-9_/{}-]*)["']""")
 
 

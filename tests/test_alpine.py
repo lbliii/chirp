@@ -157,10 +157,10 @@ class TestAlpineInjectDedup:
         @app.route("/")
         def index():
             return (
-                '<html><body>'
+                "<html><body>"
                 '<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3" '
                 'data-chirp="alpine"></script>'
-                '</body></html>'
+                "</body></html>"
             )
 
         async with TestClient(app) as client:

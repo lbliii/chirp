@@ -56,9 +56,7 @@ async def send_response(
         raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
     # Chirp DevTools tray + proxies: fragment vs full-page intent (HTML only)
     if response.content_type.startswith("text/html"):
-        raw_headers.append(
-            (b"x-chirp-render-intent", response.render_intent.encode("latin-1"))
-        )
+        raw_headers.append((b"x-chirp-render-intent", response.render_intent.encode("latin-1")))
 
     body = response.body_bytes if _body_allowed(response.status) else b""
 
