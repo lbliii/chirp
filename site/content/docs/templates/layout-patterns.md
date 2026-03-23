@@ -18,6 +18,8 @@ Chirp templates use Kida's block system: `{% extends %}`, `{% block %}`, `{% inc
 
 Pick the right base layout before writing any templates.
 
+For **fixed column ratios** on page content (`grid()` + `block(span=…)`), see the Chirp UI package **`docs/LAYOUT-OVERFLOW.md`** (section *Fixed columns: grid presets*).
+
 | Scenario | Layout |
 |---|---|
 | App shell with sidebar navigation | `chirpui/app_shell_layout.html` |

@@ -103,15 +103,21 @@ form is submitted.
 Convert standard links and forms into AJAX-powered navigation with a
 single attribute.
 
-**Simple case (no OOB/SSE live updates):**
+**App shell (ChirpUI):** `app_shell_layout.html` uses `hx-boost="true"`,
+`hx-target="#main"`, `hx-swap="innerHTML"`, and `hx-select="#page-content"` on
+`<main id="main">` with a `#page-content` wrapper inside. All links inside inherit SPA navigation automatically.
+
+**App shell (standalone, no chirp-ui):** use `hx-swap="outerHTML"` and `hx-select="#main"` on the same element you target for a full-main swap.
+
+**Standalone (no chirp-ui):**
 
 ```html
-<body hx-boost="true"
-      hx-target="#content"
-      hx-swap="innerHTML transition:true"
-      hx-indicator="#page-loader">
+<body>
   <header>...</header>
-  <main id="content">{% block content %}{% endblock %}</main>
+  <main id="content" hx-boost="true" hx-target="#content"
+        hx-swap="outerHTML" hx-select="#content">
+    {% block content %}{% endblock %}
+  </main>
 </body>
 ```
 
@@ -337,8 +343,13 @@ stable pattern.
 <a href="/page" hx-swap="innerHTML transition:true">Link</a>
 ```
 
+When using `app_shell_layout.html`, `chirpui-transitions.css` applies
+`view-transition-name: page-content` to `#main` automatically and suppresses
+root transitions. For apps with OOB swaps inside `#main`, scope the name
+to nav-only content instead:
+
 ```css
-/* Scope to nav-only content, never parents of OOB targets */
+/* OOB apps: scope to nav-only content, never parents of OOB targets */
 #main > .detail-view { view-transition-name: page-content; }
 ```
 

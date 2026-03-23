@@ -27,6 +27,17 @@ Chirp integrates Alpine via config and macros. When enabled, the Alpine script i
 
 ## Enabling Alpine
 
+If you use `chirp-ui`, Alpine is enabled automatically:
+
+```python
+from chirp import App, use_chirp_ui
+
+app = App()
+use_chirp_ui(app)  # auto-enables alpine=True
+```
+
+For apps without `chirp-ui`, enable it explicitly:
+
 ```python
 from chirp import App, AppConfig
 
@@ -34,14 +45,21 @@ config = AppConfig(alpine=True)
 app = App(config=config)
 ```
 
-The Alpine script is injected into full-page HTML responses only. Fragment responses (htmx partials) are unchanged.
+Chirp is the **single authority** for Alpine.js injection. The script is injected into full-page HTML responses only. Fragment responses (htmx partials) are unchanged. If Alpine is already present in the response (e.g. from a third-party layout), Chirp's `AlpineInject` middleware skips injection to prevent double-loading.
+
+The injection block includes:
+
+- **Alpine core** (jsdelivr CDN)
+- **Plugins**: Mask, Intersect, Focus
+- **Store init**: `modals` and `trays` stores for chirp-ui components
+- **`Alpine.safeData()` helper** for htmx-safe component registration
 
 ## Configuration Options
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `alpine` | `bool` | `False` | Enable Alpine.js script injection |
-| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (unpkg CDN) |
+| `alpine` | `bool` | `False` | Enable Alpine.js script injection (`use_chirp_ui` sets this to `True` automatically) |
+| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (jsdelivr CDN) |
 | `alpine_csp` | `bool` | `False` | Use CSP-safe build for strict Content-Security-Policy |
 
 For strict CSP, set `alpine_csp=True` and ensure your CSP allows the Alpine script.
@@ -86,6 +104,28 @@ Import Chirp's Alpine macros and use them in your templates:
 
 - `tabs(tab_names, default=none, tab_list_class="", panel_class="")` — Tab list + panel slot
 - Caller provides panel content with `x-show="active === 'TabName'"` per panel
+
+## Registering Custom Components (`Alpine.safeData`)
+
+When you register named Alpine components with `Alpine.data()`, the standard `alpine:init` event only fires once on the initial page load. Under htmx boosted navigation, swapped-in scripts that rely on `alpine:init` will not re-register.
+
+Chirp provides `Alpine.safeData(name, factory)` — a drop-in replacement for `Alpine.data()` that works on both initial loads and htmx-boosted navigations:
+
+```html
+<script>
+Alpine.safeData("counter", () => ({
+  count: 0,
+  increment() { this.count++; },
+}));
+</script>
+
+<div x-data="counter">
+  <span x-text="count"></span>
+  <button @click="increment">+</button>
+</div>
+```
+
+**Why not `Alpine.data()` directly?** On the first page load, `Alpine.data()` must be called during or before the `alpine:init` event — but after Alpine is loaded. On subsequent htmx navigations, Alpine is already initialized so `Alpine.data()` works immediately. `Alpine.safeData()` handles both cases: it queues registrations until Alpine is ready, then becomes a direct passthrough.
 
 ## htmx + Alpine Together
 

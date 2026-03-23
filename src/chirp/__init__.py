@@ -92,6 +92,7 @@ __all__ = [
     "ShellActionZone",
     "ShellActions",
     "ShellMenuItem",
+    "ShellSubmitSurface",
     "Stream",
     "Suspense",
     "Template",
@@ -150,6 +151,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ShellActions": ("chirp.pages.shell_actions", "ShellActions"),
     "ShellActionZone": ("chirp.pages.shell_actions", "ShellActionZone"),
     "ShellMenuItem": ("chirp.pages.shell_actions", "ShellMenuItem"),
+    "ShellSubmitSurface": ("chirp.pages.shell_actions", "ShellSubmitSurface"),
     # Middleware
     "AnyResponse": ("chirp.middleware.protocol", "AnyResponse"),
     "Middleware": ("chirp.middleware.protocol", "Middleware"),

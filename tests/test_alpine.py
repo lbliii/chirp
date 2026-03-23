@@ -1,4 +1,4 @@
-"""Tests for Alpine.js support — config, injection, and macros."""
+"""Tests for Alpine.js support — config, injection, dedup, and macros."""
 
 from kida import Environment, PackageLoader
 
@@ -27,19 +27,46 @@ def _make_env() -> Environment:
 class TestAlpineSnippet:
     def test_default_builds_script_tag(self) -> None:
         s = alpine_snippet("3.15.8", csp=False)
-        assert 'src="https://unpkg.com/alpinejs@3.15.8"' in s
+        assert 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8"' in s
         assert 'data-chirp="alpine"' in s
         assert "defer" in s
 
-    def test_includes_focus_plugin_for_tray_modal_overlay(self) -> None:
+    def test_includes_focus_plugin(self) -> None:
         s = alpine_snippet("3.15.8", csp=False)
         assert "@alpinejs/focus" in s
         assert 'data-chirp="alpine-focus"' in s
+
+    def test_includes_mask_plugin(self) -> None:
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "@alpinejs/mask" in s
+        assert 'data-chirp="alpine-mask"' in s
+
+    def test_includes_intersect_plugin(self) -> None:
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "@alpinejs/intersect" in s
+        assert 'data-chirp="alpine-intersect"' in s
+
+    def test_includes_safe_data_helper(self) -> None:
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "Alpine.safeData" in s
+        assert "_chirpAlpineData" in s
+
+    def test_includes_store_init(self) -> None:
+        s = alpine_snippet("3.15.8", csp=False)
+        assert 'Alpine.store("modals"' in s
+        assert 'Alpine.store("trays"' in s
 
     def test_csp_uses_csp_build(self) -> None:
         s = alpine_snippet("3.15.8", csp=True)
         assert "alpinejs/dist/cdn/csp" in s
         assert "@3.15.8" in s
+
+    def test_safe_data_helper_is_first(self) -> None:
+        """safeData helper must appear before Alpine core so it queues early calls."""
+        s = alpine_snippet("3.15.8", csp=False)
+        helper_pos = s.index("_chirpAlpineData")
+        core_pos = s.index('data-chirp="alpine"')
+        assert helper_pos < core_pos
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +87,9 @@ class TestAlpineInjection:
             response = await client.get("/")
             assert response.status == 200
             assert 'data-chirp="alpine"' in response.text
-            assert "unpkg.com/alpinejs" in response.text
+            assert "cdn.jsdelivr.net/npm/alpinejs" in response.text
             assert "@alpinejs/focus" in response.text
+            assert "Alpine.safeData" in response.text
 
     async def test_not_injected_when_alpine_disabled(self) -> None:
         """alpine=False (default) does not inject."""
@@ -114,6 +142,46 @@ class TestAlpineInjection:
             response = await client.get("/")
             assert response.status == 200
             assert "alpinejs@3.14.0" in response.text
+
+
+# ---------------------------------------------------------------------------
+# AlpineInject deduplication tests
+# ---------------------------------------------------------------------------
+
+
+class TestAlpineInjectDedup:
+    async def test_skips_injection_when_alpine_already_present(self) -> None:
+        """AlpineInject does not double-inject if page already has Alpine."""
+        app = App(config=AppConfig(alpine=True))
+
+        @app.route("/")
+        def index():
+            return (
+                "<html><body>"
+                '<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3" '
+                'data-chirp="alpine"></script>'
+                "</body></html>"
+            )
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            body = response.text
+            count = body.count('data-chirp="alpine"')
+            assert count == 1, f"Expected 1 Alpine marker, found {count}"
+
+    async def test_injects_when_alpine_not_present(self) -> None:
+        """AlpineInject adds Alpine to a page that lacks it."""
+        app = App(config=AppConfig(alpine=True))
+
+        @app.route("/")
+        def index():
+            return "<html><body><h1>No Alpine here</h1></body></html>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert 'data-chirp="alpine"' in response.text
 
 
 # ---------------------------------------------------------------------------

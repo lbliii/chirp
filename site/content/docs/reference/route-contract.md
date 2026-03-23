@@ -79,6 +79,8 @@ Layouts inherit down the directory tree. Each `_layout.html` declares `{# target
 
 The framework provides: `page_title`, `breadcrumb_items`, `tab_items`, `current_path`. Resolution order: `RouteMeta` → section → handler override.
 
+**Imperative routes:** For handlers that return `Template(...)` or `Page(...)` directly (not using filesystem routing), Chirp auto-injects `current_path = request.path` into the template context when the handler does not provide it. This ensures ChirpUI navigation macros with `match=` work for both filesystem and imperative route styles.
+
 ## Route Kinds
 
 | Kind | Files | Description |

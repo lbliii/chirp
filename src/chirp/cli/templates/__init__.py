@@ -14,6 +14,11 @@ from chirp.cli.templates.minimal import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
 )
+from chirp.cli.templates.scaffold import (
+    MIGRATIONS_README,
+    PYPROJECT_TOML,
+    THEME_CSS_STUB,
+)
 from chirp.cli.templates.shell import (
     SHELL_APP_PY,
     SHELL_CONTEXT_PY,
@@ -54,8 +59,10 @@ __all__ = [
     "APP_PY",
     "BASE_HTML",
     "INDEX_HTML",
+    "MIGRATIONS_README",
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",
+    "PYPROJECT_TOML",
     "SHELL_APP_PY",
     "SHELL_CONTEXT_PY",
     "SHELL_ITEMS_LAYOUT_HTML",
@@ -69,6 +76,7 @@ __all__ = [
     "SSE_INDEX_HTML",
     "STYLE_CSS",
     "TEST_APP_PY",
+    "THEME_CSS_STUB",
     "V2_APP_CHIRPUI_PY",
     "V2_APP_PY",
     "V2_CONFTEST_PY",

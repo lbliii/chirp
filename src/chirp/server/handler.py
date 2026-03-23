@@ -23,9 +23,14 @@ from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
+from chirp.server.devtools import (
+    DEVTOOLS_BOOT_JS,
+    DEVTOOLS_BOOT_PATH,
+    HIGHLIGHT_PATH,
+    handle_highlight_request,
+)
 from chirp.server.errors import handle_http_error, handle_internal_error
 from chirp.server.handler_kwargs import build_handler_kwargs
-from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS, HTMX_DEBUG_BOOT_PATH
 from chirp.server.negotiation import negotiate
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_response, send_streaming_response
@@ -68,10 +73,17 @@ def create_request_handler(
     routes = discovered_routes or []
 
     async def dispatch(req: Request) -> AnyResponse:
-        if debug and req.path == HTMX_DEBUG_BOOT_PATH:
+        if debug and req.path == DEVTOOLS_BOOT_PATH:
             return Response(
-                body=HTMX_DEBUG_BOOT_JS,
+                body=DEVTOOLS_BOOT_JS,
                 content_type="application/javascript; charset=utf-8",
+                render_intent="full_page",
+            )
+        if debug and req.path == HIGHLIGHT_PATH:
+            body = handle_highlight_request(req.query)
+            return Response(
+                body=body,
+                content_type="application/json; charset=utf-8",
                 render_intent="full_page",
             )
         if req.path == ROUTE_EXPLORER_PATH:

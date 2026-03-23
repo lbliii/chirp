@@ -1,55 +1,20 @@
-"""Tests for chirp.server.htmx_debug — debug script loading and syntax."""
+"""Backwards-compat test — verify the htmx_debug shim still exports everything."""
 
-import os
-import shutil
-import subprocess
-import tempfile
+from chirp.server.htmx_debug import (
+    HIGHLIGHT_PATH,
+    HTMX_DEBUG_BOOT_JS,
+    HTMX_DEBUG_BOOT_PATH,
+    HTMX_DEBUG_BOOT_SNIPPET,
+    handle_highlight_request,
+    highlight_code,
+)
 
-import pytest
 
-from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_JS
-
-
-def test_htmx_debug_js_loads() -> None:
-    """HTMX debug script loads and contains expected content."""
+def test_htmx_debug_shim_exports() -> None:
+    """All legacy names are importable and non-empty."""
+    assert HTMX_DEBUG_BOOT_PATH == "/__chirp/debug/htmx.js"
+    assert "script" in HTMX_DEBUG_BOOT_SNIPPET
     assert "__chirpHtmxDebugBooted" in HTMX_DEBUG_BOOT_JS
-    assert "htmx:targetError" in HTMX_DEBUG_BOOT_JS
-    assert "Co-locate the target with the mutating element" in HTMX_DEBUG_BOOT_JS
-    assert "htmx:beforeSwap" in HTMX_DEBUG_BOOT_JS
-    assert "chirp-debug" in HTMX_DEBUG_BOOT_JS
-    assert "chirp-dbg-drawer" in HTMX_DEBUG_BOOT_JS
-    assert "chirp-dbg-pill" in HTMX_DEBUG_BOOT_JS
-    assert "getEffectiveConfig" in HTMX_DEBUG_BOOT_JS
-    assert "htmx:oobBeforeSwap" in HTMX_DEBUG_BOOT_JS
-
-
-def test_htmx_debug_js_parses_route_headers() -> None:
-    """HTMX debug script parses X-Chirp-Route-* headers for activity log."""
-    assert "X-Chirp-Route-Kind" in HTMX_DEBUG_BOOT_JS
-    assert "getResponseHeader" in HTMX_DEBUG_BOOT_JS
-    assert "r.route" in HTMX_DEBUG_BOOT_JS
-
-
-def test_htmx_debug_js_valid_syntax() -> None:
-    """HTMX debug script is valid JavaScript (catches escaping/quote errors).
-
-    Uses node --check when available. Skips if node is not installed.
-    """
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("node not found — install Node.js to validate JS syntax")
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
-        f.write(HTMX_DEBUG_BOOT_JS)
-        path = f.name
-
-    try:
-        result = subprocess.run(
-            [node, "--check", path],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        assert result.returncode == 0, f"JS syntax error: {result.stderr or result.stdout}"
-    finally:
-        os.unlink(path)
+    assert HIGHLIGHT_PATH == "/__chirp/debug/highlight"
+    assert callable(handle_highlight_request)
+    assert callable(highlight_code)

@@ -17,6 +17,7 @@ chirp serving both interfaces from the same app.
 - **JSON responses** — `dict`/`list` returns for API endpoints, JSON error handlers
 - **CORS** — `CORSMiddleware` for cross-origin API access
 - **Template filter** — Custom `type_color` filter for Pokemon type badge colors
+- **Detail layout** — Two-column hero (artwork \| name, types, stats) with plain CSS grid, matching the structural pattern of chirp-ui **`frame(variant="hero")`** used in [chirp-demo-pokedex](https://github.com/lbliii/chirp-demo-pokedex) (this example does not add a chirp-ui dependency)
 
 ## Run
 
@@ -55,3 +56,7 @@ curl -H "Authorization: Bearer demo-key-change-me" \
 curl -H "Authorization: Bearer demo-key-change-me" \
      "http://127.0.0.1:8000/api/pokemon?q=char"
 ```
+
+## See also
+
+- **[chirp-demo-pokedex](https://github.com/lbliii/chirp-demo-pokedex)** (separate repo) — full ChirpUI app shell with **`filter_chips.html`** (`filter_group` / `filter_chip`), **`register_colors`**, and **`badge`** for type styling. This standalone example stays minimal (no chirp-ui dependency).

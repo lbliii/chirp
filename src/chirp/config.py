@@ -62,6 +62,9 @@ class AppConfig:
     reload_include: tuple[str, ...] = (".html", ".css", ".md")
     reload_dirs: tuple[str, ...] = ()  # Extra directories to watch alongside cwd
 
+    # Browser refresh (debug): SSE endpoint + injected script; polls mtimes for reload_include
+    dev_browser_reload: bool = False
+
     # Security
     secret_key: str = ""
 
@@ -93,8 +96,9 @@ class AppConfig:
     # SSE lifecycle — data-sse-state attribute + chirp:sse:connected/disconnected events
     sse_lifecycle: bool = True
 
-    # View Transitions — auto-inject meta tag, default CSS, and htmx global config
-    view_transitions: bool = False
+    # View Transitions — meta tag, default CSS, htmx globalViewTransitions (default on).
+    # Set False for API-only apps or tests that need responses without injected head/body.
+    view_transitions: bool = True
 
     # Event delegation — copy-btn and compare-switch for SSE-swapped content
     delegation: bool = False

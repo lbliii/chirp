@@ -6,7 +6,7 @@ no magic, fully predictable.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from kida import Environment
 
@@ -20,6 +20,7 @@ from chirp.http.response import (
     StreamingResponse,
 )
 from chirp.realtime.events import EventStream
+from chirp.server.debug.render_plan_snapshot import stash_render_debug_for_request
 from chirp.server.negotiation_oob import (
     append_shell_actions_oob_stream,
     compute_shell_region_updates,
@@ -94,6 +95,51 @@ def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environ
     return kida_env
 
 
+@overload
+def _with_current_path_in_context(value: Template, request: Request | None) -> Template: ...
+
+
+@overload
+def _with_current_path_in_context(
+    value: Page | LayoutPage,
+    request: Request | None,
+) -> Page | LayoutPage: ...
+
+
+def _with_current_path_in_context(
+    value: Template | Page | LayoutPage,
+    request: Request | None,
+) -> Template | Page | LayoutPage:
+    """Return *value* with ``current_path`` merged into context (copy-on-write).
+
+    Avoids mutating a shared ``context`` dict when handlers reuse a frozen
+    ``Template``/``Page``/``LayoutPage`` across requests.
+
+    ``Template``/``Page``/``LayoutPage`` use custom ``__init__`` — construct fresh
+    instances instead of ``dataclasses.replace`` (which does not pass ``name``).
+    """
+    if request is None or "current_path" in value.context:
+        return value
+    new_ctx = {**value.context, "current_path": request.path}
+    if isinstance(value, Template):
+        return Template(value.name, **new_ctx)
+    if isinstance(value, Page):
+        return Page(
+            value.name,
+            value.block_name,
+            page_block_name=value.page_block_name,
+            **new_ctx,
+        )
+    return LayoutPage(
+        value.name,
+        value.block_name,
+        page_block_name=value.page_block_name,
+        layout_chain=value.layout_chain,
+        context_providers=value.context_providers,
+        **new_ctx,
+    )
+
+
 def _render_composition(
     composition: PageComposition,
     request: Request | None,
@@ -110,6 +156,7 @@ def _render_composition(
         fragment_target_registry=fragment_target_registry,
         shell_region_updates=shell_updates,
     )
+    stash_render_debug_for_request(plan, request, debug=validate_blocks)
     _set_layout_debug_from_plan(plan, request)
     adapter = KidaAdapter(kida_env)
     rendered = execute_render_plan(
@@ -206,7 +253,7 @@ def negotiate(
                 )
         case Template():
             kida_env = _require_kida_env(kida_env, "Template")
-            html = render_template(kida_env, value)
+            html = render_template(kida_env, _with_current_path_in_context(value, request))
             return _html_response(html, intent="full_page")
         case InlineTemplate():
             env = kida_env or _minimal_kida_env()
@@ -219,6 +266,7 @@ def negotiate(
             return _fragment_response(html)
         case Page() | LayoutPage():
             kida_env = _require_kida_env(kida_env, "Page/LayoutPage")
+            value = _with_current_path_in_context(value, request)
             composition = normalize_to_composition(value)
             if composition is None:
                 msg = f"Cannot normalize {type(value).__name__} to composition"

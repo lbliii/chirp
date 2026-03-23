@@ -14,6 +14,7 @@ Usage::
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,6 +80,10 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     from the chirp-ui package. Automatically registers chirp-ui filters (bem,
     field_errors, html_attrs, validate_variant) so components render correctly.
 
+    Alpine.js is auto-enabled (chirp-ui components require it). Chirp is the
+    single authority for Alpine injection — the ``app_shell_layout.html`` does
+    not include its own Alpine scripts.
+
     When strict is None, uses app.config.debug. When True, invalid component
     variants log warnings during template render. When False, no validation.
 
@@ -87,6 +92,9 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     import chirp_ui
 
     from chirp.middleware.static import StaticFiles
+
+    if not app.config.alpine:
+        app.bind_config(replace(app.config, alpine=True))
 
     chirp_ui.register_filters(app)
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))

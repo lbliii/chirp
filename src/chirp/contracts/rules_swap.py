@@ -22,6 +22,10 @@ _HX_SELECT_COVERAGE_PATTERN = re.compile(
     r'hx-select\s*=|hx-disinherit\s*=\s*["\'][^"\']*\bhx-select\b',
     re.IGNORECASE,
 )
+_HX_OWN_SELECT_PATTERN = re.compile(r"hx-select\s*=", re.IGNORECASE)
+_HX_DISINHERIT_SELECT_PATTERN = re.compile(
+    r'hx-disinherit\s*=\s*["\'][^"\']*\bhx-select\b', re.IGNORECASE
+)
 _MUTATING_TAG_PATTERN = re.compile(
     r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\b(?:hx-(?:post|put|patch|delete)|action)\s*="
     r"\s*[\"'][^\"']*[\"'][^>]*)>",
@@ -35,6 +39,27 @@ _SSE_SWAP_TAG_PATTERN = re.compile(
 _SSE_CONNECT_TAG_PATTERN = re.compile(
     r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-connect\s*=\s*[\"'][^\"']+[\"'][^>]*)>",
     re.IGNORECASE,
+)
+
+_BROAD_CONTAINER_TAGS = frozenset(
+    {
+        "body",
+        "main",
+        "div",
+        "section",
+        "article",
+        "aside",
+        "nav",
+        "header",
+        "footer",
+        "form",
+        "details",
+        "dialog",
+        "fieldset",
+        "figure",
+        "hgroup",
+        "search",
+    }
 )
 
 
@@ -63,6 +88,8 @@ def _collect_broad_selects_map(
     for template_name, source in template_sources.items():
         for match in _TAG_WITH_SELECT_PATTERN.finditer(source):
             tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
             attrs = match.group("attrs")
             select = match.group("select")
             if "{{" in select or "{%" in select:
@@ -94,6 +121,8 @@ def collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
     for template_name, source in template_sources.items():
         for match in _TAG_WITH_TARGET_PATTERN.finditer(source):
             tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
             attrs = match.group("attrs")
             target = match.group("target")
             if "{{" in target or "{%" in target:
@@ -160,6 +189,39 @@ def check_swap_safety(
                         ),
                         template=template_name,
                         details=f"Inherited broad select(s): {selects_text}",
+                    )
+                )
+                break
+
+    # Second pass: forms with hx-disinherit="hx-select" but no own hx-select= are
+    # still vulnerable. hx-disinherit prevents children from inheriting, but the form
+    # itself still receives the inherited hx-select from its parent container.
+    if broad_selects_map:
+        for template_name, source in template_sources.items():
+            if template_name.startswith(("chirp/", "chirpui/")):
+                continue
+            ancestors = _extends_ancestors(template_name, template_sources)
+            if not any(a in broad_selects_map for a in ancestors):
+                continue
+            for match in _MUTATING_TAG_PATTERN.finditer(source):
+                attrs = match.group("attrs")
+                if not _HX_DISINHERIT_SELECT_PATTERN.search(attrs):
+                    continue
+                if _HX_OWN_SELECT_PATTERN.search(attrs):
+                    continue
+                if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs, re.IGNORECASE):
+                    continue
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="select_inheritance",
+                        message=(
+                            'Mutating element has hx-disinherit="hx-select" but no own '
+                            "hx-select attribute. hx-disinherit only prevents children from "
+                            "inheriting — the element itself still receives the inherited "
+                            'hx-select. Add hx-select="unset" on the element to override.'
+                        ),
+                        template=template_name,
                     )
                 )
                 break
