@@ -12,8 +12,10 @@ import sys
 from pathlib import Path
 
 from chirp.cli.templates import (
+    MIGRATIONS_README,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
+    PYPROJECT_TOML,
     SHELL_APP_PY,
     SHELL_CONTEXT_PY,
     SHELL_ITEMS_LAYOUT_HTML,
@@ -27,6 +29,7 @@ from chirp.cli.templates import (
     SSE_INDEX_HTML,
     STYLE_CSS,
     TEST_APP_PY,
+    THEME_CSS_STUB,
     V2_APP_CHIRPUI_PY,
     V2_APP_PY,
     V2_CONFTEST_PY,
@@ -58,12 +61,32 @@ def _has_chirpui() -> bool:
         return False
 
 
+def _write_scaffold_extras(project_dir: Path, name: str) -> None:
+    """pyproject.toml, migrations/, optional theme.css hook."""
+    (project_dir / "pyproject.toml").write_text(
+        PYPROJECT_TOML.format(name=name),
+        encoding="utf-8",
+    )
+    mig = project_dir / "migrations"
+    mig.mkdir(exist_ok=True)
+    (mig / ".gitkeep").write_text("", encoding="utf-8")
+    (mig / "README.md").write_text(MIGRATIONS_README, encoding="utf-8")
+
+
 def create_project(args: argparse.Namespace) -> None:
     """Generate a new chirp project directory.
 
     Creates the project at ``./<args.name>/`` relative to cwd.
     Refuses to overwrite an existing directory.
     """
+    if getattr(args, "with_chirpui", False) and not _has_chirpui():
+        print(
+            "Error: --with-chirpui requires chirp-ui "
+            "(pip install 'chirp[ui]' or chirp-ui)",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
     project_dir = Path(args.name)
 
     if project_dir.exists():
@@ -138,6 +161,9 @@ def _create_v2(project_dir: Path, name: str) -> None:
     (tests_dir / "conftest.py").write_text(V2_CONFTEST_PY)
     (tests_dir / "test_app.py").write_text(V2_TEST_APP_PY.format(name=name))
 
+    _write_scaffold_extras(project_dir, name)
+    (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+
 
 def _create_shell(project_dir: Path, name: str) -> None:
     """Generate project with persistent app shell (topbar, sidebar)."""
@@ -163,6 +189,9 @@ def _create_shell(project_dir: Path, name: str) -> None:
     (items_dir / "page.py").write_text(SHELL_ITEMS_PAGE_PY)
     (items_dir / "page.html").write_text(SHELL_ITEMS_PAGE_HTML)
 
+    _write_scaffold_extras(project_dir, name)
+    (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+
 
 def _create_minimal(project_dir: Path, name: str) -> None:
     """Generate the minimal project layout."""
@@ -171,6 +200,8 @@ def _create_minimal(project_dir: Path, name: str) -> None:
 
     (project_dir / "app.py").write_text(MINIMAL_APP_PY)
     (templates_dir / "index.html").write_text(MINIMAL_INDEX_HTML.format(name=name))
+
+    _write_scaffold_extras(project_dir, name)
 
 
 def _create_sse(project_dir: Path, name: str) -> None:
@@ -187,3 +218,5 @@ def _create_sse(project_dir: Path, name: str) -> None:
     (templates_dir / "index.html").write_text(SSE_INDEX_HTML)
     (static_dir / "style.css").write_text(STYLE_CSS.format(name=name))
     (tests_dir / "test_app.py").write_text(TEST_APP_PY.format(name=name))
+
+    _write_scaffold_extras(project_dir, name)

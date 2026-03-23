@@ -59,6 +59,15 @@ class TestChirpRun:
         kwargs = mock_server.call_args[1]
         assert kwargs["reload"] is True  # debug=True in fixture
 
+    @patch("chirp.server.dev.run_dev_server")
+    def test_dev_sets_browser_reload_config(
+        self, mock_server: MagicMock, fake_app: App
+    ) -> None:
+        """chirp dev enables AppConfig.dev_browser_reload on the resolved app."""
+        main(["dev", "_run_test_app:app"])
+        app_arg = mock_server.call_args[0][0]
+        assert app_arg.config.dev_browser_reload is True
+
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """run exits 1 with error message for bad import string."""
         with pytest.raises(SystemExit) as exc_info:

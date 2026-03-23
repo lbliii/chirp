@@ -62,6 +62,9 @@ class AppConfig:
     reload_include: tuple[str, ...] = (".html", ".css", ".md")
     reload_dirs: tuple[str, ...] = ()  # Extra directories to watch alongside cwd
 
+    # Browser refresh (debug): SSE endpoint + injected script; polls mtimes for reload_include
+    dev_browser_reload: bool = False
+
     # Security
     secret_key: str = ""
 

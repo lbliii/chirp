@@ -74,15 +74,21 @@ def _collect_builtin_middleware(
             )
         )
         middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
-    if config.debug:
-        from chirp.middleware.inject import HTMLInject, ViewTransitionCssDebugWarning
-        from chirp.middleware.layout_debug import LayoutDebugMiddleware
-        from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
+        if config.debug:
+            from chirp.middleware.inject import HTMLInject, ViewTransitionCssDebugWarning
+            from chirp.middleware.layout_debug import LayoutDebugMiddleware
+            from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
 
-        middleware_list.append(LayoutDebugMiddleware())
-        middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
-        if not config.view_transitions:
-            middleware_list.append(ViewTransitionCssDebugWarning())
+            middleware_list.append(LayoutDebugMiddleware())
+            middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
+            if not config.view_transitions:
+                middleware_list.append(ViewTransitionCssDebugWarning())
+            if config.dev_browser_reload:
+                from chirp.server.dev_browser_reload import DEV_BROWSER_RELOAD_SNIPPET
+
+                middleware_list.append(
+                    HTMLInject(DEV_BROWSER_RELOAD_SNIPPET, full_page_only=True),
+                )
     return middleware_list
 
 
@@ -149,6 +155,11 @@ class AppCompiler:
         if self._mutable.lazy_pages_dir is not None:
             self._registry.discover_and_register_pages(self._mutable.lazy_pages_dir)
             self._mutable.lazy_pages_dir = None
+
+        if self._config.debug and self._config.dev_browser_reload:
+            from chirp.server.dev_browser_reload import make_dev_reload_pending_route
+
+            self._mutable.pending_routes.append(make_dev_reload_pending_route(self._config))
 
         router = _compile_routes(
             self._mutable.pending_routes,

@@ -10,6 +10,48 @@ import argparse
 import sys
 
 
+def _add_server_run_args(p: argparse.ArgumentParser) -> None:
+    """Shared ``chirp run`` / ``chirp dev`` arguments."""
+    p.add_argument(
+        "app",
+        help="Import string (e.g. myapp:app)",
+    )
+    p.add_argument("--host", default=None, help="Bind host address")
+    p.add_argument("--port", type=int, default=None, help="Bind port number")
+    p.add_argument(
+        "--production",
+        action="store_true",
+        help="Run in production mode (multi-worker, all features enabled)",
+    )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker count (0=auto-detect, production only)",
+    )
+    p.add_argument(
+        "--metrics",
+        action="store_true",
+        help="Enable Prometheus /metrics endpoint",
+    )
+    p.add_argument(
+        "--rate-limit",
+        action="store_true",
+        help="Enable per-IP rate limiting",
+    )
+    p.add_argument(
+        "--queue",
+        action="store_true",
+        help="Enable request queueing",
+    )
+    p.add_argument(
+        "--sentry-dsn",
+        type=str,
+        default=None,
+        help="Sentry DSN for error tracking",
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point for the ``chirp`` command."""
     parser = argparse.ArgumentParser(
@@ -36,49 +78,22 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Generate project with persistent app shell (topbar, sidebar)",
     )
+    new_parser.add_argument(
+        "--with-chirpui",
+        action="store_true",
+        help="Require ChirpUI templates (fail if chirp-ui is not installed)",
+    )
 
     # -- chirp run --------------------------------------------------------
     run_parser = subparsers.add_parser("run", help="Start dev or production server")
-    run_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-    run_parser.add_argument("--host", default=None, help="Bind host address")
-    run_parser.add_argument("--port", type=int, default=None, help="Bind port number")
+    _add_server_run_args(run_parser)
 
-    # Production mode flags
-    run_parser.add_argument(
-        "--production",
-        action="store_true",
-        help="Run in production mode (multi-worker, all features enabled)",
+    # -- chirp dev --------------------------------------------------------
+    dev_parser = subparsers.add_parser(
+        "dev",
+        help="Development server with browser reload on template/CSS changes",
     )
-    run_parser.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="Worker count (0=auto-detect, production only)",
-    )
-    run_parser.add_argument(
-        "--metrics",
-        action="store_true",
-        help="Enable Prometheus /metrics endpoint",
-    )
-    run_parser.add_argument(
-        "--rate-limit",
-        action="store_true",
-        help="Enable per-IP rate limiting",
-    )
-    run_parser.add_argument(
-        "--queue",
-        action="store_true",
-        help="Enable request queueing",
-    )
-    run_parser.add_argument(
-        "--sentry-dsn",
-        type=str,
-        default=None,
-        help="Sentry DSN for error tracking",
-    )
+    _add_server_run_args(dev_parser)
 
     # -- chirp check ------------------------------------------------------
     check_parser = subparsers.add_parser("check", help="Validate hypermedia contracts")
@@ -112,6 +127,11 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "run":
         from chirp.cli._run import run_server
 
+        run_server(args)
+    elif args.command == "dev":
+        from chirp.cli._run import run_server
+
+        args.dev_browser_reload = True
         run_server(args)
     elif args.command == "check":
         from chirp.cli._check import run_check
