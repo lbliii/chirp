@@ -225,6 +225,12 @@ def _validate_shell_action_item(item: ShellAction, zone_name: str) -> None:
         if item.form_method.lower() != "post":
             msg = f"shell_actions.{zone_name} action {item.id!r}: only form_method='post' is supported"
             raise ValueError(msg)
+        if item.attrs:
+            msg = (
+                f"shell_actions.{zone_name} action {item.id!r}: "
+                "attrs is only valid for kind='link' or 'button'"
+            )
+            raise ValueError(msg)
         return
     if item.form_action is not None:
         msg = f"shell_actions.{zone_name} action {item.id!r}: form_action is only valid for kind='form'"

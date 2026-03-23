@@ -24,12 +24,18 @@ app.mount_pages(str(PAGES_DIR))
 
 @app.error(404)
 def not_found():
-    return Page("error.html", error_code="404", error_heading="", error_description=""), 404
+    return (
+        Page("error.html", "page_root", error_code="404", error_heading="", error_description=""),
+        404,
+    )
 
 
 @app.error(500)
 def server_error():
-    return Page("error.html", error_code="500", error_heading="", error_description=""), 500
+    return (
+        Page("error.html", "page_root", error_code="500", error_heading="", error_description=""),
+        500,
+    )
 
 
 if __name__ == "__main__":
