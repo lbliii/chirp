@@ -7,11 +7,14 @@ Useful for live-reload scripts, analytics, debug toolbars, or any
 markup that should appear on every page without modifying templates.
 """
 
+import logging
 from dataclasses import replace
 
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.middleware.protocol import AnyResponse, Next
+
+_LOG = logging.getLogger("chirp.middleware.inject")
 
 
 class HTMLInject:
@@ -75,3 +78,40 @@ class HTMLInject:
             body = body + self._snippet
 
         return replace(response, body=body)
+
+
+class ViewTransitionCssDebugWarning:
+    """Log when the response body uses View Transition CSS but VT injection is off.
+
+    Only runs in debug builds (see ``compiler._collect_builtin_middleware``).
+    Helps catch ``view-transition-name`` / ``@view-transition`` in templates while
+    ``AppConfig.view_transitions`` is ``False``, which disables HTMX global VT.
+    """
+
+    __slots__ = ()
+
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        response = await next(request)
+        if not isinstance(response, Response):
+            return response
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_fragment:
+            return response
+
+        body = response.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        lowered = body.lower()
+        if (
+            "@view-transition" in lowered
+            or "view-transition-name" in lowered
+            or "::view-transition" in lowered
+        ):
+            _LOG.warning(
+                "View Transition CSS detected in HTML but view_transitions is disabled — "
+                "HTMX navigations will not animate. Set AppConfig(view_transitions=True)."
+            )
+        return response

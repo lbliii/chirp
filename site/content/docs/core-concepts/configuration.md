@@ -43,7 +43,7 @@ app = App(config=config)
 | `static_url` | `str` | `"/static"` | URL prefix for static files |
 | `safe_target` | `bool` | `True` | Auto-add `hx-target="this"` to event-driven elements |
 | `sse_lifecycle` | `bool` | `True` | Inject SSE connection status (`data-sse-state`) and custom events |
-| `view_transitions` | `bool` | `False` | Auto-inject View Transitions API meta tag, CSS defaults, and htmx config |
+| `view_transitions` | `bool` | `True` | Auto-inject View Transitions API meta tag, CSS defaults, and htmx config |
 | `alpine` | `bool` | `False` | Enable Alpine.js script injection for local UI state |
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (unpkg CDN) |
 | `alpine_csp` | `bool` | `False` | Use CSP-safe Alpine build for strict Content-Security-Policy |

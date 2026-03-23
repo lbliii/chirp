@@ -75,12 +75,14 @@ def _collect_builtin_middleware(
         )
         middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
     if config.debug:
-        from chirp.middleware.inject import HTMLInject
+        from chirp.middleware.inject import HTMLInject, ViewTransitionCssDebugWarning
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
         from chirp.server.htmx_debug import HTMX_DEBUG_BOOT_SNIPPET
 
         middleware_list.append(LayoutDebugMiddleware())
         middleware_list.append(HTMLInject(HTMX_DEBUG_BOOT_SNIPPET))
+        if not config.view_transitions:
+            middleware_list.append(ViewTransitionCssDebugWarning())
     return middleware_list
 
 
