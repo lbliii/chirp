@@ -19,6 +19,9 @@
     tab: "chirp-debug-tab",
     flash: "chirp-debug-flash",
     inspector: "chirp-debug-inspector",
+    verbose: "chirp-debug-verbose",
+    pause: "chirp-debug-pause",
+    redactCurl: "chirp-debug-redact-curl",
   };
 
   // --- Helpers ---
@@ -67,6 +70,69 @@
     return lines.join("\n");
   }
 
+  function shellQuote(s) {
+    if (s == null) return "''";
+    return "'" + String(s).replace(/'/g, "'\\''") + "'";
+  }
+
+  function parseResponseHeaders(xhr) {
+    var raw = xhr.getAllResponseHeaders && xhr.getAllResponseHeaders();
+    if (!raw) return {};
+    var out = {};
+    raw.trim().split(/[\r\n]+/).forEach(function(line) {
+      var idx = line.indexOf(":");
+      if (idx === -1) return;
+      var name = line.slice(0, idx).trim().toLowerCase();
+      var val = line.slice(idx + 1).trim();
+      out[name] = val;
+    });
+    return out;
+  }
+
+  function filterHxAndChirpHeaders(rh) {
+    var list = [];
+    for (var k in rh) {
+      if (!Object.prototype.hasOwnProperty.call(rh, k)) continue;
+      if (k.indexOf("hx-") === 0 || k.indexOf("x-chirp-") === 0) {
+        list.push([k, rh[k]]);
+      }
+    }
+    list.sort(function(a, b) {
+      return a[0].localeCompare(b[0]);
+    });
+    return list;
+  }
+
+  function buildCurl(r) {
+    var path = r.path || "";
+    var url = window.location.origin + path;
+    if (state.redactCurl && url.indexOf("?") >= 0) {
+      url = url.split("?")[0];
+    }
+    var m = (r.method || "GET").toUpperCase();
+    var parts = ["curl", "-sS", "-i"];
+    if (m !== "GET") {
+      parts.push("-X", shellQuote(m));
+    }
+    if (r.requestHeaders && typeof r.requestHeaders === "object") {
+      for (var hk in r.requestHeaders) {
+        if (!Object.prototype.hasOwnProperty.call(r.requestHeaders, hk)) continue;
+        if (state.redactCurl && /^(cookie|authorization)$/i.test(hk)) continue;
+        parts.push("-H", shellQuote(hk + ": " + r.requestHeaders[hk]));
+      }
+    }
+    parts.push(shellQuote(url));
+    return parts.join(" ");
+  }
+
+  function firePlugin(name, arg) {
+    var ch = window.ChirpHtmxDebug;
+    if (!ch || typeof ch[name] !== "function") return;
+    try {
+      ch[name](arg);
+    } catch (e) {}
+  }
+
   // --- State ---
   var state = {
     open: false,
@@ -74,6 +140,8 @@
     tab: "activity",
     flash: true,
     inspector: false,
+    paused: false,
+    redactCurl: false,
     requestCount: 0,
     errorCount: 0,
     records: [],
@@ -94,6 +162,10 @@
       if (f !== null) state.flash = f === "true";
       var i = localStorage.getItem(STORAGE_KEYS.inspector);
       if (i !== null) state.inspector = i === "true";
+      var p = localStorage.getItem(STORAGE_KEYS.pause);
+      if (p !== null) state.paused = p === "true";
+      var rc = localStorage.getItem(STORAGE_KEYS.redactCurl);
+      if (rc !== null) state.redactCurl = rc === "true";
     } catch (e) {}
   }
 
@@ -104,8 +176,12 @@
       localStorage.setItem(STORAGE_KEYS.tab, state.tab);
       localStorage.setItem(STORAGE_KEYS.flash, String(state.flash));
       localStorage.setItem(STORAGE_KEYS.inspector, String(state.inspector));
+      localStorage.setItem(STORAGE_KEYS.pause, String(state.paused));
+      localStorage.setItem(STORAGE_KEYS.redactCurl, String(state.redactCurl));
     } catch (e) {}
   }
+
+  loadState();
 
   // --- Event Collector ---
   function findPendingRecord(hasSent, hasResponse) {
@@ -133,6 +209,14 @@
       elt: null,
       expanded: false,
       route: null,
+      layout: null,
+      requestId: null,
+      requestHeaders: null,
+      responseHeaders: null,
+      hxPairs: null,
+      renderIntent: "",
+      bodyPreview: "",
+      contentType: "",
     };
     state.records.unshift(r);
     if (state.records.length > BUFFER_SIZE) state.records.pop();
@@ -142,6 +226,7 @@
   }
 
   document.body.addEventListener("htmx:configRequest", function(evt) {
+    if (state.paused) return;
     var d = evt.detail || {};
     var r = createRecord();
     r.path = (d.pathInfo && d.pathInfo.requestPath) || "";
@@ -153,6 +238,19 @@
     ));
     r.elt = d.elt;
     r.timing.config = Date.now();
+    try {
+      r.requestHeaders = {};
+      if (d.headers && typeof d.headers === "object") {
+        for (var hk in d.headers) {
+          if (Object.prototype.hasOwnProperty.call(d.headers, hk)) {
+            r.requestHeaders[hk] = d.headers[hk];
+          }
+        }
+      }
+    } catch (e) {
+      r.requestHeaders = {};
+    }
+    firePlugin("onRequest", r);
   });
 
   document.body.addEventListener("htmx:beforeRequest", function(evt) {
@@ -183,6 +281,31 @@
           shellContext: xhr.getResponseHeader("X-Chirp-Shell-Context") || "",
         };
       }
+      var layoutChain = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Chain");
+      var layoutMatch = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Match");
+      var layoutMode = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Mode");
+      if (layoutChain || layoutMatch || layoutMode) {
+        r.layout = {
+          chain: layoutChain || "",
+          match: layoutMatch || "",
+          mode: layoutMode || "",
+        };
+      }
+      var reqId = xhr.getResponseHeader && xhr.getResponseHeader("X-Request-Id");
+      if (reqId) r.requestId = reqId;
+      var rh = parseResponseHeaders(xhr);
+      r.responseHeaders = rh;
+      r.contentType = rh["content-type"] || "";
+      r.renderIntent = rh["x-chirp-render-intent"] || "";
+      r.hxPairs = filterHxAndChirpHeaders(rh);
+      if (xhr.status >= 400 && xhr.responseText) {
+        var txt = String(xhr.responseText);
+        r.bodyPreview =
+          txt.length > 2048
+            ? txt.slice(0, 2048) + "\n… (truncated, " + txt.length + " bytes total)"
+            : txt;
+      }
+      firePlugin("onResponse", r);
     }
   });
 
@@ -263,6 +386,9 @@
       ".chirp-dbg-tab:hover{background:#252530}",
       ".chirp-dbg-tab.active{border-bottom-color:var(--chirp-info);color:var(--chirp-info)}",
       ".chirp-dbg-tab .badge{background:var(--chirp-error);color:var(--chirp-bg);border-radius:8px;padding:1px 5px;font-size:10px;margin-left:4px}",
+      ".chirp-dbg-help{padding:6px 16px;font-size:11px;color:#7c8396;border-bottom:1px solid #2a2e3a;background:#15161f;flex-shrink:0;line-height:1.4}",
+      ".chirp-dbg-help kbd{display:inline-block;padding:1px 5px;border:1px solid #444;border-radius:3px;background:#0d0e14;font-size:10px;color:#a9b1d6}",
+      ".chirp-dbg-layout-hint{font-size:11px;color:#7aa2f7;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
       ".chirp-dbg-panel{flex:1;overflow:auto;padding:16px}",
       ".chirp-dbg-log-row{padding:10px 12px;border-radius:4px;cursor:pointer;margin-bottom:4px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}",
       ".chirp-dbg-log-row:hover{background:#252530}",
@@ -361,6 +487,10 @@
 
     togglePill = document.createElement("div");
     togglePill.className = "chirp-dbg-pill";
+    togglePill.setAttribute(
+      "title",
+      "Chirp HTMX debug — Click to open drawer. Shortcuts: Ctrl+Shift+D toggle drawer, Ctrl+Shift+K inspector, Esc close."
+    );
     togglePill.innerHTML = "<span>HTMX</span><span class='chirp-dbg-badge'>0</span>";
     if (state.errorCount > 0) {
       var eb = document.createElement("span");
@@ -420,6 +550,18 @@
     });
     drawer.appendChild(tabs);
 
+    var helpBar = document.createElement("div");
+    helpBar.className = "chirp-dbg-help";
+    helpBar.innerHTML =
+      "<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> drawer · " +
+      "<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> inspector · " +
+      "<kbd>Esc</kbd> close · " +
+      "<label style='margin-left:8px;cursor:pointer'><input type='checkbox' id='chirp-dbg-verbose-cb' style='vertical-align:middle'> Verbose console</label> · " +
+      "<label style='cursor:pointer'><input type='checkbox' id='chirp-dbg-pause-cb' style='vertical-align:middle'> Pause capture</label> · " +
+      "<label style='cursor:pointer'><input type='checkbox' id='chirp-dbg-redact-cb' style='vertical-align:middle'> Redact curl</label> · " +
+      "<button type='button' id='chirp-dbg-export-btn' style='padding:2px 8px;font-size:11px;cursor:pointer;background:#333;border:1px solid #555;border-radius:4px;color:inherit'>Export JSON</button>";
+    drawer.appendChild(helpBar);
+
     activityPanel = document.createElement("div");
     activityPanel.className = "chirp-dbg-panel";
     activityPanel.style.display = state.tab === "activity" ? "block" : "none";
@@ -428,10 +570,11 @@
     inspectorPanel.className = "chirp-dbg-panel";
     inspectorPanel.style.display = state.tab === "inspector" ? "block" : "none";
     inspectorPanel.innerHTML =
-      "<p>Click 'Toggle Inspector' or press Ctrl+Shift+I to inspect element htmx attributes.</p>" +
+      "<p>Hover elements to preview inherited <code>hx-*</code>. Click to pin. " +
+      "Use <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> when the drawer is open (avoids browser DevTools on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>).</p>" +
       "<div class='chirp-dbg-filter' style='flex-direction:column;align-items:flex-start'>" +
       "<label><input type='checkbox' id='chirp-dbg-flash-cb'> Swap flash highlights</label>" +
-      "<button id='chirp-dbg-inspector-btn'>Toggle Inspector</button>" +
+      "<button id='chirp-dbg-inspector-btn' type='button'>Toggle Inspector</button>" +
       "</div>";
 
     errorsPanel = document.createElement("div");
@@ -454,6 +597,52 @@
         saveState();
       });
     }
+    try {
+      var verbCb = document.getElementById("chirp-dbg-verbose-cb");
+      if (verbCb) {
+        verbCb.checked = localStorage.getItem(STORAGE_KEYS.verbose) === "1";
+        verbCb.addEventListener("change", function() {
+          try {
+            localStorage.setItem(STORAGE_KEYS.verbose, verbCb.checked ? "1" : "0");
+          } catch (err) {}
+        });
+      }
+      var pauseCb = document.getElementById("chirp-dbg-pause-cb");
+      if (pauseCb) {
+        pauseCb.checked = state.paused;
+        pauseCb.addEventListener("change", function() {
+          state.paused = pauseCb.checked;
+          saveState();
+        });
+      }
+      var redactCb = document.getElementById("chirp-dbg-redact-cb");
+      if (redactCb) {
+        redactCb.checked = state.redactCurl;
+        redactCb.addEventListener("change", function() {
+          state.redactCurl = redactCb.checked;
+          saveState();
+        });
+      }
+      var exportBtn = document.getElementById("chirp-dbg-export-btn");
+      if (exportBtn) {
+        exportBtn.addEventListener("click", function() {
+          var payload = JSON.stringify(
+            { exportedAt: new Date().toISOString(), records: state.records, errors: state.errors },
+            null,
+            2
+          );
+          navigator.clipboard.writeText(payload).catch(function() {});
+          try {
+            var blob = new Blob([payload], { type: "application/json" });
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "chirp-htmx-debug-export.json";
+            a.click();
+            URL.revokeObjectURL(a.href);
+          } catch (err) {}
+        });
+      }
+    } catch (e) {}
 
     function renderTabs() {
       var ts = tabs.querySelectorAll(".chirp-dbg-tab");
@@ -521,23 +710,62 @@
 
     var lower = filterText.toLowerCase();
     var filtered = all.filter(function(r) {
-      if (filterErrorsOnly && !r.failed && r.status !== 500) return false;
-      if (lower && (r.path + r.method + (r.target || "")).toLowerCase().indexOf(lower) < 0) return false;
-      return true;
+      if (filterErrorsOnly) {
+        var isErr = r.failed || (r.status != null && r.status >= 400);
+        if (!isErr) return false;
+      }
+      if (!lower) return true;
+      var hay = (r.path || "") + (r.method || "") + (r.target || "") + (r.requestId || "");
+      if (r.layout) {
+        hay += (r.layout.chain || "") + (r.layout.match || "") + (r.layout.mode || "");
+      }
+      if (r.route) {
+        hay += (r.route.kind || "") + (r.route.section || "") + (r.route.meta || "");
+      }
+      if (r.renderIntent) hay += r.renderIntent;
+      return hay.toLowerCase().indexOf(lower) >= 0;
     });
 
     filtered.forEach(function(r) {
       var row = document.createElement("div");
       row.className = "chirp-dbg-log-row" + (r.expanded ? " expanded" : "");
       var statusColor = r.status === null ? "#666" : r.status >= 500 ? COLORS.error : r.status >= 400 ? COLORS.warning : r.status >= 300 ? COLORS.info : COLORS.success;
+      var t = r.timing || {};
+      var rtt = t.sent && t.response ? t.response - t.sent : null;
+      var swapMs = t.response && t.afterSwap ? t.afterSwap - t.response : null;
+      var settleMs = t.afterSwap && t.settle ? t.settle - t.afterSwap : null;
       var time = "";
-      if (r.timing && r.timing.sent && r.timing.response) time = (r.timing.response - r.timing.sent) + "ms";
-      else if (r.timing && r.timing.config) time = "--";
+      if (rtt != null) {
+        time = rtt + "ms";
+        if (swapMs != null) time += " · swap " + swapMs + "ms";
+        if (settleMs != null) time += " · settle " + settleMs + "ms";
+      } else if (t.config) time = "--";
+      var layoutHint = "";
+      if (r.layout) {
+        if (r.layout.mode) layoutHint = r.layout.mode;
+        if (r.layout.chain) {
+          var ch = r.layout.chain;
+          if (ch.length > 42) ch = ch.slice(0, 40) + "…";
+          layoutHint = layoutHint ? layoutHint + " · " + ch : ch;
+        }
+      }
       row.innerHTML =
         "<span class='method'>" + (r.isOob ? "[OOB]" : "[" + r.method + "]") + "</span>" +
         "<span class='path'>" + (r.path || "-") + "</span>" +
         "<span class='status' style='color:" + statusColor + "'>" + (r.status || "-") + "</span>" +
+        (r.renderIntent
+          ? "<span style='font-size:11px;color:#bb9af7;min-width:56px;flex-shrink:0' title='X-Chirp-Render-Intent'>" +
+              String(r.renderIntent).replace(/</g, "&lt;") +
+            "</span>"
+          : "<span style='min-width:0'></span>") +
         "<span class='time'>" + time + "</span>" +
+        (layoutHint
+          ? "<span class='chirp-dbg-layout-hint' title='" +
+              layoutHint.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") +
+              "'>" +
+              layoutHint.replace(/&/g, "&amp;").replace(/</g, "&lt;") +
+              "</span>"
+          : "") +
         "<span class='target'>" + (r.target ? "-> " + r.target + " " + r.swap : "") + "</span>";
       row.addEventListener("click", function() {
         r.expanded = !r.expanded;
@@ -547,9 +775,28 @@
         var detail = document.createElement("div");
         detail.className = "chirp-dbg-log-detail";
         var parts = ["Path: " + r.path, "Method: " + r.method, "Target: " + r.target, "Swap: " + r.swap];
+        if (r.requestId) parts.push("X-Request-Id: " + r.requestId);
         if (r.elt) parts.push("Trigger: " + desc(r.elt));
         if (r.timing) {
-          parts.push("Timing: config=" + (r.timing.config || "-") + " sent=" + (r.timing.sent || "-") + " response=" + (r.timing.response || "-") + " swap=" + (r.timing.afterSwap || "-") + " settle=" + (r.timing.settle || "-"));
+          var tm = r.timing;
+          parts.push(
+            "Timestamps (epoch ms): config=" + (tm.config || "-") + " sent=" + (tm.sent || "-") +
+              " response=" + (tm.response || "-") + " afterSwap=" + (tm.afterSwap || "-") + " settle=" + (tm.settle || "-")
+          );
+          if (tm.sent && tm.response) {
+            parts.push("RTT (sent→response): " + (tm.response - tm.sent) + "ms");
+          }
+          if (tm.response && tm.afterSwap) {
+            parts.push("Swap (response→afterSwap): " + (tm.afterSwap - tm.response) + "ms");
+          }
+          if (tm.afterSwap && tm.settle) {
+            parts.push("Settle (afterSwap→settle): " + (tm.settle - tm.afterSwap) + "ms");
+          }
+        }
+        if (r.layout) {
+          parts.push("Layout chain: " + (r.layout.chain || "(empty)"));
+          parts.push("Layout match: " + (r.layout.match || "(empty)"));
+          parts.push("Layout mode: " + (r.layout.mode || "(empty)"));
         }
         if (r.route) {
           parts.push("Route: kind=" + r.route.kind + " section=" + r.route.section);
@@ -558,12 +805,54 @@
           if (r.route.contextChain) parts.push("Context chain: " + r.route.contextChain);
           if (r.route.shellContext) parts.push("Shell context: " + r.route.shellContext);
         }
+        if (r.renderIntent) parts.push("Chirp render intent (X-Chirp-Render-Intent): " + r.renderIntent);
+        if (r.contentType) parts.push("Content-Type: " + r.contentType);
+        if (r.hxPairs && r.hxPairs.length) {
+          parts.push("HX / X-Chirp response headers:");
+          for (var hi = 0; hi < r.hxPairs.length; hi++) {
+            parts.push("  " + r.hxPairs[hi][0] + ": " + r.hxPairs[hi][1]);
+          }
+        }
+        if (r.bodyPreview) {
+          parts.push("Response body (preview, status >= 400):");
+          parts.push(r.bodyPreview);
+        }
+        var curlLine = buildCurl(r);
+        parts.push("Replay (approximate curl — uses captured request headers):");
+        parts.push(curlLine);
         if (r.elt) {
           var cfg = getEffectiveConfig(r.elt);
-          parts.push("Effective hx-*:\n" + formatConfig(cfg));
+          parts.push("Effective hx-* on trigger:\n" + formatConfig(cfg));
         }
         detail.textContent = parts.join("\n");
+        var btnRow = document.createElement("div");
+        btnRow.setAttribute("style", "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px");
+        var copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.textContent = "Copy details";
+        copyBtn.setAttribute(
+          "style",
+          "padding:4px 10px;background:#333;border:none;border-radius:4px;color:var(--chirp-text);cursor:pointer;font-size:12px"
+        );
+        copyBtn.addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          navigator.clipboard.writeText(detail.textContent || "").catch(function() {});
+        });
+        var curlBtn = document.createElement("button");
+        curlBtn.type = "button";
+        curlBtn.textContent = "Copy curl";
+        curlBtn.setAttribute(
+          "style",
+          "padding:4px 10px;background:#333;border:none;border-radius:4px;color:var(--chirp-text);cursor:pointer;font-size:12px"
+        );
+        curlBtn.addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          navigator.clipboard.writeText(curlLine).catch(function() {});
+        });
+        btnRow.appendChild(copyBtn);
+        btnRow.appendChild(curlBtn);
         row.appendChild(detail);
+        row.appendChild(btnRow);
       }
       activityPanel.appendChild(row);
     });
@@ -830,19 +1119,33 @@
       if (state.open) { state.open = false; drawer.classList.remove("open"); saveState(); e.preventDefault(); }
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "D") {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "d" || e.key === "D")) {
       e.preventDefault();
       renderPanel();
       toggleDrawer();
     }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "I") {
-      if (state.open) {
-        e.preventDefault();
-        renderPanel();
-        toggleInspector();
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      renderPanel();
+      if (!state.open) {
+        state.open = true;
+        if (drawer) drawer.classList.add("open");
+        saveState();
+        updatePill();
       }
+      toggleInspector();
     }
   });
+
+  // --- Public API (onRequest / onResponse hooks + helpers) ---
+  var CH = (window.ChirpHtmxDebug = window.ChirpHtmxDebug || {});
+  CH.version = 2;
+  CH.getState = function() {
+    return state;
+  };
+  CH.exportRecordsJson = function() {
+    return JSON.stringify({ records: state.records, errors: state.errors }, null, 2);
+  };
 
   // --- Boot ---
   function boot() {
@@ -857,5 +1160,9 @@
     boot();
   }
 
-  console.log("chirp htmx debug overlay active");
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.verbose) === "1") {
+      console.log("chirp htmx debug overlay active (verbose)");
+    }
+  } catch (err) {}
 })();

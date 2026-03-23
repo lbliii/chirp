@@ -30,6 +30,37 @@ def test_htmx_debug_js_parses_route_headers() -> None:
     assert "r.route" in HTMX_DEBUG_BOOT_JS
 
 
+def test_htmx_debug_js_parses_layout_headers() -> None:
+    """HTMX debug script captures X-Chirp-Layout-* from Chirp debug middleware."""
+    assert "X-Chirp-Layout-Chain" in HTMX_DEBUG_BOOT_JS
+    assert "X-Chirp-Layout-Match" in HTMX_DEBUG_BOOT_JS
+    assert "X-Chirp-Layout-Mode" in HTMX_DEBUG_BOOT_JS
+    assert "r.layout" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_enhanced_ui_strings() -> None:
+    """Tray exposes shortcuts, help strip, copy, and optional verbose logging."""
+    assert "chirp-dbg-help" in HTMX_DEBUG_BOOT_JS
+    assert "chirp-debug-verbose" in HTMX_DEBUG_BOOT_JS
+    assert "Copy details" in HTMX_DEBUG_BOOT_JS
+    assert "RTT (sent" in HTMX_DEBUG_BOOT_JS
+    assert "Layout chain:" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_s_tier_features() -> None:
+    """S-tier: render intent header, HX response parse, curl, export, hooks, error body."""
+    assert "x-chirp-render-intent" in HTMX_DEBUG_BOOT_JS
+    assert "parseResponseHeaders" in HTMX_DEBUG_BOOT_JS
+    assert "buildCurl" in HTMX_DEBUG_BOOT_JS
+    assert "ChirpHtmxDebug" in HTMX_DEBUG_BOOT_JS
+    assert "firePlugin" in HTMX_DEBUG_BOOT_JS
+    assert "bodyPreview" in HTMX_DEBUG_BOOT_JS
+    assert "Export JSON" in HTMX_DEBUG_BOOT_JS
+    assert "Pause capture" in HTMX_DEBUG_BOOT_JS
+    assert "Redact curl" in HTMX_DEBUG_BOOT_JS
+    assert "Copy curl" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_valid_syntax() -> None:
     """HTMX debug script is valid JavaScript (catches escaping/quote errors).
 
