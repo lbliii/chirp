@@ -111,7 +111,7 @@ def _render_composition(
         fragment_target_registry=fragment_target_registry,
         shell_region_updates=shell_updates,
     )
-    stash_render_debug_for_request(plan, request)
+    stash_render_debug_for_request(plan, request, debug=validate_blocks)
     _set_layout_debug_from_plan(plan, request)
     adapter = KidaAdapter(kida_env)
     rendered = execute_render_plan(

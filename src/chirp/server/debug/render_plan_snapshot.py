@@ -84,9 +84,18 @@ def serialize_render_plan_for_debug(plan: RenderPlan) -> dict[str, Any]:
     }
 
 
-def stash_render_debug_for_request(plan: RenderPlan, request: Request | None) -> None:
-    """Store render plan snapshot on the request for :func:`render_debug_page`."""
-    if request is None:
+def stash_render_debug_for_request(
+    plan: RenderPlan,
+    request: Request | None,
+    *,
+    debug: bool = False,
+) -> None:
+    """Store render plan snapshot on the request for :func:`render_debug_page`.
+
+    Only serializes when *debug* is True, avoiding repr/serialization
+    overhead in production.
+    """
+    if not debug or request is None:
         return
     request._cache[RENDER_DEBUG_CACHE_KEY] = serialize_render_plan_for_debug(plan)
 

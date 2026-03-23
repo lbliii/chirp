@@ -73,14 +73,16 @@ def _watch_roots(config: AppConfig) -> list[Path]:
     return out
 
 
+_SKIP_DIRS = frozenset((".git", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache"))
+
+
 def _iter_tracked_files(roots: list[Path], suffixes: tuple[str, ...]) -> list[Path]:
     files: list[Path] = []
     for root in roots:
-        files.extend(
-            p
-            for p in root.rglob("*")
-            if p.is_file() and p.suffix.lower() in suffixes
-        )
+        for suffix in suffixes:
+            for p in root.rglob(f"*{suffix}"):
+                if not any(part in _SKIP_DIRS for part in p.parts):
+                    files.append(p)
     return files
 
 
@@ -89,11 +91,9 @@ async def _reload_event_stream(
 ) -> AsyncIterator[SSEEvent]:
     """Yield SSE reload events when watched files change."""
     roots = _watch_roots(config)
-    suffixes = tuple(x.lower() for x in config.reload_include) if config.reload_include else (
-        ".html",
-        ".css",
-        ".md",
-    )
+    suffixes = tuple(x.lower() for x in config.reload_include)
+    if not suffixes:
+        return
     mtimes: dict[str, float] = {}
 
     while True:
