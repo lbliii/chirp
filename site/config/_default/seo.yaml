@@ -1,0 +1,47 @@
+# SEO + AI/discovery outputs (Bengal 0.2.6+)
+# ------------------------------------------
+# Explicitly enables the full post-build surface: per-page JSON + LLM text,
+# site-wide index.json, llm-full.txt, llms.txt, changelog.json, agent.json,
+# Lunr prebuild, Schema.org JSON-LD, and Content-Signals / robots alignment.
+#
+# Bengal core defaults omit per-page `llm_txt` and site-wide `llm_full`; this
+# file opts into the complete set used by modern docs sites.
+
+output_formats:
+  enabled: true
+  per_page:
+    - json
+    - llm_txt
+  site_wide:
+    - index_json
+    - llm_full
+    - llms_txt
+    - changelog
+    - agent_manifest
+  options:
+    excerpt_length: 200
+    json_indent: null
+    llm_separator_width: 80
+    include_full_content_in_index: false
+    include_chunks: true
+    include_plain_text: true
+    include_html_content: false
+    exclude_sections: []
+    exclude_patterns: ["404.html", "search.html"]
+
+structured_data:
+  article: true
+
+content_signals:
+  enabled: true
+  search: true
+  ai_input: true
+  ai_train: false
+  include_sitemap: true
+
+search:
+  lunr:
+    prebuilt: true
+
+link_previews:
+  enabled: true
