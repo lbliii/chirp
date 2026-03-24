@@ -82,14 +82,20 @@ def check_route_file_consistency(
     route_metas: dict[str, RouteMeta | None],
     page_route_paths: set[str],
     action_route_paths: set[str] | None = None,
+    meta_provider_paths: set[str] | None = None,
 ) -> list[ContractIssue]:
     """Info-level for page routes without _meta.py.
 
     Action routes (no sibling template, pure mutation handlers) are skipped
     because they render fragments rather than standalone pages and don't
     benefit from title/breadcrumb metadata.
+
+    Routes whose ``_meta.py`` defines ``meta()`` (dynamic metadata) register a
+    meta provider at discovery time with static ``meta`` left ``None``; those
+    paths are listed in *meta_provider_paths* and are treated as having metadata.
     """
-    skip = action_route_paths or set()
+    skip_action = action_route_paths or set()
+    skip_meta_provider = meta_provider_paths or set()
     return [
         ContractIssue(
             severity=Severity.INFO,
@@ -101,7 +107,9 @@ def check_route_file_consistency(
             route=path,
         )
         for path in page_route_paths
-        if path not in skip and (path not in route_metas or route_metas[path] is None)
+        if path not in skip_action
+        and path not in skip_meta_provider
+        and (path not in route_metas or route_metas[path] is None)
     ]
 
 
