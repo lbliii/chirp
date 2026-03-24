@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
