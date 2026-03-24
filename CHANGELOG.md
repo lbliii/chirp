@@ -7,13 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] — 2026-03-24
-
 ### Fixed
 
 - **Route contract** — `chirp check` no longer reports missing `_meta.py` for routes whose `_meta.py` defines only `meta()` (dynamic metadata). Those routes register a meta provider at discovery time; the checker now treats that as satisfying the route metadata contract.
-
-[0.2.1]: https://github.com/lbliii/chirp/releases/tag/v0.2.1
 
 ## [0.2.0] — 2026-03-23
 
