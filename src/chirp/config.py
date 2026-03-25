@@ -99,9 +99,11 @@ class AppConfig:
     # SSE lifecycle — data-sse-state attribute + chirp:sse:connected/disconnected events
     sse_lifecycle: bool = True
 
-    # View Transitions — meta tag, default CSS, htmx globalViewTransitions (default on).
-    # Set False for API-only apps or tests that need responses without injected head/body.
-    view_transitions: bool = True
+    # View Transitions — tiered opt-in for the View Transitions API.
+    #   False / "off"  — inject nothing (default)
+    #   True  / "htmx" — htmx globalViewTransitions only (baseline, all browsers)
+    #   "full"         — htmx JS + MPA CSS/meta (cross-document, no Firefox yet)
+    view_transitions: bool | str = False
 
     # Event delegation — copy-btn and compare-switch for SSE-swapped content
     delegation: bool = False

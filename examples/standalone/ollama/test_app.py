@@ -244,14 +244,15 @@ class TestMCPTools:
 
 
 class TestChatNonStreaming:
-    """Test the non-streaming chat path (stream toggle OFF)."""
+    """Test the non-streaming chat path (stream toggle OFF).
 
-    async def test_chat_returns_response(self, example_app, example_module) -> None:
-        fake_chat, state = _fake_chat_from(
-            _ollama_response(content="Hello! How can I help?"),
-        )
-        example_module.ollama_chat = fake_chat
+    The non-streaming path is a two-step flow:
+    1. POST /chat → user bubble + spinner (immediate feedback)
+    2. GET /chat/complete → assistant response (deferred)
+    """
 
+    async def test_chat_post_returns_pending(self, example_app) -> None:
+        """POST /chat without stream returns user bubble + spinner."""
         async with TestClient(example_app) as client:
             response = await client.fragment(
                 "/chat",
@@ -259,6 +260,20 @@ class TestChatNonStreaming:
                 body=b"message=Hello",
                 headers={"content-type": "application/x-www-form-urlencoded"},
             )
+            assert response.status == 200
+            assert "msg-user" in response.text
+            assert "Hello" in response.text
+            assert "/chat/complete" in response.text
+
+    async def test_chat_complete_returns_response(self, example_app, example_module) -> None:
+        fake_chat, state = _fake_chat_from(
+            _ollama_response(content="Hello! How can I help?"),
+        )
+        example_module.ollama_chat = fake_chat
+        example_module._append_history("user", "Hello")
+
+        async with TestClient(example_app) as client:
+            response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "Hello! How can I help?" in response.text
             assert state["count"] == 1
@@ -279,14 +294,10 @@ class TestChatNonStreaming:
             _ollama_response(content="It is currently 12:00 UTC."),
         )
         example_module.ollama_chat = fake_chat
+        example_module._append_history("user", "What time is it")
 
         async with TestClient(example_app) as client:
-            response = await client.fragment(
-                "/chat",
-                method="POST",
-                body=b"message=What+time+is+it",
-                headers={"content-type": "application/x-www-form-urlencoded"},
-            )
+            response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "12:00 UTC" in response.text
             assert state["count"] == 2
@@ -297,14 +308,10 @@ class TestChatNonStreaming:
             _ollama_response(content="2 + 2 = 4"),
         )
         example_module.ollama_chat = fake_chat
+        example_module._append_history("user", "What is 2 plus 2")
 
         async with TestClient(example_app) as client:
-            response = await client.fragment(
-                "/chat",
-                method="POST",
-                body=b"message=What+is+2+plus+2",
-                headers={"content-type": "application/x-www-form-urlencoded"},
-            )
+            response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "2 + 2 = 4" in response.text
             assert state["count"] == 2
@@ -328,14 +335,10 @@ class TestChatNonStreaming:
             return responses[idx]
 
         example_module.ollama_chat = fake_chat
+        example_module._append_history("user", "Remember this")
 
         async with TestClient(example_app) as client:
-            await client.fragment(
-                "/chat",
-                method="POST",
-                body=b"message=Remember+this",
-                headers={"content-type": "application/x-www-form-urlencoded"},
-            )
+            await client.fragment("/chat/complete")
 
         assert len(captured_messages) == 2
         second_call_msgs = captured_messages[1]
@@ -349,14 +352,10 @@ class TestChatNonStreaming:
             _ollama_response(content="It is noon."),
         )
         example_module.ollama_chat = fake_chat
+        example_module._append_history("user", "What time")
 
         async with TestClient(example_app) as client:
-            response = await client.fragment(
-                "/chat",
-                method="POST",
-                body=b"message=What+time",
-                headers={"content-type": "application/x-www-form-urlencoded"},
-            )
+            response = await client.fragment("/chat/complete")
             assert "get_current_time" in response.text
 
 
@@ -384,15 +383,8 @@ class TestChatStreaming:
             assert "/chat/stream" in response.text
             assert 'sse-close="done"' in response.text
 
-    async def test_stream_no_toggle_returns_full_response(
-        self, example_app, example_module
-    ) -> None:
-        """POST without stream field returns the complete response."""
-        fake_chat, _ = _fake_chat_from(
-            _ollama_response(content="Full response here."),
-        )
-        example_module.ollama_chat = fake_chat
-
+    async def test_stream_no_toggle_returns_pending(self, example_app) -> None:
+        """POST without stream field returns pending spinner, not SSE."""
         async with TestClient(example_app) as client:
             response = await client.fragment(
                 "/chat",
@@ -401,7 +393,8 @@ class TestChatStreaming:
                 headers={"content-type": "application/x-www-form-urlencoded"},
             )
             assert response.status == 200
-            assert "Full response here." in response.text
+            assert "msg-user" in response.text
+            assert "/chat/complete" in response.text
             assert "sse-connect" not in response.text
 
     async def test_chat_stream_endpoint_simple(self, example_app, example_module) -> None:
@@ -414,7 +407,7 @@ class TestChatStreaming:
         )
         example_module.ollama_chat = fake_chat
         # Phase 2: streaming delivers the actual tokens
-        example_module.ollama_chat_stream = _fake_stream("Hi ", "there!")
+        example_module.ollama_chat_stream = _fake_stream("Hello ", "world!")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=5)
@@ -422,8 +415,9 @@ class TestChatStreaming:
         assert result.status == 200
         fragments = [e for e in result.events if e.event == "fragment"]
         text = "".join(e.data for e in fragments)
-        assert "Hi " in text
-        assert "there!" in text
+        # SSE data fields strip trailing whitespace, so assert on content
+        assert "Hello" in text
+        assert "world!" in text
         done_events = [e for e in result.events if e.event == "done"]
         assert len(done_events) == 1
 

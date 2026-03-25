@@ -19,9 +19,8 @@
   </p>
 </div>
 
-<form method="post" action="/photos/{{ photo.id }}" style="margin-top: 1.5rem;">
+<form method="post" action="/photos/{{ photo.id }}/delete" style="margin-top: 1.5rem;">
   {{ csrf_field() }}
-  <input type="hidden" name="_method" value="DELETE">
   <button type="submit" style="background: #dc2626;">Delete photo</button>
 </form>
 {% endblock %}

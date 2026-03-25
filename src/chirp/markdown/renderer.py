@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from kida.template import Markup
+
 from chirp.markdown.errors import MarkdownNotInstalledError
 
 if TYPE_CHECKING:
@@ -35,18 +37,21 @@ class MarkdownRenderer:
     ) -> None:
         self._md: Markdown = _get_markdown(plugins=plugins, highlight=highlight)
 
-    def render(self, source: str) -> str:
+    def render(self, source: str) -> Markup:
         """Render Markdown source to an HTML string.
+
+        Returns ``Markup`` so kida's auto-escaping preserves the HTML
+        when the renderer is used as a template filter.
 
         Args:
             source: Raw Markdown text.
 
         Returns:
-            Rendered HTML.
+            Rendered HTML wrapped in ``Markup``.
         """
         if not source:
-            return ""
-        return self._md(source)
+            return Markup("")
+        return Markup(self._md(source))
 
 
 def _get_markdown(

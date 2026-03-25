@@ -145,6 +145,7 @@ class ViewTransitionCssDebugWarning:
         ):
             _LOG.warning(
                 "View Transition CSS detected in HTML but view_transitions is disabled — "
-                "HTMX navigations will not animate. Set AppConfig(view_transitions=True)."
+                "htmx navigations will not animate. Set AppConfig(view_transitions=True) "
+                "for htmx swap transitions, or 'full' for cross-document transitions."
             )
         return response

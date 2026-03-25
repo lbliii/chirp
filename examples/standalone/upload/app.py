@@ -211,7 +211,7 @@ def photo_detail(photo_id: int):
     return Template("detail.html", photo=photo)
 
 
-@app.route("/photos/{photo_id}", methods=["DELETE"])
+@app.route("/photos/{photo_id}/delete", methods=["POST"])
 def delete_photo_route(photo_id: int):
     """Delete a photo and its file."""
     photo = _delete_photo(photo_id)

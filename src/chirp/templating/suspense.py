@@ -71,8 +71,11 @@ def format_oob_script(block_html: str, target_id: str) -> str:
 
     Used for initial page loads where htmx OOB is not available.
     The inline script moves template content into the target element.
+
+    If the block's first child element has the same ``id`` as the target,
+    ``replaceWith`` is used (outerHTML-style) to avoid double-nesting.
+    Otherwise ``innerHTML`` replacement is used.
     """
-    # Escape the block HTML for safe embedding inside a <template>
     escaped_id = target_id.replace('"', "&quot;")
     template_id = f"_chirp_d_{target_id}"
     return (
@@ -80,8 +83,11 @@ def format_oob_script(block_html: str, target_id: str) -> str:
         f"<script>"
         f'(function(){{var t=document.getElementById("{template_id}"),'
         f'e=document.getElementById("{escaped_id}");'
-        f"if(t&&e){{e.innerHTML='';var c=t.content.cloneNode(true);"
-        f"e.appendChild(c);t.remove();}}}})();"
+        f"if(t&&e){{var c=t.content.cloneNode(true);"
+        f"var f=c.firstElementChild;"
+        f'if(f&&f.id==="{escaped_id}"){{e.replaceWith(c);}}'
+        f"else{{e.innerHTML='';e.appendChild(c);}}"
+        f"t.remove();}}}})();"
         f"</script>"
     )
 

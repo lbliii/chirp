@@ -158,24 +158,5 @@ def events():
     return EventStream(generate())
 
 
-# ---------------------------------------------------------------------------
-# Entry point — multi-worker Pounce for the full stack demo
-# ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
-    try:
-        from pounce import ServerConfig
-        from pounce.server import Server
-
-        app._ensure_frozen()
-        config = ServerConfig(host="127.0.0.1", port=8000, workers=4)
-        server = Server(config, app)
-        print("Weather Station Dashboard")
-        print("  http://127.0.0.1:8000")
-        print("  4 worker threads (free-threading)")
-        print()
-        server.run()
-    except ImportError:
-        # Pounce not installed — fall back to single-worker dev server
-        print("Weather Station Dashboard (single worker — install pounce for multi-worker)")
-        app.run()
+    app.run()

@@ -197,14 +197,18 @@ async def save_contact(request: Request, contact_id: int):
         return ("Contact not found", 404)
 
     contacts = _get_contacts()
-    return OOB(
-        Fragment("contacts.html", "contact_row", contact=updated),
-        Fragment(
-            "contacts.html",
-            "contact_count",
-            target="contact-count",
-            count=len(contacts),
+    return (
+        OOB(
+            Fragment("contacts.html", "contact_row", contact=updated),
+            Fragment(
+                "contacts.html",
+                "contact_count",
+                target="contact-count",
+                count=len(contacts),
+            ),
         ),
+        200,
+        {"HX-Push-Url": "/"},
     )
 
 

@@ -296,9 +296,15 @@
 
   {# --- Fragments: non-streaming mode --- #}
 
-  {% block chat_response %}
+  {% block chat_pending %}
   {% if (user_content ?? none) %}
   <div class="msg msg-user">{{ user_content }}</div>
+  <div class="spinner" hx-get="/chat/complete" hx-trigger="load" hx-target="this" hx-swap="outerHTML">Thinking</div>
+  {% end %}
+  {% end %}
+
+  {% block chat_response %}
+  {% if (assistant_content ?? none) %}
   {% if tools_used %}<div class="msg msg-tools">used: {{ tools_used | join(", ") }}</div>{% end %}
   <div class="msg msg-assistant prose">{{ assistant_content | markdown }}</div>
   {% end %}
@@ -309,12 +315,19 @@
   {% block stream_start %}
   {% if (user_content ?? none) %}
   <div class="msg msg-user">{{ user_content }}</div>
+  <div id="stream-tools"></div>
   <div class="msg-streaming"
        hx-ext="sse"
        sse-connect="/chat/stream"
        sse-swap="fragment"
        hx-swap="beforeend"
        sse-close="done"><span class="cursor"></span></div>
+  {% end %}
+  {% end %}
+
+  {% block stream_tools_used %}
+  {% if (tools_used ?? none) %}
+  <div class="msg msg-tools">used: {{ tools_used | join(", ") }}</div>
   {% end %}
   {% end %}
 
