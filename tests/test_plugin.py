@@ -3,7 +3,6 @@
 import pytest
 
 from chirp import App, AppConfig
-from chirp.plugin import ChirpPlugin
 
 
 class SimplePlugin:

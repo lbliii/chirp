@@ -82,7 +82,7 @@ def cache_view(ttl: int = 300, key_func: Callable[..., str] | None = None) -> Ca
             if key_func is not None:
                 cache_key = key_func(*args, **kwargs)
             else:
-                cache_key = f"chirp:view:{func.__module__}.{func.__qualname__}"
+                cache_key = f"chirp:view:{func.__module__}.{getattr(func, '__qualname__', getattr(func, '__name__', 'unknown'))}"
 
             try:
                 cached = await backend.get(cache_key)

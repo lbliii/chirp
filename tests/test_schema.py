@@ -1,7 +1,5 @@
 """Tests for schema migration system."""
 
-import pytest
-
 from chirp.data.schema.diff import diff_schemas
 from chirp.data.schema.generate import operation_to_sql
 from chirp.data.schema.operations import AddColumn, CreateTable, DropColumn, DropTable

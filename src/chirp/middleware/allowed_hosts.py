@@ -48,7 +48,7 @@ class AllowedHostsMiddleware:
         return False
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
-        host = request.headers.get("host", "")
+        host = request.headers.get("host", "") or ""
         if not self._is_valid_host(host):
             body = "Invalid HTTP_HOST header"
             if self._debug:

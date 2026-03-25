@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from chirp.i18n import get_locale, init_catalog, set_locale, t
+from chirp.i18n import get_locale, set_locale, t
 from chirp.i18n.catalog import MessageCatalog
 from chirp.i18n.detection import detect_from_cookie, detect_from_header, detect_from_url_prefix
-from chirp.i18n.formatting import format_date, format_number
+from chirp.i18n.formatting import format_number
 from chirp.i18n.middleware import LocaleMiddleware
 
 

@@ -11,10 +11,6 @@ def default_cache_key(request: Request) -> str:
     Format: ``chirp:{method}:{path}:{hash(vary_headers)}``
     """
     parts = [request.method, request.path]
-    # Include query string if present
-    qs = request.query_string
-    if qs:
-        parts.append(qs)
     raw = ":".join(parts)
     h = hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()[:12]
     return f"chirp:{request.method}:{request.path}:{h}"
