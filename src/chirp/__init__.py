@@ -63,6 +63,7 @@ CHIRP_CAPABILITIES = frozenset(
 __all__ = [
     "CHIRP_CAPABILITIES",
     "OOB",
+    "STOP_POLLING",
     "Action",
     "AnyResponse",
     "App",
@@ -127,6 +128,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Request": ("chirp.http.request", "Request"),
     "Response": ("chirp.http.response", "Response"),
     "Redirect": ("chirp.http.response", "Redirect"),
+    "STOP_POLLING": ("chirp.http.response", "STOP_POLLING"),
     "hx_redirect": ("chirp.http.response", "hx_redirect"),
     # Return types
     "Template": ("chirp.templating.returns", "Template"),

@@ -173,6 +173,83 @@ class TestRequestProperties:
         req = Request.from_asgi(_make_scope(), _make_receive())
         assert req.htmx_trigger_name is None
 
+    def test_is_history_restore_true(self) -> None:
+        scope = _make_scope(headers=[(b"hx-history-restore-request", b"true")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.is_history_restore is True
+
+    def test_is_history_restore_false(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.is_history_restore is False
+
+    # -- URI-AutoEncoded --
+
+    def test_htmx_target_uri_autoencoded(self) -> None:
+        scope = _make_scope(
+            headers=[
+                (b"hx-target", b"%23results%20panel"),
+                (b"hx-target-uri-autoencoded", b"true"),
+            ]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target == "#results panel"
+
+    def test_htmx_trigger_uri_autoencoded(self) -> None:
+        scope = _make_scope(
+            headers=[
+                (b"hx-trigger", b"btn%20%23click"),
+                (b"hx-trigger-uri-autoencoded", b"true"),
+            ]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_trigger == "btn #click"
+
+    def test_htmx_header_without_autoencoded_returns_raw(self) -> None:
+        scope = _make_scope(headers=[(b"hx-trigger", b"btn%20%23click")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_trigger == "btn%20%23click"
+
+    # -- HX-Current-URL --
+
+    def test_htmx_current_url(self) -> None:
+        scope = _make_scope(
+            headers=[(b"hx-current-url", b"http://localhost:8000/dashboard")]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_current_url == "http://localhost:8000/dashboard"
+
+    def test_htmx_current_url_missing(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.htmx_current_url is None
+
+    def test_htmx_current_url_abs_path_same_origin(self) -> None:
+        scope = _make_scope(
+            headers=[(b"hx-current-url", b"http://localhost:8000/dash?tab=users")]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_current_url_abs_path == "/dash?tab=users"
+
+    def test_htmx_current_url_abs_path_different_origin(self) -> None:
+        scope = _make_scope(
+            headers=[(b"hx-current-url", b"http://other:9000/page")]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_current_url_abs_path == "http://other:9000/page"
+
+    def test_htmx_current_url_abs_path_missing(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.htmx_current_url_abs_path is None
+
+    def test_htmx_current_url_uri_autoencoded(self) -> None:
+        scope = _make_scope(
+            headers=[
+                (b"hx-current-url", b"http://localhost:8000/search%3Fq%3Dhello"),
+                (b"hx-current-url-uri-autoencoded", b"true"),
+            ]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_current_url == "http://localhost:8000/search?q=hello"
+
     def test_content_type(self) -> None:
         scope = _make_scope(headers=[(b"content-type", b"application/json")])
         req = Request.from_asgi(scope, _make_receive())

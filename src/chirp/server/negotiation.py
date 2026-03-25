@@ -148,7 +148,13 @@ def _render_composition(
     validate_blocks: bool,
     oob_registry: OOBRegistry | None,
 ) -> Response:
-    """Shared 5-step pipeline: shell updates → plan → execute → serialize → response."""
+    """Shared 5-step pipeline: shell updates → plan → execute → serialize → response.
+
+    Sets ``Vary: HX-Request`` because the response varies depending on
+    whether the request is a full-page load or an htmx fragment request.
+    Without this, HTTP caches may serve a cached fragment to a full-page
+    request (or vice versa).
+    """
     shell_updates = compute_shell_region_updates(composition, request, fragment_target_registry)
     plan = build_render_plan(
         composition,
@@ -167,7 +173,7 @@ def _render_composition(
     )
     html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
     intent = "fragment" if plan.intent != "full_page" else "full_page"
-    return _html_response(html, intent=intent)
+    return _html_response(html, intent=intent).with_header("Vary", "HX-Request")
 
 
 def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:

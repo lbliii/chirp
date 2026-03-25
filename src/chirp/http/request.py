@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlparse
 
 from chirp._internal.asgi import Receive, Scope
 from chirp.http.cookies import parse_cookies
@@ -122,6 +123,20 @@ class Request:
 
     # -- Computed properties --
 
+    def _htmx_header(self, name: str) -> str | None:
+        """Read an htmx header, decoding URI-AutoEncoded values when present.
+
+        htmx may percent-encode header values and send a companion
+        ``{name}-URI-AutoEncoded: true`` header to signal this. When
+        present, the value is passed through ``urllib.parse.unquote()``.
+        """
+        value = self.headers.get(name)
+        if value is None:
+            return None
+        if self.headers.get(f"{name}-uri-autoencoded") == "true":
+            return unquote(value)
+        return value
+
     @property
     def is_fragment(self) -> bool:
         """True if this is an htmx fragment request (HX-Request header)."""
@@ -140,17 +155,47 @@ class Request:
     @property
     def htmx_target(self) -> str | None:
         """The target element ID from HX-Target header."""
-        return self.headers.get("hx-target")
+        return self._htmx_header("hx-target")
 
     @property
     def htmx_trigger(self) -> str | None:
         """The trigger element ID from HX-Trigger header."""
-        return self.headers.get("hx-trigger")
+        return self._htmx_header("hx-trigger")
 
     @property
     def htmx_trigger_name(self) -> str | None:
         """The name attribute of the trigger element (HX-Trigger-Name header)."""
-        return self.headers.get("hx-trigger-name")
+        return self._htmx_header("hx-trigger-name")
+
+    @property
+    def htmx_current_url(self) -> str | None:
+        """The browser's current URL from HX-Current-URL header."""
+        return self._htmx_header("hx-current-url")
+
+    @property
+    def htmx_current_url_abs_path(self) -> str | None:
+        """The path portion of the browser's current URL.
+
+        Strips scheme and host when the origin matches this request's
+        server, returning just the path (+ query + fragment). Returns
+        the full URL unchanged when the origin differs or server info
+        is unavailable.
+        """
+        url = self.htmx_current_url
+        if url is None:
+            return None
+        parsed = urlparse(url)
+        if self.server is not None:
+            host, port = self.server
+            request_host = f"{host}:{port}" if port not in (80, 443) else host
+            if parsed.netloc == request_host:
+                path = parsed.path
+                if parsed.query:
+                    path = f"{path}?{parsed.query}"
+                if parsed.fragment:
+                    path = f"{path}#{parsed.fragment}"
+                return path
+        return url
 
     @property
     def content_type(self) -> str | None:
