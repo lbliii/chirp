@@ -212,9 +212,7 @@ class TestRequestProperties:
     # -- HX-Current-URL --
 
     def test_htmx_current_url(self) -> None:
-        scope = _make_scope(
-            headers=[(b"hx-current-url", b"http://localhost:8000/dashboard")]
-        )
+        scope = _make_scope(headers=[(b"hx-current-url", b"http://localhost:8000/dashboard")])
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx_current_url == "http://localhost:8000/dashboard"
 
@@ -223,16 +221,12 @@ class TestRequestProperties:
         assert req.htmx_current_url is None
 
     def test_htmx_current_url_abs_path_same_origin(self) -> None:
-        scope = _make_scope(
-            headers=[(b"hx-current-url", b"http://localhost:8000/dash?tab=users")]
-        )
+        scope = _make_scope(headers=[(b"hx-current-url", b"http://localhost:8000/dash?tab=users")])
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx_current_url_abs_path == "/dash?tab=users"
 
     def test_htmx_current_url_abs_path_different_origin(self) -> None:
-        scope = _make_scope(
-            headers=[(b"hx-current-url", b"http://other:9000/page")]
-        )
+        scope = _make_scope(headers=[(b"hx-current-url", b"http://other:9000/page")])
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx_current_url_abs_path == "http://other:9000/page"
 
@@ -297,16 +291,12 @@ class TestRequestProperties:
         assert req.htmx.history_restore is True
 
     def test_htmx_details_current_url(self) -> None:
-        scope = _make_scope(
-            headers=[(b"hx-current-url", b"http://localhost:8000/page")]
-        )
+        scope = _make_scope(headers=[(b"hx-current-url", b"http://localhost:8000/page")])
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx.current_url == "http://localhost:8000/page"
 
     def test_htmx_details_current_url_abs_path(self) -> None:
-        scope = _make_scope(
-            headers=[(b"hx-current-url", b"http://localhost:8000/page?q=1")]
-        )
+        scope = _make_scope(headers=[(b"hx-current-url", b"http://localhost:8000/page?q=1")])
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx.current_url_abs_path == "/page?q=1"
 

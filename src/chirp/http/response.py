@@ -140,10 +140,15 @@ class Response:
             "event": event,
             "select": select,
         }
-        has_opts = any(v is not None for v in opts.values()) or values is not None or headers is not None
+        has_opts = (
+            any(v is not None for v in opts.values()) or values is not None or headers is not None
+        )
         if not has_opts:
             return self.with_header("HX-Location", url)
-        obj: dict[str, Any] = {"path": url, **{key: val for key, val in opts.items() if val is not None}}
+        obj: dict[str, Any] = {
+            "path": url,
+            **{key: val for key, val in opts.items() if val is not None},
+        }
         if values is not None:
             obj["values"] = values
         if headers is not None:
@@ -199,7 +204,7 @@ class Response:
                 else:
                     # Non-dict JSON (shouldn't happen, but be safe)
                     merged = {existing: True, **new_events}
-            except (json_module.JSONDecodeError, ValueError):
+            except json_module.JSONDecodeError, ValueError:
                 # Plain string event name
                 merged = {existing: True, **new_events}
             # Remove the old header, add the merged one
