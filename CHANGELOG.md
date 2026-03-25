@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Security middleware** — `AllowedHostsMiddleware` validates the `Host` header against a configurable allowlist, rejecting spoofed-host requests. `CSPNonceMiddleware` generates per-request `Content-Security-Policy` nonces accessible via `request.state["csp_nonce"]` and injected into templates.
-- **Caching framework** — `chirp.cache` with a `CacheBackend` protocol and three backends: `MemoryCache`, `NullCache`, and `RedisCache`. Includes `CacheMiddleware` for response caching, `cache_key()` helpers, and `Vary`-aware keying.
-- **Plugin system** — `ChirpPlugin` protocol and `app.install(plugin)` for distributing reusable middleware, routes, and template extensions as packages.
+- **Caching framework** — `chirp.cache` with a `CacheBackend` protocol and three backends: `MemoryCacheBackend`, `NullCacheBackend`, and `RedisCacheBackend`. Includes `CacheMiddleware` for response caching with a configurable key function, `default_cache_key()` / `vary_aware_cache_key()` helpers, and `Vary`-aware keying.
+- **Plugin system** — `ChirpPlugin` protocol and `app.mount(prefix, plugin)` for distributing reusable middleware, routes, and template extensions as packages.
 - **Schema migrations** — `chirp.data.schema` with introspection, diff, operation generation, and migration file output. `chirp makemigrations` CLI command auto-generates migration files from model changes.
-- **Internationalization** — `chirp.i18n` with message catalogs, locale detection middleware, number/date/currency formatting, and `_()` / `ngettext()` translation helpers wired into templates.
+- **Internationalization** — `chirp.i18n` with message catalogs, `LocaleMiddleware` for locale detection, number/date/currency formatting, and `t()` translation helpers wired into templates.
 - **CLI** — `chirp makemigrations` and `chirp security-check` subcommands.
 - **Vary contract rule** — `contracts.rules_vary` validates that responses include correct `Vary` headers when content depends on request headers.
 - **SECURITY.md** — Vulnerability reporting policy.
