@@ -78,9 +78,17 @@ def _resolve_fragment_block(
     *,
     fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> str:
-    """Resolve fragment block: explicit > registry > fallback."""
+    """Resolve fragment block: explicit > partial > registry > fallback."""
     if composition.fragment_block is not None:
         return composition.fragment_block
+    # htmx 4.0+: <htmx-partial> element name maps to a registered block
+    if request and fragment_target_registry:
+        htmx = getattr(request, "htmx", None)
+        partial_name = getattr(htmx, "partial", None) if htmx is not None else None
+        if partial_name:
+            config = fragment_target_registry.get(partial_name)
+            if config is not None:
+                return config.fragment_block
     if request and request.htmx_target and fragment_target_registry:
         config = fragment_target_registry.get(request.htmx_target)
         if config is not None:
