@@ -21,6 +21,22 @@ app.run()
 
 ---
 
+## Hypermedia-Native Python
+
+Chirp is a **hypermedia-native** web framework. Your routes return intent — `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — and the framework handles content negotiation, layout composition, and htmx awareness automatically. One template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No separate API layer. No client-side state. No serialization boundary.
+
+```python
+@app.route("/search")
+async def search(request: Request):
+    results = await db.search(request.query.get("q", ""))
+    return Page("search.html", "results", results=results)
+    # Full page for browsers. Fragment for htmx. Same template, same data.
+```
+
+Read the [Philosophy](docs/philosophy.md) for the full picture.
+
+---
+
 ## What is Chirp?
 
 Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Use plain Kida templates, your own CSS, or optional companion packages like `chirp-ui`. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
@@ -31,6 +47,7 @@ Chirp is a Python web framework built for the modern web platform: browser-nativ
 - **HTML over the wire** — Serve full pages, template fragments, streaming HTML, and SSE. Built for htmx and the modern browser.
 - **Streaming HTML** — Send the page shell first and fill in content as data becomes available. No loading spinners, no skeleton screens.
 - **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure.
+- **MCP tools** — Register functions as tools callable by LLMs and MCP clients, with a real-time event bus for agent activity dashboards.
 
 ## Use Chirp For
 
@@ -350,18 +367,15 @@ chirp check myapp:app --warnings-as-errors
 
 ## Key Ideas
 
-- **HTML over the wire.** Serve full pages, template fragments, streaming HTML, and
-  Server-Sent Events. Built for htmx and the modern browser.
-- **Kida built in.** Same author, no seam. Fragment rendering, streaming templates, and
-  filter registration are first-class features, not afterthoughts.
-- **Typed end-to-end.** Frozen config, frozen request, chainable response. Zero
-  `type: ignore` comments.
-- **Free-threading native.** Designed for Python 3.14t from the first line. Immutable data
-  structures, ContextVar isolation.
+- **Hypermedia-native.** The return type *is* the architecture. `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — the framework negotiates; the developer declares.
+- **One template, many modes.** A single template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No partials directory, no serialization layer.
 - **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
-  startup.
-- **UI is optional.** Build with plain templates and your own design system, or add
-  `chirp-ui` as a companion layer.
+  startup — routes, fragments, SSE structures, form actions.
+- **SSE over WebSockets.** Real-time updates over plain HTTP. Heartbeats, disconnect detection, error boundaries, and automatic cleanup built in.
+- **The browser is the framework.** `<dialog>`, `popover`, View Transitions, container queries. Let the browser do what the browser does.
+- **Free-threading native.** Designed for Python 3.14t from the first line. Frozen dataclasses, ContextVar isolation, thread-safe by construction.
+- **Kida built in.** Same author, no seam. Fragment rendering, streaming templates, and
+  filter registration are first-class features.
 - **Minimal dependencies.** `kida-templates` + `anyio` + `bengal-pounce`. Everything else is optional.
 
 ---
