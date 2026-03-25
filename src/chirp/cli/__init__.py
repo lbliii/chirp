@@ -114,6 +114,37 @@ def main(argv: list[str] | None = None) -> None:
         help="Import string (e.g. myapp:app)",
     )
 
+    # -- chirp security-check ---------------------------------------------
+    sec_parser = subparsers.add_parser(
+        "security-check",
+        help="Audit app config against OWASP security checklist",
+    )
+    sec_parser.add_argument(
+        "app",
+        help="Import string (e.g. myapp:app)",
+    )
+
+    # -- chirp makemigrations ---------------------------------------------
+    mig_parser = subparsers.add_parser(
+        "makemigrations",
+        help="Auto-generate schema migration from SQL diff",
+    )
+    mig_parser.add_argument(
+        "--db",
+        required=True,
+        help="Database URL (e.g. sqlite:///app.db)",
+    )
+    mig_parser.add_argument(
+        "--schema",
+        required=True,
+        help="Schema file path (SQL or Python with SCHEMA variable)",
+    )
+    mig_parser.add_argument(
+        "--migrations-dir",
+        default="migrations",
+        help="Output directory for migration files (default: migrations)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -141,3 +172,11 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._routes import run_routes
 
         run_routes(args)
+    elif args.command == "security-check":
+        from chirp.cli._security_check import run_security_check
+
+        run_security_check(args)
+    elif args.command == "makemigrations":
+        from chirp.cli._makemigrations import run_makemigrations
+
+        run_makemigrations(args)

@@ -67,6 +67,9 @@ class AppConfig:
 
     # Security
     secret_key: str = ""
+    allowed_hosts: tuple[str, ...] = ("*",)
+    csp_nonce_enabled: bool = False
+    strict_transport_security: str | None = None
 
     # Templates
     template_dir: str | Path = "templates"
@@ -165,6 +168,19 @@ class AppConfig:
     # TLS (optional)
     ssl_certfile: str | None = None
     ssl_keyfile: str | None = None
+
+    # Cache
+    cache_backend: str = "memory"
+    cache_default_ttl: int = 300
+    cache_middleware_enabled: bool = False
+
+    # Internationalization (i18n)
+    i18n_enabled: bool = False
+    i18n_default_locale: str = "en"
+    i18n_supported_locales: tuple[str, ...] = ("en",)
+    i18n_directory: str | Path = "locales"
+    i18n_cookie_name: str = "chirp_locale"
+    i18n_url_prefix: bool = False
 
     # Enterprise scale (12-factor, observability, shared state)
     env: str = "development"  # development | staging | production

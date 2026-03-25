@@ -60,6 +60,7 @@ def create_environment(
     config: AppConfig,
     filters: dict[str, Callable[..., Any]],
     globals_: dict[str, Any],
+    plugin_loaders: list | None = None,
 ) -> Environment:
     """Create a kida Environment from app configuration.
 
@@ -78,6 +79,10 @@ def create_environment(
 
     # Add chirp's built-in macros
     loaders.append(PackageLoader("chirp.templating", "macros"))
+
+    # Add plugin template loaders
+    if plugin_loaders:
+        loaders.extend(plugin_loaders)
 
     # Auto-detect chirp-ui if installed
     try:

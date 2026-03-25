@@ -20,6 +20,56 @@ def _collect_builtin_middleware(
     middleware_list: list,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
+    # AllowedHostsMiddleware — reject bad hosts first
+    from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
+
+    middleware_list.insert(0, AllowedHostsMiddleware(config.allowed_hosts, debug=config.debug))
+
+    # CacheMiddleware — site-wide GET caching (opt-in)
+    if config.cache_middleware_enabled:
+        from chirp.cache import create_backend
+        from chirp.cache.middleware import CacheMiddleware
+
+        backend = create_backend(config.cache_backend)
+        middleware_list.append(CacheMiddleware(backend, ttl=config.cache_default_ttl))
+
+    # LocaleMiddleware — i18n locale detection
+    if config.i18n_enabled:
+        from chirp.i18n.middleware import LocaleMiddleware
+
+        middleware_list.append(
+            LocaleMiddleware(
+                supported_locales=config.i18n_supported_locales,
+                default_locale=config.i18n_default_locale,
+                cookie_name=config.i18n_cookie_name,
+                url_prefix=config.i18n_url_prefix,
+            )
+        )
+
+    # CSP nonce middleware
+    if config.csp_nonce_enabled:
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        middleware_list.append(CSPNonceMiddleware())
+
+    # HSTS auto-enable in production with TLS
+    if (
+        config.env == "production"
+        and config.ssl_certfile
+        and not config.strict_transport_security
+    ):
+        # Auto-set HSTS — mutating config is not possible (frozen),
+        # so we add SecurityHeadersMiddleware with HSTS manually
+        from chirp.middleware.security_headers import (
+            SecurityHeadersConfig,
+            SecurityHeadersMiddleware,
+        )
+
+        sec_config = SecurityHeadersConfig(
+            strict_transport_security="max-age=63072000; includeSubDomains",
+        )
+        middleware_list.append(SecurityHeadersMiddleware(sec_config))
+
     if config.static_dir is not None:
         static_path = Path(config.static_dir).resolve()
         if static_path.is_dir():
@@ -180,6 +230,13 @@ class AppCompiler:
                 for name, func in mw_globals.items():
                     self._mutable.template_globals.setdefault(name, func)
 
+        # Register i18n template global if enabled
+        if self._config.i18n_enabled:
+            from chirp.i18n import init_catalog, t
+
+            init_catalog(str(self._config.i18n_directory))
+            self._mutable.template_globals.setdefault("t", t)
+
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env
             if self._mutable.template_filters:
@@ -191,6 +248,7 @@ class AppCompiler:
                 self._config,
                 self._mutable.template_filters,
                 self._mutable.template_globals,
+                plugin_loaders=self._mutable.plugin_loaders,
             )
 
         self._runtime.tool_registry = compile_tools(

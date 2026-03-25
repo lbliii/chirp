@@ -126,6 +126,11 @@ class AppRegistry:
         self._state.worker_shutdown_hooks.append(func)
         return func
 
+    def add_loader(self, loader: Any) -> None:
+        """Add a template loader (e.g., from a plugin)."""
+        self._ensure_mutable()
+        self._state.plugin_loaders.append(loader)
+
     def mount_pages(self, pages_dir: str | None, *, lazy_pages: bool) -> None:
         self._ensure_mutable()
         resolved = pages_dir or "pages"

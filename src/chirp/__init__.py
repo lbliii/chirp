@@ -69,6 +69,7 @@ __all__ = [
     "App",
     "AppConfig",
     "ChirpError",
+    "ChirpPlugin",
     "ConfigurationError",
     "EventStream",
     "FormAction",
@@ -102,10 +103,12 @@ __all__ = [
     "ToolCallEvent",
     "ValidationError",
     "ViewRef",
+    "cache_view",
     "form_from",
     "form_or_errors",
     "form_values",
     "g",
+    "get_cache",
     "get_request",
     "get_user",
     "hx_redirect",
@@ -186,6 +189,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
+    # Cache
+    "get_cache": ("chirp.cache", "get_cache"),
+    "cache_view": ("chirp.cache", "cache_view"),
+    # Plugin
+    "ChirpPlugin": ("chirp.plugin", "ChirpPlugin"),
     # Extensions
     "use_chirp_ui": ("chirp.ext.chirp_ui", "use_chirp_ui"),
 }

@@ -14,9 +14,11 @@ Built-in middleware:
     StaticFiles -- Serve static files from a directory
 """
 
+from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
+from chirp.middleware.csp_nonce import CSPNonceMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.inject import HTMLInject
 from chirp.middleware.protocol import Middleware, Next
@@ -27,12 +29,14 @@ from chirp.middleware.security_headers import (
 from chirp.middleware.static import StaticFiles
 
 __all__ = [
+    "AllowedHostsMiddleware",
     "AuthConfig",
     "AuthMiddleware",
     "AuthRateLimitConfig",
     "AuthRateLimitMiddleware",
     "CORSConfig",
     "CORSMiddleware",
+    "CSPNonceMiddleware",
     "CSRFConfig",
     "CSRFMiddleware",
     "HTMLInject",
