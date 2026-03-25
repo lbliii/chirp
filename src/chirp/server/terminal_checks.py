@@ -46,7 +46,7 @@ def _use_color(stream: object | None = None) -> bool:
     """True if the output stream supports ANSI color."""
     s = stream or sys.stderr
     try:
-        return s.isatty()  # type: ignore[union-attr]
+        return s.isatty()  # type: ignore[union-attr]  # ty: ignore[unresolved-attribute]
     except Exception:
         return False
 

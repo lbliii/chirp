@@ -182,6 +182,10 @@ exclude = ["dist/", "build/", "tests/"]
 # Only relax what produces genuine false positives.
 unused-ignore-comment = "warn" # Flag stale type: ignore for cleanup
 
+# Mapping.get override in Headers/QueryParams/FormData/LazyHeaders/LazyCookies
+# is intentional (str-only keys/values); LSP violation is accepted.
+invalid-method-override = "warn"
+
 # =============================================================================
 # Pytest
 # =============================================================================

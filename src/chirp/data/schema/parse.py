@@ -29,7 +29,9 @@ _REFERENCES_RE = re.compile(
 )
 
 
-def _parse_column_def(col_def: str, table_name: str) -> tuple[ColumnSchema | None, ForeignKey | None]:
+def _parse_column_def(
+    col_def: str, table_name: str
+) -> tuple[ColumnSchema | None, ForeignKey | None]:
     """Parse a single column definition."""
     col_def = col_def.strip()
     if not col_def:
@@ -55,7 +57,11 @@ def _parse_column_def(col_def: str, table_name: str) -> tuple[ColumnSchema | Non
 
     # Check for DEFAULT
     default = None
-    default_match = re.search(r"DEFAULT\s+(.+?)(?:\s+(?:NOT|NULL|PRIMARY|REFERENCES|UNIQUE|CHECK)|$)", col_def, re.IGNORECASE)
+    default_match = re.search(
+        r"DEFAULT\s+(.+?)(?:\s+(?:NOT|NULL|PRIMARY|REFERENCES|UNIQUE|CHECK)|$)",
+        col_def,
+        re.IGNORECASE,
+    )
     if default_match:
         default = default_match.group(1).strip().rstrip(",")
 

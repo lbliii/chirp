@@ -23,7 +23,7 @@ import anyio
 
 def _run_sync(func: Callable[..., Any], *args: Any) -> Any:
     """Run blocking call in anyio worker thread. Wrapper for ty compatibility."""
-    return anyio.to_thread.run_sync(func, *args)  # type: ignore[union-attr]
+    return anyio.to_thread.run_sync(func, *args)  # type: ignore[union-attr]  # ty: ignore[unresolved-attribute]
 
 
 class AsyncCursor:

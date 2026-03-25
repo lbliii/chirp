@@ -19,6 +19,7 @@ class SimplePlugin:
         @app.route(f"{prefix}/")
         async def plugin_index():
             from chirp.http.response import Response
+
             return Response("plugin works")
 
 
