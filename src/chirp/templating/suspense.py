@@ -84,7 +84,7 @@ def format_oob_script(block_html: str, target_id: str) -> str:
         f'(function(){{var t=document.getElementById("{template_id}"),'
         f'e=document.getElementById("{escaped_id}");'
         f"if(t&&e){{var c=t.content.cloneNode(true);"
-        f'var f=c.firstElementChild;'
+        f"var f=c.firstElementChild;"
         f'if(f&&f.id==="{escaped_id}"){{e.replaceWith(c);}}'
         f"else{{e.innerHTML='';e.appendChild(c);}}"
         f"t.remove();}}}})();"
