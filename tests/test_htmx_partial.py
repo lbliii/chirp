@@ -32,8 +32,7 @@ class TestExtractHtmxPartialSources:
 
     def test_multiple_partials(self):
         source = (
-            '<htmx-partial src="/header"></htmx-partial>'
-            '<htmx-partial src="/footer"></htmx-partial>'
+            '<htmx-partial src="/header"></htmx-partial><htmx-partial src="/footer"></htmx-partial>'
         )
         assert extract_htmx_partial_sources(source) == ["/header", "/footer"]
 

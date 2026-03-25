@@ -24,10 +24,6 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from chirp.routing.router import Router
 
 SpeculationRulesMode = str  # "off" | "conservative" | "moderate" | "eager"
 
@@ -60,7 +56,7 @@ def _route_to_href_pattern(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "*", path)
 
 
-def build_speculation_rules_json(router: Router, mode: SpeculationRulesMode) -> str:
+def build_speculation_rules_json(router: object, mode: SpeculationRulesMode) -> str:
     """Generate Speculation Rules JSON from the router.
 
     Returns empty string for ``"off"`` mode or when no eligible routes exist.
@@ -137,7 +133,7 @@ def build_speculation_rules_json(router: Router, mode: SpeculationRulesMode) -> 
     return json.dumps(rules, separators=(",", ":"))
 
 
-def build_speculation_rules_snippet(router: Router, mode: SpeculationRulesMode) -> str:
+def build_speculation_rules_snippet(router: object, mode: SpeculationRulesMode) -> str:
     """Build the full ``<script type="speculationrules">`` snippet.
 
     Returns empty string when mode is ``"off"`` or no rules are generated.
