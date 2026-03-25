@@ -59,8 +59,8 @@ FULL_PAGE = "<html><head><title>T</title></head><body><h1>Hi</h1></body></html>"
 
 
 class TestViewTransitionsInjection:
-    async def test_injects_by_default(self) -> None:
-        """Default AppConfig enables view transition injection."""
+    async def test_off_by_default(self) -> None:
+        """Default AppConfig does not inject view transitions."""
         app = App()
 
         @app.route("/")
@@ -70,8 +70,8 @@ class TestViewTransitionsInjection:
         async with TestClient(app) as client:
             response = await client.get("/")
             assert response.status == 200
-            assert 'name="view-transition"' in response.text
-            assert "globalViewTransitions" in response.text
+            assert "view-transition" not in response.text
+            assert "globalViewTransitions" not in response.text
 
     async def test_disabled_when_false(self) -> None:
         """view_transitions=False skips injection."""

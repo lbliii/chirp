@@ -22,7 +22,7 @@ navigations and htmx-driven SPA-style swaps.  Two snippets are injected:
   after the script (e.g., ``<script defer>``).
 
 Injected into full-page HTML responses via ``HTMLInject`` middleware.
-Controlled by ``AppConfig.view_transitions`` (default: ``True``; set ``False`` to disable).
+Controlled by ``AppConfig.view_transitions`` (default: ``False``; set ``True`` to enable).
 """
 
 VIEW_TRANSITIONS_CSS = """\

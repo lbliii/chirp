@@ -402,10 +402,13 @@ async def set_model(request: Request):
 async def post_chat(request: Request):
     """Handle a chat message.
 
-    When streaming is enabled (default), returns scaffolding HTML that
-    opens an SSE connection to ``/chat/stream`` for token-by-token
-    delivery. When streaming is off, runs the full agent loop and
-    returns the complete response in one fragment.
+    Both streaming and non-streaming paths return the user bubble
+    immediately so the form clears and the user sees their message
+    right away.
+
+    - **Streaming**: returns user bubble + SSE-connected streaming div.
+    - **Non-streaming**: returns user bubble + a spinner that triggers
+      ``GET /chat/complete`` on load to fetch the assistant response.
     """
     form = await request.form()
     user_message = (form.get("message") or "").strip()
@@ -417,11 +420,19 @@ async def post_chat(request: Request):
     _append_history("user", user_message)
 
     if streaming:
-        # Return scaffolding: user bubble + empty assistant bubble
-        # that connects to /chat/stream via SSE
         return Fragment("chat.html", "stream_start", user_content=user_message)
 
-    # --- Non-streaming path: full agent loop, return complete response ---
+    # Non-streaming: show user bubble + spinner immediately
+    return Fragment("chat.html", "chat_pending", user_content=user_message)
+
+
+@app.route("/chat/complete")
+async def chat_complete():
+    """Run the full agent loop and return the assistant response.
+
+    Called via ``hx-get`` from the spinner placed by the non-streaming
+    ``/chat`` POST. The spinner is replaced with the assistant bubble.
+    """
     client = _get_client()
     registry, ollama_tools = _prepare_agent()
 
@@ -454,7 +465,6 @@ async def post_chat(request: Request):
     return Fragment(
         "chat.html",
         "chat_response",
-        user_content=user_message,
         assistant_content=final_content,
         tools_used=tools_called,
     )
@@ -488,14 +498,24 @@ def chat_stream():
             # --- Phase 1: non-streaming tool rounds ---
             # consume_final=False discards the probe response so we can
             # re-ask with streaming enabled for true token-by-token UX.
+            tools_called: list[str] = []
             await _run_tool_rounds(
                 client,
                 messages,
                 registry,
                 ollama_tools,
-                on_tool_call=lambda name, args: None,  # activity panel handles display
+                on_tool_call=lambda name, _args: tools_called.append(name),
                 consume_final=False,
             )
+
+            # Show which tools were used (OOB swap into placeholder)
+            if tools_called:
+                yield Fragment(
+                    "chat.html",
+                    "stream_tools_used",
+                    target="stream-tools",
+                    tools_used=tools_called,
+                )
 
             # --- Phase 2: stream the final answer token-by-token ---
             # No tools parameter — model can only respond with text.
