@@ -41,6 +41,7 @@ from .rules_sse import (
     check_sse_self_swap,
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
+from .rules_vary import check_vary_coverage
 from .template_scan import (
     extract_fragment_island_ids,
     extract_href_references,
@@ -351,6 +352,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(
             check_island_mounts(template_sources, strict=snapshot.islands_contract_strict)
         )
+        result.issues.extend(check_vary_coverage(template_sources))
         for template_name, source in template_sources.items():
             if template_name.startswith(("chirp/", "chirpui/")):
                 continue

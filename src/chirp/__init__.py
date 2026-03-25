@@ -63,6 +63,7 @@ CHIRP_CAPABILITIES = frozenset(
 __all__ = [
     "CHIRP_CAPABILITIES",
     "OOB",
+    "STOP_POLLING",
     "Action",
     "AnyResponse",
     "App",
@@ -74,6 +75,7 @@ __all__ = [
     "FormBindingError",
     "Fragment",
     "HTTPError",
+    "HtmxDetails",
     "InlineTemplate",
     "LayoutPage",
     "MarkdownRenderer",
@@ -124,9 +126,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # HTTP
+    "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),
     "Response": ("chirp.http.response", "Response"),
     "Redirect": ("chirp.http.response", "Redirect"),
+    "STOP_POLLING": ("chirp.http.response", "STOP_POLLING"),
     "hx_redirect": ("chirp.http.response", "hx_redirect"),
     # Return types
     "Template": ("chirp.templating.returns", "Template"),

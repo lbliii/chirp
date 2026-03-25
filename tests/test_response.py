@@ -4,7 +4,14 @@ import json
 
 import pytest
 
-from chirp.http.response import JSONResponse, Redirect, Response, SSEResponse, hx_redirect
+from chirp.http.response import (
+    STOP_POLLING,
+    JSONResponse,
+    Redirect,
+    Response,
+    SSEResponse,
+    hx_redirect,
+)
 
 
 class TestResponse:
@@ -221,6 +228,137 @@ class TestHtmxResponseHeaders:
         assert r.header("HX-Retarget") == "#form-errors"
         assert r.header("HX-Reswap") == "innerHTML"
         assert r.header("HX-Trigger") == "validationFailed"
+
+    # -- Trigger merge semantics --
+
+    def test_hx_trigger_merge_two_strings(self) -> None:
+        r = Response().with_hx_trigger("a").with_hx_trigger("b")
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"a": True, "b": True}
+
+    def test_hx_trigger_merge_string_then_dict(self) -> None:
+        r = Response().with_hx_trigger("close").with_hx_trigger({"toast": {"msg": "ok"}})
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"close": True, "toast": {"msg": "ok"}}
+
+    def test_hx_trigger_merge_two_dicts(self) -> None:
+        r = Response().with_hx_trigger({"a": 1}).with_hx_trigger({"b": 2})
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"a": 1, "b": 2}
+
+    def test_hx_trigger_after_settle_merge(self) -> None:
+        r = Response().with_hx_trigger_after_settle("x").with_hx_trigger_after_settle("y")
+        obj = json.loads(r.header("HX-Trigger-After-Settle"))
+        assert obj == {"x": True, "y": True}
+
+    def test_hx_trigger_after_swap_merge(self) -> None:
+        r = Response().with_hx_trigger_after_swap("x").with_hx_trigger_after_swap("y")
+        obj = json.loads(r.header("HX-Trigger-After-Swap"))
+        assert obj == {"x": True, "y": True}
+
+    def test_hx_trigger_single_stays_plain_string(self) -> None:
+        r = Response().with_hx_trigger("single")
+        assert r.header("HX-Trigger") == "single"
+
+    def test_hx_trigger_single_dict_stays_json(self) -> None:
+        r = Response().with_hx_trigger({"evt": {"detail": 1}})
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"evt": {"detail": 1}}
+
+    def test_hx_trigger_merge_produces_single_header(self) -> None:
+        r = Response().with_hx_trigger("a").with_hx_trigger("b")
+        trigger_headers = [v for n, v in r.headers if n == "HX-Trigger"]
+        assert len(trigger_headers) == 1, "Should be exactly one HX-Trigger header"
+
+    # -- HX-Location full spec --
+
+    def test_hx_location_with_event(self) -> None:
+        r = Response().with_hx_location("/page", event="click")
+        obj = json.loads(r.header("HX-Location"))
+        assert obj["path"] == "/page"
+        assert obj["event"] == "click"
+
+    def test_hx_location_with_select(self) -> None:
+        r = Response().with_hx_location("/page", select="#content")
+        obj = json.loads(r.header("HX-Location"))
+        assert obj["select"] == "#content"
+
+    def test_hx_location_with_values(self) -> None:
+        r = Response().with_hx_location("/page", values={"key": "val"})
+        obj = json.loads(r.header("HX-Location"))
+        assert obj["values"] == {"key": "val"}
+
+    def test_hx_location_with_headers(self) -> None:
+        r = Response().with_hx_location("/page", headers={"X-Custom": "1"})
+        obj = json.loads(r.header("HX-Location"))
+        assert obj["headers"] == {"X-Custom": "1"}
+
+    def test_hx_location_full_spec(self) -> None:
+        r = Response().with_hx_location(
+            "/page",
+            target="#main",
+            swap="innerHTML",
+            source="#btn",
+            event="click",
+            select="#content",
+            values={"k": "v"},
+            headers={"X-A": "1"},
+        )
+        obj = json.loads(r.header("HX-Location"))
+        assert obj == {
+            "path": "/page",
+            "target": "#main",
+            "swap": "innerHTML",
+            "source": "#btn",
+            "event": "click",
+            "select": "#content",
+            "values": {"k": "v"},
+            "headers": {"X-A": "1"},
+        }
+
+    # -- Stop polling --
+
+    def test_hx_stop_polling(self) -> None:
+        r = Response().with_hx_stop_polling()
+        assert r.status == 286
+
+    def test_stop_polling_constant(self) -> None:
+        assert STOP_POLLING == 286
+
+    # -- with_hx_triggers (plural) --
+
+    def test_hx_triggers_plural(self) -> None:
+        r = Response().with_hx_triggers(closeModal=True, showToast={"msg": "ok"})
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"closeModal": True, "showToast": {"msg": "ok"}}
+
+    def test_hx_triggers_merges_with_existing(self) -> None:
+        r = Response().with_hx_trigger("a").with_hx_triggers(b=True, c=2)
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"a": True, "b": True, "c": 2}
+
+    # -- with_vary --
+
+    def test_vary_single(self) -> None:
+        r = Response().with_vary("HX-Request")
+        assert r.header("Vary") == "HX-Request"
+
+    def test_vary_append(self) -> None:
+        r = Response().with_vary("Origin").with_vary("HX-Request")
+        assert r.header("Vary") == "HX-Request, Origin"
+
+    def test_vary_no_duplicates(self) -> None:
+        r = Response().with_vary("Origin").with_vary("Origin")
+        assert r.header("Vary") == "Origin"
+
+    def test_vary_multiple_at_once(self) -> None:
+        r = Response().with_vary("Origin", "HX-Request")
+        assert r.header("Vary") == "HX-Request, Origin"
+
+    def test_vary_single_header(self) -> None:
+        r = Response().with_vary("Origin").with_vary("HX-Request")
+        vary_headers = [v for n, v in r.headers if n == "Vary"]
+        assert len(vary_headers) == 1, "Should be exactly one Vary header"
 
     def test_immutability_preserved(self) -> None:
         r1 = Response(body="ok")

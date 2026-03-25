@@ -90,6 +90,37 @@ class TestNegotiateTemplateTypes:
         )
         assert result.render_intent == "fragment"
 
+    def test_page_sets_vary_hx_request_on_fragment(self, kida_env: Environment) -> None:
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/",
+                "headers": [(b"hx-request", b"true")],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+        result = negotiate(
+            Page("search.html", "results_list", results=["one"]),
+            kida_env=kida_env,
+            request=request,
+        )
+        assert result.header("Vary") == "HX-Request"
+
+    def test_page_sets_vary_hx_request_on_full_page(self, kida_env: Environment) -> None:
+        result = negotiate(
+            Page("search.html", "results_list", results=["one"]),
+            kida_env=kida_env,
+        )
+        assert result.header("Vary") == "HX-Request"
+
     def test_page_composition_renders_fragment(self, kida_env: Environment) -> None:
         async def _receive():
             return {"type": "http.request", "body": b"", "more_body": False}

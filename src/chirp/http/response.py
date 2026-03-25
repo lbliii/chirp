@@ -13,6 +13,9 @@ from chirp.http.cookies import SetCookie
 
 type RenderIntent = Literal["unknown", "full_page", "fragment"]
 
+STOP_POLLING: int = 286
+"""HTTP status code that tells htmx to stop polling (htmx extension)."""
+
 
 @dataclass(frozen=True, slots=True)
 class Response:
@@ -38,6 +41,27 @@ class Response:
     def with_header(self, name: str, value: str) -> Response:
         """Return a new Response with an additional header."""
         return replace(self, headers=(*self.headers, (name, value)))
+
+    def with_vary(self, *fields: str) -> Response:
+        """Append field(s) to the ``Vary`` header without duplicating values.
+
+        Merges with any existing ``Vary`` header so that CORS
+        (``Vary: Origin``) and content negotiation (``Vary: HX-Request``)
+        compose correctly.
+        """
+        existing = self.header("Vary")
+        current: set[str] = set()
+        if existing:
+            current = {v.strip() for v in existing.split(",")}
+        new_fields = [f for f in fields if f not in current]
+        if not new_fields and existing:
+            return self
+        merged = ", ".join(sorted(current | set(fields)))
+        # Replace existing Vary header if present
+        if existing is not None:
+            filtered = tuple((n, v) for n, v in self.headers if n.lower() != "vary")
+            return replace(self, headers=(*filtered, ("Vary", merged)))
+        return self.with_header("Vary", merged)
 
     def with_headers(self, headers: Mapping[str, str]) -> Response:
         """Return a new Response with additional headers."""
@@ -98,22 +122,37 @@ class Response:
         target: str | None = None,
         swap: str | None = None,
         source: str | None = None,
+        event: str | None = None,
+        select: str | None = None,
+        values: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Response:
         """Tell htmx to navigate via AJAX (like clicking a boosted link).
 
         When only *url* is provided, sets ``HX-Location`` to the plain
-        URL string.  When *target*, *swap*, or *source* are given, sets
-        the header to a JSON object with the specified fields.
+        URL string.  When any extra option is given, sets the header to
+        a JSON object per the htmx ``HX-Location`` spec.
         """
-        if target is None and swap is None and source is None:
+        opts: dict[str, str | None | dict[str, Any]] = {
+            "target": target,
+            "swap": swap,
+            "source": source,
+            "event": event,
+            "select": select,
+        }
+        has_opts = (
+            any(v is not None for v in opts.values()) or values is not None or headers is not None
+        )
+        if not has_opts:
             return self.with_header("HX-Location", url)
-        obj: dict[str, str] = {"path": url}
-        if target is not None:
-            obj["target"] = target
-        if swap is not None:
-            obj["swap"] = swap
-        if source is not None:
-            obj["source"] = source
+        obj: dict[str, Any] = {
+            "path": url,
+            **{key: val for key, val in opts.items() if val is not None},
+        }
+        if values is not None:
+            obj["values"] = values
+        if headers is not None:
+            obj["headers"] = headers
         return self.with_header("HX-Location", json_module.dumps(obj))
 
     def with_hx_retarget(self, selector: str) -> Response:
@@ -141,6 +180,42 @@ class Response:
         """
         return self.with_header("HX-Reselect", selector)
 
+    def _merge_hx_trigger(self, header_name: str, event: str | dict[str, Any]) -> Response:
+        """Merge an event into an ``HX-Trigger*`` header.
+
+        Multiple calls are merged into a single JSON object so that all
+        events travel in one header value. A plain string event ``"foo"``
+        becomes ``{"foo": true}`` during merge; a dict is merged directly.
+        """
+        # Build the new events dict from the incoming event
+        if isinstance(event, str):
+            new_events: dict[str, Any] = {event: True}
+        else:
+            new_events = dict(event)
+
+        # Check for an existing header value to merge with
+        existing = self.header(header_name)
+        if existing is not None:
+            # Parse existing: could be plain string "evt" or JSON {"evt": {...}}
+            try:
+                parsed = json_module.loads(existing)
+                if isinstance(parsed, dict):
+                    merged = {**parsed, **new_events}
+                else:
+                    # Non-dict JSON (shouldn't happen, but be safe)
+                    merged = {existing: True, **new_events}
+            except json_module.JSONDecodeError, ValueError:
+                # Plain string event name
+                merged = {existing: True, **new_events}
+            # Remove the old header, add the merged one
+            filtered = tuple((n, v) for n, v in self.headers if n.lower() != header_name.lower())
+            return replace(self, headers=(*filtered, (header_name, json_module.dumps(merged))))
+
+        # No existing header — single event can stay as plain string
+        if isinstance(event, str):
+            return self.with_header(header_name, event)
+        return self.with_header(header_name, json_module.dumps(event))
+
     def with_hx_trigger(self, event: str | dict[str, Any]) -> Response:
         """Trigger a client-side event after the response is received.
 
@@ -149,25 +224,40 @@ class Response:
 
             .with_hx_trigger("closeModal")
             .with_hx_trigger({"showToast": {"message": "Saved!"}})
+
+        Multiple calls are merged into a single JSON header::
+
+            .with_hx_trigger("a").with_hx_trigger("b")
+            # -> HX-Trigger: {"a": true, "b": true}
         """
-        value = event if isinstance(event, str) else json_module.dumps(event)
-        return self.with_header("HX-Trigger", value)
+        return self._merge_hx_trigger("HX-Trigger", event)
 
     def with_hx_trigger_after_settle(self, event: str | dict[str, Any]) -> Response:
         """Trigger a client-side event after the settle step.
 
         Sets the ``HX-Trigger-After-Settle`` response header.
+        Multiple calls are merged into a single JSON header.
         """
-        value = event if isinstance(event, str) else json_module.dumps(event)
-        return self.with_header("HX-Trigger-After-Settle", value)
+        return self._merge_hx_trigger("HX-Trigger-After-Settle", event)
 
     def with_hx_trigger_after_swap(self, event: str | dict[str, Any]) -> Response:
         """Trigger a client-side event after the swap step.
 
         Sets the ``HX-Trigger-After-Swap`` response header.
+        Multiple calls are merged into a single JSON header.
         """
-        value = event if isinstance(event, str) else json_module.dumps(event)
-        return self.with_header("HX-Trigger-After-Swap", value)
+        return self._merge_hx_trigger("HX-Trigger-After-Swap", event)
+
+    def with_hx_triggers(self, **events: Any) -> Response:
+        """Set multiple ``HX-Trigger`` events in a single call.
+
+        Each keyword argument becomes an event name. Values are payloads
+        (use ``True`` for events with no data)::
+
+            .with_hx_triggers(closeModal=True, showToast={"message": "Saved!"})
+            # -> HX-Trigger: {"closeModal": true, "showToast": {"message": "Saved!"}}
+        """
+        return self._merge_hx_trigger("HX-Trigger", events)
 
     def with_hx_push_url(self, url: str | bool) -> Response:
         """Push a URL into the browser history stack.
@@ -193,6 +283,13 @@ class Response:
         Sets ``HX-Refresh: true``.
         """
         return self.with_header("HX-Refresh", "true")
+
+    def with_hx_stop_polling(self) -> Response:
+        """Tell htmx to stop polling this endpoint.
+
+        Sets the response status to 286 (``STOP_POLLING``).
+        """
+        return self.with_status(STOP_POLLING)
 
     # -- Header lookup --
 
@@ -412,6 +509,10 @@ class SSEResponse:
         target: str | None = None,
         swap: str | None = None,
         source: str | None = None,
+        event: str | None = None,
+        select: str | None = None,
+        values: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> SSEResponse:
         """No-op: SSE streams cannot set HX-Location."""
         return self
@@ -450,4 +551,16 @@ class SSEResponse:
 
     def with_hx_refresh(self) -> SSEResponse:
         """No-op: SSE streams cannot set HX-Refresh."""
+        return self
+
+    def with_hx_stop_polling(self) -> SSEResponse:
+        """No-op: SSE streams cannot stop polling."""
+        return self
+
+    def with_hx_triggers(self, **events: Any) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Trigger."""
+        return self
+
+    def with_vary(self, *fields: str) -> SSEResponse:
+        """No-op: SSE headers are fixed by the protocol handler."""
         return self
