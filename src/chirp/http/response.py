@@ -143,10 +143,7 @@ class Response:
         has_opts = any(v is not None for v in opts.values()) or values is not None or headers is not None
         if not has_opts:
             return self.with_header("HX-Location", url)
-        obj: dict[str, Any] = {"path": url}
-        for key, val in opts.items():
-            if val is not None:
-                obj[key] = val
+        obj: dict[str, Any] = {"path": url, **{key: val for key, val in opts.items() if val is not None}}
         if values is not None:
             obj["values"] = values
         if headers is not None:

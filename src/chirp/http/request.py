@@ -30,10 +30,14 @@ class HtmxDetails:
 
     __slots__ = ("_cache", "_headers", "_server")
 
+    _headers: Headers
+    _server: tuple[str, int] | None
+    _cache: dict[str, str | None]
+
     def __init__(self, headers: Headers, server: tuple[str, int] | None) -> None:
-        object.__setattr__(self, "_headers", headers)
-        object.__setattr__(self, "_server", server)
-        object.__setattr__(self, "_cache", {})
+        self._headers = headers
+        self._server = server
+        self._cache = {}
 
     def __bool__(self) -> bool:
         """True if this is an htmx request (HX-Request header is present)."""

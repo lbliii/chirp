@@ -4,7 +4,14 @@ import json
 
 import pytest
 
-from chirp.http.response import JSONResponse, Redirect, Response, SSEResponse, STOP_POLLING, hx_redirect
+from chirp.http.response import (
+    STOP_POLLING,
+    JSONResponse,
+    Redirect,
+    Response,
+    SSEResponse,
+    hx_redirect,
+)
 
 
 class TestResponse:
