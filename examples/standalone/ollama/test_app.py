@@ -407,7 +407,7 @@ class TestChatStreaming:
         )
         example_module.ollama_chat = fake_chat
         # Phase 2: streaming delivers the actual tokens
-        example_module.ollama_chat_stream = _fake_stream("Hi ", "there!")
+        example_module.ollama_chat_stream = _fake_stream("Hello ", "world!")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=5)
@@ -415,8 +415,9 @@ class TestChatStreaming:
         assert result.status == 200
         fragments = [e for e in result.events if e.event == "fragment"]
         text = "".join(e.data for e in fragments)
-        assert "Hi " in text
-        assert "there!" in text
+        # SSE data fields strip trailing whitespace, so assert on content
+        assert "Hello" in text
+        assert "world!" in text
         done_events = [e for e in result.events if e.event == "done"]
         assert len(done_events) == 1
 
