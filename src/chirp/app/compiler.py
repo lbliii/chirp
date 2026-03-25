@@ -105,12 +105,17 @@ def _collect_builtin_middleware(
         middleware_list.append(
             HTMLInject(islands_snippet(config.islands_version), full_page_only=True)
         )
-    if config.view_transitions:
+    from chirp.server.view_transitions import normalize_view_transitions
+
+    vt_mode = normalize_view_transitions(config.view_transitions)
+    if vt_mode in ("htmx", "full"):
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.view_transitions import (
-            VIEW_TRANSITIONS_HEAD_SNIPPET,
-            VIEW_TRANSITIONS_SCRIPT_SNIPPET,
-        )
+        from chirp.server.view_transitions import VIEW_TRANSITIONS_SCRIPT_SNIPPET
+
+        middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
+    if vt_mode == "full":
+        from chirp.middleware.inject import HTMLInject
+        from chirp.server.view_transitions import VIEW_TRANSITIONS_HEAD_SNIPPET
 
         middleware_list.append(
             HTMLInject(
@@ -119,7 +124,6 @@ def _collect_builtin_middleware(
                 full_page_only=True,
             )
         )
-        middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
     if config.debug:
         from chirp.middleware.inject import HTMLInject
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
@@ -127,7 +131,7 @@ def _collect_builtin_middleware(
 
         middleware_list.append(LayoutDebugMiddleware())
         middleware_list.append(HTMLInject(DEVTOOLS_BOOT_SNIPPET))
-        if not config.view_transitions:
+        if vt_mode == "off":
             from chirp.middleware.inject import ViewTransitionCssDebugWarning
 
             middleware_list.append(ViewTransitionCssDebugWarning())

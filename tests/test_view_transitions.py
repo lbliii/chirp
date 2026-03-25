@@ -1,4 +1,6 @@
-"""Tests for View Transitions — auto-inject meta tag, CSS, and htmx config."""
+"""Tests for View Transitions — tiered injection (off / htmx / full)."""
+
+import pytest
 
 from chirp import App
 from chirp.config import AppConfig
@@ -7,6 +9,7 @@ from chirp.server.view_transitions import (
     VIEW_TRANSITIONS_HEAD_SNIPPET,
     VIEW_TRANSITIONS_JS,
     VIEW_TRANSITIONS_SCRIPT_SNIPPET,
+    normalize_view_transitions,
 )
 from chirp.testing import TestClient
 
@@ -52,6 +55,32 @@ class TestViewTransitionsConstants:
 
 
 # ---------------------------------------------------------------------------
+# Unit tests — normalize_view_transitions
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeViewTransitions:
+    def test_false_returns_off(self) -> None:
+        assert normalize_view_transitions(False) == "off"
+
+    def test_off_string_returns_off(self) -> None:
+        assert normalize_view_transitions("off") == "off"
+
+    def test_true_returns_htmx(self) -> None:
+        assert normalize_view_transitions(True) == "htmx"
+
+    def test_htmx_string_returns_htmx(self) -> None:
+        assert normalize_view_transitions("htmx") == "htmx"
+
+    def test_full_string_returns_full(self) -> None:
+        assert normalize_view_transitions("full") == "full"
+
+    def test_invalid_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="Invalid view_transitions"):
+            normalize_view_transitions("auto")
+
+
+# ---------------------------------------------------------------------------
 # Integration tests — injection via App._freeze()
 # ---------------------------------------------------------------------------
 
@@ -87,9 +116,49 @@ class TestViewTransitionsInjection:
             assert "view-transition" not in response.text
             assert "globalViewTransitions" not in response.text
 
-    async def test_injects_meta_tag(self) -> None:
-        """view_transitions=True injects the meta tag."""
+    async def test_off_string_skips_injection(self) -> None:
+        """view_transitions='off' behaves like False."""
+        app = App(config=AppConfig(view_transitions="off"))
+
+        @app.route("/")
+        def index():
+            return FULL_PAGE
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert "view-transition" not in response.text
+            assert "globalViewTransitions" not in response.text
+
+    async def test_true_injects_only_script(self) -> None:
+        """view_transitions=True injects htmx JS but NOT MPA CSS/meta."""
         app = App(config=AppConfig(view_transitions=True))
+
+        @app.route("/")
+        def index():
+            return FULL_PAGE
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert "globalViewTransitions" in response.text
+            assert 'name="view-transition"' not in response.text
+            assert "chirp-vt-out" not in response.text
+
+    async def test_htmx_string_injects_only_script(self) -> None:
+        """view_transitions='htmx' behaves like True."""
+        app = App(config=AppConfig(view_transitions="htmx"))
+
+        @app.route("/")
+        def index():
+            return FULL_PAGE
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert "globalViewTransitions" in response.text
+            assert 'name="view-transition"' not in response.text
+
+    async def test_full_injects_meta_tag(self) -> None:
+        """view_transitions='full' injects the MPA meta tag."""
+        app = App(config=AppConfig(view_transitions="full"))
 
         @app.route("/")
         def index():
@@ -99,9 +168,9 @@ class TestViewTransitionsInjection:
             response = await client.get("/")
             assert 'name="view-transition"' in response.text
 
-    async def test_injects_css(self) -> None:
-        """view_transitions=True injects the default crossfade CSS."""
-        app = App(config=AppConfig(view_transitions=True))
+    async def test_full_injects_css(self) -> None:
+        """view_transitions='full' injects the default crossfade CSS."""
+        app = App(config=AppConfig(view_transitions="full"))
 
         @app.route("/")
         def index():
@@ -112,9 +181,9 @@ class TestViewTransitionsInjection:
             assert "chirp-vt-out" in response.text
             assert "chirp-vt-in" in response.text
 
-    async def test_injects_script(self) -> None:
-        """view_transitions=True injects the htmx config script."""
-        app = App(config=AppConfig(view_transitions=True))
+    async def test_full_injects_script(self) -> None:
+        """view_transitions='full' also injects the htmx config script."""
+        app = App(config=AppConfig(view_transitions="full"))
 
         @app.route("/")
         def index():
@@ -124,9 +193,9 @@ class TestViewTransitionsInjection:
             response = await client.get("/")
             assert "globalViewTransitions" in response.text
 
-    async def test_meta_and_css_in_head(self) -> None:
+    async def test_full_meta_and_css_in_head(self) -> None:
         """Meta tag and CSS are injected before </head>."""
-        app = App(config=AppConfig(view_transitions=True))
+        app = App(config=AppConfig(view_transitions="full"))
 
         @app.route("/")
         def index():

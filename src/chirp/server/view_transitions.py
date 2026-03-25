@@ -1,9 +1,16 @@
-"""View Transitions bridge — one-flag setup for the View Transitions API.
+"""View Transitions bridge — tiered setup for the View Transitions API.
 
-Enables smooth, animated page transitions for both browser-native MPA
-navigations and htmx-driven SPA-style swaps.  Two snippets are injected:
+Three modes controlled by ``AppConfig.view_transitions``:
 
-**Head snippet** (before ``</head>``):
+- ``False`` / ``"off"`` — inject nothing (default).
+- ``True`` / ``"htmx"`` — inject only the **script snippet** so htmx swaps
+  animate via the same-document View Transitions API (baseline in all
+  browsers since October 2025).
+- ``"full"`` — inject both the **head snippet** (MPA cross-document
+  transitions) and the **script snippet**.  Cross-document transitions
+  are not yet baseline (no Firefox support as of early 2026).
+
+**Head snippet** (``"full"`` only, before ``</head>``):
 
 - ``<meta name="view-transition" content="same-origin">`` — enables the
   browser's native cross-document View Transitions API.
@@ -13,7 +20,7 @@ navigations and htmx-driven SPA-style swaps.  Two snippets are injected:
   ``root`` transition name.  Apps can override with their own
   ``view-transition-name`` CSS for per-element transitions.
 
-**Script snippet** (before ``</body>``):
+**Script snippet** (``"htmx"`` and ``"full"``, before ``</body>``):
 
 - Sets ``htmx.config.globalViewTransitions = true`` so every htmx swap
   automatically uses the View Transitions API when available.
@@ -22,8 +29,9 @@ navigations and htmx-driven SPA-style swaps.  Two snippets are injected:
   after the script (e.g., ``<script defer>``).
 
 Injected into full-page HTML responses via ``HTMLInject`` middleware.
-Controlled by ``AppConfig.view_transitions`` (default: ``False``; set ``True`` to enable).
 """
+
+from __future__ import annotations
 
 VIEW_TRANSITIONS_CSS = """\
 @view-transition { navigation: auto; }
@@ -53,3 +61,25 @@ VIEW_TRANSITIONS_JS = """\
 VIEW_TRANSITIONS_SCRIPT_SNIPPET = (
     '<script data-chirp="view-transitions">' + VIEW_TRANSITIONS_JS + "</script>"
 )
+
+
+# ---------------------------------------------------------------------------
+# Mode normalizer
+# ---------------------------------------------------------------------------
+
+ViewTransitionMode = str  # "off" | "htmx" | "full"
+
+
+def normalize_view_transitions(value: bool | str) -> ViewTransitionMode:
+    """Canonicalize the ``view_transitions`` config value.
+
+    Returns one of ``"off"``, ``"htmx"``, or ``"full"``.
+    """
+    if value is False or value == "off":
+        return "off"
+    if value is True or value == "htmx":
+        return "htmx"
+    if value == "full":
+        return "full"
+    msg = f"Invalid view_transitions value: {value!r}. Use False, True, 'off', 'htmx', or 'full'."
+    raise ValueError(msg)
