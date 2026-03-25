@@ -75,6 +75,7 @@ __all__ = [
     "FormBindingError",
     "Fragment",
     "HTTPError",
+    "HtmxDetails",
     "InlineTemplate",
     "LayoutPage",
     "MarkdownRenderer",
@@ -125,6 +126,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # HTTP
+    "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),
     "Response": ("chirp.http.response", "Response"),
     "Redirect": ("chirp.http.response", "Redirect"),

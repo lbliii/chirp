@@ -318,6 +318,41 @@ class TestHtmxResponseHeaders:
     def test_stop_polling_constant(self) -> None:
         assert STOP_POLLING == 286
 
+    # -- with_hx_triggers (plural) --
+
+    def test_hx_triggers_plural(self) -> None:
+        r = Response().with_hx_triggers(closeModal=True, showToast={"msg": "ok"})
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"closeModal": True, "showToast": {"msg": "ok"}}
+
+    def test_hx_triggers_merges_with_existing(self) -> None:
+        r = Response().with_hx_trigger("a").with_hx_triggers(b=True, c=2)
+        obj = json.loads(r.header("HX-Trigger"))
+        assert obj == {"a": True, "b": True, "c": 2}
+
+    # -- with_vary --
+
+    def test_vary_single(self) -> None:
+        r = Response().with_vary("HX-Request")
+        assert r.header("Vary") == "HX-Request"
+
+    def test_vary_append(self) -> None:
+        r = Response().with_vary("Origin").with_vary("HX-Request")
+        assert r.header("Vary") == "HX-Request, Origin"
+
+    def test_vary_no_duplicates(self) -> None:
+        r = Response().with_vary("Origin").with_vary("Origin")
+        assert r.header("Vary") == "Origin"
+
+    def test_vary_multiple_at_once(self) -> None:
+        r = Response().with_vary("Origin", "HX-Request")
+        assert r.header("Vary") == "HX-Request, Origin"
+
+    def test_vary_single_header(self) -> None:
+        r = Response().with_vary("Origin").with_vary("HX-Request")
+        vary_headers = [v for n, v in r.headers if n == "Vary"]
+        assert len(vary_headers) == 1, "Should be exactly one Vary header"
+
     def test_immutability_preserved(self) -> None:
         r1 = Response(body="ok")
         r2 = r1.with_hx_redirect("/home")

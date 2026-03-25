@@ -42,6 +42,27 @@ class Response:
         """Return a new Response with an additional header."""
         return replace(self, headers=(*self.headers, (name, value)))
 
+    def with_vary(self, *fields: str) -> Response:
+        """Append field(s) to the ``Vary`` header without duplicating values.
+
+        Merges with any existing ``Vary`` header so that CORS
+        (``Vary: Origin``) and content negotiation (``Vary: HX-Request``)
+        compose correctly.
+        """
+        existing = self.header("Vary")
+        current: set[str] = set()
+        if existing:
+            current = {v.strip() for v in existing.split(",")}
+        new_fields = [f for f in fields if f not in current]
+        if not new_fields and existing:
+            return self
+        merged = ", ".join(sorted(current | set(fields)))
+        # Replace existing Vary header if present
+        if existing is not None:
+            filtered = tuple((n, v) for n, v in self.headers if n.lower() != "vary")
+            return replace(self, headers=(*filtered, ("Vary", merged)))
+        return self.with_header("Vary", merged)
+
     def with_headers(self, headers: Mapping[str, str]) -> Response:
         """Return a new Response with additional headers."""
         new = tuple(headers.items())
@@ -224,6 +245,17 @@ class Response:
         Multiple calls are merged into a single JSON header.
         """
         return self._merge_hx_trigger("HX-Trigger-After-Swap", event)
+
+    def with_hx_triggers(self, **events: Any) -> Response:
+        """Set multiple ``HX-Trigger`` events in a single call.
+
+        Each keyword argument becomes an event name. Values are payloads
+        (use ``True`` for events with no data)::
+
+            .with_hx_triggers(closeModal=True, showToast={"message": "Saved!"})
+            # -> HX-Trigger: {"closeModal": true, "showToast": {"message": "Saved!"}}
+        """
+        return self._merge_hx_trigger("HX-Trigger", events)
 
     def with_hx_push_url(self, url: str | bool) -> Response:
         """Push a URL into the browser history stack.
@@ -521,4 +553,12 @@ class SSEResponse:
 
     def with_hx_stop_polling(self) -> SSEResponse:
         """No-op: SSE streams cannot stop polling."""
+        return self
+
+    def with_hx_triggers(self, **events: Any) -> SSEResponse:
+        """No-op: SSE streams cannot set HX-Trigger."""
+        return self
+
+    def with_vary(self, *fields: str) -> SSEResponse:
+        """No-op: SSE headers are fixed by the protocol handler."""
         return self

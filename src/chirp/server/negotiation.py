@@ -173,7 +173,7 @@ def _render_composition(
     )
     html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
     intent = "fragment" if plan.intent != "full_page" else "full_page"
-    return _html_response(html, intent=intent).with_header("Vary", "HX-Request")
+    return _html_response(html, intent=intent).with_vary("HX-Request")
 
 
 def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:

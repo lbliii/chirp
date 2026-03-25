@@ -152,6 +152,7 @@ function createRecord() {
     requestHeaders: null,
     responseHeaders: null,
     hxPairs: null,
+    hxTriggerEvents: null,
     renderIntent: "",
     bodyPreview: "",
     contentType: "",
@@ -245,6 +246,29 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     if (rpHeader) {
       r.renderPlan = decodeRenderPlan(rpHeader);
     }
+
+    // Extract HX-Trigger events for devtools display
+    var triggerHeaders = ["HX-Trigger", "HX-Trigger-After-Settle", "HX-Trigger-After-Swap"];
+    var triggerEvents = [];
+    for (var ti = 0; ti < triggerHeaders.length; ti++) {
+      var tv = xhr.getResponseHeader && xhr.getResponseHeader(triggerHeaders[ti]);
+      if (tv) {
+        try {
+          var parsed = JSON.parse(tv);
+          if (typeof parsed === "object" && parsed !== null) {
+            for (var ek in parsed) {
+              if (Object.prototype.hasOwnProperty.call(parsed, ek)) {
+                triggerEvents.push({ name: ek, phase: triggerHeaders[ti], data: parsed[ek] });
+              }
+            }
+          }
+        } catch (e) {
+          // Plain string event name
+          triggerEvents.push({ name: tv, phase: triggerHeaders[ti], data: null });
+        }
+      }
+    }
+    if (triggerEvents.length) r.hxTriggerEvents = triggerEvents;
 
     if (xhr.responseText) {
       var txt = String(xhr.responseText);
