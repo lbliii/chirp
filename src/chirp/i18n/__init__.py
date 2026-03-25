@@ -26,6 +26,8 @@ import logging
 from chirp.i18n.catalog import MessageCatalog
 from chirp.i18n.middleware import _locale_var
 
+__all__ = ["MessageCatalog", "get_catalog", "get_locale", "init_catalog", "set_locale", "t"]
+
 logger = logging.getLogger("chirp.i18n")
 
 # Global catalog instance, set during app startup

@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     from chirp.app import App
 
 
+__all__ = ["ChirpPlugin"]
+
+
 class ChirpPlugin(Protocol):
     """Protocol for Chirp plugins.
 

@@ -27,6 +27,8 @@ from typing import Any
 
 from chirp.cache.protocol import CacheBackend
 
+__all__ = ["CacheBackend", "cache_view", "create_backend", "get_cache", "set_cache"]
+
 logger = logging.getLogger("chirp.cache")
 
 _cache_var: ContextVar[CacheBackend | None] = ContextVar("chirp_cache", default=None)
