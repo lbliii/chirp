@@ -397,7 +397,7 @@ class App:
         from chirp.server.sync_handler import handle_sync as _handle_sync
 
         return _handle_sync(
-            raw=raw,  # type: ignore[arg-type]
+            raw=raw,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
             router=self._router,
             middleware=self._middleware,
             providers=self._mutable_state.providers,

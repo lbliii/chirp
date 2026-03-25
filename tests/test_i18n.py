@@ -39,9 +39,7 @@ def test_catalog_missing_key():
 
 def test_catalog_interpolation():
     with tempfile.TemporaryDirectory() as d:
-        Path(d, "es.json").write_text(
-            json.dumps({"Hello, {name}!": "\u00a1Hola, {name}!"})
-        )
+        Path(d, "es.json").write_text(json.dumps({"Hello, {name}!": "\u00a1Hola, {name}!"}))
         catalog = MessageCatalog(d)
         result = catalog.translate("es", "Hello, {name}!", name="Alice")
         assert result == "\u00a1Hola, Alice!"
@@ -96,6 +94,7 @@ async def test_locale_middleware_header():
 
         detected = _locale_var.get()
         from chirp.http.response import Response
+
         return Response("ok")
 
     req = FakeRequest(headers={"accept-language": "es"})
@@ -115,6 +114,7 @@ async def test_locale_middleware_default():
 
         detected = _locale_var.get()
         from chirp.http.response import Response
+
         return Response("ok")
 
     req = FakeRequest(headers={})

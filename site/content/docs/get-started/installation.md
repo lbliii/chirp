@@ -56,6 +56,8 @@ Chirp ships with two core dependencies: `kida` (template engine) and `anyio` (as
 | `data-pg` | PostgreSQL access via asyncpg | `pip install bengal-chirp[data-pg]` |
 | `ai` | LLM streaming via httpx | `pip install bengal-chirp[ai]` |
 | `ui` | chirp-ui component library (CSS, themes, macros) | `pip install bengal-chirp[ui]` |
+| `redis` | Redis-backed cache and sessions | `pip install bengal-chirp[redis]` |
+| `config` | Load config from `.env` files | `pip install bengal-chirp[config]` |
 | `all` | Everything above | `pip install bengal-chirp[all]` |
 
 ```bash
@@ -94,6 +96,8 @@ After installation, the `chirp` command is available:
 | `chirp check <app>` | Validate hypermedia contracts from the command line |
 | `chirp check <app> --warnings-as-errors` | Exit non-zero on contract warnings (CI gate) |
 | `chirp routes <app>` | Print the registered route table |
+| `chirp makemigrations <app>` | Auto-generate schema migration files from model changes |
+| `chirp security-check <app>` | Audit security configuration and middleware setup |
 
 ## Next Steps
 

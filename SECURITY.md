@@ -14,6 +14,7 @@ You will receive an acknowledgment within 48 hours and a detailed response withi
 
 | Version | Supported |
 |---------|-----------|
+| 0.3.x   | Yes       |
 | 0.2.x   | Yes       |
 | < 0.2   | No        |
 

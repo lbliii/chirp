@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-03-25
+
+### Added
+
+- **Security middleware** — `AllowedHostsMiddleware` validates the `Host` header against a configurable allowlist, rejecting spoofed-host requests. `CSPNonceMiddleware` generates per-request `Content-Security-Policy` nonces accessible via `request.state["csp_nonce"]` and injected into templates.
+- **Caching framework** — `chirp.cache` with a `CacheBackend` protocol and three backends: `MemoryCacheBackend`, `NullCacheBackend`, and `RedisCacheBackend`. Includes `CacheMiddleware` for response caching with a configurable key function, `default_cache_key()` / `vary_aware_cache_key()` helpers, and `Vary`-aware keying.
+- **Plugin system** — `ChirpPlugin` protocol and `app.mount(prefix, plugin)` for distributing reusable middleware, routes, and template extensions as packages.
+- **Schema migrations** — `chirp.data.schema` with introspection, diff, operation generation, and migration file output. `chirp makemigrations` CLI command auto-generates migration files from model changes.
+- **Internationalization** — `chirp.i18n` with message catalogs, `LocaleMiddleware` for locale detection, number/date/currency formatting, and `t()` translation helpers wired into templates.
+- **CLI** — `chirp makemigrations` and `chirp security-check` subcommands.
+- **Vary contract rule** — `contracts.rules_vary` validates that responses include correct `Vary` headers when content depends on request headers.
+- **SECURITY.md** — Vulnerability reporting policy.
+
+### Changed
+
+- **htmx headers** — `Request` and `Response` htmx header handling improved for correctness, inspired by django-htmx. `HX-Trigger`, `HX-Push-Url`, `HX-Replace-Url`, and related headers now follow the htmx spec more closely with proper JSON encoding and boolean handling.
+
+### Dependencies
+
+- No dependency changes (all new modules use stdlib or existing deps).
+
 ## [0.2.0] — 2026-03-23
 
 ### Added
@@ -158,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Regex for Kida URL extraction in htmx attributes
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
+[0.3.0]: https://github.com/lbliii/chirp/releases/tag/v0.3.0
 [0.1.8]: https://github.com/lbliii/chirp/releases/tag/v0.1.8
 [0.1.9]: https://github.com/lbliii/chirp/releases/tag/v0.1.9
 [0.2.0]: https://github.com/lbliii/chirp/releases/tag/v0.2.0

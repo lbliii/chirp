@@ -44,7 +44,7 @@ class AllowedHostsMiddleware:
                 return True
             # ".example.com" matches sub.example.com and example.com
             if pattern.startswith(".") and (host == pattern[1:] or host.endswith(pattern)):
-                    return True
+                return True
         return False
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:

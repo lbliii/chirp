@@ -12,6 +12,7 @@ class FakeRequest:
 
 async def ok_next(request):
     from chirp.http.response import Response
+
     return Response("ok", status=200)
 
 

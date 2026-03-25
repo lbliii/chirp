@@ -21,6 +21,7 @@ def _get_header(resp, name):
 
 async def ok_next(request):
     from chirp.http.response import Response
+
     nonce = get_csp_nonce()
     return Response(f"nonce={nonce}", status=200, content_type="text/html")
 

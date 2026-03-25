@@ -53,11 +53,7 @@ def _collect_builtin_middleware(
         middleware_list.append(CSPNonceMiddleware())
 
     # HSTS auto-enable in production with TLS
-    if (
-        config.env == "production"
-        and config.ssl_certfile
-        and not config.strict_transport_security
-    ):
+    if config.env == "production" and config.ssl_certfile and not config.strict_transport_security:
         # Auto-set HSTS — mutating config is not possible (frozen),
         # so we add SecurityHeadersMiddleware with HSTS manually
         from chirp.middleware.security_headers import (

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -181,6 +181,10 @@ exclude = ["dist/", "build/", "tests/"]
 # Strict: all rules are errors by default.
 # Only relax what produces genuine false positives.
 unused-ignore-comment = "warn" # Flag stale type: ignore for cleanup
+
+# Mapping.get override in Headers/QueryParams/FormData/LazyHeaders/LazyCookies
+# is intentional (str-only keys/values); LSP violation is accepted.
+invalid-method-override = "warn"
 
 # =============================================================================
 # Pytest
