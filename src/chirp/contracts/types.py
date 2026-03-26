@@ -33,6 +33,7 @@ class CheckResult:
     templates_scanned: int = 0
     targets_found: int = 0
     hx_targets_validated: int = 0
+    commandfor_validated: int = 0
     dead_templates_found: int = 0
     sse_fragments_validated: int = 0
     forms_validated: int = 0
@@ -59,6 +60,8 @@ class CheckResult:
             f"validated {self.hx_targets_validated} hx-target selectors.",
         ]
         extras: list[str] = []
+        if self.commandfor_validated:
+            extras.append(f"{self.commandfor_validated} commandfor target(s) validated")
         if self.dead_templates_found:
             extras.append(f"{self.dead_templates_found} dead template(s)")
         if self.sse_fragments_validated:

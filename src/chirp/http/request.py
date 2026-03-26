@@ -123,6 +123,14 @@ class HtmxDetails:
         """The user response to hx-prompt (HX-Prompt header)."""
         return self._get("hx-prompt")
 
+    @property
+    def partial(self) -> str | None:
+        """The partial element name from HX-Partial header (htmx 4.0+).
+
+        Set when the request originates from an ``<htmx-partial>`` element.
+        """
+        return self._get("hx-partial")
+
 
 class _LazyQueryParams(Mapping[str, str]):
     """QueryParams that parses on first access."""
@@ -281,6 +289,11 @@ class Request:
     def htmx_current_url_abs_path(self) -> str | None:
         """The path portion of the browser's current URL."""
         return self.htmx.current_url_abs_path
+
+    @property
+    def htmx_partial(self) -> str | None:
+        """The partial element name from HX-Partial header (htmx 4.0+)."""
+        return self.htmx.partial
 
     @property
     def content_type(self) -> str | None:

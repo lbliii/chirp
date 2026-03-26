@@ -18,6 +18,8 @@ from .state import MutableAppState, RuntimeAppState
 def _collect_builtin_middleware(
     config: AppConfig,
     middleware_list: list,
+    *,
+    router: object | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first
@@ -124,6 +126,21 @@ def _collect_builtin_middleware(
                 full_page_only=True,
             )
         )
+    if config.speculation_rules and router is not None:
+        from chirp.server.speculation_rules import (
+            build_speculation_rules_snippet,
+            normalize_speculation_rules,
+        )
+
+        sr_mode = normalize_speculation_rules(config.speculation_rules)
+        if sr_mode != "off":
+            sr_snippet = build_speculation_rules_snippet(router, sr_mode)
+            if sr_snippet:
+                from chirp.middleware.inject import HTMLInject
+
+                middleware_list.append(
+                    HTMLInject(sr_snippet, before="</head>", full_page_only=True)
+                )
     if config.debug:
         from chirp.middleware.inject import HTMLInject
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
@@ -221,7 +238,7 @@ class AppCompiler:
         self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
         middleware_list = list(self._mutable.middleware_list)
-        middleware_list = _collect_builtin_middleware(self._config, middleware_list)
+        middleware_list = _collect_builtin_middleware(self._config, middleware_list, router=router)
         self._runtime.middleware = tuple(middleware_list)
 
         for middleware in self._runtime.middleware:

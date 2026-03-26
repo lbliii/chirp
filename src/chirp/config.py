@@ -105,6 +105,13 @@ class AppConfig:
     #   "full"         — htmx JS + MPA CSS/meta (cross-document, no Firefox yet)
     view_transitions: bool | str = False
 
+    # Speculation Rules API — prefetch/prerender predictions for instant MPA navigation.
+    #   False / "off"          — inject nothing (default)
+    #   True  / "conservative" — prefetch linked pages on hover (safe for all apps)
+    #   "moderate"             — prefetch eagerly, prerender on hover
+    #   "eager"                — prerender eagerly (routes must be side-effect-free)
+    speculation_rules: bool | str = False
+
     # Event delegation — copy-btn and compare-switch for SSE-swapped content
     delegation: bool = False
 

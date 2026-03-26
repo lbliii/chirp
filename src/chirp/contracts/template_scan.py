@@ -42,6 +42,10 @@ _MACRO_URL_ARG_PATTERN = re.compile(
     r"""(?:href|url|search_url|action_url)\s*=\s*["'](/[^"']*?)["']"""
 )
 _POSITIONAL_URL_ARG_PATTERN = re.compile(r"""\(\s*["'](/[a-zA-Z][a-zA-Z0-9_/{}-]*)["']""")
+_HTMX_PARTIAL_PATTERN = re.compile(
+    r'<htmx-partial\b[^>]*(?<![-\w])src\s*=\s*["\']([^"\']*)["\']',
+    re.IGNORECASE,
+)
 
 
 def _is_static_url_candidate(url: str) -> bool:
@@ -234,6 +238,31 @@ def extract_mutation_target_ids(source: str) -> set[str]:
         if "{{" not in val and "{%" not in val:
             ids.add(val.strip())
     return ids
+
+
+def extract_htmx_partial_sources(source: str) -> list[str]:
+    """Extract ``src=`` attribute values from ``<htmx-partial>`` elements.
+
+    Values are normalized to URL paths suitable for route matching:
+    query strings and fragments are stripped, and only leading-``/`` paths
+    are kept.  Results are deduplicated while preserving order.
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+    for m in _HTMX_PARTIAL_PATTERN.finditer(source):
+        raw = m.group(1).strip()
+        if not _is_static_url_candidate(raw):
+            continue
+        path = raw
+        for sep in ("?", "#"):
+            if sep in path:
+                path = path.split(sep, 1)[0]
+        if not path.startswith("/"):
+            continue
+        if path and path not in seen:
+            seen.add(path)
+            urls.append(path)
+    return urls
 
 
 def _load_one(loader: Any, name: str) -> tuple[str, str] | None:
