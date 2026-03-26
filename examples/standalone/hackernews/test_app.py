@@ -33,7 +33,7 @@ class TestStoryList:
     async def test_index_renders_domains(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/")
-            assert "github.com" in response.text
+            assert "story-domain" in response.text
 
     async def test_index_contains_sse_connection(self, example_app) -> None:
         async with TestClient(example_app) as client:
