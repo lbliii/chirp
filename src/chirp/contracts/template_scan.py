@@ -43,7 +43,7 @@ _MACRO_URL_ARG_PATTERN = re.compile(
 )
 _POSITIONAL_URL_ARG_PATTERN = re.compile(r"""\(\s*["'](/[a-zA-Z][a-zA-Z0-9_/{}-]*)["']""")
 _HTMX_PARTIAL_PATTERN = re.compile(
-    r'<htmx-partial\b[^>]*\bsrc\s*=\s*["\']([^"\']*)["\']',
+    r'<htmx-partial\b[^>]*(?<![-\w])src\s*=\s*["\']([^"\']*)["\']',
     re.IGNORECASE,
 )
 

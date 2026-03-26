@@ -78,7 +78,7 @@ def _resolve_fragment_block(
     *,
     fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> str:
-    """Resolve fragment block: explicit > partial > registry > fallback."""
+    """Resolve fragment block: explicit > htmx partial > HX-Target registry lookup > fallback."""
     if composition.fragment_block is not None:
         return composition.fragment_block
     # htmx 4.0+: <htmx-partial> element name maps to a registered block
