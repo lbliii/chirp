@@ -141,4 +141,5 @@ def build_speculation_rules_snippet(router: object, mode: SpeculationRulesMode) 
     rules_json = build_speculation_rules_json(router, mode)
     if not rules_json:
         return ""
-    return f'<script type="speculationrules" data-chirp="speculation-rules">{rules_json}</script>'
+    safe_json = rules_json.replace("<", "\\u003c").replace("&", "\\u0026")
+    return f'<script type="speculationrules" data-chirp="speculation-rules">{safe_json}</script>'

@@ -102,3 +102,20 @@ class TestCommandValues:
         }
         issues = check_command_values(sources)
         assert issues == []
+
+    def test_data_command_not_matched(self):
+        """data-command should not trigger validation (negative lookbehind)."""
+        sources = {
+            "page.html": '<button data-command="anything">Go</button>',
+        }
+        issues = check_command_values(sources)
+        assert issues == []
+
+    def test_data_commandfor_not_matched(self):
+        """data-commandfor should not trigger validation."""
+        sources = {
+            "page.html": '<div data-commandfor="missing" id="x">Go</div>',
+        }
+        issues, validated = check_commandfor_targets(sources, set())
+        assert issues == []
+        assert validated == 0

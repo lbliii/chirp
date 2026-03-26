@@ -38,8 +38,8 @@ _BUILTIN_COMMANDS = frozenset(
     }
 )
 
-_COMMANDFOR_PATTERN = re.compile(r'commandfor\s*=\s*(["\'])(.*?)\1')
-_COMMAND_PATTERN = re.compile(r'\bcommand\s*=\s*(["\'])(.*?)\1')
+_COMMANDFOR_PATTERN = re.compile(r'(?<![-\w])commandfor\b\s*=\s*(["\'])(.*?)\1')
+_COMMAND_PATTERN = re.compile(r'(?<![-\w])command\b\s*=\s*(["\'])(.*?)\1')
 
 
 def check_commandfor_targets(
