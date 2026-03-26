@@ -21,9 +21,9 @@ app.run()
 
 ---
 
-## Hypermedia-Native Python
+## What is Chirp?
 
-Chirp is a **hypermedia-native** web framework. Your routes return intent — `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — and the framework handles content negotiation, layout composition, and htmx awareness automatically. One template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No separate API layer. No client-side state. No serialization boundary.
+Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Routes return intent — `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — and the framework handles content negotiation, layout composition, and htmx awareness automatically. One template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No `make_response()`. No `jsonify()`. The type *is* the intent.
 
 ```python
 @app.route("/search")
@@ -33,21 +33,13 @@ async def search(request: Request):
     # Full page for browsers. Fragment for htmx. Same template, same data.
 ```
 
+- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries. Let the browser be the framework.
+- **HTML over the wire** — Full pages, fragments, streaming HTML, and SSE. Built for htmx.
+- **Streaming HTML** — Shell first, content fills in as data arrives. No loading spinners.
+- **Server-Sent Events** — Real-time updates over plain HTTP. No WebSocket upgrade required.
+- **MCP tools** — Register functions as tools callable by LLMs and MCP clients.
+
 Read the [Philosophy](docs/philosophy.md) for the full picture.
-
----
-
-## What is Chirp?
-
-Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Use plain Kida templates, your own CSS, or optional companion packages like `chirp-ui`. Return values drive content negotiation — no `make_response()`, no `jsonify()`. The type *is* the intent.
-
-**Why people pick it:**
-
-- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries. Most of what required a JS framework is now native HTML and CSS.
-- **HTML over the wire** — Serve full pages, template fragments, streaming HTML, and SSE. Built for htmx and the modern browser.
-- **Streaming HTML** — Send the page shell first and fill in content as data becomes available. No loading spinners, no skeleton screens.
-- **Server-Sent Events** — Push real-time updates over plain HTTP. No WebSocket protocol upgrade, no special infrastructure.
-- **MCP tools** — Register functions as tools callable by LLMs and MCP clients, with a real-time event bus for agent activity dashboards.
 
 ## Use Chirp For
 
@@ -105,15 +97,6 @@ chirp new myapp && cd myapp && python app.py
 
 ---
 
-## New in 0.1.9
-
-- **Route-directory golden path** — Filesystem routes now have a clearer contract around `_meta.py`, `_context.py`, `_actions.py`, and `_viewmodel.py`, plus section registration for tabs, breadcrumbs, and shell metadata.
-- **Sync-path improvements** — `App.handle_sync()` and `SyncRequest` add a fused sync path for simple handlers, while the standard request path now keeps URL query values and cookies lazy until needed.
-- **Debug route introspection** — Debug builds expose `X-Chirp-Route-*` headers and a `/__chirp/routes` explorer so you can inspect route metadata, layouts, providers, and actions.
-- **Synthetic benchmarks** — A new `benchmark` extra and benchmark suite compare Chirp, FastAPI, and Flask on JSON, CPU, fused sync, and mixed JSON+SSE workloads.
-
----
-
 ## Features
 
 | Feature | Description | Docs |
@@ -154,66 +137,7 @@ See [`benchmarks/README.md`](benchmarks/README.md) for how the benchmarks work, 
 
 ## Production Deployment
 
-Chirp apps run on **[pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with enterprise features built-in:
-
-### Automatic Features (Zero Configuration)
-- ✅ **WebSocket compression** — 60% bandwidth reduction
-- ✅ **HTTP/2 support** — Multiplexed streams, server push
-- ✅ **Graceful shutdown** — Finishes active requests on SIGTERM
-- ✅ **Zero-downtime reload** — `kill -SIGUSR1` for hot code updates
-- ✅ **Built-in health endpoint** — `/health` for Kubernetes probes
-
-### Production Features (Configurable)
-- 📊 **Prometheus metrics** — `/metrics` endpoint for monitoring
-- 🛡️ **Per-IP rate limiting** — Token bucket algorithm, configurable burst
-- 📦 **Request queueing** — Load shedding during traffic spikes
-- 🐛 **Sentry integration** — Automatic error tracking and reporting
-- 🔄 **Multi-worker mode** — CPU-based auto-scaling
-
-### Quick Start: Production Mode
-
-```python
-from chirp import App, AppConfig
-
-# Production configuration
-config = AppConfig(
-    debug=False,  # ← Enables production mode
-    workers=4,
-    metrics_enabled=True,
-    rate_limit_enabled=True,
-    sentry_dsn="https://...",
-)
-
-app = App(config=config)
-
-@app.route("/")
-def index():
-    return "Hello, Production!"
-
-app.run()  # ← Automatically uses production server
-```
-
-### CLI Production Mode
-
-```bash
-# Development (single worker, auto-reload)
-chirp run myapp:app
-
-# Production (multi-worker, all features)
-chirp run myapp:app --production --workers 4 --metrics --rate-limit
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.14-slim
-WORKDIR /app
-COPY . .
-RUN pip install bengal-chirp
-CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
-```
-
-**Full deployment guide**: [Deployment docs](https://lbliii.github.io/chirp/docs/deployment/production/)
+Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. See the [deployment guide](https://lbliii.github.io/chirp/docs/deployment/production/) for details.
 
 ---
 
@@ -365,43 +289,6 @@ chirp check myapp:app --warnings-as-errors
 
 ---
 
-## Key Ideas
-
-- **Hypermedia-native.** The return type *is* the architecture. `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — the framework negotiates; the developer declares.
-- **One template, many modes.** A single template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No partials directory, no serialization layer.
-- **Contracts, not conventions.** `app.check()` validates the full hypermedia surface at
-  startup — routes, fragments, SSE structures, form actions.
-- **SSE over WebSockets.** Real-time updates over plain HTTP. Heartbeats, disconnect detection, error boundaries, and automatic cleanup built in.
-- **The browser is the framework.** `<dialog>`, `popover`, View Transitions, container queries. Let the browser do what the browser does.
-- **Free-threading native.** Designed for Python 3.14t from the first line. Frozen dataclasses, ContextVar isolation, thread-safe by construction.
-- **Kida built in.** Same author, no seam. Fragment rendering, streaming templates, and
-  filter registration are first-class features.
-- **Minimal dependencies.** `kida-templates` + `anyio` + `bengal-pounce`. Everything else is optional.
-
----
-
-## Documentation
-
-📚 **[lbliii.github.io/chirp](https://lbliii.github.io/chirp/)**
-
-| Section | Description |
-|---------|-------------|
-| [Get Started](https://lbliii.github.io/chirp/docs/get-started/) | Installation and quickstart |
-| [Core Concepts](https://lbliii.github.io/chirp/docs/core-concepts/) | App lifecycle, return values, configuration |
-| [Routing](https://lbliii.github.io/chirp/docs/routing/) | Routes, filesystem routing, requests |
-| [Templates](https://lbliii.github.io/chirp/docs/templates/) | Rendering, fragments, filters |
-| [Streaming](https://lbliii.github.io/chirp/docs/streaming/) | HTML streaming and Server-Sent Events |
-| [Middleware](https://lbliii.github.io/chirp/docs/middleware/) | Built-in and custom middleware |
-| [Data](https://lbliii.github.io/chirp/docs/data/) | Database integration and forms |
-| [Testing](https://lbliii.github.io/chirp/docs/testing/) | Test client and assertions |
-| [Deployment](https://lbliii.github.io/chirp/docs/deployment/) | Production deployment with Pounce |
-| [Guides](https://lbliii.github.io/chirp/docs/guides/) | App shells, islands, Alpine, accessibility |
-| [Tutorials](https://lbliii.github.io/chirp/docs/tutorials/) | Flask migration, htmx patterns |
-| [Examples](https://lbliii.github.io/chirp/docs/examples/) | RAG demo, production stack, API |
-| [Reference](https://lbliii.github.io/chirp/docs/reference/) | API documentation |
-
----
-
 ## Development
 
 ```bash
@@ -427,6 +314,7 @@ A structured reactive stack written in pure Python for 3.14t free-threading. Chi
 | **)彡** | [Kida](https://github.com/lbliii/kida) | Template engine | [Docs](https://lbliii.github.io/kida/) |
 | **ฅᨐฅ** | [Patitas](https://github.com/lbliii/patitas) | Markdown parser | [Docs](https://lbliii.github.io/patitas/) |
 | **⌾⌾⌾** | [Rosettes](https://github.com/lbliii/rosettes) | Syntax highlighter | [Docs](https://lbliii.github.io/rosettes/) |
+| **⚡** | [Zoomies](https://github.com/lbliii/zoomies) | QUIC / HTTP/3 | — |
 
 Python-native. Free-threading ready. No npm required.
 
