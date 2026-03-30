@@ -53,3 +53,39 @@ def test_csp_nonce_outside_request():
 async def test_template_globals():
     mw = CSPNonceMiddleware()
     assert "csp_nonce" in mw.template_globals
+
+
+# --- CSP nonce must allow framework-required script origins ---
+
+
+class TestNonceCSPAllowsFrameworkScripts:
+    """When CSP nonces are enabled the policy must still permit CDN scripts.
+
+    Chirp templates load htmx from unpkg.com and Alpine.js from
+    cdn.jsdelivr.net.  A nonce-only policy would silently block those
+    external scripts and break all htmx/JS functionality.
+    """
+
+    @pytest.mark.asyncio
+    async def test_nonce_csp_allows_unpkg(self):
+        mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "https://unpkg.com" in csp
+
+    @pytest.mark.asyncio
+    async def test_nonce_csp_allows_jsdelivr(self):
+        mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "https://cdn.jsdelivr.net" in csp
+
+    @pytest.mark.asyncio
+    async def test_nonce_csp_has_nonce_and_origins(self):
+        """script-src must contain the nonce AND the CDN origins together."""
+        mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "nonce-" in csp
+        assert "https://unpkg.com" in csp
+        assert "https://cdn.jsdelivr.net" in csp
