@@ -25,7 +25,9 @@ class SecurityHeadersConfig:
     x_content_type_options: str = "nosniff"
     referrer_policy: str = "strict-origin-when-cross-origin"
     content_security_policy: str | None = (
-        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+        "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
     )
     strict_transport_security: str | None = None
 
