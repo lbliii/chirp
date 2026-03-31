@@ -117,6 +117,15 @@ class TestDefaultCSPAllowsFrameworkScripts:
         csp = _header(resp, "content-security-policy") or ""
         assert "'unsafe-inline'" in csp
 
+    @pytest.mark.anyio
+    async def test_default_csp_no_unsafe_eval(self) -> None:
+        """Default CSP should not include unsafe-eval (opt-in via compiler)."""
+        app = _make_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/")
+        csp = _header(resp, "content-security-policy") or ""
+        assert "'unsafe-eval'" not in csp
+
     def test_config_default_has_script_src(self) -> None:
         """SecurityHeadersConfig default CSP includes an explicit script-src."""
         cfg = SecurityHeadersConfig()

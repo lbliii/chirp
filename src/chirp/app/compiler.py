@@ -52,7 +52,8 @@ def _collect_builtin_middleware(
     if config.csp_nonce_enabled:
         from chirp.middleware.csp_nonce import CSPNonceMiddleware
 
-        middleware_list.append(CSPNonceMiddleware())
+        needs_eval = config.alpine and not config.alpine_csp
+        middleware_list.append(CSPNonceMiddleware(unsafe_eval=needs_eval))
 
     # HSTS auto-enable in production with TLS
     if config.env == "production" and config.ssl_certfile and not config.strict_transport_security:
@@ -63,8 +64,17 @@ def _collect_builtin_middleware(
             SecurityHeadersMiddleware,
         )
 
+        needs_eval = config.alpine and not config.alpine_csp
+        eval_directive = " 'unsafe-eval'" if needs_eval else ""
+        csp = (
+            "default-src 'self'; "
+            f"script-src 'self' 'unsafe-inline'{eval_directive}"
+            " https://unpkg.com https://cdn.jsdelivr.net; "
+            "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+        )
         sec_config = SecurityHeadersConfig(
             strict_transport_security="max-age=63072000; includeSubDomains",
+            content_security_policy=csp,
         )
         middleware_list.append(SecurityHeadersMiddleware(sec_config))
 

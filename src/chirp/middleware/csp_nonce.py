@@ -45,13 +45,14 @@ class CSPNonceMiddleware:
         <script nonce="{{ csp_nonce() }}">...</script>
     """
 
-    __slots__ = ("_base_csp", "_script_origins")
+    __slots__ = ("_base_csp", "_script_origins", "_unsafe_eval")
 
-    def __init__(self, base_csp: str | None = None) -> None:
+    def __init__(self, base_csp: str | None = None, *, unsafe_eval: bool = False) -> None:
         self._base_csp = base_csp or (
             "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
         )
         self._script_origins = "https://unpkg.com https://cdn.jsdelivr.net"
+        self._unsafe_eval = unsafe_eval
 
     @property
     def template_globals(self) -> dict:
@@ -64,7 +65,8 @@ class CSPNonceMiddleware:
         try:
             response = await next(request)
             if isinstance(response, (Response, StreamingResponse)):
-                csp = f"{self._base_csp}; script-src 'self' 'nonce-{nonce}' {self._script_origins}"
+                eval_token = " 'unsafe-eval'" if self._unsafe_eval else ""
+                csp = f"{self._base_csp}; script-src 'self'{eval_token} 'nonce-{nonce}' {self._script_origins}"
                 response = response.with_header("Content-Security-Policy", csp)
             return response
         finally:
