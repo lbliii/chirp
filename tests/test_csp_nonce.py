@@ -81,9 +81,17 @@ class TestNonceCSPAllowsFrameworkScripts:
         assert "https://cdn.jsdelivr.net" in csp
 
     @pytest.mark.asyncio
-    async def test_nonce_csp_allows_unsafe_eval(self):
-        """Alpine.js standard build uses eval() for x-data/x-bind expressions."""
+    async def test_nonce_csp_no_unsafe_eval_by_default(self):
+        """Default CSP should not include unsafe-eval (opt-in only)."""
         mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "'unsafe-eval'" not in csp
+
+    @pytest.mark.asyncio
+    async def test_nonce_csp_unsafe_eval_when_opted_in(self):
+        """Alpine.js standard build needs unsafe-eval; opt-in via constructor."""
+        mw = CSPNonceMiddleware(unsafe_eval=True)
         resp = await mw(FakeRequest(), ok_next)
         csp = _get_header(resp, "content-security-policy")
         assert "'unsafe-eval'" in csp
