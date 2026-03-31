@@ -117,6 +117,15 @@ class TestDefaultCSPAllowsFrameworkScripts:
         csp = _header(resp, "content-security-policy") or ""
         assert "'unsafe-inline'" in csp
 
+    @pytest.mark.anyio
+    async def test_default_csp_allows_unsafe_eval(self) -> None:
+        """Alpine.js standard build uses eval() for x-data/x-bind expressions."""
+        app = _make_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/")
+        csp = _header(resp, "content-security-policy") or ""
+        assert "'unsafe-eval'" in csp
+
     def test_config_default_has_script_src(self) -> None:
         """SecurityHeadersConfig default CSP includes an explicit script-src."""
         cfg = SecurityHeadersConfig()

@@ -27,7 +27,7 @@ def _make_env() -> Environment:
 class TestAlpineSnippet:
     def test_default_builds_script_tag(self) -> None:
         s = alpine_snippet("3.15.8", csp=False)
-        assert 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8"' in s
+        assert 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8/dist/cdn.min.js"' in s
         assert 'data-chirp="alpine"' in s
         assert "defer" in s
 
@@ -58,8 +58,7 @@ class TestAlpineSnippet:
 
     def test_csp_uses_csp_build(self) -> None:
         s = alpine_snippet("3.15.8", csp=True)
-        assert "alpinejs/dist/cdn/csp" in s
-        assert "@3.15.8" in s
+        assert "@alpinejs/csp@3.15.8/dist/cdn.min.js" in s
 
     def test_safe_data_helper_is_first(self) -> None:
         """safeData helper must appear before Alpine core so it queues early calls."""

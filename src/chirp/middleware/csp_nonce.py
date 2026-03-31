@@ -64,7 +64,7 @@ class CSPNonceMiddleware:
         try:
             response = await next(request)
             if isinstance(response, (Response, StreamingResponse)):
-                csp = f"{self._base_csp}; script-src 'self' 'nonce-{nonce}' {self._script_origins}"
+                csp = f"{self._base_csp}; script-src 'self' 'unsafe-eval' 'nonce-{nonce}' {self._script_origins}"
                 response = response.with_header("Content-Security-Policy", csp)
             return response
         finally:

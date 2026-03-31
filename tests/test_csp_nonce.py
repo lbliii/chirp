@@ -81,6 +81,14 @@ class TestNonceCSPAllowsFrameworkScripts:
         assert "https://cdn.jsdelivr.net" in csp
 
     @pytest.mark.asyncio
+    async def test_nonce_csp_allows_unsafe_eval(self):
+        """Alpine.js standard build uses eval() for x-data/x-bind expressions."""
+        mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "'unsafe-eval'" in csp
+
+    @pytest.mark.asyncio
     async def test_nonce_csp_has_nonce_and_origins(self):
         """script-src must contain the nonce AND the CDN origins together."""
         mw = CSPNonceMiddleware()
