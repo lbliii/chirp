@@ -304,7 +304,7 @@ is more flexible (server doesn't need to know about the htmx swap).
 
 ## 6b. ChirpUI app shell — lazy `hx-get` inside `#main`
 
-Apps using `chirpui/app_shell_layout.html` put page scroll on `<main id=”main”>`
+Apps using `chirpui/app_shell_layout.html` put page scroll on `<main id="main">`
 (`overflow-y: auto`), not on `window`. This matters for any content that should
 load on demand when the user scrolls it into view — dashboard widgets, analytics
 charts, long tables below the fold, etc.
@@ -314,22 +314,22 @@ visible), prefer **`intersect`** with an explicit root, not **`revealed`**:
 
 ```html
 {# Dashboard widget that loads chart data when scrolled into view #}
-<div hx-get=”/workspace/analytics/data”
-     hx-trigger=”intersect root:#main threshold:0”
-     hx-target=”this”
-     hx-swap=”innerHTML”>
-  <div class=”skeleton” style=”height: 20rem;”></div>
+<div hx-get="/workspace/analytics/data"
+     hx-trigger="intersect root:#main threshold:0"
+     hx-target="this"
+     hx-swap="innerHTML">
+  <div class="skeleton" style="height: 20rem;"></div>
 </div>
 ```
 
-**Why not `revealed`?** htmx 2.x `revealed` uses a window-level “scrolled into
-view” check. In the ChirpUI app shell, `<main id=”main”>` is the scrollport
+**Why not `revealed`?** htmx 2.x `revealed` uses a window-level "scrolled into
+view" check. In the ChirpUI app shell, `<main id="main">` is the scrollport
 (it has `overflow-y: auto`), so content that scrolls only inside `#main` may
 never satisfy `revealed`. **`intersect`** uses `IntersectionObserver` with
 `root: #main`, which correctly tracks the real scroll container.
 
 Combine with polling when needed:
-`hx-trigger=”intersect root:#main threshold:0, every 5m”`.
+`hx-trigger="intersect root:#main threshold:0, every 5m"`.
 
 **htmx ref:** [hx-trigger](https://htmx.org/attributes/hx-trigger/) (intersect,
 root, threshold)

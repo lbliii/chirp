@@ -79,7 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 
 - No dependency changes (all new modules use stdlib or existing deps).
->>>>>>> origin/main
 
 ## [0.2.0] — 2026-03-23
 

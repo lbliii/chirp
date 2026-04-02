@@ -366,12 +366,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 meta_provider_paths,
             )
         )
-        result.issues.extend(check_duplicate_routes(getattr(snapshot, "discovered_routes", [])))
+        result.issues.extend(check_duplicate_routes(discovered))
         result.issues.extend(check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths))
         providers = getattr(app._mutable_state, "providers", None)
         result.issues.extend(
             check_context_provider_signatures(
-                getattr(snapshot, "discovered_routes", []),
+                discovered,
                 providers,
             )
         )
