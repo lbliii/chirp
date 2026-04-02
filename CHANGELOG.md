@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Route contract** — `chirp check` no longer reports missing `_meta.py` for routes whose `_meta.py` defines only `meta()` (dynamic metadata). Those routes register a meta provider at discovery time; the checker now treats that as satisfying the route metadata contract.
 
+### Changed
+
+- **Scaffold template** — `chirp new` now pins `bengal-chirp>=0.2.0` (was `>=0.1.9`). Existing projects are unaffected; new projects get the latest contract fixes and Alpine injection improvements from 0.2.x.
+
 ## [0.3.3] — 2026-03-30
 
 ### Fixed

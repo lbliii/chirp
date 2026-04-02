@@ -60,6 +60,19 @@ class TestAlpineSnippet:
         s = alpine_snippet("3.15.8", csp=True)
         assert "@alpinejs/csp@3.15.8/dist/cdn.min.js" in s
 
+    def test_csp_excludes_standard_alpine(self) -> None:
+        """CSP build must not include the standard alpinejs core script."""
+        s = alpine_snippet("3.15.8", csp=True)
+        assert 'src="https://cdn.jsdelivr.net/npm/alpinejs@' not in s
+
+    def test_csp_includes_plugins_and_helper(self) -> None:
+        """CSP build still ships plugins and the safeData helper."""
+        s = alpine_snippet("3.15.8", csp=True)
+        assert "@alpinejs/focus" in s
+        assert "@alpinejs/mask" in s
+        assert "@alpinejs/intersect" in s
+        assert "Alpine.safeData" in s
+
     def test_safe_data_helper_is_first(self) -> None:
         """safeData helper must appear before Alpine core so it queues early calls."""
         s = alpine_snippet("3.15.8", csp=False)
