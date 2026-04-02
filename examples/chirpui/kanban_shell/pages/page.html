@@ -9,6 +9,7 @@
 {% end %}
 
 {% block page_root %}
+<div id="page-root">
 {% block page_root_inner %}
 {% block page_content %}
 <div class="kanban-page">
@@ -178,6 +179,7 @@ document.body.addEventListener("click", function(event) {
 </script>
 {% end %}
 {% end %}
+</div>
 {% end %}
 
 {# Empty main for hx-swap="none" OOB routes #}

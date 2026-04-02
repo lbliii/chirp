@@ -302,6 +302,35 @@ is more flexible (server doesn't need to know about the htmx swap).
 
 ---
 
+## 6b. ChirpUI app shell — lazy `hx-get` inside `#main`
+
+Apps using `chirpui/app_shell_layout.html` put page scroll on `<main id="main">`
+(`overflow-y: auto`), not on `window`.
+
+For **deferred** requests (`hx-get` that should run when a region becomes
+visible), prefer **`intersect`** with an explicit root, not **`revealed`**:
+
+```html
+<div hx-get="/workspace/analytics/data"
+     hx-trigger="intersect root:#main threshold:0"
+     hx-target="this"
+     hx-swap="innerHTML">
+  …
+</div>
+```
+
+HTMX 2.x **`revealed`** uses a window-based “scrolled into view” check. Content
+that scrolls only inside `#main` may never satisfy that check. **`intersect`**
+uses `IntersectionObserver` with `root: #main`, matching the real scrollport.
+
+Combine with polling when needed:  
+`hx-trigger="intersect root:#main threshold:0, every 5m"`.
+
+**htmx ref:** [hx-trigger](https://htmx.org/attributes/hx-trigger/) (intersect,
+root, threshold)
+
+---
+
 ## 7. View Transitions — `transition:true`
 
 Smooth animations between page states using the View Transitions API.

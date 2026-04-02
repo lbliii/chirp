@@ -25,6 +25,17 @@ Chirp + chirp-ui use several overlapping words (**shell**, **chrome**, **fragmen
 
 **Rule:** In prose and APIs, **shell** means **L1** (persistent frame). Do not call card borders “shell”; use **surface chrome**.
 
+## Boosted navigation and ``hx-select``
+
+``#main`` participates in boosted navigation; the fragment selector depends on the layout:
+
+| Layout | ``hx-select`` on ``#main`` | Required in page HTML |
+|--------|---------------------------|------------------------|
+| ``chirpui/app_shell_layout.html`` / ``app_shell`` | ``#page-root`` | ``<div id="page-root">…</div>`` inside the content block |
+| ``chirp/layouts/boost.html`` | ``#page-content`` | The layout’s ``#page-content`` wrapper |
+
+A block named ``page_root`` does **not** create ``id="page-root"``; omitting that element yields an empty main area after sidebar links.
+
 ## Shell regions (stable DOM ids)
 
 Shell **regions** are elements with fixed ``id`` attributes that htmx updates with **out-of-band** swaps after the primary ``#main`` swap. Import canonical ids from :mod:`chirp.shell_regions`:

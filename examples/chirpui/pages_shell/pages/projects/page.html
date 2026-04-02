@@ -5,6 +5,7 @@
 {% from "chirpui/stat.html" import stat %}
 
 {% block page_root %}
+<div id="page-root">
 {% block page_root_inner %}
 {% call container(max_width="84rem") %}
 {% call stack(gap="lg", cls="example-page") %}
@@ -44,4 +45,5 @@
 {% end %}
 {% end %}
 {% end %}
+</div>
 {% endblock %}

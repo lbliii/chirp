@@ -18,9 +18,11 @@
 {% end %}
 
 {% block page_root %}
+<div id="page-root">
 {% call container() %}
 {% call ascii_error(code=error_code, heading=error_heading, description=error_description) %}
   {{ btn("Back to projects", href="/projects", variant="primary") }}
 {% end %}
 {% end %}
+</div>
 {% end %}

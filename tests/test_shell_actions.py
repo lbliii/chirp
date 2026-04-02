@@ -53,21 +53,22 @@ def test_shell_action_link_rejects_form_fields() -> None:
         )
 
 
-def test_shell_action_form_rejects_attrs() -> None:
-    with pytest.raises(ValueError, match="attrs"):
-        ShellActions(
-            primary=ShellActionZone(
-                items=(
-                    ShellAction(
-                        id="x",
-                        label="y",
-                        kind="form",
-                        form_action="/a",
-                        attrs=' class="x"',
-                    ),
+def test_shell_action_form_accepts_attrs() -> None:
+    """attrs on kind=form passes through to the <form> element (e.g. CSS custom properties)."""
+    actions = ShellActions(
+        primary=ShellActionZone(
+            items=(
+                ShellAction(
+                    id="x",
+                    label="y",
+                    kind="form",
+                    form_action="/a",
+                    attrs='style="--color: red;"',
                 ),
             ),
-        )
+        ),
+    )
+    assert actions.primary.items[0].attrs == 'style="--color: red;"'
 
 
 def test_shell_action_form_accepts_primary_zone() -> None:

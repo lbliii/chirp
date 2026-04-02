@@ -23,6 +23,7 @@ class TestContactsShell:
             )
             assert response.status == 200
             assert 'id="contacts-page"' in response.text
+            assert 'id="page-root"' in response.text
             assert "chirpui-app-shell__sidebar" not in response.text
 
     async def test_add_success(self, example_app) -> None:

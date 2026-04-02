@@ -50,13 +50,22 @@ def alpine_snippet(version: str, csp: bool = False) -> str:
     Includes plugins (Mask, Intersect, Focus), the ``safeData`` helper with
     chirp-ui store init, and the Alpine.js core script.
 
+    The script URL must include ``/dist/cdn.min.js``. A bare ``alpinejs@version``
+    path on jsdelivr resolves to ``package.json`` ``main`` (``dist/module.cjs.js``),
+    which is CommonJS and throws ``ReferenceError: module is not defined`` in the
+    browser when loaded as a classic script.
+
     Args:
         version: Alpine version (e.g. "3.15.8").
-        csp: If True, use the CSP-safe build for strict Content-Security-Policy.
+        csp: If True, use the ``@alpinejs/csp`` browser CDN build (also explicit
+            ``dist/cdn.min.js``; that package's main is CJS too).
 
     Returns:
         HTML: safeData helper + plugins + Alpine.js script tag.
     """
-    pkg = "alpinejs" if not csp else "alpinejs/dist/cdn/csp"
-    script = f'<script defer src="{_CDN}/{pkg}@{version}" data-chirp="alpine"></script>'
+    if csp:
+        path = f"@alpinejs/csp@{version}/dist/cdn.min.js"
+    else:
+        path = f"alpinejs@{version}/dist/cdn.min.js"
+    script = f'<script defer src="{_CDN}/{path}" data-chirp="alpine"></script>'
     return SAFE_DATA_HELPER + PLUGINS + script

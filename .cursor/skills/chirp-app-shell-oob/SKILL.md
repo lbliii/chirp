@@ -131,16 +131,18 @@ def get(request: Request, skill: Skill) -> PageComposition:
 
 ## Page Template Pattern
 
-Page templates define two nested blocks:
+Page templates define two nested blocks **and** must render **`id="page-root"`** on a wrapper element. `app_shell_layout` / `app_shell` set `hx-select="#page-root"` on `#main`; a block named `page_root` does **not** create that id — HTMX would match nothing and clear the main area.
 
 ```html
 {% block page_root %}
+<div id="page-root">
 {% block page_content %}
 <div style="padding: 2rem;">
   <h1>Settings</h1>
   <p>Page content here.</p>
 </div>
 {% end %}
+</div>
 {% end %}
 ```
 

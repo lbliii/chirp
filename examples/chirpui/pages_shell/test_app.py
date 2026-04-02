@@ -22,6 +22,8 @@ class TestPagesShell:
             assert response.status == 200
             assert "Apollo" in response.text
             assert "project-stats" in response.text
+            # hx-select="#page-root" on #main — fragment must include this id or swaps are empty
+            assert 'id="page-root"' in response.text
 
     async def test_detail_page_overrides_shell_actions(self, example_app) -> None:
         async with TestClient(example_app) as client:

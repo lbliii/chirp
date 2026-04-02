@@ -2,7 +2,7 @@
 
 A small mounted-pages example for Chirp's current routing story. It shows a
 persistent `chirp-ui` shell, `_context.py` cascade, route-scoped shell actions,
-`page_root` for boosted list navigation, and `Suspense` on a nested detail page.
+`<div id="page-root">` (required for `hx-select` on `#main`), and `Suspense` on a nested detail page.
 
 **Shell actions patterns:**
 - **Cascade + remove:** `projects/{slug}/` removes `new-project` from parent
