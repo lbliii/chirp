@@ -251,7 +251,7 @@ def build_render_plan(
     )
 
     # Build region updates from composition.regions + pre-computed shell updates
-    region_updates = tuple(list(composition.regions) + list(shell_region_updates))
+    region_updates = composition.regions + shell_region_updates
 
     # Include layout OOB for page_fragment or when shell updates were added
     triggers_shell = bool(shell_region_updates)

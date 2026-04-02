@@ -58,7 +58,10 @@ class Headers(Mapping[str, str]):
                 yield key
 
     def __len__(self) -> int:
-        return len(set(self))
+        seen: set[bytes] = set()
+        for name, _ in self._raw:
+            seen.add(name.lower())
+        return len(seen)
 
     def __repr__(self) -> str:
         items = ", ".join(f"{k!r}: {self[k]!r}" for k in self)

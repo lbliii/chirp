@@ -81,46 +81,44 @@ def build_speculation_rules_json(router: object, mode: SpeculationRulesMode) -> 
             static_urls.append(path)
 
     rules: dict[str, list[dict]] = {"prefetch": [], "prerender": []}
+    sorted_urls = sorted(static_urls) if static_urls else []
+    sorted_patterns = sorted(parametric_patterns) if parametric_patterns else []
 
     if mode == "conservative":
-        if static_urls:
+        if sorted_urls:
             rules["prefetch"].append(
-                {"source": "list", "urls": sorted(static_urls), "eagerness": "moderate"}
+                {"source": "list", "urls": sorted_urls, "eagerness": "moderate"}
             )
-        if parametric_patterns:
+        if sorted_patterns:
             rules["prefetch"].append(
                 {
                     "source": "document",
-                    "where": {"or": [{"href_matches": p} for p in sorted(parametric_patterns)]},
+                    "where": {"or": [{"href_matches": p} for p in sorted_patterns]},
                     "eagerness": "conservative",
                 }
             )
     elif mode == "moderate":
-        if static_urls:
-            rules["prefetch"].append(
-                {"source": "list", "urls": sorted(static_urls), "eagerness": "eager"}
-            )
+        if sorted_urls:
+            rules["prefetch"].append({"source": "list", "urls": sorted_urls, "eagerness": "eager"})
             rules["prerender"].append(
-                {"source": "list", "urls": sorted(static_urls), "eagerness": "moderate"}
+                {"source": "list", "urls": sorted_urls, "eagerness": "moderate"}
             )
-        if parametric_patterns:
+        if sorted_patterns:
             rules["prefetch"].append(
                 {
                     "source": "document",
-                    "where": {"or": [{"href_matches": p} for p in sorted(parametric_patterns)]},
+                    "where": {"or": [{"href_matches": p} for p in sorted_patterns]},
                     "eagerness": "moderate",
                 }
             )
     elif mode == "eager":
-        if static_urls:
-            rules["prerender"].append(
-                {"source": "list", "urls": sorted(static_urls), "eagerness": "eager"}
-            )
-        if parametric_patterns:
+        if sorted_urls:
+            rules["prerender"].append({"source": "list", "urls": sorted_urls, "eagerness": "eager"})
+        if sorted_patterns:
             rules["prerender"].append(
                 {
                     "source": "document",
-                    "where": {"or": [{"href_matches": p} for p in sorted(parametric_patterns)]},
+                    "where": {"or": [{"href_matches": p} for p in sorted_patterns]},
                     "eagerness": "moderate",
                 }
             )
