@@ -240,7 +240,7 @@ class Database:
     # -- Echo / query logging --
 
     def _log_query(self, sql: str, params: tuple[Any, ...] | Sequence[Any], elapsed: float) -> None:
-        """Log a query to stderr when echo is enabled."""
+        """Log a query via the ``chirp.data`` logger when echo is enabled."""
         if not self._config.echo:
             return
         ms = elapsed * 1000
