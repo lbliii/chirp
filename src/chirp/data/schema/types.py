@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ColumnSchema:
     """A single column in a table."""
 
@@ -14,7 +14,7 @@ class ColumnSchema:
     primary_key: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class IndexSchema:
     """A database index."""
 
@@ -24,7 +24,7 @@ class IndexSchema:
     unique: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ForeignKey:
     """A foreign key constraint."""
 
@@ -33,7 +33,7 @@ class ForeignKey:
     ref_column: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TableSchema:
     """Schema for a single table."""
 
@@ -42,7 +42,7 @@ class TableSchema:
     foreign_keys: tuple[ForeignKey, ...] = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SchemaSnapshot:
     """Complete database schema snapshot."""
 

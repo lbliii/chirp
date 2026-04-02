@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CreateTable:
     """Create a new table."""
 
@@ -11,14 +11,14 @@ class CreateTable:
     sql: str  # Original CREATE TABLE statement
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DropTable:
     """Drop an existing table."""
 
     name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddColumn:
     """Add a column to an existing table."""
 
@@ -29,7 +29,7 @@ class AddColumn:
     default: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DropColumn:
     """Drop a column from an existing table."""
 
@@ -37,7 +37,7 @@ class DropColumn:
     name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CreateIndex:
     """Create a new index."""
 
@@ -47,7 +47,7 @@ class CreateIndex:
     unique: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DropIndex:
     """Drop an existing index."""
 

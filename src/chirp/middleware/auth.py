@@ -193,8 +193,8 @@ class AuthConfig:
     """
 
     session_key: str = "user_id"
-    token_header: str = "Authorization"
-    token_scheme: str = "Bearer"
+    token_header: str = "Authorization"  # noqa: S105
+    token_scheme: str = "Bearer"  # noqa: S105
     load_user: Callable[[str], Awaitable[User | None]] | None = None
     verify_token: Callable[[str], Awaitable[User | None]] | None = None
     session_version: Callable[[User], str | int | None] | None = None

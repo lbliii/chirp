@@ -144,15 +144,36 @@ select = [
     "C4",   # unnecessary comprehensions/list()/dict() calls
     "RUF",  # Ruff-specific (unused noqa, mutable class defaults, etc.)
     "PT",   # flake8-pytest-style — pytest best practices
+    "T20",  # flake8-print — catch stray print() statements
+    "A",    # flake8-builtins — detect builtin shadowing
+    "S",    # bandit — security checks
+    "TRY",  # tryceratops — exception handling best practices
+    "LOG",  # flake8-logging — logging best practices
 ]
 ignore = [
-    "E501", # line too long — handled by formatter
+    "E501",   # line too long — handled by formatter
+    "A002",   # builtin-argument-shadowing — `next` is the middleware convention
+    "TRY003", # long exception messages — we prefer inline detail strings
+    "TRY300", # try-return — idiomatic in check-then-proceed patterns
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]      # Allow unused imports in __init__ files (re-exports)
-"tests/**/*.py" = ["S101"]    # Allow assert in tests
-"examples/**/*.py" = ["E402"] # Path setup before imports for standalone run
+"__init__.py" = ["F401"]              # Allow unused imports in __init__ files (re-exports)
+"tests/**/*.py" = ["S101", "S104", "S105", "S106", "S107", "S603", "TRY301"] # Tests use asserts, test secrets, subprocess, raise-in-try
+"examples/**/*.py" = ["E402", "S101", "S105", "S106", "S107", "S307", "S311", "S608", "T20"] # Examples are demos
+"benchmarks/**/*.py" = ["T20", "S101", "S603"] # Prints, asserts, subprocess in benchmarks
+"scripts/**/*.py" = ["T20"]           # Scripts use print for output
+"src/chirp/cli/**/*.py" = ["T20"]     # CLI commands use print for user output
+"src/chirp/app/diagnostics.py" = ["T20"] # Startup diagnostics use print
+"src/chirp/app/server.py" = ["T20"]   # Server startup uses print
+"src/chirp/testing/assertions.py" = ["S101"] # Test assertion helpers use assert by design
+"src/chirp/app/__init__.py" = ["S101"] # Internal state assertions after freeze
+"src/chirp/app/runtime.py" = ["S101"] # Internal state assertions after freeze
+"src/chirp/data/errors.py" = ["A001"] # ConnectionError shadows builtin intentionally
+"src/chirp/data/query.py" = ["S608"]  # Query builder constructs SQL safely (parameterized)
+"src/chirp/data/migrate.py" = ["S608"] # Migration SQL is framework-generated
+"src/chirp/server/production.py" = ["S104"] # Server binds to 0.0.0.0 intentionally
+"src/chirp/contracts/**/*.py" = ["S110", "S112", "S608"] # Contract checkers intentionally suppress errors
 
 # =============================================================================
 # ty — Type Checker (Rust-based, Astral)
