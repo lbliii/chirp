@@ -18,8 +18,66 @@ from .state import MutableAppState, RuntimeAppState
 def _collect_builtin_middleware(
     config: AppConfig,
     middleware_list: list,
+    *,
+    router: object | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
+    # AllowedHostsMiddleware — reject bad hosts first
+    from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
+
+    middleware_list.insert(0, AllowedHostsMiddleware(config.allowed_hosts, debug=config.debug))
+
+    # CacheMiddleware — site-wide GET caching (opt-in)
+    if config.cache_middleware_enabled:
+        from chirp.cache import create_backend
+        from chirp.cache.middleware import CacheMiddleware
+
+        backend = create_backend(config.cache_backend)
+        middleware_list.append(CacheMiddleware(backend, ttl=config.cache_default_ttl))
+
+    # LocaleMiddleware — i18n locale detection
+    if config.i18n_enabled:
+        from chirp.i18n.middleware import LocaleMiddleware
+
+        middleware_list.append(
+            LocaleMiddleware(
+                supported_locales=config.i18n_supported_locales,
+                default_locale=config.i18n_default_locale,
+                cookie_name=config.i18n_cookie_name,
+                url_prefix=config.i18n_url_prefix,
+            )
+        )
+
+    # CSP nonce middleware
+    if config.csp_nonce_enabled:
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        needs_eval = config.alpine and not config.alpine_csp
+        middleware_list.append(CSPNonceMiddleware(unsafe_eval=needs_eval))
+
+    # HSTS auto-enable in production with TLS
+    if config.env == "production" and config.ssl_certfile and not config.strict_transport_security:
+        # Auto-set HSTS — mutating config is not possible (frozen),
+        # so we add SecurityHeadersMiddleware with HSTS manually
+        from chirp.middleware.security_headers import (
+            SecurityHeadersConfig,
+            SecurityHeadersMiddleware,
+        )
+
+        needs_eval = config.alpine and not config.alpine_csp
+        eval_directive = " 'unsafe-eval'" if needs_eval else ""
+        csp = (
+            "default-src 'self'; "
+            f"script-src 'self' 'unsafe-inline'{eval_directive}"
+            " https://unpkg.com https://cdn.jsdelivr.net; "
+            "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+        )
+        sec_config = SecurityHeadersConfig(
+            strict_transport_security="max-age=63072000; includeSubDomains",
+            content_security_policy=csp,
+        )
+        middleware_list.append(SecurityHeadersMiddleware(sec_config))
+
     if config.static_dir is not None:
         static_path = Path(config.static_dir).resolve()
         if static_path.is_dir():
@@ -59,12 +117,17 @@ def _collect_builtin_middleware(
         middleware_list.append(
             HTMLInject(islands_snippet(config.islands_version), full_page_only=True)
         )
-    if config.view_transitions:
+    from chirp.server.view_transitions import normalize_view_transitions
+
+    vt_mode = normalize_view_transitions(config.view_transitions)
+    if vt_mode in ("htmx", "full"):
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.view_transitions import (
-            VIEW_TRANSITIONS_HEAD_SNIPPET,
-            VIEW_TRANSITIONS_SCRIPT_SNIPPET,
-        )
+        from chirp.server.view_transitions import VIEW_TRANSITIONS_SCRIPT_SNIPPET
+
+        middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
+    if vt_mode == "full":
+        from chirp.middleware.inject import HTMLInject
+        from chirp.server.view_transitions import VIEW_TRANSITIONS_HEAD_SNIPPET
 
         middleware_list.append(
             HTMLInject(
@@ -73,7 +136,21 @@ def _collect_builtin_middleware(
                 full_page_only=True,
             )
         )
-        middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
+    if config.speculation_rules and router is not None:
+        from chirp.server.speculation_rules import (
+            build_speculation_rules_snippet,
+            normalize_speculation_rules,
+        )
+
+        sr_mode = normalize_speculation_rules(config.speculation_rules)
+        if sr_mode != "off":
+            sr_snippet = build_speculation_rules_snippet(router, sr_mode)
+            if sr_snippet:
+                from chirp.middleware.inject import HTMLInject
+
+                middleware_list.append(
+                    HTMLInject(sr_snippet, before="</head>", full_page_only=True)
+                )
     if config.debug:
         from chirp.middleware.inject import HTMLInject
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
@@ -81,7 +158,7 @@ def _collect_builtin_middleware(
 
         middleware_list.append(LayoutDebugMiddleware())
         middleware_list.append(HTMLInject(DEVTOOLS_BOOT_SNIPPET))
-        if not config.view_transitions:
+        if vt_mode == "off":
             from chirp.middleware.inject import ViewTransitionCssDebugWarning
 
             middleware_list.append(ViewTransitionCssDebugWarning())
@@ -171,7 +248,7 @@ class AppCompiler:
         self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
         middleware_list = list(self._mutable.middleware_list)
-        middleware_list = _collect_builtin_middleware(self._config, middleware_list)
+        middleware_list = _collect_builtin_middleware(self._config, middleware_list, router=router)
         self._runtime.middleware = tuple(middleware_list)
 
         for middleware in self._runtime.middleware:
@@ -179,6 +256,13 @@ class AppCompiler:
             if mw_globals and isinstance(mw_globals, dict):
                 for name, func in mw_globals.items():
                     self._mutable.template_globals.setdefault(name, func)
+
+        # Register i18n template global if enabled
+        if self._config.i18n_enabled:
+            from chirp.i18n import init_catalog, t
+
+            init_catalog(str(self._config.i18n_directory))
+            self._mutable.template_globals.setdefault("t", t)
 
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env
@@ -191,6 +275,7 @@ class AppCompiler:
                 self._config,
                 self._mutable.template_filters,
                 self._mutable.template_globals,
+                plugin_loaders=self._mutable.plugin_loaders,
             )
 
         self._runtime.tool_registry = compile_tools(

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.2.0"
+version = "0.3.3"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -35,9 +35,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "kida-templates>=0.2.9", # Template engine (same ecosystem, same author)
+    "kida-templates>=0.3.0", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.3.1",  # ASGI server (public PounceError et al. from pounce)
+    "bengal-pounce>=0.4.0",  # ASGI server (public PounceError et al. from pounce)
 ]
 
 [project.optional-dependencies]
@@ -63,7 +63,7 @@ ai = ["httpx>=0.27.0"]
 markdown = ["patitas[syntax]>=0.3.5"]
 
 # chirp-ui component library (CSS, themes, layout macros)
-ui = ["chirp-ui>=0.2.1"]
+ui = ["chirp-ui>=0.2.3"]
 
 # Config from env (python-dotenv for local .env loading)
 config = ["python-dotenv>=1.0.0"]
@@ -110,7 +110,7 @@ Repository = "https://github.com/lbliii/chirp"
 Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 
 # tool.uv.sources: omitted — workspace root (b-stack) provides bengal-pounce override
-# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.3.1).
+# for local dev. Standalone/CI/external installs use PyPI (bengal-pounce>=0.4.0).
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -182,6 +182,10 @@ exclude = ["dist/", "build/", "tests/"]
 # Only relax what produces genuine false positives.
 unused-ignore-comment = "warn" # Flag stale type: ignore for cleanup
 
+# Mapping.get override in Headers/QueryParams/FormData/LazyHeaders/LazyCookies
+# is intentional (str-only keys/values); LSP violation is accepted.
+invalid-method-override = "warn"
+
 # =============================================================================
 # Pytest
 # =============================================================================
@@ -248,7 +252,7 @@ dev = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
-    "chirp-ui>=0.2.1",          # Layout macros for llm_playground example tests
+    "chirp-ui>=0.2.3",          # Layout macros for llm_playground example tests
 ]
 
 # =============================================================================

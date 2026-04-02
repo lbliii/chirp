@@ -11,6 +11,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Route contract** — `chirp check` no longer reports missing `_meta.py` for routes whose `_meta.py` defines only `meta()` (dynamic metadata). Those routes register a meta provider at discovery time; the checker now treats that as satisfying the route metadata contract.
 
+## [0.3.3] — 2026-03-30
+
+### Fixed
+
+- **CSP defaults** — `SecurityHeadersMiddleware` and `CSPNonceMiddleware` now allow `unpkg.com` (htmx), `cdn.jsdelivr.net` (Alpine.js), and inline scripts in the default `script-src`, fixing silent breakage of htmx/JS actions.
+
+### Dependencies
+
+- `chirp-ui>=0.2.3` (bumped from `>=0.2.2`)
+
+## [0.3.2] — 2026-03-30
+
+### Dependencies
+
+- `chirp-ui>=0.2.2` (bumped from `>=0.2.1`)
+
+## [0.3.1] — 2026-03-30
+
+### Added
+
+- **Speculation Rules API** — Auto-generate `<script type="speculationrules">` from route definitions with tiered opt-in via `AppConfig(speculation_rules=...)`: `False`/`"off"` (default), `True`/`"conservative"` (prefetch on hover), `"moderate"` (prefetch eagerly, prerender on hover), `"eager"` (prerender eagerly). XSS-safe JSON escaping in the injected script tag.
+- **Invoker Commands validation** — `app.check()` now validates `commandfor` targets and `command` attribute values against the Invoker Commands spec, with negative lookbehind to avoid false positives on `data-command`/`data-commandfor`.
+- **htmx 4.0 `<htmx-partial>` alignment** — `HX-Partial` header parsing on `Request`, fragment block resolution for partial requests, and contract validation for `<htmx-partial src="...">` routes.
+- **Philosophy doc** — `docs/philosophy.md` coins "hypermedia-native" as Chirp's app style and documents the five core opinions.
+- **CLAUDE.md** — Development guide for contributors and AI assistants.
+
+### Changed
+
+- **View Transitions** — Replaced the single boolean toggle with three tiers: `False`/`"off"` (inject nothing, now the default), `True`/`"htmx"` (htmx `globalViewTransitions` only), `"full"` (htmx JS + MPA CSS/meta for cross-document transitions). **Breaking:** default changed from `True` to `False`.
+- **README** — Trimmed redundant sections; merged "Hypermedia-Native Python" and "What is Chirp?"; added Zoomies to the Bengal ecosystem table.
+
+### Fixed
+
+- **Suspense** — `format_oob_script` no longer double-nests OOB swap markup.
+- **SSE fragment whitespace** — Trailing whitespace stripped from SSE data fields, fixing htmx table row parsing.
+- **Markdown filter** — Renderer output is now marked safe to prevent Kida auto-escaping HTML.
+- **Standalone examples** — Contacts edit URL reset after save; upload delete route reachable from HTML forms; dashboard/hackernews SSE restored (missing `worker_mode`); ollama chat form clears on submit and shows tools-used label in streaming mode.
+- **Kanban template** — Replaced `loop.index` inside `{% call %}` with CSS `:nth-child(odd)` to work with Kida 0.3.0 scope isolation fix.
+
+### Dependencies
+
+- `kida-templates>=0.3.0` (unchanged minimum, but now tested against Kida 0.3.0 scope isolation)
+- `bengal-pounce>=0.4.0` (unchanged minimum)
+
+## [0.3.0] — 2026-03-25
+
+### Added
+
+- **Security middleware** — `AllowedHostsMiddleware` validates the `Host` header against a configurable allowlist, rejecting spoofed-host requests. `CSPNonceMiddleware` generates per-request `Content-Security-Policy` nonces accessible via `request.state["csp_nonce"]` and injected into templates.
+- **Caching framework** — `chirp.cache` with a `CacheBackend` protocol and three backends: `MemoryCacheBackend`, `NullCacheBackend`, and `RedisCacheBackend`. Includes `CacheMiddleware` for response caching with a configurable key function, `default_cache_key()` / `vary_aware_cache_key()` helpers, and `Vary`-aware keying.
+- **Plugin system** — `ChirpPlugin` protocol and `app.mount(prefix, plugin)` for distributing reusable middleware, routes, and template extensions as packages.
+- **Schema migrations** — `chirp.data.schema` with introspection, diff, operation generation, and migration file output. `chirp makemigrations` CLI command auto-generates migration files from model changes.
+- **Internationalization** — `chirp.i18n` with message catalogs, `LocaleMiddleware` for locale detection, number/date/currency formatting, and `t()` translation helpers wired into templates.
+- **CLI** — `chirp makemigrations` and `chirp security-check` subcommands.
+- **Vary contract rule** — `contracts.rules_vary` validates that responses include correct `Vary` headers when content depends on request headers.
+- **SECURITY.md** — Vulnerability reporting policy.
+
+### Changed
+
+- **htmx headers** — `Request` and `Response` htmx header handling improved for correctness, inspired by django-htmx. `HX-Trigger`, `HX-Push-Url`, `HX-Replace-Url`, and related headers now follow the htmx spec more closely with proper JSON encoding and boolean handling.
+
+### Dependencies
+
+- No dependency changes (all new modules use stdlib or existing deps).
+>>>>>>> origin/main
+
 ## [0.2.0] — 2026-03-23
 
 ### Added
@@ -162,6 +228,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contracts** — Regex for Kida URL extraction in htmx attributes
 - **Contracts** — Action+method matrix: GET default, swap safety for form actions
 
+[0.3.3]: https://github.com/lbliii/chirp/releases/tag/v0.3.3
+[0.3.2]: https://github.com/lbliii/chirp/releases/tag/v0.3.2
+[0.3.1]: https://github.com/lbliii/chirp/releases/tag/v0.3.1
+[0.3.0]: https://github.com/lbliii/chirp/releases/tag/v0.3.0
 [0.1.8]: https://github.com/lbliii/chirp/releases/tag/v0.1.8
 [0.1.9]: https://github.com/lbliii/chirp/releases/tag/v0.1.9
 [0.2.0]: https://github.com/lbliii/chirp/releases/tag/v0.2.0

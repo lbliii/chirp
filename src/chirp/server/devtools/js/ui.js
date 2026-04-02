@@ -577,9 +577,32 @@ function renderActivityLog() {
         dc.appendChild(hlSection("Render Plan", esc(formatRenderPlan(r.renderPlan)), false));
       }
 
+      if (r.requestHeaders && typeof r.requestHeaders === "object") {
+        var hxReqLines = [];
+        var hxReqKeys = ["HX-Request", "HX-Target", "HX-Trigger", "HX-Trigger-Name",
+          "HX-Boosted", "HX-History-Restore-Request", "HX-Current-URL", "HX-Prompt"];
+        for (var ki = 0; ki < hxReqKeys.length; ki++) {
+          var hk = hxReqKeys[ki];
+          if (r.requestHeaders[hk]) hxReqLines.push(hk + ": " + r.requestHeaders[hk]);
+        }
+        if (hxReqLines.length) {
+          dc.appendChild(hlSection("htmx Request Headers", hlHeaders(hxReqLines.join("\n")), false));
+        }
+      }
+
+      if (r.hxTriggerEvents && r.hxTriggerEvents.length) {
+        var tl = r.hxTriggerEvents.map(function(te) {
+          var line = te.name;
+          if (te.phase !== "HX-Trigger") line += "  (" + te.phase + ")";
+          if (te.data && te.data !== true) line += "  " + JSON.stringify(te.data);
+          return line;
+        }).join("\n");
+        dc.appendChild(hlSection("Triggered Events (" + r.hxTriggerEvents.length + ")", esc(tl), false));
+      }
+
       if (r.hxPairs && r.hxPairs.length) {
         var ht = r.hxPairs.map(function(p) { return p[0] + ": " + p[1]; }).join("\n");
-        dc.appendChild(hlSection("HX / X-Chirp Headers", hlHeaders(ht), false));
+        dc.appendChild(hlSection("HX / X-Chirp Response Headers", hlHeaders(ht), false));
       }
 
       if (r.bodyPreview) {

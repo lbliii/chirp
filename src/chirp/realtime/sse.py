@@ -256,7 +256,7 @@ def _format_event(
             raise RuntimeError("Fragment events require kida integration.")
         from chirp.templating.integration import render_fragment
 
-        html = render_fragment(kida_env, value)
+        html = render_fragment(kida_env, value).strip()
         # Use the Fragment's target as the SSE event name when specified.
         # This allows sse-swap="target_id" on DOM elements to receive
         # updates for specific blocks (reactive templates pattern).

@@ -73,6 +73,7 @@ class MutableAppState:
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
+    plugin_loaders: list[Any] = field(default_factory=list)
 
 
 @dataclass(slots=True)

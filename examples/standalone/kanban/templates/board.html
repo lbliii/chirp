@@ -15,7 +15,7 @@
     - | sort(attribute=)    — sort within columns
     - | length              — counts
     - | lower, | capitalize — string transforms
-    - loop.index, is odd    — alternating card tints
+    - :nth-child(odd)       — alternating card tints (CSS)
 -#}
 
 {# Fragment-safe imports — available during both render() and render_block(). #}
@@ -130,11 +130,7 @@
             <p class="empty">No tasks in {{ col_name | lower }}.</p>
           {% end %}
           {% for task in col_tasks | sort(attribute="created_at") %}
-            {% if loop.index is odd %}
-            <div class="card-wrapper alt">
-            {% else %}
             <div class="card-wrapper">
-            {% end %}
               {{ task_card(task) }}
             </div>
           {% end %}
@@ -240,11 +236,7 @@
     <p class="empty">No tasks.</p>
   {% end %}
   {% for task in tasks | sort(attribute="created_at") %}
-    {% if loop.index is odd %}
-    <div class="card-wrapper alt">
-    {% else %}
     <div class="card-wrapper">
-    {% end %}
       {{ task_card(task) }}
     </div>
   {% end %}

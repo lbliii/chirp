@@ -63,17 +63,20 @@ CHIRP_CAPABILITIES = frozenset(
 __all__ = [
     "CHIRP_CAPABILITIES",
     "OOB",
+    "STOP_POLLING",
     "Action",
     "AnyResponse",
     "App",
     "AppConfig",
     "ChirpError",
+    "ChirpPlugin",
     "ConfigurationError",
     "EventStream",
     "FormAction",
     "FormBindingError",
     "Fragment",
     "HTTPError",
+    "HtmxDetails",
     "InlineTemplate",
     "LayoutPage",
     "MarkdownRenderer",
@@ -100,10 +103,12 @@ __all__ = [
     "ToolCallEvent",
     "ValidationError",
     "ViewRef",
+    "cache_view",
     "form_from",
     "form_or_errors",
     "form_values",
     "g",
+    "get_cache",
     "get_request",
     "get_user",
     "hx_redirect",
@@ -124,9 +129,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # HTTP
+    "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),
     "Response": ("chirp.http.response", "Response"),
     "Redirect": ("chirp.http.response", "Redirect"),
+    "STOP_POLLING": ("chirp.http.response", "STOP_POLLING"),
     "hx_redirect": ("chirp.http.response", "hx_redirect"),
     # Return types
     "Template": ("chirp.templating.returns", "Template"),
@@ -182,6 +189,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
+    # Cache
+    "get_cache": ("chirp.cache", "get_cache"),
+    "cache_view": ("chirp.cache", "cache_view"),
+    # Plugin
+    "ChirpPlugin": ("chirp.plugin", "ChirpPlugin"),
     # Extensions
     "use_chirp_ui": ("chirp.ext.chirp_ui", "use_chirp_ui"),
 }

@@ -16,6 +16,7 @@ from .routes import (
     find_matching_route,
 )
 from .rules_accessibility import check_accessibility
+from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_forms import validate_form_contracts
 from .rules_htmx import (
     check_hx_boost,
@@ -41,9 +42,11 @@ from .rules_sse import (
     check_sse_self_swap,
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
+from .rules_vary import check_vary_coverage
 from .template_scan import (
     extract_fragment_island_ids,
     extract_href_references,
+    extract_htmx_partial_sources,
     extract_ids_with_disinherit,
     extract_legacy_action_contracts,
     extract_static_ids,
@@ -294,6 +297,19 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 href_match = find_matching_route(href_url, static_routes, parametric_routes)
                 if href_match is not None:
                     referenced_paths.add(href_match[0])
+            for partial_url in extract_htmx_partial_sources(source):
+                partial_match = find_matching_route(partial_url, static_routes, parametric_routes)
+                if partial_match is not None:
+                    referenced_paths.add(partial_match[0])
+                else:
+                    result.issues.append(
+                        ContractIssue(
+                            severity=Severity.ERROR,
+                            category="htmx_partial",
+                            message=(f'<htmx-partial src="{partial_url}"> has no matching route.'),
+                            template=template_name,
+                        )
+                    )
 
         hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
         result.hx_targets_validated = hx_validated
@@ -301,6 +317,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
         result.issues.extend(check_selector_syntax(template_sources))
         result.issues.extend(check_hx_boost(template_sources))
+        commandfor_issues, commandfor_validated = check_commandfor_targets(
+            template_sources, all_ids
+        )
+        result.commandfor_validated = commandfor_validated
+        result.issues.extend(commandfor_issues)
+        result.issues.extend(check_command_values(template_sources))
         result.issues.extend(
             check_swap_safety(
                 template_sources,
@@ -356,6 +378,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(
             check_island_mounts(template_sources, strict=snapshot.islands_contract_strict)
         )
+        result.issues.extend(check_vary_coverage(template_sources))
         for template_name, source in template_sources.items():
             if template_name.startswith(("chirp/", "chirpui/")):
                 continue

@@ -316,6 +316,22 @@ class App:
         self._check_not_frozen()
         self._mutable_state.fragment_target_registry.register_contract(contract)
 
+    def mount(self, prefix: str, plugin: object) -> None:
+        """Mount a plugin at the given URL prefix.
+
+        Calls ``plugin.register(app, prefix)`` during setup phase.
+        """
+        self._check_not_frozen()
+        register = getattr(plugin, "register", None)
+        if register is None or not callable(register):
+            msg = f"Plugin {plugin!r} must have a register(app, prefix) method"
+            raise ConfigurationError(msg)
+        register(self, prefix)
+
+    def add_loader(self, loader: object) -> None:
+        """Add a template loader (e.g., from a plugin's PackageLoader)."""
+        self._registry.add_loader(loader)
+
     def add_middleware(self, middleware: object) -> None:
         self._registry.add_middleware(middleware)
 
@@ -381,7 +397,7 @@ class App:
         from chirp.server.sync_handler import handle_sync as _handle_sync
 
         return _handle_sync(
-            raw=raw,  # type: ignore[arg-type]
+            raw=raw,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
             router=self._router,
             middleware=self._middleware,
             providers=self._mutable_state.providers,

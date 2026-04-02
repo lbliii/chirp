@@ -1,12 +1,12 @@
 ---
 title: Built-in Middleware
-description: CORS, StaticFiles, Sessions, Auth, CSRF, and HTMLInject
+description: CORS, StaticFiles, Sessions, Auth, CSRF, Security, and HTMLInject
 draft: false
 weight: 20
 lang: en
 type: doc
-tags: [middleware, cors, static, sessions, auth, csrf]
-keywords: [cors, static-files, sessions, auth, csrf, html-inject, middleware]
+tags: [middleware, cors, static, sessions, auth, csrf, security, csp]
+keywords: [cors, static-files, sessions, auth, csrf, html-inject, middleware, allowed-hosts, csp-nonce]
 category: guide
 ---
 
@@ -345,6 +345,68 @@ app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
     x_frame_options="SAMEORIGIN",
 )))
 ```
+
+## AllowedHostsMiddleware
+
+Validate the `Host` header against a whitelist, rejecting requests with spoofed or unrecognized hosts:
+
+```python
+from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
+
+app.add_middleware(AllowedHostsMiddleware(
+    ("example.com", ".example.com"),
+))
+```
+
+Wildcard patterns:
+
+- `"*"` — allow all hosts (default, suitable for development)
+- `".example.com"` — matches `example.com` and any subdomain (e.g. `api.example.com`)
+
+Returns `400 Bad Request` for unrecognized hosts. Pass `debug=True` to include the rejected host and allowed list in the error response (development only).
+
+:::{warning}
+Always set explicit allowed hosts in production. The `"*"` default is for local development only.
+:::
+
+## CSPNonceMiddleware
+
+Generate a per-request cryptographic nonce for `Content-Security-Policy`, allowing inline scripts without `'unsafe-inline'`:
+
+```python
+from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+app.add_middleware(CSPNonceMiddleware())
+```
+
+The nonce is available in templates via `csp_nonce()`:
+
+```html
+<script nonce="{{ csp_nonce() }}">
+    // Inline script allowed by CSP
+</script>
+```
+
+You can also access the nonce in handlers:
+
+```python
+from chirp.middleware.csp_nonce import get_csp_nonce
+
+@app.route("/page")
+def page():
+    nonce = get_csp_nonce()
+    return Template("page.html", nonce=nonce)
+```
+
+To customize the base CSP directive:
+
+```python
+app.add_middleware(CSPNonceMiddleware(
+    base_csp="default-src 'self'; img-src 'self' https://cdn.example.com"
+))
+```
+
+The middleware appends `script-src 'self' 'nonce-<value>'` to whatever base CSP you provide.
 
 ## HTMLInject
 

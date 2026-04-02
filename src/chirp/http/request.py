@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlparse
 
 from chirp._internal.asgi import Receive, Scope
 from chirp.http.cookies import parse_cookies
@@ -17,6 +18,118 @@ from chirp.http.query import QueryParams
 
 if TYPE_CHECKING:
     from chirp.http.forms import FormData
+
+
+class HtmxDetails:
+    """Parsed htmx request headers with caching.
+
+    Attached to ``request.htmx``. Truthy when ``HX-Request`` is present,
+    providing typed access to all htmx request headers. Values are
+    computed once and cached for the lifetime of the request.
+    """
+
+    __slots__ = ("_cache", "_headers", "_server")
+
+    _headers: Headers
+    _server: tuple[str, int] | None
+    _cache: dict[str, str | None]
+
+    def __init__(self, headers: Headers, server: tuple[str, int] | None) -> None:
+        self._headers = headers
+        self._server = server
+        self._cache = {}
+
+    def __bool__(self) -> bool:
+        """True if this is an htmx request (HX-Request header is present)."""
+        return self._headers.get("hx-request") == "true"
+
+    def _get(self, name: str) -> str | None:
+        """Read an htmx header with URI-AutoEncoded decoding and caching."""
+        if name in self._cache:
+            return self._cache[name]
+        value = self._headers.get(name)
+        if value is None:
+            self._cache[name] = None
+            return None
+        if self._headers.get(f"{name}-uri-autoencoded") == "true":
+            value = unquote(value)
+        self._cache[name] = value
+        return value
+
+    @property
+    def boosted(self) -> bool:
+        """True if this request came from an hx-boost enhanced element."""
+        return self._headers.get("hx-boosted") == "true"
+
+    @property
+    def history_restore(self) -> bool:
+        """True if htmx is restoring from history (cache miss on back/forward)."""
+        return self._headers.get("hx-history-restore-request") == "true"
+
+    @property
+    def target(self) -> str | None:
+        """The target element ID from HX-Target header."""
+        return self._get("hx-target")
+
+    @property
+    def trigger(self) -> str | None:
+        """The trigger element ID from HX-Trigger header."""
+        return self._get("hx-trigger")
+
+    @property
+    def trigger_name(self) -> str | None:
+        """The name attribute of the trigger element (HX-Trigger-Name header)."""
+        return self._get("hx-trigger-name")
+
+    @property
+    def current_url(self) -> str | None:
+        """The browser's current URL from HX-Current-URL header."""
+        return self._get("hx-current-url")
+
+    @property
+    def current_url_abs_path(self) -> str | None:
+        """The path portion of the browser's current URL.
+
+        Strips scheme and host when the origin matches this request's
+        server, returning just the path (+ query + fragment). Returns
+        the full URL unchanged when the origin differs or server info
+        is unavailable.
+        """
+        key = "_current_url_abs_path"
+        if key in self._cache:
+            return self._cache[key]
+        url = self.current_url
+        if url is None:
+            self._cache[key] = None
+            return None
+        parsed = urlparse(url)
+        server = self._server
+        if server is not None:
+            host, port = server
+            request_host = f"{host}:{port}" if port not in (80, 443) else host
+            if parsed.netloc == request_host:
+                path = parsed.path
+                if parsed.query:
+                    path = f"{path}?{parsed.query}"
+                if parsed.fragment:
+                    path = f"{path}#{parsed.fragment}"
+                self._cache[key] = path
+                return path
+        self._cache[key] = url
+        return url
+
+    @property
+    def prompt(self) -> str | None:
+        """The user response to hx-prompt (HX-Prompt header)."""
+        return self._get("hx-prompt")
+
+    @property
+    def partial(self) -> str | None:
+        """The partial element name from HX-Partial header (htmx 4.0+).
+
+        Set when the request originates from an ``<htmx-partial>`` element.
+        """
+        return self._get("hx-partial")
 
 
 class _LazyQueryParams(Mapping[str, str]):
@@ -123,34 +236,64 @@ class Request:
     # -- Computed properties --
 
     @property
+    def htmx(self) -> HtmxDetails:
+        """Typed, cached htmx request details.
+
+        Truthy when ``HX-Request`` is present::
+
+            if request.htmx:
+                target = request.htmx.target
+        """
+        if "_htmx" not in self._cache:
+            self._cache["_htmx"] = HtmxDetails(self.headers, self.server)
+        return self._cache["_htmx"]
+
+    # -- Convenience aliases (delegate to request.htmx) --
+
+    @property
     def is_fragment(self) -> bool:
         """True if this is an htmx fragment request (HX-Request header)."""
-        return self.headers.get("hx-request") == "true"
+        return bool(self.htmx)
 
     @property
     def is_history_restore(self) -> bool:
         """True if htmx is restoring from history (cache miss on back/forward)."""
-        return self.headers.get("hx-history-restore-request") == "true"
+        return self.htmx.history_restore
 
     @property
     def is_boosted(self) -> bool:
         """True if this request came from an hx-boost enhanced element."""
-        return self.headers.get("hx-boosted") == "true"
+        return self.htmx.boosted
 
     @property
     def htmx_target(self) -> str | None:
         """The target element ID from HX-Target header."""
-        return self.headers.get("hx-target")
+        return self.htmx.target
 
     @property
     def htmx_trigger(self) -> str | None:
         """The trigger element ID from HX-Trigger header."""
-        return self.headers.get("hx-trigger")
+        return self.htmx.trigger
 
     @property
     def htmx_trigger_name(self) -> str | None:
         """The name attribute of the trigger element (HX-Trigger-Name header)."""
-        return self.headers.get("hx-trigger-name")
+        return self.htmx.trigger_name
+
+    @property
+    def htmx_current_url(self) -> str | None:
+        """The browser's current URL from HX-Current-URL header."""
+        return self.htmx.current_url
+
+    @property
+    def htmx_current_url_abs_path(self) -> str | None:
+        """The path portion of the browser's current URL."""
+        return self.htmx.current_url_abs_path
+
+    @property
+    def htmx_partial(self) -> str | None:
+        """The partial element name from HX-Partial header (htmx 4.0+)."""
+        return self.htmx.partial
 
     @property
     def content_type(self) -> str | None:

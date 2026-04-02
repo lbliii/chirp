@@ -67,6 +67,9 @@ class AppConfig:
 
     # Security
     secret_key: str = ""
+    allowed_hosts: tuple[str, ...] = ("*",)
+    csp_nonce_enabled: bool = False
+    strict_transport_security: str | None = None
 
     # Templates
     template_dir: str | Path = "templates"
@@ -96,9 +99,18 @@ class AppConfig:
     # SSE lifecycle — data-sse-state attribute + chirp:sse:connected/disconnected events
     sse_lifecycle: bool = True
 
-    # View Transitions — meta tag, default CSS, htmx globalViewTransitions (default on).
-    # Set False for API-only apps or tests that need responses without injected head/body.
-    view_transitions: bool = True
+    # View Transitions — tiered opt-in for the View Transitions API.
+    #   False / "off"  — inject nothing (default)
+    #   True  / "htmx" — htmx globalViewTransitions only (baseline, all browsers)
+    #   "full"         — htmx JS + MPA CSS/meta (cross-document, no Firefox yet)
+    view_transitions: bool | str = False
+
+    # Speculation Rules API — prefetch/prerender predictions for instant MPA navigation.
+    #   False / "off"          — inject nothing (default)
+    #   True  / "conservative" — prefetch linked pages on hover (safe for all apps)
+    #   "moderate"             — prefetch eagerly, prerender on hover
+    #   "eager"                — prerender eagerly (routes must be side-effect-free)
+    speculation_rules: bool | str = False
 
     # Event delegation — copy-btn and compare-switch for SSE-swapped content
     delegation: bool = False
@@ -165,6 +177,19 @@ class AppConfig:
     # TLS (optional)
     ssl_certfile: str | None = None
     ssl_keyfile: str | None = None
+
+    # Cache
+    cache_backend: str = "memory"
+    cache_default_ttl: int = 300
+    cache_middleware_enabled: bool = False
+
+    # Internationalization (i18n)
+    i18n_enabled: bool = False
+    i18n_default_locale: str = "en"
+    i18n_supported_locales: tuple[str, ...] = ("en",)
+    i18n_directory: str | Path = "locales"
+    i18n_cookie_name: str = "chirp_locale"
+    i18n_url_prefix: bool = False
 
     # Enterprise scale (12-factor, observability, shared state)
     env: str = "development"  # development | staging | production
