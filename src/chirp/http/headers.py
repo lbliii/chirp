@@ -58,9 +58,9 @@ class Headers(Mapping[str, str]):
                 yield key
 
     def __len__(self) -> int:
-        seen: set[bytes] = set()
+        seen: set[str] = set()
         for name, _ in self._raw:
-            seen.add(name.lower())
+            seen.add(name.decode("latin-1").lower())
         return len(seen)
 
     def __repr__(self) -> str:
