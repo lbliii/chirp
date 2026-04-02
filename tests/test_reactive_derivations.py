@@ -26,6 +26,10 @@ def _make_index(*blocks: tuple[str, str, list[str]]) -> DependencyIndex:
         ref = BlockRef(template_name=template, block_name=block)
         for path in dep_paths:
             index._path_to_blocks.setdefault(path, []).append(ref)
+            parts = path.split(".")
+            for i in range(len(parts)):
+                prefix = ".".join(parts[: i + 1])
+                index._prefix_to_paths.setdefault(prefix, set()).add(path)
     return index
 
 

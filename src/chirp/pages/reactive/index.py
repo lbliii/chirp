@@ -32,13 +32,16 @@ class DependencyIndex:
     from C, changing C invalidates both B and A.
     """
 
-    __slots__ = ("_path_to_blocks", "_source_to_derived")
+    __slots__ = ("_path_to_blocks", "_prefix_to_paths", "_source_to_derived")
 
     def __init__(self) -> None:
         # context_path -> list of BlockRef
         self._path_to_blocks: dict[str, list[BlockRef]] = {}
         # source_path -> list of derived paths that depend on it
         self._source_to_derived: dict[str, list[str]] = {}
+        # prefix segment -> set of full registered paths sharing that prefix
+        # e.g. "doc" -> {"doc", "doc.version", "doc.title"}
+        self._prefix_to_paths: dict[str, set[str]] = {}
 
     def register_template(
         self,
@@ -74,6 +77,11 @@ class DependencyIndex:
             )
             for dep_path in block_meta.depends_on:
                 self._path_to_blocks.setdefault(dep_path, []).append(ref)
+                # Index all ancestor prefixes for fast prefix matching
+                parts = dep_path.split(".")
+                for i in range(len(parts)):
+                    prefix = ".".join(parts[: i + 1])
+                    self._prefix_to_paths.setdefault(prefix, set()).add(dep_path)
 
     def register_from_sse_swaps(
         self,
@@ -261,16 +269,25 @@ class DependencyIndex:
                     seen.add(key)
                     result.append(ref)
 
-            # Check if any registered path is a prefix of the changed path
-            # e.g., block depends on "doc", changed_paths includes "doc.version"
-            for registered_path, refs in self._path_to_blocks.items():
-                if changed.startswith(registered_path + ".") or registered_path.startswith(
-                    changed + "."
-                ):
-                    for ref in refs:
+            # Registered paths that are children of the changed path
+            # e.g., changed="doc", finds registered "doc.version", "doc.title"
+            for registered_path in self._prefix_to_paths.get(changed, ()):
+                if registered_path != changed:
+                    for ref in self._path_to_blocks.get(registered_path, []):
                         key = (ref.template_name, ref.block_name)
                         if key not in seen:
                             seen.add(key)
                             result.append(ref)
+
+            # Registered paths that are ancestors of the changed path
+            # e.g., changed="doc.version", finds registered "doc"
+            parts = changed.split(".")
+            for i in range(1, len(parts)):
+                ancestor = ".".join(parts[:i])
+                for ref in self._path_to_blocks.get(ancestor, []):
+                    key = (ref.template_name, ref.block_name)
+                    if key not in seen:
+                        seen.add(key)
+                        result.append(ref)
 
         return result
