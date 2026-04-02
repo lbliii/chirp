@@ -18,8 +18,8 @@ def action(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     The action name is used as the value for the _action form field.
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        setattr(func, "_chirp_action_name", name)
+    def decorator(func: Any) -> Any:
+        func._chirp_action_name = name
         return func
 
     return decorator
