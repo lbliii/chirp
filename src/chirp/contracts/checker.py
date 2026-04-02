@@ -351,22 +351,27 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 kida_env,
             )
         )
+        discovered = getattr(snapshot, "discovered_routes", [])
         action_route_paths = {
-            r.url_path
-            for r in getattr(snapshot, "discovered_routes", [])
-            if getattr(r, "kind", None) == "action"
+            r.url_path for r in discovered if getattr(r, "kind", None) == "action"
+        }
+        meta_provider_paths = {
+            r.url_path for r in discovered if getattr(r, "meta_provider", None) is not None
         }
         result.issues.extend(
             check_route_file_consistency(
-                snapshot.route_metas, snapshot.page_route_paths, action_route_paths
+                snapshot.route_metas,
+                snapshot.page_route_paths,
+                action_route_paths,
+                meta_provider_paths,
             )
         )
-        result.issues.extend(check_duplicate_routes(getattr(snapshot, "discovered_routes", [])))
+        result.issues.extend(check_duplicate_routes(discovered))
         result.issues.extend(check_section_tab_hrefs(snapshot.sections, snapshot.page_route_paths))
         providers = getattr(app._mutable_state, "providers", None)
         result.issues.extend(
             check_context_provider_signatures(
-                getattr(snapshot, "discovered_routes", []),
+                discovered,
                 providers,
             )
         )

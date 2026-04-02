@@ -86,8 +86,8 @@ class ShellAction:
     hx_swap: str | None = None
     hx_disinherit: str | None = None
     submit_surface: ShellSubmitSurface = "btn"
-    #: Extra HTML attributes for ``kind="link"`` / ``kind="button"`` (passed to ``btn``, e.g. HTMX).
-    #: Not used for ``kind="form"`` (form actions use dedicated fields).
+    #: Extra HTML attributes passed to the rendered element (``btn`` for link/button,
+    #: ``<form>`` for kind="form").  CSS custom properties on the form cascade to children.
     attrs: str = ""
 
     def as_menu_item(self) -> ShellMenuItem:
@@ -224,12 +224,6 @@ def _validate_shell_action_item(item: ShellAction, zone_name: str) -> None:
             raise ValueError(msg)
         if item.form_method.lower() != "post":
             msg = f"shell_actions.{zone_name} action {item.id!r}: only form_method='post' is supported"
-            raise ValueError(msg)
-        if item.attrs:
-            msg = (
-                f"shell_actions.{zone_name} action {item.id!r}: "
-                "attrs is only valid for kind='link' or 'button'"
-            )
             raise ValueError(msg)
         return
     if item.form_action is not None:

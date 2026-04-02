@@ -1,6 +1,7 @@
 # Font Configuration
 # ==================
+# Google Fonts for the site CSS and for social card (OG image) PNG rendering
+# (Pillow loads the same downloaded TTFs).
 
 fonts:
-  # Use default system fonts
-  enabled: false
+  display: "Inter:400,600,700"

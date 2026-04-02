@@ -1,0 +1,12 @@
+# Open Graph / social preview images (Bengal + Pillow)
+# -----------------------------------------------------
+# Generates 1200×630 PNGs (default under assets/social/). Runs on full
+# non-incremental post-process; generation is sequential for Pillow safety.
+# Per-page: `social_card: false` or `image: /path.png` in frontmatter.
+
+social_cards:
+  enabled: true
+  template: "default"
+  background_color: "#0f172a"
+  text_color: "#f8fafc"
+  accent_color: "#06b6d4"

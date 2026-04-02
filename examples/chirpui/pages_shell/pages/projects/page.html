@@ -4,7 +4,12 @@
 {% from "chirpui/layout.html" import container, page_header, stack, cluster, grid %}
 {% from "chirpui/stat.html" import stat %}
 
+{# page_root: wrap content in <div id="page-root"> so hx-select="#page-root"
+   on #main can extract this page's content during boosted navigation.
+   Override page_root_inner (not page_root) when you need to change page
+   content without losing the wrapper div. #}
 {% block page_root %}
+<div id="page-root">
 {% block page_root_inner %}
 {% call container(max_width="84rem") %}
 {% call stack(gap="lg", cls="example-page") %}
@@ -44,4 +49,5 @@
 {% end %}
 {% end %}
 {% end %}
+</div>
 {% endblock %}
