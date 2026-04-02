@@ -65,7 +65,7 @@ class LayoutDebugMiddleware:
                 compact = _compact_render_plan(render_plan)
                 encoded = base64.b64encode(json.dumps(compact, separators=(",", ":")).encode())
                 response = response.with_header("X-Chirp-Render-Plan", encoded.decode("ascii"))
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         return response

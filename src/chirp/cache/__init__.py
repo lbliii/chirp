@@ -62,7 +62,9 @@ def create_backend(name: str, **kwargs: Any) -> CacheBackend:
     raise ValueError(msg)
 
 
-def cache_view(ttl: int = 300, key_func: Callable[..., str] | None = None) -> Callable:
+def cache_view(
+    ttl: int = 300, key_func: Callable[..., str] | None = None
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to cache a view's response.
 
     Usage::
@@ -73,7 +75,7 @@ def cache_view(ttl: int = 300, key_func: Callable[..., str] | None = None) -> Ca
             ...
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             backend = get_cache()

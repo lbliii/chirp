@@ -6,19 +6,20 @@ Discovers @action decorated functions and dispatches by _action form field.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from typing import Any
 
 from chirp.pages.types import ActionInfo
 
 
-def action(name: str) -> Any:
+def action(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to register a named action in _actions.py.
 
     The action name is used as the value for the _action form field.
     """
 
-    def decorator(func: Any) -> Any:
-        func._chirp_action_name = name
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        func._chirp_action_name = name  # type: ignore[attr-defined]
         return func
 
     return decorator

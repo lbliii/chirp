@@ -403,27 +403,30 @@ class TestTransaction:
 
 
 class TestEcho:
-    async def test_echo_logs_to_stderr(self, tmp_path, capsys) -> None:
+    async def test_echo_logs_queries(self, tmp_path, caplog) -> None:
+        import logging
+
         db_path = tmp_path / "echo.db"
         db = Database(f"sqlite:///{db_path}", echo=True)
         await db.connect()
-        await db.execute("CREATE TABLE t (id INTEGER)")
-        await db.execute("INSERT INTO t (id) VALUES (?)", 42)
+        with caplog.at_level(logging.DEBUG, logger="chirp.data"):
+            await db.execute("CREATE TABLE t (id INTEGER)")
+            await db.execute("INSERT INTO t (id) VALUES (?)", 42)
         await db.disconnect()
 
-        captured = capsys.readouterr()
-        assert "[chirp.data]" in captured.err
-        assert "CREATE TABLE" in captured.err
-        assert "INSERT INTO" in captured.err
+        assert "CREATE TABLE" in caplog.text
+        assert "INSERT INTO" in caplog.text
 
-    async def test_no_echo_by_default(self, db, capsys) -> None:
-        await db.execute(
-            "INSERT INTO users (name, email) VALUES (?, ?)",
-            "Alice",
-            "alice@test.com",
-        )
-        captured = capsys.readouterr()
-        assert captured.err == ""
+    async def test_no_echo_by_default(self, db, caplog) -> None:
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="chirp.data"):
+            await db.execute(
+                "INSERT INTO users (name, email) VALUES (?, ?)",
+                "Alice",
+                "alice@test.com",
+            )
+        assert caplog.text == ""
 
 
 # =============================================================================

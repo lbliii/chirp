@@ -10,15 +10,14 @@ Connection URL format::
     postgresql://user:pass@host/db # PostgreSQL
 
 Free-threading safety:
-    - Connection pool uses ``threading.Lock`` for thread-safe access
+    - Connection pool uses ``anyio.Lock`` for async-safe initialization
     - Connections are per-task (ContextVar), never shared between tasks
     - All public methods are async — no sync I/O on the calling thread
 """
 
 import asyncio
 import contextlib
-import sys
-import threading
+import logging
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -36,6 +35,8 @@ from chirp.data.errors import (
     QueryError,
 )
 from chirp.data.types import DatabaseConfig, Notification
+
+_log = logging.getLogger("chirp.data")
 
 # Per-task connection tracking (free-threading safe via ContextVar).
 # Set inside transaction() — query methods check this to reuse the
@@ -113,7 +114,7 @@ class Database:
             await db.execute("INSERT INTO profiles ...", user_id)
     """
 
-    __slots__ = ("_async_lock", "_config", "_driver", "_initialized", "_lock", "_pool")
+    __slots__ = ("_config", "_driver", "_init_lock", "_initialized", "_pool", "_sqlite_lock")
 
     def __init__(
         self,
@@ -133,8 +134,8 @@ class Database:
             connect_retries=connect_retries,
         )
         self._driver = _detect_driver(url)
-        self._lock = threading.Lock()
-        self._async_lock: anyio.Lock | None = None  # Created lazily on first use
+        self._init_lock = anyio.Lock()
+        self._sqlite_lock = anyio.Lock()
         self._pool: Any = None
         self._initialized = False
 
@@ -166,11 +167,7 @@ class Database:
 
         # Acquire fresh connection from pool
         if self._driver == "sqlite":
-            # Lazy-init the async lock (can't create in __init__ before
-            # an event loop exists).
-            if self._async_lock is None:
-                self._async_lock = anyio.Lock()
-            async with self._async_lock:
+            async with self._sqlite_lock:
                 yield self._pool  # SQLite: pool IS the connection
         else:
             conn = await self._pool.acquire()
@@ -212,9 +209,7 @@ class Database:
 
         # Top-level transaction — acquire a dedicated connection
         if self._driver == "sqlite":
-            if self._async_lock is None:
-                self._async_lock = anyio.Lock()
-            async with self._async_lock:
+            async with self._sqlite_lock:
                 conn = self._pool
                 token = _current_conn.set(conn)
                 try:
@@ -250,7 +245,7 @@ class Database:
             return
         ms = elapsed * 1000
         param_str = f"  params={params!r}" if params else ""
-        print(f"[chirp.data] {ms:6.1f}ms  {sql}{param_str}", file=sys.stderr)
+        _log.debug("%6.1fms  %s%s", ms, sql, param_str)
 
     # -- Public query API --
 
@@ -498,7 +493,7 @@ class Database:
         """
         if self._initialized:
             return
-        with self._lock:
+        async with self._init_lock:
             if self._initialized:
                 return
             cfg = self._config
@@ -524,7 +519,7 @@ class Database:
         """Close all connections in the pool."""
         if not self._initialized:
             return
-        with self._lock:
+        async with self._init_lock:
             if not self._initialized:
                 return
             await _close_pool(self._driver, self._pool)
