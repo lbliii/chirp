@@ -19,7 +19,7 @@ def action(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        func._chirp_action_name = name  # type: ignore[attr-defined]
+        setattr(func, "_chirp_action_name", name)
         return func
 
     return decorator
