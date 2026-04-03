@@ -78,16 +78,17 @@ __all__ = [
     "HTTPError",
     "HtmxDetails",
     "InlineTemplate",
-    "LayoutPage",
     "MarkdownRenderer",
     "MethodNotAllowed",
     "Middleware",
+    "MutationResult",
     "Next",
     "NotFound",
     "Page",
     "PageComposition",
     "Redirect",
     "RegionUpdate",
+    "RenderPlan",
     "Request",
     "Response",
     "SSEEvent",
@@ -101,6 +102,9 @@ __all__ = [
     "Template",
     "TemplateStream",
     "ToolCallEvent",
+    "ToolDef",
+    "ToolEventBus",
+    "ToolRegistry",
     "ValidationError",
     "ViewRef",
     "cache_view",
@@ -109,6 +113,7 @@ __all__ = [
     "form_values",
     "g",
     "get_cache",
+    "get_render_plan",
     "get_request",
     "get_user",
     "hx_redirect",
@@ -143,9 +148,9 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "PageComposition": ("chirp.templating.composition", "PageComposition"),
     "RegionUpdate": ("chirp.templating.composition", "RegionUpdate"),
     "ViewRef": ("chirp.templating.composition", "ViewRef"),
-    "LayoutPage": ("chirp.templating.returns", "LayoutPage"),
     "Action": ("chirp.templating.returns", "Action"),
     "FormAction": ("chirp.templating.returns", "FormAction"),
+    "MutationResult": ("chirp.templating.returns", "MutationResult"),
     "Stream": ("chirp.templating.returns", "Stream"),
     "Suspense": ("chirp.templating.returns", "Suspense"),
     "TemplateStream": ("chirp.templating.returns", "TemplateStream"),
@@ -185,8 +190,14 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "form_or_errors": ("chirp.http.forms", "form_or_errors"),
     "form_values": ("chirp.http.forms", "form_values"),
     "FormBindingError": ("chirp.http.forms", "FormBindingError"),
+    # Render introspection
+    "RenderPlan": ("chirp.templating.render_plan", "RenderPlan"),
+    "get_render_plan": ("chirp.server.debug.render_plan_snapshot", "get_render_plan"),
     # Tools
     "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
+    "ToolDef": ("chirp.tools.registry", "ToolDef"),
+    "ToolEventBus": ("chirp.tools.events", "ToolEventBus"),
+    "ToolRegistry": ("chirp.tools.registry", "ToolRegistry"),
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
     # Cache
@@ -196,6 +207,16 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ChirpPlugin": ("chirp.plugin", "ChirpPlugin"),
     # Extensions
     "use_chirp_ui": ("chirp.ext.chirp_ui", "use_chirp_ui"),
+}
+
+
+_DEPRECATED_IMPORTS: dict[str, tuple[str, str, str]] = {
+    "LayoutPage": (
+        "chirp.templating.returns",
+        "LayoutPage",
+        "LayoutPage is framework-internal and will be removed from the public API. "
+        "Import from chirp.templating.returns if needed.",
+    ),
 }
 
 
@@ -212,5 +233,16 @@ def __getattr__(name: str) -> object:
 
         mod = importlib.import_module(module_path)
         return getattr(mod, attr)
+
+    deprecated = _DEPRECATED_IMPORTS.get(name)
+    if deprecated is not None:
+        import importlib
+        import warnings
+
+        module_path, attr, message = deprecated
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        mod = importlib.import_module(module_path)
+        return getattr(mod, attr)
+
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

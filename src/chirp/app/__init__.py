@@ -254,6 +254,23 @@ class App:
         return self._mutable_state.db
 
     @property
+    def tools(self) -> Any:
+        """The frozen ``ToolRegistry`` — available after ``app.run()`` / freeze.
+
+        Use to inspect registered tools::
+
+            for tool_info in app.tools.list_tools():
+                print(tool_info["name"])
+
+        Raises ``RuntimeError`` if accessed before the app is frozen.
+        """
+        registry = self._runtime_state.tool_registry
+        if registry is None:
+            msg = "Tool registry is not available until the app is frozen (app.run() or first request)."
+            raise RuntimeError(msg)
+        return registry
+
+    @property
     def tool_events(self):
         return self._mutable_state.tool_events
 

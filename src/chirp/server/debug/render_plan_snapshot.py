@@ -1,4 +1,8 @@
-"""Serialize RenderPlan for dev-mode debug HTML (repr previews, bounded size)."""
+"""Serialize RenderPlan for dev-mode debug HTML (repr previews, bounded size).
+
+Also provides :func:`get_render_plan` for public read-only access to the
+frozen ``RenderPlan`` that was used to render the current request.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +12,7 @@ from chirp.http.request import Request
 from chirp.templating.render_plan import RenderPlan
 
 RENDER_DEBUG_CACHE_KEY = "_chirp_render_debug"
+RENDER_PLAN_CACHE_KEY = "_chirp_render_plan"
 
 _MAX_CONTEXT_KEYS = 48
 _MAX_REPR_LEN = 120
@@ -90,14 +95,37 @@ def stash_render_debug_for_request(
     *,
     debug: bool = False,
 ) -> None:
-    """Store render plan snapshot on the request for :func:`render_debug_page`.
+    """Store render plan on the request for middleware and debug tools.
 
-    Only serializes when *debug* is True, avoiding repr/serialization
-    overhead in production.
+    The frozen ``RenderPlan`` object is always stashed (zero overhead —
+    it is already immutable).  The heavier serialized debug snapshot is
+    only built when *debug* is True.
     """
-    if not debug or request is None:
+    if request is None:
         return
-    request._cache[RENDER_DEBUG_CACHE_KEY] = serialize_render_plan_for_debug(plan)
+    request._cache[RENDER_PLAN_CACHE_KEY] = plan
+    if debug:
+        request._cache[RENDER_DEBUG_CACHE_KEY] = serialize_render_plan_for_debug(plan)
+
+
+def get_render_plan(request: Any) -> RenderPlan | None:
+    """Return the frozen ``RenderPlan`` used to render this request.
+
+    Available after content negotiation has run for ``Page``,
+    ``LayoutPage``, or ``PageComposition`` return types.  Returns
+    ``None`` for non-page responses or if negotiation has not yet run.
+
+    Use in middleware to inspect rendering decisions::
+
+        plan = get_render_plan(request)
+        if plan is not None:
+            print(plan.intent)  # "full_page", "page_fragment", "local_fragment"
+    """
+    cache = getattr(request, "_cache", None)
+    if not isinstance(cache, dict):
+        return None
+    plan = cache.get(RENDER_PLAN_CACHE_KEY)
+    return plan if isinstance(plan, RenderPlan) else None
 
 
 def read_render_debug_from_request(request: Any) -> dict[str, Any] | None:

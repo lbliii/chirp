@@ -17,6 +17,7 @@ from .routes import (
 )
 from .rules_accessibility import check_accessibility
 from .rules_commands import check_command_values, check_commandfor_targets
+from .rules_context_cascade import check_context_cascade
 from .rules_forms import validate_form_contracts
 from .rules_htmx import (
     check_hx_boost,
@@ -380,6 +381,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         providers = getattr(app._mutable_state, "providers", None)
         result.issues.extend(
             check_context_provider_signatures(
+                discovered,
+                providers,
+            )
+        )
+        result.issues.extend(
+            check_context_cascade(
                 discovered,
                 providers,
             )
