@@ -274,7 +274,54 @@ dev = [
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
     "chirp-ui>=0.2.3",          # Layout macros for llm_playground example tests
+    "poethepoet>=0.35.0",
+    "towncrier>=24.0",
 ]
+
+# =============================================================================
+# Changelog (Towncrier) — see bengal docs/b-stack-changelog-strategy.md
+# =============================================================================
+
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+# PyPI name — `importlib.metadata.version("chirp")` can resolve a different dist first
+package = "bengal-chirp"
+package_dir = "src"
+name = "Chirp"
+title_format = "## [{version}] - {project_date}"
+issue_format = "`#{issue}`"
+underlines = ["", "", ""]
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
 
 # =============================================================================
 # Task Runner (poethepoet) — use: poe <task>
@@ -316,6 +363,9 @@ check = { sequence = [
 
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build && ls -la dist/", help = "Build distribution" }
+changelog = { cmd = "towncrier build --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
+changelog-draft = { cmd = "towncrier build --draft", help = "Preview changelog from fragments (stdout)" }
+changelog-check = { cmd = "towncrier check --compare-with origin/main", help = "Verify branch adds a fragment (vs main)" }
 
 # Benchmarks
 benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask benchmarks" }
