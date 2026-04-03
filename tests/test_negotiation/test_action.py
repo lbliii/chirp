@@ -177,4 +177,4 @@ class TestNegotiateFormAction:
         assert "primary" in result.text
         # Secondary fragment wrapped with OOB swap targeting its declared target
         assert 'id="cart-count"' in result.text
-        assert 'hx-swap-oob=' in result.text
+        assert "hx-swap-oob=" in result.text
