@@ -229,11 +229,7 @@ def check_section_coverage(
     for path in page_route_paths:
         meta = route_metas.get(path)
         covering = [s for s in sections.values() if s.is_active(path)]
-        if (
-            covering
-            and (meta is None or meta.section is None)
-            and path not in skip_meta_provider
-        ):
+        if covering and (meta is None or meta.section is None) and path not in skip_meta_provider:
             issues.append(
                 ContractIssue(
                     severity=Severity.INFO,
