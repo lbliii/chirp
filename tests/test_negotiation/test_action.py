@@ -160,3 +160,21 @@ class TestNegotiateFormAction:
         assert "x" in result.text
         assert "42" in result.text
         assert result.render_intent == "fragment"
+
+    def test_htmx_secondary_fragments_get_oob_wrapping(self, kida_env: Environment) -> None:
+        """Secondary fragments in MutationResult must have hx-swap-oob for htmx to swap them."""
+        request = self._htmx_request()
+        result = negotiate(
+            FormAction(
+                "/ok",
+                Fragment("search.html", "results_list", results=["primary"]),
+                Fragment("cart.html", "counter", target="cart-count", count=7),
+            ),
+            kida_env=kida_env,
+            request=request,
+        )
+        # Primary fragment rendered without OOB wrapper
+        assert "primary" in result.text
+        # Secondary fragment wrapped with OOB swap targeting its declared target
+        assert 'id="cart-count"' in result.text
+        assert 'hx-swap-oob=' in result.text

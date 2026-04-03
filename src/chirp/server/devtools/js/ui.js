@@ -574,7 +574,7 @@ function renderActivityLog() {
       }
 
       if (r.renderPlan) {
-        dc.appendChild(hlSection("Render Plan", esc(formatRenderPlan(r.renderPlan)), false));
+        dc.appendChild(makeSection("Render Plan", '<div class="chirp-dbg-hl">' + renderRenderPlanHTML(r.renderPlan) + '</div>', true));
       }
 
       if (r.requestHeaders && typeof r.requestHeaders === "object") {
