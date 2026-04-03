@@ -34,7 +34,16 @@ from chirp.pages.reactive import (
     reactive_stream,
 )
 from chirp.pages.renderer import render_with_layouts
-from chirp.pages.types import ContextProvider, LayoutChain, LayoutInfo, PageRoute, RouteMeta
+from chirp.pages.types import (
+    ContextProvider,
+    LayoutChain,
+    LayoutInfo,
+    PageRoute,
+    RouteMeta,
+    Section,
+    TabItem,
+    TabMatchMode,
+)
 
 __all__ = [
     "BlockRef",
@@ -46,6 +55,9 @@ __all__ = [
     "PageRoute",
     "ReactiveBus",
     "RouteMeta",
+    "Section",
+    "TabItem",
+    "TabMatchMode",
     "action",
     "discover_pages",
     "reactive_stream",

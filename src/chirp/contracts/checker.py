@@ -33,6 +33,7 @@ from .rules_route_contract import (
     check_duplicate_routes,
     check_route_file_consistency,
     check_section_bindings,
+    check_section_coverage,
     check_section_tab_hrefs,
     check_shell_mode_blocks,
 )
@@ -98,7 +99,7 @@ def _route_prepass(
             src = inspect.getsource(handler)
             for m in _TEMPLATE_CALL_PATTERN.finditer(src):
                 referenced_templates.add(m.group(1))
-        except TypeError, OSError:
+        except (TypeError, OSError):
             pass
         contract = getattr(handler, "_chirp_contract", None)
         if contract is None:
@@ -343,6 +344,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             )
         )
         result.issues.extend(check_section_bindings(snapshot.route_metas, snapshot.sections))
+        result.issues.extend(
+            check_section_coverage(
+                snapshot.route_metas,
+                snapshot.sections,
+                snapshot.page_route_paths,
+            )
+        )
         result.issues.extend(
             check_shell_mode_blocks(
                 snapshot.route_metas,

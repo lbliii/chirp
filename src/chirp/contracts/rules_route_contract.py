@@ -12,6 +12,26 @@ from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from .types import ContractIssue, Severity
 
 
+def _normalize_href_path(href: str) -> str:
+    return href.split("?")[0].rstrip("/") or "/"
+
+
+def _tab_href_matches_page_routes(
+    tab_path: str,
+    match_mode: str,
+    page_route_paths: set[str],
+) -> bool:
+    """True if *tab_path* is exact or, for prefix tabs, covered by a registered route."""
+    if tab_path in page_route_paths:
+        return True
+    if match_mode != "prefix":
+        return False
+    if tab_path == "/":
+        return bool(page_route_paths)
+    prefixes = (tab_path + "/", tab_path + "{")
+    return any(route.startswith(prefixes) for route in page_route_paths)
+
+
 def check_section_bindings(
     route_metas: dict[str, RouteMeta | None],
     sections: dict[str, Section],
@@ -142,22 +162,89 @@ def check_section_tab_hrefs(
     sections: dict[str, Section],
     page_route_paths: set[str],
 ) -> list[ContractIssue]:
-    """Warn if a TabItem.href does not match any registered route path."""
+    """Warn if a TabItem.href does not match any registered route path.
+
+    For prefix-match tabs, the href may be a parent path; at least one
+    registered route must equal it or lie under it (including ``/seg/{param}``).
+
+    Emits a warning when two tabs in the same section normalize to the same href.
+    """
     issues: list[ContractIssue] = []
     for section_id, section in sections.items():
+        seen_hrefs: set[str] = set()
         for tab in getattr(section, "tab_items", ()):
             if not isinstance(tab, TabItem):
                 continue
             href = getattr(tab, "href", "") or ""
-            path = href.split("?")[0].rstrip("/") or "/"
-            if path not in page_route_paths:
+            path = _normalize_href_path(href)
+            match_mode = getattr(tab, "match", "exact") or "exact"
+            if path in seen_hrefs:
                 issues.append(
                     ContractIssue(
                         severity=Severity.WARNING,
                         category="route_contract",
                         message=(
-                            f"Section '{section_id}' tab href '{href}' "
-                            "does not match any registered route path."
+                            f"Section '{section_id}' has duplicate tab href '{href}' "
+                            f"(normalized path '{path}')."
+                        ),
+                        route=path,
+                    )
+                )
+            seen_hrefs.add(path)
+            if _tab_href_matches_page_routes(path, match_mode, page_route_paths):
+                continue
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="route_contract",
+                    message=(
+                        f"Section '{section_id}' tab href '{href}' "
+                        "(match="
+                        f"'{match_mode}') does not match any registered route path."
+                    ),
+                    route=path,
+                )
+            )
+    return issues
+
+
+def check_section_coverage(
+    route_metas: dict[str, RouteMeta | None],
+    sections: dict[str, Section],
+    page_route_paths: set[str],
+) -> list[ContractIssue]:
+    """Info when routes sit under a section prefix but lack ``meta.section``.
+
+    Warn when ``meta.section`` is set but the route path is not covered by that
+    section's ``active_prefixes`` (when prefixes are defined).
+    """
+    issues: list[ContractIssue] = []
+    for path in page_route_paths:
+        meta = route_metas.get(path)
+        covering = [s for s in sections.values() if s.is_active(path)]
+        if covering and (meta is None or meta.section is None):
+            issues.append(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="route_contract",
+                    message=(
+                        f"Route '{path}' is under a section's active_prefixes but "
+                        "has no meta.section; set section in _meta.py for consistent "
+                        "shell context (tabs, breadcrumbs)."
+                    ),
+                    route=path,
+                )
+            )
+        elif meta and meta.section:
+            section = sections.get(meta.section)
+            if section is not None and section.active_prefixes and not section.is_active(path):
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.WARNING,
+                        category="route_contract",
+                        message=(
+                            f"Route '{path}' has meta.section='{meta.section}' but that "
+                            "section's active_prefixes do not cover this path."
                         ),
                         route=path,
                     )
