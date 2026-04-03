@@ -1,10 +1,12 @@
 """Tests for Alpine.js support — config, injection, dedup, and macros."""
 
+import re
+
 from kida import Environment, PackageLoader
 
 from chirp import App
 from chirp.config import AppConfig
-from chirp.server.alpine import alpine_snippet
+from chirp.server.alpine import PLUGINS, alpine_snippet
 from chirp.templating.filters import BUILTIN_FILTERS
 from chirp.testing import TestClient
 
@@ -99,22 +101,25 @@ class TestAlpineSnippet:
         Alpine.js is dist/module.cjs.js — a CommonJS module that throws
         ReferenceError: module is not defined in the browser.
         """
-        import re
-
         s = alpine_snippet("3.15.8", csp=False)
-        bare_urls = re.findall(r'src="[^"]+@[\d.]+(?:")', s)
-        assert bare_urls == [], (
-            f"Bare CDN URLs found (missing /dist/cdn.min.js): {bare_urls}"
-        )
+        bare_urls = re.findall(r'src="[^"]+@[0-9.]+"', s)
+        assert not bare_urls, f"Bare package script URLs (no /dist/...): {bare_urls}"
+        s_csp = alpine_snippet("3.15.8", csp=True)
+        bare_csp = re.findall(r'src="[^"]+@[0-9.]+"', s_csp)
+        assert not bare_csp, f"Bare package script URLs in CSP build: {bare_csp}"
+
+    def test_bare_url_pattern_detects_known_bad_url(self) -> None:
+        """Guard: regex must match a known-bad bare URL so the test is not vacuous."""
+        bad = 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8"'
+        assert re.findall(r'src="[^"]+@[0-9.]+"', bad) == [bad]
 
     def test_plugin_urls_have_explicit_cdn_path(self) -> None:
-        """All plugin script tags must use explicit /dist/cdn.min.js paths."""
-        from chirp.server.alpine import PLUGINS
-
-        assert "/dist/cdn.min.js" in PLUGINS
+        """Each plugin script src must include @alpinejs/{name}@…/dist/cdn.min.js."""
         for plugin in ("mask", "intersect", "focus"):
-            assert f"@alpinejs/{plugin}" in PLUGINS
-            assert f"@alpinejs/{plugin}@" in PLUGINS
+            assert re.search(
+                rf"@alpinejs/{plugin}@[0-9.]+/dist/cdn\.min\.js",
+                PLUGINS,
+            ), f"Missing explicit /dist/cdn.min.js for plugin: {plugin}"
 
 
 # ---------------------------------------------------------------------------

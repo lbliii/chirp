@@ -126,17 +126,20 @@ is skipped.
 ### CDN URL footgun
 
 All jsDelivr script URLs **must** use explicit `/dist/cdn.min.js` paths.
-A bare `cdn.jsdelivr.net/npm/alpinejs@3.15.8` resolves to `dist/module.cjs.js`
-(CommonJS), which throws `ReferenceError: module is not defined` in the browser.
-This is silent — the error shows only as `"Script error."` due to CORS.
+A bare `https://cdn.jsdelivr.net/npm/alpinejs@3.15.8` (no `/dist/...`) resolves to
+`dist/module.cjs.js` (CommonJS), which throws `ReferenceError: module is not defined`
+in the browser. This is silent — the error shows only as `"Script error."` due to CORS.
 
 ```python
 # WRONG — bare path → CJS module → broken in browser
-f"cdn.jsdelivr.net/npm/alpinejs@{version}"
+f"https://cdn.jsdelivr.net/npm/alpinejs@{version}"
 
 # CORRECT — explicit browser CDN build
-f"cdn.jsdelivr.net/npm/alpinejs@{version}/dist/cdn.min.js"
+f"https://cdn.jsdelivr.net/npm/alpinejs@{version}/dist/cdn.min.js"
 ```
+
+Scoped plugins must use the same pattern, for example
+`https://cdn.jsdelivr.net/npm/@alpinejs/mask@{version}/dist/cdn.min.js`.
 
 **Symptoms:** All Alpine-powered components dead (toggles, dropdowns, modals,
 command palette, sidebar collapse). `window.Alpine` is `undefined`. No visible
