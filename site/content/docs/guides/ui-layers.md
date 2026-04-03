@@ -61,3 +61,4 @@ htmx applies the **primary** swap before **out-of-band** fragments. chirp-ui’s
 
 - [App shells](./app-shell.md) — navigation model and ``use_chirp_ui``
 - [chirp-ui App Shell](https://lbliii.github.io/chirp-ui/docs/app-shell/) — layouts and components
+- [Shell, sections, and route tabs (checklist)](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) — chirp-ui doc: sections, ``TabItem``, ``hx-target``, and OOB handoffs

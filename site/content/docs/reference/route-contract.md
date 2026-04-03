@@ -6,7 +6,7 @@ weight: 30
 lang: en
 type: doc
 tags: [routing, contracts, filesystem]
-keywords: [route contract, _meta.py, _context.py, _actions.py, RouteMeta, sections]
+keywords: [route contract, _meta.py, _context.py, _actions.py, RouteMeta, sections, route_tabs]
 category: reference
 ---
 
@@ -65,7 +65,9 @@ app.register_section(Section(
 ))
 ```
 
-Routes bind to sections via `RouteMeta.section`. The framework resolves `tab_items` and `breadcrumb_prefix` from the matched section.
+Routes bind to sections via `RouteMeta.section`. The framework resolves `tab_items` and `breadcrumb_prefix` from the matched section. Tab rows use the same data under **`route_tabs`** (an alias of `tab_items`) for chirp-ui’s `render_route_tabs` macro. Each item is a dict shaped like `TabItem`: `label`, `href`, optional `icon`, `badge`, and optional `match` (`"exact"` or `"prefix"` for nested URLs).
+
+For delivery modes (`hx-target`, boost vs route-tab clicks) and a full checklist, see the [shell, sections, and route tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) in the chirp-ui repository.
 
 ## Context Cascade
 
@@ -77,7 +79,7 @@ Layouts inherit down the directory tree. Each `_layout.html` declares `{# target
 
 ## Shell Context Assembly
 
-The framework provides: `page_title`, `breadcrumb_items`, `tab_items`, `current_path`. Resolution order: `RouteMeta` → section → handler override.
+The framework provides: `page_title`, `breadcrumb_items`, `tab_items`, `route_tabs` (same list as `tab_items` when the section defines tabs), `current_path`. Resolution order: `RouteMeta` → section → handler override.
 
 **Imperative routes:** For handlers that return `Template(...)` or `Page(...)` directly (not using filesystem routing), Chirp auto-injects `current_path = request.path` into the template context when the handler does not provide it. This ensures ChirpUI navigation macros with `match=` work for both filesystem and imperative route styles.
 

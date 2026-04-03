@@ -31,13 +31,24 @@ type MetaProvider = Callable[
     ..., RouteMeta | dict[str, Any] | Awaitable[RouteMeta | dict[str, Any]]
 ]
 
+type TabMatchMode = Literal["exact", "prefix"]
+
 
 @dataclass(frozen=True, slots=True)
 class TabItem:
-    """A tab item for section navigation."""
+    """A tab item for section navigation (Chirp ``Section`` + chirp-ui route tabs).
+
+    Optional fields match the dict shape consumed by ``render_route_tabs`` /
+    ``tab_is_active`` in chirp-ui: ``match`` controls active state for nested URLs.
+    See ``SHELL-TABS-CONTRACT.md`` in chirp-ui for the full shell to route-tabs
+    data flow.
+    """
 
     label: str
     href: str
+    icon: str | None = None
+    badge: str | None = None
+    match: TabMatchMode = "exact"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +61,11 @@ class ActionInfo:
 
 @dataclass(frozen=True, slots=True)
 class Section:
-    """A named section with tab items and breadcrumb prefix."""
+    """A named section with tab items and breadcrumb prefix.
+
+    Register via ``app.register_section()`` before ``mount_pages()``; tab items
+    flow to chirp-ui ``render_route_tabs`` through ``resolve_section_context``.
+    """
 
     id: str
     label: str
