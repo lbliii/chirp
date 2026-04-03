@@ -1,0 +1,1 @@
+**Documentation** — Linked the route contract and UI guides to chirp-ui’s [shell/tabs checklist](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md); documented `route_tabs` next to `tab_items` in the route directory reference.

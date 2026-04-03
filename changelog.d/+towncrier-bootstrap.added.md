@@ -1,0 +1,1 @@
+Adopt [Towncrier](https://towncrier.readthedocs.io/) for release notes: `changelog.d/` fragments, `poe changelog` / `poe changelog-draft` / `poe changelog-check`, aligned with the b-stack strategy (see Bengal’s `docs/b-stack-changelog-strategy.md`).
