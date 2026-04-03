@@ -8,7 +8,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from chirp.pages.types import RouteMeta, Section
+from chirp.pages.types import RouteMeta, Section, TabItem
+
+
+def _tab_item_to_shell_dict(tab: TabItem) -> dict[str, Any]:
+    """Shape for templates and ``tab_is_active`` (chirp-ui route tabs)."""
+    row: dict[str, Any] = {"label": tab.label, "href": tab.href}
+    if tab.icon is not None:
+        row["icon"] = tab.icon
+    if tab.badge is not None:
+        row["badge"] = tab.badge
+    if tab.match != "exact":
+        row["match"] = tab.match
+    return row
 
 
 def resolve_section_context(
@@ -38,7 +50,7 @@ def resolve_section_context(
 
     result: dict[str, Any] = {}
     if section.tab_items:
-        tab_list = [{"label": t.label, "href": t.href} for t in section.tab_items]
+        tab_list = [_tab_item_to_shell_dict(t) for t in section.tab_items]
         result["tab_items"] = tab_list
         result["route_tabs"] = tab_list
     if section.breadcrumb_prefix:

@@ -40,6 +40,35 @@ def test_resolve_section_context_with_matching_section() -> None:
     assert result["breadcrumb_prefix"] == [{"label": "Docs", "href": "/docs"}]
 
 
+def test_resolve_section_context_tab_item_optional_fields() -> None:
+    """tab_items dicts include icon, badge, and non-default match for chirp-ui."""
+    section = Section(
+        id="settings",
+        label="Settings",
+        tab_items=(
+            TabItem(
+                label="General",
+                href="/settings",
+                icon="gear",
+                badge="2",
+                match="prefix",
+            ),
+        ),
+    )
+    sections = {"settings": section}
+    meta = RouteMeta(section="settings")
+    result = resolve_section_context(meta, sections)
+    assert result["tab_items"] == [
+        {
+            "label": "General",
+            "href": "/settings",
+            "icon": "gear",
+            "badge": "2",
+            "match": "prefix",
+        },
+    ]
+
+
 def test_resolve_section_context_with_no_section() -> None:
     """resolve_section_context with no section returns empty dict."""
     sections = {"admin": Section(id="admin", label="Admin")}
