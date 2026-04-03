@@ -74,4 +74,18 @@ Use islands + static ES modules for complex UI state while staying server-first.
 Harden sessions, CSRF, abuse limits, security headers, and audit events.
 :::{/card}
 
+:::{card} Tools & MCP
+:icon: wrench
+:link: ./tools
+:description: Register functions as MCP tools for AI agents
+Humans use forms, agents use JSON-RPC. Same functions, two interfaces.
+:::{/card}
+
+:::{card} RenderPlan Middleware
+:icon: eye
+:link: ./render-plan
+:description: Inspect rendering decisions from middleware
+Read-only access to the frozen RenderPlan for analytics, caching, debugging.
+:::{/card}
+
 :::{/cards}
