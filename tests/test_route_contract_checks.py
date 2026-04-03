@@ -135,6 +135,42 @@ def meta(id: str) -> RouteMeta:
     assert no_meta == []
 
 
+def test_dynamic_meta_skips_section_coverage_info(tmp_path: Path) -> None:
+    """Routes with ``meta()`` must not emit 'no meta.section' section-coverage INFO."""
+    pages_dir = tmp_path / "pages"
+    pages_dir.mkdir()
+    item = pages_dir / "docs" / "item" / "{id}"
+    item.mkdir(parents=True)
+    (item / "_meta.py").write_text(
+        """
+from chirp.pages.types import RouteMeta
+
+def meta(id: str) -> RouteMeta:
+    return RouteMeta(title=id, section="docs")
+"""
+    )
+    (item / "page.py").write_text("def get(id): return {}")
+    (item / "page.html").write_text("<html></html>")
+
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    app.register_section(
+        Section(id="docs", label="Docs", active_prefixes=("/docs",)),
+    )
+    app.mount_pages(str(pages_dir))
+
+    result = check_hypermedia_surface(app)
+    missing_section_info = [
+        i
+        for i in result.issues
+        if getattr(i, "category", None) == "route_contract"
+        and i.route == "/docs/item/{id}"
+        and i.message
+        and "active_prefixes" in i.message
+        and "meta.section" in i.message
+    ]
+    assert missing_section_info == []
+
+
 def test_known_section_passes(tmp_path: Path) -> None:
     """Route with known section passes section binding check."""
     pages_dir = tmp_path / "pages"

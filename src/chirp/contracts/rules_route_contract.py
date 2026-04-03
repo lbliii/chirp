@@ -212,17 +212,28 @@ def check_section_coverage(
     route_metas: dict[str, RouteMeta | None],
     sections: dict[str, Section],
     page_route_paths: set[str],
+    meta_provider_paths: set[str] | None = None,
 ) -> list[ContractIssue]:
     """Info when routes sit under a section prefix but lack ``meta.section``.
+
+    Routes whose ``_meta.py`` defines ``meta()`` (dynamic metadata) register a
+    meta provider at discovery time with static ``meta`` left ``None``; those
+    paths are listed in *meta_provider_paths* and are excluded from the
+    "no meta.section" INFO to avoid false positives.
 
     Warn when ``meta.section`` is set but the route path is not covered by that
     section's ``active_prefixes`` (when prefixes are defined).
     """
     issues: list[ContractIssue] = []
+    skip_meta_provider = meta_provider_paths or set()
     for path in page_route_paths:
         meta = route_metas.get(path)
         covering = [s for s in sections.values() if s.is_active(path)]
-        if covering and (meta is None or meta.section is None):
+        if (
+            covering
+            and (meta is None or meta.section is None)
+            and path not in skip_meta_provider
+        ):
             issues.append(
                 ContractIssue(
                     severity=Severity.INFO,

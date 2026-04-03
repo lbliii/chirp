@@ -344,11 +344,16 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             )
         )
         result.issues.extend(check_section_bindings(snapshot.route_metas, snapshot.sections))
+        discovered = getattr(snapshot, "discovered_routes", [])
+        meta_provider_paths = {
+            r.url_path for r in discovered if getattr(r, "meta_provider", None) is not None
+        }
         result.issues.extend(
             check_section_coverage(
                 snapshot.route_metas,
                 snapshot.sections,
                 snapshot.page_route_paths,
+                meta_provider_paths,
             )
         )
         result.issues.extend(
@@ -359,12 +364,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 kida_env,
             )
         )
-        discovered = getattr(snapshot, "discovered_routes", [])
         action_route_paths = {
             r.url_path for r in discovered if getattr(r, "kind", None) == "action"
-        }
-        meta_provider_paths = {
-            r.url_path for r in discovered if getattr(r, "meta_provider", None) is not None
         }
         result.issues.extend(
             check_route_file_consistency(
