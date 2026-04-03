@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Shell tabs** — Linked the route contract and UI guides to chirp-ui’s [shell/tabs checklist](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md); documented `route_tabs` next to `tab_items` in the route directory reference.
+
 ### Fixed
 
 - **Route contract** — `chirp check` no longer reports missing `_meta.py` for routes whose `_meta.py` defines only `meta()` (dynamic metadata). Those routes register a meta provider at discovery time; the checker now treats that as satisfying the route metadata contract.

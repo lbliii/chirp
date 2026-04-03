@@ -6,7 +6,7 @@ weight: 25
 lang: en
 type: doc
 tags: [guides, chirp-ui, components, kida, htmx]
-keywords: [chirp-ui, components, layout, cards, forms, badges, theming]
+keywords: [chirp-ui, components, layout, cards, forms, badges, theming, route_tabs, shell tabs]
 category: guide
 ---
 
@@ -125,6 +125,8 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 **Fragment-only apps (no sidebar nav):** If your app uses forms or SSE but no sidebar navigation, extend `chirp/layouts/shell.html` instead. Unlike `boost.html`, `shell.html` sets no global `hx-select`, so fragment responses flow directly to their `hx-target` with no risk of silent empty swaps. See [[docs/templates/layout-patterns|Layout Patterns]] for the decision guide.
 
 **Page spacing contract:** Let the page-level wrapper own vertical rhythm. A good pattern is a parent layout with a `page_root` block that contains `container()` + `stack(gap="lg")`, while inner blocks such as `page_content` hold the page-specific sections. Pair that with `Page(..., "page_content", page_block_name="page_root", ...)` or `PageComposition(..., fragment_block="page_content", page_block="page_root", ...)` so boosted navigation swaps the full page shell instead of a too-narrow inner fragment.
+
+**Route tabs:** Register `Section.tab_items` in Python and set `RouteMeta.section` on each route file’s `_meta.py`. Chirp injects `tab_items` / `route_tabs` into template context; `use_chirp_ui(app)` registers `render_route_tabs` and `tab_is_active`. See the [shell, sections, and route tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) for targets, boost behavior, and `app.check()` expectations.
 
 **Manual shell:** For full control, chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html`:
 
