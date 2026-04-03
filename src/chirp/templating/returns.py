@@ -187,10 +187,11 @@ class Action:
     refresh: bool = False
 
 
-class FormAction:
-    """Form success result with progressive enhancement.
+class MutationResult:
+    """Mutation success with progressive enhancement.
 
-    Auto-negotiates htmx vs non-htmx responses:
+    Auto-negotiates htmx vs non-htmx responses for any mutation
+    (POST, PUT, PATCH, DELETE):
 
     - **htmx + fragments**: renders fragments (OOB-style) + optional
       ``HX-Trigger`` header.  No redirect.
@@ -198,17 +199,25 @@ class FormAction:
       (client-side full redirect).
     - **non-htmx**: 303 redirect to ``redirect`` URL.
 
-    Usage::
+    Usage (form submission)::
 
-        return FormAction("/contacts")
+        return MutationResult("/contacts")
 
     With fragments for htmx (non-htmx still gets a redirect)::
 
-        return FormAction(
+        return MutationResult(
             "/contacts",
             Fragment("contacts.html", "table", contacts=contacts),
             Fragment("contacts.html", "count", target="count", count=len(contacts)),
             trigger="contactAdded",
+        )
+
+    DELETE with confirmation::
+
+        return MutationResult(
+            "/items",
+            Fragment("items.html", "list", items=remaining),
+            trigger="itemDeleted",
         )
     """
 
@@ -225,6 +234,9 @@ class FormAction:
         self.fragments = fragments
         self.trigger = trigger
         self.status = status
+
+
+FormAction = MutationResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,8 +290,16 @@ class ValidationError:
 class Stream:
     """Render a kida template with progressive streaming.
 
-    Context values that are awaitables resolve concurrently.
-    Each template section streams to the browser as its data arrives.
+    **When to use:** All data is known upfront (or resolves quickly), but
+    the template is large and you want the browser to start painting before
+    the full HTML is ready.  Context awaitables resolve concurrently before
+    streaming begins.
+
+    **Not this — use TemplateStream** when the template itself consumes an
+    async iterator (``{% async for %}``, ``{{ await }}``).
+
+    **Not this — use Suspense** when you want a shell/skeleton rendered
+    immediately while slow data loads in the background.
 
     Usage::
 
@@ -302,9 +322,16 @@ class Stream:
 class TemplateStream:
     """Render a template with Kida's render_stream_async.
 
-    Use when the template contains ``{% async for %}`` or ``{{ await }}``
-    and context includes async iterators consumed during rendering.
-    O(n) work — template yields chunks as it iterates, not re-render per item.
+    **When to use:** The template itself consumes an async iterator via
+    ``{% async for %}`` or ``{{ await }}``.  HTML chunks stream to the
+    browser as the iterator yields.  O(n) — one pass, not re-render per
+    item.  Ideal for LLM token streaming and long async feeds.
+
+    **Not this — use Stream** when all data resolves upfront and you just
+    want chunked transfer of a large template.
+
+    **Not this — use Suspense** when you want a shell rendered first, then
+    slow sections filled in as out-of-band swaps.
 
     Usage::
 
@@ -325,6 +352,17 @@ class TemplateStream:
 @dataclass(frozen=True, slots=True)
 class Suspense:
     """Render a page shell immediately, then fill in deferred blocks via OOB.
+
+    **When to use:** The page has slow data sources (DB queries, API calls)
+    and you want the user to see the page shell/skeleton instantly.  Deferred
+    blocks stream in as out-of-band swaps when their data resolves.  Best
+    for dashboards, detail pages with multiple independent data sources.
+
+    **Not this — use Stream** when all data resolves quickly and you just
+    want chunked transfer of a large template.
+
+    **Not this — use TemplateStream** when the template consumes an async
+    iterator inline (``{% async for %}``).
 
     Like React's ``<Suspense>`` but server-rendered.  Context values that
     are awaitables are **deferred**: the shell renders with those keys

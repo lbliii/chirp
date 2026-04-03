@@ -1,0 +1,110 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; color: #f8fafc; margin-bottom: 1.5rem; }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem; max-width: 960px;
+    }
+    .card {
+      background: #1e293b; border-radius: 0.75rem; padding: 1.5rem;
+    }
+    .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.75rem; }
+    .big { font-size: 2rem; font-weight: 700; color: #f8fafc; }
+    .meta { font-size: 0.85rem; color: #64748b; margin-top: 0.5rem; }
+    .positive { color: #4ade80; }
+    .negative { color: #f87171; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th { text-align: left; font-size: 0.75rem; color: #64748b; padding: 0.4rem 0; border-bottom: 1px solid #334155; }
+    td { padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid #1e293b; }
+    .status { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; }
+    .status-shipped { background: #1e3a5f; color: #60a5fa; }
+    .status-processing { background: #3b2f1e; color: #fbbf24; }
+    .status-delivered { background: #1a3329; color: #4ade80; }
+    .skeleton { background: #334155; border-radius: 0.5rem; animation: pulse 1.5s ease-in-out infinite; }
+    .skeleton-line { height: 1.2rem; margin: 0.5rem 0; }
+    .skeleton-big { height: 2.5rem; width: 60%; margin: 0.5rem 0; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .orders-card { grid-column: span 2; }
+    footer { margin-top: 2rem; font-size: 0.75rem; color: #475569; }
+  </style>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+
+  <div class="grid">
+
+    {# Revenue card — deferred, shows skeleton while loading #}
+    {% block revenue %}
+    <div id="revenue" class="card">
+      <h2>Revenue</h2>
+      {% if revenue %}
+        <div class="big">{{ revenue.total }}</div>
+        <div class="meta">
+          <span class="{{ 'positive' if revenue.change >= 0 else 'negative' }}">
+            {{ '+' if revenue.change >= 0 else '' }}{{ revenue.change }}%
+          </span>
+          &mdash; {{ revenue.period }}
+        </div>
+      {% else %}
+        <div class="skeleton skeleton-big"></div>
+        <div class="skeleton skeleton-line" style="width: 70%;"></div>
+      {% endif %}
+    </div>
+    {% endblock %}
+
+    {# Visitors card — deferred, shows skeleton while loading #}
+    {% block visitors %}
+    <div id="visitors" class="card">
+      <h2>Live Visitors</h2>
+      {% if visitors %}
+        <div class="big">{{ visitors.current }}</div>
+        <div class="meta">Peak today: {{ visitors.peak_today }} &middot; {{ visitors.source }}</div>
+      {% else %}
+        <div class="skeleton skeleton-big"></div>
+        <div class="skeleton skeleton-line" style="width: 50%;"></div>
+      {% endif %}
+    </div>
+    {% endblock %}
+
+    {# Orders table — deferred, shows skeleton rows while loading #}
+    {% block orders %}
+    <div id="orders" class="card orders-card">
+      <h2>Recent Orders</h2>
+      {% if orders %}
+        <table>
+          <thead><tr><th>ID</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for order in orders %}
+            <tr>
+              <td>#{{ order.id }}</td>
+              <td>{{ order.customer }}</td>
+              <td>{{ order.amount }}</td>
+              <td><span class="status status-{{ order.status }}">{{ order.status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        {% for _ in range(4) %}
+        <div class="skeleton skeleton-line"></div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endblock %}
+
+  </div>
+
+  <footer>Chirp Suspense &mdash; shell renders instantly, data fills in via OOB swaps</footer>
+</body>
+</html>

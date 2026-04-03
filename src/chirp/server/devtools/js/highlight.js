@@ -116,3 +116,117 @@ function formatRenderPlan(plan) {
   if (plan.include_layout_oob) parts.push("include_layout_oob: true");
   return parts.join("\n");
 }
+
+function renderRenderPlanHTML(plan) {
+  if (!plan) return '<span style="color:#565f89">(no render plan)</span>';
+
+  // Intent badge
+  var intentColors = {
+    full_page: COLORS.success,
+    page_fragment: COLORS.info,
+    local_fragment: COLORS.warning
+  };
+  var intentColor = intentColors[plan.intent] || COLORS.text;
+  var html = '<div style="margin-bottom:10px">';
+  html += '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:bold;background:' + intentColor + '20;color:' + intentColor + ';border:1px solid ' + intentColor + '40">' + esc(plan.intent || "unknown") + '</span>';
+
+  // Flags
+  var flags = [];
+  if (plan.render_full_template) flags.push("full_template");
+  if (plan.apply_layouts) flags.push("apply_layouts");
+  if (plan.include_layout_oob) flags.push("layout_oob");
+  if (flags.length) {
+    html += ' <span style="color:#565f89;font-size:11px">' + flags.join(" \u00b7 ") + '</span>';
+  }
+  html += '</div>';
+
+  // Template + Block
+  html += '<div style="margin-bottom:8px">';
+  html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">View</span><br>';
+  html += '<span style="color:' + HL.str + '">' + esc(plan.template || "?") + '</span>';
+  html += ' <span style="color:#565f89">\u2192</span> ';
+  html += '<span style="color:' + HL.key + '">' + esc(plan.block || "(full)") + '</span>';
+  html += '</div>';
+
+  // Layout chain
+  if (plan.layout_chain && plan.layout_chain.length) {
+    html += '<div style="margin-bottom:8px">';
+    html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Layout Chain</span>';
+    if (plan.layout_start > 0) {
+      html += ' <span style="color:' + COLORS.warning + ';font-size:11px">(start=' + plan.layout_start + ')</span>';
+    }
+    html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    for (var li = 0; li < plan.layout_chain.length; li++) {
+      var lay = plan.layout_chain[li];
+      var isActive = li >= (plan.layout_start || 0);
+      var layStyle = isActive
+        ? 'background:#7aa2f720;color:' + COLORS.info + ';border:1px solid ' + COLORS.info + '40'
+        : 'background:#1e1f2e;color:#565f89;border:1px solid #333';
+      html += '<span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;' + layStyle + '">';
+      html += esc(lay.template);
+      if (lay.target) html += ' <span style="opacity:.6">\u2192 #' + esc(lay.target) + '</span>';
+      html += '</span>';
+      if (li < plan.layout_chain.length - 1) {
+        html += '<span style="color:#565f89;font-size:10px">\u203a</span>';
+      }
+    }
+    html += '</div></div>';
+  } else if (plan.layouts_applied && plan.layouts_applied.length) {
+    // Fallback for old compact format
+    html += '<div style="margin-bottom:8px">';
+    html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Layouts Applied</span>';
+    html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    for (var ai = 0; ai < plan.layouts_applied.length; ai++) {
+      html += '<span style="display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;background:#7aa2f720;color:' + COLORS.info + ';border:1px solid ' + COLORS.info + '40">';
+      html += esc(plan.layouts_applied[ai]);
+      html += '</span>';
+      if (ai < plan.layouts_applied.length - 1) {
+        html += '<span style="color:#565f89;font-size:10px">\u203a</span>';
+      }
+    }
+    html += '</div></div>';
+  }
+
+  // Context
+  var ctxList = plan.context || null;
+  var ctxKeys = plan.context_keys || null;
+  if (ctxList && ctxList.length) {
+    html += '<div style="margin-bottom:8px">';
+    html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Context (' + ctxList.length + ')</span>';
+    html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">';
+    for (var ci = 0; ci < ctxList.length; ci++) {
+      var entry = ctxList[ci];
+      html += '<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:11px;background:#9ece6a15;border:1px solid #9ece6a30">';
+      html += '<span style="color:' + HL.key + '">' + esc(entry.key) + '</span>';
+      html += '<span style="color:#565f89;font-size:10px;margin-left:3px">' + esc(entry.type) + '</span>';
+      html += '</span>';
+    }
+    html += '</div></div>';
+  } else if (ctxKeys && ctxKeys.length) {
+    // Fallback for old compact format
+    html += '<div style="margin-bottom:8px">';
+    html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Context Keys (' + ctxKeys.length + ')</span>';
+    html += '<div style="margin-top:4px;color:' + HL.key + ';font-size:12px">' + ctxKeys.map(esc).join(', ') + '</div>';
+    html += '</div>';
+  }
+
+  // Region updates
+  if (plan.regions && plan.regions.length) {
+    html += '<div>';
+    html += '<span style="color:#565f89;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Region Updates (' + plan.regions.length + ')</span>';
+    html += '<div style="margin-top:4px">';
+    for (var ri = 0; ri < plan.regions.length; ri++) {
+      var reg = plan.regions[ri];
+      html += '<div style="font-size:12px;padding:2px 0">';
+      html += '<span style="color:' + COLORS.oob + '">#' + esc(reg.region) + '</span>';
+      html += ' <span style="color:#565f89">\u2190</span> ';
+      html += '<span style="color:' + HL.str + '">' + esc(reg.template) + '</span>';
+      if (reg.block) html += '<span style="color:#565f89">:</span><span style="color:' + HL.key + '">' + esc(reg.block) + '</span>';
+      if (reg.mode) html += ' <span style="color:#565f89;font-size:10px">[' + esc(reg.mode) + ']</span>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  return html;
+}

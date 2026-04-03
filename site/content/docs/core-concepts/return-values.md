@@ -250,19 +250,19 @@ It returns a `Response` with both:
 Use it when the same handler services both progressive enhancement paths and you
 want one return value that works cleanly for both.
 
-## FormAction
+## MutationResult
 
-Progressive enhancement for form submissions. Auto-negotiates htmx vs non-htmx: htmx requests get rendered fragments, non-htmx requests get a redirect.
+Progressive enhancement for any mutation (POST, PUT, PATCH, DELETE). Auto-negotiates htmx vs non-htmx: htmx requests get rendered fragments, non-htmx requests get a redirect.
 
 ```python
-from chirp import FormAction, Fragment
+from chirp import MutationResult, Fragment
 
 @app.route("/contacts", methods=["POST"])
 async def add_contact(form: ContactForm):
     _add_contact(form.name, form.email)
     contacts = _get_contacts()
 
-    return FormAction(
+    return MutationResult(
         "/contacts",
         Fragment("contacts.html", "table", contacts=contacts),
         Fragment("contacts.html", "count", target="count", count=len(contacts)),
@@ -274,11 +274,29 @@ async def add_contact(form: ContactForm):
 - **htmx + fragments**: renders the fragments, adds `HX-Trigger` if set
 - **htmx + no fragments**: sends `HX-Redirect` header
 
+Works for all mutation methods, not just form POST:
+
+```python
+@app.route("/items/{item_id}", methods=["DELETE"])
+async def delete_item(item_id: int):
+    _delete_item(item_id)
+    items = _get_items()
+    return MutationResult(
+        "/items",
+        Fragment("items.html", "list", items=items),
+        trigger="itemDeleted",
+    )
+```
+
 Simple redirect for both modes:
 
 ```python
-return FormAction("/dashboard")
+return MutationResult("/dashboard")
 ```
+
+:::{note}
+`FormAction` is a backwards-compatible alias for `MutationResult`. Both names work identically.
+:::
 
 ## Strings and Dicts
 
@@ -328,8 +346,45 @@ def update():
 
 Combined with htmx's `hx-swap-oob`, this updates multiple parts of the page in one request.
 
+## Choosing a Streaming Type
+
+Chirp has three streaming return types. Use this decision tree:
+
+| Question | Answer | Type |
+|----------|--------|------|
+| Does your template use `{% async for %}` or `{{ await }}`? | Yes | **TemplateStream** |
+| Do you want a skeleton/shell rendered instantly, with slow data filling in later? | Yes | **Suspense** |
+| Do you just want chunked transfer of a large page? | Yes | **Stream** |
+
+**Stream** -- All data resolves upfront (concurrently), then chunks stream out. Best for large templates where you want the browser painting before the full HTML is ready.
+
+**TemplateStream** -- The template itself consumes an async iterator during rendering. One pass, O(n). Ideal for LLM token streaming and long async feeds.
+
+**Suspense** -- Shell renders instantly with skeletons, then slow blocks fill in as OOB swaps. Best for dashboards with multiple independent slow data sources.
+
+See [[docs/streaming/html-streaming|Streaming HTML]] for the full story.
+
+## Introspecting Render Decisions
+
+For `Page`, `LayoutPage`, and `PageComposition` returns, Chirp builds a `RenderPlan` that captures the rendering decision before HTML is produced. Middleware can inspect it:
+
+```python
+from chirp import get_render_plan
+
+async def analytics_middleware(request, next):
+    response = await next(request)
+    plan = get_render_plan(request)
+    if plan is not None:
+        log_render_intent(plan.intent, plan.layout_start_index)
+    return response
+```
+
+The `RenderPlan` is a frozen dataclass with fields for `intent` (`"full_page"`, `"page_fragment"`, `"local_fragment"`), layout chain depth, and region updates. See [[docs/guides/render-plan|RenderPlan Middleware Guide]] for practical patterns.
+
 ## Next Steps
 
 - [[docs/templates/fragments|Fragments]] -- Deep dive into fragment rendering
 - [[docs/templates/rendering|Rendering]] -- Template rendering in detail
 - [[docs/routing/request-response|Request & Response]] -- The chainable Response API
+- [[docs/guides/tools|Tools & MCP]] -- Register functions as MCP tools for AI agents
+- [[docs/guides/render-plan|RenderPlan Middleware]] -- Inspect rendering decisions from middleware

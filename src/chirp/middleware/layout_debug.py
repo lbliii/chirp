@@ -12,7 +12,10 @@ import json
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
-from chirp.server.debug.render_plan_snapshot import RENDER_DEBUG_CACHE_KEY
+from chirp.server.debug.render_plan_snapshot import (
+    RENDER_DEBUG_CACHE_KEY,
+    get_render_plan,
+)
 
 _CACHE_KEY = "_layout_debug"
 _ROUTE_CACHE_KEY = "_route_debug"
@@ -24,8 +27,64 @@ def set_layout_debug_metadata(request: Request | None, chain: str, match: str, m
         request._cache[_CACHE_KEY] = {"chain": chain, "match": match, "mode": mode}
 
 
+def _build_render_plan_payload(request: Request) -> dict | None:
+    """Build a rich render plan payload from the stashed RenderPlan.
+
+    Uses the public ``get_render_plan()`` API to access the frozen
+    RenderPlan object, producing a richer payload than the old compact
+    snapshot (which was capped at 20 context keys and ~2 KB).
+    """
+    plan = get_render_plan(request)
+    if plan is None:
+        return None
+
+    mv = plan.main_view
+    context_entries = []
+    for key, val in mv.context.items():
+        type_name = type(val).__name__
+        context_entries.append({"key": key, "type": type_name})
+
+    layout_chain_info = [
+        {"template": lay.template_name, "target": lay.target, "depth": lay.depth}
+        for lay in (plan.layout_chain.layouts if plan.layout_chain is not None else ())
+    ]
+
+    layouts_applied = []
+    if plan.layout_chain is not None and plan.layout_start_index < len(plan.layout_chain.layouts):
+        layouts_applied = [
+            lay.template_name for lay in plan.layout_chain.layouts[plan.layout_start_index :]
+        ]
+
+    regions = [
+        {
+            "region": ru.region,
+            "template": ru.view.template,
+            "block": ru.view.block,
+            "mode": ru.mode,
+        }
+        for ru in plan.region_updates
+    ]
+
+    return {
+        "intent": plan.intent,
+        "template": mv.template,
+        "block": mv.block,
+        "render_full_template": plan.render_full_template,
+        "apply_layouts": plan.apply_layouts,
+        "context": context_entries,
+        "layout_chain": layout_chain_info,
+        "layouts_applied": layouts_applied,
+        "layout_start": plan.layout_start_index,
+        "regions": regions,
+        "include_layout_oob": plan.include_layout_oob,
+    }
+
+
 def _compact_render_plan(plan: dict) -> dict:
-    """Trim a render plan snapshot to header-safe size (~2 KB)."""
+    """Trim a render plan snapshot to header-safe size (~2 KB).
+
+    Fallback used when the frozen RenderPlan is not available.
+    """
     mv = plan.get("main_view", {})
     return {
         "intent": plan.get("intent"),
@@ -59,13 +118,20 @@ class LayoutDebugMiddleware:
             response = response.with_header("X-Chirp-Context-Chain", route_info.context_chain)
             response = response.with_header("X-Chirp-Shell-Context", route_info.shell_context_keys)
 
-        render_plan = request._cache.pop(RENDER_DEBUG_CACHE_KEY, None)
-        if render_plan is not None:
-            try:
-                compact = _compact_render_plan(render_plan)
-                encoded = base64.b64encode(json.dumps(compact, separators=(",", ":")).encode())
+        # Build render plan payload — prefer the rich version from the frozen
+        # RenderPlan object, fall back to the serialized debug snapshot.
+        try:
+            payload = _build_render_plan_payload(request)
+            if payload is None:
+                debug_snapshot = request._cache.pop(RENDER_DEBUG_CACHE_KEY, None)
+                if debug_snapshot is not None:
+                    payload = _compact_render_plan(debug_snapshot)
+            else:
+                request._cache.pop(RENDER_DEBUG_CACHE_KEY, None)
+            if payload is not None:
+                encoded = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode())
                 response = response.with_header("X-Chirp-Render-Plan", encoded.decode("ascii"))
-            except Exception:  # noqa: S110
-                pass
+        except Exception:  # noqa: S110
+            pass
 
         return response

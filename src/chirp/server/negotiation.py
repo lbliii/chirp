@@ -40,11 +40,11 @@ from chirp.templating.render_plan import (
 from chirp.templating.returns import (
     OOB,
     Action,
-    FormAction,
     Fragment,
     InlineTemplate,
     LayoutPage,
     LayoutSuspense,
+    MutationResult,
     Page,
     Stream,
     Suspense,
@@ -211,7 +211,7 @@ def negotiate(
 
     1. ``Response``         -> pass through
     2. ``Redirect``         -> 302 with Location header
-    3. ``FormAction``       -> htmx: fragments or HX-Redirect; non-htmx: 303
+    3. ``MutationResult``   -> htmx: fragments or HX-Redirect; non-htmx: 303
     4. ``Template``         -> render via kida -> Response
     5. ``Fragment``         -> render block via kida -> Response
     6. ``Page``             -> Template or Fragment based on request headers
@@ -240,10 +240,31 @@ def negotiate(
                 .with_header("Location", value.url)
                 .with_headers(dict(value.headers))
             )
-        case FormAction():
+        case MutationResult():
             if request is not None and request.is_fragment:
                 if value.fragments and kida_env is not None:
-                    parts = [render_fragment(kida_env, frag) for frag in value.fragments]
+                    parts: list[str] = []
+                    for i, frag in enumerate(value.fragments):
+                        html = render_fragment(kida_env, frag)
+                        if i == 0:
+                            # First fragment is the primary swap target
+                            parts.append(html)
+                        else:
+                            # Secondary fragments use OOB swap
+                            target_id = frag.target if frag.target is not None else frag.block_name
+                            swap_attr = getattr(frag, "swap", None)
+                            if swap_attr is None and oob_registry is not None:
+                                swap_attr, wrap = oob_registry.resolve_serialization(target_id)
+                            else:
+                                wrap = True
+                            if swap_attr is None:
+                                swap_attr = "true"
+                            if wrap:
+                                parts.append(
+                                    f'<div id="{target_id}" hx-swap-oob="{swap_attr}">{html}</div>'
+                                )
+                            else:
+                                parts.append(html)
                     html = "\n".join(parts)
                     response = _fragment_response(html)
                     if value.trigger:

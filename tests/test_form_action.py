@@ -212,3 +212,27 @@ class TestFormActionHtmx:
         # Both fragments rendered
         assert "x" in response.text
         assert "42" in response.text
+
+    async def test_secondary_fragments_get_oob_wrapping(self) -> None:
+        """Secondary fragments must get hx-swap-oob so htmx swaps them by ID."""
+        app = _app()
+
+        @app.route("/submit", methods=["POST"])
+        def submit():
+            return FormAction(
+                "/ok",
+                Fragment("search.html", "results_list", results=["primary"]),
+                Fragment("cart.html", "counter", target="cart-count", count=7),
+            )
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                headers={"HX-Request": "true"},
+            )
+
+        assert response.status == 200
+        assert "primary" in response.text
+        # Secondary fragment wrapped with OOB swap
+        assert 'id="cart-count"' in response.text
+        assert "hx-swap-oob" in response.text
