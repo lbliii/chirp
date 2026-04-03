@@ -1,10 +1,12 @@
 """Tests for Alpine.js support — config, injection, dedup, and macros."""
 
+import re
+
 from kida import Environment, PackageLoader
 
 from chirp import App
 from chirp.config import AppConfig
-from chirp.server.alpine import alpine_snippet
+from chirp.server.alpine import PLUGINS, alpine_snippet
 from chirp.templating.filters import BUILTIN_FILTERS
 from chirp.testing import TestClient
 
@@ -79,6 +81,45 @@ class TestAlpineSnippet:
         helper_pos = s.index("_chirpAlpineData")
         core_pos = s.index('data-chirp="alpine"')
         assert helper_pos < core_pos
+
+    def test_core_url_has_explicit_cdn_path(self) -> None:
+        """Bare package paths (alpinejs@version without /dist/cdn.min.js) resolve to
+        CommonJS on jsDelivr, which throws ReferenceError in browsers.
+        Every script src must use an explicit /dist/cdn.min.js path."""
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "alpinejs@3.15.8/dist/cdn.min.js" in s
+
+    def test_csp_url_has_explicit_cdn_path(self) -> None:
+        """CSP build must also use explicit /dist/cdn.min.js — same CJS footgun."""
+        s = alpine_snippet("3.15.8", csp=True)
+        assert "@alpinejs/csp@3.15.8/dist/cdn.min.js" in s
+
+    def test_no_bare_package_urls(self) -> None:
+        """Guard: no script src should end with a bare @version (no subpath).
+
+        jsDelivr resolves bare npm paths to package.json "main", which for
+        Alpine.js is dist/module.cjs.js — a CommonJS module that throws
+        ReferenceError: module is not defined in the browser.
+        """
+        s = alpine_snippet("3.15.8", csp=False)
+        bare_urls = re.findall(r'src="[^"]+@[0-9.]+"', s)
+        assert not bare_urls, f"Bare package script URLs (no /dist/...): {bare_urls}"
+        s_csp = alpine_snippet("3.15.8", csp=True)
+        bare_csp = re.findall(r'src="[^"]+@[0-9.]+"', s_csp)
+        assert not bare_csp, f"Bare package script URLs in CSP build: {bare_csp}"
+
+    def test_bare_url_pattern_detects_known_bad_url(self) -> None:
+        """Guard: regex must match a known-bad bare URL so the test is not vacuous."""
+        bad = 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8"'
+        assert re.findall(r'src="[^"]+@[0-9.]+"', bad) == [bad]
+
+    def test_plugin_urls_have_explicit_cdn_path(self) -> None:
+        """Each plugin script src must include @alpinejs/{name}@…/dist/cdn.min.js."""
+        for plugin in ("mask", "intersect", "focus"):
+            assert re.search(
+                rf"@alpinejs/{plugin}@[0-9.]+/dist/cdn\.min\.js",
+                PLUGINS,
+            ), f"Missing explicit /dist/cdn.min.js for plugin: {plugin}"
 
 
 # ---------------------------------------------------------------------------
