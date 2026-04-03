@@ -116,6 +116,38 @@ uv run ruff format . --check # Format check
 - `view_transitions` — `False` (off), `True`/`"htmx"` (swap animations), `"full"` (MPA + htmx)
 - `secret_key` — required for sessions, CSRF
 
+## Alpine.js Injection
+
+Chirp is the **single authority** for Alpine.js. When `AppConfig(alpine=True)`,
+`AlpineInject` middleware appends the Alpine script before `</body>` on full-page
+HTML responses. Dedup: if `data-chirp="alpine"` already exists in the body, injection
+is skipped.
+
+### CDN URL footgun
+
+All jsDelivr script URLs **must** use explicit `/dist/cdn.min.js` paths.
+A bare `cdn.jsdelivr.net/npm/alpinejs@3.15.8` resolves to `dist/module.cjs.js`
+(CommonJS), which throws `ReferenceError: module is not defined` in the browser.
+This is silent — the error shows only as `"Script error."` due to CORS.
+
+```python
+# WRONG — bare path → CJS module → broken in browser
+f"cdn.jsdelivr.net/npm/alpinejs@{version}"
+
+# CORRECT — explicit browser CDN build
+f"cdn.jsdelivr.net/npm/alpinejs@{version}/dist/cdn.min.js"
+```
+
+**Symptoms:** All Alpine-powered components dead (toggles, dropdowns, modals,
+command palette, sidebar collapse). `window.Alpine` is `undefined`. No visible
+JS errors in console (CORS masks cross-origin script errors).
+
+**Diagnosis:** Check the Alpine `<script>` tag's `src` attribute in the browser
+inspector. If it ends with `@3.x.x` without `/dist/cdn.min.js`, that's the bug.
+
+Tests in `tests/test_alpine.py` enforce this — `test_no_bare_package_urls` will
+catch any regression.
+
 ## Dependencies
 
 Core: `kida-templates`, `anyio`, `bengal-pounce`. Everything else optional:

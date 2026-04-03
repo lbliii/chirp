@@ -80,6 +80,42 @@ class TestAlpineSnippet:
         core_pos = s.index('data-chirp="alpine"')
         assert helper_pos < core_pos
 
+    def test_core_url_has_explicit_cdn_path(self) -> None:
+        """Bare package paths (alpinejs@version without /dist/cdn.min.js) resolve to
+        CommonJS on jsDelivr, which throws ReferenceError in browsers.
+        Every script src must use an explicit /dist/cdn.min.js path."""
+        s = alpine_snippet("3.15.8", csp=False)
+        assert "alpinejs@3.15.8/dist/cdn.min.js" in s
+
+    def test_csp_url_has_explicit_cdn_path(self) -> None:
+        """CSP build must also use explicit /dist/cdn.min.js — same CJS footgun."""
+        s = alpine_snippet("3.15.8", csp=True)
+        assert "@alpinejs/csp@3.15.8/dist/cdn.min.js" in s
+
+    def test_no_bare_package_urls(self) -> None:
+        """Guard: no script src should end with a bare @version (no subpath).
+
+        jsDelivr resolves bare npm paths to package.json "main", which for
+        Alpine.js is dist/module.cjs.js — a CommonJS module that throws
+        ReferenceError: module is not defined in the browser.
+        """
+        import re
+
+        s = alpine_snippet("3.15.8", csp=False)
+        bare_urls = re.findall(r'src="[^"]+@[\d.]+(?:")', s)
+        assert bare_urls == [], (
+            f"Bare CDN URLs found (missing /dist/cdn.min.js): {bare_urls}"
+        )
+
+    def test_plugin_urls_have_explicit_cdn_path(self) -> None:
+        """All plugin script tags must use explicit /dist/cdn.min.js paths."""
+        from chirp.server.alpine import PLUGINS
+
+        assert "/dist/cdn.min.js" in PLUGINS
+        for plugin in ("mask", "intersect", "focus"):
+            assert f"@alpinejs/{plugin}" in PLUGINS
+            assert f"@alpinejs/{plugin}@" in PLUGINS
+
 
 # ---------------------------------------------------------------------------
 # Integration tests — injection via App._freeze()
