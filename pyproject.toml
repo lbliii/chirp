@@ -35,9 +35,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "kida-templates>=0.3.0", # Template engine (same ecosystem, same author)
+    "kida-templates>=0.3.2", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.4.0",  # ASGI server (public PounceError et al. from pounce)
+    "bengal-pounce>=0.5.0",  # ASGI server (public PounceError et al. from pounce)
 ]
 
 [project.optional-dependencies]
@@ -63,7 +63,7 @@ ai = ["httpx>=0.27.0"]
 markdown = ["patitas[syntax]>=0.3.5"]
 
 # chirp-ui component library (CSS, themes, layout macros)
-ui = ["chirp-ui>=0.2.3"]
+ui = ["chirp-ui>=0.2.5"]
 
 # Config from env (python-dotenv for local .env loading)
 config = ["python-dotenv>=1.0.0"]
@@ -273,7 +273,7 @@ dev = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
-    "chirp-ui>=0.2.3",          # Layout macros for llm_playground example tests
+    "chirp-ui>=0.2.5",          # Layout macros for llm_playground example tests
 ]
 
 # =============================================================================
