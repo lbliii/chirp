@@ -19,13 +19,13 @@ class TestSSEEventStream:
     """Events stream through the full pipeline."""
 
     async def test_collects_all_events(self, example_app) -> None:
-        """The generator yields 1 string + 1 SSEEvent + 4 Fragments = 6 total."""
+        """The generator yields 1 string + 1 SSEEvent + 4 Fragments + 1 close = 7 total."""
         async with TestClient(example_app) as client:
-            result = await client.sse("/events", max_events=6)
+            result = await client.sse("/events", max_events=7)
 
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
-        assert len(result.events) == 6
+        assert len(result.events) == 7
 
     async def test_first_event_is_string(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -72,5 +72,13 @@ class TestSSEEventStream:
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=20)
 
-        # Generator only yields 6, so we get exactly 6
-        assert len(result.events) == 6
+        # Generator yields 6 events + 1 close event = 7 total
+        assert len(result.events) == 7
+
+    async def test_close_event_sent_after_generator_exhausts(self, example_app) -> None:
+        """The server sends a 'close' event so htmx stops reconnecting."""
+        async with TestClient(example_app) as client:
+            result = await client.sse("/events", max_events=20)
+
+        last = result.events[-1]
+        assert last.event == "close"

@@ -24,7 +24,7 @@
 <body>
 <h1>Live Feed</h1>
 <div id="feed">
-  <div hx-ext="sse" sse-connect="/events" style="display: contents">
+  <div hx-ext="sse" sse-connect="/events" sse-close="close" style="display: contents">
     <p id="placeholder">Waiting for events...</p>
     <div sse-swap="fragment" hx-swap="beforeend"></div>
   </div>

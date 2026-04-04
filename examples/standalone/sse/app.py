@@ -9,13 +9,15 @@ Run:
 """
 
 import asyncio
+import os
 from pathlib import Path
 
 from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+EVENT_DELAY = float(os.environ.get("SSE_DELAY", "1.5"))
 
-config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
+config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async", sse_close_event="close")
 app = App(config=config)
 
 # ---------------------------------------------------------------------------
@@ -52,14 +54,14 @@ def events():
         # 1. Plain string event
         yield "connected"
 
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(EVENT_DELAY)
 
         # 2. Structured SSEEvent with custom type and id
         yield SSEEvent(data="heartbeat check", event="status", id="1")
 
         # 3. Fragment events — rendered HTML pushed to the browser
         for notification in _NOTIFICATIONS:
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(EVENT_DELAY)
             yield Fragment(
                 "feed.html",
                 "notification",
