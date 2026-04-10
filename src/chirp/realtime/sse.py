@@ -260,11 +260,10 @@ def _format_event(
         # Use the Fragment's target as the SSE event name when specified.
         # This allows sse-swap="target_id" on DOM elements to receive
         # updates for specific blocks (reactive templates pattern).
+        # Note: no OOB wrapper — sse-swap matches on event name alone,
+        # and OOB would replace the target element, destroying the
+        # sse-swap attribute and breaking subsequent updates.
         event_name = value.target or "fragment"
-        # Wrap with hx-swap-oob when target is set so htmx can process OOB swaps
-        if value.target:
-            target_id = value.target
-            html = f'<div id="{target_id}" hx-swap-oob="true">{html}</div>'
         event = SSEEvent(data=html, event=event_name)
         return event.encode()
 
