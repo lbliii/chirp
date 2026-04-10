@@ -15,7 +15,13 @@ from .routes import (
     collect_route_paths,
     find_matching_route,
 )
-from .rules_accessibility import check_accessibility, check_label_association
+from .rules_accessibility import (
+    check_accessibility,
+    check_heading_order,
+    check_image_alt,
+    check_label_association,
+    check_landmarks,
+)
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_context_cascade import check_context_cascade
 from .rules_form_routes import check_form_action_contracts
@@ -348,6 +354,18 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
         result.issues.extend(check_layout_chains(snapshot.layout_chains, template_sources))
+        # Landmark check: root layout templates define the page shell (<html>/<body>)
+        # and contain {% block %} for child templates to fill.  Leaf pages also
+        # contain {% block %} but inherit landmarks from their layout, so we
+        # only check templates that define the document structure.
+        layout_sources = {
+            name: src
+            for name, src in template_sources.items()
+            if ("{% block " in src or "{%block " in src)
+            and ("<html" in src.lower() or "<body" in src.lower() or "<!doctype" in src.lower())
+            and not name.startswith(("chirp/", "chirpui/"))
+        }
+        result.issues.extend(check_landmarks(layout_sources))
         result.issues.extend(
             check_page_shell_contracts(
                 snapshot.page_leaf_templates,
@@ -411,6 +429,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 continue
             result.issues.extend(check_accessibility(source, template_name))
             result.issues.extend(check_label_association(source, template_name))
+            result.issues.extend(check_image_alt(source, template_name))
+            result.issues.extend(check_heading_order(source, template_name))
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
         result.issues.extend(check_oob_targets(template_sources, all_ids))

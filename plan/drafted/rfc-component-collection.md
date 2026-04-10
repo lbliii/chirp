@@ -1,6 +1,6 @@
 # RFC: First-Party Component Collection
 
-**Status**: Draft  
+**Status**: Not started — separate chirp-ui package, blocked on Kida typed `{% def %}`
 **Date**: 2026-02-10  
 **Scope**: Separate package — `chirp-ui` or ecosystem-named equivalent  
 **Related**: Gap Analysis — Kida/Chirp Strategic Plan  

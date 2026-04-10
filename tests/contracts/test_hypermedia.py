@@ -249,6 +249,120 @@ class TestCheckHypermediaSurface:
         a11y_warnings = [i for i in result.warnings if i.category == "a11y_interactive"]
         assert len(a11y_warnings) == 0
 
+    def test_a11y_interactive_override_to_error(self, tmp_path):
+        """Promote a11y_interactive from WARNING to ERROR via severity override."""
+        (tmp_path / "index.html").write_text(
+            '<div hx-get="/api/items">load</div>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        app.override_contract_severity("a11y_interactive", Severity.ERROR)
+        result = check_hypermedia_surface(app)
+
+        a11y_errors = [i for i in result.errors if i.category == "a11y_interactive"]
+        assert len(a11y_errors) == 1
+        assert "<div>" in a11y_errors[0].message
+        # Promoted to ERROR, so result.ok should be False
+        assert not result.ok
+
+    def test_a11y_label_override_to_error(self, tmp_path):
+        """Promote a11y_label from WARNING to ERROR via severity override."""
+        (tmp_path / "index.html").write_text(
+            '<input type="text" name="email">'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        app.override_contract_severity("a11y_label", Severity.ERROR)
+        result = check_hypermedia_surface(app)
+
+        label_errors = [i for i in result.errors if i.category == "a11y_label"]
+        assert len(label_errors) == 1
+        assert "email" in label_errors[0].message
+        assert not result.ok
+
+    def test_a11y_alt_override_to_error(self, tmp_path):
+        """Promote a11y_alt from WARNING to ERROR via severity override."""
+        (tmp_path / "index.html").write_text(
+            '<img src="photo.jpg">'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        app.override_contract_severity("a11y_alt", Severity.ERROR)
+        result = check_hypermedia_surface(app)
+
+        alt_errors = [i for i in result.errors if i.category == "a11y_alt"]
+        assert len(alt_errors) == 1
+        assert "photo.jpg" in alt_errors[0].message
+        assert not result.ok
+
+    def test_a11y_heading_override_to_error(self, tmp_path):
+        """Promote a11y_heading from WARNING to ERROR via severity override."""
+        (tmp_path / "index.html").write_text(
+            "<h1>Title</h1><h3>Skipped</h3>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        app.override_contract_severity("a11y_heading", Severity.ERROR)
+        result = check_hypermedia_surface(app)
+
+        heading_errors = [i for i in result.errors if i.category == "a11y_heading"]
+        assert len(heading_errors) == 1
+        assert "<h1>" in heading_errors[0].message
+        assert "<h3>" in heading_errors[0].message
+        assert not result.ok
+
+    def test_multiple_a11y_overrides_combined(self, tmp_path):
+        """Multiple a11y categories can be overridden independently."""
+        (tmp_path / "index.html").write_text(
+            '<div hx-get="/api/items">load</div>'
+            '<img src="photo.jpg">'
+            "<h1>Title</h1><h3>Skipped</h3>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        # Promote interactive and alt to ERROR, leave heading as WARNING
+        app.override_contract_severity("a11y_interactive", Severity.ERROR)
+        app.override_contract_severity("a11y_alt", Severity.ERROR)
+        result = check_hypermedia_surface(app)
+
+        interactive_errors = [i for i in result.errors if i.category == "a11y_interactive"]
+        alt_errors = [i for i in result.errors if i.category == "a11y_alt"]
+        heading_warnings = [i for i in result.warnings if i.category == "a11y_heading"]
+
+        assert len(interactive_errors) == 1
+        assert len(alt_errors) == 1
+        assert len(heading_warnings) == 1  # NOT promoted — still WARNING
+
     def test_swap_safety_warning_surfaces(self, tmp_path):
         """Broad hx-target + mutating request without local target warns."""
         write_layout_page(
@@ -269,3 +383,109 @@ class TestCheckHypermediaSurface:
         swap_warnings = [issue for issue in result.warnings if issue.category == "swap_safety"]
         assert len(swap_warnings) == 1
         assert "Action()" in swap_warnings[0].message
+
+
+class TestAccessibilityFullPipeline:
+    """Integration test: deliberately broken app triggers all a11y_* categories."""
+
+    def test_all_a11y_categories_reported(self, tmp_path):
+        """A single app with multiple a11y issues reports all categories."""
+        # Root layout: has <html>/<body>, has {% block %}, but NO <main> → a11y_landmark
+        (tmp_path / "layout.html").write_text(
+            "<!DOCTYPE html><html><body>"
+            "{% block content %}{% endblock %}"
+            "</body></html>"
+        )
+        # Page template: triggers a11y_interactive, a11y_label, a11y_alt, a11y_heading
+        (tmp_path / "index.html").write_text(
+            # a11y_interactive: hx-get on <div>
+            '<div hx-get="/api/items">load</div>'
+            # a11y_label: input without label
+            '<input type="text" name="query">'
+            # a11y_alt: img without alt
+            '<img src="photo.jpg">'
+            # a11y_heading: h1 → h3 skip
+            "<h1>Title</h1><h3>Subsection</h3>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+
+        # Collect all a11y categories found
+        a11y_categories = {i.category for i in result.issues if i.category.startswith("a11y_")}
+
+        assert "a11y_interactive" in a11y_categories
+        assert "a11y_label" in a11y_categories
+        assert "a11y_alt" in a11y_categories
+        assert "a11y_heading" in a11y_categories
+        assert "a11y_landmark" in a11y_categories
+
+        # All are warnings by default — result.ok should still be True
+        a11y_issues = [i for i in result.issues if i.category.startswith("a11y_")]
+        assert all(i.severity.name == "WARNING" for i in a11y_issues)
+
+    def test_all_a11y_promoted_to_error_breaks_check(self, tmp_path):
+        """Promoting all a11y categories to ERROR makes result.ok False."""
+        (tmp_path / "layout.html").write_text(
+            "<!DOCTYPE html><html><body>"
+            "{% block content %}{% endblock %}"
+            "</body></html>"
+        )
+        (tmp_path / "index.html").write_text(
+            '<div hx-get="/api/items">load</div>'
+            '<input type="text" name="query">'
+            '<img src="photo.jpg">'
+            "<h1>Title</h1><h3>Subsection</h3>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        from chirp.contracts import Severity
+
+        app.override_contract_severity("a11y_interactive", Severity.ERROR)
+        app.override_contract_severity("a11y_label", Severity.ERROR)
+        app.override_contract_severity("a11y_alt", Severity.ERROR)
+        app.override_contract_severity("a11y_heading", Severity.ERROR)
+        app.override_contract_severity("a11y_landmark", Severity.ERROR)
+
+        result = check_hypermedia_surface(app)
+        assert not result.ok
+
+        a11y_errors = [i for i in result.errors if i.category.startswith("a11y_")]
+        a11y_error_cats = {i.category for i in a11y_errors}
+        assert "a11y_interactive" in a11y_error_cats
+        assert "a11y_label" in a11y_error_cats
+        assert "a11y_alt" in a11y_error_cats
+        assert "a11y_heading" in a11y_error_cats
+        assert "a11y_landmark" in a11y_error_cats
+
+    def test_clean_app_no_a11y_warnings(self, tmp_path):
+        """An accessible app produces zero a11y warnings."""
+        (tmp_path / "layout.html").write_text(
+            "<!DOCTYPE html><html><body>"
+            "<main>{% block content %}{% endblock %}</main>"
+            "</body></html>"
+        )
+        (tmp_path / "index.html").write_text(
+            '<label for="q">Search</label>'
+            '<input type="text" id="q" name="q">'
+            '<img src="photo.jpg" alt="A photo">'
+            '<button hx-get="/api/items">Load</button>'
+            "<h1>Title</h1><h2>Section</h2>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/api/items")
+        async def list_items():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        a11y_issues = [i for i in result.issues if i.category.startswith("a11y_")]
+        assert len(a11y_issues) == 0

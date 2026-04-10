@@ -3,6 +3,9 @@
 Checks:
 - ``a11y_interactive``: htmx URL attrs on non-interactive elements
 - ``a11y_label``: form fields without associated labels
+- ``a11y_alt``: images without alt attribute
+- ``a11y_heading``: heading levels that skip
+- ``a11y_landmark``: layout templates missing <main>
 """
 
 import re
@@ -152,4 +155,104 @@ def check_label_association(source: str, template_name: str) -> list[ContractIss
             )
         )
 
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# a11y_alt — images without alt attribute
+# ---------------------------------------------------------------------------
+
+_IMG_TAG = re.compile(r"<img\b([^>]*)(?:>|/>)", re.IGNORECASE)
+_ALT_ATTR = re.compile(r"\balt=", re.IGNORECASE)
+_SRC_ATTR = re.compile(r"""src=["']([^"']*)["']""", re.IGNORECASE)
+
+
+def check_image_alt(source: str, template_name: str) -> list[ContractIssue]:
+    """Warn when <img> tags lack an alt attribute."""
+    issues: list[ContractIssue] = []
+    for match in _IMG_TAG.finditer(source):
+        attrs = match.group(1)
+        if _ALT_ATTR.search(attrs):
+            continue
+        src_match = _SRC_ATTR.search(attrs)
+        src_desc = src_match.group(1) if src_match else "<img>"
+        issues.append(
+            ContractIssue(
+                severity=Severity.WARNING,
+                category="a11y_alt",
+                message=(
+                    f"<img> '{src_desc}' has no alt attribute — "
+                    "add alt=\"...\" for screen readers (use alt=\"\" for decorative images)."
+                ),
+                template=template_name,
+            )
+        )
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# a11y_heading — heading levels that skip
+# ---------------------------------------------------------------------------
+
+_HEADING_TAG = re.compile(r"<h([1-6])\b", re.IGNORECASE)
+
+
+def check_heading_order(source: str, template_name: str) -> list[ContractIssue]:
+    """Warn when heading levels skip (e.g. h1 → h3 with no h2)."""
+    issues: list[ContractIssue] = []
+    levels = [int(m.group(1)) for m in _HEADING_TAG.finditer(source)]
+    if not levels:
+        return issues
+    for i in range(1, len(levels)):
+        prev, curr = levels[i - 1], levels[i]
+        if curr > prev + 1:
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="a11y_heading",
+                    message=(
+                        f"Heading level skips from <h{prev}> to <h{curr}> — "
+                        "don't skip heading levels for proper document outline."
+                    ),
+                    template=template_name,
+                )
+            )
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# a11y_landmark — layout templates missing <main>
+# ---------------------------------------------------------------------------
+
+_MAIN_TAG = re.compile(r"<main\b", re.IGNORECASE)
+_ROLE_MAIN = re.compile(r"""\brole=["']main["']""", re.IGNORECASE)
+
+
+def check_landmarks(
+    layout_sources: dict[str, str],
+) -> list[ContractIssue]:
+    """Warn when layout templates have no <main> or role="main" landmark.
+
+    Parameters
+    ----------
+    layout_sources:
+        Mapping of layout template name → source for templates that serve as
+        layouts (contain ``{% block %}``).  Only layout templates are checked
+        because pages inherit their landmark structure from the layout.
+    """
+    issues: list[ContractIssue] = []
+    for name, source in layout_sources.items():
+        if _MAIN_TAG.search(source) or _ROLE_MAIN.search(source):
+            continue
+        issues.append(
+            ContractIssue(
+                severity=Severity.WARNING,
+                category="a11y_landmark",
+                message=(
+                    "Layout template has no <main> landmark — "
+                    "add <main> or role=\"main\" for screen reader navigation."
+                ),
+                template=name,
+            )
+        )
     return issues

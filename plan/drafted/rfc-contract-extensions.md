@@ -1,6 +1,6 @@
 # RFC: Contract Validation Extensions
 
-**Status**: Draft  
+**Status**: Partial — Phases 1-3 implemented, Phase 4 blocked on Kida typed `{% def %}`
 **Date**: 2026-02-10  
 **Scope**: `src/chirp/contracts.py`  
 **Related**: Gap Analysis — Kida/Chirp Strategic Plan  

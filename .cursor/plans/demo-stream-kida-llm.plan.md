@@ -5,6 +5,8 @@ todos: []
 isProject: false
 ---
 
+**Status**: Implemented
+
 # Plan: Three Missing Demonstrations
 
 Demonstrate the last three gaps from the template-engine research:
