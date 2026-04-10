@@ -82,7 +82,7 @@ class AppConfig:
     trim_blocks: bool = True
     lstrip_blocks: bool = True
     static_context: MappingProxyType[str, Any] | dict[str, Any] | None = (
-        None  # Compile-time constants for kida partial evaluator
+        None  # Compile-time constants for kida partial evaluator; frozen to MappingProxyType
     )
 
     # Static files
@@ -204,6 +204,13 @@ class AppConfig:
     http_retries: int = 0
     skip_contract_checks: bool = False
     lazy_pages: bool = False
+
+    def __post_init__(self) -> None:
+        # Freeze mutable static_context dict → MappingProxyType so the
+        # "frozen dataclass" guarantee extends to nested containers.
+        sc = self.static_context
+        if isinstance(sc, dict):
+            object.__setattr__(self, "static_context", MappingProxyType(sc))
 
     @classmethod
     def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:

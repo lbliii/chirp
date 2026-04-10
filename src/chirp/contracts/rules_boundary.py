@@ -14,6 +14,11 @@ render errors and fall back to safe defaults.
 
 This check emits INFO-level issues (not errors or warnings) since
 server-side error handling already prevents page-level failures.
+
+**Scope limitations** — the check uses regex-based HTML parsing, so it:
+- Only sees blocks in the literal template source (not inherited/included blocks)
+- May miss OOB regions split across template conditionals
+These are acceptable trade-offs for an INFO-level advisory check.
 """
 
 import re
@@ -38,7 +43,14 @@ _TRY_PATTERN = re.compile(
 
 
 def _extract_oob_regions(source: str) -> list[str]:
-    """Extract the inner content of each OOB element by tracking tag nesting."""
+    """Extract the inner content of each OOB element by tracking tag nesting.
+
+    Limitations (regex-based HTML parsing):
+    - Cannot see blocks inherited via ``{% extends %}`` or pulled in via
+      ``{% include %}`` — only the literal source of each template is scanned.
+    - HTML comments or template conditionals that split tags may confuse the
+      nesting tracker, though this is rare in practice.
+    """
     regions: list[str] = []
     for oob_open in _OOB_OPEN_PATTERN.finditer(source):
         tag = oob_open.group("tag")

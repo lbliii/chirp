@@ -290,11 +290,11 @@ class AppCompiler:
                 return catalog.translate(get_locale(), message)
 
             def _ngettext(singular: str, plural: str, n: int) -> str:
-                message = singular if n == 1 else plural
-                catalog = _get_catalog()
-                if catalog is None:
-                    return message
-                return catalog.translate(get_locale(), message)
+                # Plural selection only — chirp's JSON catalogs don't store
+                # plural form rules, so we pick singular/plural by English
+                # rules (n==1) and return untranslated.  Full ngettext with
+                # CLDR plural categories requires a catalog format upgrade.
+                return singular if n == 1 else plural
 
             self._runtime.kida_env.install_gettext_callables(_gettext, _ngettext)
 

@@ -40,6 +40,15 @@ class TestAppConfig:
         with pytest.raises(AttributeError):
             cfg.debug = True  # type: ignore[misc]
 
+    def test_static_context_frozen_to_mapping_proxy(self) -> None:
+        cfg = AppConfig(static_context={"site": "Chirp"})
+        from types import MappingProxyType
+
+        assert isinstance(cfg.static_context, MappingProxyType)
+        assert cfg.static_context["site"] == "Chirp"
+        with pytest.raises(TypeError):
+            cfg.static_context["site"] = "changed"  # type: ignore[index]
+
     def test_template_dir_as_path(self) -> None:
         cfg = AppConfig(template_dir=Path("views"))
         assert cfg.template_dir == Path("views")
