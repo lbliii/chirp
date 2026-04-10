@@ -18,11 +18,33 @@ class TestBoundaryCoverage:
         assert "stats" in issues[0].message
         assert issues[0].template == "page.html"
 
+    def test_warns_oob_block_closed_with_end(self) -> None:
+        """Blocks closed with {% end %} (kida shorthand) are also detected."""
+        source = (
+            '<div hx-swap-oob="true" id="stats">'
+            "{% block stats %}<p>{{ count }}</p>{% end %}"
+            "</div>"
+        )
+        issues = check_boundary_coverage({"page.html": source})
+        assert len(issues) == 1
+        assert "stats" in issues[0].message
+
     def test_no_issue_when_try_present(self) -> None:
         source = (
             '<div hx-swap-oob="true" id="stats">'
             "{% block stats %}{% try %}<p>{{ count }}</p>"
             "{% fallback %}<p>--</p>{% end %}{% endblock %}"
+            "</div>"
+        )
+        issues = check_boundary_coverage({"page.html": source})
+        assert len(issues) == 0
+
+    def test_no_issue_when_try_present_end_shorthand(self) -> None:
+        """Block closed with {% end %} containing {% try %} is not flagged."""
+        source = (
+            '<div hx-swap-oob="true" id="stats">'
+            "{% block stats %}{% try %}<p>{{ count }}</p>"
+            "{% fallback %}<p>--</p>{% end %}{% end %}"
             "</div>"
         )
         issues = check_boundary_coverage({"page.html": source})

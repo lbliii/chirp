@@ -1,13 +1,16 @@
-"""Error boundary coverage check for Suspense deferred blocks.
+"""Error boundary coverage check for OOB template blocks.
 
-Scans template sources for blocks that render as OOB (out-of-band) swaps
-and suggests wrapping them in ``{% try %}...{% fallback %}`` for graceful
-error handling.
+Scans template sources for blocks inside elements with ``hx-swap-oob``
+attributes and suggests wrapping them in ``{% try %}...{% fallback %}``
+for graceful error handling.
+
+This only catches templates that *embed* ``hx-swap-oob`` in their source.
+Templates used with ``Suspense`` don't contain ``hx-swap-oob`` — the OOB
+wrappers are generated at render time by chirp's Suspense pipeline, which
+already has its own per-block error handling (see ``suspense.py``).
 
 Kida 0.4.0 introduced error boundaries — ``{% try %}`` blocks that catch
-render errors and fall back to safe defaults.  For Suspense pages, each
-deferred block can fail independently (e.g., a slow API times out).
-Wrapping in ``{% try %}`` shows a fallback instead of dropping the block.
+render errors and fall back to safe defaults.
 
 This check emits INFO-level issues (not errors or warnings) since
 server-side error handling already prevents page-level failures.
@@ -18,7 +21,7 @@ import re
 from .types import ContractIssue, Severity
 
 _BLOCK_PATTERN = re.compile(
-    r"""\{%-?\s*block\s+(?P<name>\w+)\s*-?%\}(?P<body>.*?)\{%-?\s*endblock\b""",
+    r"""\{%-?\s*block\s+(?P<name>\w+)\s*-?%\}(?P<body>.*?)\{%-?\s*end(?:block)?(?:\s+\w+)?\s*-?%\}""",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -36,11 +39,12 @@ _TRY_PATTERN = re.compile(
 def check_boundary_coverage(
     template_sources: dict[str, str],
 ) -> list[ContractIssue]:
-    """Suggest error boundaries for blocks in templates with OOB patterns.
+    """Suggest error boundaries for blocks in OOB templates.
 
-    Only inspects templates that contain ``hx-swap-oob`` attributes
-    (likely targets of Suspense or OOB updates).  Within those templates,
-    blocks without ``{% try %}`` get an INFO issue.
+    Only inspects templates whose source contains ``hx-swap-oob`` attributes
+    (explicit OOB swap targets).  Within those templates, blocks without
+    ``{% try %}`` get an INFO issue.  Does not cover Suspense-rendered OOB
+    (those wrappers are generated at render time, not in the source).
     """
     issues: list[ContractIssue] = []
 

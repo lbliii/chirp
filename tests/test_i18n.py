@@ -269,3 +269,48 @@ class TestTransBlockIntegration:
             assert "Adi\u00f3s" in html
         finally:
             _locale_var.set("en")
+
+
+class TestTransBlockFreezePipeline:
+    """Integration: {% trans %} wired automatically through App._freeze()."""
+
+    def test_freeze_wires_gettext_for_trans_blocks(self, tmp_path):
+        """App._freeze() installs gettext so {% trans %} works without manual setup."""
+        from chirp import App
+        from chirp.config import AppConfig
+        from chirp.i18n.middleware import _locale_var
+        from chirp.templating.returns import Template
+
+        # Set up locale directory with a Spanish translation
+        locale_dir = tmp_path / "locales"
+        locale_dir.mkdir()
+        (locale_dir / "es.json").write_text(json.dumps({"Hello": "Hola"}))
+
+        # Create template that uses {% trans %}
+        tpl_dir = tmp_path / "templates"
+        tpl_dir.mkdir()
+        (tpl_dir / "greeting.html").write_text("{% trans %}Hello{% endtrans %}")
+
+        config = AppConfig(
+            template_dir=str(tpl_dir),
+            i18n_enabled=True,
+            i18n_directory=str(locale_dir),
+            i18n_supported_locales=("en", "es"),
+            i18n_default_locale="en",
+        )
+        app = App(config=config)
+
+        # Add a dummy route so the app can freeze
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._freeze()
+
+        # Render through the app — gettext was wired by freeze(), not manually
+        _locale_var.set("es")
+        try:
+            html = app.render(Template("greeting.html"))
+            assert html == "Hola"
+        finally:
+            _locale_var.set("en")
