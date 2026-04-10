@@ -238,3 +238,109 @@ class TestCreateEnvironmentExtraLoaders:
         env = create_environment(config, filters={}, globals_={})
         html = env.get_template("page.html").render(title="Home")
         assert "<h1>Home</h1>" in html
+
+
+# ── create_environment static_context (partial evaluator) ─────────────────
+
+
+class TestCreateEnvironmentStaticContext:
+    """Static context enables kida's compile-time partial evaluator."""
+
+    def test_default_none(self, tmp_path: Path) -> None:
+        """Default static_context is None — no partial evaluation."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        assert env.static_context is None
+
+    def test_static_context_passed_through(self, tmp_path: Path) -> None:
+        """static_context dict reaches the kida Environment."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        ctx = {"site_name": "Chirp", "version": "1.0"}
+        config = AppConfig(template_dir=str(tmp_path), static_context=ctx)
+        env = create_environment(config, filters={}, globals_={})
+        assert env.static_context == ctx
+
+    def test_static_context_baked_into_templates(self, tmp_path: Path) -> None:
+        """Static values are resolved at compile time."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "page.html").write_text("<title>{{ site_name }}</title>")
+        config = AppConfig(
+            template_dir=str(tmp_path),
+            static_context={"site_name": "Chirp"},
+        )
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("page.html").render()
+        assert "<title>Chirp</title>" in html
+
+
+# ── kida 0.4.0 feature verification ──────────────────────────────────────
+
+
+class TestKida040Features:
+    """Verify kida 0.4.0 features work through chirp's environment."""
+
+    def test_error_boundary_renders_fallback(self, tmp_path: Path) -> None:
+        """{% try %} catches errors and renders fallback."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "page.html").write_text(
+            "{% try %}{{ missing.attr }}{% fallback %}<p>fallback</p>{% end %}"
+        )
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("page.html").render()
+        assert "<p>fallback</p>" in html
+
+    def test_scoped_slot_passes_data_to_caller(self, tmp_path: Path) -> None:
+        """Scoped slots expose data from def to caller via let: bindings."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "comp.html").write_text(
+            "{% def greet(name) %}"
+            "<div>{% slot body let:who=name %}Hello {{ who }}{% end %}</div>"
+            "{% enddef %}"
+        )
+        (tmp_path / "page.html").write_text(
+            '{% from "comp.html" import greet %}'
+            '{% call greet("World") %}'
+            "{% slot body %}Hi {{ who }}!{% end %}"
+            "{% endcall %}"
+        )
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("page.html").render()
+        assert "Hi World!" in html
+
+    def test_list_comprehension_in_template(self, tmp_path: Path) -> None:
+        """List comprehensions work in template expressions."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "page.html").write_text(
+            "{{ [x.upper() for x in items if x != 'b'] | join(', ') }}"
+        )
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        html = env.get_template("page.html").render(items=["a", "b", "c"])
+        assert html == "A, C"
+
+    def test_trans_block_renders(self, tmp_path: Path) -> None:
+        """{% trans %} blocks render through chirp's environment."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        (tmp_path / "page.html").write_text("{% trans %}Hello{% endtrans %}")
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        # Without gettext installed, trans blocks return source string
+        html = env.get_template("page.html").render()
+        assert html == "Hello"

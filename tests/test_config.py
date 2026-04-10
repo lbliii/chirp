@@ -24,6 +24,7 @@ class TestAppConfig:
         assert cfg.mcp_path == "/mcp"
         assert cfg.max_content_length == 16 * 1024 * 1024
         assert cfg.view_transitions is False
+        assert cfg.static_context is None
 
     def test_override(self) -> None:
         cfg = AppConfig(host="0.0.0.0", port=3000, debug=True, secret_key="s3cret")
@@ -38,6 +39,15 @@ class TestAppConfig:
 
         with pytest.raises(AttributeError):
             cfg.debug = True  # type: ignore[misc]
+
+    def test_static_context_frozen_to_mapping_proxy(self) -> None:
+        cfg = AppConfig(static_context={"site": "Chirp"})
+        from types import MappingProxyType
+
+        assert isinstance(cfg.static_context, MappingProxyType)
+        assert cfg.static_context["site"] == "Chirp"
+        with pytest.raises(TypeError):
+            cfg.static_context["site"] = "changed"  # type: ignore[index]
 
     def test_template_dir_as_path(self) -> None:
         cfg = AppConfig(template_dir=Path("views"))

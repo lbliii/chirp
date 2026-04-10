@@ -22,6 +22,7 @@ from .rules_accessibility import (
     check_label_association,
     check_landmarks,
 )
+from .rules_boundary import check_boundary_coverage
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_context_cascade import check_context_cascade
 from .rules_form_routes import check_form_action_contracts
@@ -435,6 +436,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(validate_form_contracts(result, router, template_sources))
         result.issues.extend(check_oob_targets(template_sources, all_ids))
         result.issues.extend(check_form_action_contracts(template_sources, router))
+        result.issues.extend(check_boundary_coverage(template_sources))
 
         # Reactive bus contract checks (if a DependencyIndex is registered)
         reactive_index = getattr(app, "_reactive_index", None)
