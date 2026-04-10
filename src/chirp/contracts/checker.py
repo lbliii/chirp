@@ -15,7 +15,7 @@ from .routes import (
     collect_route_paths,
     find_matching_route,
 )
-from .rules_accessibility import check_accessibility
+from .rules_accessibility import check_accessibility, check_label_association
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_context_cascade import check_context_cascade
 from .rules_form_routes import check_form_action_contracts
@@ -410,6 +410,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             if template_name.startswith(("chirp/", "chirpui/")):
                 continue
             result.issues.extend(check_accessibility(source, template_name))
+            result.issues.extend(check_label_association(source, template_name))
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
         result.issues.extend(check_oob_targets(template_sources, all_ids))

@@ -225,7 +225,7 @@ class TestCheckHypermediaSurface:
         result = check_hypermedia_surface(app)
         # Routes match, so no errors — but div triggers a11y warning
         assert result.ok
-        a11y_warnings = [i for i in result.warnings if i.category == "accessibility"]
+        a11y_warnings = [i for i in result.warnings if i.category == "a11y_interactive"]
         assert len(a11y_warnings) == 1
         assert "<div>" in a11y_warnings[0].message
 
@@ -246,7 +246,7 @@ class TestCheckHypermediaSurface:
 
         result = check_hypermedia_surface(app)
         assert result.ok
-        a11y_warnings = [i for i in result.warnings if i.category == "accessibility"]
+        a11y_warnings = [i for i in result.warnings if i.category == "a11y_interactive"]
         assert len(a11y_warnings) == 0
 
     def test_swap_safety_warning_surfaces(self, tmp_path):
