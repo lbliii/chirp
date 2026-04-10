@@ -290,7 +290,11 @@ class AppCompiler:
                 return catalog.translate(get_locale(), message)
 
             def _ngettext(singular: str, plural: str, n: int) -> str:
-                return singular if n == 1 else plural
+                message = singular if n == 1 else plural
+                catalog = _get_catalog()
+                if catalog is None:
+                    return message
+                return catalog.translate(get_locale(), message)
 
             self._runtime.kida_env.install_gettext_callables(_gettext, _ngettext)
 

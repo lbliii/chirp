@@ -7,6 +7,7 @@ no string-key dict lookups.
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 
@@ -80,7 +81,7 @@ class AppConfig:
     autoescape: bool = True
     trim_blocks: bool = True
     lstrip_blocks: bool = True
-    static_context: dict[str, Any] | None = (
+    static_context: MappingProxyType[str, Any] | dict[str, Any] | None = (
         None  # Compile-time constants for kida partial evaluator
     )
 

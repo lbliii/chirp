@@ -25,8 +25,9 @@ _BLOCK_PATTERN = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
-_OOB_PATTERN = re.compile(
-    r"""hx-swap-oob\s*=\s*["']""",
+# Matches the opening tag of an OOB element, capturing its tag name.
+_OOB_OPEN_PATTERN = re.compile(
+    r"""<(?P<tag>\w+)[^>]+hx-swap-oob\s*=\s*["']""",
     re.IGNORECASE,
 )
 
@@ -36,14 +37,45 @@ _TRY_PATTERN = re.compile(
 )
 
 
+def _extract_oob_regions(source: str) -> list[str]:
+    """Extract the inner content of each OOB element by tracking tag nesting."""
+    regions: list[str] = []
+    for oob_open in _OOB_OPEN_PATTERN.finditer(source):
+        tag = oob_open.group("tag")
+        # Find the end of the opening tag
+        gt_pos = source.find(">", oob_open.end())
+        if gt_pos == -1:
+            continue
+        inner_start = gt_pos + 1
+        # Track nesting to find the matching closing tag
+        open_pat = re.compile(rf"<{tag}\b", re.IGNORECASE)
+        close_pat = re.compile(rf"</{tag}\s*>", re.IGNORECASE)
+        depth = 1
+        pos = inner_start
+        while depth > 0 and pos < len(source):
+            next_open = open_pat.search(source, pos)
+            next_close = close_pat.search(source, pos)
+            if next_close is None:
+                break
+            if next_open and next_open.start() < next_close.start():
+                depth += 1
+                pos = next_open.end()
+            else:
+                depth -= 1
+                if depth == 0:
+                    regions.append(source[inner_start : next_close.start()])
+                pos = next_close.end()
+    return regions
+
+
 def check_boundary_coverage(
     template_sources: dict[str, str],
 ) -> list[ContractIssue]:
-    """Suggest error boundaries for blocks in OOB templates.
+    """Suggest error boundaries for blocks inside OOB elements.
 
-    Only inspects templates whose source contains ``hx-swap-oob`` attributes
-    (explicit OOB swap targets).  Within those templates, blocks without
-    ``{% try %}`` get an INFO issue.  Does not cover Suspense-rendered OOB
+    Only inspects blocks that are *inside* elements with ``hx-swap-oob``
+    attributes (explicit OOB swap targets).  Blocks outside OOB regions in the
+    same template are not flagged.  Does not cover Suspense-rendered OOB
     (those wrappers are generated at render time, not in the source).
     """
     issues: list[ContractIssue] = []
@@ -52,27 +84,25 @@ def check_boundary_coverage(
         if template_name.startswith(("chirp/", "chirpui/")):
             continue
 
-        if not _OOB_PATTERN.search(source):
-            continue
+        for oob_inner in _extract_oob_regions(source):
+            for m in _BLOCK_PATTERN.finditer(oob_inner):
+                block_name = m.group("name")
+                block_body = m.group("body")
 
-        for m in _BLOCK_PATTERN.finditer(source):
-            block_name = m.group("name")
-            block_body = m.group("body")
+                if _TRY_PATTERN.search(block_body):
+                    continue
 
-            if _TRY_PATTERN.search(block_body):
-                continue
-
-            issues.append(
-                ContractIssue(
-                    severity=Severity.INFO,
-                    category="boundary",
-                    message=(
-                        f"Block '{block_name}' in OOB template lacks "
-                        f"{{% try %}} error boundary — consider wrapping "
-                        f"for graceful fallback."
-                    ),
-                    template=template_name,
+                issues.append(
+                    ContractIssue(
+                        severity=Severity.INFO,
+                        category="boundary",
+                        message=(
+                            f"Block '{block_name}' in OOB template lacks "
+                            f"{{% try %}} error boundary — consider wrapping "
+                            f"for graceful fallback."
+                        ),
+                        template=template_name,
+                    )
                 )
-            )
 
     return issues

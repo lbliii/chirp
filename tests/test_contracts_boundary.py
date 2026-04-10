@@ -70,3 +70,16 @@ class TestBoundaryCoverage:
         issues = check_boundary_coverage({"page.html": source})
         assert len(issues) == 1
         assert "uncovered" in issues[0].message
+
+    def test_ignores_blocks_outside_oob_region(self) -> None:
+        """Blocks outside OOB elements are not flagged, even in the same template."""
+        source = (
+            "{% block header %}<h1>Title</h1>{% endblock %}"
+            '<div hx-swap-oob="true" id="stats">'
+            "{% block stats %}<p>{{ count }}</p>{% endblock %}"
+            "</div>"
+            "{% block footer %}<footer>End</footer>{% endblock %}"
+        )
+        issues = check_boundary_coverage({"page.html": source})
+        assert len(issues) == 1
+        assert "stats" in issues[0].message

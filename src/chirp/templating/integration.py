@@ -119,7 +119,7 @@ def create_environment(
         auto_reload=config.debug,
         trim_blocks=config.trim_blocks,
         lstrip_blocks=config.lstrip_blocks,
-        static_context=config.static_context,
+        static_context=dict(config.static_context) if config.static_context else None,
     )
 
     # Register chirp's built-in filters (field_errors, qs, etc.)
