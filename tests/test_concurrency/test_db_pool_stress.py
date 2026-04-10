@@ -85,9 +85,7 @@ class TestDatabasePoolStress:
     async def test_concurrent_transactions_serialize(self) -> None:
         """Concurrent transactions don't corrupt shared state."""
         async with Database("sqlite:///:memory:") as db:
-            await db.execute(
-                "CREATE TABLE balance (id INTEGER PRIMARY KEY, amount INTEGER)"
-            )
+            await db.execute("CREATE TABLE balance (id INTEGER PRIMARY KEY, amount INTEGER)")
             await db.execute("INSERT INTO balance (id, amount) VALUES (1, 1000)")
 
             n_tasks = 20
@@ -95,9 +93,7 @@ class TestDatabasePoolStress:
 
             async def transactor(task_id: int) -> None:
                 async with db.transaction():
-                    current = await db.fetch_val(
-                        "SELECT amount FROM balance WHERE id = 1"
-                    )
+                    current = await db.fetch_val("SELECT amount FROM balance WHERE id = 1")
                     await db.execute(
                         "UPDATE balance SET amount = ? WHERE id = 1",
                         current + increment,
@@ -115,9 +111,7 @@ class TestDatabasePoolStress:
     async def test_mixed_read_write_no_errors(self) -> None:
         """Concurrent readers and writers don't cause errors."""
         async with Database("sqlite:///:memory:") as db:
-            await db.execute(
-                "CREATE TABLE log (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT)"
-            )
+            await db.execute("CREATE TABLE log (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT)")
 
             errors: list[str] = []
             lock = asyncio.Lock()

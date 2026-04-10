@@ -33,14 +33,10 @@ class TestRequestGlobalsIsolation:
             # Verify our values are still ours
             if g.task_id != task_id:
                 async with lock:
-                    violations.append(
-                        f"Task {task_id} saw g.task_id={g.task_id}"
-                    )
+                    violations.append(f"Task {task_id} saw g.task_id={g.task_id}")
             if g.data != f"data-{task_id}":
                 async with lock:
-                    violations.append(
-                        f"Task {task_id} saw g.data={g.data}"
-                    )
+                    violations.append(f"Task {task_id} saw g.data={g.data}")
 
         await asyncio.gather(*(task_fn(i) for i in range(n_tasks)))
         assert not violations, f"Context leaks: {violations}"

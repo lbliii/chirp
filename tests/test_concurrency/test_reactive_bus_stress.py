@@ -270,6 +270,4 @@ class TestMultiScopeStress:
 
         # Each scope should only have events from its own scope
         for scope, events in received.items():
-            assert all(e == scope for e in events), (
-                f"{scope} received cross-scope events: {events}"
-            )
+            assert all(e == scope for e in events), f"{scope} received cross-scope events: {events}"

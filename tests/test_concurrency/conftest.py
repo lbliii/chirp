@@ -119,9 +119,7 @@ def assert_at_least(actual: int, minimum: int, label: str = "count") -> None:
     Use this for soft lower bounds where exact delivery isn't guaranteed
     (e.g., when back-pressure may drop some events).
     """
-    assert actual >= minimum, (
-        f"Expected {label} >= {minimum}, got {actual}"
-    )
+    assert actual >= minimum, f"Expected {label} >= {minimum}, got {actual}"
 
 
 def assert_no_errors(result: ThreadStressResult) -> None:

@@ -16,8 +16,7 @@ class TestFormActionContracts:
 
     def test_form_with_contract_passes(self, tmp_path):
         (tmp_path / "login.html").write_text(
-            '<form action="/login" method="post">'
-            '<input name="username"><button>Go</button></form>'
+            '<form action="/login" method="post"><input name="username"><button>Go</button></form>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -39,8 +38,7 @@ class TestFormActionContracts:
 
     def test_form_without_contract_reports_info(self, tmp_path):
         (tmp_path / "login.html").write_text(
-            '<form action="/login" method="post">'
-            '<input name="username"><button>Go</button></form>'
+            '<form action="/login" method="post"><input name="username"><button>Go</button></form>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 

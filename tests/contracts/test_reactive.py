@@ -40,9 +40,7 @@ class TestReactiveBlockExistence:
         assert len(issues) == 0
 
     def test_missing_block_reports_error(self, tmp_path):
-        (tmp_path / "board.html").write_text(
-            "{% block task_list %}<ul></ul>{% endblock %}"
-        )
+        (tmp_path / "board.html").write_text("{% block task_list %}<ul></ul>{% endblock %}")
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
         index._path_to_blocks.setdefault("tasks", []).append(
@@ -76,9 +74,7 @@ class TestReactiveBlockExistence:
 
     def test_duplicate_refs_checked_once(self, tmp_path):
         """Same (template, block) registered under multiple paths is checked once."""
-        (tmp_path / "page.html").write_text(
-            "{% block status %}<span>ok</span>{% endblock %}"
-        )
+        (tmp_path / "page.html").write_text("{% block status %}<span>ok</span>{% endblock %}")
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
         ref = BlockRef(template_name="page.html", block_name="status")
@@ -96,9 +92,7 @@ class TestReactiveBlockExistence:
         index._path_to_blocks.setdefault("x", []).append(
             BlockRef(template_name="a.html", block_name="good")
         )
-        index._path_to_blocks["x"].append(
-            BlockRef(template_name="b.html", block_name="missing")
-        )
+        index._path_to_blocks["x"].append(BlockRef(template_name="b.html", block_name="missing"))
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 1
