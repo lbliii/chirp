@@ -21,9 +21,7 @@ class TestBoundaryCoverage:
     def test_warns_oob_block_closed_with_end(self) -> None:
         """Blocks closed with {% end %} (kida shorthand) are also detected."""
         source = (
-            '<div hx-swap-oob="true" id="stats">'
-            "{% block stats %}<p>{{ count }}</p>{% end %}"
-            "</div>"
+            '<div hx-swap-oob="true" id="stats">{% block stats %}<p>{{ count }}</p>{% end %}</div>'
         )
         issues = check_boundary_coverage({"page.html": source})
         assert len(issues) == 1
