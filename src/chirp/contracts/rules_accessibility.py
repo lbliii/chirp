@@ -67,7 +67,8 @@ _LABELABLE_ELEMENT = re.compile(
 _ID_ATTR = re.compile(r"""\bid=["']([^"']*)["']""", re.IGNORECASE)
 _TYPE_ATTR = re.compile(r"""\btype=["']([^"']*)["']""", re.IGNORECASE)
 _NAME_ATTR = re.compile(r"""\bname=["']([^"']*)["']""", re.IGNORECASE)
-_ARIA_LABEL_ATTR = re.compile(r"\baria-label(?:ledby)?=", re.IGNORECASE)
+_ALT_ATTR = re.compile(r"(?:^|\s)alt\s*=", re.IGNORECASE)
+_ARIA_LABEL_ATTR = re.compile(r"(?:^|\s)aria-label(?:ledby)?\s*=", re.IGNORECASE)
 _LABEL_FOR = re.compile(r"""<label\b[^>]*\bfor=["']([^"']*)["']""", re.IGNORECASE)
 
 # Wrapping labels: <label ...> ... <input|select|textarea ...> ... </label>
@@ -80,7 +81,7 @@ _WRAPPING_LABEL = re.compile(
 _KIDA_EXPR = re.compile(r"\{\{.*?\}\}")
 
 # Types that don't need labels.
-_EXEMPT_TYPES = frozenset({"hidden", "submit", "button", "image", "reset"})
+_EXEMPT_TYPES = frozenset({"hidden", "submit", "button", "reset"})
 
 
 def _normalize_for_matching(value: str) -> str:
@@ -119,8 +120,13 @@ def check_label_association(source: str, template_name: str) -> list[ContractIss
         # Check exempt types (input only).
         if tag_name == "input":
             type_match = _TYPE_ATTR.search(attrs)
-            if type_match and type_match.group(1).lower() in _EXEMPT_TYPES:
-                continue
+            if type_match:
+                input_type = type_match.group(1).lower()
+                if input_type in _EXEMPT_TYPES:
+                    continue
+                # type="image" is exempt when alt is present (alt IS the accessible name).
+                if input_type == "image" and _ALT_ATTR.search(attrs):
+                    continue
 
         # Check aria-label or aria-labelledby.
         if _ARIA_LABEL_ATTR.search(attrs):
@@ -161,7 +167,6 @@ def check_label_association(source: str, template_name: str) -> list[ContractIss
 # ---------------------------------------------------------------------------
 
 _IMG_TAG = re.compile(r"<img\b([^>]*)(?:>|/>)", re.IGNORECASE)
-_ALT_ATTR = re.compile(r"\balt=", re.IGNORECASE)
 _SRC_ATTR = re.compile(r"""src=["']([^"']*)["']""", re.IGNORECASE)
 
 

@@ -282,11 +282,11 @@ Categories follow the existing pattern (lowercase, underscore-separated). The `a
 | Category | WCAG SC | Default Severity | What It Catches |
 |----------|---------|-----------------|-----------------|
 | `a11y_interactive` | 2.1.1 Keyboard, 4.1.2 Name/Role/Value | WARNING | htmx action attributes (`hx-get`, `hx-post`, etc.) on non-interactive elements (`<div>`, `<span>`, `<tr>`) without `role`/`tabindex`. Already exists as `accessibility` — rename only. |
-| `a11y_label` | 1.3.1 Info and Relationships, 4.1.2 Name/Role/Value | WARNING | `<input>`, `<select>`, `<textarea>` without an associated label. Valid associations: `<label for="id">`, wrapping `<label>`, `aria-label`, `aria-labelledby`. Exemptions: `type="hidden"`, `type="submit"`, `type="button"`, `type="image"` with `alt`. |
+| `a11y_label` | 1.3.1 Info and Relationships, 4.1.2 Name/Role/Value | WARNING | `<input>`, `<select>`, `<textarea>` without an associated label. Valid associations: `<label for="id">`, wrapping `<label>`, `aria-label`, `aria-labelledby`. Exemptions: `type="hidden"`, `type="submit"`, `type="button"`, `type="reset"`. `type="image"` requires `alt` or label. |
 | `a11y_alt` | 1.1.1 Non-text Content | WARNING | `<img>` without any `alt` attribute. `alt=""` is valid (decorative). Missing `alt` entirely is the issue. |
-| `a11y_landmark` | 1.3.1 Info and Relationships | INFO | Layout templates (files in `page_templates` set) missing a `<main>` element. Only checked on layout chain roots, not leaf templates. |
-| `a11y_heading` | 1.3.1 Info and Relationships | INFO | Heading levels that skip within a single template (e.g., `<h1>` then `<h3>` with no `<h2>`). Single-template scope only — cross-template heading order depends on layout composition. |
-| `a11y_aria_error` | 1.3.1, 3.3.1 Error Identification | INFO | Form error messages (`<span class="field-error">`) not associated with their field via `aria-describedby`/`aria-errormessage`. This is a **macro-level** check — it validates the chirp form macros emit correct ARIA, not that user templates do. Promotion to WARNING recommended for apps using the macros. |
+| `a11y_landmark` | 1.3.1 Info and Relationships | WARNING | Layout templates (files in `page_templates` set) missing a `<main>` element. Only checked on layout chain roots, not leaf templates. |
+| `a11y_heading` | 1.3.1 Info and Relationships | WARNING | Heading levels that skip within a single template (e.g., `<h1>` then `<h3>` with no `<h2>`). Single-template scope only — cross-template heading order depends on layout composition. |
+| ~~`a11y_aria_error`~~ | ~~1.3.1, 3.3.1~~ | — | Not implemented — the ARIA-first form macro rewrite (Sprint 1) ensures macros emit correct `aria-describedby`/`role="alert"` by default, making a runtime check unnecessary. |
 
 **Naming convention**: underscore (`a11y_label`) not hyphen (`a11y_label`), matching the existing codebase pattern (`swap_safety`, `layout_chain`, `sse_self_swap`, etc.).
 

@@ -199,10 +199,15 @@ class TestCheckLabelAssociation:
         issues = check_label_association(html, "form.html")
         assert len(issues) == 0
 
-    def test_image_input_exempt(self):
+    def test_image_input_with_alt_exempt(self):
         html = '<input type="image" src="go.png" alt="Go">'
         issues = check_label_association(html, "form.html")
         assert len(issues) == 0
+
+    def test_image_input_without_alt_warns(self):
+        html = '<input type="image" src="go.png">'
+        issues = check_label_association(html, "form.html")
+        assert len(issues) == 1
 
     def test_reset_input_exempt(self):
         html = '<input type="reset" value="Reset">'
