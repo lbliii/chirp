@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ReactiveBus observability** — `emitted_count`, `dropped_count`, and `subscriber_count` properties for monitoring event throughput and back-pressure.
+- **Configurable queue depth** — `ReactiveBus(maxsize=N)` controls per-subscriber queue size (default 256, unchanged).
+- **Reactive contract rules** — `chirp check` validates that `DependencyIndex` block references point to real template blocks and that derivation graphs are acyclic.
+- **OOB target contract** — `chirp check` warns when `hx-swap-oob` elements reference IDs not found in any template.
+- **Form action contract** — `chirp check` reports `<form action="/path" method="post">` targets that lack a `FormContract` declaration.
+- **Concurrency stress tests** — 25 new tests covering all Lock-protected modules (bus, cache, rate-limiter, lockout, OOB registry), ContextVar isolation, and database pool stress.
+
 ### Documentation
 
+- **Reactive system** — New dedicated guide covering ReactiveBus API, DependencyIndex, derived paths, observability counters, and contract validation.
+- **Thread safety** — Added stress test coverage table, ReactiveBus as real-world Lock example, and code references for the concurrency test suite.
+- **Contract reference** — Documented the 4 new contract checks (reactive_block, reactive_cycle, oob_target, form_action) in the route contract guide.
+- **SSE patterns** — Added monitoring section for bus counters and configurable queue depth.
+- **Architecture** — Added `pages/reactive/` to the module layout tree.
 - **Shell tabs** — Linked the route contract and UI guides to chirp-ui’s [shell/tabs checklist](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md); documented `route_tabs` next to `tab_items` in the route directory reference.
 
 ### Fixed

@@ -18,6 +18,7 @@ from .routes import (
 from .rules_accessibility import check_accessibility
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_context_cascade import check_context_cascade
+from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
 from .rules_htmx import (
     check_hx_boost,
@@ -28,6 +29,8 @@ from .rules_htmx import (
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
+from .rules_oob_targets import check_oob_targets
+from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
 from .rules_page_shell import check_page_shell_contracts
 from .rules_route_contract import (
     check_context_provider_signatures,
@@ -401,6 +404,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             result.issues.extend(check_accessibility(source, template_name))
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
+        result.issues.extend(check_oob_targets(template_sources, all_ids))
+        result.issues.extend(check_form_action_contracts(template_sources, router))
+
+        # Reactive bus contract checks (if a DependencyIndex is registered)
+        reactive_index = getattr(app, "_reactive_index", None)
+        if reactive_index is not None:
+            result.issues.extend(check_reactive_block_existence(reactive_index, kida_env))
+            result.issues.extend(check_reactive_derivation_dag(reactive_index))
 
         page_route_paths = snapshot.page_route_paths
         for route_path in route_paths:

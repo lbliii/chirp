@@ -112,20 +112,29 @@ Chirp declares `_Py_mod_gil = 0` (PEP 703), telling Python 3.14t that the module
 
 ## When You Need Mutable State
 
-For shared mutable state (caches, rate limiters, metrics), use explicit locks:
+For shared mutable state (caches, rate limiters, event buses), use explicit locks. Chirp's `ReactiveBus` is the primary example -- it protects subscriber lists and observability counters under a single `threading.Lock`:
 
 ```python
-import threading
-
-class MetricsCollector:
-    def __init__(self) -> None:
-        self._counts: dict[str, int] = {}
+class ReactiveBus:
+    def __init__(self, *, maxsize: int = 256) -> None:
+        self._subscribers: dict[str, set[asyncio.Queue]] = {}
         self._lock = threading.Lock()
+        self._emitted_count = 0
+        self._dropped_count = 0
 
-    def increment(self, metric: str) -> None:
+    def emit_sync(self, event: ChangeEvent) -> None:
         with self._lock:
-            self._counts[metric] = self._counts.get(metric, 0) + 1
+            queues = set(self._subscribers.get(event.scope, set()))
+            self._emitted_count += 1
+        for queue in queues:
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                with self._lock:
+                    self._dropped_count += 1
 ```
+
+The same pattern protects `MemoryCacheBackend`, `_InMemoryRateLimitBackend`, `_InMemoryLockoutBackend`, `OOBRegistry`, and `SecurityAuditLogger` -- 8 Lock sites total, each with dedicated concurrency stress tests.
 
 For per-request mutable state, use `g`:
 
@@ -136,6 +145,21 @@ from chirp import g
 g.user = current_user
 g.start_time = time.monotonic()
 ```
+
+## Stress-Tested Under Contention
+
+Every Lock-protected module has concurrency stress tests in `tests/test_concurrency/`. These run deterministically using `threading.Barrier` for synchronized start, bounded iteration counts, and explicit timeouts -- no sleeps, no flakiness.
+
+| Module | Test | What it proves |
+|--------|------|---------------|
+| ReactiveBus | 100 subscribers, 50 emitter threads | No deadlock, no lost subscriptions |
+| ReactiveBus | Queue saturation at capacity | Silent drop count is accurate |
+| MemoryCacheBackend | 100 threads doing get/set/delete | No `KeyError`, no corrupt values |
+| Rate limiter | 200 burst login attempts | Rate counts accurate (no under/over-counting) |
+| Lockout backend | Concurrent lockout checks | Threshold triggers at correct count |
+| OOB registry | Concurrent contract builds | Single build, cache hit on subsequent access |
+| ContextVar | 50 concurrent async tasks | Each task sees only its own `g`, `request_var`, `_session_var` |
+| Database pool | 50 concurrent queries | No pool exhaustion, transactions serialize correctly |
 
 ## Summary
 
@@ -156,6 +180,8 @@ g.start_time = time.monotonic()
 | PEP 703 declaration | [src/chirp/__init__.py](https://github.com/lbliii/chirp/blob/main/src/chirp/__init__.py) |
 | Request/ContextVar (`g`, `get_request`) | [src/chirp/context.py](https://github.com/lbliii/chirp/blob/main/src/chirp/context.py) |
 | App freeze, double-check locking | [src/chirp/app/__init__.py](https://github.com/lbliii/chirp/blob/main/src/chirp/app/__init__.py) |
+| ReactiveBus (Lock + observability) | [src/chirp/pages/reactive/bus.py](https://github.com/lbliii/chirp/blob/main/src/chirp/pages/reactive/bus.py) |
+| Concurrency stress tests | [tests/test_concurrency/](https://github.com/lbliii/chirp/tree/main/tests/test_concurrency) |
 
 ## Next Steps
 

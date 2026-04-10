@@ -19,14 +19,22 @@ class ReactiveBus:
     subscriber's queue.
 
     Modeled on chirp's ``ToolEventBus`` but scoped per-key.
+
+    Args:
+        maxsize: Maximum queue depth per subscriber.  Events are
+            silently dropped when a subscriber's queue is full
+            (back-pressure).  Default: 256.
     """
 
-    __slots__ = ("_lock", "_subscribers")
+    __slots__ = ("_dropped_count", "_emitted_count", "_lock", "_maxsize", "_subscribers")
 
-    def __init__(self) -> None:
+    def __init__(self, *, maxsize: int = 256) -> None:
         # scope -> set of subscriber queues
         self._subscribers: dict[str, set[asyncio.Queue[ChangeEvent | None]]] = {}
         self._lock = threading.Lock()
+        self._maxsize = maxsize
+        self._emitted_count = 0
+        self._dropped_count = 0
 
     def emit_sync(self, event: ChangeEvent) -> None:
         """Broadcast a change event synchronously (from any thread).
@@ -36,9 +44,13 @@ class ReactiveBus:
         """
         with self._lock:
             queues = set(self._subscribers.get(event.scope, set()))
+            self._emitted_count += 1
         for queue in queues:
-            with contextlib.suppress(asyncio.QueueFull):
+            try:
                 queue.put_nowait(event)
+            except asyncio.QueueFull:
+                with self._lock:
+                    self._dropped_count += 1
 
     async def emit(self, event: ChangeEvent) -> None:
         """Broadcast a change event (async version)."""
@@ -51,7 +63,7 @@ class ReactiveBus:
         subscription is automatically cleaned up when the iterator
         exits (client disconnects).
         """
-        queue: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(maxsize=256)
+        queue: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(maxsize=self._maxsize)
         with self._lock:
             self._subscribers.setdefault(scope, set()).add(queue)
         try:
@@ -84,3 +96,23 @@ class ReactiveBus:
         for queue in queues:
             with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(None)
+
+    # -- Observability --
+
+    @property
+    def emitted_count(self) -> int:
+        """Total number of events emitted (including dropped)."""
+        with self._lock:
+            return self._emitted_count
+
+    @property
+    def dropped_count(self) -> int:
+        """Total number of events dropped due to full subscriber queues."""
+        with self._lock:
+            return self._dropped_count
+
+    @property
+    def subscriber_count(self) -> int:
+        """Total number of active subscribers across all scopes."""
+        with self._lock:
+            return sum(len(s) for s in self._subscribers.values())
