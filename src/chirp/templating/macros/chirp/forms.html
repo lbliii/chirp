@@ -1,10 +1,13 @@
-{#- Chirp form field macros — importable via {% from "chirp/forms" import ... %}
+{#- Chirp form field macros — importable via {% from "chirp/forms.html" import ... %}
 
    Each macro renders a labelled form field with inline error display.
    Works with the ``field_errors`` filter and ``ValidationError``.
 
+   ARIA attributes (aria-invalid, aria-describedby, aria-required, role)
+   are emitted automatically based on error and required state.
+
    Usage:
-       {% from "chirp/forms" import text_field, textarea_field, select_field %}
+       {% from "chirp/forms.html" import text_field, textarea_field, select_field %}
        {{ text_field("title", form.title ?? "", label="Title",
                      errors=errors, required=true) }}
 -#}
@@ -12,17 +15,23 @@
 {# Text input with label and error display #}
 {% def text_field(name, value="", label=none, errors=none, type="text",
                   required=false, placeholder="", attrs="") %}
-<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+{% set field_errors_list = errors | field_errors(name) %}
+<div class="field{{ " field--error" if field_errors_list else "" }}">
     {% if label %}
         <label for="{{ name }}">{{ label }}</label>
     {% end %}
     <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
            value="{{ value }}"
-           {% if required %}required{% end %}
+           {% if required %}required aria-required="true"{% end %}
+           {% if field_errors_list %}aria-invalid="true" aria-describedby="{{ name }}-errors"{% end %}
            {% if placeholder %}placeholder="{{ placeholder }}"{% end %}
            {{ attrs }}>
-    {% for msg in errors | field_errors(name) %}
+    {% if field_errors_list %}
+    <div id="{{ name }}-errors" role="alert">
+        {% for msg in field_errors_list %}
         <span class="field-error">{{ msg }}</span>
+        {% end %}
+    </div>
     {% end %}
 </div>
 {% end %}
@@ -30,15 +39,21 @@
 {# Textarea with label and error display #}
 {% def textarea_field(name, value="", label=none, errors=none,
                       rows=4, required=false, placeholder="") %}
-<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+{% set field_errors_list = errors | field_errors(name) %}
+<div class="field{{ " field--error" if field_errors_list else "" }}">
     {% if label %}
         <label for="{{ name }}">{{ label }}</label>
     {% end %}
     <textarea id="{{ name }}" name="{{ name }}" rows="{{ rows }}"
-              {% if required %}required{% end %}
+              {% if required %}required aria-required="true"{% end %}
+              {% if field_errors_list %}aria-invalid="true" aria-describedby="{{ name }}-errors"{% end %}
               {% if placeholder %}placeholder="{{ placeholder }}"{% end %}>{{ value }}</textarea>
-    {% for msg in errors | field_errors(name) %}
+    {% if field_errors_list %}
+    <div id="{{ name }}-errors" role="alert">
+        {% for msg in field_errors_list %}
         <span class="field-error">{{ msg }}</span>
+        {% end %}
+    </div>
     {% end %}
 </div>
 {% end %}
@@ -46,12 +61,14 @@
 {# Select dropdown with label and error display #}
 {% def select_field(name, options, selected="", label=none, errors=none,
                     required=false) %}
-<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+{% set field_errors_list = errors | field_errors(name) %}
+<div class="field{{ " field--error" if field_errors_list else "" }}">
     {% if label %}
         <label for="{{ name }}">{{ label }}</label>
     {% end %}
     <select id="{{ name }}" name="{{ name }}"
-            {% if required %}required{% end %}>
+            {% if required %}required aria-required="true"{% end %}
+            {% if field_errors_list %}aria-invalid="true" aria-describedby="{{ name }}-errors"{% end %}>
         {% for opt in options %}
             <option value="{{ opt.value }}"
                     {% if opt.value == selected %}selected{% end %}>
@@ -59,22 +76,32 @@
             </option>
         {% end %}
     </select>
-    {% for msg in errors | field_errors(name) %}
+    {% if field_errors_list %}
+    <div id="{{ name }}-errors" role="alert">
+        {% for msg in field_errors_list %}
         <span class="field-error">{{ msg }}</span>
+        {% end %}
+    </div>
     {% end %}
 </div>
 {% end %}
 
 {# Checkbox #}
 {% def checkbox_field(name, checked=false, label=none, errors=none) %}
-<div class="field{{ " field--error" if errors | field_errors(name) else "" }}">
+{% set field_errors_list = errors | field_errors(name) %}
+<div class="field{{ " field--error" if field_errors_list else "" }}">
     <label>
         <input type="checkbox" id="{{ name }}" name="{{ name }}"
-               {% if checked %}checked{% end %}>
+               {% if checked %}checked{% end %}
+               {% if field_errors_list %}aria-invalid="true" aria-describedby="{{ name }}-errors"{% end %}>
         {{ label ?? name }}
     </label>
-    {% for msg in errors | field_errors(name) %}
+    {% if field_errors_list %}
+    <div id="{{ name }}-errors" role="alert">
+        {% for msg in field_errors_list %}
         <span class="field-error">{{ msg }}</span>
+        {% end %}
+    </div>
     {% end %}
 </div>
 {% end %}

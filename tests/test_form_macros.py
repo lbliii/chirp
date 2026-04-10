@@ -130,6 +130,58 @@ class TestTextField:
         assert "field-error" not in html
         assert "Invalid email." not in html
 
+    def test_aria_invalid_on_error(self) -> None:
+        env = _make_env()
+        errors = {"title": ["Required."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}'
+            '{{ text_field("title", errors=errors) }}',
+            errors=errors,
+        )
+        assert 'aria-invalid="true"' in html
+        assert 'aria-describedby="title-errors"' in html
+
+    def test_aria_error_container(self) -> None:
+        env = _make_env()
+        errors = {"title": ["Too short.", "No spaces."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}'
+            '{{ text_field("title", errors=errors) }}',
+            errors=errors,
+        )
+        assert 'id="title-errors"' in html
+        assert 'role="alert"' in html
+        assert html.count("field-error") == 2
+
+    def test_no_aria_invalid_without_errors(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}{{ text_field("title") }}',
+        )
+        assert "aria-invalid" not in html
+        assert "aria-describedby" not in html
+        assert 'role="alert"' not in html
+
+    def test_aria_required(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}'
+            '{{ text_field("name", required=true) }}',
+        )
+        assert 'aria-required="true"' in html
+
+    def test_no_aria_required_when_optional(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import text_field %}{{ text_field("name") }}',
+        )
+        assert "aria-required" not in html
+
 
 # ---------------------------------------------------------------------------
 # textarea_field
@@ -170,6 +222,38 @@ class TestTextareaField:
         )
         assert "field--error" in html
         assert "Too long." in html
+
+    def test_aria_invalid_on_error(self) -> None:
+        env = _make_env()
+        errors = {"desc": ["Required."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import textarea_field %}'
+            '{{ textarea_field("desc", errors=errors) }}',
+            errors=errors,
+        )
+        assert 'aria-invalid="true"' in html
+        assert 'aria-describedby="desc-errors"' in html
+        assert 'id="desc-errors"' in html
+        assert 'role="alert"' in html
+
+    def test_no_aria_invalid_without_errors(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import textarea_field %}{{ textarea_field("desc") }}',
+        )
+        assert "aria-invalid" not in html
+        assert "aria-describedby" not in html
+
+    def test_aria_required(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import textarea_field %}'
+            '{{ textarea_field("desc", required=true) }}',
+        )
+        assert 'aria-required="true"' in html
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +310,45 @@ class TestSelectField:
         assert "field--error" in html
         assert "Invalid status." in html
 
+    def test_aria_invalid_on_error(self) -> None:
+        env = _make_env()
+        options = [SelectOption("a", "A")]
+        errors = {"status": ["Pick one."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import select_field %}'
+            '{{ select_field("status", options, errors=errors) }}',
+            options=options,
+            errors=errors,
+        )
+        assert 'aria-invalid="true"' in html
+        assert 'aria-describedby="status-errors"' in html
+        assert 'id="status-errors"' in html
+        assert 'role="alert"' in html
+
+    def test_no_aria_invalid_without_errors(self) -> None:
+        env = _make_env()
+        options = [SelectOption("a", "A")]
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import select_field %}'
+            '{{ select_field("status", options) }}',
+            options=options,
+        )
+        assert "aria-invalid" not in html
+        assert "aria-describedby" not in html
+
+    def test_aria_required(self) -> None:
+        env = _make_env()
+        options = [SelectOption("a", "A")]
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import select_field %}'
+            '{{ select_field("status", options, required=true) }}',
+            options=options,
+        )
+        assert 'aria-required="true"' in html
+
 
 # ---------------------------------------------------------------------------
 # checkbox_field
@@ -273,6 +396,29 @@ class TestCheckboxField:
             '{% from "chirp/forms.html" import checkbox_field %}{{ checkbox_field("newsletter") }}',
         )
         assert "newsletter" in html
+
+    def test_aria_invalid_on_error(self) -> None:
+        env = _make_env()
+        errors = {"agree": ["Must agree."]}
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import checkbox_field %}'
+            '{{ checkbox_field("agree", errors=errors) }}',
+            errors=errors,
+        )
+        assert 'aria-invalid="true"' in html
+        assert 'aria-describedby="agree-errors"' in html
+        assert 'id="agree-errors"' in html
+        assert 'role="alert"' in html
+
+    def test_no_aria_invalid_without_errors(self) -> None:
+        env = _make_env()
+        html = _render(
+            env,
+            '{% from "chirp/forms.html" import checkbox_field %}{{ checkbox_field("agree") }}',
+        )
+        assert "aria-invalid" not in html
+        assert "aria-describedby" not in html
 
 
 # ---------------------------------------------------------------------------
