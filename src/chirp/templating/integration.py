@@ -16,11 +16,12 @@ from chirp.templating.returns import Fragment, Template
 
 
 def _ensure_chirp_ui_filters(env: Environment) -> None:
-    """Ensure chirp-ui required filters exist when chirp-ui templates are loadable.
+    """Ensure chirp-ui required filters and globals exist when chirp-ui templates are loadable.
 
     When chirp adds chirp-ui's PackageLoader, those templates require bem, field_errors,
-    html_attrs, validate_variant, validate_variant_block, validate_size, icon. This
-    fallback adds any missing filters so the env is self-consistent.
+    html_attrs, validate_variant, validate_variant_block, validate_size, icon as filters
+    and build_hx_attrs, tab_is_active as globals. This fallback adds any missing entries
+    so the env is self-consistent.
     See docs/rfcs/001-component-filter-contract.md.
     """
     try:
@@ -54,6 +55,25 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
     missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
     if missing:
         env.update_filters(cast(dict[str, Callable[..., Any]], missing))
+
+    # Ensure chirp-ui globals (functions used directly in templates, not as filters)
+    chirp_ui_globals: dict[str, Callable[..., Any]] = {}
+    try:
+        from chirp_ui.filters import build_hx_attrs
+
+        chirp_ui_globals["build_hx_attrs"] = build_hx_attrs
+    except ImportError:
+        pass
+    try:
+        from chirp_ui.route_tabs import tab_is_active
+
+        chirp_ui_globals["tab_is_active"] = tab_is_active
+    except ImportError:
+        pass
+    env_globals = env.globals if hasattr(env, "globals") else {}
+    for name, func in chirp_ui_globals.items():
+        if name not in env_globals:
+            env.add_global(name, func)
 
 
 def create_environment(
