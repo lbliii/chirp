@@ -169,7 +169,6 @@ ignore = [
 "src/chirp/testing/assertions.py" = ["S101"] # Test assertion helpers use assert by design
 "src/chirp/app/__init__.py" = ["S101"] # Internal state assertions after freeze
 "src/chirp/app/runtime.py" = ["S101"] # Internal state assertions after freeze
-"src/chirp/data/errors.py" = ["A001"] # ConnectionError shadows builtin intentionally
 "src/chirp/data/query.py" = ["S608"]  # Query builder constructs SQL safely (parameterized)
 "src/chirp/data/migrate.py" = ["S608"] # Migration SQL is framework-generated
 "src/chirp/server/production.py" = ["S104"] # Server binds to 0.0.0.0 intentionally

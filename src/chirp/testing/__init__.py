@@ -17,6 +17,10 @@ from chirp.testing.assertions import (
     assert_hx_trigger,
     assert_is_error_fragment,
     assert_is_fragment,
+    assert_mutation_fragments,
+    assert_mutation_redirect,
+    assert_oob_targets,
+    assert_status,
     hx_headers,
 )
 from chirp.testing.client import TestClient
@@ -34,5 +38,9 @@ __all__ = [
     "assert_hx_trigger",
     "assert_is_error_fragment",
     "assert_is_fragment",
+    "assert_mutation_fragments",
+    "assert_mutation_redirect",
+    "assert_oob_targets",
+    "assert_status",
     "hx_headers",
 ]

@@ -507,7 +507,7 @@ All data layer errors inherit from `DataError`:
 |-------|------|
 | `DataError` | Base class for all data errors |
 | `QueryError` | SQL execution fails |
-| `ConnectionError` | Cannot connect to database |
+| `DatabaseConnectionError` | Cannot connect to database |
 | `DriverNotInstalledError` | Missing `aiosqlite` or `asyncpg` |
 | `MigrationError` | Migration file invalid or execution fails |
 

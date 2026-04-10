@@ -11,7 +11,7 @@ class DriverNotInstalledError(DataError):
     """Raised when the required database driver is not installed."""
 
 
-class ConnectionError(DataError):
+class DatabaseConnectionError(DataError):
     """Raised when a database connection cannot be established."""
 
 

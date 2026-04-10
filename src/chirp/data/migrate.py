@@ -99,10 +99,12 @@ def _discover_migrations(directory: str | Path) -> list[Migration]:
         migrations.append(Migration(version=version, name=name, sql=sql))
 
     # Check for duplicate versions
-    versions = [m.version for m in migrations]
-    if len(versions) != len(set(versions)):
-        msg = "Duplicate migration version numbers found"
-        raise MigrationError(msg)
+    seen: set[int] = set()
+    for m in migrations:
+        if m.version in seen:
+            msg = f"Duplicate migration version: {m.version} ({m.name})"
+            raise MigrationError(msg)
+        seen.add(m.version)
 
     return migrations
 

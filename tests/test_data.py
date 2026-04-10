@@ -683,11 +683,13 @@ class TestExports:
 
         expected = {
             "Database",
+            "DatabaseConnectionError",
             "DataError",
             "DriverNotInstalledError",
             "MigrationError",
             "Notification",
             "Query",
+            "QueryError",
             "get_db",
             "migrate",
         }
@@ -695,8 +697,8 @@ class TestExports:
 
     def test_error_hierarchy(self) -> None:
         """All data errors inherit from DataError."""
-        from chirp.data.errors import ConnectionError as ConnErr
+        from chirp.data.errors import DatabaseConnectionError
 
         assert issubclass(QueryError, DataError)
         assert issubclass(MigrationError, DataError)
-        assert issubclass(ConnErr, DataError)
+        assert issubclass(DatabaseConnectionError, DataError)
