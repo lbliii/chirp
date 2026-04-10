@@ -161,7 +161,7 @@ def _discover_chirpui_components() -> frozenset[str] | None:
         templates_dir = Path(chirp_ui.__file__).resolve().parent / "templates" / "chirpui"
         if templates_dir.is_dir():
             return frozenset(f.name for f in templates_dir.glob("*.html"))
-    except Exception:  # noqa: S110
+    except ImportError, AttributeError, OSError:
         pass
     return None
 

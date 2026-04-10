@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from kida import Environment
 
 from chirp._internal.types import ErrorHandler, Handler
+from chirp.contracts.types import Severity
 from chirp.middleware.protocol import Middleware
 from chirp.pages.types import RouteMeta, Section
 from chirp.routing.router import Router
@@ -76,7 +77,7 @@ class MutableAppState:
     plugin_loaders: list[Any] = field(default_factory=list)
     contract_checks: list[Callable[..., Any]] = field(default_factory=list)
     contract_check_data: dict[str, Any] = field(default_factory=dict)
-    contract_severity_overrides: dict[str, Any] = field(default_factory=dict)
+    contract_severity_overrides: dict[str, Severity] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

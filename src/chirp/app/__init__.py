@@ -394,6 +394,9 @@ class App:
             app.override_contract_severity("dead", Severity.ERROR)
         """
         self._check_not_frozen()
+        if not isinstance(severity, Severity):
+            msg = f"severity must be a Severity enum member, got {type(severity).__name__}"
+            raise TypeError(msg)
         self._mutable_state.contract_severity_overrides[category] = severity
 
     def template_filter(
