@@ -2,11 +2,33 @@
 
 import asyncio
 
+import pytest
+
 from chirp.pages.reactive import ChangeEvent, ReactiveBus
+
+POLL_INTERVAL = 0.005
+WAIT_TIMEOUT = 2.0
 
 
 def _event(scope: str = "s", path: str = "x") -> ChangeEvent:
     return ChangeEvent(scope=scope, changed_paths=frozenset({path}))
+
+
+async def _wait_for_subscribers(
+    bus: ReactiveBus,
+    expected: int,
+    *,
+    timeout: float = WAIT_TIMEOUT,
+) -> None:
+    """Poll subscriber_count until it reaches *expected*."""
+    import time
+
+    deadline = time.monotonic() + timeout
+    while bus.subscriber_count < expected:
+        if time.monotonic() > deadline:
+            msg = f"Timed out waiting for {expected} subscribers (got {bus.subscriber_count})"
+            raise TimeoutError(msg)
+        await asyncio.sleep(POLL_INTERVAL)
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +72,7 @@ class TestDroppedCount:
                 received.append(ev)  # noqa: PERF401
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
 
         # Emit 10 events into a queue of size 4
         for i in range(10):
@@ -75,7 +97,7 @@ class TestDroppedCount:
                     break
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
 
         for i in range(5):
             bus.emit_sync(_event("s", f"p-{i}"))
@@ -99,7 +121,7 @@ class TestSubscriberCount:
                 break
 
         task = asyncio.create_task(sub())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
         assert bus.subscriber_count == 1
 
         bus.emit_sync(_event("s"))
@@ -115,13 +137,30 @@ class TestSubscriberCount:
                 pass
 
         tasks = [asyncio.create_task(sub(f"scope-{i}")) for i in range(5)]
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 5)
         assert bus.subscriber_count == 5
 
         bus.close()
         await asyncio.gather(*tasks)
         await asyncio.sleep(0.01)
         assert bus.subscriber_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Maxsize validation
+# ---------------------------------------------------------------------------
+
+
+class TestMaxsizeValidation:
+    """ReactiveBus rejects invalid maxsize values."""
+
+    def test_zero_maxsize_raises(self) -> None:
+        with pytest.raises(ValueError, match="maxsize must be >= 1"):
+            ReactiveBus(maxsize=0)
+
+    def test_negative_maxsize_raises(self) -> None:
+        with pytest.raises(ValueError, match="maxsize must be >= 1"):
+            ReactiveBus(maxsize=-1)
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +180,7 @@ class TestConfigurableMaxsize:
                 received.append(ev)  # noqa: PERF401
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
 
         for i in range(300):
             bus.emit_sync(_event("s", f"p-{i}"))
@@ -160,7 +199,7 @@ class TestConfigurableMaxsize:
                 received.append(ev)  # noqa: PERF401
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
 
         for i in range(100):
             bus.emit_sync(_event("s", f"p-{i}"))
@@ -179,7 +218,7 @@ class TestConfigurableMaxsize:
                 received.append(ev)  # noqa: PERF401
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.01)
+        await _wait_for_subscribers(bus, 1)
 
         for i in range(600):
             bus.emit_sync(_event("s", f"p-{i}"))

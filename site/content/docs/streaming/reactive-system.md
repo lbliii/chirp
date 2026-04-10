@@ -64,7 +64,7 @@ bus.dropped_count      # events lost to full queues
 bus.subscriber_count   # active subscribers across all scopes
 ```
 
-All counters are `int`s incremented under the existing lock — no extra overhead.
+All counters are `int`s maintained by the bus for observability.
 
 ## ChangeEvent
 

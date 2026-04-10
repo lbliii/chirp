@@ -29,6 +29,9 @@ class ReactiveBus:
     __slots__ = ("_dropped_count", "_emitted_count", "_lock", "_maxsize", "_subscribers")
 
     def __init__(self, *, maxsize: int = 256) -> None:
+        if maxsize < 1:
+            msg = f"maxsize must be >= 1, got {maxsize}"
+            raise ValueError(msg)
         # scope -> set of subscriber queues
         self._subscribers: dict[str, set[asyncio.Queue[ChangeEvent | None]]] = {}
         self._lock = threading.Lock()
@@ -94,8 +97,15 @@ class ReactiveBus:
                 for s in list(self._subscribers):
                     queues |= self._subscribers.pop(s)
         for queue in queues:
-            with contextlib.suppress(asyncio.QueueFull):
+            # Drain one event if needed to guarantee the sentinel lands.
+            # This ensures close() is reliable even with small maxsize.
+            try:
                 queue.put_nowait(None)
+            except asyncio.QueueFull:
+                with contextlib.suppress(asyncio.QueueEmpty):
+                    queue.get_nowait()
+                with contextlib.suppress(asyncio.QueueFull):
+                    queue.put_nowait(None)
 
     # -- Observability --
 

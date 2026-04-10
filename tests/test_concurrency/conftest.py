@@ -109,6 +109,36 @@ async def run_tasks_synchronized(
 
 
 # ---------------------------------------------------------------------------
+# Bus helpers
+# ---------------------------------------------------------------------------
+
+
+async def wait_for_subscribers(
+    bus: Any,
+    expected: int,
+    *,
+    timeout: float = STRESS_TIMEOUT,
+    poll_interval: float = 0.005,
+) -> None:
+    """Poll ``bus.subscriber_count`` until it reaches *expected*.
+
+    Raises ``TimeoutError`` if the count isn't reached within *timeout*.
+    Preferable to ``asyncio.sleep()`` for deterministic subscriber readiness.
+    """
+    import time
+
+    deadline = time.monotonic() + timeout
+    while bus.subscriber_count < expected:
+        if time.monotonic() > deadline:
+            msg = (
+                f"Timed out waiting for {expected} subscribers "
+                f"(got {bus.subscriber_count}) after {timeout}s"
+            )
+            raise TimeoutError(msg)
+        await asyncio.sleep(poll_interval)
+
+
+# ---------------------------------------------------------------------------
 # Assertion helpers
 # ---------------------------------------------------------------------------
 

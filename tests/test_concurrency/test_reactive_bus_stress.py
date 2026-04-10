@@ -12,11 +12,17 @@ import threading
 
 from chirp.pages.reactive import ChangeEvent, ReactiveBus
 
-from .conftest import STRESS_TIMEOUT, assert_at_least
+from .conftest import STRESS_TIMEOUT, assert_at_least, wait_for_subscribers
 
 
 def _event(scope: str = "s", path: str = "x") -> ChangeEvent:
     return ChangeEvent(scope=scope, changed_paths=frozenset({path}))
+
+
+def _assert_all_threads_finished(threads: list[threading.Thread]) -> None:
+    """Assert that no thread is still alive after join."""
+    alive = [t for t in threads if t.is_alive()]
+    assert not alive, f"{len(alive)} thread(s) still alive after join (possible deadlock)"
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +46,7 @@ class TestManySubscribersManyEmitters:
                     break
 
         tasks = [asyncio.create_task(collect(i)) for i in range(n_subscribers)]
-        await asyncio.sleep(0.05)
+        await wait_for_subscribers(bus, n_subscribers)
 
         barrier = threading.Barrier(n_emitters)
 
@@ -53,6 +59,7 @@ class TestManySubscribersManyEmitters:
             t.start()
         for t in threads:
             t.join(timeout=STRESS_TIMEOUT)
+        _assert_all_threads_finished(threads)
 
         # All tasks should complete (each got at least 1 event)
         _done, pending = await asyncio.wait(tasks, timeout=STRESS_TIMEOUT)
@@ -78,7 +85,7 @@ class TestManySubscribersManyEmitters:
             return count
 
         task = asyncio.create_task(subscriber())
-        await asyncio.sleep(0.02)
+        await wait_for_subscribers(bus, 1)
 
         barrier = threading.Barrier(n_emitters)
 
@@ -92,6 +99,7 @@ class TestManySubscribersManyEmitters:
             t.start()
         for t in threads:
             t.join(timeout=STRESS_TIMEOUT)
+        _assert_all_threads_finished(threads)
 
         result = await asyncio.wait_for(task, timeout=STRESS_TIMEOUT)
         assert_at_least(result, 50, "events received")
@@ -114,7 +122,7 @@ class TestQueueSaturation:
                 received.append(event)  # noqa: PERF401
 
         task = asyncio.create_task(collect())
-        await asyncio.sleep(0.02)
+        await wait_for_subscribers(bus, 1)
 
         n_emitters = 20
         events_per_emitter = 50  # 20 * 50 = 1000, well above queue maxsize=256
@@ -130,6 +138,7 @@ class TestQueueSaturation:
             t.start()
         for t in threads:
             t.join(timeout=STRESS_TIMEOUT)
+        _assert_all_threads_finished(threads)
 
         await asyncio.sleep(0.1)
         bus.close("s")
@@ -161,7 +170,7 @@ class TestCloseRaceEmit:
                 pass
 
         task = asyncio.create_task(subscriber())
-        await asyncio.sleep(0.02)
+        await wait_for_subscribers(bus, 1)
 
         barrier = threading.Barrier(2)
 
@@ -186,6 +195,7 @@ class TestCloseRaceEmit:
         t_close.start()
         t_emit.join(timeout=STRESS_TIMEOUT)
         t_close.join(timeout=STRESS_TIMEOUT)
+        _assert_all_threads_finished([t_emit, t_close])
 
         # Subscriber should have exited (via sentinel from close)
         await asyncio.wait_for(task, timeout=STRESS_TIMEOUT)
@@ -215,7 +225,7 @@ class TestSubscribeRaceClose:
         task = asyncio.create_task(late_subscriber())
 
         # Give subscriber time to register, then close from another thread
-        await asyncio.sleep(0.03)
+        await wait_for_subscribers(bus, 1)
 
         def close_thread() -> None:
             bus.close("s")
@@ -223,6 +233,7 @@ class TestSubscribeRaceClose:
         t = threading.Thread(target=close_thread)
         t.start()
         t.join(timeout=STRESS_TIMEOUT)
+        assert not t.is_alive(), "close thread still alive"
 
         await asyncio.wait_for(task, timeout=STRESS_TIMEOUT)
         # Subscriber should have exited cleanly (0 events)
@@ -250,7 +261,7 @@ class TestMultiScopeStress:
                     break
 
         tasks = [asyncio.create_task(collect(f"scope-{i}")) for i in range(n_scopes)]
-        await asyncio.sleep(0.03)
+        await wait_for_subscribers(bus, n_scopes)
 
         barrier = threading.Barrier(n_scopes)
 
@@ -265,6 +276,7 @@ class TestMultiScopeStress:
             t.start()
         for t in threads:
             t.join(timeout=STRESS_TIMEOUT)
+        _assert_all_threads_finished(threads)
 
         await asyncio.wait_for(asyncio.gather(*tasks), timeout=STRESS_TIMEOUT)
 

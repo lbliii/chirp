@@ -148,7 +148,7 @@ g.start_time = time.monotonic()
 
 ## Stress-Tested Under Contention
 
-Every Lock-protected module has concurrency stress tests in `tests/test_concurrency/`. These run deterministically using `threading.Barrier` for synchronized start, bounded iteration counts, and explicit timeouts -- no sleeps, no flakiness.
+Every Lock-protected module has concurrency stress tests in `tests/test_concurrency/`. These use synchronized starts (for example, `threading.Barrier` where applicable), bounded iteration counts, and explicit timeouts to reduce flakiness under contention. Some async stress tests also use short `asyncio.sleep(...)` calls to allow subscriber registration or processing before assertions.
 
 | Module | Test | What it proves |
 |--------|------|---------------|

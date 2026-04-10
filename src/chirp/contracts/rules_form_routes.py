@@ -1,9 +1,9 @@
 """Form action → route contract matching.
 
-Validates that <form action="/path"> targets have routes that accept
-the form's HTTP method.  This complements the existing target check
-(which validates URL existence) by also checking that form POST
-targets have FormContract declarations.
+Validates that ``<form action="/path" method="post">`` targets have
+routes with ``FormContract`` declarations.  This complements the
+existing target check (which validates URL existence) by surfacing
+POST routes that may silently ignore form data or lack validation.
 """
 
 from __future__ import annotations

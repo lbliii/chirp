@@ -298,7 +298,7 @@ bus.dropped_count      # Events lost to full subscriber queues
 bus.subscriber_count   # Active subscribers across all scopes
 ```
 
-These are simple `int` counters incremented under the existing lock -- no new lock acquisition, no measurable overhead.
+These are simple `int` counters maintained under the bus's existing `threading.Lock` -- minimal overhead on the emit path.
 
 ### Configurable Queue Depth
 
