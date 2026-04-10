@@ -248,6 +248,52 @@ class TestFragmentSSE:
         assert "x" in evt.data
         assert "y" in evt.data
 
+    async def test_targeted_fragment_uses_target_as_event_name(self) -> None:
+        """Fragment with target= uses the target as the SSE event name."""
+        app = _app()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment(
+                    "dashboard.html", "stats", target="stats", stats=["a", "b"]
+                )
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert len(result.events) == 1
+        evt = result.events[0]
+        assert evt.event == "stats"
+        assert "a" in evt.data
+        assert "b" in evt.data
+
+    async def test_targeted_fragment_no_oob_wrapper(self) -> None:
+        """Targeted Fragment must NOT be wrapped in hx-swap-oob div.
+
+        Regression: OOB wrapping destroys sse-swap attributes on the target
+        element after the first SSE update, breaking all subsequent updates.
+        The sse-swap mechanism matches on event name alone — no OOB needed.
+        """
+        app = _app()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment(
+                    "dashboard.html", "stats", target="stats", stats=["x"]
+                )
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        evt = result.events[0]
+        assert "hx-swap-oob" not in evt.data
+
 
 # ---------------------------------------------------------------------------
 # Disconnect handling
