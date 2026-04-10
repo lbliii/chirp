@@ -78,13 +78,9 @@ class TestBasicFragmentYield:
             context_builder=lambda: {"tasks": ["a", "b"]},
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
-        await bus.emit(
-            ChangeEvent(scope="board:1", changed_paths=frozenset({"tasks"}))
-        )
+        await bus.emit(ChangeEvent(scope="board:1", changed_paths=frozenset({"tasks"})))
         fragments = await task
 
         assert len(fragments) == 1
@@ -102,13 +98,9 @@ class TestBasicFragmentYield:
             context_builder=lambda: {"total": 42},
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"total"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"total"})))
         fragments = await task
 
         assert len(fragments) == 1
@@ -137,13 +129,9 @@ class TestMultipleBlocks:
             context_builder=lambda: {"tasks": []},
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=2)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=2))
         await asyncio.sleep(0.01)
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"tasks"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"tasks"})))
         fragments = await task
 
         assert len(fragments) == 2
@@ -171,9 +159,7 @@ class TestOriginFiltering:
             origin="user-123",
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1, timeout=0.3)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1, timeout=0.3))
         await asyncio.sleep(0.01)
         # Emit with same origin — should be skipped
         await bus.emit(
@@ -198,9 +184,7 @@ class TestOriginFiltering:
             origin="user-123",
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
         # Emit with different origin — should be delivered
         await bus.emit(
@@ -225,14 +209,10 @@ class TestOriginFiltering:
             origin="user-123",
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
         # System event (origin=None) always delivered
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"data"}), origin=None)
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"}), origin=None))
         fragments = await task
         assert len(fragments) == 1
 
@@ -256,14 +236,10 @@ class TestNoAffectedBlocks:
             context_builder=lambda: {"tasks": []},
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1, timeout=0.3)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1, timeout=0.3))
         await asyncio.sleep(0.01)
         # "users" path doesn't match any registered block
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"users"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"users"})))
         fragments = await task
         assert len(fragments) == 0
 
@@ -296,22 +272,16 @@ class TestContextBuilderErrors:
             context_builder=flaky_context,
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
 
         with caplog.at_level(logging.ERROR, logger="chirp.reactive"):
             # First emit — context builder raises, event skipped
-            await bus.emit(
-                ChangeEvent(scope="s", changed_paths=frozenset({"data"}))
-            )
+            await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
             await asyncio.sleep(0.05)
 
         # Second emit — context builder succeeds
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"data"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
         fragments = await task
 
         assert len(fragments) == 1
@@ -340,20 +310,14 @@ class TestContextBuilderErrors:
             context_builder=bad_then_good,
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
 
         with caplog.at_level(logging.WARNING, logger="chirp.reactive"):
-            await bus.emit(
-                ChangeEvent(scope="s", changed_paths=frozenset({"data"}))
-            )
+            await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
             await asyncio.sleep(0.05)
 
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"data"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
         fragments = await task
 
         assert len(fragments) == 1
@@ -383,13 +347,9 @@ class TestAsyncContextBuilder:
             context_builder=async_context,
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"data"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
         fragments = await task
 
         assert len(fragments) == 1
@@ -418,13 +378,9 @@ class TestDOMTarget:
             context_builder=lambda: {"total": 5},
         )
 
-        task = asyncio.create_task(
-            _collect_fragments(bus, stream, max_fragments=1)
-        )
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
         await asyncio.sleep(0.01)
-        await bus.emit(
-            ChangeEvent(scope="s", changed_paths=frozenset({"total"}))
-        )
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"total"})))
         fragments = await task
 
         assert len(fragments) == 1

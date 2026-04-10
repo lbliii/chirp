@@ -36,9 +36,7 @@ class TestMutations:
 
     async def test_add_task(self, example_app) -> None:
         async with TestClient(example_app.app) as client:
-            response = await client.post(
-                "/tasks", data={"title": "New task"}
-            )
+            response = await client.post("/tasks", data={"title": "New task"})
             assert response.status == 200
             assert "New task" in response.text
 

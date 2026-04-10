@@ -255,9 +255,7 @@ class TestFragmentSSE:
         @app.route("/events")
         def events():
             async def gen():
-                yield Fragment(
-                    "dashboard.html", "stats", target="stats", stats=["a", "b"]
-                )
+                yield Fragment("dashboard.html", "stats", target="stats", stats=["a", "b"])
 
             return EventStream(gen())
 
@@ -282,9 +280,7 @@ class TestFragmentSSE:
         @app.route("/events")
         def events():
             async def gen():
-                yield Fragment(
-                    "dashboard.html", "stats", target="stats", stats=["x"]
-                )
+                yield Fragment("dashboard.html", "stats", target="stats", stats=["x"])
 
             return EventStream(gen())
 

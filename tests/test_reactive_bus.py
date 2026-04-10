@@ -178,9 +178,7 @@ class TestClose:
         task_b = asyncio.create_task(collect("b", exited_b))
         await asyncio.sleep(0.01)
         bus.close()  # close all
-        await asyncio.wait_for(
-            asyncio.gather(exited_a.wait(), exited_b.wait()), timeout=1.0
-        )
+        await asyncio.wait_for(asyncio.gather(exited_a.wait(), exited_b.wait()), timeout=1.0)
         await asyncio.gather(task_a, task_b)
         assert exited_a.is_set()
         assert exited_b.is_set()
