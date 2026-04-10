@@ -23,17 +23,25 @@ SQLite works out of the box. For PostgreSQL, install the driver::
 """
 
 from chirp.data.database import Database, Notification, get_db
-from chirp.data.errors import DataError, DriverNotInstalledError, MigrationError
+from chirp.data.errors import (
+    DatabaseConnectionError,
+    DataError,
+    DriverNotInstalledError,
+    MigrationError,
+    QueryError,
+)
 from chirp.data.migrate import migrate
 from chirp.data.query import Query
 
 __all__ = [
     "DataError",
     "Database",
+    "DatabaseConnectionError",
     "DriverNotInstalledError",
     "MigrationError",
     "Notification",
     "Query",
+    "QueryError",
     "get_db",
     "migrate",
 ]

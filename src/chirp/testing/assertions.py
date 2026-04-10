@@ -158,3 +158,75 @@ def assert_hx_push_url(response: Response, url: str) -> None:
     assert headers["HX-Push-Url"] == url, (
         f"Expected HX-Push-Url to be {url!r}, got {headers['HX-Push-Url']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Status and OOB assertion helpers
+# ---------------------------------------------------------------------------
+
+
+def assert_status(response: Response, status: int) -> None:
+    """Assert the response has the expected HTTP status code."""
+    assert response.status == status, f"Expected status {status}, got {response.status}"
+
+
+def assert_oob_targets(response: Response, *target_ids: str) -> None:
+    """Assert the response contains OOB swap elements for each target ID.
+
+    Checks that the response body includes ``hx-swap-oob`` attributes
+    targeting the given element IDs — the pattern produced by ``OOB()``
+    return values.
+
+    Usage::
+
+        response = await client.post("/save")
+        assert_oob_targets(response, "item-row", "count")
+    """
+    import re
+
+    body = response.text
+    found_ids: set[str] = set()
+    for match in re.finditer(r'id=["\']([^"\']+)["\'][^>]*hx-swap-oob', body):
+        found_ids.add(match.group(1))
+    for match in re.finditer(r'hx-swap-oob=["\'][^"\']*["\'][^>]*id=["\']([^"\']+)["\']', body):
+        found_ids.add(match.group(1))
+
+    missing = set(target_ids) - found_ids
+    assert not missing, (
+        f"OOB targets missing from response: {sorted(missing)}.\n"
+        f"Found OOB targets: {sorted(found_ids)}\n"
+        f"Response body: {body[:500]}"
+    )
+
+
+def assert_mutation_redirect(response: Response, url: str, *, status: int = 303) -> None:
+    """Assert the response is a mutation redirect (non-htmx POST result).
+
+    Checks for a 303 (or custom status) redirect to the given URL —
+    the pattern produced by ``MutationResult`` for non-htmx requests.
+
+    Usage::
+
+        response = await client.post("/save")
+        assert_mutation_redirect(response, "/items")
+    """
+    assert response.status == status, f"Expected redirect status {status}, got {response.status}"
+    location = dict(response.headers).get("location", "")
+    assert location == url, f"Expected redirect to {url!r}, got {location!r}"
+
+
+def assert_mutation_fragments(response: Response, *target_ids: str) -> None:
+    """Assert the response is an htmx mutation with OOB fragments.
+
+    Checks for a 200 status (htmx inline swap) and verifies the
+    expected OOB swap targets are present — the pattern produced by
+    ``MutationResult`` with fragments for htmx requests.
+
+    Usage::
+
+        response = await client.post("/save", headers=hx_request_headers)
+        assert_mutation_fragments(response, "item-row", "count")
+    """
+    assert response.status == 200, f"Expected status 200, got {response.status}"
+    if target_ids:
+        assert_oob_targets(response, *target_ids)
