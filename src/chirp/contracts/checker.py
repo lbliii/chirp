@@ -30,8 +30,8 @@ from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
 from .rules_oob_targets import check_oob_targets
-from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
 from .rules_page_shell import check_page_shell_contracts
+from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
 from .rules_route_contract import (
     check_context_provider_signatures,
     check_duplicate_routes,
