@@ -190,9 +190,14 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         raise RuntimeError(msg)
     from chirp.app.state import ContractCheckSnapshot as _Snapshot
 
+    kida_env = app._kida_env
+    ts: dict[str, str] = {}
+    if kida_env is not None and kida_env.loader is not None:
+        ts = load_template_sources(kida_env)
+
     return _Snapshot(
         router=router,
-        kida_env=app._kida_env,
+        kida_env=kida_env,
         layout_chains=getattr(app, "_discovered_layout_chains", []),
         page_route_paths=getattr(app, "_page_route_paths", set()),
         page_leaf_templates=getattr(app, "_page_leaf_templates", set()),
@@ -203,6 +208,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
         discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
+        template_sources=ts,
     )
 
 
@@ -231,8 +237,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     )
     check_inline_templates(router, result)
 
+    template_sources = snapshot.template_sources
     if kida_env is not None and kida_env.loader is not None:
-        template_sources = load_template_sources(kida_env)
+        if not template_sources:
+            template_sources = load_template_sources(kida_env)
         result.templates_scanned = len(template_sources)
         referenced_paths: set[str] = set()
         static_routes, parametric_routes = build_route_index(route_paths)
@@ -509,5 +517,40 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         template=getattr(issue, "template", None),
                     )
                 )
+
+    # Run registered plugin checks
+    registered_checks = getattr(app, "_mutable_state", None)
+    if registered_checks is not None:
+        for check_fn in getattr(registered_checks, "contract_checks", ()):
+            try:
+                check_fn(snapshot, result)
+            except Exception as exc:
+                name = getattr(check_fn, "__name__", None) or type(check_fn).__name__
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="plugin_check_error",
+                        message=f"Custom check '{name}' raised: {exc}",
+                    )
+                )
+
+    # Apply severity overrides as post-processing
+    overrides: dict[str, Severity] = {}
+    if registered_checks is not None:
+        overrides = getattr(registered_checks, "contract_severity_overrides", {})
+    if overrides:
+        result.issues = [
+            ContractIssue(
+                severity=overrides[issue.category],
+                category=issue.category,
+                message=issue.message,
+                template=issue.template,
+                route=issue.route,
+                details=issue.details,
+            )
+            if issue.category in overrides
+            else issue
+            for issue in result.issues
+        ]
 
     return result

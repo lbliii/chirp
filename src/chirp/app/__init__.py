@@ -8,6 +8,7 @@ from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
+from chirp.contracts.types import Severity
 from chirp.errors import ConfigurationError
 from chirp.pages.types import Section
 from chirp.templating.fragment_target_registry import PageShellContract
@@ -359,6 +360,45 @@ class App:
         """Register a named section for route metadata resolution."""
         self._registry.register_section(section)
 
+    def register_contract_check(self, check: Callable[..., Any]) -> None:
+        """Register a custom contract check that runs during ``app.check()``.
+
+        The callable must accept ``(snapshot, result)`` where *snapshot*
+        is a :class:`ContractCheckSnapshot` and *result* is a
+        :class:`CheckResult`.  Append issues to ``result.issues``.
+
+        Both plain functions and callable class instances are accepted.
+        """
+        self._check_not_frozen()
+        if not callable(check):
+            msg = f"Contract check must be callable, got {type(check).__name__}"
+            raise TypeError(msg)
+        self._mutable_state.contract_checks.append(check)
+
+    def set_contract_check_data(self, key: str, value: Any) -> None:
+        """Store arbitrary data for use by custom contract checks.
+
+        Data is available in ``snapshot.extras[key]`` during
+        ``app.check()``.
+        """
+        self._check_not_frozen()
+        self._mutable_state.contract_check_data[key] = value
+
+    def override_contract_severity(self, category: str, severity: Severity) -> None:
+        """Override the severity of all contract issues in *category*.
+
+        Applied as a post-processing step after all checks (built-in and
+        custom) have run.  For example, to promote dead-template warnings
+        to errors::
+
+            app.override_contract_severity("dead", Severity.ERROR)
+        """
+        self._check_not_frozen()
+        if not isinstance(severity, Severity):
+            msg = f"severity must be a Severity enum member, got {type(severity).__name__}"
+            raise TypeError(msg)
+        self._mutable_state.contract_severity_overrides[category] = severity
+
     def template_filter(
         self,
         name: str | None = None,
@@ -501,9 +541,15 @@ class App:
         self._ensure_frozen()
         self._assert_contracts_ready()
         assert self._runtime_state.router is not None
+        kida_env = self._runtime_state.kida_env
+        ts: dict[str, str] = {}
+        if kida_env is not None and kida_env.loader is not None:
+            from chirp.contracts.template_scan import load_template_sources
+
+            ts = load_template_sources(kida_env)
         return ContractCheckSnapshot(
             router=self._runtime_state.router,
-            kida_env=self._runtime_state.kida_env,
+            kida_env=kida_env,
             layout_chains=self._mutable_state.discovered_layout_chains,
             page_route_paths=self._mutable_state.page_route_paths,
             page_leaf_templates=self._mutable_state.page_leaf_templates,
@@ -514,4 +560,6 @@ class App:
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
             discovered_routes=self._mutable_state.discovered_routes,
+            template_sources=ts,
+            extras=dict(self._mutable_state.contract_check_data),
         )

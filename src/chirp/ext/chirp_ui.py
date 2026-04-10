@@ -14,13 +14,17 @@ Usage::
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from chirp.app import App
+    from chirp.app.state import ContractCheckSnapshot
+    from chirp.contracts.types import CheckResult
 
+from chirp.contracts.types import ContractIssue, Severity
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Middleware, Next
 from chirp.templating.fragment_target_registry import PageShellContract, PageShellTarget
@@ -128,3 +132,69 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     )
 
     app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)
+
+    # Register chirp-ui contract check so app.check() validates component imports.
+    _available = _discover_chirpui_components()
+    if _available is not None:
+        app.set_contract_check_data("chirpui_components", _available)
+        app.register_contract_check(check_chirpui_imports)
+
+
+# ---------------------------------------------------------------------------
+# Contract check: validate chirp-ui component imports
+# ---------------------------------------------------------------------------
+
+_CHIRPUI_IMPORT_RE = re.compile(
+    r"""\{%[-\s]+from\s+["']chirpui/([^"']+)["']""",
+)
+
+
+def _discover_chirpui_components() -> frozenset[str] | None:
+    """Return the set of available chirp-ui component template filenames.
+
+    Returns ``None`` if the chirp-ui templates directory cannot be found
+    (e.g. editable install without the expected layout).
+    """
+    try:
+        import chirp_ui
+
+        templates_dir = Path(chirp_ui.__file__).resolve().parent / "templates" / "chirpui"
+        if templates_dir.is_dir():
+            return frozenset(f.name for f in templates_dir.glob("*.html"))
+    except ImportError, AttributeError, OSError:
+        pass
+    return None
+
+
+def check_chirpui_imports(
+    snapshot: ContractCheckSnapshot,
+    result: CheckResult,
+) -> None:
+    """Verify that ``{% from "chirpui/..." %}`` imports reference real components.
+
+    Catches typos like ``{% from "chirpui/cardd.html" import card %}`` at
+    startup instead of letting them surface as runtime ``TemplateNotFound``
+    errors.
+    """
+    available: frozenset[str] | None = snapshot.extras.get("chirpui_components")
+    if available is None:
+        return
+
+    for template_name, source in snapshot.template_sources.items():
+        for match in _CHIRPUI_IMPORT_RE.finditer(source):
+            component_file = match.group(1)
+            if component_file not in available:
+                result.issues.append(
+                    ContractIssue(
+                        severity=Severity.ERROR,
+                        category="chirpui_import",
+                        message=(f'Unknown chirp-ui component "chirpui/{component_file}"'),
+                        template=template_name,
+                        details=(
+                            "Check for typos. Available components can be listed "
+                            'with: python -c "import chirp_ui; print(sorted('
+                            "p.name for p in (pathlib.Path(chirp_ui.__file__)"
+                            ".parent / 'templates' / 'chirpui').glob('*.html')))\""
+                        ),
+                    )
+                )

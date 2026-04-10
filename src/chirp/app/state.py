@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from kida import Environment
 
 from chirp._internal.types import ErrorHandler, Handler
+from chirp.contracts.types import Severity
 from chirp.middleware.protocol import Middleware
 from chirp.pages.types import RouteMeta, Section
 from chirp.routing.router import Router
@@ -74,6 +75,9 @@ class MutableAppState:
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
     plugin_loaders: list[Any] = field(default_factory=list)
+    contract_checks: list[Callable[..., Any]] = field(default_factory=list)
+    contract_check_data: dict[str, Any] = field(default_factory=dict)
+    contract_severity_overrides: dict[str, Severity] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -93,7 +97,14 @@ class RuntimeAppState:
 
 @dataclass(frozen=True, slots=True)
 class ContractCheckSnapshot:
-    """Stable read model for contract checks."""
+    """Stable read model for contract checks.
+
+    Third-party contract checks receive this snapshot alongside a
+    ``CheckResult`` to append issues to.  The ``template_sources`` dict
+    contains ``{template_name: source_text}`` for every loaded template,
+    and ``extras`` carries arbitrary data registered via
+    ``app.set_contract_check_data()``.
+    """
 
     router: Router
     kida_env: Environment | None
@@ -107,3 +118,5 @@ class ContractCheckSnapshot:
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
+    template_sources: dict[str, str] = field(default_factory=dict)
+    extras: dict[str, Any] = field(default_factory=dict)
