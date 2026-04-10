@@ -286,6 +286,31 @@ Key rules:
 
 See [[docs/examples/rag-demo|RAG demo]] for the full implementation.
 
+## Monitoring the Bus
+
+`ReactiveBus` exposes lightweight observability counters -- useful for dashboards, health checks, and debugging back-pressure:
+
+```python
+bus = app.reactive_bus
+
+bus.emitted_count      # Total events emitted (including dropped)
+bus.dropped_count      # Events lost to full subscriber queues
+bus.subscriber_count   # Active subscribers across all scopes
+```
+
+These are simple `int` counters maintained under the bus's existing `threading.Lock` -- minimal overhead on the emit path.
+
+### Configurable Queue Depth
+
+The default per-subscriber queue depth is 256. Tune it for your workload:
+
+```python
+bus = ReactiveBus(maxsize=64)    # Tight back-pressure (low-latency)
+bus = ReactiveBus(maxsize=1024)  # Deep buffer (burst tolerance)
+```
+
+When a subscriber's queue is full, events are silently dropped and `dropped_count` increments. Monitor this to detect slow consumers.
+
 ## Compile-Time Validation
 
 `chirp check` catches common SSE mistakes:

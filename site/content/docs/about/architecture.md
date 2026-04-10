@@ -77,6 +77,8 @@ chirp/
 ├── routing/             # Router, Route, path parameters
 ├── middleware/           # Protocol, CORS, StaticFiles, Sessions, Auth, CSRF
 ├── templating/          # Kida integration, return types, filters, streaming
+├── pages/
+│   └── reactive/        # ReactiveBus, DependencyIndex, reactive_stream
 ├── realtime/            # SSE protocol and EventStream
 ├── server/              # ASGI handler, dev server, content negotiation
 ├── data/                # Database access, row mapping

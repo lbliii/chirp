@@ -32,6 +32,13 @@ Send the shell immediately, fill in content as data arrives. Suspense streams de
 Push kida-rendered fragments to the browser over SSE.
 :::{/card}
 
+:::{card} Reactive System
+:icon: refresh-cw
+:link: ./reactive-system
+:description: Automatic SSE from data changes
+ReactiveBus, DependencyIndex, derived paths, and observability counters.
+:::{/card}
+
 :::{card} SSE Patterns
 :icon: layers
 :link: ./sse-patterns
