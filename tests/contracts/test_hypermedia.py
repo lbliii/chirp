@@ -251,9 +251,7 @@ class TestCheckHypermediaSurface:
 
     def test_a11y_interactive_override_to_error(self, tmp_path):
         """Promote a11y_interactive from WARNING to ERROR via severity override."""
-        (tmp_path / "index.html").write_text(
-            '<div hx-get="/api/items">load</div>'
-        )
+        (tmp_path / "index.html").write_text('<div hx-get="/api/items">load</div>')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/api/items")
@@ -273,9 +271,7 @@ class TestCheckHypermediaSurface:
 
     def test_a11y_label_override_to_error(self, tmp_path):
         """Promote a11y_label from WARNING to ERROR via severity override."""
-        (tmp_path / "index.html").write_text(
-            '<input type="text" name="email">'
-        )
+        (tmp_path / "index.html").write_text('<input type="text" name="email">')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
@@ -294,9 +290,7 @@ class TestCheckHypermediaSurface:
 
     def test_a11y_alt_override_to_error(self, tmp_path):
         """Promote a11y_alt from WARNING to ERROR via severity override."""
-        (tmp_path / "index.html").write_text(
-            '<img src="photo.jpg">'
-        )
+        (tmp_path / "index.html").write_text('<img src="photo.jpg">')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
@@ -315,9 +309,7 @@ class TestCheckHypermediaSurface:
 
     def test_a11y_heading_override_to_error(self, tmp_path):
         """Promote a11y_heading from WARNING to ERROR via severity override."""
-        (tmp_path / "index.html").write_text(
-            "<h1>Title</h1><h3>Skipped</h3>"
-        )
+        (tmp_path / "index.html").write_text("<h1>Title</h1><h3>Skipped</h3>")
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
@@ -338,9 +330,7 @@ class TestCheckHypermediaSurface:
     def test_multiple_a11y_overrides_combined(self, tmp_path):
         """Multiple a11y categories can be overridden independently."""
         (tmp_path / "index.html").write_text(
-            '<div hx-get="/api/items">load</div>'
-            '<img src="photo.jpg">'
-            "<h1>Title</h1><h3>Skipped</h3>"
+            '<div hx-get="/api/items">load</div><img src="photo.jpg"><h1>Title</h1><h3>Skipped</h3>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -392,9 +382,7 @@ class TestAccessibilityFullPipeline:
         """A single app with multiple a11y issues reports all categories."""
         # Root layout: has <html>/<body>, has {% block %}, but NO <main> → a11y_landmark
         (tmp_path / "layout.html").write_text(
-            "<!DOCTYPE html><html><body>"
-            "{% block content %}{% endblock %}"
-            "</body></html>"
+            "<!DOCTYPE html><html><body>{% block content %}{% endblock %}</body></html>"
         )
         # Page template: triggers a11y_interactive, a11y_label, a11y_alt, a11y_heading
         (tmp_path / "index.html").write_text(
@@ -431,9 +419,7 @@ class TestAccessibilityFullPipeline:
     def test_all_a11y_promoted_to_error_breaks_check(self, tmp_path):
         """Promoting all a11y categories to ERROR makes result.ok False."""
         (tmp_path / "layout.html").write_text(
-            "<!DOCTYPE html><html><body>"
-            "{% block content %}{% endblock %}"
-            "</body></html>"
+            "<!DOCTYPE html><html><body>{% block content %}{% endblock %}</body></html>"
         )
         (tmp_path / "index.html").write_text(
             '<div hx-get="/api/items">load</div>'

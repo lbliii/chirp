@@ -241,8 +241,7 @@ class TestTextareaField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import textarea_field %}'
-            '{{ textarea_field("desc") }}',
+            '{% from "chirp/forms.html" import textarea_field %}{{ textarea_field("desc") }}',
         )
         assert "aria-invalid" not in html
         assert "aria-describedby" not in html
@@ -416,8 +415,7 @@ class TestCheckboxField:
         env = _make_env()
         html = _render(
             env,
-            '{% from "chirp/forms.html" import checkbox_field %}'
-            '{{ checkbox_field("agree") }}',
+            '{% from "chirp/forms.html" import checkbox_field %}{{ checkbox_field("agree") }}',
         )
         assert "aria-invalid" not in html
         assert "aria-describedby" not in html

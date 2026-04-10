@@ -102,9 +102,7 @@ def check_label_association(source: str, template_name: str) -> list[ContractIss
     issues: list[ContractIssue] = []
 
     # Pre-compute: all label-for targets in this template.
-    label_for_values = {
-        _normalize_for_matching(m.group(1)) for m in _LABEL_FOR.finditer(source)
-    }
+    label_for_values = {_normalize_for_matching(m.group(1)) for m in _LABEL_FOR.finditer(source)}
 
     # Pre-compute: character positions covered by wrapping labels.
     wrapping_ranges: list[tuple[int, int]] = []
@@ -149,7 +147,7 @@ def check_label_association(source: str, template_name: str) -> list[ContractIss
                 category="a11y_label",
                 message=(
                     f"<{tag_name}> '{field_desc}' has no associated label — "
-                    "add <label for=\"...\"> or aria-label."
+                    'add <label for="..."> or aria-label.'
                 ),
                 template=template_name,
             )
@@ -182,7 +180,7 @@ def check_image_alt(source: str, template_name: str) -> list[ContractIssue]:
                 category="a11y_alt",
                 message=(
                     f"<img> '{src_desc}' has no alt attribute — "
-                    "add alt=\"...\" for screen readers (use alt=\"\" for decorative images)."
+                    'add alt="..." for screen readers (use alt="" for decorative images).'
                 ),
                 template=template_name,
             )
@@ -250,7 +248,7 @@ def check_landmarks(
                 category="a11y_landmark",
                 message=(
                     "Layout template has no <main> landmark — "
-                    "add <main> or role=\"main\" for screen reader navigation."
+                    'add <main> or role="main" for screen reader navigation.'
                 ),
                 template=name,
             )
