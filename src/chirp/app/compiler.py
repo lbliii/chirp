@@ -278,6 +278,22 @@ class AppCompiler:
                 plugin_loaders=self._mutable.plugin_loaders,
             )
 
+        # Wire kida's {% trans %} blocks to chirp's i18n catalog
+        if self._config.i18n_enabled and self._runtime.kida_env is not None:
+            from chirp.i18n import get_catalog as _get_catalog
+            from chirp.i18n import get_locale
+
+            def _gettext(message: str) -> str:
+                catalog = _get_catalog()
+                if catalog is None:
+                    return message
+                return catalog.translate(get_locale(), message)
+
+            def _ngettext(singular: str, plural: str, n: int) -> str:
+                return singular if n == 1 else plural
+
+            self._runtime.kida_env.install_gettext_callables(_gettext, _ngettext)
+
         self._runtime.tool_registry = compile_tools(
             [(t.name, t.description, t.handler) for t in self._mutable.pending_tools],
             self._mutable.tool_events,

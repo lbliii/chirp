@@ -80,6 +80,9 @@ class AppConfig:
     autoescape: bool = True
     trim_blocks: bool = True
     lstrip_blocks: bool = True
+    static_context: dict[str, Any] | None = (
+        None  # Compile-time constants for kida partial evaluator
+    )
 
     # Static files
     static_dir: str | Path | None = "static"

@@ -24,6 +24,7 @@ class TestAppConfig:
         assert cfg.mcp_path == "/mcp"
         assert cfg.max_content_length == 16 * 1024 * 1024
         assert cfg.view_transitions is False
+        assert cfg.static_context is None
 
     def test_override(self) -> None:
         cfg = AppConfig(host="0.0.0.0", port=3000, debug=True, secret_key="s3cret")
