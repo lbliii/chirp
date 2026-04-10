@@ -188,13 +188,11 @@ def check_chirpui_imports(
                     ContractIssue(
                         severity=Severity.ERROR,
                         category="chirpui_import",
-                        message=(
-                            f'Unknown chirp-ui component "chirpui/{component_file}"'
-                        ),
+                        message=(f'Unknown chirp-ui component "chirpui/{component_file}"'),
                         template=template_name,
                         details=(
                             "Check for typos. Available components can be listed "
-                            "with: python -c \"import chirp_ui; print(sorted("
+                            'with: python -c "import chirp_ui; print(sorted('
                             "p.name for p in (pathlib.Path(chirp_ui.__file__)"
                             ".parent / 'templates' / 'chirpui').glob('*.html')))\""
                         ),

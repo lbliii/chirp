@@ -77,9 +77,7 @@ class TestMountedPagesWithCustomCheck:
 
         # page.html has {% block content %}, so no warnings from it
         block_issues = [
-            i
-            for i in result.issues
-            if i.category == "block_check" and i.template == "page.html"
+            i for i in result.issues if i.category == "block_check" and i.template == "page.html"
         ]
         assert len(block_issues) == 0
 
@@ -115,8 +113,7 @@ class TestChirpUIContractCheck:
 
     def test_valid_import_no_issues(self, tmp_path: Path) -> None:
         (tmp_path / "page.html").write_text(
-            '{% from "chirpui/card.html" import card %}'
-            "<html>{{ card() }}</html>"
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -133,8 +130,7 @@ class TestChirpUIContractCheck:
 
     def test_typo_import_produces_error(self, tmp_path: Path) -> None:
         (tmp_path / "page.html").write_text(
-            '{% from "chirpui/cardd.html" import card %}'
-            "<html>{{ card() }}</html>"
+            '{% from "chirpui/cardd.html" import card %}<html>{{ card() }}</html>'
         )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
@@ -153,12 +149,8 @@ class TestChirpUIContractCheck:
         assert import_issues[0].severity == Severity.ERROR
 
     def test_multiple_typos_across_templates(self, tmp_path: Path) -> None:
-        (tmp_path / "a.html").write_text(
-            '{% from "chirpui/modall.html" import modal %}<div></div>'
-        )
-        (tmp_path / "b.html").write_text(
-            '{% from "chirpui/bttun.html" import btn %}<div></div>'
-        )
+        (tmp_path / "a.html").write_text('{% from "chirpui/modall.html" import modal %}<div></div>')
+        (tmp_path / "b.html").write_text('{% from "chirpui/bttun.html" import btn %}<div></div>')
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")

@@ -63,9 +63,7 @@ class TestSeverityOverrides:
         assert my_issues[0].severity == Severity.WARNING
         # Downgraded from ERROR, so result.ok should be True (no errors)
         strict_errors = [
-            i
-            for i in result.issues
-            if i.category == "strict_rule" and i.severity == Severity.ERROR
+            i for i in result.issues if i.category == "strict_rule" and i.severity == Severity.ERROR
         ]
         assert len(strict_errors) == 0
 
