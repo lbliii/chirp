@@ -2,6 +2,35 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from chirp.app.state import ContractCheckSnapshot
+
+
+class ContractCheck(Protocol):
+    """Protocol for custom contract check plugins.
+
+    Both plain functions and callable class instances satisfy this
+    protocol.  Register via ``app.register_contract_check()``.
+
+    Example — function form::
+
+        def my_check(snapshot: ContractCheckSnapshot, result: CheckResult) -> None:
+            for name, source in snapshot.template_sources.items():
+                if "TODO" in source:
+                    result.issues.append(
+                        ContractIssue(Severity.WARNING, "todo", f"TODO in {name}", template=name)
+                    )
+
+    Example — class form::
+
+        class ComponentCheck:
+            def __call__(self, snapshot: ContractCheckSnapshot, result: CheckResult) -> None:
+                ...
+    """
+
+    def __call__(self, snapshot: ContractCheckSnapshot, result: CheckResult) -> None: ...
 
 
 class Severity(Enum):

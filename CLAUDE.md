@@ -98,6 +98,53 @@ if not result:
 - **Thread-safe stores** with `threading.Lock` for shared mutable state
 - **`app.check()`** validates hypermedia contracts at startup (routes, fragments, SSE)
 
+## Custom Contract Checks
+
+Third-party packages and apps can extend `app.check()` with custom validation rules.
+
+### Registering checks
+
+```python
+from chirp import ContractCheck, ContractCheckSnapshot, CheckResult, ContractIssue, Severity
+
+def my_check(snapshot: ContractCheckSnapshot, result: CheckResult) -> None:
+    for name, source in snapshot.template_sources.items():
+        if "TODO" in source:
+            result.issues.append(
+                ContractIssue(Severity.WARNING, "todo", f"TODO in {name}", template=name)
+            )
+
+app.register_contract_check(my_check)
+```
+
+- Checks receive a frozen `ContractCheckSnapshot` and a mutable `CheckResult`
+- Both function and callable class forms are accepted (`ContractCheck` Protocol)
+- Register during setup (before freeze); raises `RuntimeError` after freeze
+- Exceptions in checks are isolated — they become ERROR issues, other checks still run
+- Checks run in registration order, after all built-in rules
+
+### Passing data to checks
+
+```python
+app.set_contract_check_data("components", ["card", "modal"])
+
+def my_check(snapshot, result):
+    components = snapshot.extras["components"]  # → ["card", "modal"]
+```
+
+### Severity overrides
+
+```python
+app.override_contract_severity("dead", Severity.ERROR)    # Promote dead-template INFO → ERROR
+app.override_contract_severity("orphan", Severity.WARNING) # Promote orphan-route INFO → WARNING
+```
+
+Overrides apply as post-processing after all checks run. Any category (built-in or custom) can be overridden.
+
+### Plugin convention
+
+Packages should register checks inside their `register()` or setup function — no magic discovery. See `chirp.ext.chirp_ui` for a real-world example (validates component imports).
+
 ## Build & Test
 
 ```bash
