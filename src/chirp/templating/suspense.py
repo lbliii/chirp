@@ -107,6 +107,10 @@ def _find_deferred_blocks(
     Uses kida's ``block_metadata()`` static analysis to find blocks
     whose ``depends_on`` set intersects with the deferred keys.
 
+    Parent blocks whose ``depends_on`` is a strict superset of another
+    matched block are pruned — they would re-render the entire section
+    for an OOB target that likely doesn't exist in the DOM.
+
     Returns ``{context_key: [block_name, ...]}`` — a key may affect
     multiple blocks, and a block may appear under multiple keys
     (de-duplicated during rendering).
@@ -118,12 +122,40 @@ def _find_deferred_blocks(
 
     for block_name, block_meta in metadata.items():
         for dep_path in block_meta.depends_on:
-            # Match context key: "stats" matches dep path "stats" or "stats.count"
             root_key = dep_path.split(".")[0]
             if root_key in deferred_keys:
                 key_to_blocks.setdefault(root_key, []).append(block_name)
 
+    for key, blocks in key_to_blocks.items():
+        if len(blocks) <= 1:
+            continue
+        deps_by_block = {b: metadata[b].depends_on for b in blocks}
+        key_to_blocks[key] = _prune_ancestor_blocks(blocks, deps_by_block)
+
     return key_to_blocks
+
+
+def _prune_ancestor_blocks(
+    blocks: list[str],
+    deps_by_block: dict[str, frozenset[str]],
+) -> list[str]:
+    """Drop blocks whose depends_on is a strict superset of another block's.
+
+    Parent blocks in the AST always accumulate the full dependency set
+    of their children.  When both a parent (``page_content``) and a leaf
+    (``stats_panel``) match a deferred key, the parent's ``depends_on``
+    is a strict superset of the leaf's.  Re-rendering the parent as an
+    OOB chunk is expensive and the target id rarely exists in the DOM.
+    """
+    drop: set[str] = set()
+    for a in blocks:
+        for b in blocks:
+            if a == b:
+                continue
+            if deps_by_block[a] > deps_by_block[b]:
+                drop.add(a)
+                break
+    return [b for b in blocks if b not in drop]
 
 
 def _should_wrap_in_layouts(
