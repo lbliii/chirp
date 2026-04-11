@@ -1,5 +1,8 @@
-"""OOB helpers for negotiation — shell actions, streamed append."""
+"""OOB helpers for negotiation — shell actions, layout regions, streamed append."""
 
+from __future__ import annotations
+
+import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
@@ -14,10 +17,14 @@ from chirp.pages.shell_actions import (
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Fragment
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
+    from chirp.pages.types import LayoutChain
+
+_log = logging.getLogger(__name__)
 
 
 def _triggers_shell_update(
@@ -139,3 +146,113 @@ def should_append_streamed_shell_actions_oob(
     if request is None:
         return False
     return request.is_fragment and not request.is_history_restore and request.is_boosted
+
+
+def render_layout_oob_blocks(
+    kida_env: Environment,
+    layout_chain: LayoutChain,
+    context: dict[str, Any],
+    oob_registry: OOBRegistry | None,
+) -> str:
+    """Render layout OOB blocks (sidebar, breadcrumbs, title) for boosted navigation.
+
+    Mirrors the OOB region logic in ``execute_render_plan`` but works
+    standalone for streaming responses (Suspense, TemplateStream) that
+    bypass the render plan pipeline.
+    """
+    from chirp.templating.render_plan import build_layout_contract
+
+    layouts = getattr(layout_chain, "layouts", ())
+    if not layouts:
+        return ""
+
+    parts: list[str] = []
+    seen_targets: set[str] = set()
+
+    for layout_info in reversed(layouts):
+        if oob_registry is not None:
+            contract = oob_registry.get_or_build_contract(
+                _KidaBlockAdapter(kida_env), layout_info.template_name
+            )
+        else:
+            contract = build_layout_contract(
+                _KidaBlockAdapter(kida_env), layout_info.template_name
+            )
+
+        for oob in contract.oob_blocks:
+            if oob.cache_scope == "site":
+                continue
+            if "page_title" in oob.depends_on and "page_title" not in context:
+                continue
+            if oob.target_id in seen_targets:
+                continue
+            seen_targets.add(oob.target_id)
+
+            try:
+                template = kida_env.get_template(layout_info.template_name)
+                html = template.render_block(oob.block_name, context)
+            except Exception:
+                _log.debug("Skipping OOB block %s: render failed", oob.block_name)
+                html = ""
+
+            if oob_registry is not None:
+                swap, wrap = oob_registry.resolve_serialization(oob.target_id)
+            else:
+                swap, wrap = "true", True
+            if wrap:
+                parts.append(f'<div id="{oob.target_id}" hx-swap-oob="{swap}">{html}</div>')
+            else:
+                parts.append(html)
+
+    return "\n".join(parts)
+
+
+class _KidaBlockAdapter:
+    """Minimal adapter that satisfies ``build_layout_contract``'s interface."""
+
+    __slots__ = ("_env",)
+
+    def __init__(self, env: Environment) -> None:
+        self._env = env
+
+    def template_metadata(self, template_name: str) -> Any:
+        try:
+            return self._env.get_template(template_name).template_metadata()
+        except Exception:
+            return None
+
+
+def should_append_layout_oob(
+    request: Request | None,
+    layout_chain: LayoutChain | None,
+) -> bool:
+    """Whether a streamed layout response should append layout OOB blocks."""
+    if request is None or layout_chain is None:
+        return False
+    if not getattr(layout_chain, "layouts", ()):
+        return False
+    return request.is_fragment and not request.is_history_restore and request.is_boosted
+
+
+async def append_layout_oob_stream(
+    chunks: AsyncIterator[str],
+    kida_env: Environment,
+    layout_chain: LayoutChain,
+    context: dict[str, Any],
+    oob_registry: OOBRegistry | None,
+) -> AsyncIterator[str]:
+    """Append layout OOB markup (sidebar, breadcrumbs, title) to the first chunk."""
+    oob = render_layout_oob_blocks(kida_env, layout_chain, context, oob_registry)
+    if not oob:
+        async for chunk in chunks:
+            yield chunk
+        return
+    first_chunk = True
+    async for chunk in chunks:
+        if first_chunk:
+            yield "\n".join((chunk, oob))
+            first_chunk = False
+            continue
+        yield chunk
+    if first_chunk:
+        yield oob

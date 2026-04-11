@@ -23,7 +23,6 @@
 {% from "chirpui/app_shell.html" import app_shell %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_section, sidebar_link %}
 {% from "chirpui/breadcrumbs.html" import breadcrumbs %}
-{% from "chirpui/shell_frame.html" import shell_outlet %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 
 {% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
@@ -59,9 +58,10 @@
   {{ sidebar_oob(current_path=current_path ?? "/") }}
   {% end %}
 
-  {% call shell_outlet() %}
-  {% block content %}{% end %}
-  {% end %}
+  {#- Inlined shell_outlet() from shell_frame (defaults) for chirp-ui versions without that def. -#}
+  <div id="page-content" hx-boost="true" hx-target="#main" hx-swap="innerHTML" hx-select="#page-content">
+    {% block content %}{% end %}
+  </div>
 {% end %}
 </body>
 </html>

@@ -22,8 +22,10 @@ from chirp.http.response import (
 from chirp.realtime.events import EventStream
 from chirp.server.debug.render_plan_snapshot import stash_render_debug_for_request
 from chirp.server.negotiation_oob import (
+    append_layout_oob_stream,
     append_shell_actions_oob_stream,
     compute_shell_region_updates,
+    should_append_layout_oob,
     should_append_streamed_shell_actions_oob,
 )
 from chirp.templating.composition import PageComposition
@@ -396,6 +398,10 @@ def negotiate(
             )
             if should_append_streamed_shell_actions_oob(value.context, req):
                 chunks = append_shell_actions_oob_stream(chunks, value.context, kida_env)
+            if should_append_layout_oob(req, value.layout_chain):
+                chunks = append_layout_oob_stream(
+                    chunks, kida_env, value.layout_chain, value.context, oob_registry
+                )
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
