@@ -268,12 +268,13 @@ class TestLayoutPageSlotContext:
             encoding="utf-8",
         )
         (tmp_path / "_layout.html").write_text(
-            "{# target: body #}"
-            '<html><body><nav id="sidebar-nav">{% block sidebar_oob %}'
-            '{% region sidebar_oob(current_path="/") %}'
-            '<a class="{{ "active" if current_path == "/about" else "" }}">About</a>'
-            "{% end %}"
-            "{% end %}</nav>"
+            "{# target: body #}\n"
+            "<html><body>\n"
+            '<nav id="sidebar-nav">\n'
+            '{% region sidebar_oob(current_path="/") %}\n'
+            '<a class="{{ "active" if current_path == "/about" else "" }}">About</a>\n'
+            "{% end %}\n"
+            "</nav>\n"
             '<main id="main">{% block content %}{% end %}</main></body></html>',
             encoding="utf-8",
         )

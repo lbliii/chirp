@@ -458,7 +458,7 @@ def execute_render_plan(
                 contract = build_layout_contract(adapter, layout_info.template_name)
 
             for oob in contract.oob_blocks:
-                if oob.cache_scope == "site":
+                if oob.cache_scope == "site" and not oob.depends_on:
                     continue
                 if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
                     continue

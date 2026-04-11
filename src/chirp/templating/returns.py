@@ -395,11 +395,20 @@ class Suspense:
     Override with *defer_map*::
 
         Suspense("page.html", defer_map={"stats": "stats-panel"}, ...)
+
+    When static analysis misses blocks (e.g. deferred values passed
+    through macro calls), list them explicitly with *defer_blocks*::
+
+        Suspense("page.html",
+            defer_blocks=("hero_stars", "footer_stars"),
+            stars=fetch_stars(),
+        )
     """
 
     template_name: str
     context: dict[str, Any] = field(default_factory=dict)
     defer_map: dict[str, str] = field(default_factory=dict)
+    defer_blocks: tuple[str, ...] | None = None
 
     def __init__(
         self,
@@ -407,11 +416,13 @@ class Suspense:
         /,
         *,
         defer_map: dict[str, str] | None = None,
+        defer_blocks: tuple[str, ...] | None = None,
         **context: Any,
     ) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "context", context)
         object.__setattr__(self, "defer_map", defer_map or {})
+        object.__setattr__(self, "defer_blocks", defer_blocks)
 
 
 @dataclass(frozen=True, slots=True)

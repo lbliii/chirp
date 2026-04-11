@@ -237,13 +237,15 @@ async def render_suspense(
 
     # -- Phase 4: Re-render affected blocks with full context --
     full_ctx = {**layout_ctx, **sync_ctx, **resolved}
-    deferred_keys = set(pending.keys())
-    key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
 
-    # Collect unique blocks (order-preserving dedup)
-    blocks_to_render = list(
-        dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
-    )
+    if suspense.defer_blocks is not None:
+        blocks_to_render = list(suspense.defer_blocks)
+    else:
+        deferred_keys = set(pending.keys())
+        key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
+        blocks_to_render = list(
+            dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
+        )
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)

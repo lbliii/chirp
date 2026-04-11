@@ -139,11 +139,13 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     app.register_swap_scope("page", "page-root")
     app.register_swap_scope("content", "page-content-inner")
 
-    # Register chirp-ui contract check so app.check() validates component imports.
+    # Register chirp-ui contract checks so app.check() validates component imports
+    # and reports design system surface.
     _available = _discover_chirpui_components()
     if _available is not None:
         app.set_contract_check_data("chirpui_components", _available)
         app.register_contract_check(check_chirpui_imports)
+        app.register_contract_check(check_design_system_surface)
 
 
 # ---------------------------------------------------------------------------
@@ -204,3 +206,68 @@ def check_chirpui_imports(
                         ),
                     )
                 )
+
+
+def check_design_system_surface(
+    snapshot: ContractCheckSnapshot,
+    result: CheckResult,
+) -> None:
+    """Report design system surface and flag descriptor/template mismatches.
+
+    Compares :data:`chirp_ui.components.COMPONENTS` against the actual
+    template files on disk.  Components with a declared ``template`` that
+    does not exist on disk are flagged as errors.  Templates that exist
+    but have no descriptor are flagged as informational notes (not all
+    templates need descriptors immediately).
+    """
+    try:
+        from chirp_ui.components import COMPONENTS, design_system_report
+    except ImportError:
+        return
+
+    available: frozenset[str] | None = snapshot.extras.get("chirpui_components")
+    if available is None:
+        return
+
+    report = design_system_report()
+    stats = report.get("stats", {})
+
+    result.issues.append(
+        ContractIssue(
+            severity=Severity.INFO,
+            category="design_system",
+            message=(
+                f"chirp-ui design system: "
+                f"{stats.get('total_components', 0)} components, "
+                f"{stats.get('total_tokens', 0)} tokens"
+            ),
+        )
+    )
+
+    for name, desc in COMPONENTS.items():
+        if desc.template and desc.template not in available:
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="design_system",
+                    message=(
+                        f'Component "{name}" declares template "{desc.template}" '
+                        f"but the file does not exist in chirp-ui templates"
+                    ),
+                )
+            )
+
+    described_templates = {desc.template for desc in COMPONENTS.values() if desc.template}
+    undescribed = sorted(available - described_templates)
+    if undescribed:
+        result.issues.append(
+            ContractIssue(
+                severity=Severity.INFO,
+                category="design_system",
+                message=(
+                    f"{len(undescribed)} chirp-ui templates without descriptors: "
+                    + ", ".join(undescribed[:10])
+                    + ("..." if len(undescribed) > 10 else "")
+                ),
+            )
+        )
