@@ -26,6 +26,13 @@ DEV_BROWSER_RELOAD_SNIPPET = f"""\
 (function() {{
   var es = new EventSource("{DEV_RELOAD_SSE_PATH}");
   es.addEventListener("reload", function() {{ location.reload(); }});
+  es.addEventListener("css", function() {{
+    var t = Date.now();
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l) {{
+      var href = l.getAttribute("href");
+      if (href) {{ l.setAttribute("href", href.split("?")[0] + "?_cr=" + t); }}
+    }});
+  }});
   es.onerror = function() {{ setTimeout(function() {{ location.reload(); }}, 2000); }};
 }})();
 </script>"""
@@ -57,6 +64,14 @@ def _watch_roots(config: AppConfig) -> list[Path]:
 
     for extra in config.reload_dirs:
         p = Path(extra)
+        if not p.is_absolute():
+            p = cwd / p
+        p = p.resolve()
+        if p.is_dir():
+            roots.append(p)
+
+    for cdir in config.component_dirs:
+        p = Path(cdir)
         if not p.is_absolute():
             p = cwd / p
         p = p.resolve()
@@ -107,7 +122,7 @@ async def _reload_event_stream(
         tick += 1
         if tick % rescan_every == 1 or not tracked_files:
             tracked_files = _iter_tracked_files(roots, suffixes)
-        changed = False
+        changed_suffixes: set[str] = set()
         for path in tracked_files:
             key = str(path.resolve())
             try:
@@ -119,9 +134,12 @@ async def _reload_event_stream(
                 mtimes[key] = m
             elif m > old:
                 mtimes[key] = m
-                changed = True
-        if changed:
-            yield SSEEvent(data="reload", event="reload")
+                changed_suffixes.add(path.suffix.lower())
+        if changed_suffixes:
+            if changed_suffixes <= {".css"}:
+                yield SSEEvent(data="css", event="css")
+            else:
+                yield SSEEvent(data="reload", event="reload")
 
 
 def make_dev_reload_pending_route(config: AppConfig) -> PendingRoute:
