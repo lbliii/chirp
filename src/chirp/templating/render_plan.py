@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from chirp.pages.types import LayoutChain
 from chirp.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -19,7 +20,6 @@ _log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
-    from chirp.pages.types import LayoutChain
     from chirp.templating.adapter import TemplateAdapter
 
 
@@ -175,6 +175,15 @@ def _compute_layout_start_index(
     return idx
 
 
+def _layout_outlet_replace_matches_target(htmx_target: str, layout_chain: LayoutChain) -> bool:
+    """True when ``HX-Target`` matches a layout ``{# outlet: #}`` with ``outlet_mode: replace``."""
+    tid = htmx_target.lstrip("#")
+    return any(
+        layout.outlet_target_id == tid and layout.outlet_mode == "replace"
+        for layout in layout_chain.layouts
+    )
+
+
 def normalize_to_composition(value: Any) -> PageComposition | None:
     """Convert Page, LayoutPage, or PageComposition to PageComposition.
 
@@ -230,6 +239,19 @@ def build_render_plan(
         layout_start_index = _compute_layout_start_index(
             layout_chain, htmx_target, is_history_restore
         )
+        if (
+            htmx_target
+            and layout_chain
+            and (
+                (
+                    fragment_target_registry
+                    and (ft_cfg := fragment_target_registry.get(htmx_target)) is not None
+                    and ft_cfg.omit_outer_layouts
+                )
+                or _layout_outlet_replace_matches_target(htmx_target, layout_chain)
+            )
+        ):
+            layout_start_index = len(layout_chain.layouts)
         block = _fragment_block_for_request(
             composition,
             request,

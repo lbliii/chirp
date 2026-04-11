@@ -309,6 +309,7 @@ class App:
         fragment_block: str,
         triggers_shell_update: bool = True,
         scope_name: str | None = None,
+        omit_outer_layouts: bool = False,
     ) -> None:
         """Register a fragment target for HTMX content-region block selection.
 
@@ -321,6 +322,11 @@ class App:
 
         scope_name: Optional symbolic scope (e.g. ``"site"``) for hierarchical OOB
             propagation. When set, OOB updates are scoped to this level and above.
+
+        omit_outer_layouts: When True, boosted fragment responses for this target
+            skip wrapping with filesystem layouts (page block only). Use for root
+            marketing shells whose outlet is the primary ``{% block content %}``
+            region so the layout is not nested inside itself on swap.
         """
         self._check_not_frozen()
         self._mutable_state.fragment_target_registry.register(
@@ -328,6 +334,7 @@ class App:
             fragment_block=fragment_block,
             triggers_shell_update=triggers_shell_update,
             scope_name=scope_name,
+            omit_outer_layouts=omit_outer_layouts,
         )
 
     def register_page_shell_contract(self, contract: PageShellContract) -> None:

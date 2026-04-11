@@ -72,6 +72,23 @@ def test_app_register_fragment_target_passes_scope_name() -> None:
     assert cfg.scope_name == "site"
 
 
+def test_app_register_fragment_target_omit_outer_layouts() -> None:
+    """App.register_fragment_target(omit_outer_layouts=) must propagate."""
+    from chirp import App, AppConfig
+
+    app = App(AppConfig(template_dir=".", secret_key="test"))
+    app.register_fragment_target(
+        "site-content",
+        fragment_block="content",
+        scope_name="site",
+        omit_outer_layouts=True,
+    )
+    reg = app._mutable_state.fragment_target_registry
+    cfg = reg.get("site-content")
+    assert cfg is not None
+    assert cfg.omit_outer_layouts is True
+
+
 # --- resolve_oob_scope ---
 
 

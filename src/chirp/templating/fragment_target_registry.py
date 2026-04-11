@@ -22,6 +22,7 @@ class PageShellTarget:
     required: bool = True
     description: str = ""
     scope_name: str | None = None
+    omit_outer_layouts: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,10 @@ class FragmentTargetConfig:
     triggers_shell_update: When True, this swap participates in shell negotiation
         (e.g. ``shell_actions`` OOB). Use False for **narrow** in-page swaps
         (e.g. ``#page-content-inner``) that must not refresh the app shell.
+    omit_outer_layouts: When True, boosted responses for this HX-Target skip
+        composing filesystem layouts (page HTML only). Use for marketing shells
+        where the outlet wraps the whole ``{% block content %}`` and re-applying
+        the root layout would duplicate header/footer inside the outlet.
     """
 
     fragment_block: str
@@ -57,6 +62,7 @@ class FragmentTargetConfig:
     required: bool = False
     description: str = ""
     scope_name: str | None = None
+    omit_outer_layouts: bool = False
 
 
 @dataclass(slots=True)
@@ -80,6 +86,7 @@ class FragmentTargetRegistry:
         required: bool = False,
         description: str = "",
         scope_name: str | None = None,
+        omit_outer_layouts: bool = False,
     ) -> None:
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
@@ -92,6 +99,7 @@ class FragmentTargetRegistry:
             required=required,
             description=description,
             scope_name=scope_name,
+            omit_outer_layouts=omit_outer_layouts,
         )
 
     def register_contract(self, contract: PageShellContract) -> None:
@@ -114,6 +122,7 @@ class FragmentTargetRegistry:
                 required=target.required,
                 description=target.description,
                 scope_name=target.scope_name,
+                omit_outer_layouts=target.omit_outer_layouts,
             )
 
     def freeze(self) -> None:
