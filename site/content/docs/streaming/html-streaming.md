@@ -166,6 +166,29 @@ The shell is sent immediately as the first chunk (instant first paint).
 Awaitables resolve concurrently in the background.
 
 :::{/step}
+:::{step} Find affected blocks
+
+Blocks to re-render are discovered via `block_metadata().depends_on` — Kida's static analysis traces which blocks reference the deferred keys. Ancestor blocks whose dependency set is a strict superset of a leaf block are pruned (they'd produce wasteful OOB chunks targeting non-existent DOM ids).
+
+When static analysis misses a block (e.g. deferred values passed through macro arguments), set `defer_blocks` to list them explicitly:
+
+```python
+return Suspense("page.html",
+    defer_blocks=("hero_stats", "sidebar_stats"),
+    stats=load_stats(),
+)
+```
+
+Use `defer_map` to remap block names to different DOM ids for the OOB swap target:
+
+```python
+return Suspense("page.html",
+    defer_map={"stats": "stats-panel"},
+    stats=load_stats(),
+)
+```
+
+:::{/step}
 :::{step} Stream OOB swaps
 
 Each affected block is re-rendered with real data and sent as an out-of-band swap.

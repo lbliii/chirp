@@ -178,7 +178,12 @@ async def dashboard():
     )
 ```
 
-The template uses `{% if stats %}...{% else %}skeleton{% end %}` inside named blocks. Chirp renders the shell with `None` for awaitable keys (triggering the skeleton branch), resolves the awaitables concurrently, then streams each block's real content as an OOB swap.
+The template uses `{% if stats %}...{% else %}skeleton{% end %}` inside named blocks. Chirp renders the shell with `None` for awaitable keys (triggering the skeleton branch), resolves the awaitables concurrently, then streams each block's real content as an OOB swap. Blocks are discovered via static analysis (`block_metadata().depends_on`) with ancestor pruning.
+
+Optional parameters:
+
+- **`defer_blocks`** — explicit tuple of block names to re-render, bypassing static analysis. Use when deferred values are passed through macro arguments the analyzer can't trace.
+- **`defer_map`** — maps block names to different DOM ids for OOB swap targeting (`{"stats": "stats-panel"}`).
 
 See [[docs/streaming/html-streaming|Streaming HTML]] for the full story.
 

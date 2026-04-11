@@ -179,7 +179,7 @@ headers so the same handler works for normal and htmx navigation:
 | `Fragment(name, block, **ctx)` | Named block render |
 | `Page(name, block, **ctx)` | Auto-detect fragment vs full page |
 | `Stream(name, **ctx)` | Progressive streaming render |
-| `Suspense(name, **ctx)` | Shell-first render with deferred OOB swaps |
+| `Suspense(name, *, defer_map={}, defer_blocks=None, **ctx)` | Shell-first render with deferred OOB swaps |
 | `TemplateStream(...)` | Lower-level streaming template response |
 | `ValidationError(name, block, **ctx)` | 422 fragment response |
 | `OOB(main, *fragments)` | Out-of-band multi-fragment response |

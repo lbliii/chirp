@@ -15,6 +15,7 @@ return Page("page.html", "block", **ctx)  # Auto: fragment for htmx, full page f
 return OOB(main, *oob_fragments)          # Multi-target swap
 return EventStream(async_generator)       # SSE stream
 return Suspense("page.html", **ctx)       # Shell first, deferred blocks stream in
+return Suspense("page.html", defer_blocks=("stats", "feed"), **ctx)  # Explicit OOB targets
 return ValidationError("page.html", "form", errors=e)  # 422 + re-rendered form
 return FormAction(redirect, *fragments)   # Fragments for htmx, redirect for plain POST
 ```
@@ -83,6 +84,42 @@ def events():
             data = await wait_for_change()
             yield Fragment("page.html", "live_block", data=data)
     return EventStream(generate())
+```
+
+### Suspense (deferred blocks)
+```python
+return Suspense("page.html",
+    title="Dashboard",       # sync — in the shell
+    stats=load_stats(),      # awaitable — deferred
+    feed=load_feed(),        # awaitable — deferred
+)
+```
+
+Awaitable context values are deferred: the shell renders with those keys set to `None`
+(showing skeleton/fallback content), then each affected block is re-rendered and streamed
+as an OOB swap.
+
+Blocks to re-render are discovered automatically via `block_metadata().depends_on`.
+Ancestor blocks whose `depends_on` is a strict superset of leaf blocks are pruned
+(they would produce wasteful OOB chunks targeting non-existent DOM ids).
+
+When static analysis misses blocks (e.g. deferred values passed through macro args),
+use `defer_blocks` to bypass discovery:
+
+```python
+return Suspense("page.html",
+    defer_blocks=("hero_stats", "sidebar_stats"),
+    stats=load_stats(),
+)
+```
+
+`defer_map` remaps block names to DOM ids for the OOB swap target:
+
+```python
+return Suspense("page.html",
+    defer_map={"stats": "stats-panel"},
+    stats=load_stats(),
+)
 ```
 
 ### Validation pattern

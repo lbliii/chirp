@@ -559,3 +559,18 @@ class TestDeferBlocks:
         oob = "".join(chunks[1:])
         assert 'id="hero_stars"' in oob
         assert oob.count("11 stars") == 1
+
+    async def test_empty_defer_blocks_produces_no_oob(self):
+        """defer_blocks=() means no blocks are re-rendered — only the shell."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=(),
+            title="Repo",
+            stars=_delayed_value("77"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        assert len(chunks) == 1
+        assert "skeleton" in chunks[0]
+        assert "77 stars" not in chunks[0]

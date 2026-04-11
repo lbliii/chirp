@@ -23,7 +23,10 @@ Pipeline::
     2. Render shell with sync context + None for awaitable keys
     3. Yield shell as first chunk (instant first paint)
     4. Resolve awaitables concurrently (anyio task group)
-    5. For each resolved key, find affected blocks via block_metadata
+    5. Determine blocks to re-render:
+       a. If ``defer_blocks`` is set, use that list directly
+       b. Otherwise, discover via ``block_metadata().depends_on``
+          and prune ancestor blocks (strict ``depends_on`` superset)
     6. Render each block with full context
     7. Yield OOB swap chunks (htmx or <template>+<script>)
 """
@@ -192,6 +195,13 @@ async def render_suspense(
            optionally wrapped in the layout chain
         2. One OOB swap chunk per deferred block as its data resolves
 
+    Blocks to re-render are determined by:
+
+    - ``suspense.defer_blocks`` — when set, renders exactly those blocks
+      (bypasses static analysis entirely).
+    - Otherwise, ``block_metadata().depends_on`` discovers blocks that
+      reference deferred context keys, and ancestor blocks are pruned.
+
     Args:
         env: Kida template environment.
         suspense: The ``Suspense`` return value from a route handler.
@@ -200,6 +210,7 @@ async def render_suspense(
         layout_chain: Optional layout chain to wrap the shell in.
         layout_context: Context for layout templates (when layout_chain used).
         request: Request for fragment detection (when layout_chain used).
+        oob_registry: Optional OOB registry for swap/wrap resolution.
     """
     context = suspense.context
     template_name = suspense.template_name
