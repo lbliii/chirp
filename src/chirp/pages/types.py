@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 type RouteKind = Literal["page", "detail", "action", "redirect", "composition"]
 
+type OutletSwapMode = Literal["compose", "replace"]
+
 
 @dataclass(frozen=True, slots=True)
 class RouteMeta:
@@ -96,6 +98,8 @@ class LayoutInfo:
     - ``{# swap_scope: name #}`` — symbolic scope (e.g. ``shell``, ``page``).
     - ``{# outlet: element_id #}`` — primary navigation outlet for this level
       (defaults to *target* when omitted).
+    - ``{# outlet_mode: compose | replace #}`` — how boosted swaps targeting
+      ``{# outlet: #}`` relate to layout composition (default ``compose``).
     - ``{# frames: id1, id2 #}`` — optional frame ids (immutable chrome).
 
     Attributes:
@@ -106,6 +110,9 @@ class LayoutInfo:
         swap_scope_name: Optional symbolic scope for ``resolve_navigation_swap``.
         outlet_target_id: Optional primary outlet id for this layout level.
         frame_targets: Optional ids treated as non-swapped frame for validation.
+        outlet_mode: ``compose`` (re-run layout shell for the fragment response) vs
+            ``replace`` (page HTML only; use for scroll/marketing shells where the
+            outlet wraps the primary ``{% block content %}`` region).
     """
 
     template_name: str
@@ -114,6 +121,7 @@ class LayoutInfo:
     swap_scope_name: str | None = None
     outlet_target_id: str | None = None
     frame_targets: frozenset[str] | None = None
+    outlet_mode: OutletSwapMode = "compose"
 
 
 @dataclass(frozen=True, slots=True)

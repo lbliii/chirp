@@ -26,6 +26,7 @@ from chirp.pages.types import (
     ContextProvider,
     LayoutChain,
     LayoutInfo,
+    OutletSwapMode,
     PageRoute,
     RouteKind,
     RouteMeta,
@@ -38,6 +39,7 @@ _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "opt
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
 _SWAP_SCOPE_RE = re.compile(r"\{#\s*swap_scope:\s*(\S+)\s*#\}")
 _OUTLET_RE = re.compile(r"\{#\s*outlet:\s*(\S+)\s*#\}")
+_OUTLET_MODE_RE = re.compile(r"\{#\s*outlet_mode:\s*(\S+)\s*#\}")
 _FRAMES_RE = re.compile(r"\{#\s*frames:\s*([^#]+?)\s*#\}")
 
 # Regex matching {param} directory names
@@ -105,6 +107,7 @@ def _walk_directory(
             swap_scope_name=meta["swap_scope_name"],
             outlet_target_id=meta["outlet_target_id"],
             frame_targets=meta["frame_targets"],
+            outlet_mode=meta["outlet_mode"],
         )
         current_layouts.append(layout)
 
@@ -205,6 +208,7 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
         {# target: element_id #}
         {# swap_scope: symbolic_name #}
         {# outlet: element_id #}
+        {# outlet_mode: compose | replace #}
         {# frames: id1, id2 #}
     """
     content = layout_file.read_text(encoding="utf-8")
@@ -216,6 +220,9 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
 
     outlet_m = _OUTLET_RE.search(content)
     outlet_target_id = outlet_m.group(1) if outlet_m else None
+
+    outlet_mode_m = _OUTLET_MODE_RE.search(content)
+    outlet_mode = _normalize_outlet_mode(outlet_mode_m.group(1) if outlet_mode_m else None)
 
     frames_m = _FRAMES_RE.search(content)
     frame_targets: frozenset[str] | None = None
@@ -229,7 +236,18 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
         "swap_scope_name": swap_scope_name,
         "outlet_target_id": outlet_target_id,
         "frame_targets": frame_targets,
+        "outlet_mode": outlet_mode,
     }
+
+
+def _normalize_outlet_mode(raw: str | None) -> OutletSwapMode:
+    """Normalize ``{# outlet_mode: #}`` token to a known mode."""
+    if not raw:
+        return "compose"
+    mode = raw.strip().lower()
+    if mode == "replace":
+        return "replace"
+    return "compose"
 
 
 def _load_viewmodel(viewmodel_file: Path, root: Path) -> Any:
