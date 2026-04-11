@@ -90,16 +90,30 @@ class LayoutInfo:
     slot and a ``{# target: element_id #}`` comment declaring which DOM
     element it owns.
 
+    Optional comments (see filesystem routing docs) declare hierarchical
+    swap scope metadata for boosted navigation helpers:
+
+    - ``{# swap_scope: name #}`` — symbolic scope (e.g. ``shell``, ``page``).
+    - ``{# outlet: element_id #}`` — primary navigation outlet for this level
+      (defaults to *target* when omitted).
+    - ``{# frames: id1, id2 #}`` — optional frame ids (immutable chrome).
+
     Attributes:
         template_name: Template name for kida (relative to pages root).
         target: DOM element ID this layout renders into.
             ``"body"`` for the root layout, ``"app-content"`` for nested.
         depth: Nesting depth (0 = root).
+        swap_scope_name: Optional symbolic scope for ``resolve_navigation_swap``.
+        outlet_target_id: Optional primary outlet id for this layout level.
+        frame_targets: Optional ids treated as non-swapped frame for validation.
     """
 
     template_name: str
     target: str
     depth: int
+    swap_scope_name: str | None = None
+    outlet_target_id: str | None = None
+    frame_targets: frozenset[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +140,11 @@ class LayoutChain:
 
         Returns the index of the matched layout, or ``None`` if the
         target doesn't match any layout (treat as fragment).
+
+        Matches ``{# target: element_id #}`` — the DOM node the layout
+        renders into — and ``{# outlet: element_id #}`` — the primary
+        boosted-navigation outlet (e.g. ``main`` for app shells with
+        ``hx-select="#page-content"``).
         """
         if htmx_target is None:
             return None
@@ -133,6 +152,8 @@ class LayoutChain:
         target_id = htmx_target.lstrip("#")
         for i, layout in enumerate(self.layouts):
             if layout.target == target_id:
+                return i
+            if layout.outlet_target_id is not None and layout.outlet_target_id == target_id:
                 return i
         return None
 

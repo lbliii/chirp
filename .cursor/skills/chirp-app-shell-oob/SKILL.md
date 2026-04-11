@@ -79,6 +79,10 @@ Kida's `{% region %}` construct compiles to BOTH a block (for `render_block`) AN
 
 The `target` annotation tells Chirp where HTMX should swap content. With `body`, the entire `<body>` is the swap target for full page loads, and the OOB regions update specific DOM areas during fragment navigation. Using `main` would skip OOB region rendering entirely.
 
+### `{# outlet: main #}` with `app_shell_layout`
+
+If the root layout **`{% extends "chirpui/app_shell_layout.html" %}`** (filesystem `mount_pages`), add **`{# outlet: main #}`** below `{# target: body #}`. Chirp’s `LayoutChain` matches `outlet` so `HX-Target: #main` resolves to this layout and `render_with_layouts` returns full shell HTML including **`#page-content`** (required for `hx-select` on boosted nav). Without `outlet`, boosted responses can be bare page HTML and shell swaps break silently.
+
 ## Page Handler Pattern
 
 Every handler must provide three context keys for OOB updates to work:
@@ -131,7 +135,7 @@ def get(request: Request, skill: Skill) -> PageComposition:
 
 ## Page Template Pattern
 
-Page templates define two nested blocks **and** must render **`id="page-root"`** on a wrapper element. `app_shell_layout` / `app_shell` set `hx-select="#page-root"` on `#main`; a block named `page_root` does **not** create that id — HTMX would match nothing and clear the main area.
+Page templates define two nested blocks **and** must render **`id="page-root"`** on a wrapper element. `app_shell_layout` sets `hx-select="#page-content"` on `#main`, and custom `app_shell` layouts should wrap routed content with `shell_outlet()` to create the same `#page-content` boundary. `page_root` remains the broader page-level fragment target inside that shell outlet. A block named `page_root` does **not** create the id by itself — HTMX `#page-root` swaps would match nothing.
 
 ```html
 {% block page_root %}
@@ -188,6 +192,7 @@ This means adding new OOB regions requires only:
 ## Checklist
 
 - [ ] Root layout uses `{# target: body #}` (not `main`)
+- [ ] Extends `app_shell_layout` via `mount_pages`: also `{# outlet: main #}` for boosted `#main` / `#page-content`
 - [ ] Use `{% region name_oob(params) %}...{% end %}` for OOB regions (zero duplication)
 - [ ] Call regions in app shell slots: `{{ name_oob(param=value | default(...)) }}`
 - [ ] `{% from %}` imports are at template top level (compile-time, works everywhere)

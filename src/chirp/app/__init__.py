@@ -10,7 +10,7 @@ from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.contracts.types import Severity
 from chirp.errors import ConfigurationError
-from chirp.pages.types import Section
+from chirp.pages.types import LayoutChain, Section
 from chirp.templating.fragment_target_registry import PageShellContract
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import Fragment, InlineTemplate, Template
@@ -308,6 +308,7 @@ class App:
         *,
         fragment_block: str,
         triggers_shell_update: bool = True,
+        scope_name: str | None = None,
     ) -> None:
         """Register a fragment target for HTMX content-region block selection.
 
@@ -317,12 +318,16 @@ class App:
         triggers_shell_update: When True (default), swapping this target triggers
             shell_actions OOB (topbar, breadcrumbs, sidebar). Use False for narrow
             content swaps (e.g. page-content-inner) that should not update the shell.
+
+        scope_name: Optional symbolic scope (e.g. ``"site"``) for hierarchical OOB
+            propagation. When set, OOB updates are scoped to this level and above.
         """
         self._check_not_frozen()
         self._mutable_state.fragment_target_registry.register(
             target_id,
             fragment_block=fragment_block,
             triggers_shell_update=triggers_shell_update,
+            scope_name=scope_name,
         )
 
     def register_page_shell_contract(self, contract: PageShellContract) -> None:
@@ -333,6 +338,37 @@ class App:
         """
         self._check_not_frozen()
         self._mutable_state.fragment_target_registry.register_contract(contract)
+
+    def register_swap_scope(self, scope: str, target_id: str) -> None:
+        """Map a symbolic swap scope to a concrete fragment target id (no ``#``).
+
+        Used by :func:`resolve_navigation_swap` and the ``swap_attrs`` template
+        global so layouts can declare ``{# swap_scope: name #}`` and links can
+        resolve ``hx-target`` from route geometry.
+        """
+        self._check_not_frozen()
+        self._mutable_state.swap_scope_map[scope] = target_id.lstrip("#")
+
+    def get_layout_chain_for_path(self, path: str) -> LayoutChain | None:
+        """Return the filesystem :class:`LayoutChain` for a GET route path, if any.
+
+        Uses the compiled router and route table built at freeze time. Unknown
+        paths or non-filesystem routes return ``None``.
+        """
+        from chirp.errors import MethodNotAllowed, NotFound
+        from chirp.templating.navigation_swap import normalize_route_path
+
+        self._ensure_frozen()
+        router = self._router
+        if router is None:
+            return None
+        normalized = normalize_route_path(path)
+        try:
+            match = router.match("GET", normalized)
+        except NotFound, MethodNotAllowed:
+            return None
+        chain = self._runtime_state.route_layout_chains.get(match.route.path)
+        return chain if isinstance(chain, LayoutChain) else None
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

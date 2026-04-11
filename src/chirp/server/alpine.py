@@ -16,6 +16,11 @@ Uses ``defer`` so Alpine runs after DOM parsing; Alpine 3 auto-discovers
 elements including those swapped by htmx.
 """
 
+import json
+from typing import Any
+
+from kida.template import Markup
+
 _CDN = "https://cdn.jsdelivr.net/npm"
 
 PLUGINS = (
@@ -42,6 +47,34 @@ SAFE_DATA_HELPER = """<script>
 })();
 </script>
 """
+
+
+def _html_escape_attr(value: str) -> str:
+    return (
+        value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+
+
+def alpine_json_config(dom_id: str, data: Any) -> Markup:
+    """Emit a ``<script type="application/json">`` tag for Alpine component config.
+
+    Provides a safe bridge for passing server-side data to client-side Alpine
+    components without HTML attribute quoting issues. Registered as a template
+    global when ``AppConfig(alpine=True)``.
+
+    Args:
+        dom_id: ``id`` attribute for the script tag. Used to locate and parse the
+            config via ``document.getElementById(...).textContent``.
+        data: Python value to serialize as JSON. Uses :func:`json.dumps` with
+            ``default=str`` for non-JSON-serializable types.
+
+    Returns:
+        Markup safe for embedding; not double-escaped by the autoescaper.
+    """
+    json_str = json.dumps(data, default=str)
+    json_str = json_str.replace("</", "<\\/")
+    escaped_id = _html_escape_attr(dom_id)
+    return Markup(f'<script id="{escaped_id}" type="application/json">{json_str}</script>')
 
 
 def alpine_snippet(version: str, csp: bool = False) -> str:

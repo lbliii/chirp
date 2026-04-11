@@ -23,6 +23,7 @@
 {% from "chirpui/app_shell.html" import app_shell %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_section, sidebar_link %}
 {% from "chirpui/breadcrumbs.html" import breadcrumbs %}
+{% from "chirpui/shell_frame.html" import shell_outlet %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 
 {% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
@@ -45,7 +46,7 @@
 {% end %}
 {% end %}
 
-{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true) %}
+{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true, brand_boost=true) %}
   {% slot topbar %}
   {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
   {% end %}
@@ -58,7 +59,9 @@
   {{ sidebar_oob(current_path=current_path ?? "/") }}
   {% end %}
 
+  {% call shell_outlet() %}
   {% block content %}{% end %}
+  {% end %}
 {% end %}
 </body>
 </html>

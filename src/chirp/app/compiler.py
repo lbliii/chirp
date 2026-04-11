@@ -264,6 +264,11 @@ class AppCompiler:
             init_catalog(str(self._config.i18n_directory))
             self._mutable.template_globals.setdefault("t", t)
 
+        if self._config.alpine:
+            from chirp.server.alpine import alpine_json_config
+
+            self._mutable.template_globals.setdefault("alpine_json_config", alpine_json_config)
+
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env
             if self._mutable.template_filters:
@@ -276,6 +281,24 @@ class AppCompiler:
                 self._mutable.template_filters,
                 self._mutable.template_globals,
                 plugin_loaders=self._mutable.plugin_loaders,
+            )
+
+        self._runtime.route_layout_chains = dict(self._mutable.route_layout_chains)
+        self._runtime.swap_scope_map = dict(self._mutable.swap_scope_map)
+        if (
+            "swap_attrs" not in self._mutable.template_globals
+            and self._runtime.kida_env is not None
+        ):
+            from chirp.templating.navigation_swap import make_swap_attrs
+
+            self._runtime.kida_env.add_global(
+                "swap_attrs",
+                make_swap_attrs(
+                    route_layout_chains=self._runtime.route_layout_chains,
+                    router=self._runtime.router,
+                    fragment_target_registry=self._mutable.fragment_target_registry,
+                    swap_scope_map=self._runtime.swap_scope_map,
+                ),
             )
 
         # Wire kida's {% trans %} blocks to chirp's i18n catalog

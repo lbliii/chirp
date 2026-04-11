@@ -46,17 +46,20 @@ CHIRPUI_PAGE_SHELL_CONTRACT = PageShellContract(
             target_id="main",
             fragment_block="page_root",
             description="Sidebar and boosted page navigation target.",
+            scope_name="shell",
         ),
         PageShellTarget(
             target_id="page-root",
             fragment_block="page_root_inner",
             description="Tabbed page shell target that keeps page-root wrappers.",
+            scope_name="page",
         ),
         PageShellTarget(
             target_id="page-content-inner",
             fragment_block="page_content",
             triggers_shell_update=False,
             description="Narrow content swap target that skips shell updates.",
+            scope_name="content",
         ),
     ),
 )
@@ -132,6 +135,9 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     )
 
     app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)
+    app.register_swap_scope("shell", "main")
+    app.register_swap_scope("page", "page-root")
+    app.register_swap_scope("content", "page-content-inner")
 
     # Register chirp-ui contract check so app.check() validates component imports.
     _available = _discover_chirpui_components()

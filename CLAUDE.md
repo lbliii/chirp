@@ -59,6 +59,8 @@ pages/
       page.html
 ```
 
+**Composition model:** Layouts and page templates use **composition**, not inheritance. Chirp injects page HTML into the layout's `{% block content %}` via `render_with_blocks`. Page templates **cannot** override sibling layout blocks like `page_scripts` or `head_extra` — those are only available to templates that `{% extends %}` the layout directly. If a page needs an inline `<script>`, put it inside the content region (inside `page_root` or `page_content`).
+
 ## Key Patterns
 
 ### Fragment + OOB for mutations
@@ -166,9 +168,10 @@ uv run ruff format . --check # Format check
 ## Alpine.js Injection
 
 Chirp is the **single authority** for Alpine.js. When `AppConfig(alpine=True)`,
-`AlpineInject` middleware appends the Alpine script before `</body>` on full-page
-HTML responses. Dedup: if `data-chirp="alpine"` already exists in the body, injection
-is skipped.
+`AlpineInject` middleware appends the Alpine script before `</body>` on buffered
+full-page HTML and rewrites **`StreamingResponse`** chunk streams the same way (e.g.
+`Suspense` shells). Dedup: if `data-chirp="alpine"` already exists before `</body>`,
+injection is skipped.
 
 ### CDN URL footgun
 
@@ -197,6 +200,14 @@ inspector. If it ends with `@3.x.x` without `/dist/cdn.min.js`, that's the bug.
 
 Tests in `tests/test_alpine.py` enforce this — `test_no_bare_package_urls` will
 catch any regression.
+
+### `alpine_json_config` (template global)
+
+When `alpine=True`, Kida templates can emit a JSON config bridge with
+`{{ alpine_json_config("my-id", data) }}` — a `<script id="my-id" type="application/json">`
+tag with HTML-escaped ids and `json.dumps(..., default=str)` for the payload
+(see `site/content/docs/guides/alpine.md`.)
+The global is not registered when `alpine=False`.
 
 ## Dependencies
 

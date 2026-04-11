@@ -45,7 +45,12 @@ config = AppConfig(alpine=True)
 app = App(config=config)
 ```
 
-Chirp is the **single authority** for Alpine.js injection. The script is injected into full-page HTML responses only. Fragment responses (htmx partials) are unchanged. If Alpine is already present in the response (e.g. from a third-party layout), Chirp's `AlpineInject` middleware skips injection to prevent double-loading.
+Chirp is the **single authority** for Alpine.js injection. `AlpineInject` appends the script **before the first `</body>`** on:
+
+- **Buffered HTML responses** — full pages and eligible buffered bodies (see middleware: fragment gating below).
+- **Streaming HTML** — `StreamingResponse` bodies (for example `Suspense`, `Stream`, `TemplateStream`) are rewritten chunk-by-chunk so Alpine appears in the final document without buffering the entire stream in memory.
+
+Fragment responses (htmx partials) and other non-HTML responses are unchanged. If Alpine is already present before `</body>` (detected via `data-chirp="alpine"`), injection is skipped to prevent double-loading.
 
 The injection block includes:
 
@@ -53,6 +58,34 @@ The injection block includes:
 - **Plugins**: Mask, Intersect, Focus
 - **Store init**: `modals` and `trays` stores for chirp-ui components
 - **`Alpine.safeData()` helper** for htmx-safe component registration
+
+## Passing server data (`alpine_json_config`)
+
+When Alpine components need structured data from the server, put JSON in a
+`<script type="application/json">` tag and read it from JavaScript (see Kida’s
+escaping docs for why raw `| tojson` inside double-quoted attributes is unsafe).
+Chirp registers a template global **`alpine_json_config`** when `alpine=True`
+so you do not have to hand-write the script tag. The first argument is the
+`id` attribute (a string); the second is any JSON-serializable value (use
+`None` for JSON `null`). Non-JSON-serializable objects use `default=str`, same
+as Kida’s `| tojson` filter.
+
+```kida
+{{ alpine_json_config("game-config", game_config) }}
+<div x-data="matchGame()">...</div>
+<script>
+document.addEventListener("alpine:init", function() {
+  var cfg = JSON.parse(document.getElementById("game-config").textContent);
+  Alpine.data("matchGame", function() {
+    return { rows: cfg.rows, cols: cfg.cols };
+  });
+});
+</script>
+```
+
+For small configs you can instead use `{{ config | tojson(attr=true) }}` inside a
+double-quoted attribute (see Kida filter reference). The script-tag pattern scales
+better for large payloads and matches Django’s `json_script` style.
 
 ## Configuration Options
 

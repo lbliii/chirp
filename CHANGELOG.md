@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`alpine_json_config` template global** — when `alpine=True`, templates can emit `<script type="application/json">` tags with safely escaped ids and JSON for Alpine components (`alpine_json_config("my-id", data)`).
+- **Layout `HX-Target` + outlet** — `LayoutChain.find_start_index_for_target` matches `{# outlet: element_id #}` as well as `{# target: #}`, so boosted `HX-Target: #main` resolves for chirp-ui app shells (`{# target: body #}` + `{# outlet: main #}`).
+- **Alpine on streaming HTML** — `AlpineInject` rewrites `StreamingResponse` bodies (e.g. `Suspense`) to insert the Alpine bundle before `</body>`, with the same deduplication as buffered pages.
 - **ReactiveBus observability** — `emitted_count`, `dropped_count`, and `subscriber_count` properties for monitoring event throughput and back-pressure.
 - **Configurable queue depth** — `ReactiveBus(maxsize=N)` controls per-subscriber queue size (default 256, unchanged).
 - **Reactive contract rules** — `chirp check` validates that `DependencyIndex` block references point to real template blocks and that derivation graphs are acyclic.
@@ -18,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`alpine_json_config`** — Chirp `CLAUDE.md`, Alpine guide, and built-in middleware reference document the template global and its relationship to `AlpineInject`.
+- **Layouts & Alpine** — Filesystem routing (outlet + `main`), route contract reference, streaming HTML + Suspense + Alpine, built-in middleware (`AlpineInject` vs `HTMLInject`).
 - **Reactive system** — New dedicated guide covering ReactiveBus API, DependencyIndex, derived paths, observability counters, and contract validation.
 - **Thread safety** — Added stress test coverage table, ReactiveBus as real-world Lock example, and code references for the concurrency test suite.
 - **Contract reference** — Documented the 4 new contract checks (reactive_block, reactive_cycle, oob_target, form_action) in the route contract guide.

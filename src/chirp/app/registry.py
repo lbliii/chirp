@@ -150,6 +150,7 @@ class AppRegistry:
             if page_route.template_name:
                 self._state.route_templates[page_route.url_path] = page_route.template_name
             self._state.discovered_layout_chains.append(page_route.layout_chain)
+            self._state.route_layout_chains[page_route.url_path] = page_route.layout_chain
             if page_route.template_name:
                 self._state.page_leaf_templates.add(page_route.template_name)
                 self._state.page_templates.add(page_route.template_name)

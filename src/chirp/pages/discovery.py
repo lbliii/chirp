@@ -34,8 +34,11 @@ from chirp.pages.types import (
 # HTTP method names recognised as handler functions
 _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
 
-# Regex to extract {# target: element_id #} from layout templates
+# Regex to extract layout shell comments from _layout.html
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
+_SWAP_SCOPE_RE = re.compile(r"\{#\s*swap_scope:\s*(\S+)\s*#\}")
+_OUTLET_RE = re.compile(r"\{#\s*outlet:\s*(\S+)\s*#\}")
+_FRAMES_RE = re.compile(r"\{#\s*frames:\s*([^#]+?)\s*#\}")
 
 # Regex matching {param} directory names
 _PARAM_DIR_RE = re.compile(r"^\{(\w+)\}$")
@@ -93,12 +96,15 @@ def _walk_directory(
     layout_file = directory / "_layout.html"
     current_layouts = list(layouts)
     if layout_file.is_file():
-        target = _parse_layout_target(layout_file)
+        meta = _parse_layout_metadata(layout_file)
         template_name = str(layout_file.relative_to(root))
         layout = LayoutInfo(
             template_name=template_name,
-            target=target,
+            target=meta["target"],
             depth=depth,
+            swap_scope_name=meta["swap_scope_name"],
+            outlet_target_id=meta["outlet_target_id"],
+            frame_targets=meta["frame_targets"],
         )
         current_layouts.append(layout)
 
@@ -191,17 +197,39 @@ def _infer_route_kind(*, has_template: bool, is_param_dir: bool) -> RouteKind:
     return "page"
 
 
-def _parse_layout_target(layout_file: Path) -> str:
-    """Extract the target element ID from a layout template.
+def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
+    """Read ``{# target #}`` and optional shell scope comments from a layout.
 
-    Looks for ``{# target: element_id #}`` in the template.
-    Defaults to ``"body"`` if not found.
+    Supported annotations::
+
+        {# target: element_id #}
+        {# swap_scope: symbolic_name #}
+        {# outlet: element_id #}
+        {# frames: id1, id2 #}
     """
     content = layout_file.read_text(encoding="utf-8")
-    match = _TARGET_RE.search(content)
-    if match:
-        return match.group(1)
-    return "body"
+    target_m = _TARGET_RE.search(content)
+    target = target_m.group(1) if target_m else "body"
+
+    scope_m = _SWAP_SCOPE_RE.search(content)
+    swap_scope_name = scope_m.group(1) if scope_m else None
+
+    outlet_m = _OUTLET_RE.search(content)
+    outlet_target_id = outlet_m.group(1) if outlet_m else None
+
+    frames_m = _FRAMES_RE.search(content)
+    frame_targets: frozenset[str] | None = None
+    if frames_m:
+        raw = frames_m.group(1)
+        parts = [p.strip().lstrip("#") for p in raw.replace(",", " ").split() if p.strip()]
+        frame_targets = frozenset(parts) if parts else None
+
+    return {
+        "target": target,
+        "swap_scope_name": swap_scope_name,
+        "outlet_target_id": outlet_target_id,
+        "frame_targets": frame_targets,
+    }
 
 
 def _load_viewmodel(viewmodel_file: Path, root: Path) -> Any:

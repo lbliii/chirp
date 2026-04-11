@@ -21,6 +21,7 @@ class PageShellTarget:
     triggers_shell_update: bool = True
     required: bool = True
     description: str = ""
+    scope_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,7 @@ class FragmentTargetConfig:
     contract_name: str | None = None
     required: bool = False
     description: str = ""
+    scope_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -77,6 +79,7 @@ class FragmentTargetRegistry:
         contract_name: str | None = None,
         required: bool = False,
         description: str = "",
+        scope_name: str | None = None,
     ) -> None:
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
@@ -88,19 +91,19 @@ class FragmentTargetRegistry:
             contract_name=contract_name,
             required=required,
             description=description,
+            scope_name=scope_name,
         )
 
     def register_contract(self, contract: PageShellContract) -> None:
-        """Register a named page shell contract and all of its targets."""
+        """Register a named page shell contract and all of its targets.
+
+        Multiple contracts are allowed (e.g. primary app shell plus a section
+        shell). Target ids must be unique across the registry; later
+        registrations override earlier ones for the same target id.
+        """
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
             raise RuntimeError(msg)
-        if self._contracts and contract.name not in self._contracts:
-            msg = (
-                "Only one page shell contract can be registered per app today. "
-                "Register fragment targets directly for secondary shells."
-            )
-            raise ValueError(msg)
         self._contracts[contract.name] = contract
         for target in contract.targets:
             self.register(
@@ -110,6 +113,7 @@ class FragmentTargetRegistry:
                 contract_name=contract.name,
                 required=target.required,
                 description=target.description,
+                scope_name=target.scope_name,
             )
 
     def freeze(self) -> None:

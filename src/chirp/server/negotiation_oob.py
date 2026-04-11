@@ -35,6 +35,29 @@ def _triggers_shell_update(
     return config is not None and config.triggers_shell_update
 
 
+def resolve_oob_scope(
+    request: Request | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> str | None:
+    """Return the scope name for the current swap target, or None.
+
+    Boosted requests default to the broadest scope (``None`` means "all
+    scopes").  Non-boosted fragment requests return the registered
+    ``scope_name`` so layout OOB blocks can be filtered to the matched
+    scope and its ancestors.
+    """
+    if not request or not request.is_fragment or request.is_history_restore:
+        return None
+    if request.is_boosted:
+        return None
+    if not request.htmx_target or not fragment_target_registry:
+        return None
+    config = fragment_target_registry.get(request.htmx_target)
+    if config is None:
+        return None
+    return config.scope_name
+
+
 def compute_shell_region_updates(
     composition: PageComposition,
     request: Request | None,

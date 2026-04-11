@@ -11,8 +11,9 @@ import logging
 from dataclasses import replace
 
 from chirp.http.request import Request
-from chirp.http.response import Response
+from chirp.http.response import Response, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.middleware.streaming_html import async_stream_inject_before_body
 
 _LOG = logging.getLogger("chirp.middleware.inject")
 
@@ -22,7 +23,7 @@ class HTMLInject:
 
     Only affects ``Response`` objects whose ``content_type`` contains
     ``text/html``.  ``StreamingResponse`` and ``SSEResponse`` are
-    passed through unchanged.
+    passed through unchanged (see :class:`AlpineInject` for streaming HTML).
 
     When *full_page_only* is ``True``, the snippet is injected **only**
     when the *before* target string is found in the response body.
@@ -86,15 +87,25 @@ class AlpineInject(HTMLInject):
     Checks for ``data-chirp="alpine"`` in the response body before injecting.
     This prevents double-loading when chirp-ui's ``app_shell_layout.html``
     (or any other source) has already included Alpine.
+
+    For :class:`~chirp.http.response.StreamingResponse` (e.g. ``Suspense``),
+    the same snippet is inserted before the first ``</body>`` using a bounded
+    buffer so ``</body>`` may be split across chunks.
     """
 
     __slots__ = ()
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         response = await next(request)
+        if isinstance(response, StreamingResponse):
+            return self._alpine_streaming(response, request)
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_fragment:
             return response
         body = response.body
         if isinstance(body, bytes):
@@ -111,6 +122,22 @@ class AlpineInject(HTMLInject):
         else:
             body = body + snippet
         return replace(response, body=body)
+
+    def _alpine_streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_fragment:
+            return response
+        new_chunks = async_stream_inject_before_body(
+            response.chunks,
+            snippet=self._snippet,
+            before=self._target,
+            dedup_marker='data-chirp="alpine"',
+            full_page_only=self._full_page_only,
+        )
+        return replace(response, chunks=new_chunks)
 
 
 class ViewTransitionCssDebugWarning:
