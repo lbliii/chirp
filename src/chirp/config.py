@@ -64,7 +64,8 @@ class AppConfig:
     reload_dirs: tuple[str, ...] = ()  # Extra directories to watch alongside cwd
 
     # Browser refresh (debug): SSE endpoint + injected script; polls mtimes for reload_include
-    dev_browser_reload: bool = False
+    # None = auto (follows debug); True/False = explicit override
+    dev_browser_reload: bool | None = None
 
     # Security
     secret_key: str = ""
@@ -206,6 +207,10 @@ class AppConfig:
     lazy_pages: bool = False
 
     def __post_init__(self) -> None:
+        # Resolve dev_browser_reload sentinel: None → follow debug flag.
+        if self.dev_browser_reload is None:
+            object.__setattr__(self, "dev_browser_reload", self.debug)
+
         # Freeze mutable static_context dict → MappingProxyType so the
         # "frozen dataclass" guarantee extends to nested containers.
         sc = self.static_context
