@@ -132,8 +132,8 @@ __all__ = [
     "login_required",
     "logout",
     "reactive_stream",
-    "resolve_navigation_swap",
     "requires",
+    "resolve_navigation_swap",
     "use_chirp_ui",
 ]
 

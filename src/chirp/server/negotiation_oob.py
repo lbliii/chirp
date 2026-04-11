@@ -17,6 +17,7 @@ from chirp.pages.shell_actions import (
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment
+from chirp.templating.kida_adapter import KidaAdapter
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Fragment
 
@@ -175,9 +176,7 @@ def render_layout_oob_blocks(
                 _KidaBlockAdapter(kida_env), layout_info.template_name
             )
         else:
-            contract = build_layout_contract(
-                _KidaBlockAdapter(kida_env), layout_info.template_name
-            )
+            contract = build_layout_contract(_KidaBlockAdapter(kida_env), layout_info.template_name)
 
         for oob in contract.oob_blocks:
             if oob.cache_scope == "site":
@@ -207,17 +206,12 @@ def render_layout_oob_blocks(
     return "\n".join(parts)
 
 
-class _KidaBlockAdapter:
-    """Minimal adapter that satisfies ``build_layout_contract``'s interface."""
+class _KidaBlockAdapter(KidaAdapter):
+    """KidaAdapter with broad error handling for layout contract discovery."""
 
-    __slots__ = ("_env",)
-
-    def __init__(self, env: Environment) -> None:
-        self._env = env
-
-    def template_metadata(self, template_name: str) -> Any:
+    def template_metadata(self, template: str) -> object | None:
         try:
-            return self._env.get_template(template_name).template_metadata()
+            return self._env.get_template(template).template_metadata()
         except Exception:
             return None
 

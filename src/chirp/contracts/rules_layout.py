@@ -25,7 +25,7 @@ def check_layout_chains(
 ) -> list[ContractIssue]:
     """Validate layout chains: targets, scopes, outlets, frames, extends conflict."""
     issues: list[ContractIssue] = []
-    seen_chains: set[tuple[tuple[str, str, int], ...]] = set()
+    seen_chains: set[tuple[tuple[str, str, int, str | None], ...]] = set()
     dom_ids: frozenset[str] | None = None
 
     for chain in layout_chains:

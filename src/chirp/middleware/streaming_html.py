@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncIterator, Iterator
+from typing import cast
 
 # If no </body> after this many bytes, stop buffering and pass through (full_page_only).
 _MAX_BUFFER_NO_BODY = 2 * 1024 * 1024
@@ -23,7 +24,7 @@ async def _chunks_to_async(
             yield c
         return
     if isinstance(chunks, AsyncIterator):
-        async for c in chunks:
+        async for c in cast(AsyncIterator[str], chunks):
             yield c
         return
     for c in chunks:
