@@ -369,6 +369,16 @@ class Suspense:
     set to ``None`` (showing skeleton/fallback content), then each block
     is re-rendered with real data and streamed as an OOB swap chunk.
 
+    The shell also sets ``__chirp_defer_pending__`` (see
+    ``CHIRP_DEFER_PENDING_KEY`` in ``chirp.templating.suspense``) to a
+    ``frozenset`` of deferred context key names; deferred block re-renders
+    use an empty frozenset.  Do not use that name for your own context keys.
+
+    **Templates:** Prefer ``{% if stats is not none %}`` (or
+    ``{% if "stats" in __chirp_defer_pending__ %}``) for loading vs loaded.
+    Bare ``{% if stats %}`` stays on the skeleton when the resolved value is
+    an empty ``tuple``/``list``, ``0``, or ``""`` — those are falsy.
+
     For htmx navigations, blocks arrive as ``hx-swap-oob`` elements.
     For initial page loads, ``<template>`` + inline ``<script>`` pairs
     handle the swap without any framework.
@@ -381,10 +391,10 @@ class Suspense:
             feed=load_feed(),              # awaitable — deferred
         )
 
-    Template (uses normal conditional rendering for skeletons)::
+    Template (skeleton vs loaded — not ``{% if stats %}`` alone)::
 
         {% block stats %}
-          {% if stats %}
+          {% if stats is not none %}
             {% for s in stats %}...{% end %}
           {% else %}
             <div class="skeleton">Loading stats...</div>

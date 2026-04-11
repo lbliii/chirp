@@ -56,6 +56,9 @@ from chirp import (
     g,
     get_request,
 
+    # Suspense (template context key string)
+    CHIRP_DEFER_PENDING_KEY,
+
     # Auth
     get_user,
     login,
@@ -199,6 +202,12 @@ headers so the same handler works for normal and htmx navigation:
 |--------|-------------|
 | `g` | Request-scoped mutable namespace (ContextVar-backed) |
 | `get_request()` | Get the current request from ContextVar |
+
+## Constants
+
+| Export | Description |
+|--------|-------------|
+| `CHIRP_DEFER_PENDING_KEY` | String ``__chirp_defer_pending__`` — Suspense injects this key into template context (see [[docs/streaming/html-streaming|Streaming HTML]]) |
 
 ## Auth
 

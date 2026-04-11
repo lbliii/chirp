@@ -96,8 +96,12 @@ return Suspense("page.html",
 ```
 
 Awaitable context values are deferred: the shell renders with those keys set to `None`
-(showing skeleton/fallback content), then each affected block is re-rendered and streamed
-as an OOB swap.
+(showing skeleton/fallback content). The shell also sets `__chirp_defer_pending__` to a
+`frozenset` of deferred key names (`CHIRP_DEFER_PENDING_KEY`); deferred block re-renders
+use an empty frozenset. In templates use **`{% if key is not none %}`** (or
+`"key" in __chirp_defer_pending__`) for loading vs loaded — not bare **`{% if key %}`**,
+which is falsy for empty `tuple`/`list`/`""`/`0` after resolution. Then each affected
+block is re-rendered and streamed as an OOB swap.
 
 Blocks to re-render are discovered automatically via `block_metadata().depends_on`.
 Ancestor blocks whose `depends_on` is a strict superset of leaf blocks are pruned

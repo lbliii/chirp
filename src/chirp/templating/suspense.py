@@ -20,7 +20,8 @@ Pipeline::
     )
 
     1. Separate sync vs. awaitable context values
-    2. Render shell with sync context + None for awaitable keys
+    2. Render shell with sync context + ``None`` for awaitable keys + the
+       ``__chirp_defer_pending__`` frozenset (``CHIRP_DEFER_PENDING_KEY``)
     3. Yield shell as first chunk (instant first paint)
     4. Resolve awaitables concurrently (anyio task group)
     5. Determine blocks to re-render:
@@ -36,7 +37,7 @@ from __future__ import annotations
 import inspect
 import logging
 from collections.abc import AsyncIterator, Awaitable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anyio
 from kida import Environment
@@ -45,6 +46,15 @@ from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Suspense
 
 logger = logging.getLogger("chirp.suspense")
+
+if TYPE_CHECKING:
+    from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+#: Shell / deferred-block template context key for which context keys are
+#: still awaiting resolution.  Shell render: ``frozenset`` of deferred names;
+#: sync-only renders and deferred block re-renders: empty ``frozenset``.
+#: Do not pass a user context key with this name — it is reserved.
+CHIRP_DEFER_PENDING_KEY = "__chirp_defer_pending__"
 
 
 # ---------------------------------------------------------------------------
@@ -187,12 +197,14 @@ async def render_suspense(
     layout_context: dict[str, Any] | None = None,
     request: Any = None,
     oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> AsyncIterator[str]:
     """Render a ``Suspense`` return value as an async chunk stream.
 
     Yields:
-        1. The full page shell (with ``None`` for deferred values),
-           optionally wrapped in the layout chain
+        1. The full page shell (with ``None`` for deferred values and
+           ``CHIRP_DEFER_PENDING_KEY`` listing those keys), optionally wrapped
+           in the layout chain
         2. One OOB swap chunk per deferred block as its data resolves
 
     Blocks to re-render are determined by:
@@ -211,6 +223,8 @@ async def render_suspense(
         layout_context: Context for layout templates (when layout_chain used).
         request: Request for fragment detection (when layout_chain used).
         oob_registry: Optional OOB registry for swap/wrap resolution.
+        fragment_target_registry: Optional fragment target registry for
+            replace-style boosted navigation that must skip outer layouts.
     """
     context = suspense.context
     template_name = suspense.template_name
@@ -244,17 +258,23 @@ async def render_suspense(
             context=ctx,
             htmx_target=htmx_target,
             is_history_restore=is_history_restore,
+            fragment_target_registry=fragment_target_registry,
         )
 
     # Fast path: no awaitables — render full page in one shot
     if not pending:
         template = env.get_template(template_name)
+        sync_ctx = {**sync_ctx, CHIRP_DEFER_PENDING_KEY: frozenset()}
         page_html = template.render(sync_ctx)
         yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
         return
 
     # -- Phase 2: Render shell with None for deferred keys --
-    shell_ctx = {**sync_ctx, **dict.fromkeys(pending)}
+    shell_ctx = {
+        **sync_ctx,
+        **dict.fromkeys(pending),
+        CHIRP_DEFER_PENDING_KEY: frozenset(pending),
+    }
     template = env.get_template(template_name)
     page_html = template.render(shell_ctx)
     yield _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
@@ -279,7 +299,12 @@ async def render_suspense(
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
-    full_ctx = {**layout_ctx, **sync_ctx, **resolved}
+    full_ctx = {
+        **layout_ctx,
+        **sync_ctx,
+        **resolved,
+        CHIRP_DEFER_PENDING_KEY: frozenset(),
+    }
 
     if suspense.defer_blocks is not None:
         blocks_to_render = list(suspense.defer_blocks)

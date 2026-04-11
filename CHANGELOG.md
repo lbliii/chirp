@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`__chirp_defer_pending__` / `CHIRP_DEFER_PENDING_KEY`** — Suspense shell renders (and sync-only Suspense renders) inject a `frozenset` of context key names still awaiting resolution; deferred block re-renders use an empty frozenset. Templates can branch on membership instead of overloading `None` / truthiness.
 - **`Suspense.defer_blocks`** — optional explicit list of blocks to re-render as OOB chunks, bypassing `block_metadata()` static analysis. Use when deferred values are passed through macro arguments that the analyzer can't trace.
 - **Ancestor block pruning** — `_find_deferred_blocks` now drops blocks whose `depends_on` is a strict superset of another matched block, preventing large parent blocks (e.g. `page_content`) from being re-rendered as wasted OOB chunks.
 - **`alpine_json_config` template global** — when `alpine=True`, templates can emit `<script type="application/json">` tags with safely escaped ids and JSON for Alpine components (`alpine_json_config("my-id", data)`).
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Suspense templates** — Document `{% if key is not none %}` / `__chirp_defer_pending__` instead of bare `{% if key %}` (falsy empty results look like perpetual skeletons). Updated `return-values.md`, streaming guide, `CLAUDE.md`, and API reference.
 - **`alpine_json_config`** — Chirp `CLAUDE.md`, Alpine guide, and built-in middleware reference document the template global and its relationship to `AlpineInject`.
 - **Layouts & Alpine** — Filesystem routing (outlet + `main`), route contract reference, streaming HTML + Suspense + Alpine, built-in middleware (`AlpineInject` vs `HTMLInject`).
 - **Reactive system** — New dedicated guide covering ReactiveBus API, DependencyIndex, derived paths, observability counters, and contract validation.
