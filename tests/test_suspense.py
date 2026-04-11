@@ -10,6 +10,9 @@ Covers:
 - Error mid-stream (deferred resolution failure)
 - defer_map override for block-to-DOM-ID mapping
 - Suspense dataclass construction
+- Two blocks sharing one deferred key
+- Ancestor block pruning
+- Explicit defer_blocks bypass
 """
 
 import asyncio
@@ -64,6 +67,31 @@ _SIMPLE_TEMPLATE = """\
 {% end %}
 </div>"""
 
+_SHARED_KEY_TEMPLATE = """\
+<html><body>
+{% block page_content %}
+<h1>{{ title }}</h1>
+<div id="hero_stars">
+{% block hero_stars %}
+  {% if stars is not none %}
+    <span>{{ stars }} stars</span>
+  {% else %}
+    <span class="skeleton">…</span>
+  {% end %}
+{% end %}
+</div>
+<div id="footer_stars">
+{% block footer_stars %}
+  {% if stars is not none %}
+    <span>{{ stars }} stars</span>
+  {% else %}
+    <span class="skeleton">…</span>
+  {% end %}
+{% end %}
+</div>
+{% end %}
+</body></html>"""
+
 
 def _env() -> Environment:
     """Build a kida Environment with in-memory test templates."""
@@ -72,6 +100,7 @@ def _env() -> Environment:
             {
                 "dashboard.html": _DASHBOARD_TEMPLATE,
                 "simple.html": _SIMPLE_TEMPLATE,
+                "shared_key.html": _SHARED_KEY_TEMPLATE,
             }
         )
     )
@@ -430,3 +459,103 @@ class TestLayoutWrapping:
         assert len(chunks) == 1
         assert "<!DOCTYPE html>" not in chunks[0]
         assert "<h1>X</h1>" in chunks[0]
+
+
+# ---------------------------------------------------------------------------
+# Two blocks sharing one deferred key
+# ---------------------------------------------------------------------------
+
+
+class TestSharedDeferredKey:
+    """Multiple blocks that depend on the same awaitable context value."""
+
+    async def test_both_leaf_blocks_receive_oob(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("42"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        shell = chunks[0]
+        assert "skeleton" in shell
+        assert "42 stars" not in shell
+
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert 'id="footer_stars"' in oob
+        assert oob.count("42 stars") == 2
+
+    async def test_parent_block_pruned_from_oob(self):
+        """page_content depends on 'stars' too, but should be pruned."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("7"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="page_content"' not in oob
+
+    async def test_script_fallback_both_blocks(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("99"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=False)
+
+        oob = "".join(chunks[1:])
+        assert "_chirp_d_hero_stars" in oob
+        assert "_chirp_d_footer_stars" in oob
+        assert oob.count("99 stars") == 2
+
+
+# ---------------------------------------------------------------------------
+# Explicit defer_blocks bypass
+# ---------------------------------------------------------------------------
+
+
+class TestDeferBlocks:
+    """Suspense.defer_blocks overrides static analysis."""
+
+    def test_dataclass_accepts_defer_blocks(self):
+        s = Suspense("page.html", defer_blocks=("a", "b"), data="x")
+        assert s.defer_blocks == ("a", "b")
+
+    def test_dataclass_default_none(self):
+        s = Suspense("page.html", data="x")
+        assert s.defer_blocks is None
+
+    async def test_explicit_blocks_rendered(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("footer_stars",),
+            title="Repo",
+            stars=_delayed_value("55"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="footer_stars"' in oob
+        assert 'id="hero_stars"' not in oob
+
+    async def test_explicit_blocks_skip_static_analysis(self):
+        """When defer_blocks is set, only those blocks are rendered."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_stars",),
+            title="Repo",
+            stars=_delayed_value("11"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert oob.count("11 stars") == 1
