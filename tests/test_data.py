@@ -688,6 +688,7 @@ class TestExports:
             "DriverNotInstalledError",
             "MigrationError",
             "Notification",
+            "PageResult",
             "Query",
             "QueryError",
             "get_db",
