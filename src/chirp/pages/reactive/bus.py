@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 from collections.abc import AsyncIterator, Callable
 
@@ -108,7 +109,12 @@ class ReactiveBus:
                     if not scope_set:
                         del self._subscribers[scope]
             if on_disconnect is not None:
-                on_disconnect(scope, connection)
+                try:
+                    on_disconnect(scope, connection)
+                except Exception:
+                    logging.getLogger("chirp.reactive").exception(
+                        "on_disconnect callback failed for scope=%s", scope
+                    )
 
     def close(self, scope: str | None = None) -> None:
         """Signal subscribers to stop.

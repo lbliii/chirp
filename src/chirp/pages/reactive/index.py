@@ -128,12 +128,7 @@ class DependencyIndex:
                 dom_id=dom_ids.get(name),
             )
             for dep_path in block_meta.depends_on:
-                self._path_to_blocks.setdefault(dep_path, []).append(ref)
-                # Index all ancestor prefixes for fast prefix matching
-                parts = dep_path.split(".")
-                for i in range(len(parts)):
-                    prefix = ".".join(parts[: i + 1])
-                    self._prefix_to_paths.setdefault(prefix, set()).add(dep_path)
+                self.register(dep_path, ref)
 
     def register_from_sse_swaps(
         self,

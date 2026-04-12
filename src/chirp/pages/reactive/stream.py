@@ -20,14 +20,15 @@ _ContextBuilder = Callable[..., dict[str, Any] | Awaitable[dict[str, Any]]]
 
 
 def _context_builder_arity(fn: _ContextBuilder) -> int:
-    """Detect whether context_builder accepts changed_paths."""
+    """Detect whether context_builder accepts a positional changed_paths arg."""
     try:
         sig = inspect.signature(fn)
         params = [
             p
             for p in sig.parameters.values()
             if p.default is inspect.Parameter.empty
-            and p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+            and p.kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
         ]
         return len(params)
     except ValueError, TypeError:
@@ -81,7 +82,7 @@ def reactive_stream(
                 bus, scope=doc_id, index=dep_index,
                 context_builder=lambda paths: {"doc": store.get(doc_id)},
                 origin=session_id,
-                connection=ConnectionInfo(session_id=sid, user_id=uid),
+                connection=ConnectionInfo(session_id=session_id, user_id=user_id),
             )
     """
     arity = _context_builder_arity(context_builder)

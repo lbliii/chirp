@@ -8,6 +8,8 @@ Covers:
 - ConnectionInfo dataclass basics
 """
 
+import time
+
 import pytest
 
 from chirp.pages.reactive import BlockRef, ConnectionInfo, DependencyIndex
@@ -143,10 +145,12 @@ class TestConnectionInfo:
     """ConnectionInfo is a proper frozen dataclass."""
 
     def test_basic_creation(self) -> None:
+        before = time.monotonic()
         conn = ConnectionInfo(session_id="sess-1", user_id="alice")
+        after = time.monotonic()
         assert conn.session_id == "sess-1"
         assert conn.user_id == "alice"
-        assert conn.connected_at == 0.0
+        assert before <= conn.connected_at <= after
 
     def test_anonymous_user(self) -> None:
         conn = ConnectionInfo(session_id="sess-2")

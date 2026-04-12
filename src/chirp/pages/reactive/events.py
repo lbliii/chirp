@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,13 +17,13 @@ class ConnectionInfo:
     Attributes:
         session_id: Unique session identifier (always required).
         user_id: Authenticated user ID, or ``None`` for anonymous.
-        connected_at: Monotonic timestamp (``time.monotonic()``) when
-            the subscription was created.  Set automatically if omitted.
+        connected_at: Monotonic timestamp (``time.monotonic()``) captured
+            at construction time.
     """
 
     session_id: str
     user_id: str | None = None
-    connected_at: float = 0.0
+    connected_at: float = field(default_factory=time.monotonic)
 
 
 @dataclass(frozen=True, slots=True)
