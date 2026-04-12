@@ -136,6 +136,29 @@ async def dashboard():
     )
 ```
 
+Middleware-provided helpers such as `get_user()` and `csrf_token()` are
+ContextVar-backed. Capture those values in the handler before returning
+`Stream`, `TemplateStream`, `Suspense`, or `EventStream`; do not call them
+during streamed template rendering or inside SSE generators. The request object
+itself is restored for chunk iteration, so this warning is about middleware
+state such as auth/session/CSRF, not `get_request()`.
+
+```python
+@app.route("/dashboard")
+def dashboard():
+    user = get_user()
+    token = csrf_token()
+    return Suspense(
+        "dashboard.html",
+        current_user=user,
+        csrf_token_value=token,
+        stats=load_stats(),
+    )
+```
+
+Then the template reads `current_user` / `csrf_token_value` from plain context
+instead of calling the ContextVar-backed helpers during the stream.
+
 Use **`{% if stats is not none %}`** for loaded vs loading — not bare `{% if stats %}`, which stays falsy for empty `tuple`/`list`/`""`/`0` after resolution and can look like a perpetual skeleton. Optionally branch on **`"stats" in __chirp_defer_pending__`** (a `frozenset` injected only by Suspense: pending key names in the shell, empty after resolution). The Python constant is **`CHIRP_DEFER_PENDING_KEY`**. The block must still **reference the context key** (e.g. `stats`) somewhere so `block_metadata().depends_on` can associate the block with that deferred key; membership in `__chirp_defer_pending__` alone is not enough for discovery.
 
 ```html
