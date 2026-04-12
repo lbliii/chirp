@@ -22,7 +22,7 @@ def test_shell_comment_is_parsed_from_layout(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# target: body #}\n{# shell: site #}\n{% block content %}{% end %}\n',
+        "{# target: body #}\n{# shell: site #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(pages)
@@ -41,7 +41,7 @@ def test_domain_comment_is_parsed_from_layout(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# target: body #}\n{# domain: marketing #}\n{% block content %}{% end %}\n',
+        "{# target: body #}\n{# domain: marketing #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(pages)
@@ -61,11 +61,11 @@ def test_shell_path_inherits_from_ancestor_layouts(tmp_path: Path) -> None:
     pages.mkdir()
     showcase.mkdir()
     (pages / "_layout.html").write_text(
-        '{# target: body #}\n{# shell: site #}\n{% block content %}{% end %}\n',
+        "{# target: body #}\n{# shell: site #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     (showcase / "_layout.html").write_text(
-        '{# target: main #}\n{# shell: showcase #}\n{% block content %}{% end %}\n',
+        "{# target: main #}\n{# shell: showcase #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(showcase)
@@ -84,11 +84,11 @@ def test_navigation_domain_path_prefers_explicit_domain_layers(tmp_path: Path) -
     pages.mkdir()
     showcase.mkdir()
     (pages / "_layout.html").write_text(
-        '{# target: body #}\n{# domain: site #}\n{# shell: site #}\n{% block content %}{% end %}\n',
+        "{# target: body #}\n{# domain: site #}\n{# shell: site #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     (showcase / "_layout.html").write_text(
-        '{# target: main #}\n{# shell: showcase #}\n{% block content %}{% end %}\n',
+        "{# target: main #}\n{# shell: showcase #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(showcase)
@@ -105,7 +105,7 @@ def test_layout_preset_supplies_metadata_defaults(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# preset: site-shell #}\n{# domain: site #}\n{# shell: site #}\n{% block content %}{% end %}\n',
+        "{# preset: site-shell #}\n{# domain: site #}\n{# shell: site #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(pages)
@@ -136,11 +136,11 @@ def test_layout_comments_override_preset_defaults(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# preset: chirpui-app-shell #}\n'
-        '{# target: main #}\n'
-        '{# domain: showcase #}\n'
-        '{# shell: showcase #}\n'
-        '{% block content %}{% end %}\n',
+        "{# preset: chirpui-app-shell #}\n"
+        "{# target: main #}\n"
+        "{# domain: showcase #}\n"
+        "{# shell: showcase #}\n"
+        "{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(pages)
@@ -169,7 +169,7 @@ def test_unknown_layout_preset_raises_clear_error(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# preset: missing #}\n{% block content %}{% end %}\n',
+        "{# preset: missing #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_page(pages)

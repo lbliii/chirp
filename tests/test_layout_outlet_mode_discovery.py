@@ -33,9 +33,9 @@ def test_outlet_mode_parsed_from_layout(
 ) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
-    layout = '{# target: body #}\n{# outlet: main #}\n'
+    layout = "{# target: body #}\n{# outlet: main #}\n"
     (pages / "_layout.html").write_text(
-        comment + layout + '{% block content %}{% end %}\n',
+        comment + layout + "{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_minimal_page(pages)
@@ -51,9 +51,7 @@ def test_outlet_mode_unknown_defaults_to_compose(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()
     (pages / "_layout.html").write_text(
-        '{# outlet_mode: banana #}\n'
-        '{# target: body #}\n'
-        '{% block content %}{% end %}\n',
+        "{# outlet_mode: banana #}\n{# target: body #}\n{% block content %}{% end %}\n",
         encoding="utf-8",
     )
     _write_minimal_page(pages)

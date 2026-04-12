@@ -241,10 +241,14 @@ def _parse_layout_metadata(
     target = target_m.group(1) if target_m else (preset.target if preset is not None else "body")
 
     domain_m = _DOMAIN_RE.search(content)
-    domain_name = domain_m.group(1) if domain_m else (preset.domain_name if preset is not None else None)
+    domain_name = (
+        domain_m.group(1) if domain_m else (preset.domain_name if preset is not None else None)
+    )
 
     shell_m = _SHELL_RE.search(content)
-    shell_name = shell_m.group(1) if shell_m else (preset.shell_name if preset is not None else None)
+    shell_name = (
+        shell_m.group(1) if shell_m else (preset.shell_name if preset is not None else None)
+    )
 
     scope_m = _SWAP_SCOPE_RE.search(content)
     swap_scope_name = (

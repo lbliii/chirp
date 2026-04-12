@@ -186,6 +186,8 @@ python-version = "3.14"
 # Optional deps; allow when not installed
 allowed-unresolved-imports = [
     "chirp_ui",
+    "chirp_ui.filters",
+    "chirp_ui.components",
     "asyncpg",
     "patitas",
     "argon2",

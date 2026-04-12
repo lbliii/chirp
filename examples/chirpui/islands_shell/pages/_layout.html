@@ -45,7 +45,7 @@
 {% end %}
 {% end %}
 
-{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true, brand_boost=true) %}
+{% call app_shell(brand="Stock Ticker", sidebar_collapsible=true) %}
   {% slot topbar %}
   {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items ?? [{"label":"Home","href":"/"}]) }}
   {% end %}

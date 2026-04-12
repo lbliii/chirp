@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -92,8 +92,7 @@ class _ChirpUIStrictMiddleware(Middleware):
 def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     normalized = "/" + prefix.strip("/")
     return (
-        f'<script defer src="{normalized}/chirpui-alpine.js" '
-        'data-chirp="chirpui-alpine"></script>'
+        f'<script defer src="{normalized}/chirpui-alpine.js" data-chirp="chirpui-alpine"></script>'
     )
 
 
@@ -126,14 +125,14 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
         try:
-            from chirp_ui.filters import make_route_link_attrs
+            from chirp_ui.filters import make_route_link_attrs  # ty: ignore[unresolved-import]
         except ImportError:
             make_route_link_attrs = None
 
         if make_route_link_attrs is not None:
             from chirp.templating.navigation_swap import make_swap_attrs
 
-            swap_helper_cache: dict[str, object] = {}
+            swap_helper_cache: dict[str, Any] = {}
 
             def _swap_resolver(href: str, *, hx_boost: bool = True) -> dict[str, str]:
                 runtime = app._runtime_state
@@ -152,7 +151,9 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
                     swap_helper_cache["swap_attrs"] = helper
                 return helper(href, hx_boost=hx_boost)
 
-            app.template_global("route_link_attrs")(make_route_link_attrs(swap_resolver=_swap_resolver))
+            app.template_global("route_link_attrs")(
+                make_route_link_attrs(swap_resolver=_swap_resolver)
+            )
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     app.add_middleware(
         StreamingHTMLInject(

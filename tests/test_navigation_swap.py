@@ -296,9 +296,9 @@ async def test_streamed_suspense_layout_preserves_request_context_for_swap_attrs
     showcase.mkdir()
 
     (pages / "_layout.html").write_text(
-        '{# target: body #}\n'
-        '{# swap_scope: site #}\n'
-        '{# outlet: site-content #}\n'
+        "{# target: body #}\n"
+        "{# swap_scope: site #}\n"
+        "{# outlet: site-content #}\n"
         '<a id="showcase-link" href="/showcase" {{ swap_attrs("/showcase") | html_attrs }}>Showcase</a>\n'
         '<div id="site-content">{% block content %}{% end %}</div>\n',
         encoding="utf-8",
@@ -325,8 +325,7 @@ async def test_streamed_suspense_layout_preserves_request_context_for_swap_attrs
         encoding="utf-8",
     )
     (showcase / "page.py").write_text(
-        "def get() -> dict[str, str]:\n"
-        "    return {'title': 'Showcase'}\n",
+        "def get() -> dict[str, str]:\n    return {'title': 'Showcase'}\n",
         encoding="utf-8",
     )
 

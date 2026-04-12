@@ -276,6 +276,10 @@ class TestChirpUIIntegration:
             resp = await client.get("/static/chirpui.js")
             assert resp.status == 200
 
+    @pytest.mark.skipif(
+        not (Path(chirp_ui.static_path()) / "chirpui-alpine.js").exists(),
+        reason="chirp-ui Alpine runtime not available in this version",
+    )
     async def test_static_alpine_runtime_served(self):
         """ChirpUI Alpine runtime is served at /static/chirpui-alpine.js."""
         app = _make_chirpui_app()
@@ -284,6 +288,10 @@ class TestChirpUIIntegration:
             assert resp.status == 200
             assert "chirpuiDropdown" in resp.text
 
+    @pytest.mark.skipif(
+        not (Path(chirp_ui.static_path()) / "chirpui-alpine.js").exists(),
+        reason="chirp-ui Alpine runtime not available in this version",
+    )
     async def test_use_chirp_ui_injects_runtime_script(self):
         """use_chirp_ui injects the chirp-ui Alpine runtime on full pages."""
         app = _make_chirpui_app()

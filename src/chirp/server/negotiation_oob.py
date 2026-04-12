@@ -214,7 +214,7 @@ class _KidaBlockAdapter(KidaAdapter):
 
         try:
             return self._env.get_template(template).template_metadata()
-        except (TemplateNotFoundError, TemplateSyntaxError, AttributeError):
+        except TemplateNotFoundError, TemplateSyntaxError, AttributeError:
             return None
 
 

@@ -639,9 +639,7 @@ class TestLayoutStartIndex:
         assert "<html>" not in html
         assert "Depth page content" in html
 
-    def test_outlet_mode_replace_preserves_descendant_layouts(
-        self, kida_env: Environment
-    ) -> None:
+    def test_outlet_mode_replace_preserves_descendant_layouts(self, kida_env: Environment) -> None:
         """Matched replace outlets skip the outer shell but keep child shells."""
         adapter = KidaAdapter(kida_env)
         layout_chain = LayoutChain(
