@@ -8,7 +8,7 @@ from kida.template import Markup
 
 from chirp import App
 from chirp.config import AppConfig
-from chirp.server.alpine import PLUGINS, alpine_json_config, alpine_snippet
+from chirp.server.alpine import PLUGIN_NAMES, alpine_json_config, alpine_snippet
 from chirp.templating.filters import BUILTIN_FILTERS
 from chirp.templating.returns import Template
 from chirp.testing import TestClient
@@ -118,11 +118,18 @@ class TestAlpineSnippet:
 
     def test_plugin_urls_have_explicit_cdn_path(self) -> None:
         """Each plugin script src must include @alpinejs/{name}@…/dist/cdn.min.js."""
-        for plugin in ("mask", "intersect", "focus"):
+        snippet = alpine_snippet("3.15.8", csp=False)
+        for plugin in PLUGIN_NAMES:
             assert re.search(
-                rf"@alpinejs/{plugin}@[0-9.]+/dist/cdn\.min\.js",
-                PLUGINS,
+                rf"@alpinejs/{plugin}@3\.15\.8/dist/cdn\.min\.js",
+                snippet,
             ), f"Missing explicit /dist/cdn.min.js for plugin: {plugin}"
+
+    def test_plugin_versions_follow_requested_alpine_version(self) -> None:
+        """Plugin URLs should stay aligned with the configured Alpine version."""
+        snippet = alpine_snippet("3.16.1", csp=False)
+        for plugin in PLUGIN_NAMES:
+            assert f"@alpinejs/{plugin}@3.16.1/dist/cdn.min.js" in snippet
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from chirp.pages.types import (
     ContextProvider,
     LayoutChain,
     LayoutInfo,
+    LayoutPreset,
     OutletSwapMode,
     PageRoute,
     RouteKind,
@@ -37,6 +39,8 @@ _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "opt
 
 # Regex to extract layout shell comments from _layout.html
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
+_PRESET_RE = re.compile(r"\{#\s*preset:\s*(\S+)\s*#\}")
+_DOMAIN_RE = re.compile(r"\{#\s*domain:\s*(\S+)\s*#\}")
 _SHELL_RE = re.compile(r"\{#\s*shell:\s*(\S+)\s*#\}")
 _SWAP_SCOPE_RE = re.compile(r"\{#\s*swap_scope:\s*(\S+)\s*#\}")
 _OUTLET_RE = re.compile(r"\{#\s*outlet:\s*(\S+)\s*#\}")
@@ -47,7 +51,11 @@ _FRAMES_RE = re.compile(r"\{#\s*frames:\s*([^#]+?)\s*#\}")
 _PARAM_DIR_RE = re.compile(r"^\{(\w+)\}$")
 
 
-def discover_pages(pages_dir: str | Path) -> list[PageRoute]:
+def discover_pages(
+    pages_dir: str | Path,
+    *,
+    layout_presets: Mapping[str, LayoutPreset] | None = None,
+) -> list[PageRoute]:
     """Walk a pages directory and discover all routes.
 
     Args:
@@ -70,6 +78,7 @@ def discover_pages(pages_dir: str | Path) -> list[PageRoute]:
         context_providers=[],
         depth=0,
         routes=routes,
+        layout_presets=layout_presets or {},
     )
     return routes
 
@@ -83,6 +92,7 @@ def _walk_directory(
     context_providers: list[ContextProvider],
     depth: int,
     routes: list[PageRoute],
+    layout_presets: Mapping[str, LayoutPreset],
 ) -> None:
     """Recursively walk a directory, discovering routes and layouts.
 
@@ -99,12 +109,13 @@ def _walk_directory(
     layout_file = directory / "_layout.html"
     current_layouts = list(layouts)
     if layout_file.is_file():
-        meta = _parse_layout_metadata(layout_file)
+        meta = _parse_layout_metadata(layout_file, layout_presets=layout_presets)
         template_name = str(layout_file.relative_to(root))
         layout = LayoutInfo(
             template_name=template_name,
             target=meta["target"],
             depth=depth,
+            domain_name=meta["domain_name"],
             shell_name=meta["shell_name"],
             swap_scope_name=meta["swap_scope_name"],
             outlet_target_id=meta["outlet_target_id"],
@@ -190,6 +201,7 @@ def _walk_directory(
             context_providers=current_providers,
             depth=depth + 1,
             routes=routes,
+            layout_presets=layout_presets,
         )
 
 
@@ -202,12 +214,18 @@ def _infer_route_kind(*, has_template: bool, is_param_dir: bool) -> RouteKind:
     return "page"
 
 
-def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
+def _parse_layout_metadata(
+    layout_file: Path,
+    *,
+    layout_presets: Mapping[str, LayoutPreset],
+) -> dict[str, Any]:
     """Read ``{# target #}`` and optional shell scope comments from a layout.
 
     Supported annotations::
 
+        {# preset: preset_name #}
         {# target: element_id #}
+        {# domain: navigation_domain #}
         {# shell: shell_name #}
         {# swap_scope: symbolic_name #}
         {# outlet: element_id #}
@@ -215,20 +233,35 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
         {# frames: id1, id2 #}
     """
     content = layout_file.read_text(encoding="utf-8")
+    preset_m = _PRESET_RE.search(content)
+    preset_name = preset_m.group(1) if preset_m else None
+    preset = _resolve_layout_preset(layout_file, preset_name, layout_presets)
+
     target_m = _TARGET_RE.search(content)
-    target = target_m.group(1) if target_m else "body"
+    target = target_m.group(1) if target_m else (preset.target if preset is not None else "body")
+
+    domain_m = _DOMAIN_RE.search(content)
+    domain_name = domain_m.group(1) if domain_m else (preset.domain_name if preset is not None else None)
 
     shell_m = _SHELL_RE.search(content)
-    shell_name = shell_m.group(1) if shell_m else None
+    shell_name = shell_m.group(1) if shell_m else (preset.shell_name if preset is not None else None)
 
     scope_m = _SWAP_SCOPE_RE.search(content)
-    swap_scope_name = scope_m.group(1) if scope_m else None
+    swap_scope_name = (
+        scope_m.group(1) if scope_m else (preset.swap_scope_name if preset is not None else None)
+    )
 
     outlet_m = _OUTLET_RE.search(content)
-    outlet_target_id = outlet_m.group(1) if outlet_m else None
+    outlet_target_id = (
+        outlet_m.group(1) if outlet_m else (preset.outlet_target_id if preset is not None else None)
+    )
 
     outlet_mode_m = _OUTLET_MODE_RE.search(content)
-    outlet_mode = _normalize_outlet_mode(outlet_mode_m.group(1) if outlet_mode_m else None)
+    outlet_mode = _normalize_outlet_mode(
+        outlet_mode_m.group(1)
+        if outlet_mode_m
+        else (preset.outlet_mode if preset is not None else None)
+    )
 
     frames_m = _FRAMES_RE.search(content)
     frame_targets: frozenset[str] | None = None
@@ -236,9 +269,12 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
         raw = frames_m.group(1)
         parts = [p.strip().lstrip("#") for p in raw.replace(",", " ").split() if p.strip()]
         frame_targets = frozenset(parts) if parts else None
+    elif preset is not None:
+        frame_targets = preset.frame_targets
 
     return {
         "target": target,
+        "domain_name": domain_name,
         "shell_name": shell_name,
         "swap_scope_name": swap_scope_name,
         "outlet_target_id": outlet_target_id,
@@ -247,11 +283,29 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
     }
 
 
-def _normalize_outlet_mode(raw: str | None) -> OutletSwapMode:
+def _resolve_layout_preset(
+    layout_file: Path,
+    preset_name: str | None,
+    layout_presets: Mapping[str, LayoutPreset],
+) -> LayoutPreset | None:
+    """Resolve a named layout preset or raise for unknown names."""
+    if preset_name is None:
+        return None
+    preset = layout_presets.get(preset_name)
+    if preset is not None:
+        return preset
+    msg = (
+        f"Unknown layout preset {preset_name!r} in {layout_file}. "
+        "Register it with app.register_layout_preset(...) before mount_pages()."
+    )
+    raise ValueError(msg)
+
+
+def _normalize_outlet_mode(raw: str | OutletSwapMode | None) -> OutletSwapMode:
     """Normalize ``{# outlet_mode: #}`` token to a known mode."""
     if not raw:
         return "compose"
-    mode = raw.strip().lower()
+    mode = raw.strip().lower() if isinstance(raw, str) else raw
     if mode == "replace":
         return "replace"
     return "compose"

@@ -47,6 +47,7 @@ Filesystem ``_layout.html`` files declare scope metadata via template comments:
 
 ```html
 {# target: body #}
+{# domain: site #}
 {# swap_scope: shell #}
 {# outlet: site-content #}
 {# frames: site-header, site-footer #}
@@ -55,6 +56,7 @@ Filesystem ``_layout.html`` files declare scope metadata via template comments:
 | Comment | Purpose |
 |---------|---------|
 | ``{# target: id #}`` | DOM element this layout renders into (required) |
+| ``{# domain: name #}`` | Explicit navigation-domain boundary for `swap_attrs()` |
 | ``{# swap_scope: name #}`` | Symbolic scope for ``resolve_navigation_swap`` |
 | ``{# outlet: id #}`` | Primary navigation outlet id for this level |
 | ``{# frames: id, id #}`` | Immutable frame ids (contract-checked: must not be swap targets) |
@@ -71,14 +73,19 @@ Instead of hand-coding ``hx-target`` on every link, use ``swap_attrs`` to resolv
 <a href="/showcase/products" {{ swap_attrs("/showcase/products") | html_attrs }}>Products</a>
 ```
 
-``swap_attrs(href)`` computes the deepest shared layout prefix between the current path and destination, then returns ``{"hx-target": "#main", "hx-boost": "true"}`` (or narrower, depending on context). Pipe through ``html_attrs`` to render as HTML attributes. Explicit ``hx-target`` on the element always overrides the resolved value.
+``swap_attrs(href)`` computes the nearest shared navigation boundary between the current
+path and destination, then returns ``{"hx-target": "#main", "hx-boost": "true"}``
+(or broader/narrower, depending on context). When layouts declare ``{# domain: #}``,
+domain ancestry drives the decision. Otherwise Chirp falls back to legacy shell/layout
+geometry. Pipe through ``html_attrs`` to render as HTML attributes. Explicit
+``hx-target`` on the element always overrides the resolved value.
 
 ### Nested shell example (b-site)
 
-b-site uses two nested shells:
+b-site uses two nested shells and two explicit navigation domains:
 
-1. **Root marketing shell** (``pages/_layout.html``, ``{# target: body #}``) — site header, footer, ``#site-content`` outlet
-2. **Showcase app shell** (``pages/showcase/_layout.html``, ``{# target: main #}``) — chirp-ui ``app_shell()`` with sidebar, breadcrumbs, ``shell_outlet()``
+1. **Root marketing shell / site domain** (``pages/_layout.html``, ``{# domain: site #}``) — site header, footer, ``#site-content`` outlet
+2. **Showcase app shell / showcase domain** (``pages/showcase/_layout.html``, ``{# domain: showcase #}``) — chirp-ui ``app_shell()`` with sidebar, breadcrumbs, ``shell_outlet()``
 
 Navigation from ``/`` to ``/showcase`` swaps at the **site** level (``#site-content``). Navigation within ``/showcase/*`` swaps at the **showcase** level (inner outlet). ``swap_attrs`` derives this automatically from the layout chains.
 

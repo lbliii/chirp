@@ -158,6 +158,59 @@ def test_resolve_navigation_swap_targets_nearest_shared_nested_shell() -> None:
     assert res.scope == "community"
 
 
+def test_resolve_navigation_swap_prefers_explicit_domains_over_shell_metadata() -> None:
+    registry = FragmentTargetRegistry()
+    registry.register("site-content", fragment_block="content", scope_name="site")
+    registry.register("main", fragment_block="page_root", scope_name="section")
+    registry.freeze()
+
+    current = LayoutChain(
+        layouts=(
+            LayoutInfo(
+                "pages/_layout.html",
+                "body",
+                0,
+                domain_name="site",
+                swap_scope_name="site",
+                outlet_target_id="site-content",
+            ),
+        )
+    )
+    dest = LayoutChain(
+        layouts=(
+            LayoutInfo(
+                "pages/_layout.html",
+                "body",
+                0,
+                domain_name="site",
+                swap_scope_name="site",
+                outlet_target_id="site-content",
+            ),
+            LayoutInfo(
+                "pages/showcase/_layout.html",
+                "main",
+                1,
+                domain_name="showcase",
+                shell_name="showcase-shell",
+                swap_scope_name="section",
+            ),
+        )
+    )
+
+    res = resolve_navigation_swap(
+        current_path="/",
+        destination_path="/showcase",
+        layout_chain_current=current,
+        layout_chain_dest=dest,
+        registry=registry,
+        swap_scope_map={"site": "site-content", "section": "main"},
+    )
+
+    assert res is not None
+    assert res.htmx_target == "#site-content"
+    assert res.scope == "site"
+
+
 def test_resolve_navigation_swap_returns_none_without_shared_shell_ancestor() -> None:
     registry = FragmentTargetRegistry()
     registry.register("site-content", fragment_block="content", scope_name="site")

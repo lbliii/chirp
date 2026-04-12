@@ -1,4 +1,4 @@
-"""Route-aware boosted navigation swap resolution (hierarchical shell scopes).
+"""Route-aware boosted navigation swap resolution (hierarchical domains).
 
 Pure helpers map (current path, destination path, layout chains) to a
 recommended ``hx-target`` and symbolic scope name. Server rendering still
@@ -83,9 +83,9 @@ def common_layout_prefix_len(a: LayoutChain, b: LayoutChain) -> int:
     return count
 
 
-def common_shell_prefix_len(a: LayoutChain, b: LayoutChain) -> int:
-    """Length of the longest common prefix of two shell paths."""
-    pa, pb = a.shell_path, b.shell_path
+def common_navigation_prefix_len(a: LayoutChain, b: LayoutChain) -> int:
+    """Length of the longest common prefix of two navigation-domain paths."""
+    pa, pb = a.navigation_domain_path, b.navigation_domain_path
     n = min(len(pa), len(pb))
     count = 0
     for i in range(n):
@@ -117,28 +117,6 @@ def lookup_layout_chain_for_path(
     return chain if isinstance(chain, LayoutChain) else None
 
 
-def can_use_same_shell_navigation(
-    *,
-    layout_chain_current: LayoutChain | None,
-    layout_chain_dest: LayoutChain | None,
-) -> bool:
-    """Return True when navigation can safely stay inside the current shell.
-
-    Backward compatibility:
-    - when neither route declares shell boundaries, fall back to the legacy
-      geometry-based behavior;
-    - when either route opts into shell boundaries, both routes must resolve to
-      the same inherited shell path before boosted navigation is allowed.
-    """
-    current_shell_path = layout_chain_current.shell_path if layout_chain_current is not None else ()
-    dest_shell_path = layout_chain_dest.shell_path if layout_chain_dest is not None else ()
-    if not current_shell_path and not dest_shell_path:
-        return True
-    if not current_shell_path or not dest_shell_path:
-        return False
-    return current_shell_path == dest_shell_path
-
-
 def pick_navigation_layout_index(
     *,
     layout_chain_current: LayoutChain | None,
@@ -147,21 +125,23 @@ def pick_navigation_layout_index(
     """Choose the destination layout whose outlet should own the navigation.
 
     Rules:
-    - no shell metadata on either side: keep legacy geometry-only behavior
+    - no navigation metadata on either side: keep legacy geometry-only behavior
     - one side annotated, the other not: be conservative and return ``None``
-    - same shell path: use the existing geometry within that shell
-    - shared shell ancestry but diverging child shells: target the last shared
-      shell boundary in the destination chain
+    - same navigation-domain path: use the existing geometry within that domain
+    - shared navigation ancestry but diverging child domains: target the last
+      shared navigation boundary in the destination chain
     """
-    current_shell_path = layout_chain_current.shell_path if layout_chain_current is not None else ()
-    dest_shell_path = layout_chain_dest.shell_path
+    current_navigation_path = (
+        layout_chain_current.navigation_domain_path if layout_chain_current is not None else ()
+    )
+    dest_navigation_path = layout_chain_dest.navigation_domain_path
 
     layouts_dest = layout_chain_dest.layouts
     nd = len(layouts_dest)
     if nd == 0:
         return None
 
-    if not current_shell_path and not dest_shell_path:
+    if not current_navigation_path and not dest_navigation_path:
         layouts_curr = layout_chain_current.layouts if layout_chain_current is not None else ()
         nc = len(layouts_curr)
         common = (
@@ -171,18 +151,18 @@ def pick_navigation_layout_index(
         )
         return pick_outlet_layout_index(nc=nc, nd=nd, common=common)
 
-    if not current_shell_path or not dest_shell_path:
+    if not current_navigation_path or not dest_navigation_path:
         return None
 
-    shell_common = (
-        common_shell_prefix_len(layout_chain_current, layout_chain_dest)
+    navigation_common = (
+        common_navigation_prefix_len(layout_chain_current, layout_chain_dest)
         if layout_chain_current is not None
         else 0
     )
-    if shell_common == 0:
+    if navigation_common == 0:
         return None
 
-    if current_shell_path == dest_shell_path:
+    if current_navigation_path == dest_navigation_path:
         layouts_curr = layout_chain_current.layouts if layout_chain_current is not None else ()
         nc = len(layouts_curr)
         common = (
@@ -192,7 +172,7 @@ def pick_navigation_layout_index(
         )
         return pick_outlet_layout_index(nc=nc, nd=nd, common=common)
 
-    return layout_chain_dest.layout_index_for_shell_depth(shell_common)
+    return layout_chain_dest.layout_index_for_navigation_depth(navigation_common)
 
 
 def pick_outlet_layout_index(*, nc: int, nd: int, common: int) -> int:

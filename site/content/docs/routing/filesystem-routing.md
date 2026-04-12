@@ -126,6 +126,56 @@ Layouts nest from root to leaf. The negotiation layer uses `HX-Target` to decide
 
 If no target is declared, it defaults to `"body"`.
 
+### Navigation domains vs shells
+
+Filesystem layouts can also declare an explicit navigation domain:
+
+```html
+{# preset: site-shell #}
+{# target: body #}
+{# domain: site #}
+{# shell: site #}
+{# outlet: site-content #}
+```
+
+Use `domain` for the author-facing answer to "which links should boost together?" Use
+`shell` for persistent UI boundaries and nested layout composition. When any layout in a
+route chain declares `domain`, `swap_attrs()` resolves navigation from the shared domain
+ancestry first and only falls back to shell ancestry for older layouts that do not opt in.
+
+This lets you model cases like:
+
+- one domain with multiple nested shells
+- sibling domains under a shared outer shell
+- incremental migration from shell-only layouts to explicit navigation intent
+
+### Layout presets
+
+Apps and extensions can register named layout presets during setup:
+
+```python
+app.register_layout_preset(
+    "site-shell",
+    target="body",
+    swap_scope_name="site",
+    outlet_target_id="site-content",
+    outlet_mode="replace",
+)
+```
+
+Then a filesystem layout can opt in with a single comment and keep only the
+route-specific intent inline:
+
+```html
+{# preset: site-shell #}
+{# domain: site #}
+{# shell: site #}
+```
+
+Explicit comments always override preset defaults. `use_chirp_ui(app)` also
+registers a built-in `chirpui-app-shell` preset for the standard `#main`
+app-shell outlet.
+
 ### How `render_with_blocks` works
 
 Chirp composes layouts using `render_with_blocks({"content": page_html})`. This **replaces** `{% block content %}` with the pre-rendered page HTML. Any markup you put inside `{% block content %}` in your layout is overridden — it never renders.

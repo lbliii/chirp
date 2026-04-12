@@ -205,7 +205,7 @@ No client-side framework needed. The browser renders the shell, and blocks fill 
 
 When using `mount_pages`, `Suspense` receives the layout chain automatically. The first chunk is wrapped in your `_layout.html` shell (head, CSS, sidebar), and OOB swaps target block IDs inside the page. Fragment-only requests skip the layout (same as `Page`).
 
-**Alpine.js:** Streaming responses are still HTML documents. When `AppConfig(alpine=True)`, `AlpineInject` rewrites the chunk stream so the Alpine bundle is inserted before `</body>` in the final output—same deduplication rules as buffered pages—so shell-first routes (Suspense, skeletons) keep interactive components working without inlining scripts in layouts.
+**Alpine.js:** Streaming responses are still HTML documents. When `AppConfig(alpine=True)`, `AlpineInject` rewrites the chunk stream so the Alpine bundle is inserted before `</body>` in the final output—same deduplication rules as buffered pages—so shell-first routes (Suspense, skeletons) keep interactive components working without inlining scripts in layouts. If `use_chirp_ui(app)` is active, the shared `chirpui-alpine.js` runtime is also injected on full-page streaming HTML, so named chirp-ui controllers remain available there too.
 
 ## When to Use Each
 

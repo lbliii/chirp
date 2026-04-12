@@ -81,12 +81,70 @@ class HTMLInject:
         return replace(response, body=body)
 
 
+class StreamingHTMLInject(HTMLInject):
+    """HTMLInject variant that also rewrites full-page StreamingResponse HTML."""
+
+    __slots__ = ("_dedup_marker",)
+
+    def __init__(
+        self,
+        snippet: str,
+        *,
+        before: str = "</body>",
+        full_page_only: bool = False,
+        dedup_marker: str | None = None,
+    ) -> None:
+        super().__init__(snippet, before=before, full_page_only=full_page_only)
+        self._dedup_marker = dedup_marker
+
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        response = await next(request)
+        if isinstance(response, StreamingResponse):
+            return self._streaming(response, request)
+        if not isinstance(response, Response):
+            return response
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_fragment:
+            return response
+        body = response.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        if self._dedup_marker and self._dedup_marker in body:
+            return response
+        if self._target in body:
+            body = body.replace(self._target, self._snippet + self._target, 1)
+        elif self._full_page_only:
+            return response
+        else:
+            body = body + self._snippet
+        return replace(response, body=body)
+
+    def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_fragment:
+            return response
+        new_chunks = async_stream_inject_before_body(
+            response.chunks,
+            snippet=self._snippet,
+            before=self._target,
+            dedup_marker=self._dedup_marker,
+            full_page_only=self._full_page_only,
+        )
+        return replace(response, chunks=new_chunks)
+
+
 class AlpineInject(HTMLInject):
     """HTMLInject that skips when Alpine is already present in the page.
 
     Checks for ``data-chirp="alpine"`` in the response body before injecting.
-    This prevents double-loading when chirp-ui's ``app_shell_layout.html``
-    (or any other source) has already included Alpine.
+    This prevents double-loading when the document already includes Alpine
+    from another source.
 
     For :class:`~chirp.http.response.StreamingResponse` (e.g. ``Suspense``),
     the same snippet is inserted before the first ``</body>`` using a bounded

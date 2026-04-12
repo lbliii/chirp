@@ -10,7 +10,7 @@ from chirp._internal.asgi import Receive, Scope, Send
 from chirp.config import AppConfig
 from chirp.contracts.types import Severity
 from chirp.errors import ConfigurationError
-from chirp.pages.types import LayoutChain, Section
+from chirp.pages.types import LayoutChain, LayoutPreset, OutletSwapMode, Section
 from chirp.templating.fragment_target_registry import PageShellContract
 from chirp.templating.integration import render_fragment, render_template
 from chirp.templating.returns import Fragment, InlineTemplate, Template
@@ -345,6 +345,40 @@ class App:
         """
         self._check_not_frozen()
         self._mutable_state.fragment_target_registry.register_contract(contract)
+
+    def register_layout_preset(
+        self,
+        name: str,
+        *,
+        target: str | None = None,
+        domain_name: str | None = None,
+        shell_name: str | None = None,
+        swap_scope_name: str | None = None,
+        outlet_target_id: str | None = None,
+        frame_targets: frozenset[str] | None = None,
+        outlet_mode: OutletSwapMode | None = None,
+    ) -> None:
+        """Register a named preset for `_layout.html` metadata defaults.
+
+        Layouts opt in with ``{# preset: name #}``. Explicit comments in the
+        template override preset defaults, letting apps encode a shell
+        convention once and keep route-tree metadata terse.
+        """
+        self._check_not_frozen()
+        self._mutable_state.layout_presets[name] = LayoutPreset(
+            name=name,
+            target=target.lstrip("#") if target is not None else None,
+            domain_name=domain_name,
+            shell_name=shell_name,
+            swap_scope_name=swap_scope_name,
+            outlet_target_id=outlet_target_id.lstrip("#") if outlet_target_id is not None else None,
+            frame_targets=(
+                frozenset(frame.lstrip("#") for frame in frame_targets)
+                if frame_targets is not None
+                else None
+            ),
+            outlet_mode=outlet_mode,
+        )
 
     def register_swap_scope(self, scope: str, target_id: str) -> None:
         """Map a symbolic swap scope to a concrete fragment target id (no ``#``).

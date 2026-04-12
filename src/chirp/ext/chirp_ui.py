@@ -26,7 +26,9 @@ if TYPE_CHECKING:
 
 from chirp.contracts.types import ContractIssue, Severity
 from chirp.http.request import Request
+from chirp.middleware.inject import StreamingHTMLInject
 from chirp.middleware.protocol import AnyResponse, Middleware, Next
+from chirp.pages.types import LayoutPreset
 from chirp.templating.fragment_target_registry import PageShellContract, PageShellTarget
 
 # Deprecated: these constants moved from chirp.templating.render_plan.
@@ -64,6 +66,13 @@ CHIRPUI_PAGE_SHELL_CONTRACT = PageShellContract(
     ),
 )
 
+CHIRPUI_APP_SHELL_PRESET = LayoutPreset(
+    name="chirpui-app-shell",
+    target="body",
+    swap_scope_name="shell",
+    outlet_target_id="main",
+)
+
 
 class _ChirpUIStrictMiddleware(Middleware):
     """Middleware that sets chirp-ui strict mode per request for variant validation."""
@@ -80,12 +89,21 @@ class _ChirpUIStrictMiddleware(Middleware):
         return await next(request)
 
 
+def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
+    normalized = "/" + prefix.strip("/")
+    return (
+        f'<script defer src="{normalized}/chirpui-alpine.js" '
+        'data-chirp="chirpui-alpine"></script>'
+    )
+
+
 def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) -> None:
     """Register chirp-ui static files (CSS, themes) and filters with the app.
 
-    Call after App creation. Serves chirpui.css, themes/, chirpui-transitions.css
-    from the chirp-ui package. Automatically registers chirp-ui filters (bem,
-    field_errors, html_attrs, validate_variant) so components render correctly.
+    Call after App creation. Serves chirpui.css, chirpui-alpine.js, themes/,
+    chirpui-transitions.css from the chirp-ui package. Automatically registers
+    chirp-ui filters (bem, field_errors, html_attrs, validate_variant) so
+    components render correctly.
 
     Alpine.js is auto-enabled (chirp-ui components require it). Chirp is the
     single authority for Alpine injection — the ``app_shell_layout.html`` does
@@ -104,7 +122,40 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
         app.bind_config(replace(app.config, alpine=True))
 
     chirp_ui.register_filters(app)
+    if hasattr(app, "template_global"):
+        from chirp_ui.filters import make_route_link_attrs
+
+        from chirp.templating.navigation_swap import make_swap_attrs
+
+        swap_helper_cache: dict[str, object] = {}
+
+        def _swap_resolver(href: str, *, hx_boost: bool = True) -> dict[str, str]:
+            runtime = app._runtime_state
+            router = runtime.router
+            registry = runtime.fragment_target_registry
+            if not runtime.frozen or router is None or registry is None:
+                return {}
+            helper = swap_helper_cache.get("swap_attrs")
+            if helper is None:
+                helper = make_swap_attrs(
+                    route_layout_chains=runtime.route_layout_chains,
+                    router=router,
+                    fragment_target_registry=registry,
+                    swap_scope_map=runtime.swap_scope_map,
+                )
+                swap_helper_cache["swap_attrs"] = helper
+            return helper(href, hx_boost=hx_boost)
+
+        app.template_global("route_link_attrs")(make_route_link_attrs(swap_resolver=_swap_resolver))
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
+    app.add_middleware(
+        StreamingHTMLInject(
+            _chirpui_alpine_runtime_snippet(prefix),
+            before="</head>",
+            full_page_only=True,
+            dedup_marker='data-chirp="chirpui-alpine"',
+        )
+    )
     # Add chirp-ui to reload dirs when editable (for dev on component library)
     try:
         chirp_ui_root = Path(chirp_ui.__file__).resolve().parent
@@ -135,6 +186,12 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     )
 
     app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)
+    app.register_layout_preset(
+        CHIRPUI_APP_SHELL_PRESET.name,
+        target=CHIRPUI_APP_SHELL_PRESET.target,
+        swap_scope_name=CHIRPUI_APP_SHELL_PRESET.swap_scope_name,
+        outlet_target_id=CHIRPUI_APP_SHELL_PRESET.outlet_target_id,
+    )
     app.register_swap_scope("shell", "main")
     app.register_swap_scope("page", "page-root")
     app.register_swap_scope("content", "page-content-inner")

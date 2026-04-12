@@ -136,3 +136,34 @@ async def test_alpine_middleware_wraps_streaming_response() -> None:
     assert 'data-chirp="alpine"' in text
     assert "cdn.jsdelivr.net/npm/alpinejs" in text
     assert "_chirpAlpineData" in text
+
+
+async def test_streaming_html_inject_wraps_streaming_response() -> None:
+    """StreamingHTMLInject rewrites StreamingResponse chunks for full-page HTML."""
+    from chirp.http.response import StreamingResponse
+    from chirp.middleware.inject import StreamingHTMLInject
+
+    class FakeRequest:
+        is_fragment = False
+
+    snippet = '<script data-chirp="chirpui-alpine" src="/static/chirpui-alpine.js"></script>'
+    mw = StreamingHTMLInject(
+        snippet,
+        before="</head>",
+        full_page_only=True,
+        dedup_marker='data-chirp="chirpui-alpine"',
+    )
+
+    async def next_ok(_req: object) -> StreamingResponse:
+        def chunks():
+            yield "<!DOCTYPE html><html><head><title>x</title></head><body>ok"
+            yield "</body></html>"
+
+        return StreamingResponse(chunks=chunks())
+
+    resp = await mw(FakeRequest(), next_ok)
+    assert isinstance(resp, StreamingResponse)
+    parts: list[str] = [chunk async for chunk in resp.chunks]
+    text = "".join(parts)
+    assert 'data-chirp="chirpui-alpine"' in text
+    assert "</script></head>" in text
