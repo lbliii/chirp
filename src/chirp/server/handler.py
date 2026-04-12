@@ -85,12 +85,13 @@ def _cross_shell_boost_redirect(
         or not request.is_boosted
         or route_layout_chains is None
         or fragment_target_registry is None
-        or swap_scope_map is None
+        or not swap_scope_map
     ):
         return None
     current_path = request.htmx_current_url_abs_path
     if current_path is None or not current_path.startswith("/"):
-        return Response(body="").with_hx_redirect(_request_path_with_query(request))
+        # Cannot compute swap diff without a valid current URL — pass through
+        return None
     dest_chain = route_layout_chains.get(match.route.path)
     if not isinstance(dest_chain, LayoutChain):
         return None
@@ -108,7 +109,8 @@ def _cross_shell_boost_redirect(
         swap_scope_map=swap_scope_map,
     )
     if resolution is None:
-        return Response(body="").with_hx_redirect(_request_path_with_query(request))
+        # No swap resolution — let the request render normally
+        return None
     request_target = request.htmx_target.lstrip("#") if request.htmx_target is not None else None
     expected_target = resolution.htmx_target.lstrip("#")
     if request_target == expected_target:

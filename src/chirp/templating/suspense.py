@@ -307,7 +307,17 @@ async def render_suspense(
     }
 
     if suspense.defer_blocks is not None:
-        blocks_to_render = list(suspense.defer_blocks)
+        available = set(template.list_blocks())
+        unknown = [b for b in suspense.defer_blocks if b not in available]
+        if unknown:
+            logger.warning(
+                "Suspense: defer_blocks contains unknown block(s) %r "
+                "for template %s (available: %s)",
+                unknown,
+                template_name,
+                sorted(available),
+            )
+        blocks_to_render = [b for b in suspense.defer_blocks if b in available]
     else:
         deferred_keys = set(pending.keys())
         key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
