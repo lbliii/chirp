@@ -207,12 +207,14 @@ def render_layout_oob_blocks(
 
 
 class _KidaBlockAdapter(KidaAdapter):
-    """KidaAdapter with broad error handling for layout contract discovery."""
+    """KidaAdapter with error handling for layout contract discovery."""
 
     def template_metadata(self, template: str) -> object | None:
+        from kida.environment.exceptions import TemplateNotFoundError, TemplateSyntaxError
+
         try:
             return self._env.get_template(template).template_metadata()
-        except Exception:
+        except (TemplateNotFoundError, TemplateSyntaxError, AttributeError):
             return None
 
 

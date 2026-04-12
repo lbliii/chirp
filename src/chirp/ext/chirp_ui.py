@@ -125,30 +125,34 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
-        from chirp_ui.filters import make_route_link_attrs
+        try:
+            from chirp_ui.filters import make_route_link_attrs
+        except ImportError:
+            make_route_link_attrs = None
 
-        from chirp.templating.navigation_swap import make_swap_attrs
+        if make_route_link_attrs is not None:
+            from chirp.templating.navigation_swap import make_swap_attrs
 
-        swap_helper_cache: dict[str, object] = {}
+            swap_helper_cache: dict[str, object] = {}
 
-        def _swap_resolver(href: str, *, hx_boost: bool = True) -> dict[str, str]:
-            runtime = app._runtime_state
-            router = runtime.router
-            registry = runtime.fragment_target_registry
-            if not runtime.frozen or router is None or registry is None:
-                return {}
-            helper = swap_helper_cache.get("swap_attrs")
-            if helper is None:
-                helper = make_swap_attrs(
-                    route_layout_chains=runtime.route_layout_chains,
-                    router=router,
-                    fragment_target_registry=registry,
-                    swap_scope_map=runtime.swap_scope_map,
-                )
-                swap_helper_cache["swap_attrs"] = helper
-            return helper(href, hx_boost=hx_boost)
+            def _swap_resolver(href: str, *, hx_boost: bool = True) -> dict[str, str]:
+                runtime = app._runtime_state
+                router = runtime.router
+                registry = runtime.fragment_target_registry
+                if not runtime.frozen or router is None or registry is None:
+                    return {}
+                helper = swap_helper_cache.get("swap_attrs")
+                if helper is None:
+                    helper = make_swap_attrs(
+                        route_layout_chains=runtime.route_layout_chains,
+                        router=router,
+                        fragment_target_registry=registry,
+                        swap_scope_map=runtime.swap_scope_map,
+                    )
+                    swap_helper_cache["swap_attrs"] = helper
+                return helper(href, hx_boost=hx_boost)
 
-        app.template_global("route_link_attrs")(make_route_link_attrs(swap_resolver=_swap_resolver))
+            app.template_global("route_link_attrs")(make_route_link_attrs(swap_resolver=_swap_resolver))
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     app.add_middleware(
         StreamingHTMLInject(

@@ -702,6 +702,31 @@ class TestDeferBlocks:
         assert "skeleton" in chunks[0]
         assert "77 stars" not in chunks[0]
 
+    async def test_unknown_defer_blocks_warns_and_skips(self, caplog):
+        """defer_blocks with nonexistent block names logs a warning and skips them."""
+        import logging
+
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_stars", "nonexistent_block"),
+            title="Repo",
+            stars=_delayed_value("33"),
+        )
+        with caplog.at_level(logging.WARNING, logger="chirp.suspense"):
+            chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        # Unknown block warned
+        assert any("nonexistent_block" in r.message for r in caplog.records)
+
+        # Valid block still rendered
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert "33 stars" in oob
+
+        # Unknown block not attempted
+        assert "nonexistent_block" not in oob
+
 
 # ---------------------------------------------------------------------------
 # __chirp_defer_pending__ context key
