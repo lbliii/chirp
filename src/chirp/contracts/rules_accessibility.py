@@ -10,7 +10,11 @@ Checks:
 
 import re
 
+from .patterns import ID_ATTR as _ID_ATTR
+from .patterns import KIDA_EXPR as _KIDA_EXPR
 from .types import ContractIssue, Severity
+
+_HX_METHOD_ATTR = re.compile(r"hx-(?:get|post|put|patch|delete)", re.IGNORECASE)
 
 # ---------------------------------------------------------------------------
 # a11y_interactive — htmx on non-interactive elements
@@ -39,7 +43,7 @@ def check_accessibility(source: str, template_name: str) -> list[ContractIssue]:
         has_role = "role=" in all_attrs.lower()
         has_tabindex = "tabindex=" in all_attrs.lower()
         if not has_role and not has_tabindex:
-            hx_match = re.search(r"hx-(?:get|post|put|patch|delete)", all_attrs)
+            hx_match = _HX_METHOD_ATTR.search(all_attrs)
             hx_attr = hx_match.group(0) if hx_match else "hx-*"
             issues.append(
                 ContractIssue(
@@ -64,7 +68,6 @@ _LABELABLE_ELEMENT = re.compile(
     r"<(input|select|textarea)\b([^>]*)(?:>|/>)",
     re.IGNORECASE,
 )
-_ID_ATTR = re.compile(r"""\bid=["']([^"']*)["']""", re.IGNORECASE)
 _TYPE_ATTR = re.compile(r"""\btype=["']([^"']*)["']""", re.IGNORECASE)
 _NAME_ATTR = re.compile(r"""\bname=["']([^"']*)["']""", re.IGNORECASE)
 _ALT_ATTR = re.compile(r"(?:^|\s)alt\s*=", re.IGNORECASE)
@@ -76,9 +79,6 @@ _WRAPPING_LABEL = re.compile(
     r"<label\b[^>]*>(?:(?!</label>).)*?<(?:input|select|textarea)\b",
     re.IGNORECASE | re.DOTALL,
 )
-
-# Kida expression: {{ ... }}
-_KIDA_EXPR = re.compile(r"\{\{.*?\}\}")
 
 # Types that don't need labels.
 _EXEMPT_TYPES = frozenset({"hidden", "submit", "button", "reset"})

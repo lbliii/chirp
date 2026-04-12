@@ -9,6 +9,7 @@ from kida import Environment
 from chirp.pages.types import RouteMeta, Section, TabItem
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
+from .patterns import PATH_PARAM
 from .types import ContractIssue, Severity
 
 
@@ -271,9 +272,7 @@ def check_context_provider_signatures(
         path_params: set[str] = set()
         url_path = getattr(route, "url_path", "")
         if "{" in url_path:
-            import re
-
-            for m in re.finditer(r"\{(\w+)\}", url_path):
+            for m in PATH_PARAM.finditer(url_path):
                 path_params.add(m.group(1))
         # Nested routes inherit parent context; params like projects/project come from cascade
         providers_list = getattr(route, "context_providers", ())

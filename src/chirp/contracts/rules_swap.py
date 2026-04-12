@@ -2,6 +2,8 @@
 
 import re
 
+from .patterns import METHOD_POST as _FORM_POST_PATTERN
+from .patterns import SSE_CONNECT_TAG_BASIC as _SSE_CONNECT_TAG_PATTERN
 from .template_scan import (
     extract_ids_with_disinherit,
     extract_mutation_target_ids,
@@ -31,15 +33,13 @@ _MUTATING_TAG_PATTERN = re.compile(
     r"\s*[\"'][^\"']*[\"'][^>]*)>",
     re.IGNORECASE,
 )
-_FORM_POST_PATTERN = re.compile(r'method\s*=\s*["\']post["\']', re.IGNORECASE)
 _SSE_SWAP_TAG_PATTERN = re.compile(
     r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-swap\s*=\s*[\"'][^\"']+[\"'][^>]*)>",
     re.IGNORECASE,
 )
-_SSE_CONNECT_TAG_PATTERN = re.compile(
-    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-connect\s*=\s*[\"'][^\"']+[\"'][^>]*)>",
-    re.IGNORECASE,
-)
+_HX_BOOST_TRUE = re.compile(r'hx-boost\s*=\s*["\']true["\']', re.IGNORECASE)
+_HX_BOOST_FALSE = re.compile(r'hx-boost\s*=\s*["\']false["\']', re.IGNORECASE)
+_HX_SWAP_NONE = re.compile(r'hx-swap\s*=\s*["\']none["\']', re.IGNORECASE)
 
 _BROAD_CONTAINER_TAGS = frozenset(
     {
@@ -95,7 +95,7 @@ def _collect_broad_selects_map(
             if "{{" in select or "{%" in select:
                 continue
             attrs_lower = attrs.lower()
-            has_boost = bool(re.search(r'hx-boost\s*=\s*["\']true["\']', attrs_lower))
+            has_boost = bool(_HX_BOOST_TRUE.search(attrs_lower))
             if tag_name in {"body", "main"} or has_boost:
                 result.setdefault(template_name, []).append(select)
     return result
@@ -128,7 +128,7 @@ def collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
             if "{{" in target or "{%" in target:
                 continue
             attrs_lower = attrs.lower()
-            has_boost = bool(re.search(r'hx-boost\s*=\s*["\']true["\']', attrs_lower))
+            has_boost = bool(_HX_BOOST_TRUE.search(attrs_lower))
             if tag_name in {"body", "main"} or has_boost:
                 broad_targets.add(f"{target} ({template_name})")
     return broad_targets
@@ -172,9 +172,9 @@ def check_swap_safety(
                         continue
                 if _HX_SELECT_COVERAGE_PATTERN.search(attrs):
                     continue
-                if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
+                if _HX_SWAP_NONE.search(attrs_lower):
                     continue
-                if re.search(r'hx-boost\s*=\s*["\']false["\']', attrs_lower):
+                if _HX_BOOST_FALSE.search(attrs_lower):
                     continue
                 issues.append(
                     ContractIssue(
@@ -209,7 +209,7 @@ def check_swap_safety(
                     continue
                 if _HX_OWN_SELECT_PATTERN.search(attrs):
                     continue
-                if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs, re.IGNORECASE):
+                if _HX_SWAP_NONE.search(attrs):
                     continue
                 issues.append(
                     ContractIssue(
@@ -243,9 +243,9 @@ def check_swap_safety(
                     continue
             if "hx-target=" in attrs_lower:
                 continue
-            if re.search(r'hx-swap\s*=\s*["\']none["\']', attrs_lower):
+            if _HX_SWAP_NONE.search(attrs_lower):
                 continue
-            if re.search(r'hx-boost\s*=\s*["\']false["\']', attrs_lower):
+            if _HX_BOOST_FALSE.search(attrs_lower):
                 continue
             issues.append(
                 ContractIssue(

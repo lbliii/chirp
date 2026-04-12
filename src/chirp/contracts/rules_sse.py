@@ -5,15 +5,12 @@ import re
 from chirp.routing.router import Router
 
 from .declarations import SSEContract
+from .patterns import KIDA_EXPR as _KIDA_EXPR_PATTERN
+from .patterns import SSE_CONNECT_TAG as _SSE_CONNECT_TAG_PATTERN
 from .routes import build_route_index, find_matching_route
 from .types import ContractIssue, Severity
 
-_SSE_CONNECT_TAG_PATTERN = re.compile(
-    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bsse-connect\s*=\s*[\"'](?P<url>[^\"']+)[\"'][^>]*)>",
-    re.IGNORECASE,
-)
 _SSE_SWAP_VALUE_PATTERN = re.compile(r'\bsse-swap\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
-_KIDA_EXPR_PATTERN = re.compile(r"\{\{[^}]+\}\}")
 
 
 def normalize_sse_url(url: str) -> str:
