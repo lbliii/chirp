@@ -31,6 +31,7 @@ from chirp.data.errors import (
     QueryError,
 )
 from chirp.data.migrate import migrate
+from chirp.data.pagination import PageResult
 from chirp.data.query import Query
 
 __all__ = [
@@ -40,6 +41,7 @@ __all__ = [
     "DriverNotInstalledError",
     "MigrationError",
     "Notification",
+    "PageResult",
     "Query",
     "QueryError",
     "get_db",
