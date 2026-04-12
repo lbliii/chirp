@@ -4,6 +4,9 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
+from .patterns import ID_ATTR as _ID_PATTERN
+from .patterns import METHOD_POST
+
 # \baction\b avoids matching "action" inside form_action, data-action, etc.
 _ACTION_OR_HX = r"(hx-(?:get|post|put|patch|delete)|\baction\b)"
 _ATTR_PATTERN_DOUBLE = re.compile(
@@ -16,7 +19,6 @@ _ATTRS_MAP_PATTERN = re.compile(rf"""["']{_ACTION_OR_HX}["']\s*:\s*["']([^"']*)[
 _CONFIRM_URL_PATTERN = re.compile(r'confirm_url\s*=\s*["\']([^"\']*)["\']')
 _CONFIRM_METHOD_PATTERN = re.compile(r'confirm_method\s*=\s*["\']([^"\']*)["\']', re.IGNORECASE)
 _HX_TARGET_PATTERN = re.compile(r'hx-target\s*=\s*["\']([^"\']*)["\']')
-_ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
 _TEMPLATE_REF_PATTERN = re.compile(
     r"""\{%-?\s*(?:extends|include|from|import)\s+["']([^"']+)["']"""
 )
@@ -45,6 +47,17 @@ _POSITIONAL_URL_ARG_PATTERN = re.compile(r"""\(\s*["'](/[a-zA-Z][a-zA-Z0-9_/{}-]
 _HTMX_PARTIAL_PATTERN = re.compile(
     r'<htmx-partial\b[^>]*(?<![-\w])src\s*=\s*["\']([^"\']*)["\']',
     re.IGNORECASE,
+)
+_FORM_OPEN_TAG = re.compile(r"<form\b", re.IGNORECASE)
+_MUTATING_BLOCK_TARGET = re.compile(
+    r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|\baction\b)\s*[=:][^}]+"
+    r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\']',
+    re.IGNORECASE | re.DOTALL,
+)
+_TARGET_IN_MUTATING = re.compile(
+    r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\'][^}]*'
+    r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete)",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -79,7 +92,7 @@ def get_form_method(source: str, action_pos: int) -> str | None:
 
     before = source[:action_pos]
     last_match = next(
-        iter(deque(re.finditer(r"<form\b", before, re.IGNORECASE), maxlen=1)),
+        iter(deque(_FORM_OPEN_TAG.finditer(before), maxlen=1)),
         None,
     )
     if last_match is None:
@@ -89,7 +102,7 @@ def get_form_method(source: str, action_pos: int) -> str | None:
     if tag_end == -1 or tag_end < action_pos:
         return None
     form_tag = source[form_start:tag_end]
-    if re.search(r'method\s*=\s*["\']post["\']', form_tag, re.IGNORECASE):
+    if METHOD_POST.search(form_tag):
         return "POST"
     return "GET"
 
@@ -219,22 +232,10 @@ def extract_mutation_target_ids(source: str) -> set[str]:
         val = m.group(1).strip()
         if val and "{{" not in val and "{%" not in val:
             ids.add(val)
-    mutating_blocks = re.findall(
-        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete|\baction\b)\s*[=:][^}]+"
-        r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\']',
-        source,
-        re.IGNORECASE | re.DOTALL,
-    )
-    for val in mutating_blocks:
+    for val in _MUTATING_BLOCK_TARGET.findall(source):
         if "{{" not in val and "{%" not in val:
             ids.add(val.strip())
-    target_in_mutating = re.findall(
-        r'(?:hx-target|hx_target)\s*[=:]\s*["\']#([^"\']+)["\'][^}]*'
-        r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete)",
-        source,
-        re.IGNORECASE | re.DOTALL,
-    )
-    for val in target_in_mutating:
+    for val in _TARGET_IN_MUTATING.findall(source):
         if "{{" not in val and "{%" not in val:
             ids.add(val.strip())
     return ids

@@ -5,9 +5,10 @@ from typing import Any
 
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
+from .patterns import ID_ATTR as _ID_ATTR_RE
 from .types import ContractIssue, Severity
 
-_ID_ATTR_RE = re.compile(r'id\s*=\s*["\']([^"\']+)["\']')
+_EXTENDS_TAG = re.compile(r"\{%\s*extends\s+")
 
 
 def _all_dom_ids(template_sources: dict[str, str]) -> frozenset[str]:
@@ -197,7 +198,7 @@ def check_layout_chains(
             source = template_sources.get(layout.template_name)
             if source is None:
                 continue
-            if layout.depth > 0 and re.search(r"\{\%\s*extends\s+", source):
+            if layout.depth > 0 and _EXTENDS_TAG.search(source):
                 issues.append(
                     ContractIssue(
                         severity=Severity.WARNING,

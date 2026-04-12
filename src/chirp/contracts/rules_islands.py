@@ -4,10 +4,10 @@ import html
 import json
 import re
 
+from .patterns import ID_ATTR as _ID_PATTERN
 from .types import ContractIssue, Severity
 
 _ISLAND_TAG_PATTERN = re.compile(r"<(?P<tag>[a-zA-Z][\w:-]*)(?P<attrs>[^>]*)>", re.IGNORECASE)
-_ID_PATTERN = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
 _ISLAND_NAME_PATTERN = re.compile(r"\bdata-island\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 _ISLAND_PROPS_PATTERN = re.compile(
     r"\bdata-island-props\s*=\s*[\"']([^\"']*)[\"']",

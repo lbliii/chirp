@@ -8,11 +8,19 @@ POST routes that may silently ignore form data or lack validation.
 
 from __future__ import annotations
 
+import re
+
 from chirp.routing.router import Router
 
 from .declarations import FormContract
+from .patterns import METHOD_POST
 from .routes import build_route_index, find_matching_route
 from .types import ContractIssue, Severity
+
+_FORM_ACTION_RE = re.compile(
+    r'<form\b[^>]*\baction\s*=\s*["\']([^"\']+)["\'][^>]*>',
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def check_form_action_contracts(
@@ -26,8 +34,6 @@ def check_form_action_contracts(
     INFO-level because many routes legitimately handle form data
     without a formal contract.
     """
-    import re
-
     issues: list[ContractIssue] = []
 
     # Build set of routes with FormContract
@@ -51,21 +57,15 @@ def check_form_action_contracts(
     static_routes, parametric_routes = build_route_index(route_paths)
 
     # Scan templates for <form action="..." method="post">
-    form_action_re = re.compile(
-        r'<form\b[^>]*\baction\s*=\s*["\']([^"\']+)["\'][^>]*>',
-        re.IGNORECASE | re.DOTALL,
-    )
-    method_post_re = re.compile(r'method\s*=\s*["\']post["\']', re.IGNORECASE)
-
     for template_name, source in template_sources.items():
         if template_name.startswith(("chirp/", "chirpui/")):
             continue
-        for match in form_action_re.finditer(source):
+        for match in _FORM_ACTION_RE.finditer(source):
             action_url = match.group(1).strip()
             form_tag = match.group(0)
 
             # Only check POST forms
-            if not method_post_re.search(form_tag):
+            if not METHOD_POST.search(form_tag):
                 continue
 
             # Skip dynamic URLs

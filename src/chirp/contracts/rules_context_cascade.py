@@ -11,7 +11,13 @@ import inspect
 import re
 from typing import Any
 
+from .patterns import PATH_PARAM
 from .types import ContractIssue, Severity
+
+_RETURN_DICT_LITERAL = re.compile(r"return\s*\{([^}]+)\}")
+_DICT_STRING_KEY = re.compile(r'["\'](\w+)["\']')
+_RETURN_DICT_CALL = re.compile(r"return\s+dict\(([^)]+)\)")
+_KEYWORD_ARG = re.compile(r"(\w+)\s*=")
 
 
 def check_context_cascade(
@@ -32,7 +38,7 @@ def check_context_cascade(
         url_path = getattr(route, "url_path", "")
         path_params: set[str] = set()
         if "{" in url_path:
-            for m in re.finditer(r"\{(\w+)\}", url_path):
+            for m in PATH_PARAM.finditer(url_path):
                 path_params.add(m.group(1))
 
         # Track which keys each depth contributes
@@ -120,13 +126,13 @@ def _extract_return_keys(source: str) -> set[str]:
     """
     keys: set[str] = set()
     # Match return {"key": ...} patterns
-    for m in re.finditer(r"return\s*\{([^}]+)\}", source):
+    for m in _RETURN_DICT_LITERAL.finditer(source):
         body = m.group(1)
-        for km in re.finditer(r'["\'](\w+)["\']', body):
+        for km in _DICT_STRING_KEY.finditer(body):
             keys.add(km.group(1))
     # Match return dict(key=...) patterns
-    for m in re.finditer(r"return\s+dict\(([^)]+)\)", source):
+    for m in _RETURN_DICT_CALL.finditer(source):
         body = m.group(1)
-        for km in re.finditer(r"(\w+)\s*=", body):
+        for km in _KEYWORD_ARG.finditer(body):
             keys.add(km.group(1))
     return keys
