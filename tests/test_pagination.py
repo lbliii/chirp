@@ -6,7 +6,6 @@ import pytest
 
 from chirp.data import Database, PageResult, Query
 
-
 # -- Test model --
 
 
@@ -130,10 +129,7 @@ async def db(tmp_path):
     db = Database(f"sqlite:///{db_path}")
     await db.connect()
     await db.execute(
-        "CREATE TABLE items ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  name TEXT NOT NULL"
-        ")"
+        "CREATE TABLE items (  id INTEGER PRIMARY KEY AUTOINCREMENT,  name TEXT NOT NULL)"
     )
     yield db
     await db.disconnect()
@@ -182,7 +178,9 @@ class TestPaginate:
         assert result.has_next is False
 
     async def test_page_beyond_total_returns_empty(self, seeded_db) -> None:
-        result = await Query(Item, "items").order_by("id").paginate(seeded_db, page=100, per_page=10)
+        result = (
+            await Query(Item, "items").order_by("id").paginate(seeded_db, page=100, per_page=10)
+        )
         assert result.items == []
         assert result.total == 50
         assert result.page == 100
