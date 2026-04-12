@@ -93,12 +93,9 @@ store = TaskStore()
 bus = ReactiveBus()
 
 # Dependency index: maps context paths to template blocks.
-# We register manually here since we're not using kida's static analysis.
 dep_index = DependencyIndex()
 for block_name in ("task_list", "task_count", "last_update"):
-    ref = BlockRef(template_name="board.html", block_name=block_name)
-    dep_index._path_to_blocks.setdefault("tasks", []).append(ref)
-    dep_index._prefix_to_paths.setdefault("tasks", set()).add("tasks")
+    dep_index.register("tasks", BlockRef(template_name="board.html", block_name=block_name))
 
 
 config = AppConfig(

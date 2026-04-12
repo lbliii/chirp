@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from chirp.data.database import Database
+    from chirp.data.pagination import PageResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +177,33 @@ class Query[T]:
         """Execute and yield rows incrementally as typed dataclasses."""
         async for row in db.stream(self._cls, self.sql, *self.params, batch_size=batch_size):
             yield row
+
+    async def paginate(self, db: Database, *, page: int = 1, per_page: int = 20) -> PageResult[T]:
+        """Execute a paginated query — count + fetch in one call.
+
+        Runs ``self.count(db)`` for the total, then
+        ``self.take(per_page).skip(offset).fetch(db)`` for the page items.
+        Both use the same WHERE clauses — no duplication needed.
+
+        ::
+
+            result = await (
+                Query(Todo, "todos")
+                .where("done = ?", False)
+                .order_by("id DESC")
+                .paginate(db, page=2, per_page=20)
+            )
+            result.items        # list[Todo]
+            result.total_pages  # calculated from total
+            result.has_next     # True/False
+        """
+        from chirp.data.pagination import PageResult
+
+        page = max(page, 1)
+        total = await self.count(db)
+        offset = (page - 1) * per_page
+        items = await self.take(per_page).skip(offset).fetch(db)
+        return PageResult(items=items, page=page, per_page=per_page, total=total)
 
     async def exists(self, db: Database) -> bool:
         """Check if at least one matching row exists.

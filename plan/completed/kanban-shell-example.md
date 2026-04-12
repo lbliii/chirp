@@ -1,7 +1,8 @@
 # Proposal: Kanban Shell Example
 
-**Status**: Proposal  
-**Created**: 2025-03-06
+**Status**: Complete  
+**Created**: 2025-03-06  
+**Completed**: 2026-04 (implemented at `examples/chirpui/kanban_shell/`)
 
 ---
 

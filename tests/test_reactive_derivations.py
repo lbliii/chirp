@@ -16,20 +16,12 @@ from chirp.pages.reactive import BlockRef, DependencyIndex
 
 
 def _make_index(*blocks: tuple[str, str, list[str]]) -> DependencyIndex:
-    """Build a DependencyIndex from (template, block, [dep_paths]) tuples.
-
-    Bypasses kida entirely — registers blocks directly into the
-    internal ``_path_to_blocks`` mapping for fast, isolated tests.
-    """
+    """Build a DependencyIndex from (template, block, [dep_paths]) tuples."""
     index = DependencyIndex()
     for template, block, dep_paths in blocks:
         ref = BlockRef(template_name=template, block_name=block)
         for path in dep_paths:
-            index._path_to_blocks.setdefault(path, []).append(ref)
-            parts = path.split(".")
-            for i in range(len(parts)):
-                prefix = ".".join(parts[: i + 1])
-                index._prefix_to_paths.setdefault(prefix, set()).add(path)
+            index.register(path, ref)
     return index
 
 

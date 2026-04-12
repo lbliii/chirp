@@ -43,6 +43,58 @@ class DependencyIndex:
         # e.g. "doc" -> {"doc", "doc.version", "doc.title"}
         self._prefix_to_paths: dict[str, set[str]] = {}
 
+    def register(self, path: str, block: BlockRef) -> None:
+        """Register a block as depending on a context path.
+
+        Public API — use this instead of mutating internal dicts.
+
+        Args:
+            path: Context path (e.g., ``"tasks"`` or ``"doc.content"``).
+            block: Reference to the template block that depends on this path.
+
+        Raises:
+            ValueError: If *path* is empty or *block* has empty names.
+
+        Example::
+
+            index = DependencyIndex()
+            index.register("tasks", BlockRef("board.html", "task_list"))
+            index.register("tasks", BlockRef("board.html", "task_count", dom_id="count"))
+        """
+        if not path:
+            msg = "path must be a non-empty string"
+            raise ValueError(msg)
+        if not block.template_name or not block.block_name:
+            msg = "BlockRef must have non-empty template_name and block_name"
+            raise ValueError(msg)
+        self._path_to_blocks.setdefault(path, []).append(block)
+        parts = path.split(".")
+        for i in range(len(parts)):
+            prefix = ".".join(parts[: i + 1])
+            self._prefix_to_paths.setdefault(prefix, set()).add(path)
+
+    def block_dependencies(self, template_name: str, block_name: str) -> frozenset[str]:
+        """Return all context paths that a block depends on.
+
+        Inverse of the path→block mapping.  Useful for selective context
+        building — only query data for paths this block actually needs.
+
+        Args:
+            template_name: Kida template name.
+            block_name: Block name within the template.
+
+        Returns:
+            Frozen set of context path strings.  Empty if the block
+            is not registered.
+        """
+        paths: set[str] = set()
+        for path, refs in self._path_to_blocks.items():
+            if any(
+                ref.template_name == template_name and ref.block_name == block_name for ref in refs
+            ):
+                paths.add(path)
+        return frozenset(paths)
+
     def register_template(
         self,
         env: Environment,
@@ -76,12 +128,7 @@ class DependencyIndex:
                 dom_id=dom_ids.get(name),
             )
             for dep_path in block_meta.depends_on:
-                self._path_to_blocks.setdefault(dep_path, []).append(ref)
-                # Index all ancestor prefixes for fast prefix matching
-                parts = dep_path.split(".")
-                for i in range(len(parts)):
-                    prefix = ".".join(parts[: i + 1])
-                    self._prefix_to_paths.setdefault(prefix, set()).add(dep_path)
+                self.register(dep_path, ref)
 
     def register_from_sse_swaps(
         self,

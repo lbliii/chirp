@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
-from chirp.pages.reactive.events import ChangeEvent
+from chirp.pages.reactive.events import ChangeEvent, ConnectionInfo
+
+# Internal subscriber record: queue + optional connection info
+_Sub = tuple[asyncio.Queue[ChangeEvent | None], ConnectionInfo | None]
 
 
 class ReactiveBus:
@@ -32,8 +36,8 @@ class ReactiveBus:
         if maxsize < 1:
             msg = f"maxsize must be >= 1, got {maxsize}"
             raise ValueError(msg)
-        # scope -> set of subscriber queues
-        self._subscribers: dict[str, set[asyncio.Queue[ChangeEvent | None]]] = {}
+        # scope -> set of (queue, connection_info) tuples
+        self._subscribers: dict[str, set[_Sub]] = {}
         self._lock = threading.Lock()
         self._maxsize = maxsize
         self._emitted_count = 0
@@ -44,11 +48,19 @@ class ReactiveBus:
 
         Uses ``put_nowait`` so it never blocks.  Drops the event for
         a subscriber if its queue is full (back-pressure).
+
+        If ``event.audience`` is set, only delivers to subscribers
+        whose ``ConnectionInfo.user_id`` is in the audience set.
+        Subscribers without ``ConnectionInfo`` are skipped when
+        audience filtering is active.
         """
         with self._lock:
-            queues = set(self._subscribers.get(event.scope, set()))
+            subs = set(self._subscribers.get(event.scope, set()))
             self._emitted_count += 1
-        for queue in queues:
+        for queue, conn in subs:
+            # Audience filtering: skip subscribers not in the audience
+            if event.audience is not None and (conn is None or conn.user_id not in event.audience):
+                continue
             try:
                 queue.put_nowait(event)
             except asyncio.QueueFull:
@@ -59,16 +71,30 @@ class ReactiveBus:
         """Broadcast a change event (async version)."""
         self.emit_sync(event)
 
-    async def subscribe(self, scope: str) -> AsyncIterator[ChangeEvent]:
+    async def subscribe(
+        self,
+        scope: str,
+        *,
+        connection: ConnectionInfo | None = None,
+        on_disconnect: Callable[[str, ConnectionInfo | None], None] | None = None,
+    ) -> AsyncIterator[ChangeEvent]:
         """Subscribe to change events for a specific scope.
 
         Yields ``ChangeEvent`` objects as they are emitted.  The
         subscription is automatically cleaned up when the iterator
         exits (client disconnects).
+
+        Args:
+            scope: Scope key to subscribe to.
+            connection: Optional identity for this subscriber.  Enables
+                audience filtering and presence tracking.
+            on_disconnect: Optional callback invoked when this subscriber
+                exits (normal or exception).  Receives ``(scope, connection)``.
         """
         queue: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(maxsize=self._maxsize)
+        sub: _Sub = (queue, connection)
         with self._lock:
-            self._subscribers.setdefault(scope, set()).add(queue)
+            self._subscribers.setdefault(scope, set()).add(sub)
         try:
             while True:
                 event = await queue.get()
@@ -79,9 +105,16 @@ class ReactiveBus:
             with self._lock:
                 scope_set = self._subscribers.get(scope)
                 if scope_set is not None:
-                    scope_set.discard(queue)
+                    scope_set.discard(sub)
                     if not scope_set:
                         del self._subscribers[scope]
+            if on_disconnect is not None:
+                try:
+                    on_disconnect(scope, connection)
+                except Exception:
+                    logging.getLogger("chirp.reactive").exception(
+                        "on_disconnect callback failed for scope=%s", scope
+                    )
 
     def close(self, scope: str | None = None) -> None:
         """Signal subscribers to stop.
@@ -91,12 +124,12 @@ class ReactiveBus:
         """
         with self._lock:
             if scope is not None:
-                queues = self._subscribers.pop(scope, set())
+                subs = self._subscribers.pop(scope, set())
             else:
-                queues = set()
+                subs = set()
                 for s in list(self._subscribers):
-                    queues |= self._subscribers.pop(s)
-        for queue in queues:
+                    subs |= self._subscribers.pop(s)
+        for queue, _conn in subs:
             # Drain one event if needed to guarantee the sentinel lands.
             # This ensures close() is reliable even with small maxsize.
             try:
@@ -106,6 +139,18 @@ class ReactiveBus:
                     queue.get_nowait()
                 with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(None)
+
+    # -- Presence --
+
+    def presence(self, scope: str) -> frozenset[ConnectionInfo]:
+        """Return all active connections for a scope.
+
+        Only includes subscribers that provided a ``ConnectionInfo``
+        at subscribe time.
+        """
+        with self._lock:
+            subs = self._subscribers.get(scope, set())
+            return frozenset(conn for _, conn in subs if conn is not None)
 
     # -- Observability --
 

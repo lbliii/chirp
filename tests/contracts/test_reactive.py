@@ -29,12 +29,8 @@ class TestReactiveBlockExistence:
         )
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
-        index._path_to_blocks.setdefault("tasks", []).append(
-            BlockRef(template_name="board.html", block_name="task_list")
-        )
-        index._path_to_blocks["tasks"].append(
-            BlockRef(template_name="board.html", block_name="task_count")
-        )
+        index.register("tasks", BlockRef(template_name="board.html", block_name="task_list"))
+        index.register("tasks", BlockRef(template_name="board.html", block_name="task_count"))
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 0
@@ -43,9 +39,9 @@ class TestReactiveBlockExistence:
         (tmp_path / "board.html").write_text("{% block task_list %}<ul></ul>{% endblock %}")
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
-        index._path_to_blocks.setdefault("tasks", []).append(
-            BlockRef(template_name="board.html", block_name="taks_list")  # typo
-        )
+        index.register(
+            "tasks", BlockRef(template_name="board.html", block_name="taks_list")
+        )  # typo
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 1
@@ -57,9 +53,7 @@ class TestReactiveBlockExistence:
     def test_missing_template_reports_error(self, tmp_path):
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
-        index._path_to_blocks.setdefault("tasks", []).append(
-            BlockRef(template_name="nonexistent.html", block_name="body")
-        )
+        index.register("tasks", BlockRef(template_name="nonexistent.html", block_name="body"))
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 1
@@ -78,8 +72,8 @@ class TestReactiveBlockExistence:
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
         ref = BlockRef(template_name="page.html", block_name="status")
-        index._path_to_blocks.setdefault("a", []).append(ref)
-        index._path_to_blocks.setdefault("b", []).append(ref)
+        index.register("a", ref)
+        index.register("b", ref)
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 0
@@ -89,10 +83,8 @@ class TestReactiveBlockExistence:
         (tmp_path / "b.html").write_text("{% block other %}<p>x</p>{% endblock %}")
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
-        index._path_to_blocks.setdefault("x", []).append(
-            BlockRef(template_name="a.html", block_name="good")
-        )
-        index._path_to_blocks["x"].append(BlockRef(template_name="b.html", block_name="missing"))
+        index.register("x", BlockRef(template_name="a.html", block_name="good"))
+        index.register("x", BlockRef(template_name="b.html", block_name="missing"))
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 1
