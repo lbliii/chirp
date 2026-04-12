@@ -408,6 +408,12 @@ app.add_middleware(CSPNonceMiddleware(
 
 The middleware appends `script-src 'self' 'nonce-<value>'` to whatever base CSP you provide.
 
+## AlpineInject
+
+When `AppConfig(alpine=True)` (including via `use_chirp_ui(app)`), Chirp registers `AlpineInject`, which injects the Alpine.js CDN bundle and its inline helper block before the first `</body>` on **buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for example `Suspense`). It skips injection when the response already contains `data-chirp="alpine"` before `</body>`, and it respects fragment / render-intent gating for non-streaming bodies. The same `alpine=True` flag registers the template global `alpine_json_config` for `<script type="application/json">` server-to-client payloads. When `use_chirp_ui(app)` is active, a separate full-page HTML injector also adds `chirpui-alpine.js` for named chirp-ui controllers, including on streaming HTML. See [[docs/guides/alpine|Alpine.js]].
+
+`HTMLInject` does not run on streaming bodies; Alpine streaming is handled only by `AlpineInject`.
+
 ## HTMLInject
 
 Inject a snippet into every HTML response before `</body>`:

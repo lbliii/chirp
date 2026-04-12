@@ -136,11 +136,34 @@ async def dashboard():
     )
 ```
 
-The template uses normal conditional rendering for skeletons:
+Middleware-provided helpers such as `get_user()` and `csrf_token()` are
+ContextVar-backed. Capture those values in the handler before returning
+`Stream`, `TemplateStream`, `Suspense`, or `EventStream`; do not call them
+during streamed template rendering or inside SSE generators. The request object
+itself is restored for chunk iteration, so this warning is about middleware
+state such as auth/session/CSRF, not `get_request()`.
+
+```python
+@app.route("/dashboard")
+def dashboard():
+    user = get_user()
+    token = csrf_token()
+    return Suspense(
+        "dashboard.html",
+        current_user=user,
+        csrf_token_value=token,
+        stats=load_stats(),
+    )
+```
+
+Then the template reads `current_user` / `csrf_token_value` from plain context
+instead of calling the ContextVar-backed helpers during the stream.
+
+Use **`{% if stats is not none %}`** for loaded vs loading — not bare `{% if stats %}`, which stays falsy for empty `tuple`/`list`/`""`/`0` after resolution and can look like a perpetual skeleton. Optionally branch on **`"stats" in __chirp_defer_pending__`** (a `frozenset` injected only by Suspense: pending key names in the shell, empty after resolution). The Python constant is **`CHIRP_DEFER_PENDING_KEY`**. The block must still **reference the context key** (e.g. `stats`) somewhere so `block_metadata().depends_on` can associate the block with that deferred key; membership in `__chirp_defer_pending__` alone is not enough for discovery.
 
 ```html
 {% block stats %}
-  {% if stats %}
+  {% if stats is not none %}
     {% for s in stats %}<div class="stat">{{ s.label }}: {{ s.value }}</div>{% end %}
   {% else %}
     <div class="skeleton">Loading stats...</div>
@@ -153,7 +176,7 @@ How it works:
 :::{steps}
 :::{step} Render shell with skeletons
 
-Sync context values render in the shell; awaitable values are set to `None` (triggering the `{% else %}` skeleton).
+Sync context values render in the shell; awaitable values are set to `None`, and `__chirp_defer_pending__` lists their names until they resolve (use `is not none` or membership in that set for skeleton vs loaded — not truthiness alone).
 
 :::{/step}
 :::{step} Send first chunk
@@ -164,6 +187,29 @@ The shell is sent immediately as the first chunk (instant first paint).
 :::{step} Resolve awaitables
 
 Awaitables resolve concurrently in the background.
+
+:::{/step}
+:::{step} Find affected blocks
+
+Blocks to re-render are discovered via `block_metadata().depends_on` — Kida's static analysis traces which blocks reference the deferred keys. Ancestor blocks whose dependency set is a strict superset of a leaf block are pruned (they'd produce wasteful OOB chunks targeting non-existent DOM ids).
+
+When static analysis misses a block (e.g. deferred values passed through macro arguments), set `defer_blocks` to list them explicitly:
+
+```python
+return Suspense("page.html",
+    defer_blocks=("hero_stats", "sidebar_stats"),
+    stats=load_stats(),
+)
+```
+
+Use `defer_map` to remap block names to different DOM ids for the OOB swap target:
+
+```python
+return Suspense("page.html",
+    defer_map={"stats": "stats-panel"},
+    stats=load_stats(),
+)
+```
 
 :::{/step}
 :::{step} Stream OOB swaps
@@ -181,6 +227,8 @@ For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<tem
 No client-side framework needed. The browser renders the shell, and blocks fill in as data arrives.
 
 When using `mount_pages`, `Suspense` receives the layout chain automatically. The first chunk is wrapped in your `_layout.html` shell (head, CSS, sidebar), and OOB swaps target block IDs inside the page. Fragment-only requests skip the layout (same as `Page`).
+
+**Alpine.js:** Streaming responses are still HTML documents. When `AppConfig(alpine=True)`, `AlpineInject` rewrites the chunk stream so the Alpine bundle is inserted before `</body>` in the final output—same deduplication rules as buffered pages—so shell-first routes (Suspense, skeletons) keep interactive components working without inlining scripts in layouts. If `use_chirp_ui(app)` is active, the shared `chirpui-alpine.js` runtime is also injected on full-page streaming HTML, so named chirp-ui controllers remain available there too.
 
 ## When to Use Each
 

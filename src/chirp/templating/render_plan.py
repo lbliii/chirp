@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from chirp.pages.types import LayoutChain
 from chirp.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -19,7 +20,6 @@ _log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
-    from chirp.pages.types import LayoutChain
     from chirp.templating.adapter import TemplateAdapter
 
 
@@ -58,6 +58,7 @@ class RenderPlan:
     region_updates: tuple[RegionUpdate, ...] = ()
     response_headers: dict[str, str] = field(default_factory=dict)
     include_layout_oob: bool = False
+    oob_scope: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,13 +163,23 @@ def _compute_layout_start_index(
     layout_chain: LayoutChain | None,
     htmx_target: str | None,
     is_history_restore: bool,
+    *,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> int:
     """Compute layout start index for HX-Target-aware depth."""
     if layout_chain is None or not layout_chain.layouts:
         return 0
     if is_history_restore or htmx_target is None:
         return 0
-    idx = layout_chain.find_start_index_for_target(htmx_target)
+    omit_targets = frozenset()
+    if fragment_target_registry is not None:
+        config = fragment_target_registry.get(htmx_target)
+        if config is not None and config.omit_outer_layouts:
+            omit_targets = frozenset({htmx_target.lstrip("#")})
+    idx = layout_chain.start_index_for_htmx_target(
+        htmx_target,
+        omit_outer_layout_targets=omit_targets,
+    )
     if idx is None:
         return len(layout_chain.layouts)
     return idx
@@ -227,7 +238,10 @@ def build_render_plan(
         intent = "page_fragment"
         apply_layouts = layout_chain is not None and bool(layout_chain.layouts)
         layout_start_index = _compute_layout_start_index(
-            layout_chain, htmx_target, is_history_restore
+            layout_chain,
+            htmx_target,
+            is_history_restore,
+            fragment_target_registry=fragment_target_registry,
         )
         block = _fragment_block_for_request(
             composition,
@@ -257,6 +271,15 @@ def build_render_plan(
     triggers_shell = bool(shell_region_updates)
     include_layout_oob = intent == "page_fragment" or triggers_shell
 
+    # Resolve OOB scope from the target's registered scope_name.
+    # None means "all scopes" (boosted nav or no target); a string limits
+    # layout OOB to the matched scope level and its ancestors.
+    oob_scope: str | None = None
+    if htmx_target and fragment_target_registry:
+        config = fragment_target_registry.get(htmx_target)
+        if config is not None:
+            oob_scope = config.scope_name
+
     # Ensure layout_context has current_path for sidebar active state
     layout_context = dict(composition.context)
     if request and layout_chain and layout_chain.layouts and "current_path" not in layout_context:
@@ -272,6 +295,7 @@ def build_render_plan(
         layout_context=layout_context,
         region_updates=tuple(region_updates),
         include_layout_oob=include_layout_oob,
+        oob_scope=oob_scope,
     )
 
 
@@ -421,28 +445,49 @@ def execute_render_plan(
     # Augment region_updates with shell OOB blocks discovered via AST
     region_updates_list: list[RegionUpdate] = list(plan.region_updates)
     if plan.include_layout_oob and plan.layout_chain and plan.layout_chain.layouts:
-        root_layout = plan.layout_chain.layouts[0]
-        if oob_registry is not None:
-            contract = oob_registry.get_or_build_contract(adapter, root_layout.template_name)
-        else:
-            contract = build_layout_contract(adapter, root_layout.template_name)
         layout_ctx = plan.layout_context
+        # Nested filesystem layouts (e.g. marketing root + section app shell) each
+        # define *_oob regions. Deepest layout wins per target_id so section
+        # sidebars/breadcrumbs refresh on boosted navigation, not only root OOB.
+        #
+        # Scoped OOB: when oob_scope is set, only include OOB from layouts at
+        # or above the matched scope's depth (the scope's layout + ancestors).
+        # When oob_scope is None (boosted nav), include all layouts.
+        max_oob_depth: int | None = None
+        if plan.oob_scope is not None:
+            for li in plan.layout_chain.layouts:
+                scope = getattr(li, "swap_scope_name", None)
+                if scope == plan.oob_scope:
+                    max_oob_depth = li.depth
+                    break
 
-        for oob in contract.oob_blocks:
-            if oob.cache_scope == "site":
+        seen_oob_targets: set[str] = set()
+        for layout_info in reversed(plan.layout_chain.layouts):
+            if max_oob_depth is not None and layout_info.depth > max_oob_depth:
                 continue
-            if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
-                continue
-            region_updates_list.append(
-                RegionUpdate(
-                    region=oob.target_id,
-                    view=ViewRef(
-                        template=root_layout.template_name,
-                        block=oob.block_name,
-                        context=layout_ctx,
-                    ),
+            if oob_registry is not None:
+                contract = oob_registry.get_or_build_contract(adapter, layout_info.template_name)
+            else:
+                contract = build_layout_contract(adapter, layout_info.template_name)
+
+            for oob in contract.oob_blocks:
+                if oob.cache_scope == "site" and not oob.depends_on:
+                    continue
+                if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
+                    continue
+                if oob.target_id in seen_oob_targets:
+                    continue
+                seen_oob_targets.add(oob.target_id)
+                region_updates_list.append(
+                    RegionUpdate(
+                        region=oob.target_id,
+                        view=ViewRef(
+                            template=layout_info.template_name,
+                            block=oob.block_name,
+                            context=layout_ctx,
+                        ),
+                    )
                 )
-            )
 
     # Render region updates
     region_htmls: dict[str, str] = {}

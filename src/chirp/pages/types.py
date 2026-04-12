@@ -10,6 +10,27 @@ from typing import Any, Literal
 
 type RouteKind = Literal["page", "detail", "action", "redirect", "composition"]
 
+type OutletSwapMode = Literal["compose", "replace"]
+
+
+@dataclass(frozen=True, slots=True)
+class LayoutPreset:
+    """Named defaults for filesystem layout metadata.
+
+    Presets let apps and extensions encode a conventional shell shape once and
+    keep `_layout.html` focused on route-tree intent. Explicit comments in the
+    layout always override preset defaults.
+    """
+
+    name: str
+    target: str | None = None
+    domain_name: str | None = None
+    shell_name: str | None = None
+    swap_scope_name: str | None = None
+    outlet_target_id: str | None = None
+    frame_targets: frozenset[str] | None = None
+    outlet_mode: OutletSwapMode | None = None
+
 
 @dataclass(frozen=True, slots=True)
 class RouteMeta:
@@ -90,16 +111,48 @@ class LayoutInfo:
     slot and a ``{# target: element_id #}`` comment declaring which DOM
     element it owns.
 
+    Optional comments (see filesystem routing docs) declare navigation and
+    swap metadata for boosted navigation helpers:
+
+    - ``{# domain: name #}`` — author-facing navigation domain boundary.
+    - ``{# shell: name #}`` — this layout introduces a shell boundary.
+    - ``{# swap_scope: name #}`` — symbolic scope (e.g. ``shell``, ``page``).
+    - ``{# outlet: element_id #}`` — primary navigation outlet for this level
+      (defaults to *target* when omitted).
+    - ``{# outlet_mode: compose | replace #}`` — how boosted swaps targeting
+      ``{# outlet: #}`` relate to layout composition (default ``compose``).
+    - ``{# frames: id1, id2 #}`` — optional frame ids (immutable chrome).
+
     Attributes:
         template_name: Template name for kida (relative to pages root).
         target: DOM element ID this layout renders into.
             ``"body"`` for the root layout, ``"app-content"`` for nested.
         depth: Nesting depth (0 = root).
+        domain_name: Optional navigation domain label introduced by this layout.
+            When any layout in the chain declares a domain, navigation helpers
+            use domain ancestry instead of inferring intent from shell ancestry.
+        shell_name: Optional shell boundary label introduced by this layout.
+            Descendant routes inherit the full shell path from ancestor layouts.
+            Shells describe persistent UI boundaries; they only imply navigation
+            intent when no explicit domain metadata is declared.
+        swap_scope_name: Optional symbolic scope for ``resolve_navigation_swap``.
+        outlet_target_id: Optional primary outlet id for this layout level.
+        frame_targets: Optional ids treated as non-swapped frame for validation.
+        outlet_mode: ``compose`` (re-run layout shell for the fragment response) vs
+            ``replace`` (skip the matched outer layout while still rendering any
+            descendant layouts below it; use for scroll/marketing shells where
+            the outlet wraps the primary ``{% block content %}`` region).
     """
 
     template_name: str
     target: str
     depth: int
+    shell_name: str | None = None
+    swap_scope_name: str | None = None
+    outlet_target_id: str | None = None
+    frame_targets: frozenset[str] | None = None
+    outlet_mode: OutletSwapMode = "compose"
+    domain_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +169,98 @@ class LayoutChain:
 
     layouts: tuple[LayoutInfo, ...] = ()
 
+    @property
+    def domain_layers(self) -> tuple[tuple[str, int], ...]:
+        """Return ``(domain_name, layout_index)`` for explicit domain boundaries."""
+        return tuple(
+            (layout.domain_name, index)
+            for index, layout in enumerate(self.layouts)
+            if layout.domain_name is not None
+        )
+
+    @property
+    def domain_path(self) -> tuple[str, ...]:
+        """Return the explicit navigation-domain ancestry for this route."""
+        return tuple(name for name, _ in self.domain_layers)
+
+    @property
+    def shell_layers(self) -> tuple[tuple[str, int], ...]:
+        """Return ``(shell_name, layout_index)`` for each declared shell boundary."""
+        return tuple(
+            (layout.shell_name, index)
+            for index, layout in enumerate(self.layouts)
+            if layout.shell_name is not None
+        )
+
+    @property
+    def shell_path(self) -> tuple[str, ...]:
+        """Return the inherited shell ancestry for this route.
+
+        The path is derived from boundary layouts that declare
+        ``{# shell: name #}``. Layouts without a shell annotation participate
+        in composition but do not introduce a new shell boundary.
+        """
+        return tuple(name for name, _ in self.shell_layers)
+
+    def layout_index_for_shell_depth(self, shell_depth: int) -> int | None:
+        """Return the layout index for the Nth shell boundary, or ``None``."""
+        if shell_depth <= 0:
+            return None
+        shell_layers = self.shell_layers
+        if shell_depth > len(shell_layers):
+            return None
+        return shell_layers[shell_depth - 1][1]
+
+    @property
+    def navigation_domain_layers(self) -> tuple[tuple[str, int], ...]:
+        """Return the ancestry used for route-aware navigation decisions.
+
+        Explicit ``{# domain: #}`` annotations win. When no layout in the chain
+        declares a domain, fall back to legacy shell ancestry for backward
+        compatibility.
+        """
+        domain_layers = self.domain_layers
+        if domain_layers:
+            return domain_layers
+        return self.shell_layers
+
+    @property
+    def navigation_domain_path(self) -> tuple[str, ...]:
+        """Return the effective navigation-domain path for this route."""
+        return tuple(name for name, _ in self.navigation_domain_layers)
+
+    def layout_index_for_navigation_depth(self, navigation_depth: int) -> int | None:
+        """Return the layout index for the Nth navigation-domain boundary."""
+        if navigation_depth <= 0:
+            return None
+        navigation_layers = self.navigation_domain_layers
+        if navigation_depth > len(navigation_layers):
+            return None
+        return navigation_layers[navigation_depth - 1][1]
+
+    def start_index_for_htmx_target(
+        self,
+        htmx_target: str | None,
+        *,
+        omit_outer_layout_targets: frozenset[str] = frozenset(),
+    ) -> int | None:
+        """Return the layout start index for a boosted navigation target.
+
+        ``omit_outer_layout_targets`` contains target ids whose registered
+        fragment config wants to skip the matched outer layout while still
+        rendering any descendant shells.
+        """
+        idx = self.find_start_index_for_target(htmx_target)
+        if idx is None or htmx_target is None:
+            return idx
+        target_id = htmx_target.lstrip("#")
+        if target_id in omit_outer_layout_targets:
+            return min(idx + 1, len(self.layouts))
+        layout = self.layouts[idx]
+        if layout.outlet_target_id == target_id and layout.outlet_mode == "replace":
+            return min(idx + 1, len(self.layouts))
+        return idx
+
     def find_start_index_for_target(self, htmx_target: str | None) -> int | None:
         """Find the layout index to start rendering from for a given HX-Target.
 
@@ -126,6 +271,11 @@ class LayoutChain:
 
         Returns the index of the matched layout, or ``None`` if the
         target doesn't match any layout (treat as fragment).
+
+        Matches ``{# target: element_id #}`` — the DOM node the layout
+        renders into — and ``{# outlet: element_id #}`` — the primary
+        boosted-navigation outlet (e.g. ``main`` for app shells with
+        ``hx-select="#page-content"``).
         """
         if htmx_target is None:
             return None
@@ -133,6 +283,8 @@ class LayoutChain:
         target_id = htmx_target.lstrip("#")
         for i, layout in enumerate(self.layouts):
             if layout.target == target_id:
+                return i
+            if layout.outlet_target_id is not None and layout.outlet_target_id == target_id:
                 return i
         return None
 

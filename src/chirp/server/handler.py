@@ -5,7 +5,7 @@ to typed Request objects, dispatches through middleware and routing,
 and sends Response back through ASGI send().
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextvars import Token
 from dataclasses import replace
 from typing import Any
@@ -56,6 +56,68 @@ def compile_middleware_chain(
     return chain
 
 
+def _request_path_with_query(request: Request) -> str:
+    """Return the request path including the raw query string when present."""
+    raw = getattr(request.query, "_raw", b"")
+    if isinstance(raw, bytes) and raw:
+        return f"{request.path}?{raw.decode('latin-1')}"
+    return request.path
+
+
+def _cross_shell_boost_redirect(
+    request: Request,
+    match: RouteMatch,
+    *,
+    router: Router,
+    route_layout_chains: Mapping[str, Any] | None,
+    fragment_target_registry: FragmentTargetRegistry | None,
+    swap_scope_map: Mapping[str, str] | None,
+) -> Response | None:
+    """Redirect boosted GETs that do not match the expected shell target."""
+    from chirp.pages.types import LayoutChain
+    from chirp.templating.navigation_swap import (
+        lookup_layout_chain_for_path,
+        resolve_navigation_swap,
+    )
+
+    if (
+        request.method != "GET"
+        or not request.is_boosted
+        or route_layout_chains is None
+        or fragment_target_registry is None
+        or not swap_scope_map
+    ):
+        return None
+    current_path = request.htmx_current_url_abs_path
+    if current_path is None or not current_path.startswith("/"):
+        # Cannot compute swap diff without a valid current URL — pass through
+        return None
+    dest_chain = route_layout_chains.get(match.route.path)
+    if not isinstance(dest_chain, LayoutChain):
+        return None
+    current_chain = lookup_layout_chain_for_path(
+        current_path,
+        router=router,
+        route_layout_chains=route_layout_chains,
+    )
+    resolution = resolve_navigation_swap(
+        current_path=current_path,
+        destination_path=request.path,
+        layout_chain_current=current_chain,
+        layout_chain_dest=dest_chain,
+        registry=fragment_target_registry,
+        swap_scope_map=swap_scope_map,
+    )
+    if resolution is None:
+        # No swap resolution — let the request render normally
+        return None
+    request_target = request.htmx_target.lstrip("#") if request.htmx_target is not None else None
+    expected_target = resolution.htmx_target.lstrip("#")
+    if request_target == expected_target:
+        return None
+    return Response(body="").with_hx_redirect(_request_path_with_query(request))
+
+
 def create_request_handler(
     *,
     router: Router,
@@ -67,6 +129,8 @@ def create_request_handler(
     kida_env: Environment | None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    route_layout_chains: Mapping[str, Any] | None = None,
+    swap_scope_map: Mapping[str, str] | None = None,
     discovered_routes: list[Any] | None = None,
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request."""
@@ -106,12 +170,15 @@ def create_request_handler(
         return await _invoke_handler(
             match,
             req,
+            router=router,
             kida_env=kida_env,
             providers=providers,
             validate_blocks=debug,
             force_inline_sync=force_inline_sync_var.get(),
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
+            route_layout_chains=route_layout_chains,
+            swap_scope_map=swap_scope_map,
         )
 
     return compile_middleware_chain(middleware, dispatch)
@@ -215,12 +282,15 @@ async def _invoke_handler(
     match: RouteMatch,
     request: Request,
     *,
+    router: Router,
     kida_env: Environment | None = None,
     providers: dict[type, Callable[..., Any]] | None = None,
     validate_blocks: bool = False,
     force_inline_sync: bool = False,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    route_layout_chains: Mapping[str, Any] | None = None,
+    swap_scope_map: Mapping[str, str] | None = None,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -241,6 +311,17 @@ async def _invoke_handler(
             _receive=request._receive,
             _cache=request._cache,
         )
+
+    cross_shell_redirect = _cross_shell_boost_redirect(
+        request,
+        match,
+        router=router,
+        route_layout_chains=route_layout_chains,
+        fragment_target_registry=fragment_target_registry,
+        swap_scope_map=swap_scope_map,
+    )
+    if cross_shell_redirect is not None:
+        return cross_shell_redirect
 
     # Pre-read body data if any handler param needs typed extraction
     plan = getattr(match.route, "invoke_plan", None)

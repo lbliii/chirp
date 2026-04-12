@@ -62,6 +62,7 @@ CHIRP_CAPABILITIES = frozenset(
 )
 __all__ = [
     "CHIRP_CAPABILITIES",
+    "CHIRP_DEFER_PENDING_KEY",
     "OOB",
     "STOP_POLLING",
     "Action",
@@ -108,6 +109,7 @@ __all__ = [
     "ShellSubmitSurface",
     "Stream",
     "Suspense",
+    "SwapResolution",
     "Template",
     "TemplateStream",
     "ToolCallEvent",
@@ -132,6 +134,7 @@ __all__ = [
     "logout",
     "reactive_stream",
     "requires",
+    "resolve_navigation_swap",
     "use_chirp_ui",
 ]
 
@@ -142,6 +145,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Application
     "App": ("chirp.app", "App"),
     "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
+    "CHIRP_DEFER_PENDING_KEY": ("chirp.templating.suspense", "CHIRP_DEFER_PENDING_KEY"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # Contracts (for plugin authors)
     "ContractCheck": ("chirp.contracts.types", "ContractCheck"),
@@ -169,6 +173,8 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "MutationResult": ("chirp.templating.returns", "MutationResult"),
     "Stream": ("chirp.templating.returns", "Stream"),
     "Suspense": ("chirp.templating.returns", "Suspense"),
+    "SwapResolution": ("chirp.templating.navigation_swap", "SwapResolution"),
+    "resolve_navigation_swap": ("chirp.templating.navigation_swap", "resolve_navigation_swap"),
     "TemplateStream": ("chirp.templating.returns", "TemplateStream"),
     "ValidationError": ("chirp.templating.returns", "ValidationError"),
     "OOB": ("chirp.templating.returns", "OOB"),

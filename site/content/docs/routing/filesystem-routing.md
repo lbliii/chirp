@@ -126,6 +126,56 @@ Layouts nest from root to leaf. The negotiation layer uses `HX-Target` to decide
 
 If no target is declared, it defaults to `"body"`.
 
+### Navigation domains vs shells
+
+Filesystem layouts can also declare an explicit navigation domain:
+
+```html
+{# preset: site-shell #}
+{# target: body #}
+{# domain: site #}
+{# shell: site #}
+{# outlet: site-content #}
+```
+
+Use `domain` for the author-facing answer to "which links should boost together?" Use
+`shell` for persistent UI boundaries and nested layout composition. When any layout in a
+route chain declares `domain`, `swap_attrs()` resolves navigation from the shared domain
+ancestry first and only falls back to shell ancestry for older layouts that do not opt in.
+
+This lets you model cases like:
+
+- one domain with multiple nested shells
+- sibling domains under a shared outer shell
+- incremental migration from shell-only layouts to explicit navigation intent
+
+### Layout presets
+
+Apps and extensions can register named layout presets during setup:
+
+```python
+app.register_layout_preset(
+    "site-shell",
+    target="body",
+    swap_scope_name="site",
+    outlet_target_id="site-content",
+    outlet_mode="replace",
+)
+```
+
+Then a filesystem layout can opt in with a single comment and keep only the
+route-specific intent inline:
+
+```html
+{# preset: site-shell #}
+{# domain: site #}
+{# shell: site #}
+```
+
+Explicit comments always override preset defaults. `use_chirp_ui(app)` also
+registers a built-in `chirpui-app-shell` preset for the standard `#main`
+app-shell outlet.
+
 ### How `render_with_blocks` works
 
 Chirp composes layouts using `render_with_blocks({"content": page_html})`. This **replaces** `{% block content %}` with the pre-rendered page HTML. Any markup you put inside `{% block content %}` in your layout is overridden — it never renders.
@@ -193,7 +243,8 @@ Key elements:
 - **`hx-boost="true"`** on `<main id="main">` — Boosted links inside the content area use AJAX navigation.
 - **`hx-select="#page-content"`** — When the server returns a full HTML page, htmx parses it and extracts only `#page-content` for the swap. The shell persists client-side.
 - **No `hx-disinherit`** on the content wrapper — Boosted links must inherit `hx-target`, `hx-swap`, and `hx-select` from `#main`. Fragment requests with explicit `hx-target` override the inherited value.
-- **`{# target: main #}`** — Tells Chirp which layout depth to render for `HX-Target: main` requests.
+- **`{# target: body #}`** — Which DOM id this layout level renders *into* in a nested layout chain (often `body` for the root shell).
+- **`{# outlet: main #}`** — Declares the **primary boosted-navigation outlet** for this layout (the `<main id="main">` region in chirp-ui’s app shell). `LayoutChain.find_start_index_for_target` matches **both** `target` and `outlet` so `HX-Target: #main` resolves to this layout and `render_with_layouts` wraps the page with the full shell—including the `#page-content` wrapper that `hx-select` expects. Without `{# outlet: main #}`, `main` does not match any layout and the server returns **bare page HTML** (no `#page-content`), which breaks boosted swaps that rely on `hx-select`.
 
 ### Nested shells with shell_section
 
@@ -212,9 +263,54 @@ For multi-level layouts (e.g. forum > subforum > thread), use the `shell_section
 
 Inner layouts don't need `hx-select` — the renderer produces fragments for them. Use `chirp new myapp --shell` to scaffold a project with this pattern.
 
+### Composition, not inheritance
+
+Chirp layouts use **composition** via `render_with_blocks`. The layout defines `{% block content %}{% end %}`; Chirp replaces it with the rendered page HTML. This is not Kida/Jinja2 `{% extends %}` inheritance — the page template does **not** extend the layout, so it cannot override sibling blocks in the layout.
+
+```html
+{# _layout.html — layout defines these blocks #}
+<div id="page-content">
+  {% block content %}{% end %}
+</div>
+{% block page_scripts %}{% end %}
+```
+
+```html
+{# page.html — this block is IGNORED, not an override #}
+{% block page_content %}
+  <p>Page content</p>
+{% end %}
+
+{% block page_scripts %}
+  <script>/* never reaches the browser */</script>
+{% end %}
+```
+
+In the example above, the `page_scripts` block in `page.html` defines a **new local block** — it does not fill the layout's `page_scripts`. The layout's version stays empty because `render_with_blocks` only injects into the `content` block.
+
+**The rule:** page templates own the region inside `{% block content %}`. Everything outside — `<head>`, footers, script slots — belongs to the layout. If your page needs a `<script>`, put it inline within the content block:
+
+```html
+{# page.html — script inside the content region, works correctly #}
+{% block page_root %}
+<div id="page-root">
+{% block page_content %}
+  <p>Page content</p>
+{% end %}
+</div>
+
+<script>
+Alpine.safeData("myComponent", function() { /* ... */ });
+</script>
+{% end %}
+```
+
+If you come from Jinja2/Django where child templates `{% extends %}` a parent and override blocks at will, this is the key difference. Chirp's filesystem pages are **injected into** layouts, not derived from them.
+
 ### Common mistakes
 
 - **`{% extends %}` in inner layouts** — Inner `_layout.html` files that use `{% extends %}` can conflict with `render_with_blocks`. The child template may wipe the shell. Prefer composing with `shell_section` instead.
+- **Overriding layout blocks from page templates** — Page templates cannot fill layout blocks like `page_scripts` or `head_extra`. These blocks are only available to templates that `{% extends %}` the layout directly (e.g. inner `_layout.html` files). Put inline `<script>` tags inside the content region instead.
 - **Missing `{# target: X #}` on inner layouts** — Non-root layouts default to `"body"` if no target is declared. Add `{# target: element_id #}` so the layout chain resolves correctly.
 - **`hx-disinherit` in shell layouts** — Prefer `hx-select` on the parent. Use `hx-target="this"` on event-driven elements (e.g. SSE) instead of `hx-disinherit`.
 - **Duplicate targets in a chain** — Two layouts with the same target cause `find_start_index_for_target` to return the first match. Use unique targets per layout.

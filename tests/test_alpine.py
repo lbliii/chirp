@@ -1,13 +1,16 @@
 """Tests for Alpine.js support — config, injection, dedup, and macros."""
 
 import re
+from datetime import date
 
 from kida import Environment, PackageLoader
+from kida.template import Markup
 
 from chirp import App
 from chirp.config import AppConfig
-from chirp.server.alpine import PLUGINS, alpine_snippet
+from chirp.server.alpine import PLUGIN_NAMES, alpine_json_config, alpine_snippet
 from chirp.templating.filters import BUILTIN_FILTERS
+from chirp.templating.returns import Template
 from chirp.testing import TestClient
 
 
@@ -115,11 +118,75 @@ class TestAlpineSnippet:
 
     def test_plugin_urls_have_explicit_cdn_path(self) -> None:
         """Each plugin script src must include @alpinejs/{name}@…/dist/cdn.min.js."""
-        for plugin in ("mask", "intersect", "focus"):
+        snippet = alpine_snippet("3.15.8", csp=False)
+        for plugin in PLUGIN_NAMES:
             assert re.search(
-                rf"@alpinejs/{plugin}@[0-9.]+/dist/cdn\.min\.js",
-                PLUGINS,
+                rf"@alpinejs/{plugin}@3\.15\.8/dist/cdn\.min\.js",
+                snippet,
             ), f"Missing explicit /dist/cdn.min.js for plugin: {plugin}"
+
+    def test_plugin_versions_follow_requested_alpine_version(self) -> None:
+        """Plugin URLs should stay aligned with the configured Alpine version."""
+        snippet = alpine_snippet("3.16.1", csp=False)
+        for plugin in PLUGIN_NAMES:
+            assert f"@alpinejs/{plugin}@3.16.1/dist/cdn.min.js" in snippet
+
+
+# ---------------------------------------------------------------------------
+# alpine_json_config template global
+# ---------------------------------------------------------------------------
+
+
+class TestAlpineJsonConfig:
+    def test_basic_output(self) -> None:
+        out = alpine_json_config("my-id", {"key": "value"})
+        assert str(out) == ('<script id="my-id" type="application/json">{"key": "value"}</script>')
+
+    def test_id_escaping(self) -> None:
+        out = alpine_json_config('a"b', {})
+        assert 'id="a&quot;b"' in str(out)
+
+    def test_escapes_ampersand_and_brackets_in_id(self) -> None:
+        out = alpine_json_config("x&y<z>", {})
+        assert 'id="x&amp;y&lt;z&gt;"' in str(out)
+
+    def test_script_close_sequence_in_data(self) -> None:
+        out = alpine_json_config("cfg", {"html": "</script><script>evil"})
+        s = str(out)
+        assert "</script><script>" not in s
+        assert "<\\/script>" in s or "<\\/scr" in s
+
+    def test_non_json_serializable_uses_default_str(self) -> None:
+        out = alpine_json_config("d", {"when": date(2026, 4, 11)})
+        assert "2026-04-11" in str(out)
+
+    def test_returns_markup(self) -> None:
+        out = alpine_json_config("x", {})
+        assert isinstance(out, Markup)
+
+    def test_none_serializes_to_null(self) -> None:
+        out = alpine_json_config("n", None)
+        assert str(out) == '<script id="n" type="application/json">null</script>'
+
+
+class TestAlpineJsonConfigTemplateRender:
+    """``alpine_json_config`` is available to Kida when ``alpine=True``."""
+
+    def test_render_inline_template_emits_script_tag(self) -> None:
+        app = App(config=AppConfig(alpine=True, template_dir="nonexistent"))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        html = app.render(
+            Template.inline(
+                '{{ alpine_json_config("app-cfg", cfg) }}',
+                cfg={"rows": 1},
+            )
+        )
+        assert '<script id="app-cfg" type="application/json">' in html
+        assert '"rows": 1' in html
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +262,28 @@ class TestAlpineInjection:
             response = await client.get("/")
             assert response.status == 200
             assert "alpinejs@3.14.0" in response.text
+
+    async def test_alpine_json_config_registered_when_alpine_enabled(self) -> None:
+        app = App(config=AppConfig(alpine=True))
+
+        @app.route("/")
+        def index():
+            return "<html><body></body></html>"
+
+        async with TestClient(app):
+            assert app._kida_env is not None
+            assert "alpine_json_config" in app._kida_env.globals
+
+    async def test_alpine_json_config_not_registered_when_alpine_disabled(self) -> None:
+        app = App()
+
+        @app.route("/")
+        def index():
+            return "<html><body></body></html>"
+
+        async with TestClient(app):
+            assert app._kida_env is not None
+            assert "alpine_json_config" not in app._kida_env.globals
 
 
 # ---------------------------------------------------------------------------

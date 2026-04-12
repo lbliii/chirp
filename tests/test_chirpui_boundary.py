@@ -276,6 +276,31 @@ class TestChirpUIIntegration:
             resp = await client.get("/static/chirpui.js")
             assert resp.status == 200
 
+    @pytest.mark.skipif(
+        not (Path(chirp_ui.static_path()) / "chirpui-alpine.js").exists(),
+        reason="chirp-ui Alpine runtime not available in this version",
+    )
+    async def test_static_alpine_runtime_served(self):
+        """ChirpUI Alpine runtime is served at /static/chirpui-alpine.js."""
+        app = _make_chirpui_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/static/chirpui-alpine.js")
+            assert resp.status == 200
+            assert "chirpuiDropdown" in resp.text
+
+    @pytest.mark.skipif(
+        not (Path(chirp_ui.static_path()) / "chirpui-alpine.js").exists(),
+        reason="chirp-ui Alpine runtime not available in this version",
+    )
+    async def test_use_chirp_ui_injects_runtime_script(self):
+        """use_chirp_ui injects the chirp-ui Alpine runtime on full pages."""
+        app = _make_chirpui_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/")
+            assert resp.status == 200
+            assert 'data-chirp="chirpui-alpine"' in resp.text
+            assert "/static/chirpui-alpine.js" in resp.text
+
     async def test_sequential_requests_through_middleware(self):
         """Multiple requests through ChirpUI middleware all see ContextVar."""
         app = _make_chirpui_app()

@@ -22,7 +22,7 @@ The **route directory contract** defines how Chirp discovers and wires filesyste
 | `page.html` | route-local | Primary page template. Sibling of `page.py`. Defines fragment blocks. |
 | `_meta.py` | route-local | Route metadata (title, section, breadcrumb_label, shell_mode). Exports `META` or `meta()`. |
 | `_context.py` | inherited | Subtree-scoped context provider. Exports `context()` receiving path params, parent context, and services. |
-| `_layout.html` | inherited | Subtree layout wrapper. Declares `{# target: element_id #}` and `{% block content %}`. |
+| `_layout.html` | inherited | Subtree layout wrapper. Declares `{# target: element_id #}` (and optionally `{# outlet: element_id #}`, `{# swap_scope: #}`, `{# frames: #}`) and `{% block content %}`. |
 | `_actions.py` | route-local | Mutation handlers. Exports `@action` decorated functions. |
 | `_viewmodel.py` | route-local | View assembly. Exports `viewmodel()` merging data for templates. |
 
@@ -75,7 +75,7 @@ For delivery modes (`hx-target`, boost vs route-tab clicks) and a full checklist
 
 ## Layout Chain
 
-Layouts inherit down the directory tree. Each `_layout.html` declares `{# target: element_id #}`. Render depth depends on `HX-Target`: full page renders all; fragment requests start at the matching layout.
+Layouts inherit down the directory tree. Each `_layout.html` declares `{# target: element_id #}` (which DOM node the layout fills in a nested chain). Optional `{# outlet: element_id #}` declares the **primary navigation outlet** (for example `main` for chirp-ui app shells). `LayoutChain.find_start_index_for_target` matches **both** so boosted `HX-Target` headers can target `#main` while the layout’s `target` remains `body`. Render depth depends on `HX-Target`: full page renders all layouts; boosted requests start at the matching layout. See [[docs/routing/filesystem-routing|Filesystem routing]] (persistent app shell pattern).
 
 ## Shell Context Assembly
 

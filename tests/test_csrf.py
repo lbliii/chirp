@@ -30,8 +30,12 @@ class TestCSRFConfig:
 
 class TestGetCSRFToken:
     def test_raises_outside_request(self) -> None:
-        with pytest.raises(LookupError, match="No CSRF token"):
+        with pytest.raises(LookupError, match="No CSRF token") as excinfo:
             get_csrf_token()
+        message = str(excinfo.value)
+        assert "CSRFMiddleware" in message
+        assert "SessionMiddleware" in message
+        assert "streamed or deferred rendering" in message
 
 
 # ---------------------------------------------------------------------------

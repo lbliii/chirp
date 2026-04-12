@@ -178,7 +178,12 @@ async def dashboard():
     )
 ```
 
-The template uses `{% if stats %}...{% else %}skeleton{% end %}` inside named blocks. Chirp renders the shell with `None` for awaitable keys (triggering the skeleton branch), resolves the awaitables concurrently, then streams each block's real content as an OOB swap.
+Use **`{% if stats is not none %}...{% else %}skeleton{% end %}`** (not bare `{% if stats %}`) so an empty resolved `tuple`/`list` does not look like “still loading”. The shell sets awaitable keys to `None` until they resolve; it also sets **`__chirp_defer_pending__`** to a `frozenset` of keys still awaiting resolution (empty once resolved or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer that to `is not none`. The constant **`CHIRP_DEFER_PENDING_KEY`** is the string `__chirp_defer_pending__`. Chirp resolves awaitables concurrently, then streams each block's real content as an OOB swap. Blocks are discovered via static analysis (`block_metadata().depends_on`) with ancestor pruning.
+
+Optional parameters:
+
+- **`defer_blocks`** — explicit tuple of block names to re-render, bypassing static analysis. Use when deferred values are passed through macro arguments the analyzer can't trace.
+- **`defer_map`** — maps block names to different DOM ids for OOB swap targeting (`{"stats": "stats-panel"}`).
 
 See [[docs/streaming/html-streaming|Streaming HTML]] for the full story.
 

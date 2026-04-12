@@ -56,6 +56,9 @@ from chirp import (
     g,
     get_request,
 
+    # Suspense (template context key string)
+    CHIRP_DEFER_PENDING_KEY,
+
     # Auth
     get_user,
     login,
@@ -179,7 +182,7 @@ headers so the same handler works for normal and htmx navigation:
 | `Fragment(name, block, **ctx)` | Named block render |
 | `Page(name, block, **ctx)` | Auto-detect fragment vs full page |
 | `Stream(name, **ctx)` | Progressive streaming render |
-| `Suspense(name, **ctx)` | Shell-first render with deferred OOB swaps |
+| `Suspense(name, *, defer_map={}, defer_blocks=None, **ctx)` | Shell-first render with deferred OOB swaps |
 | `TemplateStream(...)` | Lower-level streaming template response |
 | `ValidationError(name, block, **ctx)` | 422 fragment response |
 | `OOB(main, *fragments)` | Out-of-band multi-fragment response |
@@ -199,6 +202,12 @@ headers so the same handler works for normal and htmx navigation:
 |--------|-------------|
 | `g` | Request-scoped mutable namespace (ContextVar-backed) |
 | `get_request()` | Get the current request from ContextVar |
+
+## Constants
+
+| Export | Description |
+|--------|-------------|
+| `CHIRP_DEFER_PENDING_KEY` | String ``__chirp_defer_pending__`` — Suspense injects this key into template context (see [[docs/streaming/html-streaming|Streaming HTML]]) |
 
 ## Auth
 

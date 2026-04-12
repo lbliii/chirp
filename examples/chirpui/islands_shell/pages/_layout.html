@@ -58,7 +58,10 @@
   {{ sidebar_oob(current_path=current_path ?? "/") }}
   {% end %}
 
-  {% block content %}{% end %}
+  {#- Inlined shell_outlet() from shell_frame (defaults) for chirp-ui versions without that def. -#}
+  <div id="page-content" hx-boost="true" hx-target="#main" hx-swap="innerHTML" hx-select="#page-content">
+    {% block content %}{% end %}
+  </div>
 {% end %}
 </body>
 </html>

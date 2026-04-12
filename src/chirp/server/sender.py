@@ -5,11 +5,14 @@ Handles both standard single-body responses and chunked streaming responses.
 
 import logging
 from collections.abc import AsyncIterator
+from contextvars import Token
 from types import MappingProxyType
 from typing import cast
 
 from chirp._internal.asgi import Send
+from chirp.context import request_var
 from chirp.http.response import Response, StreamingResponse
+from chirp.logging import request_id_var
 
 logger = logging.getLogger("chirp.server")
 
@@ -111,6 +114,12 @@ async def send_streaming_response(
     def _encode_chunk(chunk: str) -> bytes:
         return chunk.encode("utf-8")
 
+    request_token: Token | None = None
+    request_id_token: Token | None = None
+    if response.request_context is not None:
+        request_token = request_var.set(response.request_context)
+        request_id_token = request_id_var.set(response.request_context.request_id)
+
     try:
         if isinstance(response.chunks, AsyncIterator):
             async for chunk in response.chunks:
@@ -164,6 +173,11 @@ async def send_streaming_response(
         )
         # Re-store exception info for any caller that needs it
         sys.exc_info()
+    finally:
+        if request_token is not None:
+            request_var.reset(request_token)
+        if request_id_token is not None:
+            request_id_var.reset(request_id_token)
 
     # Close the stream
     await send(

@@ -235,7 +235,7 @@ def test_register_contract_registers_targets_and_required_blocks() -> None:
     assert cfg.required is True
 
 
-def test_register_contract_rejects_multiple_contracts() -> None:
+def test_register_contract_allows_multiple_named_contracts() -> None:
     reg = FragmentTargetRegistry()
     reg.register_contract(
         PageShellContract(
@@ -243,14 +243,15 @@ def test_register_contract_rejects_multiple_contracts() -> None:
             targets=(PageShellTarget(target_id="main", fragment_block="page_root"),),
         )
     )
-
-    with pytest.raises(ValueError, match="Only one page shell contract"):
-        reg.register_contract(
-            PageShellContract(
-                name="secondary-shell",
-                targets=(PageShellTarget(target_id="alt-main", fragment_block="alt_root"),),
-            )
+    reg.register_contract(
+        PageShellContract(
+            name="secondary-shell",
+            targets=(PageShellTarget(target_id="alt-main", fragment_block="alt_root"),),
         )
+    )
+    assert reg.get("main") is not None
+    assert reg.get("alt-main") is not None
+    assert {c.name for c in reg.registered_contracts} == {"app-shell", "secondary-shell"}
 
 
 def test_fragment_block_for_request_main_target_when_not_in_layout_chain() -> None:

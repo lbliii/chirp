@@ -54,6 +54,7 @@ from .rules_sse import (
     check_sse_self_swap,
 )
 from .rules_swap import check_swap_safety, collect_broad_targets
+from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
 from .template_scan import (
     extract_fragment_island_ids,
@@ -216,6 +217,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         route_templates=getattr(app._mutable_state, "route_templates", {}),
         discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
         template_sources=ts,
+        extras=dict(getattr(app._mutable_state, "contract_check_data", {})),
     )
 
 
@@ -354,7 +356,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         broad_targets = collect_broad_targets(template_sources)
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
-        result.issues.extend(check_layout_chains(snapshot.layout_chains, template_sources))
+        result.issues.extend(
+            check_layout_chains(
+                snapshot.layout_chains,
+                template_sources,
+                fragment_target_registry=snapshot.fragment_target_registry,
+            )
+        )
         # Landmark check: root layout templates define the page shell (<html>/<body>)
         # and contain {% block %} for child templates to fill.  Leaf pages also
         # contain {% block %} but inherit landmarks from their layout, so we
@@ -372,6 +380,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 snapshot.page_leaf_templates,
                 snapshot.fragment_target_registry,
                 kida_env,
+            )
+        )
+        result.issues.extend(
+            check_unreachable_blocks(
+                snapshot.page_leaf_templates,
+                kida_env,
+                extras=snapshot.extras,
             )
         )
         result.issues.extend(check_section_bindings(snapshot.route_metas, snapshot.sections))

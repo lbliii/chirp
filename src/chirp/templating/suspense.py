@@ -20,10 +20,14 @@ Pipeline::
     )
 
     1. Separate sync vs. awaitable context values
-    2. Render shell with sync context + None for awaitable keys
+    2. Render shell with sync context + ``None`` for awaitable keys + the
+       ``__chirp_defer_pending__`` frozenset (``CHIRP_DEFER_PENDING_KEY``)
     3. Yield shell as first chunk (instant first paint)
     4. Resolve awaitables concurrently (anyio task group)
-    5. For each resolved key, find affected blocks via block_metadata
+    5. Determine blocks to re-render:
+       a. If ``defer_blocks`` is set, use that list directly
+       b. Otherwise, discover via ``block_metadata().depends_on``
+          and prune ancestor blocks (strict ``depends_on`` superset)
     6. Render each block with full context
     7. Yield OOB swap chunks (htmx or <template>+<script>)
 """
@@ -33,7 +37,7 @@ from __future__ import annotations
 import inspect
 import logging
 from collections.abc import AsyncIterator, Awaitable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anyio
 from kida import Environment
@@ -42,6 +46,15 @@ from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Suspense
 
 logger = logging.getLogger("chirp.suspense")
+
+if TYPE_CHECKING:
+    from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+#: Shell / deferred-block template context key for which context keys are
+#: still awaiting resolution.  Shell render: ``frozenset`` of deferred names;
+#: sync-only renders and deferred block re-renders: empty ``frozenset``.
+#: Do not pass a user context key with this name — it is reserved.
+CHIRP_DEFER_PENDING_KEY = "__chirp_defer_pending__"
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +120,10 @@ def _find_deferred_blocks(
     Uses kida's ``block_metadata()`` static analysis to find blocks
     whose ``depends_on`` set intersects with the deferred keys.
 
+    Parent blocks whose ``depends_on`` is a strict superset of another
+    matched block are pruned — they would re-render the entire section
+    for an OOB target that likely doesn't exist in the DOM.
+
     Returns ``{context_key: [block_name, ...]}`` — a key may affect
     multiple blocks, and a block may appear under multiple keys
     (de-duplicated during rendering).
@@ -118,12 +135,40 @@ def _find_deferred_blocks(
 
     for block_name, block_meta in metadata.items():
         for dep_path in block_meta.depends_on:
-            # Match context key: "stats" matches dep path "stats" or "stats.count"
             root_key = dep_path.split(".")[0]
             if root_key in deferred_keys:
                 key_to_blocks.setdefault(root_key, []).append(block_name)
 
+    for key, blocks in key_to_blocks.items():
+        if len(blocks) <= 1:
+            continue
+        deps_by_block = {b: metadata[b].depends_on for b in blocks}
+        key_to_blocks[key] = _prune_ancestor_blocks(blocks, deps_by_block)
+
     return key_to_blocks
+
+
+def _prune_ancestor_blocks(
+    blocks: list[str],
+    deps_by_block: dict[str, frozenset[str]],
+) -> list[str]:
+    """Drop blocks whose depends_on is a strict superset of another block's.
+
+    Parent blocks in the AST always accumulate the full dependency set
+    of their children.  When both a parent (``page_content``) and a leaf
+    (``stats_panel``) match a deferred key, the parent's ``depends_on``
+    is a strict superset of the leaf's.  Re-rendering the parent as an
+    OOB chunk is expensive and the target id rarely exists in the DOM.
+    """
+    drop: set[str] = set()
+    for a in blocks:
+        for b in blocks:
+            if a == b:
+                continue
+            if deps_by_block[a] > deps_by_block[b]:
+                drop.add(a)
+                break
+    return [b for b in blocks if b not in drop]
 
 
 def _should_wrap_in_layouts(
@@ -152,13 +197,22 @@ async def render_suspense(
     layout_context: dict[str, Any] | None = None,
     request: Any = None,
     oob_registry: OOBRegistry | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> AsyncIterator[str]:
     """Render a ``Suspense`` return value as an async chunk stream.
 
     Yields:
-        1. The full page shell (with ``None`` for deferred values),
-           optionally wrapped in the layout chain
+        1. The full page shell (with ``None`` for deferred values and
+           ``CHIRP_DEFER_PENDING_KEY`` listing those keys), optionally wrapped
+           in the layout chain
         2. One OOB swap chunk per deferred block as its data resolves
+
+    Blocks to re-render are determined by:
+
+    - ``suspense.defer_blocks`` — when set, renders exactly those blocks
+      (bypasses static analysis entirely).
+    - Otherwise, ``block_metadata().depends_on`` discovers blocks that
+      reference deferred context keys, and ancestor blocks are pruned.
 
     Args:
         env: Kida template environment.
@@ -168,6 +222,9 @@ async def render_suspense(
         layout_chain: Optional layout chain to wrap the shell in.
         layout_context: Context for layout templates (when layout_chain used).
         request: Request for fragment detection (when layout_chain used).
+        oob_registry: Optional OOB registry for swap/wrap resolution.
+        fragment_target_registry: Optional fragment target registry for
+            replace-style boosted navigation that must skip outer layouts.
     """
     context = suspense.context
     template_name = suspense.template_name
@@ -201,17 +258,23 @@ async def render_suspense(
             context=ctx,
             htmx_target=htmx_target,
             is_history_restore=is_history_restore,
+            fragment_target_registry=fragment_target_registry,
         )
 
     # Fast path: no awaitables — render full page in one shot
     if not pending:
         template = env.get_template(template_name)
+        sync_ctx = {**sync_ctx, CHIRP_DEFER_PENDING_KEY: frozenset()}
         page_html = template.render(sync_ctx)
         yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
         return
 
     # -- Phase 2: Render shell with None for deferred keys --
-    shell_ctx = {**sync_ctx, **dict.fromkeys(pending)}
+    shell_ctx = {
+        **sync_ctx,
+        **dict.fromkeys(pending),
+        CHIRP_DEFER_PENDING_KEY: frozenset(pending),
+    }
     template = env.get_template(template_name)
     page_html = template.render(shell_ctx)
     yield _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
@@ -236,14 +299,31 @@ async def render_suspense(
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
-    full_ctx = {**layout_ctx, **sync_ctx, **resolved}
-    deferred_keys = set(pending.keys())
-    key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
+    full_ctx = {
+        **layout_ctx,
+        **sync_ctx,
+        **resolved,
+        CHIRP_DEFER_PENDING_KEY: frozenset(),
+    }
 
-    # Collect unique blocks (order-preserving dedup)
-    blocks_to_render = list(
-        dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
-    )
+    if suspense.defer_blocks is not None:
+        available = set(template.list_blocks())
+        unknown = [b for b in suspense.defer_blocks if b not in available]
+        if unknown:
+            logger.warning(
+                "Suspense: defer_blocks contains unknown block(s) %r "
+                "for template %s (available: %s)",
+                unknown,
+                template_name,
+                sorted(available),
+            )
+        blocks_to_render = [b for b in suspense.defer_blocks if b in available]
+    else:
+        deferred_keys = set(pending.keys())
+        key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
+        blocks_to_render = list(
+            dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
+        )
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)

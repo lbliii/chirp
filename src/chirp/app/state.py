@@ -9,7 +9,7 @@ from kida import Environment
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.contracts.types import Severity
 from chirp.middleware.protocol import Middleware
-from chirp.pages.types import RouteMeta, Section
+from chirp.pages.types import LayoutPreset, RouteMeta, Section
 from chirp.routing.router import Router
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
@@ -74,6 +74,9 @@ class MutableAppState:
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
+    route_layout_chains: dict[str, Any] = field(default_factory=dict)
+    swap_scope_map: dict[str, str] = field(default_factory=dict)
+    layout_presets: dict[str, LayoutPreset] = field(default_factory=dict)
     plugin_loaders: list[Any] = field(default_factory=list)
     contract_checks: list[Callable[..., Any]] = field(default_factory=list)
     contract_check_data: dict[str, Any] = field(default_factory=dict)
@@ -93,6 +96,8 @@ class RuntimeAppState:
     oob_registry: OOBRegistry | None = None
     fragment_target_registry: FragmentTargetRegistry | None = None
     discovered_routes: list[Any] = field(default_factory=list)
+    route_layout_chains: dict[str, Any] = field(default_factory=dict)
+    swap_scope_map: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

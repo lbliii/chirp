@@ -21,6 +21,8 @@ class PageShellTarget:
     triggers_shell_update: bool = True
     required: bool = True
     description: str = ""
+    scope_name: str | None = None
+    omit_outer_layouts: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +50,10 @@ class FragmentTargetConfig:
     triggers_shell_update: When True, this swap participates in shell negotiation
         (e.g. ``shell_actions`` OOB). Use False for **narrow** in-page swaps
         (e.g. ``#page-content-inner``) that must not refresh the app shell.
+    omit_outer_layouts: When True, boosted responses for this HX-Target skip
+        composing filesystem layouts (page HTML only). Use for marketing shells
+        where the outlet wraps the whole ``{% block content %}`` and re-applying
+        the root layout would duplicate header/footer inside the outlet.
     """
 
     fragment_block: str
@@ -55,6 +61,8 @@ class FragmentTargetConfig:
     contract_name: str | None = None
     required: bool = False
     description: str = ""
+    scope_name: str | None = None
+    omit_outer_layouts: bool = False
 
 
 @dataclass(slots=True)
@@ -77,6 +85,8 @@ class FragmentTargetRegistry:
         contract_name: str | None = None,
         required: bool = False,
         description: str = "",
+        scope_name: str | None = None,
+        omit_outer_layouts: bool = False,
     ) -> None:
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
@@ -88,19 +98,20 @@ class FragmentTargetRegistry:
             contract_name=contract_name,
             required=required,
             description=description,
+            scope_name=scope_name,
+            omit_outer_layouts=omit_outer_layouts,
         )
 
     def register_contract(self, contract: PageShellContract) -> None:
-        """Register a named page shell contract and all of its targets."""
+        """Register a named page shell contract and all of its targets.
+
+        Multiple contracts are allowed (e.g. primary app shell plus a section
+        shell). Target ids must be unique across the registry; later
+        registrations override earlier ones for the same target id.
+        """
         if self._frozen:
             msg = "Cannot modify fragment target registry after app has started."
             raise RuntimeError(msg)
-        if self._contracts and contract.name not in self._contracts:
-            msg = (
-                "Only one page shell contract can be registered per app today. "
-                "Register fragment targets directly for secondary shells."
-            )
-            raise ValueError(msg)
         self._contracts[contract.name] = contract
         for target in contract.targets:
             self.register(
@@ -110,6 +121,8 @@ class FragmentTargetRegistry:
                 contract_name=contract.name,
                 required=target.required,
                 description=target.description,
+                scope_name=target.scope_name,
+                omit_outer_layouts=target.omit_outer_layouts,
             )
 
     def freeze(self) -> None:

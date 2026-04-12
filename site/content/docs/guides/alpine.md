@@ -14,7 +14,10 @@ category: guide
 
 Alpine.js complements htmx for **client-only UI state**: dropdowns, modals, tabs, accordions. htmx handles server round-trips; Alpine handles interactions that don't need a request.
 
-Chirp integrates Alpine via config and macros. When enabled, the Alpine script is auto-injected before `</body>`.
+Chirp integrates Alpine via config and macros. When enabled, the Alpine script is
+auto-injected before `</body>`. If you also use `chirp-ui`, `use_chirp_ui(app)`
+serves the shared static assets and injects `chirpui-alpine.js` as the behavior
+runtime alongside the core Alpine bootstrap.
 
 ## When to Use Alpine vs htmx
 
@@ -45,7 +48,12 @@ config = AppConfig(alpine=True)
 app = App(config=config)
 ```
 
-Chirp is the **single authority** for Alpine.js injection. The script is injected into full-page HTML responses only. Fragment responses (htmx partials) are unchanged. If Alpine is already present in the response (e.g. from a third-party layout), Chirp's `AlpineInject` middleware skips injection to prevent double-loading.
+Chirp is the **single authority** for Alpine.js injection. `AlpineInject` appends the script **before the first `</body>`** on:
+
+- **Buffered HTML responses** — full pages and eligible buffered bodies (see middleware: fragment gating below).
+- **Streaming HTML** — `StreamingResponse` bodies (for example `Suspense`, `Stream`, `TemplateStream`) are rewritten chunk-by-chunk so Alpine appears in the final document without buffering the entire stream in memory.
+
+Fragment responses (htmx partials) and other non-HTML responses are unchanged. If Alpine is already present before `</body>` (detected via `data-chirp="alpine"`), injection is skipped to prevent double-loading.
 
 The injection block includes:
 
@@ -53,6 +61,36 @@ The injection block includes:
 - **Plugins**: Mask, Intersect, Focus
 - **Store init**: `modals` and `trays` stores for chirp-ui components
 - **`Alpine.safeData()` helper** for htmx-safe component registration
+
+When `use_chirp_ui(app)` is active, full-page HTML also includes the
+`chirpui-alpine.js` runtime that registers chirp-ui's named Alpine controllers,
+including streamed full-page HTML responses.
+
+## Passing server data (`alpine_json_config`)
+
+When Alpine components need structured data from the server, put JSON in a
+`<script type="application/json">` tag and read it from JavaScript (see Kida’s
+escaping docs for why raw `| tojson` inside double-quoted attributes is unsafe).
+Chirp registers a template global **`alpine_json_config`** when `alpine=True`
+so you do not have to hand-write the script tag. The first argument is the
+`id` attribute (a string); the second is any JSON-serializable value (use
+`None` for JSON `null`). Non-JSON-serializable objects use `default=str`, same
+as Kida’s `| tojson` filter.
+
+```kida
+{{ alpine_json_config("game-config", game_config) }}
+<div x-data="matchGame()">...</div>
+<script>
+var cfg = JSON.parse(document.getElementById("game-config").textContent);
+Alpine.safeData("matchGame", function() {
+  return { rows: cfg.rows, cols: cfg.cols };
+});
+</script>
+```
+
+For small configs you can instead use `{{ config | tojson(attr=true) }}` inside a
+double-quoted attribute (see Kida filter reference). The script-tag pattern scales
+better for large payloads and matches Django’s `json_script` style.
 
 ## Configuration Options
 
@@ -109,7 +147,8 @@ Import Chirp's Alpine macros and use them in your templates:
 
 When you register named Alpine components with `Alpine.data()`, the standard `alpine:init` event only fires once on the initial page load. Under htmx boosted navigation, swapped-in scripts that rely on `alpine:init` will not re-register.
 
-Chirp provides `Alpine.safeData(name, factory)` — a drop-in replacement for `Alpine.data()` that works on both initial loads and htmx-boosted navigations:
+Chirp provides `Alpine.safeData(name, factory)` — a drop-in replacement for
+`Alpine.data()` that works on both initial loads and htmx-boosted navigations:
 
 ```html
 <script>
@@ -125,7 +164,16 @@ Alpine.safeData("counter", () => ({
 </div>
 ```
 
-**Why not `Alpine.data()` directly?** On the first page load, `Alpine.data()` must be called during or before the `alpine:init` event — but after Alpine is loaded. On subsequent htmx navigations, Alpine is already initialized so `Alpine.data()` works immediately. `Alpine.safeData()` handles both cases: it queues registrations until Alpine is ready, then becomes a direct passthrough.
+**Why not `Alpine.data()` directly?** On the first page load, `Alpine.data()`
+must be called during or before the `alpine:init` event — but after Alpine is
+loaded. On subsequent htmx navigations, Alpine is already initialized so
+`Alpine.data()` works immediately. `Alpine.safeData()` handles both cases: it
+queues registrations until Alpine is ready, then becomes a direct passthrough.
+
+This is also the preferred registration path for shared chirp-ui behavior. The
+runtime shipped by `use_chirp_ui(app)` registers named controllers such as
+dropdown, copy, theme/style, dialog-target, and shell/sidebar behavior via the
+same helper.
 
 ## htmx + Alpine Together
 

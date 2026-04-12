@@ -504,13 +504,24 @@ yield Fragment("page.html", "column_block_oob",
                column_id="backlog", tasks=filtered, ...)
 ```
 
-### ContextVar Loss in SSE Generators
+### ContextVar Loss in Streamed Rendering
 
-The SSE async generator runs in its own task, outside the middleware context.
-Calling `get_user()`, `csrf_token()`, or any ContextVar-backed function inside
-the generator raises `LookupError`.
+Middleware-provided helpers backed by `ContextVar` only exist while the request
+is inside the middleware pipeline. Calling `get_user()`, `csrf_token()`, or
+similar middleware-backed helpers during streamed or deferred rendering can
+raise `LookupError`.
 
-**Fix:** Capture request-scoped values **before** entering the generator:
+The request object itself is restored for stream iteration, so this warning is
+about middleware-scoped values such as auth/session/CSRF state, not `get_request()`.
+
+This applies to:
+
+- SSE async generators
+- `Stream` / `TemplateStream` body rendering
+- `Suspense` shell or deferred block rendering
+
+**Fix:** Capture request-scoped values **before** returning the stream or
+entering the generator:
 
 ```python
 def events_route():
@@ -522,6 +533,21 @@ def events_route():
 
     return EventStream(generate())
 ```
+
+The same pattern applies to `Suspense` and other streaming responses:
+
+```python
+@app.route("/dashboard")
+def dashboard():
+    token = csrf_token()
+    return Suspense("dashboard.html", csrf_token_value=token, stats=load_stats())
+```
+
+Then the template uses `{{ csrf_token_value }}` instead of calling
+`{{ csrf_token() }}` while the stream is rendering.
+
+For the broader streaming model (`Stream`, `TemplateStream`, `Suspense`), see
+[[docs/streaming/html-streaming|Streaming HTML]].
 
 ### Dual Template Blocks for HTTP vs SSE
 

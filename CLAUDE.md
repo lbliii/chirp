@@ -15,6 +15,7 @@ return Page("page.html", "block", **ctx)  # Auto: fragment for htmx, full page f
 return OOB(main, *oob_fragments)          # Multi-target swap
 return EventStream(async_generator)       # SSE stream
 return Suspense("page.html", **ctx)       # Shell first, deferred blocks stream in
+return Suspense("page.html", defer_blocks=("stats", "feed"), **ctx)  # Explicit OOB targets
 return ValidationError("page.html", "form", errors=e)  # 422 + re-rendered form
 return FormAction(redirect, *fragments)   # Fragments for htmx, redirect for plain POST
 ```
@@ -59,6 +60,8 @@ pages/
       page.html
 ```
 
+**Composition model:** Layouts and page templates use **composition**, not inheritance. Chirp injects page HTML into the layout's `{% block content %}` via `render_with_blocks`. Page templates **cannot** override sibling layout blocks like `page_scripts` or `head_extra` — those are only available to templates that `{% extends %}` the layout directly. If a page needs an inline `<script>`, put it inside the content region (inside `page_root` or `page_content`).
+
 ## Key Patterns
 
 ### Fragment + OOB for mutations
@@ -81,6 +84,46 @@ def events():
             data = await wait_for_change()
             yield Fragment("page.html", "live_block", data=data)
     return EventStream(generate())
+```
+
+### Suspense (deferred blocks)
+```python
+return Suspense("page.html",
+    title="Dashboard",       # sync — in the shell
+    stats=load_stats(),      # awaitable — deferred
+    feed=load_feed(),        # awaitable — deferred
+)
+```
+
+Awaitable context values are deferred: the shell renders with those keys set to `None`
+(showing skeleton/fallback content). The shell also sets `__chirp_defer_pending__` to a
+`frozenset` of deferred key names (`CHIRP_DEFER_PENDING_KEY`); deferred block re-renders
+use an empty frozenset. In templates use **`{% if key is not none %}`** (or
+`"key" in __chirp_defer_pending__`) for loading vs loaded — not bare **`{% if key %}`**,
+which is falsy for empty `tuple`/`list`/`""`/`0` after resolution. Then each affected
+block is re-rendered and streamed as an OOB swap.
+
+Blocks to re-render are discovered automatically via `block_metadata().depends_on`.
+Ancestor blocks whose `depends_on` is a strict superset of leaf blocks are pruned
+(they would produce wasteful OOB chunks targeting non-existent DOM ids).
+
+When static analysis misses blocks (e.g. deferred values passed through macro args),
+use `defer_blocks` to bypass discovery:
+
+```python
+return Suspense("page.html",
+    defer_blocks=("hero_stats", "sidebar_stats"),
+    stats=load_stats(),
+)
+```
+
+`defer_map` remaps block names to DOM ids for the OOB swap target:
+
+```python
+return Suspense("page.html",
+    defer_map={"stats": "stats-panel"},
+    stats=load_stats(),
+)
 ```
 
 ### Validation pattern
@@ -166,9 +209,10 @@ uv run ruff format . --check # Format check
 ## Alpine.js Injection
 
 Chirp is the **single authority** for Alpine.js. When `AppConfig(alpine=True)`,
-`AlpineInject` middleware appends the Alpine script before `</body>` on full-page
-HTML responses. Dedup: if `data-chirp="alpine"` already exists in the body, injection
-is skipped.
+`AlpineInject` middleware appends the Alpine script before `</body>` on buffered
+full-page HTML and rewrites **`StreamingResponse`** chunk streams the same way (e.g.
+`Suspense` shells). Dedup: if `data-chirp="alpine"` already exists before `</body>`,
+injection is skipped.
 
 ### CDN URL footgun
 
@@ -197,6 +241,14 @@ inspector. If it ends with `@3.x.x` without `/dist/cdn.min.js`, that's the bug.
 
 Tests in `tests/test_alpine.py` enforce this — `test_no_bare_package_urls` will
 catch any regression.
+
+### `alpine_json_config` (template global)
+
+When `alpine=True`, Kida templates can emit a JSON config bridge with
+`{{ alpine_json_config("my-id", data) }}` — a `<script id="my-id" type="application/json">`
+tag with HTML-escaped ids and `json.dumps(..., default=str)` for the payload
+(see `site/content/docs/guides/alpine.md`.)
+The global is not registered when `alpine=False`.
 
 ## Dependencies
 

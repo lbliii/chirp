@@ -24,6 +24,11 @@ Templates::
 htmx (via meta tag)::
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+For streamed or deferred responses (for example ``Stream``,
+``TemplateStream``, ``Suspense``, or ``EventStream``), capture the token
+in the handler and pass the raw value into template context instead of
+calling ``csrf_token()`` during stream rendering.
 """
 
 import secrets
@@ -48,13 +53,17 @@ def get_csrf_token() -> str:
     """Return the current CSRF token.
 
     Raises ``LookupError`` if called outside a request with
-    ``CSRFMiddleware`` active.
+    ``CSRFMiddleware`` active. For streamed or deferred rendering,
+    capture the token in the handler before returning the stream.
     """
     token = _csrf_token_var.get()
     if token is None:
         msg = (
             "No CSRF token available. Ensure CSRFMiddleware is added "
-            "to the app after SessionMiddleware."
+            "to the app after SessionMiddleware. For streamed or deferred "
+            "rendering (for example Stream, TemplateStream, Suspense, or "
+            "EventStream), capture the token in the handler and pass the "
+            "raw value into template context."
         )
         raise LookupError(msg)
     return token
@@ -84,6 +93,9 @@ def csrf_token() -> str:
     For use as a template global in meta tags::
 
         <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    For streamed or deferred rendering, capture the token in the
+    handler and pass it as plain template context instead.
     """
     return get_csrf_token()
 

@@ -142,7 +142,7 @@ class AppRegistry:
     def discover_and_register_pages(self, pages_dir: str) -> None:
         from chirp.pages.discovery import discover_pages
 
-        page_routes = discover_pages(pages_dir)
+        page_routes = discover_pages(pages_dir, layout_presets=self._state.layout_presets)
         self._state.discovered_routes = page_routes
         for page_route in page_routes:
             self._state.page_route_paths.add(page_route.url_path)
@@ -150,6 +150,7 @@ class AppRegistry:
             if page_route.template_name:
                 self._state.route_templates[page_route.url_path] = page_route.template_name
             self._state.discovered_layout_chains.append(page_route.layout_chain)
+            self._state.route_layout_chains[page_route.url_path] = page_route.layout_chain
             if page_route.template_name:
                 self._state.page_leaf_templates.add(page_route.template_name)
                 self._state.page_templates.add(page_route.template_name)

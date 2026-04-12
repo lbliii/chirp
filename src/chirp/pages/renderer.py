@@ -8,11 +8,28 @@ rendered, preserving the outer shell on the client.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
 from chirp.pages.types import LayoutChain
+
+if TYPE_CHECKING:
+    from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+
+def _omit_outer_layout_targets(
+    *,
+    fragment_target_registry: FragmentTargetRegistry | None,
+    htmx_target: str | None,
+) -> frozenset[str]:
+    """Return registered targets that should omit the matched outer layout."""
+    if fragment_target_registry is None or htmx_target is None:
+        return frozenset()
+    config = fragment_target_registry.get(htmx_target)
+    if config is None or not config.omit_outer_layouts:
+        return frozenset()
+    return frozenset({htmx_target.lstrip("#")})
 
 
 def render_with_layouts(
@@ -23,6 +40,7 @@ def render_with_layouts(
     context: dict[str, Any],
     htmx_target: str | None = None,
     is_history_restore: bool = False,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> str:
     """Render page content wrapped in its layout chain.
 
@@ -30,8 +48,10 @@ def render_with_layouts(
 
     - **No target** (full page load or history restore): render all
       layouts nested, innermost first.
-    - **Target matches a layout**: skip layouts at or above the
-      matched one; render from the next layout down.
+    - **Target matches a replace outlet or omit target**: skip the matched
+      outer layout and render any descendant layouts below it.
+    - **Target matches an ordinary layout target**: render the matched layout
+      and any descendants below it.
     - **Target matches no layout**: return page HTML as-is (fragment).
 
     Args:
@@ -42,6 +62,8 @@ def render_with_layouts(
         context: Merged context variables for layout templates.
         htmx_target: Value of ``HX-Target`` header, or ``None``.
         is_history_restore: Whether this is an htmx history restore.
+        fragment_target_registry: Optional registry for targets that must skip
+            the matched outer filesystem layout during boosted navigation.
 
     Returns:
         Rendered HTML string with appropriate layout wrapping.
@@ -56,11 +78,18 @@ def render_with_layouts(
         # Full page render — wrap with all layouts
         start_index = 0
     else:
-        idx = layout_chain.find_start_index_for_target(htmx_target)
-        if idx is None:
+        start_index = layout_chain.start_index_for_htmx_target(
+            htmx_target,
+            omit_outer_layout_targets=_omit_outer_layout_targets(
+                fragment_target_registry=fragment_target_registry,
+                htmx_target=htmx_target,
+            ),
+        )
+        if start_index is None:
             # Target doesn't match any layout — return as fragment
             return page_html
-        start_index = idx
+        if start_index >= len(layouts):
+            return page_html
 
     # Slice layouts: only render from start_index onward
     layouts_to_render = layouts[start_index:]

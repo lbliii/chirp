@@ -10,6 +10,9 @@ Covers:
 - Error mid-stream (deferred resolution failure)
 - defer_map override for block-to-DOM-ID mapping
 - Suspense dataclass construction
+- Two blocks sharing one deferred key
+- Ancestor block pruning
+- Explicit defer_blocks bypass
 """
 
 import asyncio
@@ -19,6 +22,7 @@ from kida import DictLoader, Environment
 
 from chirp.templating.returns import Suspense
 from chirp.templating.suspense import (
+    CHIRP_DEFER_PENDING_KEY,
     format_oob_htmx,
     format_oob_script,
     render_suspense,
@@ -34,7 +38,7 @@ _DASHBOARD_TEMPLATE = """\
 <h1>{{ title }}</h1>
 <div id="stats">
 {% block stats %}
-  {% if stats %}
+  {% if stats is not none %}
     <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
   {% else %}
     <div class="skeleton">Loading stats...</div>
@@ -43,7 +47,7 @@ _DASHBOARD_TEMPLATE = """\
 </div>
 <div id="feed">
 {% block feed %}
-  {% if feed %}
+  {% if feed is not none %}
     <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
   {% else %}
     <div class="skeleton">Loading feed...</div>
@@ -52,6 +56,22 @@ _DASHBOARD_TEMPLATE = """\
 </div>
 </body>
 </html>"""
+
+_DEFER_PENDING_TEMPLATE = """\
+<html><body>
+{% block stats %}
+<div id="stats">
+{# Reference `stats` so block_metadata depends_on includes it (OOB discovery). #}
+{% if stats is not none %}
+<span class="ready-flag">ready</span>
+{% elif "stats" in __chirp_defer_pending__ %}
+<span class="pending-flag">pending</span>
+{% else %}
+<span class="ready-flag">ready</span>
+{% endif %}
+</div>
+{% end %}
+</body></html>"""
 
 _SIMPLE_TEMPLATE = """\
 <div id="content">
@@ -64,6 +84,31 @@ _SIMPLE_TEMPLATE = """\
 {% end %}
 </div>"""
 
+_SHARED_KEY_TEMPLATE = """\
+<html><body>
+{% block page_content %}
+<h1>{{ title }}</h1>
+<div id="hero_stars">
+{% block hero_stars %}
+  {% if stars is not none %}
+    <span>{{ stars }} stars</span>
+  {% else %}
+    <span class="skeleton">…</span>
+  {% end %}
+{% end %}
+</div>
+<div id="footer_stars">
+{% block footer_stars %}
+  {% if stars is not none %}
+    <span>{{ stars }} stars</span>
+  {% else %}
+    <span class="skeleton">…</span>
+  {% end %}
+{% end %}
+</div>
+{% end %}
+</body></html>"""
+
 
 def _env() -> Environment:
     """Build a kida Environment with in-memory test templates."""
@@ -71,7 +116,9 @@ def _env() -> Environment:
         loader=DictLoader(
             {
                 "dashboard.html": _DASHBOARD_TEMPLATE,
+                "defer_pending.html": _DEFER_PENDING_TEMPLATE,
                 "simple.html": _SIMPLE_TEMPLATE,
+                "shared_key.html": _SHARED_KEY_TEMPLATE,
             }
         )
     )
@@ -430,3 +477,314 @@ class TestLayoutWrapping:
         assert len(chunks) == 1
         assert "<!DOCTYPE html>" not in chunks[0]
         assert "<h1>X</h1>" in chunks[0]
+
+    async def test_boosted_replace_outlet_skips_layout_wrapping(self):
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        layout_html = """<!DOCTYPE html><html><head><title>{{ title }}</title></head>
+<body><div id="site-content">{% block content %}{% end %}</div></body></html>"""
+        env = Environment(
+            loader=DictLoader(
+                {
+                    "dashboard.html": _DASHBOARD_TEMPLATE,
+                    "_layout.html": layout_html,
+                }
+            )
+        )
+        chain = LayoutChain(
+            layouts=(
+                LayoutInfo(
+                    "_layout.html",
+                    "body",
+                    0,
+                    outlet_target_id="site-content",
+                    outlet_mode="replace",
+                ),
+            )
+        )
+        request = type(
+            "Req",
+            (),
+            {
+                "is_fragment": True,
+                "is_history_restore": False,
+                "is_boosted": True,
+                "htmx_target": "site-content",
+            },
+        )()
+
+        s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                layout_chain=chain,
+                layout_context={"title": "X"},
+                request=request,
+            )
+        ]
+
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" not in chunks[0]
+        assert 'id="site-content"' not in chunks[0]
+        assert "<h1>X</h1>" in chunks[0]
+
+    async def test_boosted_replace_outlet_preserves_descendant_layouts(self):
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        env = Environment(
+            loader=DictLoader(
+                {
+                    "dashboard.html": _DASHBOARD_TEMPLATE,
+                    "_layout.html": (
+                        "<!DOCTYPE html><html><body>"
+                        '<div id="site-content">{% block content %}{% end %}</div>'
+                        "</body></html>"
+                    ),
+                    "_showcase.html": '<main id="main">{% block content %}{% end %}</main>',
+                }
+            )
+        )
+        chain = LayoutChain(
+            layouts=(
+                LayoutInfo(
+                    "_layout.html",
+                    "body",
+                    0,
+                    outlet_target_id="site-content",
+                    outlet_mode="replace",
+                ),
+                LayoutInfo("_showcase.html", "site-content", 1),
+            )
+        )
+        request = type(
+            "Req",
+            (),
+            {
+                "is_fragment": True,
+                "is_history_restore": False,
+                "is_boosted": True,
+                "htmx_target": "site-content",
+            },
+        )()
+
+        s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                layout_chain=chain,
+                layout_context={"title": "X"},
+                request=request,
+            )
+        ]
+
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" not in chunks[0]
+        assert 'id="site-content"' not in chunks[0]
+        assert 'id="main"' in chunks[0]
+        assert "<h1>X</h1>" in chunks[0]
+
+
+# ---------------------------------------------------------------------------
+# Two blocks sharing one deferred key
+# ---------------------------------------------------------------------------
+
+
+class TestSharedDeferredKey:
+    """Multiple blocks that depend on the same awaitable context value."""
+
+    async def test_both_leaf_blocks_receive_oob(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("42"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        shell = chunks[0]
+        assert "skeleton" in shell
+        assert "42 stars" not in shell
+
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert 'id="footer_stars"' in oob
+        assert oob.count("42 stars") == 2
+
+    async def test_parent_block_pruned_from_oob(self):
+        """page_content depends on 'stars' too, but should be pruned."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("7"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="page_content"' not in oob
+
+    async def test_script_fallback_both_blocks(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            title="Repo",
+            stars=_delayed_value("99"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=False)
+
+        oob = "".join(chunks[1:])
+        assert "_chirp_d_hero_stars" in oob
+        assert "_chirp_d_footer_stars" in oob
+        assert oob.count("99 stars") == 2
+
+
+# ---------------------------------------------------------------------------
+# Explicit defer_blocks bypass
+# ---------------------------------------------------------------------------
+
+
+class TestDeferBlocks:
+    """Suspense.defer_blocks overrides static analysis."""
+
+    def test_dataclass_accepts_defer_blocks(self):
+        s = Suspense("page.html", defer_blocks=("a", "b"), data="x")
+        assert s.defer_blocks == ("a", "b")
+
+    def test_dataclass_default_none(self):
+        s = Suspense("page.html", data="x")
+        assert s.defer_blocks is None
+
+    async def test_explicit_blocks_rendered(self):
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("footer_stars",),
+            title="Repo",
+            stars=_delayed_value("55"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="footer_stars"' in oob
+        assert 'id="hero_stars"' not in oob
+
+    async def test_explicit_blocks_skip_static_analysis(self):
+        """When defer_blocks is set, only those blocks are rendered."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_stars",),
+            title="Repo",
+            stars=_delayed_value("11"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert oob.count("11 stars") == 1
+
+    async def test_empty_defer_blocks_produces_no_oob(self):
+        """defer_blocks=() means no blocks are re-rendered — only the shell."""
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=(),
+            title="Repo",
+            stars=_delayed_value("77"),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        assert len(chunks) == 1
+        assert "skeleton" in chunks[0]
+        assert "77 stars" not in chunks[0]
+
+    async def test_unknown_defer_blocks_warns_and_skips(self, caplog):
+        """defer_blocks with nonexistent block names logs a warning and skips them."""
+        import logging
+
+        env = _env()
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_stars", "nonexistent_block"),
+            title="Repo",
+            stars=_delayed_value("33"),
+        )
+        with caplog.at_level(logging.WARNING, logger="chirp.suspense"):
+            chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        # Unknown block warned
+        assert any("nonexistent_block" in r.message for r in caplog.records)
+
+        # Valid block still rendered
+        oob = "".join(chunks[1:])
+        assert 'id="hero_stars"' in oob
+        assert "33 stars" in oob
+
+        # Unknown block not attempted
+        assert "nonexistent_block" not in oob
+
+
+# ---------------------------------------------------------------------------
+# __chirp_defer_pending__ context key
+# ---------------------------------------------------------------------------
+
+
+class TestDeferPendingKey:
+    """CHIRP_DEFER_PENDING_KEY / __chirp_defer_pending__ in shell vs OOB."""
+
+    def test_constant_value(self) -> None:
+        assert CHIRP_DEFER_PENDING_KEY == "__chirp_defer_pending__"
+
+    def test_chirp_lazy_export(self) -> None:
+        import chirp
+
+        assert chirp.CHIRP_DEFER_PENDING_KEY == "__chirp_defer_pending__"
+
+    async def test_shell_lists_pending_keys(self) -> None:
+        env = _env()
+        s = Suspense(
+            "defer_pending.html",
+            stats=_delayed_value(["a"]),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+        shell = chunks[0]
+        assert "pending-flag" in shell
+        assert "ready-flag" not in shell
+
+    async def test_oob_block_sees_empty_pending(self) -> None:
+        env = _env()
+        s = Suspense(
+            "defer_pending.html",
+            stats=_delayed_value(["a"]),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+        oob = "".join(chunks[1:])
+        assert "ready-flag" in oob
+        assert "pending-flag" not in oob
+
+    async def test_sync_only_has_empty_pending(self) -> None:
+        env = _env()
+        s = Suspense("defer_pending.html", stats=["sync"])
+        chunks = await _collect_chunks(env, s)
+        assert len(chunks) == 1
+        assert "ready-flag" in chunks[0]
+        assert "pending-flag" not in chunks[0]
+
+    async def test_resolved_empty_collections_leave_skeleton(self) -> None:
+        """Empty tuple/list is not none after resolve — OOB must not re-show skeleton."""
+        env = _env()
+        s = Suspense(
+            "dashboard.html",
+            title="Dashboard",
+            stats=_delayed_value([]),
+            feed=_delayed_value([]),
+        )
+        chunks = await _collect_chunks(env, s)
+        assert "Loading stats..." in chunks[0]
+        oob = "".join(chunks[1:])
+        assert "Loading stats..." not in oob
+        assert "Loading feed..." not in oob

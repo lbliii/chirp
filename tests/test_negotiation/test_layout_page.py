@@ -249,6 +249,167 @@ class TestLayoutPageSlotContext:
         assert 'hx-swap-oob="innerHTML"' in combined
         assert 'href="/deploy"' in combined
 
+    @pytest.mark.asyncio
+    async def test_layout_suspense_boosted_navigation_appends_layout_oob_blocks(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Layout OOB blocks (sidebar, breadcrumbs) must appear as OOB swaps
+        in LayoutSuspense streaming responses during boosted navigation."""
+        from chirp.http.response import StreamingResponse
+        from chirp.pages.types import LayoutChain, LayoutInfo
+        from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
+
+        (tmp_path / "page.html").write_text(
+            "<h1>{{ title }}</h1>"
+            '<div id="data">{% block data %}'
+            "{% if data %}<p>{{ data }}</p>{% else %}<p>Loading...</p>{% end %}"
+            "{% end %}</div>",
+            encoding="utf-8",
+        )
+        (tmp_path / "_layout.html").write_text(
+            "{# target: body #}\n"
+            "<html><body>\n"
+            '<nav id="sidebar-nav">\n'
+            '{% region sidebar_oob(current_path="/") %}\n'
+            '<a class="{{ "active" if current_path == "/about" else "" }}">About</a>\n'
+            "{% end %}\n"
+            "</nav>\n"
+            '<main id="main">{% block content %}{% end %}</main></body></html>',
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        oob_registry = OOBRegistry()
+        oob_registry.register(
+            "sidebar_oob", OOBRegionConfig(target_id="sidebar-nav", swap="innerHTML", wrap=True)
+        )
+        oob_registry.freeze()
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/about",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        async def _data():
+            return "resolved"
+
+        result = negotiate(
+            LayoutSuspense(
+                Suspense("page.html", title="About", data=_data()),
+                LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),)),
+                context={"current_path": "/about"},
+                request=request,
+            ),
+            kida_env=env,
+            request=request,
+            oob_registry=oob_registry,
+        )
+
+        assert isinstance(result, StreamingResponse)
+        chunks = [chunk async for chunk in result.chunks]
+        combined = "".join(chunks)
+        assert 'id="sidebar-nav"' in combined
+        assert 'hx-swap-oob="innerHTML"' in combined
+        assert 'class="active"' in combined
+
+    @pytest.mark.asyncio
+    async def test_layout_suspense_boosted_navigation_omit_outer_layouts_skips_layouts(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        from chirp.http.response import StreamingResponse
+        from chirp.pages.types import LayoutChain, LayoutInfo
+        from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+        (tmp_path / "page.html").write_text(
+            "<h1>{{ title }}</h1>"
+            '<div id="data">{% block data %}'
+            "{% if data %}<p>{{ data }}</p>{% else %}<p>Loading...</p>{% end %}"
+            "{% end %}</div>",
+            encoding="utf-8",
+        )
+        (tmp_path / "_layout.html").write_text(
+            "{# target: body #}\n"
+            "{# outlet: site-content #}\n"
+            "<!DOCTYPE html><html><body>"
+            '<div id="site-content">{% block content %}{% end %}</div>'
+            "</body></html>",
+            encoding="utf-8",
+        )
+        env = create_environment(AppConfig(template_dir=tmp_path), filters={}, globals_={})
+
+        fragment_target_registry = FragmentTargetRegistry()
+        fragment_target_registry.register(
+            "site-content",
+            fragment_block="content",
+            omit_outer_layouts=True,
+        )
+        fragment_target_registry.freeze()
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/about",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"site-content"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        async def _data():
+            return "resolved"
+
+        result = negotiate(
+            LayoutSuspense(
+                Suspense("page.html", title="About", data=_data()),
+                LayoutChain(
+                    layouts=(
+                        LayoutInfo("_layout.html", "body", 0, outlet_target_id="site-content"),
+                    )
+                ),
+                request=request,
+            ),
+            kida_env=env,
+            request=request,
+            fragment_target_registry=fragment_target_registry,
+        )
+
+        assert isinstance(result, StreamingResponse)
+        chunks = [chunk async for chunk in result.chunks]
+        combined = "".join(chunks)
+        assert "<!DOCTYPE html>" not in combined
+        assert 'id="site-content"' not in combined
+        assert "<h1>About</h1>" in combined
+        assert "resolved" in combined
+
     def test_layout_page_boosted_navigation_prefers_page_block_name(self, tmp_path: Path) -> None:
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         (tmp_path / "base.html").write_text(

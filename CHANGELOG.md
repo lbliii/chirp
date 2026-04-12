@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`__chirp_defer_pending__` / `CHIRP_DEFER_PENDING_KEY`** — Suspense shell renders (and sync-only Suspense renders) inject a `frozenset` of context key names still awaiting resolution; deferred block re-renders use an empty frozenset. Templates can branch on membership instead of overloading `None` / truthiness.
+- **`Suspense.defer_blocks`** — optional explicit list of blocks to re-render as OOB chunks, bypassing `block_metadata()` static analysis. Use when deferred values are passed through macro arguments that the analyzer can't trace.
+- **Ancestor block pruning** — `_find_deferred_blocks` now drops blocks whose `depends_on` is a strict superset of another matched block, preventing large parent blocks (e.g. `page_content`) from being re-rendered as wasted OOB chunks.
+- **`alpine_json_config` template global** — when `alpine=True`, templates can emit `<script type="application/json">` tags with safely escaped ids and JSON for Alpine components (`alpine_json_config("my-id", data)`).
+- **Layout `HX-Target` + outlet** — `LayoutChain.find_start_index_for_target` matches `{# outlet: element_id #}` as well as `{# target: #}`, so boosted `HX-Target: #main` resolves for chirp-ui app shells (`{# target: body #}` + `{# outlet: main #}`).
+- **Alpine on streaming HTML** — `AlpineInject` rewrites `StreamingResponse` bodies (e.g. `Suspense`) to insert the Alpine bundle before `</body>`, with the same deduplication as buffered pages.
 - **ReactiveBus observability** — `emitted_count`, `dropped_count`, and `subscriber_count` properties for monitoring event throughput and back-pressure.
 - **Configurable queue depth** — `ReactiveBus(maxsize=N)` controls per-subscriber queue size (default 256, unchanged).
 - **Reactive contract rules** — `chirp check` validates that `DependencyIndex` block references point to real template blocks and that derivation graphs are acyclic.
@@ -18,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Suspense templates** — Document `{% if key is not none %}` / `__chirp_defer_pending__` instead of bare `{% if key %}` (falsy empty results look like perpetual skeletons). Updated `return-values.md`, streaming guide, `CLAUDE.md`, and API reference.
+- **`alpine_json_config`** — Chirp `CLAUDE.md`, Alpine guide, and built-in middleware reference document the template global and its relationship to `AlpineInject`.
+- **Layouts & Alpine** — Filesystem routing (outlet + `main`), route contract reference, streaming HTML + Suspense + Alpine, built-in middleware (`AlpineInject` vs `HTMLInject`).
 - **Reactive system** — New dedicated guide covering ReactiveBus API, DependencyIndex, derived paths, observability counters, and contract validation.
 - **Thread safety** — Added stress test coverage table, ReactiveBus as real-world Lock example, and code references for the concurrency test suite.
 - **Contract reference** — Documented the 4 new contract checks (reactive_block, reactive_cycle, oob_target, form_action) in the route contract guide.

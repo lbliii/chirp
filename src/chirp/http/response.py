@@ -7,9 +7,12 @@ built incrementally by design.
 import json as json_module
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, replace
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from chirp.http.cookies import SetCookie
+
+if TYPE_CHECKING:
+    from chirp.http.request import Request
 
 type RenderIntent = Literal["unknown", "full_page", "fragment"]
 
@@ -390,12 +393,17 @@ class StreamingResponse:
     Supports the same ``.with_*()`` chainable API as ``Response``
     so middleware can modify headers/status without knowing the
     response is streamed.
+
+    ``render_intent`` mirrors :class:`Response` so HTML middleware (e.g.
+    :class:`~chirp.middleware.inject.AlpineInject`) can skip fragments.
     """
 
     chunks: Iterator[str] | AsyncIterator[str]
     status: int = 200
     content_type: str = "text/html; charset=utf-8"
     headers: tuple[tuple[str, str], ...] = ()
+    render_intent: RenderIntent = "unknown"
+    request_context: Request | None = None
 
     def with_status(self, status: int) -> StreamingResponse:
         """Return a new StreamingResponse with a different status code."""
@@ -446,6 +454,10 @@ class StreamingResponse:
             samesite=samesite,
         )
         return self.with_header("Set-Cookie", cookie.to_header_value())
+
+    def with_render_intent(self, render_intent: RenderIntent) -> StreamingResponse:
+        """Return a new StreamingResponse with fragment vs full-page intent."""
+        return replace(self, render_intent=render_intent)
 
 
 @dataclass(frozen=True, slots=True)
