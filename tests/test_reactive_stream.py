@@ -15,25 +15,18 @@ import logging
 
 import pytest
 
-from chirp.pages.reactive import BlockRef, ChangeEvent, DependencyIndex, ReactiveBus
+from chirp.pages.reactive import BlockRef, ChangeEvent, ConnectionInfo, DependencyIndex, ReactiveBus
 from chirp.pages.reactive.stream import reactive_stream
 from chirp.templating.returns import Fragment
 
 
 def _make_index(*blocks: tuple[str, str, list[str]]) -> DependencyIndex:
-    """Build a DependencyIndex from (template, block, [dep_paths]) tuples.
-
-    Bypasses kida — registers blocks directly into internal mappings.
-    """
+    """Build a DependencyIndex from (template, block, [dep_paths]) tuples."""
     index = DependencyIndex()
     for template, block, dep_paths in blocks:
         ref = BlockRef(template_name=template, block_name=block)
         for path in dep_paths:
-            index._path_to_blocks.setdefault(path, []).append(ref)
-            parts = path.split(".")
-            for i in range(len(parts)):
-                prefix = ".".join(parts[: i + 1])
-                index._prefix_to_paths.setdefault(prefix, set()).add(path)
+            index.register(path, ref)
     return index
 
 
@@ -368,8 +361,7 @@ class TestDOMTarget:
         bus = ReactiveBus()
         index = DependencyIndex()
         ref = BlockRef(template_name="page.html", block_name="count", dom_id="task-count")
-        index._path_to_blocks.setdefault("total", []).append(ref)
-        index._prefix_to_paths.setdefault("total", set()).add("total")
+        index.register("total", ref)
 
         stream = reactive_stream(
             bus,
@@ -385,3 +377,226 @@ class TestDOMTarget:
 
         assert len(fragments) == 1
         assert fragments[0].target == "task-count"
+
+
+# ---------------------------------------------------------------------------
+# Connection info passthrough
+# ---------------------------------------------------------------------------
+
+
+class TestConnectionInfo:
+    """reactive_stream passes ConnectionInfo to the bus."""
+
+    async def test_connection_enables_presence(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+        conn = ConnectionInfo(session_id="sess-1", user_id="alice")
+
+        stream = reactive_stream(
+            bus,
+            scope="room",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn,
+        )
+
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
+        await asyncio.sleep(0.01)
+
+        # Connection should be visible in presence
+        assert conn in bus.presence("room")
+
+        await bus.emit(ChangeEvent(scope="room", changed_paths=frozenset({"data"})))
+        fragments = await task
+        assert len(fragments) == 1
+
+    async def test_disconnect_callback_fired(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+        conn = ConnectionInfo(session_id="sess-1", user_id="bob")
+        disconnected: list[tuple[str, ConnectionInfo | None]] = []
+
+        stream = reactive_stream(
+            bus,
+            scope="room",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn,
+            on_disconnect=lambda s, c: disconnected.append((s, c)),
+        )
+
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1, timeout=0.2))
+        await asyncio.sleep(0.01)
+        bus.close("room")
+        await task
+
+        assert len(disconnected) == 1
+        assert disconnected[0] == ("room", conn)
+
+
+# ---------------------------------------------------------------------------
+# Audience filtering
+# ---------------------------------------------------------------------------
+
+
+class TestAudienceFiltering:
+    """Events with audience only reach matching subscribers."""
+
+    async def test_audience_filters_to_matching_user(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+
+        conn_alice = ConnectionInfo(session_id="s1", user_id="alice")
+        conn_bob = ConnectionInfo(session_id="s2", user_id="bob")
+
+        stream_alice = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn_alice,
+        )
+        stream_bob = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn_bob,
+        )
+
+        task_alice = asyncio.create_task(
+            _collect_fragments(bus, stream_alice, max_fragments=1, timeout=0.3)
+        )
+        task_bob = asyncio.create_task(
+            _collect_fragments(bus, stream_bob, max_fragments=1, timeout=0.3)
+        )
+        await asyncio.sleep(0.01)
+
+        # Only alice should receive this
+        await bus.emit(
+            ChangeEvent(
+                scope="s",
+                changed_paths=frozenset({"data"}),
+                audience=frozenset({"alice"}),
+            )
+        )
+
+        fragments_alice = await task_alice
+        fragments_bob = await task_bob
+
+        assert len(fragments_alice) == 1
+        assert len(fragments_bob) == 0
+
+    async def test_none_audience_broadcasts_to_all(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+
+        conn_a = ConnectionInfo(session_id="s1", user_id="alice")
+        conn_b = ConnectionInfo(session_id="s2", user_id="bob")
+
+        stream_a = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn_a,
+        )
+        stream_b = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=lambda: {"data": "x"},
+            connection=conn_b,
+        )
+
+        task_a = asyncio.create_task(_collect_fragments(bus, stream_a, max_fragments=1))
+        task_b = asyncio.create_task(_collect_fragments(bus, stream_b, max_fragments=1))
+        await asyncio.sleep(0.01)
+
+        # audience=None → broadcast
+        await bus.emit(
+            ChangeEvent(
+                scope="s",
+                changed_paths=frozenset({"data"}),
+                audience=None,
+            )
+        )
+
+        assert len(await task_a) == 1
+        assert len(await task_b) == 1
+
+
+# ---------------------------------------------------------------------------
+# Changed paths passthrough to context builder
+# ---------------------------------------------------------------------------
+
+
+class TestChangedPathsPassthrough:
+    """Context builders that accept changed_paths receive them."""
+
+    async def test_1arg_builder_receives_changed_paths(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+        received_paths: list[frozenset[str]] = []
+
+        def ctx_builder(changed_paths: frozenset[str]) -> dict:
+            received_paths.append(changed_paths)
+            return {"data": "x"}
+
+        stream = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=ctx_builder,
+        )
+
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
+        await asyncio.sleep(0.01)
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
+        await task
+
+        assert len(received_paths) == 1
+        assert received_paths[0] == frozenset({"data"})
+
+    async def test_0arg_builder_still_works(self) -> None:
+        """Backward compat: 0-arg builders don't break."""
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+
+        stream = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=lambda: {"data": "ok"},
+        )
+
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
+        await asyncio.sleep(0.01)
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
+        fragments = await task
+
+        assert len(fragments) == 1
+        assert fragments[0].context["data"] == "ok"
+
+    async def test_async_1arg_builder(self) -> None:
+        bus = ReactiveBus()
+        index = _make_index(("page.html", "content", ["data"]))
+
+        async def ctx_builder(changed_paths: frozenset[str]) -> dict:
+            await asyncio.sleep(0.001)
+            return {"data": "async", "paths": list(changed_paths)}
+
+        stream = reactive_stream(
+            bus,
+            scope="s",
+            index=index,
+            context_builder=ctx_builder,
+        )
+
+        task = asyncio.create_task(_collect_fragments(bus, stream, max_fragments=1))
+        await asyncio.sleep(0.01)
+        await bus.emit(ChangeEvent(scope="s", changed_paths=frozenset({"data"})))
+        fragments = await task
+
+        assert len(fragments) == 1
+        assert fragments[0].context["data"] == "async"

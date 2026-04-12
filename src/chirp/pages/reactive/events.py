@@ -3,7 +3,27 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectionInfo:
+    """Identity of a reactive subscriber connection.
+
+    Attached at subscribe time so the bus can filter events per-user,
+    track presence, and invoke disconnect callbacks.
+
+    Attributes:
+        session_id: Unique session identifier (always required).
+        user_id: Authenticated user ID, or ``None`` for anonymous.
+        connected_at: Monotonic timestamp (``time.monotonic()``) captured
+            at construction time.
+    """
+
+    session_id: str
+    user_id: str | None = None
+    connected_at: float = field(default_factory=time.monotonic)
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,11 +39,15 @@ class ChangeEvent:
             user ID, session ID).  Used by ``reactive_stream`` to
             skip events originating from the same connection.
             ``None`` means system-initiated — always delivered.
+        audience: If set, only deliver to subscribers whose
+            ``ConnectionInfo.user_id`` is in this set.  ``None``
+            broadcasts to all subscribers (default).
     """
 
     scope: str
     changed_paths: frozenset[str]
     origin: str | None = None
+    audience: frozenset[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)

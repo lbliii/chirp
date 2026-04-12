@@ -8,9 +8,31 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, cast
 
 from chirp.pages.reactive.bus import ReactiveBus
+from chirp.pages.reactive.events import ConnectionInfo
 from chirp.pages.reactive.index import DependencyIndex
 from chirp.realtime.events import EventStream
 from chirp.templating.returns import Fragment
+
+# Context builder signatures we support:
+#   () -> dict                    (0-arg, original)
+#   (frozenset[str]) -> dict      (1-arg, receives changed_paths)
+_ContextBuilder = Callable[..., dict[str, Any] | Awaitable[dict[str, Any]]]
+
+
+def _context_builder_arity(fn: _ContextBuilder) -> int:
+    """Detect whether context_builder accepts a positional changed_paths arg."""
+    try:
+        sig = inspect.signature(fn)
+        params = [
+            p
+            for p in sig.parameters.values()
+            if p.default is inspect.Parameter.empty
+            and p.kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        return len(params)
+    except ValueError, TypeError:
+        return 0
 
 
 def reactive_stream(
@@ -18,8 +40,10 @@ def reactive_stream(
     *,
     scope: str,
     index: DependencyIndex,
-    context_builder: Callable[[], dict[str, Any] | Awaitable[dict[str, Any]]],
+    context_builder: _ContextBuilder,
     origin: str | None = None,
+    connection: ConnectionInfo | None = None,
+    on_disconnect: Callable[[str, ConnectionInfo | None], None] | None = None,
     kida_env: Any = None,
 ) -> EventStream:
     """Create an SSE EventStream that auto-pushes re-rendered blocks.
@@ -33,12 +57,17 @@ def reactive_stream(
         bus: The reactive event bus to subscribe to.
         scope: Scope key (e.g., document ID).
         index: Dependency index mapping paths to blocks.
-        context_builder: Callable that returns the current context dict
-            (called after each change to get fresh data).
+        context_builder: Callable that returns the current context dict.
+            May accept zero arguments (original API) or one argument
+            (``frozenset[str]`` of changed paths for selective queries).
         origin: Identity of this connection (e.g., user/session ID).
             Events whose ``origin`` matches are skipped — the client
             that caused the change doesn't need to be notified of it.
             ``None`` disables origin filtering.
+        connection: Optional subscriber identity.  Enables audience
+            filtering and presence tracking on the bus.
+        on_disconnect: Optional callback invoked when this subscriber
+            exits.  Receives ``(scope, connection)``.
         kida_env: Deprecated — rendering is handled by the SSE response
             layer.  Accepted for backwards compatibility.
 
@@ -51,13 +80,17 @@ def reactive_stream(
         def live(doc_id: str) -> EventStream:
             return reactive_stream(
                 bus, scope=doc_id, index=dep_index,
-                context_builder=lambda: {"doc": store.get(doc_id)},
+                context_builder=lambda paths: {"doc": store.get(doc_id)},
                 origin=session_id,
+                connection=ConnectionInfo(session_id=session_id, user_id=user_id),
             )
     """
+    arity = _context_builder_arity(context_builder)
 
     async def generate() -> AsyncIterator[Fragment]:
-        async for change in bus.subscribe(scope):
+        async for change in bus.subscribe(
+            scope, connection=connection, on_disconnect=on_disconnect
+        ):
             # Skip events we caused (both must be non-None and equal)
             if origin is not None and change.origin == origin:
                 continue
@@ -70,7 +103,7 @@ def reactive_stream(
             # don't kill the stream.  The next ChangeEvent will
             # retry with fresh data.
             try:
-                ctx = context_builder()
+                ctx = context_builder(change.changed_paths) if arity >= 1 else context_builder()
                 if inspect.isawaitable(ctx):
                     ctx = await ctx
                 if not isinstance(ctx, dict):
