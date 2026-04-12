@@ -37,6 +37,16 @@ class TestIdAttr:
         assert m
         assert m.group(1) == ""
 
+    def test_case_insensitive(self):
+        m = ID_ATTR.search('<div ID="upper">')
+        assert m
+        assert m.group(1) == "upper"
+
+    def test_mixed_case(self):
+        m = ID_ATTR.search('<div Id="mixed">')
+        assert m
+        assert m.group(1) == "mixed"
+
 
 class TestMethodPost:
     def test_lowercase(self):
@@ -76,6 +86,18 @@ class TestPathParam:
     def test_simple(self):
         params = PATH_PARAM.findall("/users/{user_id}/posts/{post_id}")
         assert params == ["user_id", "post_id"]
+
+    def test_typed_int(self):
+        params = PATH_PARAM.findall("/users/{id:int}")
+        assert params == ["id"]
+
+    def test_typed_path(self):
+        params = PATH_PARAM.findall("/files/{filepath:path}")
+        assert params == ["filepath"]
+
+    def test_mixed_typed_and_untyped(self):
+        params = PATH_PARAM.findall("/org/{org_id}/users/{id:int}")
+        assert params == ["org_id", "id"]
 
     def test_no_params(self):
         assert PATH_PARAM.findall("/static/path") == []

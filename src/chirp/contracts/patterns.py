@@ -14,7 +14,7 @@ import re
 # HTML attribute patterns
 # ---------------------------------------------------------------------------
 
-ID_ATTR = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']')
+ID_ATTR = re.compile(r'\bid\s*=\s*["\']([^"\']*)["\']', re.IGNORECASE)
 """Extract ``id="..."`` value from an HTML tag's attributes."""
 
 METHOD_POST = re.compile(r'method\s*=\s*["\']post["\']', re.IGNORECASE)
@@ -31,8 +31,8 @@ KIDA_EXPR = re.compile(r"\{\{.*?\}\}")
 # URL / path patterns
 # ---------------------------------------------------------------------------
 
-PATH_PARAM = re.compile(r"\{(\w+)\}")
-"""Extract path parameter names from route patterns like ``/users/{user_id}``."""
+PATH_PARAM = re.compile(r"\{(\w+)(?::[^{}:]+)?\}")
+"""Extract path parameter names from route patterns like ``/users/{user_id}`` and ``/users/{id:int}``."""
 
 # ---------------------------------------------------------------------------
 # SSE connect tag patterns
