@@ -13,24 +13,29 @@ from chirp.contracts.patterns import (
 class TestIdAttr:
     def test_double_quotes(self):
         m = ID_ATTR.search('<div id="main">')
-        assert m and m.group(1) == "main"
+        assert m
+        assert m.group(1) == "main"
 
     def test_single_quotes(self):
         m = ID_ATTR.search("<div id='sidebar'>")
-        assert m and m.group(1) == "sidebar"
+        assert m
+        assert m.group(1) == "sidebar"
 
     def test_spaces_around_equals(self):
         m = ID_ATTR.search('<div id = "spaced">')
-        assert m and m.group(1) == "spaced"
+        assert m
+        assert m.group(1) == "spaced"
 
     def test_hyphenated_prefix_still_matches(self):
         # \b matches between `-` and `i` since `-` is non-word
         m = ID_ATTR.search('<div data-id="nope">')
-        assert m and m.group(1) == "nope"
+        assert m
+        assert m.group(1) == "nope"
 
     def test_empty_id(self):
         m = ID_ATTR.search('<div id="">')
-        assert m and m.group(1) == ""
+        assert m
+        assert m.group(1) == ""
 
 
 class TestMethodPost:
@@ -50,15 +55,18 @@ class TestMethodPost:
 class TestKidaExpr:
     def test_simple_variable(self):
         m = KIDA_EXPR.search("{{ name }}")
-        assert m and m.group() == "{{ name }}"
+        assert m
+        assert m.group() == "{{ name }}"
 
     def test_filter(self):
         m = KIDA_EXPR.search("{{ name|upper }}")
-        assert m and m.group() == "{{ name|upper }}"
+        assert m
+        assert m.group() == "{{ name|upper }}"
 
     def test_empty_expression(self):
         m = KIDA_EXPR.search("{{ }}")
-        assert m and m.group() == "{{ }}"
+        assert m
+        assert m.group() == "{{ }}"
 
     def test_no_match_single_brace(self):
         assert KIDA_EXPR.search("{ not_a_template }") is None
@@ -78,15 +86,18 @@ class TestSseConnectTag:
 
     def test_captures_url(self):
         m = SSE_CONNECT_TAG.search(self.SAMPLE)
-        assert m and m.group("url") == "/events"
+        assert m
+        assert m.group("url") == "/events"
 
     def test_captures_tag(self):
         m = SSE_CONNECT_TAG.search(self.SAMPLE)
-        assert m and m.group("tag") == "div"
+        assert m
+        assert m.group("tag") == "div"
 
     def test_basic_no_url_group(self):
         m = SSE_CONNECT_TAG_BASIC.search(self.SAMPLE)
-        assert m and m.group("tag") == "div"
+        assert m
+        assert m.group("tag") == "div"
         # basic variant has no "url" group
         assert "url" not in m.groupdict()
 
