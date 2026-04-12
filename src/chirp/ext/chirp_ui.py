@@ -103,7 +103,9 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     Call after App creation. Serves chirpui.css, chirpui-alpine.js, themes/,
     chirpui-transitions.css from the chirp-ui package. Automatically registers
     chirp-ui filters (bem, field_errors, html_attrs, validate_variant) so
-    components render correctly.
+    components render correctly. It also upgrades chirp-ui's
+    ``route_link_attrs`` global to use Chirp's route-aware ``swap_attrs``
+    resolution for supported internal links.
 
     Alpine.js is auto-enabled (chirp-ui components require it). Chirp is the
     single authority for Alpine injection — the ``app_shell_layout.html`` does
