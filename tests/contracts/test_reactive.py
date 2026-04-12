@@ -39,7 +39,9 @@ class TestReactiveBlockExistence:
         (tmp_path / "board.html").write_text("{% block task_list %}<ul></ul>{% endblock %}")
         env = Environment(loader=FileSystemLoader(str(tmp_path)))
         index = DependencyIndex()
-        index.register("tasks", BlockRef(template_name="board.html", block_name="taks_list"))  # typo
+        index.register(
+            "tasks", BlockRef(template_name="board.html", block_name="taks_list")
+        )  # typo
 
         issues = check_reactive_block_existence(index, env)
         assert len(issues) == 1

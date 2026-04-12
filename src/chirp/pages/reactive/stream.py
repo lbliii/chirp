@@ -27,11 +27,10 @@ def _context_builder_arity(fn: _ContextBuilder) -> int:
             p
             for p in sig.parameters.values()
             if p.default is inspect.Parameter.empty
-            and p.kind
-            not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+            and p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
         ]
         return len(params)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return 0
 
 

@@ -450,12 +450,16 @@ class TestAudienceFiltering:
         conn_bob = ConnectionInfo(session_id="s2", user_id="bob")
 
         stream_alice = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=lambda: {"data": "x"},
             connection=conn_alice,
         )
         stream_bob = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=lambda: {"data": "x"},
             connection=conn_bob,
         )
@@ -469,11 +473,13 @@ class TestAudienceFiltering:
         await asyncio.sleep(0.01)
 
         # Only alice should receive this
-        await bus.emit(ChangeEvent(
-            scope="s",
-            changed_paths=frozenset({"data"}),
-            audience=frozenset({"alice"}),
-        ))
+        await bus.emit(
+            ChangeEvent(
+                scope="s",
+                changed_paths=frozenset({"data"}),
+                audience=frozenset({"alice"}),
+            )
+        )
 
         fragments_alice = await task_alice
         fragments_bob = await task_bob
@@ -489,30 +495,32 @@ class TestAudienceFiltering:
         conn_b = ConnectionInfo(session_id="s2", user_id="bob")
 
         stream_a = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=lambda: {"data": "x"},
             connection=conn_a,
         )
         stream_b = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=lambda: {"data": "x"},
             connection=conn_b,
         )
 
-        task_a = asyncio.create_task(
-            _collect_fragments(bus, stream_a, max_fragments=1)
-        )
-        task_b = asyncio.create_task(
-            _collect_fragments(bus, stream_b, max_fragments=1)
-        )
+        task_a = asyncio.create_task(_collect_fragments(bus, stream_a, max_fragments=1))
+        task_b = asyncio.create_task(_collect_fragments(bus, stream_b, max_fragments=1))
         await asyncio.sleep(0.01)
 
         # audience=None → broadcast
-        await bus.emit(ChangeEvent(
-            scope="s",
-            changed_paths=frozenset({"data"}),
-            audience=None,
-        ))
+        await bus.emit(
+            ChangeEvent(
+                scope="s",
+                changed_paths=frozenset({"data"}),
+                audience=None,
+            )
+        )
 
         assert len(await task_a) == 1
         assert len(await task_b) == 1
@@ -536,7 +544,9 @@ class TestChangedPathsPassthrough:
             return {"data": "x"}
 
         stream = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=ctx_builder,
         )
 
@@ -554,7 +564,9 @@ class TestChangedPathsPassthrough:
         index = _make_index(("page.html", "content", ["data"]))
 
         stream = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=lambda: {"data": "ok"},
         )
 
@@ -575,7 +587,9 @@ class TestChangedPathsPassthrough:
             return {"data": "async", "paths": list(changed_paths)}
 
         stream = reactive_stream(
-            bus, scope="s", index=index,
+            bus,
+            scope="s",
+            index=index,
             context_builder=ctx_builder,
         )
 

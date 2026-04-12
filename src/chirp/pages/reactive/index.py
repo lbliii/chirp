@@ -73,9 +73,7 @@ class DependencyIndex:
             prefix = ".".join(parts[: i + 1])
             self._prefix_to_paths.setdefault(prefix, set()).add(path)
 
-    def block_dependencies(
-        self, template_name: str, block_name: str
-    ) -> frozenset[str]:
+    def block_dependencies(self, template_name: str, block_name: str) -> frozenset[str]:
         """Return all context paths that a block depends on.
 
         Inverse of the path→block mapping.  Useful for selective context
@@ -92,8 +90,7 @@ class DependencyIndex:
         paths: set[str] = set()
         for path, refs in self._path_to_blocks.items():
             if any(
-                ref.template_name == template_name and ref.block_name == block_name
-                for ref in refs
+                ref.template_name == template_name and ref.block_name == block_name for ref in refs
             ):
                 paths.add(path)
         return frozenset(paths)
