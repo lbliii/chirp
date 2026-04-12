@@ -362,20 +362,14 @@ class App:
         Uses the compiled router and route table built at freeze time. Unknown
         paths or non-filesystem routes return ``None``.
         """
-        from chirp.errors import MethodNotAllowed, NotFound
-        from chirp.templating.navigation_swap import normalize_route_path
+        from chirp.templating.navigation_swap import lookup_layout_chain_for_path
 
         self._ensure_frozen()
-        router = self._router
-        if router is None:
-            return None
-        normalized = normalize_route_path(path)
-        try:
-            match = router.match("GET", normalized)
-        except NotFound, MethodNotAllowed:
-            return None
-        chain = self._runtime_state.route_layout_chains.get(match.route.path)
-        return chain if isinstance(chain, LayoutChain) else None
+        return lookup_layout_chain_for_path(
+            path,
+            router=self._router,
+            route_layout_chains=self._runtime_state.route_layout_chains,
+        )
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

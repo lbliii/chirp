@@ -639,6 +639,45 @@ class TestLayoutStartIndex:
         assert "<html>" not in html
         assert "Depth page content" in html
 
+    def test_outlet_mode_replace_preserves_descendant_layouts(
+        self, kida_env: Environment
+    ) -> None:
+        """Matched replace outlets skip the outer shell but keep child shells."""
+        adapter = KidaAdapter(kida_env)
+        layout_chain = LayoutChain(
+            layouts=(
+                LayoutInfo(
+                    template_name="oob_layout/_depth_root.html",
+                    target="body",
+                    depth=0,
+                    outlet_target_id="app-content",
+                    outlet_mode="replace",
+                ),
+                LayoutInfo(
+                    template_name="oob_layout/_depth_inner.html",
+                    target="app-content",
+                    depth=1,
+                ),
+            )
+        )
+        comp = PageComposition(
+            template="oob_layout/depth_page.html",
+            fragment_block="content",
+            page_block="content",
+            context={},
+            layout_chain=layout_chain,
+        )
+        request = _htmx_boosted_request(htmx_target="#app-content")
+        plan = build_render_plan(comp, request=request, fragment_target_registry=None)
+
+        assert plan.layout_start_index == 1
+        rendered = execute_render_plan(plan, adapter=adapter)
+        html = serialize_rendered_plan(rendered)
+        assert "<html>" not in html
+        assert "<body>" not in html
+        assert html.count('id="app-content"') == 1
+        assert "Depth page content" in html
+
     def test_outlet_mode_replace_overrides_registry_omit_false(self, kida_env: Environment) -> None:
         """Layout ``replace`` still skips shells when registry sets omit_outer_layouts=False."""
         reg = FragmentTargetRegistry()

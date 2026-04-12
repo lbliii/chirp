@@ -530,6 +530,63 @@ class TestLayoutWrapping:
         assert 'id="site-content"' not in chunks[0]
         assert "<h1>X</h1>" in chunks[0]
 
+    async def test_boosted_replace_outlet_preserves_descendant_layouts(self):
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        env = Environment(
+            loader=DictLoader(
+                {
+                    "dashboard.html": _DASHBOARD_TEMPLATE,
+                    "_layout.html": (
+                        "<!DOCTYPE html><html><body>"
+                        '<div id="site-content">{% block content %}{% end %}</div>'
+                        "</body></html>"
+                    ),
+                    "_showcase.html": '<main id="main">{% block content %}{% end %}</main>',
+                }
+            )
+        )
+        chain = LayoutChain(
+            layouts=(
+                LayoutInfo(
+                    "_layout.html",
+                    "body",
+                    0,
+                    outlet_target_id="site-content",
+                    outlet_mode="replace",
+                ),
+                LayoutInfo("_showcase.html", "site-content", 1),
+            )
+        )
+        request = type(
+            "Req",
+            (),
+            {
+                "is_fragment": True,
+                "is_history_restore": False,
+                "is_boosted": True,
+                "htmx_target": "site-content",
+            },
+        )()
+
+        s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                layout_chain=chain,
+                layout_context={"title": "X"},
+                request=request,
+            )
+        ]
+
+        assert len(chunks) == 1
+        assert "<!DOCTYPE html>" not in chunks[0]
+        assert 'id="site-content"' not in chunks[0]
+        assert 'id="main"' in chunks[0]
+        assert "<h1>X</h1>" in chunks[0]
+
 
 # ---------------------------------------------------------------------------
 # Two blocks sharing one deferred key

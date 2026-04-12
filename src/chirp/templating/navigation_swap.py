@@ -83,6 +83,118 @@ def common_layout_prefix_len(a: LayoutChain, b: LayoutChain) -> int:
     return count
 
 
+def common_shell_prefix_len(a: LayoutChain, b: LayoutChain) -> int:
+    """Length of the longest common prefix of two shell paths."""
+    pa, pb = a.shell_path, b.shell_path
+    n = min(len(pa), len(pb))
+    count = 0
+    for i in range(n):
+        if pa[i] != pb[i]:
+            break
+        count += 1
+    return count
+
+
+def lookup_layout_chain_for_path(
+    path: str,
+    *,
+    router: Any | None,
+    route_layout_chains: Mapping[str, Any],
+) -> LayoutChain | None:
+    """Resolve a concrete GET path to its filesystem ``LayoutChain``."""
+    from chirp.errors import MethodNotAllowed, NotFound
+
+    if router is None:
+        return None
+    if path.startswith(("http://", "https://", "//")):
+        return None
+    normalized = normalize_route_path(path)
+    try:
+        match = router.match("GET", normalized)
+    except NotFound, MethodNotAllowed:
+        return None
+    chain = route_layout_chains.get(match.route.path)
+    return chain if isinstance(chain, LayoutChain) else None
+
+
+def can_use_same_shell_navigation(
+    *,
+    layout_chain_current: LayoutChain | None,
+    layout_chain_dest: LayoutChain | None,
+) -> bool:
+    """Return True when navigation can safely stay inside the current shell.
+
+    Backward compatibility:
+    - when neither route declares shell boundaries, fall back to the legacy
+      geometry-based behavior;
+    - when either route opts into shell boundaries, both routes must resolve to
+      the same inherited shell path before boosted navigation is allowed.
+    """
+    current_shell_path = layout_chain_current.shell_path if layout_chain_current is not None else ()
+    dest_shell_path = layout_chain_dest.shell_path if layout_chain_dest is not None else ()
+    if not current_shell_path and not dest_shell_path:
+        return True
+    if not current_shell_path or not dest_shell_path:
+        return False
+    return current_shell_path == dest_shell_path
+
+
+def pick_navigation_layout_index(
+    *,
+    layout_chain_current: LayoutChain | None,
+    layout_chain_dest: LayoutChain,
+) -> int | None:
+    """Choose the destination layout whose outlet should own the navigation.
+
+    Rules:
+    - no shell metadata on either side: keep legacy geometry-only behavior
+    - one side annotated, the other not: be conservative and return ``None``
+    - same shell path: use the existing geometry within that shell
+    - shared shell ancestry but diverging child shells: target the last shared
+      shell boundary in the destination chain
+    """
+    current_shell_path = layout_chain_current.shell_path if layout_chain_current is not None else ()
+    dest_shell_path = layout_chain_dest.shell_path
+
+    layouts_dest = layout_chain_dest.layouts
+    nd = len(layouts_dest)
+    if nd == 0:
+        return None
+
+    if not current_shell_path and not dest_shell_path:
+        layouts_curr = layout_chain_current.layouts if layout_chain_current is not None else ()
+        nc = len(layouts_curr)
+        common = (
+            common_layout_prefix_len(layout_chain_current, layout_chain_dest)
+            if layout_chain_current is not None and layouts_curr
+            else 0
+        )
+        return pick_outlet_layout_index(nc=nc, nd=nd, common=common)
+
+    if not current_shell_path or not dest_shell_path:
+        return None
+
+    shell_common = (
+        common_shell_prefix_len(layout_chain_current, layout_chain_dest)
+        if layout_chain_current is not None
+        else 0
+    )
+    if shell_common == 0:
+        return None
+
+    if current_shell_path == dest_shell_path:
+        layouts_curr = layout_chain_current.layouts if layout_chain_current is not None else ()
+        nc = len(layouts_curr)
+        common = (
+            common_layout_prefix_len(layout_chain_current, layout_chain_dest)
+            if layout_chain_current is not None and layouts_curr
+            else 0
+        )
+        return pick_outlet_layout_index(nc=nc, nd=nd, common=common)
+
+    return layout_chain_dest.layout_index_for_shell_depth(shell_common)
+
+
 def pick_outlet_layout_index(*, nc: int, nd: int, common: int) -> int:
     """Choose which layout level owns the primary outlet for this transition."""
     if nc == nd == common and nc > 0:
@@ -137,23 +249,13 @@ def resolve_navigation_swap(
         return None
     if layout_chain_dest is None or not layout_chain_dest.layouts:
         return None
-
     layouts_dest = layout_chain_dest.layouts
-    nd = len(layouts_dest)
-
-    layouts_curr = layout_chain_current.layouts if layout_chain_current else ()
-    nc = len(layouts_curr)
-
-    common = (
-        common_layout_prefix_len(layout_chain_current, layout_chain_dest)
-        if layout_chain_current and layouts_curr
-        else 0
+    idx = pick_navigation_layout_index(
+        layout_chain_current=layout_chain_current,
+        layout_chain_dest=layout_chain_dest,
     )
-
-    idx = pick_outlet_layout_index(nc=nc, nd=nd, common=common)
-    if idx < 0 or idx >= nd:
-        idx = max(0, nd - 1)
-
+    if idx is None:
+        return None
     layout = layouts_dest[idx]
     tid = concrete_target_id(layout, swap_scope_map)
     scope = _scope_label(layout, tid, swap_scope_map)
@@ -183,7 +285,6 @@ def make_swap_attrs(
 
     def swap_attrs(href: str, *, hx_boost: bool = True) -> dict[str, str]:
         from chirp.context import get_request
-        from chirp.errors import MethodNotAllowed, NotFound
 
         try:
             request = get_request()
@@ -195,21 +296,19 @@ def make_swap_attrs(
             _logger.debug("navigation_swap: external or unresolved href %r", href)
             return {}
 
-        layout_current: LayoutChain | None = None
-        layout_dest: LayoutChain | None = None
-        if router is None:
-            return {}
-        try:
-            m = router.match("GET", dest)
-            layout_dest = route_layout_chains.get(m.route.path)
-        except NotFound, MethodNotAllowed:
+        layout_dest = lookup_layout_chain_for_path(
+            dest,
+            router=router,
+            route_layout_chains=route_layout_chains,
+        )
+        if layout_dest is None:
             _logger.debug("navigation_swap: no route for destination %r", dest)
             return {}
-        try:
-            mc = router.match("GET", current)
-            layout_current = route_layout_chains.get(mc.route.path)
-        except NotFound, MethodNotAllowed:
-            layout_current = None
+        layout_current = lookup_layout_chain_for_path(
+            current,
+            router=router,
+            route_layout_chains=route_layout_chains,
+        )
 
         res = resolve_navigation_swap(
             current_path=current,

@@ -163,25 +163,26 @@ def _compute_layout_start_index(
     layout_chain: LayoutChain | None,
     htmx_target: str | None,
     is_history_restore: bool,
+    *,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> int:
     """Compute layout start index for HX-Target-aware depth."""
     if layout_chain is None or not layout_chain.layouts:
         return 0
     if is_history_restore or htmx_target is None:
         return 0
-    idx = layout_chain.find_start_index_for_target(htmx_target)
+    omit_targets = frozenset()
+    if fragment_target_registry is not None:
+        config = fragment_target_registry.get(htmx_target)
+        if config is not None and config.omit_outer_layouts:
+            omit_targets = frozenset({htmx_target.lstrip("#")})
+    idx = layout_chain.start_index_for_htmx_target(
+        htmx_target,
+        omit_outer_layout_targets=omit_targets,
+    )
     if idx is None:
         return len(layout_chain.layouts)
     return idx
-
-
-def _layout_outlet_replace_matches_target(htmx_target: str, layout_chain: LayoutChain) -> bool:
-    """True when ``HX-Target`` matches a layout ``{# outlet: #}`` with ``outlet_mode: replace``."""
-    tid = htmx_target.lstrip("#")
-    return any(
-        layout.outlet_target_id == tid and layout.outlet_mode == "replace"
-        for layout in layout_chain.layouts
-    )
 
 
 def normalize_to_composition(value: Any) -> PageComposition | None:
@@ -237,21 +238,11 @@ def build_render_plan(
         intent = "page_fragment"
         apply_layouts = layout_chain is not None and bool(layout_chain.layouts)
         layout_start_index = _compute_layout_start_index(
-            layout_chain, htmx_target, is_history_restore
+            layout_chain,
+            htmx_target,
+            is_history_restore,
+            fragment_target_registry=fragment_target_registry,
         )
-        if (
-            htmx_target
-            and layout_chain
-            and (
-                (
-                    fragment_target_registry
-                    and (ft_cfg := fragment_target_registry.get(htmx_target)) is not None
-                    and ft_cfg.omit_outer_layouts
-                )
-                or _layout_outlet_replace_matches_target(htmx_target, layout_chain)
-            )
-        ):
-            layout_start_index = len(layout_chain.layouts)
         block = _fragment_block_for_request(
             composition,
             request,

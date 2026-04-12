@@ -367,6 +367,7 @@ def negotiate(
                 return StreamingResponse(
                     chunks=chunks,
                     content_type="text/html; charset=utf-8",
+                    request_context=request,
                 )
             # All context values are resolved — use sync streaming
             tmpl = kida_env.get_template(value.template_name)
@@ -374,6 +375,7 @@ def negotiate(
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
+                request_context=request,
             )
         case TemplateStream():
             kida_env = _require_kida_env(kida_env, "TemplateStream")
@@ -382,6 +384,7 @@ def negotiate(
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
+                request_context=request,
             )
         case LayoutSuspense():
             kida_env = _require_kida_env(kida_env, "LayoutSuspense")
@@ -395,6 +398,7 @@ def negotiate(
                 layout_context=value.context,
                 request=req,
                 oob_registry=oob_registry,
+                fragment_target_registry=fragment_target_registry,
             )
             if should_append_streamed_shell_actions_oob(value.context, req):
                 chunks = append_shell_actions_oob_stream(chunks, value.context, kida_env)
@@ -405,6 +409,7 @@ def negotiate(
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
+                request_context=req,
             )
         case Suspense():
             kida_env = _require_kida_env(kida_env, "Suspense")
@@ -413,6 +418,7 @@ def negotiate(
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
+                request_context=request,
             )
         case EventStream():
             return SSEResponse(

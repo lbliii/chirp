@@ -37,6 +37,7 @@ _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "opt
 
 # Regex to extract layout shell comments from _layout.html
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
+_SHELL_RE = re.compile(r"\{#\s*shell:\s*(\S+)\s*#\}")
 _SWAP_SCOPE_RE = re.compile(r"\{#\s*swap_scope:\s*(\S+)\s*#\}")
 _OUTLET_RE = re.compile(r"\{#\s*outlet:\s*(\S+)\s*#\}")
 _OUTLET_MODE_RE = re.compile(r"\{#\s*outlet_mode:\s*(\S+)\s*#\}")
@@ -104,6 +105,7 @@ def _walk_directory(
             template_name=template_name,
             target=meta["target"],
             depth=depth,
+            shell_name=meta["shell_name"],
             swap_scope_name=meta["swap_scope_name"],
             outlet_target_id=meta["outlet_target_id"],
             frame_targets=meta["frame_targets"],
@@ -206,6 +208,7 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
     Supported annotations::
 
         {# target: element_id #}
+        {# shell: shell_name #}
         {# swap_scope: symbolic_name #}
         {# outlet: element_id #}
         {# outlet_mode: compose | replace #}
@@ -214,6 +217,9 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
     content = layout_file.read_text(encoding="utf-8")
     target_m = _TARGET_RE.search(content)
     target = target_m.group(1) if target_m else "body"
+
+    shell_m = _SHELL_RE.search(content)
+    shell_name = shell_m.group(1) if shell_m else None
 
     scope_m = _SWAP_SCOPE_RE.search(content)
     swap_scope_name = scope_m.group(1) if scope_m else None
@@ -233,6 +239,7 @@ def _parse_layout_metadata(layout_file: Path) -> dict[str, Any]:
 
     return {
         "target": target,
+        "shell_name": shell_name,
         "swap_scope_name": swap_scope_name,
         "outlet_target_id": outlet_target_id,
         "frame_targets": frame_targets,

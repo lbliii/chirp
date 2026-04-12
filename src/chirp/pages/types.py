@@ -95,6 +95,7 @@ class LayoutInfo:
     Optional comments (see filesystem routing docs) declare hierarchical
     swap scope metadata for boosted navigation helpers:
 
+    - ``{# shell: name #}`` — this layout introduces a shell boundary.
     - ``{# swap_scope: name #}`` — symbolic scope (e.g. ``shell``, ``page``).
     - ``{# outlet: element_id #}`` — primary navigation outlet for this level
       (defaults to *target* when omitted).
@@ -107,6 +108,8 @@ class LayoutInfo:
         target: DOM element ID this layout renders into.
             ``"body"`` for the root layout, ``"app-content"`` for nested.
         depth: Nesting depth (0 = root).
+        shell_name: Optional shell boundary label introduced by this layout.
+            Descendant routes inherit the full shell path from ancestor layouts.
         swap_scope_name: Optional symbolic scope for ``resolve_navigation_swap``.
         outlet_target_id: Optional primary outlet id for this layout level.
         frame_targets: Optional ids treated as non-swapped frame for validation.
@@ -118,6 +121,7 @@ class LayoutInfo:
     template_name: str
     target: str
     depth: int
+    shell_name: str | None = None
     swap_scope_name: str | None = None
     outlet_target_id: str | None = None
     frame_targets: frozenset[str] | None = None
@@ -137,6 +141,57 @@ class LayoutChain:
     """
 
     layouts: tuple[LayoutInfo, ...] = ()
+
+    @property
+    def shell_layers(self) -> tuple[tuple[str, int], ...]:
+        """Return ``(shell_name, layout_index)`` for each declared shell boundary."""
+        return tuple(
+            (layout.shell_name, index)
+            for index, layout in enumerate(self.layouts)
+            if layout.shell_name is not None
+        )
+
+    @property
+    def shell_path(self) -> tuple[str, ...]:
+        """Return the inherited shell ancestry for this route.
+
+        The path is derived from boundary layouts that declare
+        ``{# shell: name #}``. Layouts without a shell annotation participate
+        in composition but do not introduce a new shell domain.
+        """
+        return tuple(name for name, _ in self.shell_layers)
+
+    def layout_index_for_shell_depth(self, shell_depth: int) -> int | None:
+        """Return the layout index for the Nth shell boundary, or ``None``."""
+        if shell_depth <= 0:
+            return None
+        shell_layers = self.shell_layers
+        if shell_depth > len(shell_layers):
+            return None
+        return shell_layers[shell_depth - 1][1]
+
+    def start_index_for_htmx_target(
+        self,
+        htmx_target: str | None,
+        *,
+        omit_outer_layout_targets: frozenset[str] = frozenset(),
+    ) -> int | None:
+        """Return the layout start index for a boosted navigation target.
+
+        ``omit_outer_layout_targets`` contains target ids whose registered
+        fragment config wants to skip the matched outer layout while still
+        rendering any descendant shells.
+        """
+        idx = self.find_start_index_for_target(htmx_target)
+        if idx is None or htmx_target is None:
+            return idx
+        target_id = htmx_target.lstrip("#")
+        if target_id in omit_outer_layout_targets:
+            return min(idx + 1, len(self.layouts))
+        layout = self.layouts[idx]
+        if layout.outlet_target_id == target_id and layout.outlet_mode == "replace":
+            return min(idx + 1, len(self.layouts))
+        return idx
 
     def find_start_index_for_target(self, htmx_target: str | None) -> int | None:
         """Find the layout index to start rendering from for a given HX-Target.

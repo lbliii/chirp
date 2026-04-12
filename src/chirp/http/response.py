@@ -7,9 +7,12 @@ built incrementally by design.
 import json as json_module
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, replace
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from chirp.http.cookies import SetCookie
+
+if TYPE_CHECKING:
+    from chirp.http.request import Request
 
 type RenderIntent = Literal["unknown", "full_page", "fragment"]
 
@@ -400,6 +403,7 @@ class StreamingResponse:
     content_type: str = "text/html; charset=utf-8"
     headers: tuple[tuple[str, str], ...] = ()
     render_intent: RenderIntent = "unknown"
+    request_context: Request | None = None
 
     def with_status(self, status: int) -> StreamingResponse:
         """Return a new StreamingResponse with a different status code."""
