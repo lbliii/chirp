@@ -54,3 +54,19 @@ class EventStream:
     generator: AsyncIterator[Any]
     event_type: str | None = None
     heartbeat_interval: float = 15.0
+
+    def __post_init__(self) -> None:
+        if self.heartbeat_interval < 1.0:
+            msg = (
+                f"EventStream heartbeat_interval={self.heartbeat_interval}s is too low "
+                f"(minimum 1.0s). Very short intervals waste bandwidth without "
+                f"improving disconnect detection."
+            )
+            raise ValueError(msg)
+        if self.heartbeat_interval > 300.0:
+            msg = (
+                f"EventStream heartbeat_interval={self.heartbeat_interval}s is too high "
+                f"(maximum 300s). Long intervals risk proxy/firewall timeouts "
+                f"closing the connection before a heartbeat is sent."
+            )
+            raise ValueError(msg)

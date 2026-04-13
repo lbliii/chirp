@@ -470,21 +470,41 @@ class SSEResponse:
     Provides no-op ``.with_*()`` methods so middleware chains don't crash.
     SSE headers (text/event-stream, no-cache) are always sent by the SSE
     handler itself; any middleware header modifications are ignored.
+
+    A warning is logged the first time a no-op method is called, so
+    middleware authors know their modifications are being silently dropped.
     """
 
     event_stream: Any  # EventStream (avoided import cycle)
     kida_env: Any = None  # kida Environment | None
+    _noop_warned: bool = False
+
+    def _warn_noop(self, method: str) -> None:
+        if not self._noop_warned:
+            # Bypass frozen restriction for this internal flag.
+            object.__setattr__(self, "_noop_warned", True)
+            import logging
+
+            logging.getLogger("chirp.server").warning(
+                "SSEResponse.%s() is a no-op — SSE headers are fixed by the "
+                "protocol handler. Middleware modifications are silently "
+                "ignored for SSE streams.",
+                method,
+            )
 
     def with_status(self, status: int) -> SSEResponse:
         """No-op: SSE always sends 200."""
+        self._warn_noop("with_status")
         return self
 
     def with_header(self, name: str, value: str) -> SSEResponse:
         """No-op: SSE headers are fixed by the protocol handler."""
+        self._warn_noop("with_header")
         return self
 
     def with_headers(self, headers: Mapping[str, str]) -> SSEResponse:
         """No-op: SSE headers are fixed by the protocol handler."""
+        self._warn_noop("with_headers")
         return self
 
     def with_content_type(self, content_type: str) -> SSEResponse:

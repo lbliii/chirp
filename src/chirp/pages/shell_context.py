@@ -73,7 +73,12 @@ def _call_meta_provider(
                 try:
                     kwargs[name] = param.annotation(value)
                 except ValueError, TypeError:
-                    kwargs[name] = value
+                    from chirp.errors import NotFound
+
+                    raise NotFound(
+                        f"Path parameter '{name}' expected "
+                        f"{param.annotation.__name__}, got '{value}'."
+                    ) from None
             else:
                 kwargs[name] = value
         elif name in accumulated_ctx:

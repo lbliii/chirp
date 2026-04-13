@@ -397,7 +397,7 @@ class TestSSEHeartbeat:
 
     @pytest.mark.slow
     async def test_heartbeat_on_slow_generator(self) -> None:
-        """With a very short heartbeat interval, heartbeats arrive between events."""
+        """With a short heartbeat interval, heartbeats arrive between events."""
         app = App()
 
         @app.route("/events")
@@ -405,17 +405,17 @@ class TestSSEHeartbeat:
             import asyncio
 
             async def gen():
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(2.5)
                 yield "done"
 
-            return EventStream(gen(), heartbeat_interval=0.1)
+            return EventStream(gen(), heartbeat_interval=1.0)
 
         async with TestClient(app) as client:
             result = await client.sse("/events", max_events=1)
 
         assert len(result.events) == 1
         assert result.events[0].data == "done"
-        # With 0.3s sleep and 0.1s heartbeat, expect ~2 heartbeats
+        # With 2.5s sleep and 1.0s heartbeat, expect ~2 heartbeats
         assert result.heartbeats >= 1
 
 
@@ -520,8 +520,8 @@ class TestSSEGeneratorError:
 class TestSSEPerEventErrorBoundary:
     """A single Fragment render failure should not kill the stream."""
 
-    async def test_bad_fragment_skipped_in_production(self) -> None:
-        """In production mode, a bad Fragment is silently skipped."""
+    async def test_bad_fragment_sends_error_in_production(self) -> None:
+        """In production mode, a bad Fragment sends an error event (not silently skipped)."""
         app = _app(debug=False)
 
         @app.route("/events")
@@ -540,9 +540,10 @@ class TestSSEPerEventErrorBoundary:
         data_values = [e.data for e in result.events]
         assert "before" in data_values
         assert "after" in data_values
-        # No error event sent — the bad fragment was silently skipped
+        # Error event sent so clients know an event was lost
         error_events = [e for e in result.events if e.event == "error"]
-        assert error_events == []
+        assert len(error_events) == 1
+        assert "rendering failed" in error_events[0].data.lower()
 
     async def test_bad_fragment_sends_targeted_error_in_debug(self) -> None:
         """In debug mode, error HTML replaces the specific block."""

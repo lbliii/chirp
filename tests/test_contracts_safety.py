@@ -1,8 +1,9 @@
-"""Tests for safety contract checks — sse_speculation, csrf_session, middleware_signature."""
+"""Tests for safety contract checks — sse_speculation, csrf_session, middleware_signature, secret_key."""
 
 from chirp.contracts.rules_safety import (
     check_csrf_session_order,
     check_middleware_signatures,
+    check_secret_key,
     check_sse_speculation,
 )
 from chirp.contracts.types import Severity
@@ -102,10 +103,10 @@ class TestCSRFSessionOrder:
         issues = check_csrf_session_order([SessionMiddleware(), CSRFMiddleware()])
         assert len(issues) == 0
 
-    def test_csrf_before_session_warns(self) -> None:
+    def test_csrf_before_session_errors(self) -> None:
         issues = check_csrf_session_order([CSRFMiddleware(), SessionMiddleware()])
         assert len(issues) == 1
-        assert issues[0].severity == Severity.WARNING
+        assert issues[0].severity == Severity.ERROR
         assert "after CSRFMiddleware" in issues[0].message
 
     def test_no_csrf_no_issues(self) -> None:
@@ -175,3 +176,41 @@ class TestMiddlewareSignatures:
             ]
         )
         assert len(issues) == 2  # sync warning + no-arg error
+
+
+# ---------------------------------------------------------------------------
+# Secret key checks
+# ---------------------------------------------------------------------------
+
+
+class _FakeConfig:
+    def __init__(self, secret_key: str = "", env: str = "development") -> None:
+        self.secret_key = secret_key
+        self.env = env
+
+
+class TestSecretKey:
+    def test_empty_key_in_production_errors(self) -> None:
+        issues = check_secret_key(_FakeConfig(secret_key="", env="production"))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "secret_key"
+
+    def test_empty_key_in_development_ok(self) -> None:
+        issues = check_secret_key(_FakeConfig(secret_key="", env="development"))
+        assert len(issues) == 0
+
+    def test_short_key_warns(self) -> None:
+        issues = check_secret_key(_FakeConfig(secret_key="short", env="production"))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert "16 characters" in issues[0].message
+
+    def test_strong_key_ok(self) -> None:
+        issues = check_secret_key(_FakeConfig(secret_key="a" * 32, env="production"))
+        assert len(issues) == 0
+
+    def test_empty_key_in_staging_errors(self) -> None:
+        issues = check_secret_key(_FakeConfig(secret_key="", env="staging"))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR

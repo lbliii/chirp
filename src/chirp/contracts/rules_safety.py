@@ -128,12 +128,13 @@ def check_csrf_session_order(
     elif csrf_index is not None and session_index is not None and session_index > csrf_index:
         issues.append(
             ContractIssue(
-                severity=Severity.WARNING,
+                severity=Severity.ERROR,
                 category="csrf_session",
                 message=(
                     "SessionMiddleware is registered after CSRFMiddleware. "
-                    "The session may not be available when CSRF validation "
-                    "runs. Move SessionMiddleware before CSRFMiddleware."
+                    "The session will not be available when CSRF validation "
+                    "runs — CSRF protection is silently broken. "
+                    "Move SessionMiddleware before CSRFMiddleware."
                 ),
             )
         )
@@ -215,5 +216,50 @@ def check_middleware_signatures(
                     ),
                 )
             )
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# Secret key validation
+# ---------------------------------------------------------------------------
+
+
+def check_secret_key(
+    config: Any,
+) -> list[ContractIssue]:
+    """Error when secret_key is empty in non-development environments.
+
+    Sessions and CSRF tokens are signed with the secret key.  An empty
+    key provides no security — anyone can forge tokens.
+    """
+    issues: list[ContractIssue] = []
+    secret_key = getattr(config, "secret_key", "")
+    env = getattr(config, "env", "development")
+
+    if not secret_key and env != "development":
+        issues.append(
+            ContractIssue(
+                severity=Severity.ERROR,
+                category="secret_key",
+                message=(
+                    "secret_key is empty but env is "
+                    f"'{env}'. Sessions and CSRF tokens are signed with the "
+                    "secret key — set a strong random value in AppConfig or "
+                    "the CHIRP_SECRET_KEY environment variable."
+                ),
+            )
+        )
+    elif secret_key and len(secret_key) < 16:
+        issues.append(
+            ContractIssue(
+                severity=Severity.WARNING,
+                category="secret_key",
+                message=(
+                    f"secret_key is only {len(secret_key)} characters. "
+                    "Use at least 16 characters for adequate security."
+                ),
+            )
+        )
 
     return issues

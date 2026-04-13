@@ -41,7 +41,7 @@ class TestDeadTemplateDetection:
         dead = _user_dead(result)
         assert len(dead) == 1
         assert "unused.html" in dead[0].message
-        assert dead[0].severity == Severity.INFO
+        assert dead[0].severity == Severity.WARNING
 
     def test_included_template_not_dead(self, tmp_path):
         """A template referenced via include should not be reported."""

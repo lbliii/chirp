@@ -147,10 +147,16 @@ async def handle_sse(
                     from chirp.server.terminal_errors import log_error
 
                     log_error(render_exc)
+                    # Always send an error event so clients know an event
+                    # was lost.  In debug mode, include targeted block info;
+                    # in production, send a generic error event.
                     if debug:
                         sse_text = _format_error_event(value, render_exc)
                     else:
-                        continue  # Skip this event, keep stream alive
+                        sse_text = SSEEvent(
+                            data="Event rendering failed",
+                            event="error",
+                        ).encode()
 
                 if sse_text:
                     try:
@@ -198,6 +204,13 @@ async def handle_sse(
                     pending_next.cancel()
                 with contextlib.suppress(asyncio.CancelledError, StopAsyncIteration):
                     await pending_next
+            # Close the generator so user try/finally blocks run
+            # (e.g. database connection cleanup, file handle release).
+            # AsyncIterator doesn't guarantee aclose(); AsyncGenerator does.
+            _aclose = getattr(gen_iter, "aclose", None)
+            if _aclose is not None:
+                with contextlib.suppress(Exception):
+                    await _aclose()
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())
