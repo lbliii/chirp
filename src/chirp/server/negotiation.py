@@ -243,7 +243,7 @@ def negotiate(
                 .with_headers(dict(value.headers))
             )
         case MutationResult():
-            if request is not None and request.is_fragment:
+            if request is not None and request.is_htmx:
                 if value.fragments:
                     kida_env = _require_kida_env(kida_env, "MutationResult")
                     parts: list[str] = []
@@ -397,7 +397,7 @@ def negotiate(
         case LayoutSuspense():
             kida_env = _require_kida_env(kida_env, "LayoutSuspense")
             req = value.request if value.request is not None else request
-            is_htmx = bool(req and req.is_fragment)
+            is_htmx = bool(req and req.is_htmx)
             chunks = render_suspense(
                 kida_env,
                 value.suspense,
@@ -421,7 +421,7 @@ def negotiate(
             )
         case Suspense():
             kida_env = _require_kida_env(kida_env, "Suspense")
-            is_htmx = request is not None and request.is_fragment
+            is_htmx = request is not None and request.is_htmx
             chunks = render_suspense(kida_env, value, is_htmx=is_htmx, oob_registry=oob_registry)
             return StreamingResponse(
                 chunks=chunks,

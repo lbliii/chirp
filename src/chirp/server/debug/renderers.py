@@ -323,6 +323,7 @@ def render_debug_page(
     exc: BaseException,
     request: Any,
     *,
+    is_htmx: bool = False,
     is_fragment: bool = False,
 ) -> str:
     """Render a rich debug error page.
@@ -330,11 +331,17 @@ def render_debug_page(
     Args:
         exc: The exception that caused the error.
         request: The chirp Request object.
-        is_fragment: If True, render a compact fragment instead of a full page.
+        is_htmx: If True, render a compact fragment instead of a full page.
+            Preferred over the deprecated *is_fragment* parameter.
+        is_fragment: Deprecated alias for *is_htmx*. Kept for backwards
+            compatibility; will be removed in a future release.
 
     Returns:
         HTML string — either a full page or a fragment snippet.
     """
+    # Merge is_htmx and legacy is_fragment into a single flag
+    _compact = is_htmx or is_fragment
+
     exc_type = type(exc).__name__
     exc_module = type(exc).__module__ or ""
     qualified = f"{exc_module}.{exc_type}" if exc_module and exc_module != "builtins" else exc_type
@@ -426,7 +433,7 @@ def render_debug_page(
 
     body_html = "\n".join(sections)
 
-    if is_fragment:
+    if _compact:
         return (
             f'<div class="chirp-error chirp-error-fragment" data-status="500">'
             f"<style>{_CSS}</style>"

@@ -1,0 +1,29 @@
+[
+  {
+    "name": "reactive_bus_throughput",
+    "events_emitted": 1000,
+    "subscribers": 10,
+    "total_delivered": 10000,
+    "dropped": 0,
+    "emit_time_ms": 3.796,
+    "events_per_sec": 263444
+  },
+  {
+    "name": "route_matching",
+    "num_routes": 100,
+    "lookups": 5000,
+    "avg_us": 0.913,
+    "p50_us": 0.916,
+    "p99_us": 1.167
+  },
+  {
+    "name": "suspense_shell_render",
+    "deferred_blocks": 10,
+    "iterations": 200,
+    "shell_avg_us": 634.402,
+    "shell_p50_us": 24.167,
+    "shell_p99_us": 87.292,
+    "total_avg_ms": 1.988,
+    "total_p99_ms": 1.609
+  }
+]

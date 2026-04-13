@@ -124,7 +124,7 @@ class Page:
     * **Page block** for boosted navigations when a page needs a wider,
       fragment-safe root than the narrow fragment block.
 
-    This eliminates the manual ``if request.is_fragment`` boilerplate
+    This eliminates the manual ``if request.is_htmx`` boilerplate
     that every htmx-reachable route would otherwise need.
 
     Usage::
@@ -420,6 +420,7 @@ class Suspense:
     context: dict[str, Any] = field(default_factory=dict)
     defer_map: dict[str, str] = field(default_factory=dict)
     defer_blocks: tuple[str, ...] | None = None
+    error_block: str | None = None
 
     def __init__(
         self,
@@ -428,12 +429,14 @@ class Suspense:
         *,
         defer_map: dict[str, str] | None = None,
         defer_blocks: tuple[str, ...] | None = None,
+        error_block: str | None = None,
         **context: Any,
     ) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "context", context)
         object.__setattr__(self, "defer_map", defer_map or {})
         object.__setattr__(self, "defer_blocks", defer_blocks)
+        object.__setattr__(self, "error_block", error_block)
 
 
 @dataclass(frozen=True, slots=True)

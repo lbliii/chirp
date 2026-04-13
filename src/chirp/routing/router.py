@@ -53,6 +53,12 @@ def parse_path(path: str) -> list[PathSegment]:
             else:
                 param_name = inner
                 param_type = "str"
+            if not param_name.isidentifier():
+                raise ConfigurationError(
+                    f"Path parameter '{{{param_name}}}' is not a valid Python "
+                    f"identifier. Use '{{{param_name.replace('-', '_')}}}' instead. "
+                    f"Route: {path!r}"
+                )
             segments.append(
                 PathSegment(
                     value=part,

@@ -118,6 +118,7 @@ async def test_alpine_middleware_wraps_streaming_response() -> None:
 
     class FakeRequest:
         is_fragment = False
+        is_htmx = False
 
     snippet = alpine_snippet("3.15.8", csp=False)
     mw = AlpineInject(snippet, full_page_only=True)
@@ -145,6 +146,7 @@ async def test_streaming_html_inject_wraps_streaming_response() -> None:
 
     class FakeRequest:
         is_fragment = False
+        is_htmx = False
 
     snippet = '<script data-chirp="chirpui-alpine" src="/static/chirpui-alpine.js"></script>'
     mw = StreamingHTMLInject(

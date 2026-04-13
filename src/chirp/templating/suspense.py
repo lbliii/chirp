@@ -140,6 +140,61 @@ def format_oob_script(block_html: str, target_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Error fallback rendering
+# ---------------------------------------------------------------------------
+
+_DEFAULT_ERROR_HTML = (
+    '<div class="chirp-suspense-error" data-block="{block_name}">'
+    "Error loading {block_name}</div>"
+)
+
+
+def _render_error_html(
+    env: Environment,
+    *,
+    block_name: str,
+    deferred_key: str,
+    error: BaseException | None,
+    error_template: str | None,
+    error_block: str,
+    suspense_error_block: str | None,
+) -> str:
+    """Render error fallback HTML for a failed deferred block.
+
+    Resolution order:
+    1. Per-route ``Suspense(error_block=...)`` — block in the same template
+       (caller should pass this as *suspense_error_block*)
+    2. Global ``error_template`` + ``error_block`` from AppConfig
+    3. Hardcoded default HTML
+    """
+    error_ctx = {
+        "error": error,
+        "block_name": block_name,
+        "deferred_key": deferred_key,
+    }
+
+    # 1. Per-route error_block (rendered from global error_template if set)
+    tmpl_name = error_template
+    blk_name = suspense_error_block or error_block
+
+    if tmpl_name is not None:
+        try:
+            tmpl = env.get_template(tmpl_name)
+            return tmpl.render_block(blk_name, error_ctx)
+        except Exception:
+            logger.warning(
+                "Suspense: failed to render error fallback block=%r from template=%r, "
+                "falling back to default error HTML",
+                blk_name,
+                tmpl_name,
+                exc_info=True,
+            )
+
+    # 3. Hardcoded default
+    return _DEFAULT_ERROR_HTML.format(block_name=block_name)
+
+
+# ---------------------------------------------------------------------------
 # Core renderer
 # ---------------------------------------------------------------------------
 
@@ -214,12 +269,8 @@ def _should_wrap_in_layouts(
         return False
     if request is None:
         return True
-    # Mirror LayoutPage: skip layouts for non-boosted fragment requests
-    return not (
-        getattr(request, "is_fragment", False)
-        and not getattr(request, "is_history_restore", False)
-        and not getattr(request, "is_boosted", False)
-    )
+    # Mirror LayoutPage: skip layouts for narrow (non-boosted) fragment requests
+    return not getattr(request, "is_narrow_fragment", False)
 
 
 async def render_suspense(
@@ -232,6 +283,8 @@ async def render_suspense(
     request: Any = None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    error_template: str | None = None,
+    error_block: str = "fallback",
 ) -> AsyncIterator[str]:
     """Render a ``Suspense`` return value as an async chunk stream.
 
@@ -277,6 +330,32 @@ async def render_suspense(
             pending[key] = value
         else:
             sync_ctx[key] = value
+
+    # -- Early validation: check defer_blocks names before sending the shell --
+    # This raises ConfigurationError *before* the shell is sent, so the error
+    # is a clean 500 instead of a half-rendered page with frozen skeletons.
+    if suspense.defer_blocks is not None and pending:
+        template = env.get_template(template_name)
+        available = set(template.list_blocks())
+        unknown = [b for b in suspense.defer_blocks if b not in available]
+        if unknown:
+            from chirp.contracts.utils import closest_match
+            from chirp.errors import ConfigurationError
+
+            hints = []
+            for name in unknown:
+                suggestion = closest_match(name, available, max_dist=3)
+                if suggestion:
+                    hints.append(f"  - '{name}': did you mean '{suggestion}'?")
+                else:
+                    hints.append(f"  - '{name}'")
+            hint_text = "\n".join(hints)
+            msg = (
+                f"Suspense: defer_blocks contains unknown block(s) "
+                f"in template '{template_name}'.\n{hint_text}\n"
+                f"Available blocks: {sorted(available)}"
+            )
+            raise ConfigurationError(msg)
 
     def _wrap_shell(page_html: str, ctx: dict[str, Any]) -> str:
         if not _should_wrap_in_layouts(layout_chain, request):
@@ -324,24 +403,30 @@ async def render_suspense(
             for key, awaitable in pending.items():
                 tg.start_soon(_resolve, key, awaitable)
     except BaseException:
-        logger.exception(
-            "Suspense: error resolving deferred context for %s",
+        logger.warning(
+            "Suspense: error resolving deferred context for template=%r, "
+            "deferred_keys=%r — shell already sent, replacing skeletons with error indicators",
             template_name,
+            sorted(pending.keys()),
+            exc_info=True,
         )
         # Shell is already sent; yield a visible error for each pending block
         # so skeletons are replaced with error indicators, not left spinning.
-        error_html = (
-            '<div class="chirp-suspense-error" data-block="__resolve__">'
-            "Error loading deferred data</div>"
-        )
-        if use_htmx_fmt:
-            for key in pending:
-                target_id = defer_map.get(key, key)
-                yield format_oob_htmx(error_html, target_id)
-        else:
-            for key in pending:
-                target_id = defer_map.get(key, key)
-                yield format_oob_script(error_html, target_id)
+        for key in pending:
+            target_id = defer_map.get(key, key)
+            fallback_html = _render_error_html(
+                env,
+                block_name=key,
+                deferred_key=key,
+                error=None,
+                error_template=error_template,
+                error_block=error_block,
+                suspense_error_block=suspense.error_block,
+            )
+            if use_htmx_fmt:
+                yield format_oob_htmx(fallback_html, target_id)
+            else:
+                yield format_oob_script(fallback_html, target_id)
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
@@ -405,14 +490,22 @@ async def render_suspense(
             else:
                 yield format_oob_script(block_html, target_id)
         except Exception:
-            logger.exception(
-                "Suspense: error rendering deferred block %r for %s",
+            logger.warning(
+                "Suspense: error rendering deferred block=%r in template=%r, "
+                "target_id=%r — replacing with error indicator",
                 block_name,
                 template_name,
+                target_id,
+                exc_info=True,
             )
-            error_html = (
-                f'<div class="chirp-suspense-error" data-block="{block_name}">'
-                f"Error loading {block_name}</div>"
+            error_html = _render_error_html(
+                env,
+                block_name=block_name,
+                deferred_key=block_name,
+                error=None,
+                error_template=error_template,
+                error_block=error_block,
+                suspense_error_block=suspense.error_block,
             )
             if use_htmx_fmt:
                 yield format_oob_htmx(error_html, target_id)
