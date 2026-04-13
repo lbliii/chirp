@@ -9,6 +9,7 @@ of the render plan for consumption by the HTMX debug tray.
 
 import base64
 import json
+import logging
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
@@ -131,7 +132,9 @@ class LayoutDebugMiddleware:
             if payload is not None:
                 encoded = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode())
                 response = response.with_header("X-Chirp-Render-Plan", encoded.decode("ascii"))
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logging.getLogger("chirp.debug").debug(
+                "Render plan encoding failed", exc_info=True,
+            )
 
         return response

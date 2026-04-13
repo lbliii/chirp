@@ -5,6 +5,7 @@ no string-key dict lookups.
 """
 
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -42,6 +43,46 @@ def _env_log_format(key: str, default: str) -> str:
     if val in ("auto", "text", "json"):
         return val
     return default
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Compute Levenshtein distance between two strings."""
+    if len(a) < len(b):
+        return _levenshtein(b, a)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a):
+        curr = [i + 1]
+        for j, cb in enumerate(b):
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (ca != cb)))
+        prev = curr
+    return prev[-1]
+
+
+def _warn_unknown_env_vars(prefix: str, known_suffixes: frozenset[str]) -> None:
+    """Emit warnings for unrecognized env vars with the given prefix."""
+    feature_prefix = f"{prefix}FEATURE_"
+    for key in os.environ:
+        if not key.startswith(prefix):
+            continue
+        suffix = key[len(prefix) :]
+        if suffix in known_suffixes or key.startswith(feature_prefix):
+            continue
+        # Find closest known suffix by edit distance
+        best, best_dist = "", 999
+        for candidate in known_suffixes:
+            d = _levenshtein(suffix, candidate)
+            if d < best_dist:
+                best, best_dist = candidate, d
+        hint = f" (did you mean {prefix}{best}?)" if best_dist <= 2 else ""
+        warnings.warn(
+            f"Unknown env var {key}{hint}. "
+            f"Chirp reads: {prefix}<SUFFIX> where SUFFIX is one of: "
+            + ", ".join(sorted(known_suffixes)),
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +258,15 @@ class AppConfig:
         if isinstance(sc, dict):
             object.__setattr__(self, "static_context", MappingProxyType(sc))
 
+        # Guard: empty secret_key outside development is a security risk.
+        if self.env != "development" and not self.secret_key:
+            from chirp.errors import ConfigurationError
+
+            raise ConfigurationError(
+                f"secret_key must not be empty when env={self.env!r}. "
+                "Set CHIRP_SECRET_KEY or pass secret_key= to AppConfig."
+            )
+
     @classmethod
     def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:
         """Load configuration from environment variables.
@@ -250,6 +300,29 @@ class AppConfig:
             if k.startswith(f"{p}FEATURE_") and len(k) > len(f"{p}FEATURE_"):
                 name = k[len(f"{p}FEATURE_") :].lower().replace("_", "-")
                 feature_flags.append((name, (v or "").lower() in ("1", "true", "yes", "on")))
+
+        _warn_unknown_env_vars(
+            p,
+            frozenset(
+                {
+                    "HOST",
+                    "PORT",
+                    "DEBUG",
+                    "SECRET_KEY",
+                    "ENV",
+                    "REDIS_URL",
+                    "AUDIT_SINK",
+                    "LOG_FORMAT",
+                    "HTTP_TIMEOUT",
+                    "HTTP_RETRIES",
+                    "SKIP_CONTRACT_CHECKS",
+                    "LAZY_PAGES",
+                    "SENTRY_DSN",
+                    "SENTRY_ENVIRONMENT",
+                    "SENTRY_RELEASE",
+                }
+            ),
+        )
 
         return cls(
             host=os.environ.get(f"{p}HOST", "127.0.0.1"),

@@ -306,7 +306,7 @@ async def test_streamed_suspense_layout_preserves_request_context_for_swap_attrs
     (pages / "page.html").write_text(
         '<div id="page-root">\n'
         "<h1>{{ title }}</h1>\n"
-        '<div id="data">{% block data %}{% if data %}{{ data }}{% else %}Loading...{% end %}{% end %}</div>\n'
+        '<div id="data">{% block data %}{% if data is deferred %}Loading...{% else %}{{ data }}{% end %}{% end %}</div>\n'
         "</div>\n",
         encoding="utf-8",
     )

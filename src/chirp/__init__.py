@@ -63,6 +63,7 @@ CHIRP_CAPABILITIES = frozenset(
 __all__ = [
     "CHIRP_CAPABILITIES",
     "CHIRP_DEFER_PENDING_KEY",
+    "DEFERRED",
     "OOB",
     "STOP_POLLING",
     "Action",
@@ -146,6 +147,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "App": ("chirp.app", "App"),
     "CHIRP_CAPABILITIES": ("chirp", "CHIRP_CAPABILITIES"),
     "CHIRP_DEFER_PENDING_KEY": ("chirp.templating.suspense", "CHIRP_DEFER_PENDING_KEY"),
+    "DEFERRED": ("chirp.templating.suspense", "DEFERRED"),
     "AppConfig": ("chirp.config", "AppConfig"),
     # Contracts (for plugin authors)
     "ContractCheck": ("chirp.contracts.types", "ContractCheck"),

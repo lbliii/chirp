@@ -23,6 +23,7 @@ from kida import DictLoader, Environment
 from chirp.templating.returns import Suspense
 from chirp.templating.suspense import (
     CHIRP_DEFER_PENDING_KEY,
+    DEFERRED,
     format_oob_htmx,
     format_oob_script,
     render_suspense,
@@ -38,19 +39,19 @@ _DASHBOARD_TEMPLATE = """\
 <h1>{{ title }}</h1>
 <div id="stats">
 {% block stats %}
-  {% if stats is not none %}
-    <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton">Loading stats...</div>
+  {% else %}
+    <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
   {% end %}
 {% end %}
 </div>
 <div id="feed">
 {% block feed %}
-  {% if feed is not none %}
-    <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
-  {% else %}
+  {% if feed is deferred %}
     <div class="skeleton">Loading feed...</div>
+  {% else %}
+    <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
   {% end %}
 {% end %}
 </div>
@@ -62,8 +63,8 @@ _DEFER_PENDING_TEMPLATE = """\
 {% block stats %}
 <div id="stats">
 {# Reference `stats` so block_metadata depends_on includes it (OOB discovery). #}
-{% if stats is not none %}
-<span class="ready-flag">ready</span>
+{% if stats is deferred %}
+<span class="pending-flag">pending</span>
 {% elif "stats" in __chirp_defer_pending__ %}
 <span class="pending-flag">pending</span>
 {% else %}
@@ -76,10 +77,10 @@ _DEFER_PENDING_TEMPLATE = """\
 _SIMPLE_TEMPLATE = """\
 <div id="content">
 {% block content %}
-  {% if data %}
-    <p>{{ data }}</p>
-  {% else %}
+  {% if data is deferred %}
     <p class="loading">Loading...</p>
+  {% else %}
+    <p>{{ data }}</p>
   {% end %}
 {% end %}
 </div>"""
@@ -90,19 +91,19 @@ _SHARED_KEY_TEMPLATE = """\
 <h1>{{ title }}</h1>
 <div id="hero_stars">
 {% block hero_stars %}
-  {% if stars is not none %}
-    <span>{{ stars }} stars</span>
-  {% else %}
+  {% if stars is deferred %}
     <span class="skeleton">…</span>
+  {% else %}
+    <span>{{ stars }} stars</span>
   {% end %}
 {% end %}
 </div>
 <div id="footer_stars">
 {% block footer_stars %}
-  {% if stars is not none %}
-    <span>{{ stars }} stars</span>
-  {% else %}
+  {% if stars is deferred %}
     <span class="skeleton">…</span>
+  {% else %}
+    <span>{{ stars }} stars</span>
   {% end %}
 {% end %}
 </div>
@@ -112,7 +113,7 @@ _SHARED_KEY_TEMPLATE = """\
 
 def _env() -> Environment:
     """Build a kida Environment with in-memory test templates."""
-    return Environment(
+    env = Environment(
         loader=DictLoader(
             {
                 "dashboard.html": _DASHBOARD_TEMPLATE,
@@ -122,6 +123,13 @@ def _env() -> Environment:
             }
         )
     )
+    _register_deferred_test(env)
+    return env
+
+
+def _register_deferred_test(env: Environment) -> None:
+    """Register the ``deferred`` kida test on an environment."""
+    env.add_test("deferred", lambda val: val is DEFERRED)
 
 
 async def _collect_chunks(
@@ -444,6 +452,7 @@ class TestLayoutWrapping:
                 }
             )
         )
+        _register_deferred_test(env)
         chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
 
         s = Suspense("dashboard.html", title="Dashboard", stats=["a"], feed=["x"])
@@ -511,6 +520,7 @@ class TestLayoutWrapping:
                 }
             )
         )
+        _register_deferred_test(env)
         chain = LayoutChain(
             layouts=(
                 LayoutInfo(
@@ -566,6 +576,7 @@ class TestLayoutWrapping:
                 }
             )
         )
+        _register_deferred_test(env)
         chain = LayoutChain(
             layouts=(
                 LayoutInfo(
@@ -730,6 +741,7 @@ class TestDeferBlocks:
             loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
             auto_reload=False,
         )
+        _register_deferred_test(env)
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_stars", "nonexistent_block"),
@@ -747,6 +759,7 @@ class TestDeferBlocks:
             loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
             auto_reload=True,
         )
+        _register_deferred_test(env)
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_stars", "nonexistent_block"),
@@ -764,6 +777,7 @@ class TestDeferBlocks:
             loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
             auto_reload=False,
         )
+        _register_deferred_test(env)
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_star",),  # close to "hero_stars"
@@ -795,6 +809,7 @@ class TestEmptyDiscoveryError:
 </body></html>"""
 
         env = Environment(loader=DictLoader({"nodep.html": no_dep_template}))
+        _register_deferred_test(env)
         s = Suspense(
             "nodep.html",
             data=_delayed_value("hello"),
@@ -817,15 +832,16 @@ class TestBlockRenderError:
         error_template = """\
 <html><body>
 {% block stats %}
-  {% if stats is not none %}
-    {{ stats.nonexistent_method() }}
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton">Loading...</div>
+  {% else %}
+    {{ stats.nonexistent_method() }}
   {% end %}
 {% end %}
 </body></html>"""
 
         env = Environment(loader=DictLoader({"error.html": error_template}))
+        _register_deferred_test(env)
         s = Suspense(
             "error.html",
             defer_blocks=("stats",),
@@ -844,15 +860,16 @@ class TestBlockRenderError:
         error_template = """\
 <html><body>
 {% block stats %}
-  {% if stats is not none %}
-    {{ stats.nonexistent_method() }}
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton">Loading...</div>
+  {% else %}
+    {{ stats.nonexistent_method() }}
   {% end %}
 {% end %}
 </body></html>"""
 
         env = Environment(loader=DictLoader({"error.html": error_template}))
+        _register_deferred_test(env)
         s = Suspense(
             "error.html",
             defer_blocks=("stats",),

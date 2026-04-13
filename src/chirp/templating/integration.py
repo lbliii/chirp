@@ -5,6 +5,7 @@ user-registered filters and globals. The environment is created
 once during App._freeze() and passed through the request pipeline.
 """
 
+import warnings
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 from chirp.config import AppConfig
 from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
 from chirp.templating.returns import Fragment, Template
+from chirp.templating.suspense import DEFERRED
 
 
 def _ensure_chirp_ui_filters(env: Environment) -> None:
@@ -122,11 +124,23 @@ def create_environment(
         static_context=dict(config.static_context) if config.static_context else None,
     )
 
+    # Register the ``deferred`` template test for Suspense sentinel checks.
+    # Usage: ``{% if x is deferred %}`` — preferred over ``{% if x is not none %}``.
+    env.add_test("deferred", lambda val: val is DEFERRED)
+
     # Register chirp's built-in filters (field_errors, qs, etc.)
     env.update_filters(BUILTIN_FILTERS)
 
     # Register user-defined filters (may override built-ins)
     if filters:
+        for name, func in filters.items():
+            if name in BUILTIN_FILTERS and func is not BUILTIN_FILTERS[name]:
+                warnings.warn(
+                    f"User filter {name!r} shadows built-in chirp filter. "
+                    "This may cause unexpected template behavior.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         env.update_filters(filters)
 
     # When chirp-ui templates are loadable, ensure required filters exist.
@@ -140,6 +154,13 @@ def create_environment(
 
     # Register user-defined globals
     for name, value in globals_.items():
+        if name in BUILTIN_GLOBALS and BUILTIN_GLOBALS[name] is not None:
+            warnings.warn(
+                f"User global {name!r} shadows built-in chirp global. "
+                "This may cause unexpected template behavior.",
+                UserWarning,
+                stacklevel=2,
+            )
         env.add_global(name, value)
 
     return env

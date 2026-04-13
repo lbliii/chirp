@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from pounce.sync_protocol import RawRequest, RawResponse
@@ -54,6 +55,9 @@ def handle_sync(
     try:
         result = match.route.handler(**kwargs)
     except Exception:
+        logging.getLogger("chirp.server").exception(
+            "Sync handler %s raised an exception", path,
+        )
         return None
 
     # Fast negotiate for common types — use pre-encoded content-type when available

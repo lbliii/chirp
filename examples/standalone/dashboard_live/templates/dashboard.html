@@ -84,7 +84,12 @@
 
   {% block stats_bar %}
   <div id="stats_bar" class="stats" hx-swap-oob="outerHTML">
-    {% if stats %}
+    {% if stats is deferred %}
+    <div class="stat-card"><div class="label">Total Orders</div><div class="value">—</div></div>
+    <div class="stat-card"><div class="label">Revenue</div><div class="value revenue">—</div></div>
+    <div class="stat-card"><div class="label">Pending</div><div class="value pending">—</div></div>
+    <div class="stat-card"><div class="label">Avg Order</div><div class="value">—</div></div>
+    {% else %}
     <div class="stat-card">
       <div class="label">Total Orders</div>
       <div class="value">{{ stats.total_orders }}</div>
@@ -101,11 +106,6 @@
       <div class="label">Avg Order</div>
       <div class="value">${{ stats.avg_order | format_number(2) }}</div>
     </div>
-    {% else %}
-    <div class="stat-card"><div class="label">Total Orders</div><div class="value">—</div></div>
-    <div class="stat-card"><div class="label">Revenue</div><div class="value revenue">—</div></div>
-    <div class="stat-card"><div class="label">Pending</div><div class="value pending">—</div></div>
-    <div class="stat-card"><div class="label">Avg Order</div><div class="value">—</div></div>
     {% end %}
   </div>
   {% end %}
@@ -125,7 +125,9 @@
         </tr>
       </thead>
       <tbody id="orders">
-        {% if orders %}
+        {% if orders is deferred %}
+        <tr><td colspan="6" style="text-align:center;color:#64748b;padding:2rem">Loading orders&hellip;</td></tr>
+        {% else %}
         {% for order in orders %}
         <tr id="order-{{ order.id }}">
           <td>{{ order.id }}</td>
@@ -136,8 +138,6 @@
           <td>{{ order.created_at }}</td>
         </tr>
         {% endfor %}
-        {% else %}
-        <tr><td colspan="6" style="text-align:center;color:#64748b;padding:2rem">Loading orders&hellip;</td></tr>
         {% end %}
       </tbody>
     </table>
