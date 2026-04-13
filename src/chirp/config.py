@@ -69,11 +69,11 @@ def _warn_unknown_env_vars(prefix: str, known_suffixes: frozenset[str]) -> None:
         suffix = key[len(prefix) :]
         if suffix in known_suffixes or key.startswith(feature_prefix):
             continue
-        # Find closest known suffix by edit distance
+        # Find closest known suffix by edit distance (sorted for determinism)
         best, best_dist = "", 999
-        for candidate in known_suffixes:
+        for candidate in sorted(known_suffixes):
             d = _levenshtein(suffix, candidate)
-            if d < best_dist:
+            if d < best_dist or (d == best_dist and candidate < best):
                 best, best_dist = candidate, d
         hint = f" (did you mean {prefix}{best}?)" if best_dist <= 2 else ""
         warnings.warn(

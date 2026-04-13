@@ -152,7 +152,7 @@ class CookieSessionStore:
         try:
             data = self._serializer.loads(cookie_value, max_age=self._config.max_age)
         except Exception:
-            _log.warning(
+            _log.debug(
                 "Failed to deserialize session cookie %r; starting fresh session",
                 self._config.cookie_name,
                 exc_info=True,
@@ -193,10 +193,8 @@ class CookieSessionStore:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
         except TypeError, ValueError:
-            _log.warning(
-                "Session timeout timestamps invalid (created=%r, last_seen=%r); discarding session",
-                created_at,
-                last_seen_at,
+            _log.debug(
+                "Session timeout timestamps invalid; discarding session",
                 exc_info=True,
             )
             return {}
@@ -252,9 +250,8 @@ class RedisSessionStore:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError, TypeError:
-            _log.warning(
-                "Failed to decode Redis session %s; starting fresh session",
-                session_id,
+            _log.debug(
+                "Failed to decode Redis session; starting fresh session",
                 exc_info=True,
             )
             return {}
@@ -319,10 +316,8 @@ class RedisSessionStore:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
         except TypeError, ValueError:
-            _log.warning(
-                "Session timeout timestamps invalid (created=%r, last_seen=%r); discarding session",
-                created_at,
-                last_seen_at,
+            _log.debug(
+                "Session timeout timestamps invalid; discarding session",
                 exc_info=True,
             )
             return {}

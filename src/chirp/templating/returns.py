@@ -558,8 +558,10 @@ class OOB:
     ) -> None:
         # Fail fast: streaming types cannot be OOB main — they need buffered
         # responses to append fragments. Check here rather than at render time.
-        _streaming = (Suspense, Stream, TemplateStream)
-        if isinstance(main, _streaming) or type(main).__name__ == "EventStream":
+        from chirp.realtime.events import EventStream
+
+        _streaming = (Suspense, Stream, TemplateStream, EventStream)
+        if isinstance(main, _streaming):
             raise TypeError(
                 f"OOB main cannot be {type(main).__name__} "
                 "(a streaming response type). "

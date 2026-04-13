@@ -152,9 +152,13 @@ def create_environment(
     for name, value in BUILTIN_GLOBALS.items():
         env.add_global(name, value)
 
+    # Globals that are intentional placeholders (None-valued) meant to be
+    # overridden per-request — don't warn when user code sets these.
+    overridable_globals = frozenset({"shell_actions"})
+
     # Register user-defined globals
     for name, value in globals_.items():
-        if name in BUILTIN_GLOBALS and BUILTIN_GLOBALS[name] is not None:
+        if name in BUILTIN_GLOBALS and name not in overridable_globals:
             warnings.warn(
                 f"User global {name!r} shadows built-in chirp global. "
                 "This may cause unexpected template behavior.",
