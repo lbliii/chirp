@@ -152,7 +152,7 @@ def _should_render_page_block(request: Request | None) -> bool:
     """Whether request needs page-level root instead of narrow fragment."""
     if request is None:
         return True
-    if request.is_history_restore or not request.is_fragment:
+    if request.is_history_restore or not request.is_htmx:
         return True
     return request.is_boosted
 
@@ -222,7 +222,7 @@ def build_render_plan(
     layout_chain = composition.layout_chain
     htmx_target = request.htmx_target if request else None
     is_history_restore = request.is_history_restore if request else False
-    is_fragment = request.is_fragment if request else False
+    is_htmx = request.is_htmx if request else False
 
     # Determine intent and main block
     if not _should_render_page_block(request):
@@ -232,7 +232,7 @@ def build_render_plan(
         )
         apply_layouts = False
         layout_start_index = 0
-    elif is_fragment and not is_history_restore:
+    elif is_htmx and not is_history_restore:
         intent = "page_fragment"
         apply_layouts = layout_chain is not None and bool(layout_chain.layouts)
         layout_start_index = _compute_layout_start_index(

@@ -53,6 +53,8 @@ class ASGIRuntime:
                 route_layout_chains=self._runtime.route_layout_chains,
                 swap_scope_map=self._runtime.swap_scope_map,
                 discovered_routes=self._runtime.discovered_routes or [],
+                suspense_error_template=self._config.suspense_error_template,
+                suspense_error_block=self._config.suspense_error_block,
             )
         return self._compiled_handler
 

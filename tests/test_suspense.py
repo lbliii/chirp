@@ -374,7 +374,7 @@ class TestErrorMidStream:
         # Visible error indicator should replace the skeleton
         combined = "".join(chunks)
         assert "chirp-suspense-error" in combined
-        assert "Error loading deferred data" in combined
+        assert "Error loading data" in combined
 
     async def test_resolution_error_htmx_targets_pending_keys(self):
         async def _fail():
@@ -394,6 +394,45 @@ class TestErrorMidStream:
         oob = "".join(chunks[1:])
         assert "chirp-suspense-error" in oob
         assert 'hx-swap-oob="true"' in oob
+
+    async def test_custom_error_block_renders_fallback(self):
+        """Per-route error_block renders custom error HTML from a template."""
+
+        async def _fail():
+            raise ValueError("database down")
+
+        error_tmpl = (
+            "{% block fallback %}"
+            '<div class="custom-error">Oops: {{ block_name }}</div>'
+            "{% endblock %}"
+        )
+        env = Environment(
+            loader=DictLoader(
+                {
+                    "simple.html": _SIMPLE_TEMPLATE,
+                    "errors/deferred.html": error_tmpl,
+                }
+            )
+        )
+        _register_deferred_test(env)
+
+        s = Suspense("simple.html", error_block="fallback", data=_fail())
+        chunks = [
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                is_htmx=False,
+                error_template="errors/deferred.html",
+                error_block="fallback",
+            )
+        ]
+
+        combined = "".join(chunks)
+        assert "custom-error" in combined
+        assert "Oops: data" in combined
+        # Should NOT contain the default hardcoded error
+        assert "chirp-suspense-error" not in combined
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +526,16 @@ class TestLayoutWrapping:
         env = _env()
         chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
         request = type(
-            "Req", (), {"is_fragment": True, "is_history_restore": False, "htmx_target": None}
+            "Req",
+            (),
+            {
+                "is_fragment": True,
+                "is_htmx": True,
+                "is_narrow_fragment": True,
+                "is_boosted": False,
+                "is_history_restore": False,
+                "htmx_target": None,
+            },
         )()
 
         s = Suspense("dashboard.html", title="X", stats=["a"], feed=["x"])
@@ -537,6 +585,8 @@ class TestLayoutWrapping:
             (),
             {
                 "is_fragment": True,
+                "is_htmx": True,
+                "is_narrow_fragment": False,
                 "is_history_restore": False,
                 "is_boosted": True,
                 "htmx_target": "site-content",
@@ -594,6 +644,8 @@ class TestLayoutWrapping:
             (),
             {
                 "is_fragment": True,
+                "is_htmx": True,
+                "is_narrow_fragment": False,
                 "is_history_restore": False,
                 "is_boosted": True,
                 "htmx_target": "site-content",

@@ -33,7 +33,7 @@ def _triggers_shell_update(
     fragment_target_registry: FragmentTargetRegistry | None,
 ) -> bool:
     """Whether this request should trigger shell OOB updates."""
-    if not request or not request.is_fragment or request.is_history_restore:
+    if not request or not request.is_htmx or request.is_history_restore:
         return False
     if request.is_boosted:
         return True
@@ -54,7 +54,7 @@ def resolve_oob_scope(
     ``scope_name`` so layout OOB blocks can be filtered to the matched
     scope and its ancestors.
     """
-    if not request or not request.is_fragment or request.is_history_restore:
+    if not request or not request.is_htmx or request.is_history_restore:
         return None
     if request.is_boosted:
         return None
@@ -146,7 +146,7 @@ def should_append_streamed_shell_actions_oob(
     del context
     if request is None:
         return False
-    return request.is_fragment and not request.is_history_restore and request.is_boosted
+    return request.is_htmx and not request.is_history_restore and request.is_boosted
 
 
 def render_layout_oob_blocks(
@@ -227,7 +227,7 @@ def should_append_layout_oob(
         return False
     if not getattr(layout_chain, "layouts", ()):
         return False
-    return request.is_fragment and not request.is_history_restore and request.is_boosted
+    return request.is_htmx and not request.is_history_restore and request.is_boosted
 
 
 async def append_layout_oob_stream(

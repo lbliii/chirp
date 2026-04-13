@@ -55,6 +55,37 @@ class TestParsePath:
         assert "{param}" in str(exc_info.value)
         assert "/share/<slug>" in str(exc_info.value)
 
+    def test_rejects_hyphenated_param(self) -> None:
+        """Path parameters must be valid Python identifiers."""
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_path("/products/{product-id}")
+        msg = str(exc_info.value)
+        assert "product-id" in msg
+        assert "product_id" in msg  # suggests the fix
+
+    def test_rejects_param_starting_with_digit(self) -> None:
+        """Params starting with digits are not valid identifiers."""
+        with pytest.raises(ConfigurationError):
+            parse_path("/items/{2nd_item}")
+
+    def test_accepts_underscore_param(self) -> None:
+        """Underscored params are valid identifiers."""
+        segments = parse_path("/products/{product_id}")
+        assert segments[1].param_name == "product_id"
+
+    def test_rejects_python_keyword_param(self) -> None:
+        """Python keywords like 'class' or 'return' are rejected."""
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_path("/items/{class}")
+        msg = str(exc_info.value)
+        assert "keyword" in msg
+        assert "class" in msg
+
+    def test_rejects_python_keyword_for(self) -> None:
+        """The keyword 'for' is also rejected."""
+        with pytest.raises(ConfigurationError):
+            parse_path("/items/{for}")
+
 
 class TestRouterStaticRoutes:
     def test_root(self) -> None:

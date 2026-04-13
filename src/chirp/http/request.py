@@ -251,8 +251,36 @@ class Request:
     # -- Convenience aliases (delegate to request.htmx) --
 
     @property
+    def is_htmx(self) -> bool:
+        """True if this is any htmx request (HX-Request header present)."""
+        return bool(self.htmx)
+
+    @property
+    def is_narrow_fragment(self) -> bool:
+        """True if this htmx request targets a narrow fragment swap.
+
+        False for boosted navigations and history restores, which need
+        full page content despite using htmx transport.
+        """
+        return bool(self.htmx) and not self.htmx.boosted and not self.htmx.history_restore
+
+    @property
     def is_fragment(self) -> bool:
-        """True if this is an htmx fragment request (HX-Request header)."""
+        """True if this is an htmx request (HX-Request header).
+
+        .. deprecated::
+            Use ``is_htmx`` (any htmx request) or ``is_narrow_fragment``
+            (narrow fragment swap, excludes boosted and history restore).
+        """
+        import warnings
+
+        warnings.warn(
+            "request.is_fragment is ambiguous for boosted navigations. "
+            "Use request.is_htmx (any htmx) or request.is_narrow_fragment "
+            "(narrow swap only).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return bool(self.htmx)
 
     @property

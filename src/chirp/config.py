@@ -136,6 +136,11 @@ class AppConfig:
     sse_retry_ms: int | None = None
     sse_close_event: str | None = None
 
+    # Suspense error fallback — used when deferred values fail after shell is sent.
+    # Per-route ``Suspense(error_block=...)`` takes precedence over these globals.
+    suspense_error_template: str | None = None  # Template containing the fallback block
+    suspense_error_block: str = "fallback"  # Block name within the error template
+
     # MCP (Model Context Protocol)
     mcp_path: str = "/mcp"
 

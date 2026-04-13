@@ -7,7 +7,7 @@ Covers the full test matrix:
 - Scope isolation (different scopes don't cross-talk)
 - close(scope) sends sentinel, subscriber exits
 - close() (all scopes) sends sentinel to all
-- Back-pressure: full queue drops events silently
+- Back-pressure: full queue drops events with logging + on_drop callback
 - Cleanup: subscriber exit removes queue from internal state
 - Empty scope (no subscribers) is a no-op
 - Thread safety: emit_sync from a thread, subscribe from async
@@ -15,6 +15,8 @@ Covers the full test matrix:
 
 import asyncio
 import threading
+
+import pytest
 
 from chirp.pages.reactive import ChangeEvent, ReactiveBus
 
@@ -194,7 +196,7 @@ class TestClose:
 
 
 class TestBackPressure:
-    """When a subscriber's queue is full, events are silently dropped."""
+    """When a subscriber's queue is full, events are dropped with logging."""
 
     async def test_full_queue_drops_event(self) -> None:
         bus = ReactiveBus()
@@ -219,6 +221,83 @@ class TestBackPressure:
 
         # Should have exactly 256 (queue capacity) — excess dropped
         assert len(received) == 256
+
+    async def test_drop_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Dropped events produce a WARNING log (throttled per scope)."""
+        bus = ReactiveBus(maxsize=1)
+
+        async def collect() -> None:
+            async for _ev in bus.subscribe("logs"):
+                pass
+
+        task = asyncio.create_task(collect())
+        await asyncio.sleep(0.01)
+
+        # First event fills the queue; second event is dropped
+        bus.emit_sync(_event("logs", "a"))
+        bus.emit_sync(_event("logs", "b"))
+
+        bus.close("logs")
+        await task
+
+        warnings = [
+            r for r in caplog.records if r.levelname == "WARNING" and "dropped" in r.message
+        ]
+        assert len(warnings) >= 1
+        assert "scope='logs'" in warnings[0].message
+        assert "maxsize=1" in warnings[0].message
+
+    async def test_on_drop_callback_invoked(self) -> None:
+        """The on_drop callback fires for each dropped event."""
+        dropped: list[tuple[str, ChangeEvent]] = []
+
+        def on_drop(scope: str, event: ChangeEvent) -> None:
+            dropped.append((scope, event))
+
+        bus = ReactiveBus(maxsize=1, on_drop=on_drop)
+
+        async def collect() -> None:
+            async for _ev in bus.subscribe("cb"):
+                pass
+
+        task = asyncio.create_task(collect())
+        await asyncio.sleep(0.01)
+
+        bus.emit_sync(_event("cb", "first"))  # fills queue
+        bus.emit_sync(_event("cb", "second"))  # dropped → callback
+
+        bus.close("cb")
+        await task
+
+        assert len(dropped) == 1
+        assert dropped[0][0] == "cb"
+        assert dropped[0][1].changed_paths == frozenset({"second"})
+
+    async def test_on_drop_callback_exception_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Exceptions in on_drop are logged, not propagated."""
+
+        def bad_callback(scope: str, event: ChangeEvent) -> None:
+            raise RuntimeError("callback boom")
+
+        bus = ReactiveBus(maxsize=1, on_drop=bad_callback)
+
+        async def collect() -> None:
+            async for _ev in bus.subscribe("err"):
+                pass
+
+        task = asyncio.create_task(collect())
+        await asyncio.sleep(0.01)
+
+        bus.emit_sync(_event("err", "a"))
+        bus.emit_sync(_event("err", "b"))  # triggers bad callback
+
+        bus.close("err")
+        await task
+
+        errors = [r for r in caplog.records if r.levelname == "ERROR" and "on_drop" in r.message]
+        assert len(errors) >= 1
 
 
 # ---------------------------------------------------------------------------

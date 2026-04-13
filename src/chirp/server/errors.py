@@ -27,14 +27,14 @@ def default_fragment_error(status: int, detail: str) -> str:
 
 
 def _with_htmx_error_headers(response: Response, request: Request) -> Response:
-    """Add htmx error-handling headers when the request is a fragment.
+    """Add htmx error-handling headers when the request is an htmx request.
 
     Headers added:
     - ``HX-Retarget: #chirp-error`` — redirect error content to a dedicated container
     - ``HX-Reswap: innerHTML`` — replace (not append) the error content
     - ``HX-Trigger: chirpError`` — fire a client-side event for custom handling
     """
-    if not request.is_fragment:
+    if not request.is_htmx:
         return response
     return (
         response.with_header("HX-Retarget", "#chirp-error")
@@ -115,7 +115,7 @@ async def handle_http_error(
         detail = f"{exc.status}: {exc.detail}"
 
     # Fragment-aware: return a snippet instead of a full page
-    body = default_fragment_error(exc.status, detail) if request.is_fragment else detail
+    body = default_fragment_error(exc.status, detail) if request.is_htmx else detail
 
     resp = Response(body=body).with_status(exc.status)
     for name, value in exc.headers:
@@ -151,10 +151,10 @@ async def handle_internal_error(
     if debug:
         from chirp.server.debug_page import render_debug_page
 
-        body = render_debug_page(exc, request, is_fragment=request.is_fragment)
+        body = render_debug_page(exc, request, is_htmx=request.is_htmx)
         return _with_htmx_error_headers(Response(body=body, status=500), request)
 
-    if request.is_fragment:
+    if request.is_htmx:
         resp = Response(body=default_fragment_error(500, "Internal Server Error"), status=500)
         return _with_htmx_error_headers(resp, request)
 

@@ -103,8 +103,10 @@ class _FakeRequest:
         path: str = "/",
     ) -> None:
         self.is_fragment = is_fragment
+        self.is_htmx = is_fragment
         self.is_boosted = is_boosted
         self.is_history_restore = is_history_restore
+        self.is_narrow_fragment = is_fragment and not is_boosted and not is_history_restore
         self.htmx_target = htmx_target
         self.path = path
 

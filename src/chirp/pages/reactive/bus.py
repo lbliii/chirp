@@ -6,12 +6,22 @@ import asyncio
 import contextlib
 import logging
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
+from typing import Any
 
 from chirp.pages.reactive.events import ChangeEvent, ConnectionInfo
 
+logger = logging.getLogger("chirp.reactive")
+
 # Internal subscriber record: queue + optional connection info
 _Sub = tuple[asyncio.Queue[ChangeEvent | None], ConnectionInfo | None]
+
+#: Type for the on_drop callback: (scope, event) -> None
+OnDropCallback = Callable[[str, ChangeEvent], Any]
+
+# Throttle window for drop warnings (seconds)
+_DROP_LOG_INTERVAL = 10.0
 
 
 class ReactiveBus:
@@ -28,11 +38,29 @@ class ReactiveBus:
         maxsize: Maximum queue depth per subscriber.  Events are
             silently dropped when a subscriber's queue is full
             (back-pressure).  Default: 256.
+        on_drop: Optional callback invoked when an event is dropped
+            due to a full subscriber queue.  Receives ``(scope, event)``.
+            Called outside the bus lock but still on the emit path —
+            keep it fast and non-blocking.
     """
 
-    __slots__ = ("_dropped_count", "_emitted_count", "_lock", "_maxsize", "_subscribers")
+    __slots__ = (
+        "_drop_log_counts",
+        "_drop_log_last",
+        "_dropped_count",
+        "_emitted_count",
+        "_lock",
+        "_maxsize",
+        "_on_drop",
+        "_subscribers",
+    )
 
-    def __init__(self, *, maxsize: int = 256) -> None:
+    def __init__(
+        self,
+        *,
+        maxsize: int = 256,
+        on_drop: OnDropCallback | None = None,
+    ) -> None:
         if maxsize < 1:
             msg = f"maxsize must be >= 1, got {maxsize}"
             raise ValueError(msg)
@@ -42,12 +70,17 @@ class ReactiveBus:
         self._maxsize = maxsize
         self._emitted_count = 0
         self._dropped_count = 0
+        self._on_drop = on_drop
+        # Throttle state: scope -> (last_log_time, drops_since_last_log)
+        self._drop_log_last: dict[str, float] = {}
+        self._drop_log_counts: dict[str, int] = {}
 
     def emit_sync(self, event: ChangeEvent) -> None:
         """Broadcast a change event synchronously (from any thread).
 
         Uses ``put_nowait`` so it never blocks.  Drops the event for
-        a subscriber if its queue is full (back-pressure).
+        a subscriber if its queue is full (back-pressure).  Dropped
+        events are logged at WARNING level (throttled per scope).
 
         If ``event.audience`` is set, only delivers to subscribers
         whose ``ConnectionInfo.user_id`` is in the audience set.
@@ -66,6 +99,30 @@ class ReactiveBus:
             except asyncio.QueueFull:
                 with self._lock:
                     self._dropped_count += 1
+                    self._log_drop(event)
+                if self._on_drop is not None:
+                    try:
+                        self._on_drop(event.scope, event)
+                    except Exception:
+                        logger.exception("on_drop callback failed for scope=%s", event.scope)
+
+    def _log_drop(self, event: ChangeEvent) -> None:
+        """Log a dropped event, throttled to once per scope per interval."""
+        now = time.monotonic()
+        scope = event.scope
+        last = self._drop_log_last.get(scope, 0.0)
+        self._drop_log_counts[scope] = self._drop_log_counts.get(scope, 0) + 1
+
+        if now - last >= _DROP_LOG_INTERVAL:
+            count = self._drop_log_counts[scope]
+            logger.warning(
+                "ReactiveBus: dropped %d event(s) for scope=%r (subscriber queue full, maxsize=%d)",
+                count,
+                scope,
+                self._maxsize,
+            )
+            self._drop_log_last[scope] = now
+            self._drop_log_counts[scope] = 0
 
     async def emit(self, event: ChangeEvent) -> None:
         """Broadcast a change event (async version)."""
@@ -125,10 +182,15 @@ class ReactiveBus:
         with self._lock:
             if scope is not None:
                 subs = self._subscribers.pop(scope, set())
+                # Clean up throttle state for the closed scope
+                self._drop_log_last.pop(scope, None)
+                self._drop_log_counts.pop(scope, None)
             else:
                 subs = set()
                 for s in list(self._subscribers):
                     subs |= self._subscribers.pop(s)
+                self._drop_log_last.clear()
+                self._drop_log_counts.clear()
         for queue, _conn in subs:
             # Drain one event if needed to guarantee the sentinel lands.
             # This ensures close() is reliable even with small maxsize.

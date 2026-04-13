@@ -1,21 +1,24 @@
 """Contract rules for Vary header correctness.
 
-Warns when templates manually branch on ``is_fragment`` / ``HX-Request``
-outside of Chirp's ``Page`` return type, which auto-sets ``Vary: HX-Request``.
-Manual branching without ``Vary`` causes HTTP caches to serve the wrong
-response variant.
+Warns when templates manually branch on ``is_htmx`` / ``is_narrow_fragment`` /
+``HX-Request`` outside of Chirp's ``Page`` return type, which auto-sets
+``Vary: HX-Request``.  Manual branching without ``Vary`` causes HTTP caches to
+serve the wrong response variant.
 """
 
 import re
 
 from .types import ContractIssue, Severity
 
-# Patterns that indicate manual fragment branching in templates
+# Patterns that indicate manual fragment branching in templates.
+# Catches legacy ``is_fragment`` as well as the newer ``is_htmx`` /
+# ``is_narrow_fragment`` properties.
 _IS_FRAGMENT_PATTERN = re.compile(
-    r"\{%-?\s*if\s+.*?\bis_fragment\b",
+    r"\{%-?\s*if\s+.*?\b(?:is_fragment|is_htmx|is_narrow_fragment)\b",
 )
 _HX_REQUEST_PATTERN = re.compile(
-    r"\{%-?\s*if\s+.*?\brequest\.htmx\b|\brequest\.is_fragment\b",
+    r"\{%-?\s*if\s+.*?\brequest\.htmx\b"
+    r"|\brequest\.(?:is_fragment|is_htmx|is_narrow_fragment)\b",
 )
 
 
@@ -25,8 +28,9 @@ def check_vary_coverage(
     """Warn when templates branch on htmx request state.
 
     Chirp's ``Page`` return type sets ``Vary: HX-Request`` automatically.
-    If a template manually checks ``is_fragment`` (via ``{% if %}`` blocks),
-    it likely needs the ``Page`` type or explicit ``Vary`` handling.
+    If a template manually checks ``is_htmx`` or ``is_narrow_fragment``
+    (via ``{% if %}`` blocks), it likely needs the ``Page`` type or
+    explicit ``Vary`` handling.
     """
     issues: list[ContractIssue] = []
     for template_name, source in template_sources.items():
@@ -39,9 +43,10 @@ def check_vary_coverage(
                     category="vary",
                     message=(
                         f"Template '{template_name}' branches on is_fragment / "
-                        f"request.htmx. Use the Page return type (which auto-sets "
-                        f"Vary: HX-Request) or manually set the Vary header to "
-                        f"prevent HTTP caches from serving wrong response variants."
+                        f"is_htmx / is_narrow_fragment / request.htmx. Use the "
+                        f"Page return type (which auto-sets Vary: HX-Request) or "
+                        f"manually set the Vary header to prevent HTTP caches "
+                        f"from serving wrong response variants."
                     ),
                     template=template_name,
                 )

@@ -64,7 +64,7 @@ class HTMLInject:
         # request heuristics for unknown/legacy responses.
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
 
         body = response.body
@@ -107,7 +107,7 @@ class StreamingHTMLInject(HTMLInject):
             return response
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
         body = response.body
         if isinstance(body, bytes):
@@ -127,7 +127,7 @@ class StreamingHTMLInject(HTMLInject):
             return response
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
         new_chunks = async_stream_inject_before_body(
             response.chunks,
@@ -163,7 +163,7 @@ class AlpineInject(HTMLInject):
             return response
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
         body = response.body
         if isinstance(body, bytes):
@@ -186,7 +186,7 @@ class AlpineInject(HTMLInject):
             return response
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
         new_chunks = async_stream_inject_before_body(
             response.chunks,
@@ -216,7 +216,7 @@ class ViewTransitionCssDebugWarning:
             return response
         if response.render_intent == "fragment":
             return response
-        if response.render_intent == "unknown" and request.is_fragment:
+        if response.render_intent == "unknown" and request.is_htmx:
             return response
 
         body = response.body
