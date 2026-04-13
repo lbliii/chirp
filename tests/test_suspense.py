@@ -346,9 +346,9 @@ class TestMixedSyncAsync:
 
 
 class TestErrorMidStream:
-    """Errors during deferred resolution don't crash the stream."""
+    """Errors during deferred resolution produce visible error indicators."""
 
-    async def test_resolution_error_yields_comment(self):
+    async def test_resolution_error_yields_visible_error(self):
         async def _fail():
             raise ValueError("database down")
 
@@ -363,9 +363,29 @@ class TestErrorMidStream:
         assert len(chunks) >= 1
         assert "Loading..." in chunks[0]
 
-        # Error comment should appear
+        # Visible error indicator should replace the skeleton
         combined = "".join(chunks)
-        assert "chirp:suspense error" in combined
+        assert "chirp-suspense-error" in combined
+        assert "Error loading deferred data" in combined
+
+    async def test_resolution_error_htmx_targets_pending_keys(self):
+        async def _fail():
+            raise ValueError("database down")
+
+        env = _env()
+        s = Suspense(
+            "dashboard.html",
+            title="Dashboard",
+            stats=_fail(),
+            feed=_fail(),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        # Shell + error OOB chunks for each pending key
+        assert len(chunks) >= 2
+        oob = "".join(chunks[1:])
+        assert "chirp-suspense-error" in oob
+        assert 'hx-swap-oob="true"' in oob
 
 
 # ---------------------------------------------------------------------------
@@ -703,10 +723,13 @@ class TestDeferBlocks:
         assert "77 stars" not in chunks[0]
 
     async def test_unknown_defer_blocks_warns_and_skips(self, caplog):
-        """defer_blocks with nonexistent block names logs a warning and skips them."""
+        """defer_blocks with nonexistent block names logs a warning and skips them (production)."""
         import logging
 
-        env = _env()
+        env = Environment(
+            loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
+            auto_reload=False,
+        )
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_stars", "nonexistent_block"),
@@ -726,6 +749,122 @@ class TestDeferBlocks:
 
         # Unknown block not attempted
         assert "nonexistent_block" not in oob
+
+    async def test_unknown_defer_blocks_raises_in_debug(self):
+        """In debug mode (auto_reload), unknown defer_blocks raises ConfigurationError."""
+        from chirp.errors import ConfigurationError
+
+        env = Environment(
+            loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
+            auto_reload=True,
+        )
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_stars", "nonexistent_block"),
+            title="Repo",
+            stars=_delayed_value("33"),
+        )
+        with pytest.raises(ConfigurationError, match="nonexistent_block"):
+            await _collect_chunks(env, s, is_htmx=True)
+
+
+# ---------------------------------------------------------------------------
+# Empty block discovery warning
+# ---------------------------------------------------------------------------
+
+
+class TestEmptyDiscoveryWarning:
+    """Auto-discovery that finds zero blocks should warn."""
+
+    async def test_empty_discovery_warns(self, caplog):
+        """When deferred keys exist but no blocks depend on them, warn."""
+        import logging
+
+        # Template with a block that doesn't reference the deferred key
+        no_dep_template = """\
+<html><body>
+{% block content %}
+<p>Static content only</p>
+{% end %}
+</body></html>"""
+
+        env = Environment(loader=DictLoader({"nodep.html": no_dep_template}))
+        s = Suspense(
+            "nodep.html",
+            data=_delayed_value("hello"),
+        )
+        with caplog.at_level(logging.WARNING, logger="chirp.suspense"):
+            chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        # Shell is still sent
+        assert len(chunks) >= 1
+        assert "Static content" in chunks[0]
+
+        # Warning about no blocks discovered
+        assert any("no blocks discovered" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Visible block render errors
+# ---------------------------------------------------------------------------
+
+
+class TestBlockRenderError:
+    """Render errors in deferred blocks produce visible error indicators."""
+
+    async def test_block_render_error_htmx(self):
+        """Block render error sends visible OOB error instead of HTML comment."""
+        # Template where block references a variable that will cause an error
+        error_template = """\
+<html><body>
+{% block stats %}
+  {% if stats is not none %}
+    {{ stats.nonexistent_method() }}
+  {% else %}
+    <div class="skeleton">Loading...</div>
+  {% end %}
+{% end %}
+</body></html>"""
+
+        env = Environment(loader=DictLoader({"error.html": error_template}))
+        s = Suspense(
+            "error.html",
+            defer_blocks=("stats",),
+            stats=_delayed_value({"value": 42}),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        oob = "".join(chunks[1:])
+        # Visible error, not HTML comment
+        assert "chirp-suspense-error" in oob
+        assert "<!-- chirp:suspense" not in oob
+        assert 'hx-swap-oob="true"' in oob
+
+    async def test_block_render_error_script(self):
+        """Block render error in script mode sends visible error via template+script."""
+        error_template = """\
+<html><body>
+{% block stats %}
+  {% if stats is not none %}
+    {{ stats.nonexistent_method() }}
+  {% else %}
+    <div class="skeleton">Loading...</div>
+  {% end %}
+{% end %}
+</body></html>"""
+
+        env = Environment(loader=DictLoader({"error.html": error_template}))
+        s = Suspense(
+            "error.html",
+            defer_blocks=("stats",),
+            stats=_delayed_value({"value": 42}),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=False)
+
+        oob = "".join(chunks[1:])
+        assert "chirp-suspense-error" in oob
+        assert "<template" in oob
+        assert "<script>" in oob
 
 
 # ---------------------------------------------------------------------------

@@ -94,16 +94,14 @@ def _resolve_fragment_block(
         config = fragment_target_registry.get(request.htmx_target)
         if config is not None:
             return config.fragment_block
-        registered_targets = (
-            sorted(fragment_target_registry.registered_targets)
-            if _log.isEnabledFor(logging.DEBUG)
-            else ()
-        )
-        _log.debug(
-            "Unregistered HX-Target %r; falling back to page_content. "
-            "Register with app.register_fragment_target() or app.register_page_shell_contract() "
-            "if this target expects a different block. Registered targets: %s",
+        registered_targets = sorted(fragment_target_registry.registered_targets)
+        _log.warning(
+            "Unregistered HX-Target %r; falling back to '%s'. "
+            "Register with app.register_fragment_target() or "
+            "app.register_page_shell_contract() if this target expects a "
+            "different block. Registered targets: %s",
             request.htmx_target,
+            composition.page_block or "page_content",
             registered_targets,
         )
     return composition.page_block or "page_content"

@@ -15,6 +15,7 @@ Modeled on Bengal's ContentDiscovery but for routes instead of content.
 from __future__ import annotations
 
 import importlib.util
+import logging
 import re
 import sys
 from collections.abc import Mapping
@@ -34,8 +35,36 @@ from chirp.pages.types import (
     RouteMeta,
 )
 
+_logger = logging.getLogger("chirp.pages")
+
 # HTTP method names recognised as handler functions
 _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
+
+# Names that look like handler attempts but aren't recognised
+_HANDLER_LIKE = frozenset(
+    {
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+        "Get",
+        "Post",
+        "Put",
+        "Delete",
+        "Patch",
+        "Head",
+        "Options",
+        "handle",
+        "index",
+        "view",
+        "route",
+        "action",
+        "dispatch",
+    }
+)
 
 # Regex to extract layout shell comments from _layout.html
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
@@ -524,6 +553,23 @@ def _process_route_file(
     if handler is not None and callable(handler) and not found_handlers:
         # Default to GET for a bare handler
         found_handlers["GET"] = handler
+
+    # Warn about public functions that look like handler attempts
+    if not found_handlers or handler is None:
+        for attr_name in dir(module):
+            if attr_name.startswith("_"):
+                continue
+            if attr_name in _HTTP_METHODS or attr_name == "handler":
+                continue
+            if attr_name in _HANDLER_LIKE and callable(getattr(module, attr_name, None)):
+                _logger.warning(
+                    "Page %s defines function %r which looks like a handler "
+                    "but is not recognised. Chirp expects lowercase HTTP "
+                    "method names: %s, or 'handler' as a fallback.",
+                    file,
+                    attr_name,
+                    ", ".join(sorted(_HTTP_METHODS)),
+                )
 
     # Check for sibling template (same stem, .html extension).
     # Convention: page.py renders page.html in the same directory.

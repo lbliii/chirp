@@ -244,7 +244,8 @@ def negotiate(
             )
         case MutationResult():
             if request is not None and request.is_fragment:
-                if value.fragments and kida_env is not None:
+                if value.fragments:
+                    kida_env = _require_kida_env(kida_env, "MutationResult")
                     parts: list[str] = []
                     for i, frag in enumerate(value.fragments):
                         html = render_fragment(kida_env, frag)
@@ -342,6 +343,13 @@ def negotiate(
                 oob_registry=oob_registry,
                 fragment_target_registry=fragment_target_registry,
             )
+            if isinstance(main_response, StreamingResponse):
+                msg = (
+                    "OOB main cannot be a StreamingResponse "
+                    "(e.g. EventStream, Suspense, Stream). "
+                    "OOB requires a buffered response to append fragments."
+                )
+                raise TypeError(msg)
             parts: list[str] = [main_response.text if isinstance(main_response, Response) else ""]
             for frag in value.oob_fragments:
                 html = render_fragment(kida_env, frag)

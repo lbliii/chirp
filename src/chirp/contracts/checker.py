@@ -556,6 +556,18 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     )
                 )
 
+    # Safety checks: catch silent failure modes
+    from chirp.contracts.rules_safety import (
+        check_csrf_session_order,
+        check_middleware_signatures,
+        check_sse_speculation,
+    )
+
+    result.issues.extend(check_sse_speculation(router))
+    middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
+    result.issues.extend(check_csrf_session_order(middleware_list))
+    result.issues.extend(check_middleware_signatures(middleware_list))
+
     # Run registered plugin checks
     registered_checks = getattr(app, "_mutable_state", None)
     if registered_checks is not None:
