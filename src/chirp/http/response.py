@@ -7,7 +7,7 @@ built incrementally by design.
 import json as json_module
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from chirp.http.cookies import SetCookie
 
@@ -477,15 +477,12 @@ class SSEResponse:
 
     event_stream: Any  # EventStream (avoided import cycle)
     kida_env: Any = None  # kida Environment | None
-
-    # Track which instances have already warned (class-level, weak by id).
-    # Using a set of object ids avoids preventing garbage collection.
-    _warned_ids: ClassVar[set[int]] = set()
+    _noop_warned: bool = False
 
     def _warn_noop(self, method: str) -> None:
-        obj_id = id(self)
-        if obj_id not in SSEResponse._warned_ids:
-            SSEResponse._warned_ids.add(obj_id)
+        if not self._noop_warned:
+            # Bypass frozen restriction for this internal flag.
+            object.__setattr__(self, "_noop_warned", True)
             import logging
 
             logging.getLogger("chirp.server").warning(
