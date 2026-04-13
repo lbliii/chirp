@@ -87,9 +87,8 @@ def _convert(value: Any, target_type: Any) -> Any:
             return int(value)
         except ValueError, TypeError:
             _log.warning(
-                "Type coercion failed: expected %s for value %r, returning raw string",
+                "Type coercion failed: expected %s, returning raw value",
                 target_type.__name__,
-                value,
             )
             return value
 
@@ -98,9 +97,8 @@ def _convert(value: Any, target_type: Any) -> Any:
             return float(value)
         except ValueError, TypeError:
             _log.warning(
-                "Type coercion failed: expected %s for value %r, returning raw string",
+                "Type coercion failed: expected %s, returning raw value",
                 target_type.__name__,
-                value,
             )
             return value
 

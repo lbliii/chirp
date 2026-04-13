@@ -148,6 +148,24 @@ class TestAppConfig:
         finally:
             os.environ.update(env_backup)
 
+    def test_invalid_view_transitions_raises(self) -> None:
+        with pytest.raises(ValueError, match="view_transitions"):
+            AppConfig(view_transitions="bad")
+
+    def test_invalid_speculation_rules_raises(self) -> None:
+        with pytest.raises(ValueError, match="speculation_rules"):
+            AppConfig(speculation_rules="bad")
+
+    def test_valid_view_transitions_accepted(self) -> None:
+        for val in (False, True, "off", "htmx", "full"):
+            cfg = AppConfig(view_transitions=val)
+            assert cfg.view_transitions == val
+
+    def test_valid_speculation_rules_accepted(self) -> None:
+        for val in (False, True, "off", "conservative", "moderate", "eager"):
+            cfg = AppConfig(speculation_rules=val)
+            assert cfg.speculation_rules == val
+
     def test_from_env_feature_flags(self) -> None:
         """from_env parses CHIRP_FEATURE_* vars."""
         env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}

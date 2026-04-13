@@ -272,21 +272,15 @@ class AppConfig:
                 "Set CHIRP_SECRET_KEY or pass secret_key= to AppConfig."
             )
 
-        # Validate view_transitions — tiered opt-in.
-        _valid_vt = {False, True, "off", "htmx", "full"}
-        if self.view_transitions not in _valid_vt:
-            raise ValueError(
-                f"Invalid view_transitions={self.view_transitions!r}. "
-                f"Valid values: False, True, 'off', 'htmx', 'full'"
-            )
+        # Validate view_transitions / speculation_rules via their normalizers
+        # (single source of truth for accepted values).
+        from chirp.server.view_transitions import normalize_view_transitions
 
-        # Validate speculation_rules — tiered opt-in.
-        _valid_sr = {False, True, "off", "conservative", "moderate", "eager"}
-        if self.speculation_rules not in _valid_sr:
-            raise ValueError(
-                f"Invalid speculation_rules={self.speculation_rules!r}. "
-                f"Valid values: False, True, 'off', 'conservative', 'moderate', 'eager'"
-            )
+        normalize_view_transitions(self.view_transitions)
+
+        from chirp.server.speculation_rules import normalize_speculation_rules
+
+        normalize_speculation_rules(self.speculation_rules)
 
     @classmethod
     def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:

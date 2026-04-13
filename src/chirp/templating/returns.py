@@ -6,6 +6,7 @@ inspects these to dispatch to the kida renderer.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -48,7 +49,10 @@ def _validate_swap(value: str | None) -> None:
     """Validate htmx swap strategy, allowing modifiers after base value."""
     if value is None:
         return
-    base = value.split()[0]
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("swap must not be empty or whitespace-only")
+    base = stripped.split()[0]
     if base not in _VALID_SWAP_STRATEGIES:
         raise ValueError(
             f"Invalid swap strategy {base!r} (from {value!r}). "
@@ -71,6 +75,16 @@ class Template:
     def __init__(self, template_name: str, /, **context: Any) -> None:
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "context", context)
+
+    @property
+    def name(self) -> str:
+        """Deprecated alias for ``template_name``."""
+        warnings.warn(
+            "Template.name is deprecated, use .template_name instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.template_name
 
     @staticmethod
     def inline(source: str, /, **context: Any) -> InlineTemplate:
@@ -203,6 +217,16 @@ class Page:
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "page_block_name", page_block_name)
         object.__setattr__(self, "context", context)
+
+    @property
+    def name(self) -> str:
+        """Deprecated alias for ``template_name``."""
+        warnings.warn(
+            "Page.name is deprecated, use .template_name instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.template_name
 
     @property
     def effective_page_block_name(self) -> str:
@@ -573,6 +597,16 @@ class LayoutPage:
         object.__setattr__(self, "layout_chain", layout_chain)
         object.__setattr__(self, "context_providers", context_providers)
         object.__setattr__(self, "context", context)
+
+    @property
+    def name(self) -> str:
+        """Deprecated alias for ``template_name``."""
+        warnings.warn(
+            "LayoutPage.name is deprecated, use .template_name instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.template_name
 
     @property
     def effective_page_block_name(self) -> str:

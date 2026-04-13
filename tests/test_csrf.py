@@ -205,8 +205,6 @@ class TestCSRFExemptPaths:
 class TestCSRFRequiresSession:
     async def test_fails_without_session_middleware(self) -> None:
         """CSRFMiddleware without SessionMiddleware raises at freeze time."""
-        import pytest
-
         from chirp.errors import ConfigurationError
 
         app = App()

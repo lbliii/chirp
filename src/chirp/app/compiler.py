@@ -216,25 +216,20 @@ def _validate_middleware_ordering(middleware_list: list) -> None:
     from chirp.middleware.csrf import CSRFMiddleware
     from chirp.middleware.sessions import SessionMiddleware
 
-    csrf_index: int | None = None
-    session_index: int | None = None
+    seen_session = False
+    for mw in middleware_list:
+        if isinstance(mw, SessionMiddleware):
+            seen_session = True
+        elif isinstance(mw, CSRFMiddleware) and not seen_session:
+            from chirp.errors import ConfigurationError
 
-    for i, mw in enumerate(middleware_list):
-        if isinstance(mw, CSRFMiddleware):
-            csrf_index = i
-        elif isinstance(mw, SessionMiddleware):
-            session_index = i
-
-    if csrf_index is not None and (session_index is None or session_index >= csrf_index):
-        from chirp.errors import ConfigurationError
-
-        msg = (
-            "CSRFMiddleware requires SessionMiddleware. "
-            "Add SessionMiddleware before CSRFMiddleware:\n\n"
-            "    app.add_middleware(SessionMiddleware(SessionConfig(secret_key=...)))\n"
-            "    app.add_middleware(CSRFMiddleware(CSRFConfig()))\n"
-        )
-        raise ConfigurationError(msg)
+            msg = (
+                "CSRFMiddleware requires SessionMiddleware. "
+                "Add SessionMiddleware before CSRFMiddleware:\n\n"
+                "    app.add_middleware(SessionMiddleware(SessionConfig(secret_key=...)))\n"
+                "    app.add_middleware(CSRFMiddleware(CSRFConfig()))\n"
+            )
+            raise ConfigurationError(msg)
 
 
 class AppCompiler:
