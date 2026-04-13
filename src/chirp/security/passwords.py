@@ -86,7 +86,8 @@ def _verify_scrypt(password: str, phc_hash: str) -> bool:
         expected_dk = base64.b64decode(parts[4])
     except Exception:
         logging.getLogger("chirp.security").debug(
-            "Password hash parsing failed (malformed hash string)", exc_info=True,
+            "Password hash parsing failed (malformed hash string)",
+            exc_info=True,
         )
         return False
 

@@ -134,7 +134,8 @@ class LayoutDebugMiddleware:
                 response = response.with_header("X-Chirp-Render-Plan", encoded.decode("ascii"))
         except Exception:
             logging.getLogger("chirp.debug").debug(
-                "Render plan encoding failed", exc_info=True,
+                "Render plan encoding failed",
+                exc_info=True,
             )
 
         return response

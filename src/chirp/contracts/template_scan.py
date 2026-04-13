@@ -297,6 +297,7 @@ def load_template_sources(kida_env: Any) -> dict[str, str]:
                     sources[result[0]] = result[1]
     except Exception:
         logging.getLogger("chirp.contracts").debug(
-            "Template source loading failed during parallel scan", exc_info=True,
+            "Template source loading failed during parallel scan",
+            exc_info=True,
         )
     return sources

@@ -56,7 +56,8 @@ def handle_sync(
         result = match.route.handler(**kwargs)
     except Exception:
         logging.getLogger("chirp.server").exception(
-            "Sync handler %s raised an exception", path,
+            "Sync handler %s raised an exception",
+            path,
         )
         return None
 
