@@ -3,19 +3,19 @@
 <h1>{{ title }}</h1>
 <div id="stats">
 {% block stats %}
-  {% if stats %}
-    <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton">Loading stats...</div>
+  {% else %}
+    <ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>
   {% end %}
 {% end %}
 </div>
 <div id="feed">
 {% block feed %}
-  {% if feed %}
-    <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
-  {% else %}
+  {% if feed is deferred %}
     <div class="skeleton">Loading feed...</div>
+  {% else %}
+    <ul>{% for f in feed %}<li>{{ f }}</li>{% end %}</ul>
   {% end %}
 {% end %}
 </div>

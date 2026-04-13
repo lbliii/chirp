@@ -1,6 +1,7 @@
 """Hypermedia contracts checker orchestration."""
 
 import inspect
+import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -541,7 +542,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         )
                     )
             except Exception:
-                pass
+                logging.getLogger("chirp.contracts").debug(
+                    "Fragment context check failed for route %s",
+                    route.path,
+                    exc_info=True,
+                )
 
     if kida_env is not None:
         validate_fn = getattr(kida_env, "validate_calls", None)

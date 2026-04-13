@@ -20,8 +20,8 @@ Pipeline::
     )
 
     1. Separate sync vs. awaitable context values
-    2. Render shell with sync context + ``None`` for awaitable keys + the
-       ``__chirp_defer_pending__`` frozenset (``CHIRP_DEFER_PENDING_KEY``)
+    2. Render shell with sync context + ``DEFERRED`` sentinel for awaitable
+       keys + the ``__chirp_defer_pending__`` frozenset (``CHIRP_DEFER_PENDING_KEY``)
     3. Yield shell as first chunk (instant first paint)
     4. Resolve awaitables concurrently (anyio task group)
     5. Determine blocks to re-render:
@@ -55,6 +55,40 @@ if TYPE_CHECKING:
 #: sync-only renders and deferred block re-renders: empty ``frozenset``.
 #: Do not pass a user context key with this name — it is reserved.
 CHIRP_DEFER_PENDING_KEY = "__chirp_defer_pending__"
+
+
+class _Deferred:
+    """Sentinel value for Suspense deferred context keys.
+
+    Used instead of ``None`` so that templates can distinguish "not yet loaded"
+    from "loaded but empty/falsy".  The ``deferred`` kida test
+    (``{% if x is deferred %}``) checks identity against this singleton.
+
+    ``__bool__`` raises ``TypeError`` so that bare ``{% if x %}`` fails loudly
+    instead of silently treating a pending value as falsy.
+    """
+
+    _instance: _Deferred | None = None
+
+    def __new__(cls) -> _Deferred:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __bool__(self) -> bool:
+        raise TypeError(
+            "Deferred value used in a boolean context. "
+            "Use '{% if x is deferred %}' instead of '{% if x %}' — "
+            "bare truthiness checks are ambiguous for deferred values."
+        )
+
+    def __repr__(self) -> str:
+        return "<DEFERRED>"
+
+
+#: Singleton sentinel for deferred Suspense context values.
+#: Use ``{% if x is deferred %}`` in templates to check for this value.
+DEFERRED = _Deferred()
 
 
 # ---------------------------------------------------------------------------
@@ -202,9 +236,9 @@ async def render_suspense(
     """Render a ``Suspense`` return value as an async chunk stream.
 
     Yields:
-        1. The full page shell (with ``None`` for deferred values and
-           ``CHIRP_DEFER_PENDING_KEY`` listing those keys), optionally wrapped
-           in the layout chain
+        1. The full page shell (with ``DEFERRED`` sentinel for deferred values
+           and ``CHIRP_DEFER_PENDING_KEY`` listing those keys), optionally
+           wrapped in the layout chain
         2. One OOB swap chunk per deferred block as its data resolves
 
     Blocks to re-render are determined by:
@@ -269,10 +303,10 @@ async def render_suspense(
         yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
         return
 
-    # -- Phase 2: Render shell with None for deferred keys --
+    # -- Phase 2: Render shell with DEFERRED sentinel for deferred keys --
     shell_ctx = {
         **sync_ctx,
-        **dict.fromkeys(pending),
+        **dict.fromkeys(pending, DEFERRED),
         CHIRP_DEFER_PENDING_KEY: frozenset(pending),
     }
     template = env.get_template(template_name)

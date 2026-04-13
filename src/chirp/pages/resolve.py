@@ -52,19 +52,18 @@ if TYPE_CHECKING:
 
 
 def _warn_if_page_root_missing(result: Any) -> None:
-    """Warn about common mounted-pages fragment roots that drop page wrappers."""
+    """Warn when Page lacks page_block_name — boosted nav uses block_name as page root."""
     from chirp.templating.returns import Page
 
     if not isinstance(result, Page):
         return
     if result.page_block_name is not None:
         return
-    if result.block_name != "page_content":
-        return
     warnings.warn(
-        "Page(..., 'page_content') inside mount_pages should set "
-        "page_block_name='page_root' (or another fragment-safe page root) "
-        "so boosted navigation preserves page-level wrappers.",
+        f"Page({result.name!r}, {result.block_name!r}) has no page_block_name — "
+        "boosted navigation will use the fragment block as the page root. "
+        "Set page_block_name='page_root' (or another fragment-safe block) "
+        "if the fragment block is narrower than the intended page view.",
         UserWarning,
         stacklevel=3,
     )

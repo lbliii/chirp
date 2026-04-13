@@ -20,6 +20,7 @@ Usage::
 import base64
 import hashlib
 import hmac
+import logging
 import os
 
 # PHC format prefixes
@@ -84,6 +85,10 @@ def _verify_scrypt(password: str, phc_hash: str) -> bool:
         salt = base64.b64decode(parts[3])
         expected_dk = base64.b64decode(parts[4])
     except Exception:
+        logging.getLogger("chirp.security").debug(
+            "Password hash parsing failed (malformed hash string)",
+            exc_info=True,
+        )
         return False
 
     n = params.get("n", _SCRYPT_N)

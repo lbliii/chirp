@@ -1,5 +1,6 @@
 """Template source scanners used by contracts checker."""
 
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -295,5 +296,8 @@ def load_template_sources(kida_env: Any) -> dict[str, str]:
                 if result is not None:
                     sources[result[0]] = result[1]
     except Exception:
-        pass
+        logging.getLogger("chirp.contracts").debug(
+            "Template source loading failed during parallel scan",
+            exc_info=True,
+        )
     return sources

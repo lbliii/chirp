@@ -1,6 +1,7 @@
 """Registration helpers for App setup APIs."""
 
 import inspect
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -255,6 +256,11 @@ class AppRegistry:
                 try:
                     form_data = dict(await request.form())
                 except Exception:
+                    logging.getLogger("chirp.pages").warning(
+                        "Failed to parse form data for action dispatch on %s",
+                        request.path,
+                        exc_info=True,
+                    )
                     form_data = {}
                 action_name = form_data.get("_action")
                 if action_name:

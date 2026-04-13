@@ -540,6 +540,20 @@ class App:
     async def _handle_worker_shutdown(self) -> None:
         await self._lifecycle.handle_worker_shutdown()
 
+    def freeze(self) -> None:
+        """Freeze the app, finalizing all configuration.
+
+        Idempotent — safe to call multiple times.  After freezing, no
+        further routes, middleware, or plugins can be registered.
+
+        Useful in tests and CI to call ``app.check()`` without starting
+        a server::
+
+            app.freeze()
+            app.check()
+        """
+        self._ensure_frozen()
+
     def _ensure_frozen(self) -> None:
         if self._runtime_state.frozen:
             return

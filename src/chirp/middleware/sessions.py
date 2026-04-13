@@ -11,6 +11,7 @@ The session object is stored in a ContextVar, accessible via
 for RedisSessionStore (``pip install chirp[redis]``).
 """
 
+import logging
 from contextvars import ContextVar
 from dataclasses import dataclass
 from time import time
@@ -19,6 +20,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
+
+_log = logging.getLogger("chirp.sessions")
 
 if TYPE_CHECKING:
     pass
@@ -149,6 +152,11 @@ class CookieSessionStore:
         try:
             data = self._serializer.loads(cookie_value, max_age=self._config.max_age)
         except Exception:
+            _log.debug(
+                "Failed to deserialize session cookie %r; starting fresh session",
+                self._config.cookie_name,
+                exc_info=True,
+            )
             return {}
         if not isinstance(data, dict):
             return {}
@@ -185,6 +193,10 @@ class CookieSessionStore:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
         except TypeError, ValueError:
+            _log.debug(
+                "Session timeout timestamps invalid; discarding session",
+                exc_info=True,
+            )
             return {}
         if (
             cfg.absolute_timeout_seconds is not None
@@ -238,6 +250,10 @@ class RedisSessionStore:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError, TypeError:
+            _log.debug(
+                "Failed to decode Redis session; starting fresh session",
+                exc_info=True,
+            )
             return {}
         if not isinstance(data, dict):
             return {}
@@ -300,6 +316,10 @@ class RedisSessionStore:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
         except TypeError, ValueError:
+            _log.debug(
+                "Session timeout timestamps invalid; discarding session",
+                exc_info=True,
+            )
             return {}
         if (
             cfg.absolute_timeout_seconds is not None

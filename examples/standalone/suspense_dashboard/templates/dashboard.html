@@ -48,7 +48,10 @@
     {% block revenue %}
     <div id="revenue" class="card">
       <h2>Revenue</h2>
-      {% if revenue %}
+      {% if revenue is deferred %}
+        <div class="skeleton skeleton-big"></div>
+        <div class="skeleton skeleton-line" style="width: 70%;"></div>
+      {% else %}
         <div class="big">{{ revenue.total }}</div>
         <div class="meta">
           <span class="{{ 'positive' if revenue.change >= 0 else 'negative' }}">
@@ -56,9 +59,6 @@
           </span>
           &mdash; {{ revenue.period }}
         </div>
-      {% else %}
-        <div class="skeleton skeleton-big"></div>
-        <div class="skeleton skeleton-line" style="width: 70%;"></div>
       {% endif %}
     </div>
     {% endblock %}
@@ -67,12 +67,12 @@
     {% block visitors %}
     <div id="visitors" class="card">
       <h2>Live Visitors</h2>
-      {% if visitors %}
-        <div class="big">{{ visitors.current }}</div>
-        <div class="meta">Peak today: {{ visitors.peak_today }} &middot; {{ visitors.source }}</div>
-      {% else %}
+      {% if visitors is deferred %}
         <div class="skeleton skeleton-big"></div>
         <div class="skeleton skeleton-line" style="width: 50%;"></div>
+      {% else %}
+        <div class="big">{{ visitors.current }}</div>
+        <div class="meta">Peak today: {{ visitors.peak_today }} &middot; {{ visitors.source }}</div>
       {% endif %}
     </div>
     {% endblock %}
@@ -81,7 +81,11 @@
     {% block orders %}
     <div id="orders" class="card orders-card">
       <h2>Recent Orders</h2>
-      {% if orders %}
+      {% if orders is deferred %}
+        {% for _ in range(4) %}
+        <div class="skeleton skeleton-line"></div>
+        {% endfor %}
+      {% else %}
         <table>
           <thead><tr><th>ID</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
           <tbody>
@@ -95,10 +99,6 @@
             {% endfor %}
           </tbody>
         </table>
-      {% else %}
-        {% for _ in range(4) %}
-        <div class="skeleton skeleton-line"></div>
-        {% endfor %}
       {% endif %}
     </div>
     {% endblock %}

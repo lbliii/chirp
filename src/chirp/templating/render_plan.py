@@ -499,6 +499,12 @@ def execute_render_plan(
                 )
             except Exception:
                 # Block may not exist (e.g. layout lacks ChirpUI OOB blocks)
+                _log.debug(
+                    "RenderPlan: block %r in %r failed to render",
+                    ru.view.block,
+                    ru.view.template,
+                    exc_info=True,
+                )
                 html = ""
         else:
             html = ""

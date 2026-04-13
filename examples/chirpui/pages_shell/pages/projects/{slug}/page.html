@@ -68,14 +68,14 @@
   {% block stats %}
   {% call card(title="Build stats", subtitle="Deferred via Suspense", cls="chirpui-block--span-full") %}
     <div id="project-stats">
-      {% if (stats ?? none) %}
+      {% if stats is deferred %}
+      {{ skeleton(variant="text", lines=2) }}
+      {% else %}
         {% call metric_grid(cols=3, gap="sm") %}
           {% for item in stats %}
           {{ metric_card(value=item.value, label=item.label) }}
           {% end %}
         {% end %}
-      {% else %}
-      {{ skeleton(variant="text", lines=2) }}
       {% end %}
     </div>
   {% end %}
@@ -84,14 +84,14 @@
   {% block activity %}
   {% call card(title="Recent activity", subtitle="Deferred via Suspense", cls="chirpui-block--span-full") %}
     <div id="project-activity">
-      {% if (activity ?? none) %}
+      {% if activity is deferred %}
+      {{ skeleton(variant="text", lines=3) }}
+      {% else %}
         {% call timeline() %}
           {% for item in activity %}
           {% call timeline_item(item, "just now") %}{% end %}
           {% end %}
         {% end %}
-      {% else %}
-      {{ skeleton(variant="text", lines=3) }}
       {% end %}
     </div>
   {% end %}

@@ -366,18 +366,19 @@ class Suspense:
 
     Like React's ``<Suspense>`` but server-rendered.  Context values that
     are awaitables are **deferred**: the shell renders with those keys
-    set to ``None`` (showing skeleton/fallback content), then each block
-    is re-rendered with real data and streamed as an OOB swap chunk.
+    set to the ``DEFERRED`` sentinel (showing skeleton/fallback content),
+    then each block is re-rendered with real data and streamed as an OOB
+    swap chunk.
 
     The shell also sets ``__chirp_defer_pending__`` (see
     ``CHIRP_DEFER_PENDING_KEY`` in ``chirp.templating.suspense``) to a
     ``frozenset`` of deferred context key names; deferred block re-renders
     use an empty frozenset.  Do not use that name for your own context keys.
 
-    **Templates:** Prefer ``{% if stats is not none %}`` (or
-    ``{% if "stats" in __chirp_defer_pending__ %}``) for loading vs loaded.
-    Bare ``{% if stats %}`` stays on the skeleton when the resolved value is
-    an empty ``tuple``/``list``, ``0``, or ``""`` — those are falsy.
+    **Templates:** Use ``{% if stats is deferred %}`` for skeleton vs loaded.
+    Bare ``{% if stats %}`` raises ``TypeError`` to prevent the common
+    footgun where empty results (``[]``, ``0``, ``""``) keep skeletons
+    visible after resolution.
 
     For htmx navigations, blocks arrive as ``hx-swap-oob`` elements.
     For initial page loads, ``<template>`` + inline ``<script>`` pairs
@@ -391,13 +392,13 @@ class Suspense:
             feed=load_feed(),              # awaitable — deferred
         )
 
-    Template (skeleton vs loaded — not ``{% if stats %}`` alone)::
+    Template (skeleton vs loaded — use ``is deferred``, not ``{% if stats %}``)::
 
         {% block stats %}
-          {% if stats is not none %}
-            {% for s in stats %}...{% end %}
-          {% else %}
+          {% if stats is deferred %}
             <div class="skeleton">Loading stats...</div>
+          {% else %}
+            {% for s in stats %}...{% end %}
           {% end %}
         {% end %}
 
@@ -555,5 +556,16 @@ class OOB:
         /,
         *oob_fragments: Fragment,
     ) -> None:
+        # Fail fast: streaming types cannot be OOB main — they need buffered
+        # responses to append fragments. Check here rather than at render time.
+        from chirp.realtime.events import EventStream
+
+        _streaming = (Suspense, Stream, TemplateStream, EventStream)
+        if isinstance(main, _streaming):
+            raise TypeError(
+                f"OOB main cannot be {type(main).__name__} "
+                "(a streaming response type). "
+                "OOB requires a buffered response to append fragments."
+            )
         object.__setattr__(self, "main", main)
         object.__setattr__(self, "oob_fragments", oob_fragments)

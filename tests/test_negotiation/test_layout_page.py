@@ -189,7 +189,7 @@ class TestLayoutPageSlotContext:
         (tmp_path / "dashboard.html").write_text(
             "<h1>{{ title }}</h1>"
             '<div id="stats">{% block stats %}'
-            "{% if stats %}<p>{{ stats[0] }}</p>{% else %}<p>Loading stats...</p>{% end %}"
+            "{% if stats is deferred %}<p>Loading stats...</p>{% else %}<p>{{ stats[0] }}</p>{% end %}"
             "{% end %}</div>",
             encoding="utf-8",
         )
@@ -263,7 +263,7 @@ class TestLayoutPageSlotContext:
         (tmp_path / "page.html").write_text(
             "<h1>{{ title }}</h1>"
             '<div id="data">{% block data %}'
-            "{% if data %}<p>{{ data }}</p>{% else %}<p>Loading...</p>{% end %}"
+            "{% if data is deferred %}<p>Loading...</p>{% else %}<p>{{ data }}</p>{% end %}"
             "{% end %}</div>",
             encoding="utf-8",
         )
@@ -341,7 +341,7 @@ class TestLayoutPageSlotContext:
         (tmp_path / "page.html").write_text(
             "<h1>{{ title }}</h1>"
             '<div id="data">{% block data %}'
-            "{% if data %}<p>{{ data }}</p>{% else %}<p>Loading...</p>{% end %}"
+            "{% if data is deferred %}<p>Loading...</p>{% else %}<p>{{ data }}</p>{% end %}"
             "{% end %}</div>",
             encoding="utf-8",
         )
