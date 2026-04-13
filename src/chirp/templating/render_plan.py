@@ -423,16 +423,20 @@ def execute_render_plan(
     # Apply layout chain if needed
     if plan.apply_layouts and plan.layout_chain is not None:
         layouts = plan.layout_chain.layouts[plan.layout_start_index :]
-        oob_blocks_to_suppress: set[str] = set()
-        if oob_registry is not None:
-            oob_blocks_to_suppress |= set(oob_registry.registered_blocks)
+        per_layout_oob: dict[str, set[str]] = {}
         if plan.intent == "full_page":
+            registry_blocks = set(oob_registry.registered_blocks) if oob_registry else set()
             for layout_info in layouts:
-                oob_blocks_to_suppress |= _oob_block_names(adapter, layout_info.template_name)
+                own_oob = _oob_block_names(adapter, layout_info.template_name)
+                # Registry blocks (e.g. shell_actions_oob) only suppressed
+                # when the layout actually defines them.
+                meta = adapter.template_metadata(layout_info.template_name)
+                all_blocks = set(getattr(meta, "blocks", None) or ()) if meta else set()
+                per_layout_oob[layout_info.template_name] = own_oob | (registry_blocks & all_blocks)
         for layout_info in reversed(layouts):
             block_overrides: dict[str, str] = {"content": main_html}
             if plan.intent == "full_page":
-                for name in oob_blocks_to_suppress:
+                for name in per_layout_oob.get(layout_info.template_name, set()):
                     block_overrides[name] = ""
             main_html = adapter.compose_layout(
                 layout_info.template_name,
