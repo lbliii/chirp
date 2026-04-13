@@ -144,8 +144,7 @@ def format_oob_script(block_html: str, target_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 _DEFAULT_ERROR_HTML = (
-    '<div class="chirp-suspense-error" data-block="{block_name}">'
-    "Error loading {block_name}</div>"
+    '<div class="chirp-suspense-error" data-block="{block_name}">Error loading {block_name}</div>'
 )
 
 

@@ -240,7 +240,9 @@ class TestBackPressure:
         bus.close("logs")
         await task
 
-        warnings = [r for r in caplog.records if r.levelname == "WARNING" and "dropped" in r.message]
+        warnings = [
+            r for r in caplog.records if r.levelname == "WARNING" and "dropped" in r.message
+        ]
         assert len(warnings) >= 1
         assert "scope='logs'" in warnings[0].message
         assert "maxsize=1" in warnings[0].message
@@ -261,7 +263,7 @@ class TestBackPressure:
         task = asyncio.create_task(collect())
         await asyncio.sleep(0.01)
 
-        bus.emit_sync(_event("cb", "first"))   # fills queue
+        bus.emit_sync(_event("cb", "first"))  # fills queue
         bus.emit_sync(_event("cb", "second"))  # dropped → callback
 
         bus.close("cb")
@@ -271,7 +273,9 @@ class TestBackPressure:
         assert dropped[0][0] == "cb"
         assert dropped[0][1].changed_paths == frozenset({"second"})
 
-    async def test_on_drop_callback_exception_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+    async def test_on_drop_callback_exception_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Exceptions in on_drop are logged, not propagated."""
 
         def bad_callback(scope: str, event: ChangeEvent) -> None:

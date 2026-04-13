@@ -402,22 +402,27 @@ class TestErrorMidStream:
             raise ValueError("database down")
 
         error_tmpl = (
-            '{% block fallback %}'
+            "{% block fallback %}"
             '<div class="custom-error">Oops: {{ block_name }}</div>'
-            '{% endblock %}'
+            "{% endblock %}"
         )
         env = Environment(
-            loader=DictLoader({
-                "simple.html": _SIMPLE_TEMPLATE,
-                "errors/deferred.html": error_tmpl,
-            })
+            loader=DictLoader(
+                {
+                    "simple.html": _SIMPLE_TEMPLATE,
+                    "errors/deferred.html": error_tmpl,
+                }
+            )
         )
         _register_deferred_test(env)
 
         s = Suspense("simple.html", error_block="fallback", data=_fail())
         chunks = [
-            c async for c in render_suspense(
-                env, s, is_htmx=False,
+            c
+            async for c in render_suspense(
+                env,
+                s,
+                is_htmx=False,
                 error_template="errors/deferred.html",
                 error_block="fallback",
             )

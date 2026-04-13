@@ -83,11 +83,13 @@ def bench_route_matching(num_routes: int = 100, lookups: int = 5000) -> dict:
         return "ok"
 
     for i in range(num_routes):
-        router.add(Route(
-            path=f"/items/{{id}}/sub{i}",
-            handler=noop,
-            methods=frozenset({"GET"}),
-        ))
+        router.add(
+            Route(
+                path=f"/items/{{id}}/sub{i}",
+                handler=noop,
+                methods=frozenset({"GET"}),
+            )
+        )
 
     router.compile()
 
@@ -151,7 +153,11 @@ async def bench_suspense_shell(num_deferred: int = 10) -> dict:
 
     for _ in range(iterations):
         ctx = {f"d_{i}": slow_value(f"val_{i}") for i in range(num_deferred)}
-        suspense = Suspense("bench_suspense.html", defer_blocks=tuple(f"panel_{i}" for i in range(num_deferred)), **ctx)
+        suspense = Suspense(
+            "bench_suspense.html",
+            defer_blocks=tuple(f"panel_{i}" for i in range(num_deferred)),
+            **ctx,
+        )
 
         t0 = time.perf_counter()
         chunks = []

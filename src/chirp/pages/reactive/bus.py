@@ -103,9 +103,7 @@ class ReactiveBus:
                     try:
                         self._on_drop(event.scope, event)
                     except Exception:
-                        logger.exception(
-                            "on_drop callback failed for scope=%s", event.scope
-                        )
+                        logger.exception("on_drop callback failed for scope=%s", event.scope)
 
     def _log_drop(self, event: ChangeEvent) -> None:
         """Log a dropped event, throttled to once per scope per interval."""
@@ -117,8 +115,7 @@ class ReactiveBus:
         if now - last >= _DROP_LOG_INTERVAL:
             count = self._drop_log_counts[scope]
             logger.warning(
-                "ReactiveBus: dropped %d event(s) for scope=%r "
-                "(subscriber queue full, maxsize=%d)",
+                "ReactiveBus: dropped %d event(s) for scope=%r (subscriber queue full, maxsize=%d)",
                 count,
                 scope,
                 self._maxsize,
