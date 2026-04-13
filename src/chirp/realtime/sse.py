@@ -206,8 +206,11 @@ async def handle_sse(
                     await pending_next
             # Close the generator so user try/finally blocks run
             # (e.g. database connection cleanup, file handle release).
-            with contextlib.suppress(Exception):
-                await gen_iter.aclose()
+            # AsyncIterator doesn't guarantee aclose(); AsyncGenerator does.
+            _aclose = getattr(gen_iter, "aclose", None)
+            if _aclose is not None:
+                with contextlib.suppress(Exception):
+                    await _aclose()
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())
