@@ -63,7 +63,7 @@ class MessageCatalog:
         if kwargs:
             try:
                 return msg.format_map(kwargs)
-            except (KeyError, IndexError):
+            except KeyError, IndexError:
                 logger.warning("Translation interpolation failed: %r %r", msg, kwargs)
                 return msg
         return msg

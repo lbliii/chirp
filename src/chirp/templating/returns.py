@@ -16,16 +16,32 @@ if TYPE_CHECKING:
 # Valid htmx swap strategies (base value before any modifiers like
 # "innerHTML transition:true" or "outerHTML show:top").
 type SwapStrategy = Literal[
-    "innerHTML", "outerHTML", "textContent",
-    "beforebegin", "afterbegin", "beforeend", "afterend",
-    "delete", "none", "true",
+    "innerHTML",
+    "outerHTML",
+    "textContent",
+    "beforebegin",
+    "afterbegin",
+    "beforeend",
+    "afterend",
+    "delete",
+    "none",
+    "true",
 ]
 
-_VALID_SWAP_STRATEGIES: frozenset[str] = frozenset({
-    "innerHTML", "outerHTML", "textContent",
-    "beforebegin", "afterbegin", "beforeend", "afterend",
-    "delete", "none", "true",
-})
+_VALID_SWAP_STRATEGIES: frozenset[str] = frozenset(
+    {
+        "innerHTML",
+        "outerHTML",
+        "textContent",
+        "beforebegin",
+        "afterbegin",
+        "beforeend",
+        "afterend",
+        "delete",
+        "none",
+        "true",
+    }
+)
 
 
 def _validate_swap(value: str | None) -> None:

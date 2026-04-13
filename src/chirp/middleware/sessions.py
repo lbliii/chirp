@@ -192,7 +192,7 @@ class CookieSessionStore:
         try:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             _log.debug(
                 "Session timeout timestamps invalid; discarding session",
                 exc_info=True,
@@ -315,7 +315,7 @@ class RedisSessionStore:
         try:
             created_ts = float(created_at)
             last_seen_ts = float(last_seen_at)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             _log.debug(
                 "Session timeout timestamps invalid; discarding session",
                 exc_info=True,

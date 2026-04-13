@@ -73,7 +73,7 @@ def t(key: str, **kwargs) -> str:
         if kwargs:
             try:
                 return key.format_map(kwargs)
-            except (KeyError, IndexError):
+            except KeyError, IndexError:
                 return key
         return key
     locale = get_locale()
