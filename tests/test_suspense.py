@@ -722,9 +722,9 @@ class TestDeferBlocks:
         assert "skeleton" in chunks[0]
         assert "77 stars" not in chunks[0]
 
-    async def test_unknown_defer_blocks_warns_and_skips(self, caplog):
-        """defer_blocks with nonexistent block names logs a warning and skips them (production)."""
-        import logging
+    async def test_unknown_defer_blocks_raises(self):
+        """defer_blocks with nonexistent block names always raises ConfigurationError."""
+        from chirp.errors import ConfigurationError
 
         env = Environment(
             loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
@@ -736,22 +736,11 @@ class TestDeferBlocks:
             title="Repo",
             stars=_delayed_value("33"),
         )
-        with caplog.at_level(logging.WARNING, logger="chirp.suspense"):
-            chunks = await _collect_chunks(env, s, is_htmx=True)
-
-        # Unknown block warned
-        assert any("nonexistent_block" in r.message for r in caplog.records)
-
-        # Valid block still rendered
-        oob = "".join(chunks[1:])
-        assert 'id="hero_stars"' in oob
-        assert "33 stars" in oob
-
-        # Unknown block not attempted
-        assert "nonexistent_block" not in oob
+        with pytest.raises(ConfigurationError, match="nonexistent_block"):
+            await _collect_chunks(env, s, is_htmx=True)
 
     async def test_unknown_defer_blocks_raises_in_debug(self):
-        """In debug mode (auto_reload), unknown defer_blocks raises ConfigurationError."""
+        """In debug mode (auto_reload), unknown defer_blocks also raises ConfigurationError."""
         from chirp.errors import ConfigurationError
 
         env = Environment(
@@ -767,18 +756,35 @@ class TestDeferBlocks:
         with pytest.raises(ConfigurationError, match="nonexistent_block"):
             await _collect_chunks(env, s, is_htmx=True)
 
+    async def test_unknown_defer_blocks_suggests_close_match(self):
+        """Error message includes 'did you mean' suggestion for close block names."""
+        from chirp.errors import ConfigurationError
+
+        env = Environment(
+            loader=DictLoader({"shared_key.html": _SHARED_KEY_TEMPLATE}),
+            auto_reload=False,
+        )
+        s = Suspense(
+            "shared_key.html",
+            defer_blocks=("hero_star",),  # close to "hero_stars"
+            title="Repo",
+            stars=_delayed_value("33"),
+        )
+        with pytest.raises(ConfigurationError, match="did you mean 'hero_stars'"):
+            await _collect_chunks(env, s, is_htmx=True)
+
 
 # ---------------------------------------------------------------------------
 # Empty block discovery warning
 # ---------------------------------------------------------------------------
 
 
-class TestEmptyDiscoveryWarning:
-    """Auto-discovery that finds zero blocks should warn."""
+class TestEmptyDiscoveryError:
+    """Auto-discovery that finds zero blocks should raise."""
 
-    async def test_empty_discovery_warns(self, caplog):
-        """When deferred keys exist but no blocks depend on them, warn."""
-        import logging
+    async def test_empty_discovery_raises(self):
+        """When deferred keys exist but no blocks depend on them, raise ConfigurationError."""
+        from chirp.errors import ConfigurationError
 
         # Template with a block that doesn't reference the deferred key
         no_dep_template = """\
@@ -793,15 +799,8 @@ class TestEmptyDiscoveryWarning:
             "nodep.html",
             data=_delayed_value("hello"),
         )
-        with caplog.at_level(logging.WARNING, logger="chirp.suspense"):
-            chunks = await _collect_chunks(env, s, is_htmx=True)
-
-        # Shell is still sent
-        assert len(chunks) >= 1
-        assert "Static content" in chunks[0]
-
-        # Warning about no blocks discovered
-        assert any("no blocks discovered" in r.message for r in caplog.records)
+        with pytest.raises(ConfigurationError, match="no blocks discovered"):
+            await _collect_chunks(env, s, is_htmx=True)
 
 
 # ---------------------------------------------------------------------------

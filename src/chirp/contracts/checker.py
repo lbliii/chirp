@@ -496,10 +496,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             result.dead_templates_found += 1
             result.issues.append(
                 ContractIssue(
-                    severity=Severity.INFO,
+                    severity=Severity.WARNING,
                     category="dead",
                     message=(
-                        f"Template '{template_name}' is not referenced by any route or template."
+                        f"Template '{template_name}' is not referenced by any route or template. "
+                        f"Remove it or add a route that uses it."
                     ),
                     template=template_name,
                 )
@@ -560,6 +561,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     from chirp.contracts.rules_safety import (
         check_csrf_session_order,
         check_middleware_signatures,
+        check_secret_key,
         check_sse_speculation,
     )
 
@@ -567,6 +569,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
     result.issues.extend(check_csrf_session_order(middleware_list))
     result.issues.extend(check_middleware_signatures(middleware_list))
+    result.issues.extend(check_secret_key(app.config))
 
     # Run registered plugin checks
     registered_checks = getattr(app, "_mutable_state", None)

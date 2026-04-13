@@ -72,3 +72,33 @@ class TestEventStream:
         es = EventStream(generator=gen())
         with pytest.raises(AttributeError):
             es.heartbeat_interval = 1.0  # type: ignore[misc]
+
+    def test_heartbeat_too_low_raises(self) -> None:
+        async def gen():
+            yield "hello"
+
+        with pytest.raises(ValueError, match="too low"):
+            EventStream(generator=gen(), heartbeat_interval=0.5)
+
+    def test_heartbeat_too_high_raises(self) -> None:
+        async def gen():
+            yield "hello"
+
+        with pytest.raises(ValueError, match="too high"):
+            EventStream(generator=gen(), heartbeat_interval=600.0)
+
+    def test_heartbeat_boundary_values(self) -> None:
+        async def gen():
+            yield "hello"
+
+        # Minimum valid
+        es = EventStream(generator=gen(), heartbeat_interval=1.0)
+        assert es.heartbeat_interval == 1.0
+
+    def test_heartbeat_max_boundary(self) -> None:
+        async def gen():
+            yield "hello"
+
+        # Maximum valid
+        es = EventStream(generator=gen(), heartbeat_interval=300.0)
+        assert es.heartbeat_interval == 300.0

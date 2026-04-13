@@ -322,16 +322,23 @@ async def render_suspense(
         available = set(template.list_blocks())
         unknown = [b for b in suspense.defer_blocks if b not in available]
         if unknown:
-            msg = (
-                f"Suspense: defer_blocks contains unknown block(s) {unknown!r} "
-                f"for template {template_name} "
-                f"(available: {sorted(available)})"
-            )
-            logger.warning(msg)
-            if getattr(env, "auto_reload", False):
-                from chirp.errors import ConfigurationError
+            from chirp.contracts.utils import closest_match
+            from chirp.errors import ConfigurationError
 
-                raise ConfigurationError(msg)
+            hints = []
+            for name in unknown:
+                suggestion = closest_match(name, available, max_dist=3)
+                if suggestion:
+                    hints.append(f"  - '{name}': did you mean '{suggestion}'?")
+                else:
+                    hints.append(f"  - '{name}'")
+            hint_text = "\n".join(hints)
+            msg = (
+                f"Suspense: defer_blocks contains unknown block(s) "
+                f"in template '{template_name}'.\n{hint_text}\n"
+                f"Available blocks: {sorted(available)}"
+            )
+            raise ConfigurationError(msg)
         blocks_to_render = [b for b in suspense.defer_blocks if b in available]
     else:
         deferred_keys = set(pending.keys())
@@ -340,14 +347,16 @@ async def render_suspense(
             dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
         )
         if not blocks_to_render and deferred_keys:
+            from chirp.errors import ConfigurationError
+
             msg = (
                 f"Suspense: no blocks discovered for deferred keys "
-                f"{sorted(deferred_keys)!r} in template {template_name}. "
+                f"{sorted(deferred_keys)!r} in template '{template_name}'. "
                 f"Deferred data resolved but no OOB swaps will be sent — "
                 f"skeletons will remain. Use defer_blocks=(...) to list "
                 f"blocks explicitly."
             )
-            logger.warning(msg)
+            raise ConfigurationError(msg)
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)
