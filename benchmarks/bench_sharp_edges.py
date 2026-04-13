@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 import statistics
-import sys
 import time
 from pathlib import Path
 
@@ -31,7 +30,6 @@ async def bench_reactive_bus(events: int = 1000, subscribers: int = 10) -> dict:
 
     bus = ReactiveBus(maxsize=events + 1)
     counts: list[int] = [0] * subscribers
-    ready = asyncio.Event()
 
     async def drain(idx: int, scope: str) -> None:
         count = 0
@@ -40,9 +38,7 @@ async def bench_reactive_bus(events: int = 1000, subscribers: int = 10) -> dict:
         counts[idx] = count
 
     # Start subscriber tasks
-    tasks = []
-    for i in range(subscribers):
-        tasks.append(asyncio.create_task(drain(i, "bench")))
+    tasks = [asyncio.create_task(drain(i, "bench")) for i in range(subscribers)]
 
     # Small yield to let subscribers register
     await asyncio.sleep(0.01)
@@ -83,7 +79,7 @@ def bench_route_matching(num_routes: int = 100, lookups: int = 5000) -> dict:
     router = Router()
 
     # Register N routes: /items/{id}/sub0, ... /items/{id}/subN
-    async def noop(request):  # noqa: ARG001
+    async def noop(_request):
         return "ok"
 
     for i in range(num_routes):
@@ -134,13 +130,12 @@ async def bench_suspense_shell(num_deferred: int = 10) -> dict:
     from chirp.templating.suspense import render_suspense
 
     # Build a template with N blocks that depend on deferred keys
-    block_defs = []
-    for i in range(num_deferred):
-        block_defs.append(
-            f"{{% block panel_{i} %}}"
-            f"{{% if d_{i} is not none %}}{{{{ d_{i} }}}}{{% else %}}loading...{{% endif %}}"
-            f"{{% endblock %}}"
-        )
+    block_defs = [
+        f"{{% block panel_{i} %}}"
+        f"{{% if d_{i} is not none %}}{{{{ d_{i} }}}}{{% else %}}loading...{{% endif %}}"
+        f"{{% endblock %}}"
+        for i in range(num_deferred)
+    ]
     template_src = "<html><body>" + "\n".join(block_defs) + "</body></html>"
 
     env = Environment(loader=DictLoader({"bench_suspense.html": template_src}))
