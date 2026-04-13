@@ -172,7 +172,7 @@ def create_environment(
 
 def render_template(env: Environment, tpl: Template) -> str:
     """Render a full template to string."""
-    template = env.get_template(tpl.name)
+    template = env.get_template(tpl.template_name)
     return template.render(tpl.context)
 
 

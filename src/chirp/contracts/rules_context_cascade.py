@@ -92,7 +92,7 @@ def check_context_cascade(
                 source = inspect.getsource(func)
                 # Look for return {"key": ...} or return dict(key=...)
                 contributed = _extract_return_keys(source)
-            except TypeError, OSError:
+            except (TypeError, OSError):
                 contributed = set()
 
             for key in contributed:

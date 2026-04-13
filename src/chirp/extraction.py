@@ -19,8 +19,11 @@ failures also fall back to the default.
 from __future__ import annotations
 
 import dataclasses
+import logging
 from collections.abc import Mapping
 from typing import Any
+
+_log = logging.getLogger("chirp.extraction")
 
 
 def is_extractable_dataclass(annotation: Any) -> bool:
@@ -71,7 +74,10 @@ def extract_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:
 
 
 def _convert(value: Any, target_type: Any) -> Any:
-    """Convert *value* to *target_type*, returning *value* unchanged on failure."""
+    """Convert *value* to *target_type*, returning *value* unchanged on failure.
+
+    Logs a WARNING when int/float coercion fails so the mismatch is visible.
+    """
     if target_type is str:
         s = str(value)
         return s.strip() if isinstance(value, str) else s
@@ -79,13 +85,23 @@ def _convert(value: Any, target_type: Any) -> Any:
     if target_type is int:
         try:
             return int(value)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
+            _log.warning(
+                "Type coercion failed: expected %s for value %r, returning raw string",
+                target_type.__name__,
+                value,
+            )
             return value
 
     if target_type is float:
         try:
             return float(value)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
+            _log.warning(
+                "Type coercion failed: expected %s for value %r, returning raw string",
+                target_type.__name__,
+                value,
+            )
             return value
 
     if target_type is bool:

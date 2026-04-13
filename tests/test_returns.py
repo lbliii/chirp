@@ -9,7 +9,7 @@ from chirp.templating.returns import OOB, Fragment, Page, Stream, Template, Vali
 class TestTemplate:
     def test_basic(self) -> None:
         t = Template("page.html", title="Home")
-        assert t.name == "page.html"
+        assert t.template_name == "page.html"
         assert t.context == {"title": "Home"}
 
     def test_no_context(self) -> None:
@@ -23,7 +23,7 @@ class TestTemplate:
     def test_frozen(self) -> None:
         t = Template("page.html")
         with pytest.raises(AttributeError):
-            t.name = "other.html"  # type: ignore[misc]
+            t.template_name = "other.html"  # type: ignore[misc]
 
 
 class TestFragment:

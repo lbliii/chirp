@@ -194,14 +194,14 @@ def normalize_to_composition(value: Any) -> PageComposition | None:
         return value
     if isinstance(value, Page):
         return PageComposition(
-            template=value.name,
+            template=value.template_name,
             fragment_block=value.block_name,
             page_block=value.page_block_name or value.block_name,
             context=dict(value.context),
         )
     if isinstance(value, LayoutPage):
         return PageComposition(
-            template=value.name,
+            template=value.template_name,
             fragment_block=value.block_name,
             page_block=value.page_block_name or value.block_name,
             context=dict(value.context),
@@ -499,7 +499,7 @@ def execute_render_plan(
                 )
             except Exception:
                 # Block may not exist (e.g. layout lacks ChirpUI OOB blocks)
-                _log.debug(
+                _log.error(
                     "RenderPlan: block %r in %r failed to render",
                     ru.view.block,
                     ru.view.template,

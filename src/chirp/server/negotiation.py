@@ -118,22 +118,22 @@ def _with_current_path_in_context(
     ``Template``/``Page``/``LayoutPage`` across requests.
 
     ``Template``/``Page``/``LayoutPage`` use custom ``__init__`` — construct fresh
-    instances instead of ``dataclasses.replace`` (which does not pass ``name``).
+    instances instead of ``dataclasses.replace`` (which does not pass ``template_name``).
     """
     if request is None or "current_path" in value.context:
         return value
     new_ctx = {**value.context, "current_path": request.path}
     if isinstance(value, Template):
-        return Template(value.name, **new_ctx)
+        return Template(value.template_name, **new_ctx)
     if isinstance(value, Page):
         return Page(
-            value.name,
+            value.template_name,
             value.block_name,
             page_block_name=value.page_block_name,
             **new_ctx,
         )
     return LayoutPage(
-        value.name,
+        value.template_name,
         value.block_name,
         page_block_name=value.page_block_name,
         layout_chain=value.layout_chain,

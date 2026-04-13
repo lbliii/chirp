@@ -7,11 +7,37 @@ inspects these to dispatch to the kida renderer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from chirp.pages.types import ContextProvider, LayoutChain
     from chirp.templating.composition import PageComposition
+
+# Valid htmx swap strategies (base value before any modifiers like
+# "innerHTML transition:true" or "outerHTML show:top").
+type SwapStrategy = Literal[
+    "innerHTML", "outerHTML", "textContent",
+    "beforebegin", "afterbegin", "beforeend", "afterend",
+    "delete", "none", "true",
+]
+
+_VALID_SWAP_STRATEGIES: frozenset[str] = frozenset({
+    "innerHTML", "outerHTML", "textContent",
+    "beforebegin", "afterbegin", "beforeend", "afterend",
+    "delete", "none", "true",
+})
+
+
+def _validate_swap(value: str | None) -> None:
+    """Validate htmx swap strategy, allowing modifiers after base value."""
+    if value is None:
+        return
+    base = value.split()[0]
+    if base not in _VALID_SWAP_STRATEGIES:
+        raise ValueError(
+            f"Invalid swap strategy {base!r} (from {value!r}). "
+            f"Valid strategies: {', '.join(sorted(_VALID_SWAP_STRATEGIES))}"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,11 +49,11 @@ class Template:
         return Template("page.html", title="Home", items=items)
     """
 
-    name: str
+    template_name: str
     context: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, name: str, /, **context: Any) -> None:
-        object.__setattr__(self, "name", name)
+    def __init__(self, template_name: str, /, **context: Any) -> None:
+        object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "context", context)
 
     @staticmethod
@@ -103,6 +129,7 @@ class Fragment:
         swap: str | None = None,
         **context: Any,
     ) -> None:
+        _validate_swap(swap)
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "target", target)
@@ -142,21 +169,21 @@ class Page:
         )
     """
 
-    name: str
+    template_name: str
     block_name: str
     page_block_name: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
     def __init__(
         self,
-        name: str,
+        template_name: str,
         block_name: str,
         /,
         *,
         page_block_name: str | None = None,
         **context: Any,
     ) -> None:
-        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "page_block_name", page_block_name)
         object.__setattr__(self, "context", context)
@@ -506,7 +533,7 @@ class LayoutPage:
         )
     """
 
-    name: str
+    template_name: str
     block_name: str
     page_block_name: str | None = None
     layout_chain: LayoutChain | None = None
@@ -515,7 +542,7 @@ class LayoutPage:
 
     def __init__(
         self,
-        name: str,
+        template_name: str,
         block_name: str,
         /,
         *,
@@ -524,7 +551,7 @@ class LayoutPage:
         context_providers: tuple[ContextProvider, ...] = (),
         **context: Any,
     ) -> None:
-        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "page_block_name", page_block_name)
         object.__setattr__(self, "layout_chain", layout_chain)

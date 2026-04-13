@@ -34,6 +34,11 @@ class OOBRegionConfig:
     swap: str = "innerHTML"
     wrap: bool = True
 
+    def __post_init__(self) -> None:
+        from chirp.templating.returns import _validate_swap
+
+        _validate_swap(self.swap)
+
 
 @dataclass(slots=True)
 class OOBRegistry:
