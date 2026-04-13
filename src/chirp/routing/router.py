@@ -158,6 +158,14 @@ class Router:
 
         # Register methods at the terminal node
         for method in route.methods:
+            existing = node.routes_by_method.get(method)
+            if existing is not None and existing.handler is not route.handler:
+                msg = (
+                    f"Duplicate route: {method} {route.path} is already "
+                    f"registered to {existing.handler!r}. "
+                    f"Cannot also register {route.handler!r}."
+                )
+                raise ConfigurationError(msg)
             node.routes_by_method[method] = route
 
     @property

@@ -294,8 +294,20 @@ async def render_suspense(
             "Suspense: error resolving deferred context for %s",
             template_name,
         )
-        # Shell is already sent; yield an error comment and stop
-        yield "\n<!-- chirp:suspense error resolving deferred data -->\n"
+        # Shell is already sent; yield a visible error for each pending block
+        # so skeletons are replaced with error indicators, not left spinning.
+        error_html = (
+            '<div class="chirp-suspense-error" data-block="__resolve__">'
+            "Error loading deferred data</div>"
+        )
+        if use_htmx_fmt:
+            for key in pending:
+                target_id = defer_map.get(key, key)
+                yield format_oob_htmx(error_html, target_id)
+        else:
+            for key in pending:
+                target_id = defer_map.get(key, key)
+                yield format_oob_script(error_html, target_id)
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
@@ -310,13 +322,16 @@ async def render_suspense(
         available = set(template.list_blocks())
         unknown = [b for b in suspense.defer_blocks if b not in available]
         if unknown:
-            logger.warning(
-                "Suspense: defer_blocks contains unknown block(s) %r "
-                "for template %s (available: %s)",
-                unknown,
-                template_name,
-                sorted(available),
+            msg = (
+                f"Suspense: defer_blocks contains unknown block(s) {unknown!r} "
+                f"for template {template_name} "
+                f"(available: {sorted(available)})"
             )
+            logger.warning(msg)
+            if getattr(env, "auto_reload", False):
+                from chirp.errors import ConfigurationError
+
+                raise ConfigurationError(msg)
         blocks_to_render = [b for b in suspense.defer_blocks if b in available]
     else:
         deferred_keys = set(pending.keys())
@@ -324,6 +339,15 @@ async def render_suspense(
         blocks_to_render = list(
             dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
         )
+        if not blocks_to_render and deferred_keys:
+            msg = (
+                f"Suspense: no blocks discovered for deferred keys "
+                f"{sorted(deferred_keys)!r} in template {template_name}. "
+                f"Deferred data resolved but no OOB swaps will be sent — "
+                f"skeletons will remain. Use defer_blocks=(...) to list "
+                f"blocks explicitly."
+            )
+            logger.warning(msg)
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)
@@ -343,4 +367,11 @@ async def render_suspense(
                 block_name,
                 template_name,
             )
-            yield f"\n<!-- chirp:suspense error in block {block_name} -->\n"
+            error_html = (
+                f'<div class="chirp-suspense-error" data-block="{block_name}">'
+                f"Error loading {block_name}</div>"
+            )
+            if use_htmx_fmt:
+                yield format_oob_htmx(error_html, target_id)
+            else:
+                yield format_oob_script(error_html, target_id)
