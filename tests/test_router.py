@@ -73,6 +73,19 @@ class TestParsePath:
         segments = parse_path("/products/{product_id}")
         assert segments[1].param_name == "product_id"
 
+    def test_rejects_python_keyword_param(self) -> None:
+        """Python keywords like 'class' or 'return' are rejected."""
+        with pytest.raises(ConfigurationError) as exc_info:
+            parse_path("/items/{class}")
+        msg = str(exc_info.value)
+        assert "keyword" in msg
+        assert "class" in msg
+
+    def test_rejects_python_keyword_for(self) -> None:
+        """The keyword 'for' is also rejected."""
+        with pytest.raises(ConfigurationError):
+            parse_path("/items/{for}")
+
 
 class TestRouterStaticRoutes:
     def test_root(self) -> None:

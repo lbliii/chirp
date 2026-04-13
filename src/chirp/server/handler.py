@@ -132,6 +132,8 @@ def create_request_handler(
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     discovered_routes: list[Any] | None = None,
+    suspense_error_template: str | None = None,
+    suspense_error_block: str = "fallback",
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request."""
     routes = discovered_routes or []
@@ -179,6 +181,8 @@ def create_request_handler(
             fragment_target_registry=fragment_target_registry,
             route_layout_chains=route_layout_chains,
             swap_scope_map=swap_scope_map,
+            suspense_error_template=suspense_error_template,
+            suspense_error_block=suspense_error_block,
         )
 
     return compile_middleware_chain(middleware, dispatch)
@@ -291,6 +295,8 @@ async def _invoke_handler(
     fragment_target_registry: FragmentTargetRegistry | None = None,
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
+    suspense_error_template: str | None = None,
+    suspense_error_block: str = "fallback",
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -359,6 +365,8 @@ async def _invoke_handler(
         validate_blocks=validate_blocks,
         oob_registry=oob_registry,
         fragment_target_registry=fragment_target_registry,
+        suspense_error_template=suspense_error_template,
+        suspense_error_block=suspense_error_block,
     )
 
 

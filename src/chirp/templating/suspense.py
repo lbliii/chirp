@@ -161,8 +161,8 @@ def _render_error_html(
     """Render error fallback HTML for a failed deferred block.
 
     Resolution order:
-    1. Per-route ``Suspense(error_block=...)`` — block in the same template
-       (caller should pass this as *suspense_error_block*)
+    1. Per-route ``Suspense(error_block=...)`` rendered from the global
+       ``error_template`` (caller should pass this as *suspense_error_block*)
     2. Global ``error_template`` + ``error_block`` from AppConfig
     3. Hardcoded default HTML
     """
@@ -401,7 +401,7 @@ async def render_suspense(
         async with anyio.create_task_group() as tg:
             for key, awaitable in pending.items():
                 tg.start_soon(_resolve, key, awaitable)
-    except BaseException:
+    except BaseException as exc:
         logger.warning(
             "Suspense: error resolving deferred context for template=%r, "
             "deferred_keys=%r — shell already sent, replacing skeletons with error indicators",
@@ -417,7 +417,7 @@ async def render_suspense(
                 env,
                 block_name=key,
                 deferred_key=key,
-                error=None,
+                error=exc,
                 error_template=error_template,
                 error_block=error_block,
                 suspense_error_block=suspense.error_block,
@@ -488,7 +488,7 @@ async def render_suspense(
                 yield format_oob_htmx(block_html, target_id, swap, wrap=wrap)
             else:
                 yield format_oob_script(block_html, target_id)
-        except Exception:
+        except Exception as exc:
             logger.warning(
                 "Suspense: error rendering deferred block=%r in template=%r, "
                 "target_id=%r — replacing with error indicator",
@@ -501,7 +501,7 @@ async def render_suspense(
                 env,
                 block_name=block_name,
                 deferred_key=block_name,
-                error=None,
+                error=exc,
                 error_template=error_template,
                 error_block=error_block,
                 suspense_error_block=suspense.error_block,

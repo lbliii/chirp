@@ -40,7 +40,8 @@ class ReactiveBus:
             (back-pressure).  Default: 256.
         on_drop: Optional callback invoked when an event is dropped
             due to a full subscriber queue.  Receives ``(scope, event)``.
-            Called under the bus lock — keep it fast.
+            Called outside the bus lock but still on the emit path —
+            keep it fast and non-blocking.
     """
 
     __slots__ = (
@@ -98,7 +99,7 @@ class ReactiveBus:
             except asyncio.QueueFull:
                 with self._lock:
                     self._dropped_count += 1
-                self._log_drop(event)
+                    self._log_drop(event)
                 if self._on_drop is not None:
                     try:
                         self._on_drop(event.scope, event)
@@ -181,10 +182,15 @@ class ReactiveBus:
         with self._lock:
             if scope is not None:
                 subs = self._subscribers.pop(scope, set())
+                # Clean up throttle state for the closed scope
+                self._drop_log_last.pop(scope, None)
+                self._drop_log_counts.pop(scope, None)
             else:
                 subs = set()
                 for s in list(self._subscribers):
                     subs |= self._subscribers.pop(s)
+                self._drop_log_last.clear()
+                self._drop_log_counts.clear()
         for queue, _conn in subs:
             # Drain one event if needed to guarantee the sentinel lands.
             # This ensures close() is reliable even with small maxsize.

@@ -4,6 +4,7 @@ Routes are registered during setup and compiled into an immutable
 lookup structure when the app freezes.
 """
 
+import keyword
 import re
 from dataclasses import dataclass
 
@@ -54,9 +55,20 @@ def parse_path(path: str) -> list[PathSegment]:
                 param_name = inner
                 param_type = "str"
             if not param_name.isidentifier():
+                suggestion = param_name.replace("-", "_")
+                hint = (
+                    f" Use '{{{suggestion}}}' instead."
+                    if suggestion.isidentifier() and not keyword.iskeyword(suggestion)
+                    else ""
+                )
                 raise ConfigurationError(
                     f"Path parameter '{{{param_name}}}' is not a valid Python "
-                    f"identifier. Use '{{{param_name.replace('-', '_')}}}' instead. "
+                    f"identifier.{hint} Route: {path!r}"
+                )
+            if keyword.iskeyword(param_name):
+                raise ConfigurationError(
+                    f"Path parameter '{{{param_name}}}' is a Python keyword "
+                    f"and cannot be used as a parameter name. "
                     f"Route: {path!r}"
                 )
             segments.append(

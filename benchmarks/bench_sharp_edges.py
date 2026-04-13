@@ -129,18 +129,19 @@ async def bench_suspense_shell(num_deferred: int = 10) -> dict:
     from kida import DictLoader, Environment
 
     from chirp.templating.returns import Suspense
-    from chirp.templating.suspense import render_suspense
+    from chirp.templating.suspense import DEFERRED, render_suspense
 
     # Build a template with N blocks that depend on deferred keys
     block_defs = [
         f"{{% block panel_{i} %}}"
-        f"{{% if d_{i} is not none %}}{{{{ d_{i} }}}}{{% else %}}loading...{{% endif %}}"
+        f"{{% if d_{i} is deferred %}}loading...{{% else %}}{{{{ d_{i} }}}}{{% endif %}}"
         f"{{% endblock %}}"
         for i in range(num_deferred)
     ]
     template_src = "<html><body>" + "\n".join(block_defs) + "</body></html>"
 
     env = Environment(loader=DictLoader({"bench_suspense.html": template_src}))
+    env.add_test("deferred", lambda val: val is DEFERRED)
 
     # Build Suspense with N deferred awaitables
     async def slow_value(v: str) -> str:

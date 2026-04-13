@@ -206,6 +206,8 @@ def negotiate(
     validate_blocks: bool = False,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    suspense_error_template: str | None = None,
+    suspense_error_block: str = "fallback",
 ) -> Response | StreamingResponse | SSEResponse:
     """Convert a route handler's return value to a Response.
 
@@ -407,6 +409,8 @@ def negotiate(
                 request=req,
                 oob_registry=oob_registry,
                 fragment_target_registry=fragment_target_registry,
+                error_template=suspense_error_template,
+                error_block=suspense_error_block,
             )
             if should_append_streamed_shell_actions_oob(value.context, req):
                 chunks = append_shell_actions_oob_stream(chunks, value.context, kida_env)
@@ -422,7 +426,14 @@ def negotiate(
         case Suspense():
             kida_env = _require_kida_env(kida_env, "Suspense")
             is_htmx = request is not None and request.is_htmx
-            chunks = render_suspense(kida_env, value, is_htmx=is_htmx, oob_registry=oob_registry)
+            chunks = render_suspense(
+                kida_env,
+                value,
+                is_htmx=is_htmx,
+                oob_registry=oob_registry,
+                error_template=suspense_error_template,
+                error_block=suspense_error_block,
+            )
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",

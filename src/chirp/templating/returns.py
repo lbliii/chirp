@@ -414,6 +414,18 @@ class Suspense:
             defer_blocks=("hero_stars", "footer_stars"),
             stars=fetch_stars(),
         )
+
+    If a deferred value fails after the shell is sent, the skeleton is
+    replaced with an error indicator.  Use *error_block* to render a
+    custom fallback from the global ``suspense_error_template``
+    (configured via ``AppConfig``).  When omitted, the ``error_block``
+    from ``AppConfig.suspense_error_block`` is used.  If no error
+    template is configured, a hardcoded default is used::
+
+        Suspense("page.html",
+            error_block="custom_fallback",
+            stats=load_stats(),
+        )
     """
 
     template_name: str
