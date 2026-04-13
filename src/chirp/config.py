@@ -272,6 +272,16 @@ class AppConfig:
                 "Set CHIRP_SECRET_KEY or pass secret_key= to AppConfig."
             )
 
+        # Validate view_transitions / speculation_rules via their normalizers
+        # (single source of truth for accepted values).
+        from chirp.server.view_transitions import normalize_view_transitions
+
+        normalize_view_transitions(self.view_transitions)
+
+        from chirp.server.speculation_rules import normalize_speculation_rules
+
+        normalize_speculation_rules(self.speculation_rules)
+
     @classmethod
     def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:
         """Load configuration from environment variables.

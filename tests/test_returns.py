@@ -9,7 +9,7 @@ from chirp.templating.returns import OOB, Fragment, Page, Stream, Template, Vali
 class TestTemplate:
     def test_basic(self) -> None:
         t = Template("page.html", title="Home")
-        assert t.name == "page.html"
+        assert t.template_name == "page.html"
         assert t.context == {"title": "Home"}
 
     def test_no_context(self) -> None:
@@ -23,7 +23,7 @@ class TestTemplate:
     def test_frozen(self) -> None:
         t = Template("page.html")
         with pytest.raises(AttributeError):
-            t.name = "other.html"  # type: ignore[misc]
+            t.template_name = "other.html"  # type: ignore[misc]
 
 
 class TestFragment:
@@ -149,6 +149,32 @@ class TestTopLevelImports:
         assert chirp.ShellActions is ShellActions
         assert chirp.ShellActionZone is ShellActionZone
         assert chirp.ShellMenuItem is ShellMenuItem
+
+
+class TestSwapValidation:
+    def test_valid_swap(self) -> None:
+        f = Fragment("a.html", "b", swap="innerHTML")
+        assert f.swap == "innerHTML"
+
+    def test_valid_swap_with_modifier(self) -> None:
+        f = Fragment("a.html", "b", swap="innerHTML transition:true")
+        assert f.swap == "innerHTML transition:true"
+
+    def test_invalid_swap_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid swap strategy"):
+            Fragment("a.html", "b", swap="inneHTML")
+
+    def test_empty_swap_raises(self) -> None:
+        with pytest.raises(ValueError, match="empty"):
+            Fragment("a.html", "b", swap="")
+
+    def test_whitespace_swap_raises(self) -> None:
+        with pytest.raises(ValueError, match="empty"):
+            Fragment("a.html", "b", swap="   ")
+
+    def test_none_swap_ok(self) -> None:
+        f = Fragment("a.html", "b")
+        assert f.swap is None
 
 
 class TestStream:

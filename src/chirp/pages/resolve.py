@@ -60,7 +60,7 @@ def _warn_if_page_root_missing(result: Any) -> None:
     if result.page_block_name is not None:
         return
     warnings.warn(
-        f"Page({result.name!r}, {result.block_name!r}) has no page_block_name — "
+        f"Page({result.template_name!r}, {result.block_name!r}) has no page_block_name — "
         "boosted navigation will use the fragment block as the page root. "
         "Set page_block_name='page_root' (or another fragment-safe block) "
         "if the fragment block is narrower than the intended page view.",
@@ -154,7 +154,7 @@ def upgrade_result(
     if isinstance(result, Page):
         _warn_if_page_root_missing(result)
         return LayoutPage(
-            result.name,
+            result.template_name,
             result.block_name,
             page_block_name=result.page_block_name,
             layout_chain=layout_chain,

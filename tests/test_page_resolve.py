@@ -290,7 +290,7 @@ class TestUpgradeResult:
         upgraded = upgrade_result(result, cascade_ctx, layout_chain=None, context_providers=())
 
         assert isinstance(upgraded, LayoutPage)
-        assert upgraded.name == "page.html"
+        assert upgraded.template_name == "page.html"
         assert upgraded.block_name == "content"
         # Page context merged with cascade context
         assert upgraded.context["title"] == "Home"

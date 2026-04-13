@@ -204,7 +204,9 @@ class TestCSRFExemptPaths:
 
 class TestCSRFRequiresSession:
     async def test_fails_without_session_middleware(self) -> None:
-        """CSRFMiddleware should fail without sessions — returns 500."""
+        """CSRFMiddleware without SessionMiddleware raises at freeze time."""
+        from chirp.errors import ConfigurationError
+
         app = App()
         # Only CSRF middleware, no session middleware
         app.add_middleware(CSRFMiddleware())
@@ -213,8 +215,5 @@ class TestCSRFRequiresSession:
         def form_page():
             return "form"
 
-        async with TestClient(app) as client:
-            # GET should fail because CSRF tries to access session
-            # The ConfigurationError is caught by the error handler → 500
-            response = await client.get("/form")
-            assert response.status == 500
+        with pytest.raises(ConfigurationError, match="SessionMiddleware"):
+            app.freeze()

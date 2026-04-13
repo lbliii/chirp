@@ -205,6 +205,33 @@ def _compile_routes(
     return router
 
 
+def _validate_middleware_ordering(middleware_list: list) -> None:
+    """Check that middleware dependencies are satisfied.
+
+    CSRFMiddleware requires SessionMiddleware to wrap it (i.e. Session must
+    be registered *before* CSRF in add_middleware calls).  Detects the
+    mis-ordering early at freeze time rather than waiting for a request to
+    fail.
+    """
+    from chirp.middleware.csrf import CSRFMiddleware
+    from chirp.middleware.sessions import SessionMiddleware
+
+    seen_session = False
+    for mw in middleware_list:
+        if isinstance(mw, SessionMiddleware):
+            seen_session = True
+        elif isinstance(mw, CSRFMiddleware) and not seen_session:
+            from chirp.errors import ConfigurationError
+
+            msg = (
+                "CSRFMiddleware requires SessionMiddleware. "
+                "Add SessionMiddleware before CSRFMiddleware:\n\n"
+                "    app.add_middleware(SessionMiddleware(SessionConfig(secret_key=...)))\n"
+                "    app.add_middleware(CSRFMiddleware(CSRFConfig()))\n"
+            )
+            raise ConfigurationError(msg)
+
+
 class AppCompiler:
     """Compiles app setup state into immutable runtime state."""
 
@@ -251,6 +278,7 @@ class AppCompiler:
         self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
         middleware_list = list(self._mutable.middleware_list)
+        _validate_middleware_ordering(middleware_list)
         middleware_list = _collect_builtin_middleware(self._config, middleware_list, router=router)
         self._runtime.middleware = tuple(middleware_list)
 
