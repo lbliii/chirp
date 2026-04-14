@@ -13,11 +13,41 @@ Implements the minimal MCP surface for v1:
 """
 
 import json as json_module
-from typing import Any
+from typing import Any, TypedDict
 
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.tools.registry import ToolRegistry
+
+
+class JsonRpcError(TypedDict):
+    """JSON-RPC error object (§5.1)."""
+
+    code: int
+    message: str
+
+
+class JsonRpcErrorResponse(TypedDict):
+    """JSON-RPC error response envelope."""
+
+    jsonrpc: str
+    error: JsonRpcError
+    id: str | int | None
+
+
+class JsonRpcSuccessResponse(TypedDict):
+    """JSON-RPC success response envelope."""
+
+    jsonrpc: str
+    result: Any
+    id: str | int | None
+
+
+class McpContentBlock(TypedDict):
+    """MCP text content block."""
+
+    type: str
+    text: str
 
 # MCP protocol version
 _MCP_VERSION = "2024-11-05"
@@ -47,11 +77,11 @@ async def handle_mcp_request(
     if request.method != "POST":
         return _json_response(
             405,
-            {
-                "jsonrpc": "2.0",
-                "error": {"code": -32600, "message": "Method not allowed. Use POST."},
-                "id": None,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32600, message="Method not allowed. Use POST."),
+                id=None,
+            ),
         )
 
     # Read request body
@@ -59,11 +89,11 @@ async def handle_mcp_request(
     if not body:
         return _json_response(
             400,
-            {
-                "jsonrpc": "2.0",
-                "error": {"code": -32700, "message": "Empty request body"},
-                "id": None,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32700, message="Empty request body"),
+                id=None,
+            ),
         )
 
     # Parse JSON-RPC
@@ -72,22 +102,22 @@ async def handle_mcp_request(
     except json_module.JSONDecodeError:
         return _json_response(
             400,
-            {
-                "jsonrpc": "2.0",
-                "error": {"code": -32700, "message": "Parse error"},
-                "id": None,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32700, message="Parse error"),
+                id=None,
+            ),
         )
 
     # Validate JSON-RPC structure
     if not isinstance(rpc_request, dict):
         return _json_response(
             400,
-            {
-                "jsonrpc": "2.0",
-                "error": {"code": -32600, "message": "Invalid request — expected object"},
-                "id": None,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32600, message="Invalid request — expected object"),
+                id=None,
+            ),
         )
 
     rpc_method = rpc_request.get("method")
@@ -101,11 +131,11 @@ async def handle_mcp_request(
     if not rpc_method:
         return _json_response(
             400,
-            {
-                "jsonrpc": "2.0",
-                "error": {"code": -32600, "message": "Missing 'method' field"},
-                "id": rpc_id,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32600, message="Missing 'method' field"),
+                id=rpc_id,
+            ),
         )
 
     # Handle notifications (no response expected)
@@ -118,20 +148,20 @@ async def handle_mcp_request(
     if isinstance(result, dict) and "error" in result:
         return _json_response(
             200,
-            {
-                "jsonrpc": "2.0",
-                "error": result["error"],
-                "id": rpc_id,
-            },
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=result["error"],
+                id=rpc_id,
+            ),
         )
 
     return _json_response(
         200,
-        {
-            "jsonrpc": "2.0",
-            "result": result,
-            "id": rpc_id,
-        },
+        JsonRpcSuccessResponse(
+            jsonrpc="2.0",
+            result=result,
+            id=rpc_id,
+        ),
     )
 
 
@@ -162,7 +192,7 @@ async def _dispatch(
     if method == "tools/call":
         return await _handle_tools_call(params, registry)
 
-    return {"error": {"code": -32601, "message": f"Method not found: {method!r}"}}
+    return {"error": JsonRpcError(code=-32601, message=f"Method not found: {method!r}")}
 
 
 def _handle_initialize(params: dict[str, Any]) -> dict[str, Any]:
@@ -186,20 +216,20 @@ async def _handle_tools_call(
     """Handle MCP ``tools/call`` — dispatch to tool handler."""
     tool_name = params.get("name")
     if not tool_name:
-        return {"error": {"code": -32602, "message": "Missing 'name' in params"}}
+        return {"error": JsonRpcError(code=-32602, message="Missing 'name' in params")}
 
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
-        return {"error": {"code": -32602, "message": "'arguments' must be an object"}}
+        return {"error": JsonRpcError(code=-32602, message="'arguments' must be an object")}
 
     try:
         result = await registry.call_tool(tool_name, arguments)
     except KeyError:
-        return {"error": {"code": -32602, "message": f"Tool not found: {tool_name!r}"}}
+        return {"error": JsonRpcError(code=-32602, message=f"Tool not found: {tool_name!r}")}
     except TypeError as exc:
-        return {"error": {"code": -32602, "message": f"Invalid arguments: {exc}"}}
+        return {"error": JsonRpcError(code=-32602, message=f"Invalid arguments: {exc}")}
     except Exception as exc:
-        return {"error": {"code": -32603, "message": f"Tool execution error: {exc}"}}
+        return {"error": JsonRpcError(code=-32603, message=f"Tool execution error: {exc}")}
 
     # MCP tools/call result format: content array
     return {
@@ -207,17 +237,17 @@ async def _handle_tools_call(
     }
 
 
-def _format_result(result: Any) -> dict[str, Any]:
+def _format_result(result: Any) -> McpContentBlock:
     """Format a tool result as an MCP content block."""
     if isinstance(result, str):
-        return {"type": "text", "text": result}
+        return McpContentBlock(type="text", text=result)
     if isinstance(result, dict | list):
-        return {"type": "text", "text": json_module.dumps(result, default=str)}
+        return McpContentBlock(type="text", text=json_module.dumps(result, default=str))
     # Fallback: convert to string
-    return {"type": "text", "text": str(result)}
+    return McpContentBlock(type="text", text=str(result))
 
 
-def _json_response(status: int, body: dict[str, Any]) -> Response:
+def _json_response(status: int, body: JsonRpcErrorResponse | JsonRpcSuccessResponse) -> Response:
     """Build a chirp Response with JSON content."""
     return Response(
         body=json_module.dumps(body, default=str),

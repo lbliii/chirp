@@ -14,10 +14,18 @@ import inspect
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
 from chirp.tools.events import ToolCallEvent, ToolEventBus
 from chirp.tools.schema import function_to_schema
+
+
+class McpToolInfo(TypedDict):
+    """MCP tool list entry for ``tools/list`` response."""
+
+    name: str
+    description: str
+    inputSchema: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,14 +58,14 @@ class ToolRegistry:
         self._tools: dict[str, ToolDef] = {t.name: t for t in tools}
         self._event_bus = event_bus
 
-    def list_tools(self) -> list[dict[str, Any]]:
+    def list_tools(self) -> list[McpToolInfo]:
         """Return MCP-formatted tool list for ``tools/list`` response."""
         return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": tool.schema,
-            }
+            McpToolInfo(
+                name=tool.name,
+                description=tool.description,
+                inputSchema=tool.schema,
+            )
             for tool in self._tools.values()
         ]
 

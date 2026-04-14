@@ -2,7 +2,27 @@
 
 import os
 import types
-from typing import Any
+from typing import Literal, TypedDict
+
+
+class FrameInfo(TypedDict):
+    """Extracted traceback frame with source context and locals."""
+
+    filename: str
+    lineno: int
+    func_name: str
+    source_lines: list[tuple[int, str]]
+    locals: dict[str, str]
+    is_app: bool
+
+
+class CollapsedFrameGroup(TypedDict):
+    """Consecutive non-app frames collapsed into a summary."""
+
+    collapsed: Literal[True]
+    count: int
+    frames: list[FrameInfo]
+    summary: str
 
 
 def _is_app_frame(filename: str) -> bool:
@@ -16,11 +36,11 @@ def _is_app_frame(filename: str) -> bool:
     return not filename.startswith(stdlib_prefix)
 
 
-def _extract_frames(tb: types.TracebackType | None) -> list[dict[str, Any]]:
+def _extract_frames(tb: types.TracebackType | None) -> list[FrameInfo]:
     """Walk a traceback and extract frame info with source context and locals."""
     import linecache
 
-    frames: list[dict[str, Any]] = []
+    frames: list[FrameInfo] = []
     while tb is not None:
         frame = tb.tb_frame
         lineno = tb.tb_lineno
@@ -48,14 +68,14 @@ def _extract_frames(tb: types.TracebackType | None) -> list[dict[str, Any]]:
                 local_vars[name] = "<unrepresentable>"
 
         frames.append(
-            {
-                "filename": filename,
-                "lineno": lineno,
-                "func_name": func_name,
-                "source_lines": source_lines,
-                "locals": local_vars,
-                "is_app": _is_app_frame(filename),
-            }
+            FrameInfo(
+                filename=filename,
+                lineno=lineno,
+                func_name=func_name,
+                source_lines=source_lines,
+                locals=local_vars,
+                is_app=_is_app_frame(filename),
+            )
         )
         tb = tb.tb_next
 
@@ -63,15 +83,15 @@ def _extract_frames(tb: types.TracebackType | None) -> list[dict[str, Any]]:
 
 
 def _collapse_framework_frames(
-    frames: list[dict[str, Any]],
+    frames: list[FrameInfo],
     min_collapse: int = 3,
-) -> list[dict[str, Any]]:
+) -> list[FrameInfo | CollapsedFrameGroup]:
     """Collapse consecutive non-app (framework) frames into a summary.
 
     Reduces traceback noise from middleware, ASGI adapters, etc.
     Returns a mix of frame dicts and collapsed-group dicts.
     """
-    result: list[dict[str, Any]] = []
+    result: list[FrameInfo | CollapsedFrameGroup] = []
     i = 0
     while i < len(frames):
         frame = frames[i]
@@ -80,19 +100,19 @@ def _collapse_framework_frames(
             i += 1
             continue
         # Collect consecutive non-app frames
-        run: list[dict[str, Any]] = [frame]
+        run: list[FrameInfo] = [frame]
         i += 1
         while i < len(frames) and not frames[i]["is_app"]:
             run.append(frames[i])
             i += 1
         if len(run) >= min_collapse:
             result.append(
-                {
-                    "collapsed": True,
-                    "count": len(run),
-                    "frames": run,
-                    "summary": f"{len(run)} framework frames",
-                }
+                CollapsedFrameGroup(
+                    collapsed=True,
+                    count=len(run),
+                    frames=run,
+                    summary=f"{len(run)} framework frames",
+                )
             )
         else:
             result.extend(run)
