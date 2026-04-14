@@ -1,0 +1,84 @@
+{# Default docs index/listing template.
+   Blocks: doc_list, doc_sidebar #}
+
+{% include "chirp_docs/_docs_styles.html" %}
+
+<div class="chirp-docs-layout">
+
+{% block doc_sidebar %}
+<nav id="doc_sidebar" class="chirp-docs-sidebar">
+  <div class="chirp-docs-search">
+    <input type="text" name="q" placeholder="Search docs..."
+           hx-get="{{ docs_prefix }}/search"
+           hx-target="#doc_list"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms, search"
+           hx-sync="this:replace"
+           aria-label="Search documentation">
+  </div>
+  {% if docs_nav_items %}
+  {% for group in docs_nav_items %}
+  <details open>
+    <summary>
+      {% if group.landing_page %}
+      <a href="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+         hx-get="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+         hx-target="#doc_content"
+         hx-push-url="true">{{ group.category }}</a>
+      {% else %}
+      {{ group.category }}
+      {% endif %}
+    </summary>
+    <ul>
+      {% for page in group.pages %}
+      <li>
+        <a href="{{ docs_prefix }}/{{ page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">{{ page.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block doc_list %}
+<main id="doc_list" class="chirp-docs-list">
+  <h1>{{ docs_title }}</h1>
+  {% for group in docs_nav_items %}
+  <section>
+    {% if group.landing_page %}
+    <h2><a href="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">{{ group.category }}</a></h2>
+    {% if group.landing_page.metadata.description %}
+    <p>{{ group.landing_page.metadata.description }}</p>
+    {% endif %}
+    {% else %}
+    <h2>{{ group.category }}</h2>
+    {% endif %}
+    <ul>
+      {% for page in group.pages %}
+      <li>
+        <a href="{{ docs_prefix }}/{{ page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">
+          <strong>{{ page.title }}</strong>
+          {% if page.metadata.description %}
+          <span>{{ page.metadata.description }}</span>
+          {% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</main>
+{% endblock %}
+
+</div>

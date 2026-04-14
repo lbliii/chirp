@@ -1,0 +1,31 @@
+{# Search results fragment — swapped into #doc_list by htmx search input.
+   Block: doc_search_results #}
+
+{% block doc_search_results %}
+<main id="doc_list" class="chirp-docs-list chirp-docs-search-results">
+  {% if query %}
+  <h2>Results for "{{ query }}"</h2>
+  {% if results %}
+  <ul>
+    {% for page in results %}
+    <li>
+      <a href="{{ docs_prefix }}/{{ page.slug }}"
+         hx-get="{{ docs_prefix }}/{{ page.slug }}"
+         hx-target="#doc_content"
+         hx-push-url="true">
+        <strong>{{ page.title }}</strong>
+        {% if page.metadata.description %}
+        <span>{{ page.metadata.description }}</span>
+        {% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="chirp-docs-no-results">No pages found.</p>
+  {% endif %}
+  {% else %}
+  <p class="chirp-docs-no-results">Type to search documentation.</p>
+  {% endif %}
+</main>
+{% endblock %}
