@@ -293,10 +293,13 @@ class AppRegistry:
                 template_name=_template,
             )
 
-        # Contract checks scan handler source for Template/Fragment/Page calls; the async
-        # wrapper would hide user handlers from inspect.getsource().
-        page_wrapper.__chirp_page_handler__ = _handler
-
         self._state.pending_routes.append(
-            PendingRoute(url_path, page_wrapper, methods, name=None, referenced=False)
+            PendingRoute(
+                url_path,
+                page_wrapper,
+                methods,
+                name=None,
+                referenced=False,
+                page_source_handler=_handler,
+            )
         )

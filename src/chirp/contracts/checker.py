@@ -111,12 +111,13 @@ def _route_prepass(
         if template is not None:
             referenced_templates.add(template)
         handler = route.handler
-        handler_for_source = getattr(handler, "__chirp_page_handler__", handler)
+        page_src = getattr(route, "page_source_handler", None)
+        handler_for_source = page_src if page_src is not None else handler
         try:
             src = inspect.getsource(handler_for_source)
             for m in _TEMPLATE_CALL_PATTERN.finditer(src):
                 referenced_templates.add(m.group(1))
-        except (TypeError, OSError):
+        except TypeError, OSError:
             pass
         contract = getattr(handler, "_chirp_contract", None)
         if contract is None:

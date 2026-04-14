@@ -199,6 +199,7 @@ def _compile_routes(
             template=pending.template,
             invoke_plan=invoke_plan,
             inline=pending.inline,
+            page_source_handler=pending.page_source_handler,
         )
         router.add(route)
     router.compile()

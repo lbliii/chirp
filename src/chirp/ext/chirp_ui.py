@@ -13,6 +13,7 @@ Usage::
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -122,12 +123,15 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
+        make_route_link_attrs_fn: Callable[..., Any] | None = None
         try:
-            from chirp_ui.filters import make_route_link_attrs  # ty: ignore[unresolved-import]
-        except ImportError:
-            make_route_link_attrs = None
+            from chirp_ui.filters import make_route_link_attrs as _make_route_link_attrs
 
-        if make_route_link_attrs is not None:
+            make_route_link_attrs_fn = _make_route_link_attrs
+        except ImportError:
+            pass
+
+        if make_route_link_attrs_fn is not None:
             from chirp.templating.navigation_swap import make_swap_attrs
 
             swap_helper_cache: dict[str, Any] = {}
@@ -150,7 +154,7 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
                 return helper(href, hx_boost=hx_boost)
 
             app.template_global("route_link_attrs")(
-                make_route_link_attrs(swap_resolver=_swap_resolver)
+                make_route_link_attrs_fn(swap_resolver=_swap_resolver)
             )
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     app.add_middleware(
