@@ -4,7 +4,7 @@
 PYTHON_VERSION ?= 3.14t
 VENV_DIR ?= .venv
 
-.PHONY: all help setup install test lint format ty clean build publish release gh-release
+.PHONY: all help setup install test lint format ty clean build publish release gh-release changelog changelog-draft changelog-check
 
 all: help
 
@@ -20,9 +20,12 @@ help:
 	@echo "  make lint       - Run ruff linter"
 	@echo "  make format     - Run ruff formatter"
 	@echo "  make ty         - Run ty type checker"
+	@echo "  make changelog  - Compile changelog.d fragments into CHANGELOG.md"
+	@echo "  make changelog-draft - Preview changelog from fragments (stdout)"
+	@echo "  make changelog-check - Verify branch adds a fragment (vs main)"
 	@echo "  make build      - Build distribution packages"
 	@echo "  make publish    - Publish to PyPI (uses .env for token)"
-	@echo "  make release   - Build and publish in one step"
+	@echo "  make release    - Compile changelog, build, and publish"
 	@echo "  make gh-release - Create GitHub release (triggers PyPI via workflow), uses site release notes"
 	@echo "  make clean      - Remove venv, build artifacts, and caches"
 
@@ -54,6 +57,16 @@ ty:
 # Build & Release
 # =============================================================================
 
+changelog:
+	@echo "Compiling changelog from fragments..."
+	uv run towncrier build --yes
+
+changelog-draft:
+	uv run towncrier build --draft
+
+changelog-check:
+	uv run towncrier check --compare-with origin/main
+
 build:
 	@echo "Building distribution packages..."
 	rm -rf dist/
@@ -70,11 +83,12 @@ publish:
 		uv publish; \
 	fi
 
-release: build publish
+release: changelog build publish
 	@echo "✓ Release complete"
 
 # Create GitHub release from site release notes; triggers python-publish workflow → PyPI
 # Strips YAML frontmatter (--- ... ---) from notes before passing to gh
+# Filters out release note type headers (### Added, ### Changed, etc.) from the body
 gh-release:
 	@VERSION=$$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
 	PROJECT=$$(grep '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/'); \
@@ -83,7 +97,9 @@ gh-release:
 	echo "Creating release v$$VERSION for $$PROJECT..."; \
 	git push origin main 2>/dev/null || true; \
 	git push origin v$$VERSION 2>/dev/null || true; \
-	awk '/^---$$/{c++;next}c>=2' "$$NOTES" | gh release create v$$VERSION \
+	awk '/^---$$/{c++;next}c>=2' "$$NOTES" \
+		| grep -v '^### \(Added\|Changed\|Deprecated\|Removed\|Fixed\|Security\)' \
+		| gh release create v$$VERSION \
 		--title "$$PROJECT $$VERSION" \
 		-F -; \
 	echo "✓ GitHub release v$$VERSION created (PyPI publish will run via workflow)"
