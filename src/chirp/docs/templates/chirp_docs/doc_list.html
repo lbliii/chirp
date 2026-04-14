@@ -1,0 +1,50 @@
+{# Default docs index/listing template.
+   Blocks: doc_list, doc_sidebar #}
+
+{% block doc_sidebar %}
+<nav id="doc_sidebar" class="chirp-docs-sidebar">
+  {% if docs_nav_items %}
+  {% for group in docs_nav_items %}
+  <details open>
+    <summary>{{ group.category }}</summary>
+    <ul>
+      {% for page in group.pages %}
+      <li>
+        <a href="{{ docs_prefix }}/{{ page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">{{ page.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block doc_list %}
+<main id="doc_list" class="chirp-docs-list">
+  <h1>{{ docs_title }}</h1>
+  {% for group in docs_nav_items %}
+  <section>
+    <h2>{{ group.category }}</h2>
+    <ul>
+      {% for page in group.pages %}
+      <li>
+        <a href="{{ docs_prefix }}/{{ page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">
+          <strong>{{ page.title }}</strong>
+          {% if page.metadata.description %}
+          <span>{{ page.metadata.description }}</span>
+          {% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</main>
+{% endblock %}

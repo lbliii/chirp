@@ -1,0 +1,47 @@
+{# Default docs page template.
+   Blocks: doc_content, doc_sidebar, doc_toc
+   Works with Page("chirp_docs/doc_page.html", "doc_content", doc=doc) #}
+
+{% block doc_sidebar %}
+<nav id="doc_sidebar" class="chirp-docs-sidebar">
+  {% if docs_nav_items %}
+  {% for group in docs_nav_items %}
+  <details open>
+    <summary>{{ group.category }}</summary>
+    <ul>
+      {% for page in group.pages %}
+      <li{% if page.slug == doc.slug %} class="active"{% endif %}>
+        <a href="{{ docs_prefix }}/{{ page.slug }}"
+           hx-get="{{ docs_prefix }}/{{ page.slug }}"
+           hx-target="#doc_content"
+           hx-push-url="true">{{ page.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block doc_toc %}
+<nav id="doc_toc" class="chirp-docs-toc">
+  {% if doc.toc %}
+  <h3>On this page</h3>
+  <ul>
+    {% for entry in doc.toc %}
+    <li class="toc-level-{{ entry.level }}">
+      <a href="#{{ entry.id }}">{{ entry.text }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block doc_content %}
+<article id="doc_content" class="chirp-docs-content">
+  <h1>{{ doc.title }}</h1>
+  {{ doc.html }}
+</article>
+{% endblock %}

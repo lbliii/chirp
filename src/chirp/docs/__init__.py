@@ -24,12 +24,14 @@ from chirp.docs.models import (
     TocEntry,
     ToolDoc,
 )
+from chirp.docs.plugin import DocsPlugin
 
 __all__ = [
     "DocMetadata",
     "DocPage",
     "DocSource",
     "DocsCollection",
+    "DocsPlugin",
     "NavGroup",
     "ParamDoc",
     "RouteDoc",
