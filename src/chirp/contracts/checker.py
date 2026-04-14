@@ -37,6 +37,7 @@ from .rules_htmx import (
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
+from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
 from .rules_page_shell import check_page_shell_contracts
 from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
@@ -218,6 +219,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         page_templates=getattr(app, "_page_templates", set()),
         fragment_target_registry=app._mutable_state.fragment_target_registry,
         islands_contract_strict=app.config.islands_contract_strict,
+        oob_registry=getattr(app._runtime_state, "oob_registry", None),
         sections=getattr(app._mutable_state, "sections", {}),
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
@@ -456,6 +458,20 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
         result.issues.extend(check_oob_targets(template_sources, all_ids))
+        # OOB registry coverage: warn when registered blocks are missing from layouts
+        layout_template_names: list[str] = []
+        for chain in snapshot.layout_chains:
+            for layout_info in getattr(chain, "layouts", ()):
+                name = getattr(layout_info, "template_name", None)
+                if name and name not in layout_template_names:
+                    layout_template_names.append(name)
+        result.issues.extend(
+            check_oob_registry_coverage(
+                snapshot.oob_registry,
+                layout_template_names,
+                kida_env,
+            )
+        )
         result.issues.extend(check_form_action_contracts(template_sources, router))
         result.issues.extend(check_boundary_coverage(template_sources))
 

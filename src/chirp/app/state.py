@@ -121,6 +121,7 @@ class ContractCheckSnapshot:
     page_templates: set[str]
     fragment_target_registry: FragmentTargetRegistry
     islands_contract_strict: bool
+    oob_registry: OOBRegistry | None = None
     sections: dict[str, Section] = field(default_factory=dict)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)

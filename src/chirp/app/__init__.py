@@ -641,6 +641,7 @@ class App:
             page_templates=self._mutable_state.page_templates,
             fragment_target_registry=self._mutable_state.fragment_target_registry,
             islands_contract_strict=self.config.islands_contract_strict,
+            oob_registry=self._runtime_state.oob_registry,
             sections=self._mutable_state.sections,
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
