@@ -181,8 +181,9 @@ class AppConfig:
 
     # Production (pounce Phase 6 features)
     workers: int = 0  # 0 = auto-detect from CPU count (multi-worker for production)
-    # Pounce worker execution: "auto" | "sync" | "async"
+    # Pounce worker execution: "auto" | "sync" | "async" | "subinterpreter"
     # sync = blocking I/O, no asyncio; async = event loop; auto = sync on 3.14t, async on GIL
+    # subinterpreter = PEP 734 concurrent.interpreters (thread-like perf, process-like isolation)
     worker_mode: str = "auto"
 
     # Phase 6.1: Prometheus Metrics
