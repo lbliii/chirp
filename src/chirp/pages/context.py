@@ -5,8 +5,6 @@ Child context overrides parent — like Bengal's cascade_snapshot but
 for live server requests instead of static site builds.
 """
 
-from __future__ import annotations
-
 import inspect
 from typing import Any
 

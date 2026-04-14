@@ -31,8 +31,6 @@ For non-template errors:
     by the ``CHIRP_TRACEBACK`` environment variable.
 """
 
-from __future__ import annotations
-
 import errno
 import logging
 import os

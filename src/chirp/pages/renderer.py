@@ -6,8 +6,6 @@ deep to render — only the layouts below the targeted element are
 rendered, preserving the outer shell on the client.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from kida import Environment

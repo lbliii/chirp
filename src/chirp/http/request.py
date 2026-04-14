@@ -4,8 +4,6 @@ Frozen metadata with async body access. The request is honest about
 what it is: received data that doesn't change.
 """
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any

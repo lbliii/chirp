@@ -4,8 +4,6 @@ Builds page_title, breadcrumb_items, tab_items, current_path for
 layout templates. Only includes keys where source is non-None.
 """
 
-from __future__ import annotations
-
 import inspect
 from typing import Any
 

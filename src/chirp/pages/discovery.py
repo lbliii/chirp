@@ -12,8 +12,6 @@ their stem to the path.
 Modeled on Bengal's ContentDiscovery but for routes instead of content.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import logging
 import re

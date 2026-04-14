@@ -7,8 +7,6 @@ contract so app-level layout expectations are explicit and contract-checkable.
 The registry is mutable during setup and frozen at runtime.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 

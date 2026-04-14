@@ -6,8 +6,6 @@ uses ``HX-Target`` and :class:`FragmentTargetRegistry` at runtime; this module
 only helps authors avoid hand-authoring targets on every link.
 """
 
-from __future__ import annotations
-
 import logging
 import posixpath
 from collections.abc import Mapping

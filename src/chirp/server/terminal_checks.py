@@ -24,8 +24,6 @@ Example output (with color)::
 
 """
 
-from __future__ import annotations
-
 import sys
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any

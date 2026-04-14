@@ -4,12 +4,52 @@ Also provides :func:`get_render_plan` for public read-only access to the
 frozen ``RenderPlan`` that was used to render the current request.
 """
 
-from __future__ import annotations
-
-from typing import Any
+from typing import Any, TypedDict
 
 from chirp.http.request import Request
 from chirp.templating.render_plan import RenderPlan
+
+
+class LayoutSnapshotDict(TypedDict):
+    """Layout info in a render plan debug snapshot."""
+
+    template_name: str
+    target: str
+    depth: int
+
+
+class MainViewSnapshotDict(TypedDict):
+    """Main view info in a render plan debug snapshot."""
+
+    template: str
+    block: str | None
+    context_keys: list[str]
+    context_preview: list[tuple[str, str]]
+
+
+class RegionUpdateDict(TypedDict):
+    """Region update info in a render plan debug snapshot."""
+
+    region: str
+    template: str
+    block: str | None
+    mode: str
+
+
+class RenderPlanSnapshotDict(TypedDict):
+    """Full serialized render plan for debug display."""
+
+    intent: str
+    render_full_template: bool
+    apply_layouts: bool
+    layout_start_index: int
+    include_layout_oob: bool
+    main_view: MainViewSnapshotDict
+    layout_chain: list[LayoutSnapshotDict]
+    layouts_applied: list[str]
+    layout_context_preview: list[tuple[str, str]]
+    region_updates: list[RegionUpdateDict]
+
 
 RENDER_DEBUG_CACHE_KEY = "_chirp_render_debug"
 RENDER_PLAN_CACHE_KEY = "_chirp_render_plan"
@@ -40,17 +80,17 @@ def summarize_context_for_debug(ctx: dict[str, Any]) -> list[tuple[str, str]]:
     return items
 
 
-def serialize_render_plan_for_debug(plan: RenderPlan) -> dict[str, Any]:
+def serialize_render_plan_for_debug(plan: RenderPlan) -> RenderPlanSnapshotDict:
     """Build a snapshot dict for the debug error page."""
     lc = plan.layout_chain
-    chain_layouts: list[dict[str, Any]] = []
+    chain_layouts: list[LayoutSnapshotDict] = []
     if lc is not None:
         chain_layouts.extend(
-            {
-                "template_name": lay.template_name,
-                "target": lay.target,
-                "depth": lay.depth,
-            }
+            LayoutSnapshotDict(
+                template_name=lay.template_name,
+                target=lay.target,
+                depth=lay.depth,
+            )
             for lay in lc.layouts
         )
 
@@ -61,32 +101,32 @@ def serialize_render_plan_for_debug(plan: RenderPlan) -> dict[str, Any]:
     )
 
     regions = [
-        {
-            "region": ru.region,
-            "template": ru.view.template,
-            "block": ru.view.block,
-            "mode": ru.mode,
-        }
+        RegionUpdateDict(
+            region=ru.region,
+            template=ru.view.template,
+            block=ru.view.block,
+            mode=ru.mode,
+        )
         for ru in plan.region_updates
     ]
 
-    return {
-        "intent": plan.intent,
-        "render_full_template": plan.render_full_template,
-        "apply_layouts": plan.apply_layouts,
-        "layout_start_index": plan.layout_start_index,
-        "include_layout_oob": plan.include_layout_oob,
-        "main_view": {
-            "template": plan.main_view.template,
-            "block": plan.main_view.block,
-            "context_keys": list(plan.main_view.context.keys()),
-            "context_preview": summarize_context_for_debug(plan.main_view.context),
-        },
-        "layout_chain": chain_layouts,
-        "layouts_applied": applied_names,
-        "layout_context_preview": summarize_context_for_debug(plan.layout_context),
-        "region_updates": regions,
-    }
+    return RenderPlanSnapshotDict(
+        intent=plan.intent,
+        render_full_template=plan.render_full_template,
+        apply_layouts=plan.apply_layouts,
+        layout_start_index=plan.layout_start_index,
+        include_layout_oob=plan.include_layout_oob,
+        main_view=MainViewSnapshotDict(
+            template=plan.main_view.template,
+            block=plan.main_view.block,
+            context_keys=list(plan.main_view.context.keys()),
+            context_preview=summarize_context_for_debug(plan.main_view.context),
+        ),
+        layout_chain=chain_layouts,
+        layouts_applied=applied_names,
+        layout_context_preview=summarize_context_for_debug(plan.layout_context),
+        region_updates=regions,
+    )
 
 
 def stash_render_debug_for_request(
@@ -128,7 +168,7 @@ def get_render_plan(request: Any) -> RenderPlan | None:
     return plan if isinstance(plan, RenderPlan) else None
 
 
-def read_render_debug_from_request(request: Any) -> dict[str, Any] | None:
+def read_render_debug_from_request(request: Any) -> RenderPlanSnapshotDict | None:
     """Return stashed snapshot if present (request may be a test double)."""
     cache = getattr(request, "_cache", None)
     if not isinstance(cache, dict):

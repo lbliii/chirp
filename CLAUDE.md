@@ -140,6 +140,7 @@ if not result:
 - **Protocol-based middleware** (no base class, just match the signature)
 - **Thread-safe stores** with `threading.Lock` for shared mutable state
 - **`app.check()`** validates hypermedia contracts at startup (routes, fragments, SSE)
+- **Python 3.14 except syntax**: `except ValueError, TypeError:` is the canonical form (ruff-normalized). Do **not** add parens — this is valid 3.14+ syntax, not a Python 2 holdover.
 
 ## Custom Contract Checks
 

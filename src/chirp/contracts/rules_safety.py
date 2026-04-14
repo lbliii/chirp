@@ -6,8 +6,6 @@ Categories:
 - ``middleware_signature``: Middleware with wrong call signature
 """
 
-from __future__ import annotations
-
 import inspect
 from typing import TYPE_CHECKING, Any
 

@@ -4,8 +4,6 @@ Minimal request wrapper for handle_sync(). Only method and path are decoded
 eagerly; query, cookies, and headers are lazy via cached_property.
 """
 
-from __future__ import annotations
-
 from functools import cached_property
 
 from chirp.http.cookies import parse_cookies

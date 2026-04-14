@@ -5,8 +5,6 @@ events. Works alongside Pounce's Python ``--reload`` so .py changes restart
 the process while .html/.css edits trigger an in-browser refresh.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path

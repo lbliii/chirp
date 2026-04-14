@@ -4,8 +4,6 @@ Frozen dataclasses that handlers return. The content negotiation layer
 inspects these to dispatch to the kida renderer.
 """
 
-from __future__ import annotations
-
 import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal

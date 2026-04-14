@@ -1,7 +1,5 @@
 """Change events, block references, and SSE swap element extraction."""
 
-from __future__ import annotations
-
 import re
 import time
 from dataclasses import dataclass, field

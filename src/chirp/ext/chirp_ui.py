@@ -12,8 +12,6 @@ Usage::
     app.run()
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import replace
 from pathlib import Path

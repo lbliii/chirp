@@ -4,8 +4,6 @@ Pipeline: normalize_to_composition → build_render_plan → execute_render_plan
 → serialize_rendered_plan. Keeps request-aware decisions in one place.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
