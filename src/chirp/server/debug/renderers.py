@@ -2,7 +2,7 @@
 
 import html
 import sys
-from typing import Any
+from typing import Any, cast
 
 from chirp.server.debug.editor import _editor_url
 from chirp.server.debug.frames import (
@@ -207,7 +207,7 @@ def _render_render_plan_panel(snapshot: RenderPlanSnapshotDict) -> str:
 
     main = snapshot.get("main_view") or {}
     mt = main.get("template", "")
-    mb = main.get("block", "")
+    mb = main.get("block") or ""
     parts.append(
         '<div class="request-line"><span class="label">Main view</span>'
         f'<span class="val">{_esc(mt)} block {_esc(mb)}</span></div>'
@@ -402,10 +402,10 @@ def render_debug_page(
         sections.append("<h2>Traceback</h2>")
         collapsed = _collapse_framework_frames(frames)
         for item in collapsed:
-            if isinstance(item, dict) and item.get("collapsed"):
-                sections.append(_render_collapsed_frames(item))
+            if "collapsed" in item:
+                sections.append(_render_collapsed_frames(cast(CollapsedFrameGroup, item)))
             else:
-                sections.append(_render_frame(item))
+                sections.append(_render_frame(cast(FrameInfo, item)))
 
     # Request context
     sections.append("<h2>Request</h2>")
