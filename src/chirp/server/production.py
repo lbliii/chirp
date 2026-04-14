@@ -20,7 +20,7 @@ def run_production_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     workers: int = 0,  # 0 = auto-detect from CPU count
-    worker_mode: str = "auto",  # "auto" | "sync" | "async"
+    worker_mode: str = "auto",  # "auto" | "sync" | "async" | "subinterpreter"
     *,
     # Phase 6.1: Prometheus Metrics
     metrics_enabled: bool = True,
