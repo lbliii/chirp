@@ -32,7 +32,6 @@ Pipeline::
     7. Yield OOB swap chunks (htmx or <template>+<script>)
 """
 
-from __future__ import annotations
 
 import inspect
 import logging

@@ -4,7 +4,6 @@ Also provides :func:`get_render_plan` for public read-only access to the
 frozen ``RenderPlan`` that was used to render the current request.
 """
 
-from __future__ import annotations
 
 from typing import Any
 

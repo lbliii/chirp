@@ -1,6 +1,5 @@
 """Route explorer — debug-only HTML endpoint for inspecting discovered routes."""
 
-from __future__ import annotations
 
 import html
 import inspect

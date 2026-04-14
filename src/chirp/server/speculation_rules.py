@@ -20,7 +20,6 @@ Chirp generates rules from the router at freeze time:
 - SSE endpoints (``referenced=True``) and non-GET routes are excluded.
 """
 
-from __future__ import annotations
 
 import json
 import re

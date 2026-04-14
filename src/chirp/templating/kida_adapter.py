@@ -1,6 +1,5 @@
 """Kida-backed implementation of TemplateAdapter."""
 
-from __future__ import annotations
 
 from typing import Any
 

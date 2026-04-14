@@ -6,7 +6,6 @@ existing target check (which validates URL existence) by surfacing
 POST routes that may silently ignore form data or lack validation.
 """
 
-from __future__ import annotations
 
 import re
 

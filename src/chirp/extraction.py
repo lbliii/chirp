@@ -16,7 +16,6 @@ Missing keys use the dataclass field default.  Type conversion
 failures also fall back to the default.
 """
 
-from __future__ import annotations
 
 import dataclasses
 import logging

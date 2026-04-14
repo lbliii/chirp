@@ -5,7 +5,6 @@ that describes how to build kwargs. The handler uses this plan instead of
 calling inspect.signature() on every request.
 """
 
-from __future__ import annotations
 
 import inspect
 from collections.abc import Callable

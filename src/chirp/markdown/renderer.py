@@ -5,7 +5,6 @@ as a template filter.  The interface is designed so that incremental
 parsing can be added behind it later without changing downstream code.
 """
 
-from __future__ import annotations
 
 from typing import TYPE_CHECKING
 

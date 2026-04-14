@@ -43,7 +43,6 @@ Example::
 See ``chirp.ext.chirp_ui`` for a real-world example.
 """
 
-from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 

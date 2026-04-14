@@ -3,7 +3,6 @@
 Discovers @action decorated functions and dispatches by _action form field.
 """
 
-from __future__ import annotations
 
 import inspect
 from collections.abc import Callable

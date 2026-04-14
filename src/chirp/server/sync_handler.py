@@ -1,6 +1,5 @@
 """Fused sync handler — bypasses ASGI for simple request-response paths."""
 
-from __future__ import annotations
 
 import json
 import logging

@@ -1,6 +1,5 @@
 """Reactive SSE stream that auto-pushes re-rendered blocks."""
 
-from __future__ import annotations
 
 import inspect
 import logging

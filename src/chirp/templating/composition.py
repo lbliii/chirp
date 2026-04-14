@@ -5,7 +5,6 @@ mental overhead with explicit role-based fields. Routes return these objects;
 the render-plan layer decides what to render based on request headers.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any

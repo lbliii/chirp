@@ -34,7 +34,6 @@ Free-threading safety:
     - No locks needed
 """
 
-from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace

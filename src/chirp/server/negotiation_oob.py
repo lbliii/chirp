@@ -1,6 +1,5 @@
 """OOB helpers for negotiation — shell actions, layout regions, streamed append."""
 
-from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator

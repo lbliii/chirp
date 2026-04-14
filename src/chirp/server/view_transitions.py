@@ -31,7 +31,6 @@ Three modes controlled by ``AppConfig.view_transitions``:
 Injected into full-page HTML responses via ``HTMLInject`` middleware.
 """
 
-from __future__ import annotations
 
 VIEW_TRANSITIONS_CSS = """\
 @view-transition { navigation: auto; }
