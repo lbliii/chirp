@@ -1,0 +1,146 @@
+"""YAML frontmatter parser for markdown documentation files.
+
+Parses the ``---`` delimited YAML header from markdown files.  Missing
+frontmatter is handled gracefully: title is derived from the first
+``#`` heading, and all other fields use defaults.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from chirp.docs.models import DocMetadata, DocPage, DocSource, TocEntry
+
+_FRONTMATTER_RE = re.compile(
+    r"\A---\s*\n(.*?)\n---\s*\n",
+    re.DOTALL,
+)
+
+_HEADING_RE = re.compile(r"^#{1,6}\s+(.+)", re.MULTILINE)
+
+_HTML_HEADING_RE = re.compile(
+    r'<h([1-6])(?:\s+id="([^"]*)")?[^>]*>(.*?)</h\1>',
+    re.IGNORECASE,
+)
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def parse_frontmatter(text: str) -> tuple[dict[str, object], str]:
+    """Split frontmatter from markdown body.
+
+    Returns:
+        A (metadata_dict, body) tuple.  If no frontmatter is found
+        the metadata dict is empty and body is the full text.
+    """
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return {}, text
+
+    import tomllib as _  # noqa: F401 — check stdlib availability
+
+    try:
+        import yaml
+    except ImportError:  # pragma: no cover
+        # Fallback: try simple key: value parsing for basic cases
+        return _parse_simple(m.group(1)), text[m.end() :]
+
+    meta = yaml.safe_load(m.group(1))
+    if not isinstance(meta, dict):
+        return {}, text
+    return meta, text[m.end() :]
+
+
+def _parse_simple(raw: str) -> dict[str, object]:
+    """Minimal key: value parser when PyYAML is unavailable."""
+    result: dict[str, object] = {}
+    for line in raw.strip().splitlines():
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip()
+        if value.lower() in ("true", "false"):
+            result[key.strip()] = value.lower() == "true"
+        elif value.isdigit():
+            result[key.strip()] = int(value)
+        else:
+            result[key.strip()] = value
+    return result
+
+
+def _meta_from_dict(d: dict[str, object]) -> DocMetadata:
+    """Build a ``DocMetadata`` from a parsed frontmatter dict."""
+    tags_raw = d.get("tags", ())
+    if isinstance(tags_raw, str):
+        tags = frozenset(t.strip() for t in tags_raw.split(",") if t.strip())
+    elif isinstance(tags_raw, list):
+        tags = frozenset(str(t) for t in tags_raw)
+    else:
+        tags = frozenset()
+
+    return DocMetadata(
+        order=int(d.get("order", 999)),
+        category=str(d.get("category", "")),
+        tags=tags,
+        description=str(d.get("description", "")),
+        draft=bool(d.get("draft", False)),
+    )
+
+
+def _title_from_body(body: str) -> str:
+    """Extract title from first markdown heading, or return empty string."""
+    m = _HEADING_RE.search(body)
+    return m.group(1).strip() if m else ""
+
+
+def _extract_toc(html: str) -> tuple[TocEntry, ...]:
+    """Extract table-of-contents entries from rendered HTML headings."""
+    entries: list[TocEntry] = []
+    for m in _HTML_HEADING_RE.finditer(html):
+        level = int(m.group(1))
+        heading_id = m.group(2) or ""
+        text = _TAG_RE.sub("", m.group(3)).strip()
+        entries.append(TocEntry(level=level, id=heading_id, text=text))
+    return tuple(entries)
+
+
+def _slug_from_path(md_path: Path, content_dir: Path) -> str:
+    """Derive a URL slug from a file path relative to content_dir.
+
+    ``content_dir/guides/getting-started.md`` → ``guides/getting-started``
+    ``content_dir/index.md`` → ``index``
+    """
+    rel = md_path.relative_to(content_dir)
+    return str(rel.with_suffix("")).replace("\\", "/")
+
+
+def parse_file(md_path: Path, content_dir: Path) -> DocPage:
+    """Parse a single markdown file into a ``DocPage``.
+
+    Reads the file, splits frontmatter, renders markdown via
+    ``MarkdownRenderer``, and extracts TOC entries.
+    """
+    from chirp.markdown import MarkdownRenderer
+
+    text = md_path.read_text(encoding="utf-8")
+    meta_dict, body = parse_frontmatter(text)
+    metadata = _meta_from_dict(meta_dict)
+
+    title = str(meta_dict.get("title", "")) or _title_from_body(body)
+    slug = _slug_from_path(md_path, content_dir)
+
+    renderer = MarkdownRenderer()
+    html = renderer.render(body)
+    toc = _extract_toc(str(html))
+
+    return DocPage(
+        slug=slug,
+        title=title,
+        raw=body,
+        html=html,
+        toc=toc,
+        metadata=metadata,
+        source=DocSource.MARKDOWN,
+        source_path=md_path,
+    )
