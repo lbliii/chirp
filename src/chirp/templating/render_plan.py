@@ -352,14 +352,14 @@ def build_layout_contract(
                 )
             )
     elif oob_registry is not None:
-        oob_blocks.extend(
-            OOBBlockInfo(
-                block_name=block_name,
-                target_id=oob_registry.resolve_target(block_name),
-                cache_scope="unknown",
-                depends_on=frozenset(),
-            )
-            for block_name in oob_registry.registered_blocks
+        # Fallback when template metadata is unavailable (e.g. Jinja2 adapter).
+        # Only include registry blocks we can verify exist via the adapter;
+        # without metadata we cannot confirm the block is renderable, so we
+        # skip rather than producing a contract with phantom blocks that
+        # cause render_block failures downstream.
+        _log.debug(
+            "build_layout_contract: no metadata for %r, skipping registry blocks",
+            template_name,
         )
 
     return LayoutContract(template_name=template_name, oob_blocks=tuple(oob_blocks))

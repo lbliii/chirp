@@ -145,6 +145,23 @@ class TestOOBRegistry:
 
 
 class TestBuildLayoutContractWithRegistry:
+    def test_registry_blocks_not_in_template_are_excluded(self, kida_env: Environment) -> None:
+        """Registry blocks absent from the layout template must not appear in the contract."""
+        reg = OOBRegistry()
+        reg.register("sidebar_oob", OOBRegionConfig(target_id="custom-sidebar"))
+        reg.register("shell_actions_oob", OOBRegionConfig(target_id="chirp-shell-actions"))
+        adapter = KidaAdapter(kida_env)
+        contract = build_layout_contract(
+            adapter,
+            "oob_layout/_layout.html",
+            oob_registry=reg,
+        )
+        block_names = {b.block_name for b in contract.oob_blocks}
+        # sidebar_oob exists in the template — included
+        assert "sidebar_oob" in block_names
+        # shell_actions_oob is NOT in the template — excluded
+        assert "shell_actions_oob" not in block_names
+
     def test_registry_resolves_target_id(self, kida_env: Environment) -> None:
         reg = OOBRegistry()
         reg.register("sidebar_oob", OOBRegionConfig(target_id="custom-sidebar"))
@@ -162,6 +179,45 @@ class TestBuildLayoutContractWithRegistry:
         contract = build_layout_contract(adapter, "oob_layout/_layout.html")
         targets = {b.block_name: b.target_id for b in contract.oob_blocks}
         assert targets["sidebar_oob"] == "sidebar"
+
+
+class TestOOBRegistryCoverageCheck:
+    def test_warns_on_orphaned_registry_block(self, kida_env: Environment) -> None:
+        """Contract check emits WARNING for registry blocks missing from all layouts."""
+        from chirp.contracts.rules_oob_registry import check_oob_registry_coverage
+
+        reg = OOBRegistry()
+        reg.register("sidebar_oob", OOBRegionConfig(target_id="sidebar"))
+        reg.register("shell_actions_oob", OOBRegionConfig(target_id="chirp-shell-actions"))
+        issues = check_oob_registry_coverage(
+            reg,
+            ["oob_layout/_layout.html"],
+            kida_env,
+        )
+        categories = {i.category for i in issues}
+        messages = [i.message for i in issues]
+        assert "oob_registry" in categories
+        assert any("shell_actions_oob" in m for m in messages)
+        # sidebar_oob IS in the layout — no warning for it
+        assert not any("sidebar_oob" in m for m in messages)
+
+    def test_no_warning_when_all_blocks_present(self, kida_env: Environment) -> None:
+        from chirp.contracts.rules_oob_registry import check_oob_registry_coverage
+
+        reg = OOBRegistry()
+        reg.register("sidebar_oob", OOBRegionConfig(target_id="sidebar"))
+        issues = check_oob_registry_coverage(
+            reg,
+            ["oob_layout/_layout.html"],
+            kida_env,
+        )
+        assert issues == []
+
+    def test_no_issues_without_registry(self, kida_env: Environment) -> None:
+        from chirp.contracts.rules_oob_registry import check_oob_registry_coverage
+
+        issues = check_oob_registry_coverage(None, ["oob_layout/_layout.html"], kida_env)
+        assert issues == []
 
 
 class TestSerializeWithRegistry:
@@ -245,3 +301,26 @@ class TestFullPipelineWithRegistry:
         if "custom-sidebar" in rendered.region_htmls:
             assert 'id="custom-sidebar"' in html
             assert 'hx-swap-oob="innerHTML"' in html
+
+    def test_full_page_render_tolerates_extra_registry_blocks(self, kida_env: Environment) -> None:
+        """Full-page GET must not crash when registry has blocks the layout lacks."""
+        reg = OOBRegistry()
+        reg.register("sidebar_oob", OOBRegionConfig(target_id="sidebar"))
+        reg.register("shell_actions_oob", OOBRegionConfig(target_id="chirp-shell-actions"))
+
+        adapter = KidaAdapter(kida_env)
+        layout_chain = LayoutChain(
+            layouts=(LayoutInfo(template_name="oob_layout/_layout.html", target="body", depth=0),)
+        )
+        comp = PageComposition(
+            template="oob_layout/page.html",
+            fragment_block="content",
+            page_block="content",
+            context={},
+            layout_chain=layout_chain,
+        )
+        req = _full_page_request()
+        plan = build_render_plan(comp, request=req)
+        # This must not raise — shell_actions_oob is in the registry but not the layout
+        rendered = execute_render_plan(plan, adapter=adapter, oob_registry=reg)
+        assert "<main" in rendered.main_html
