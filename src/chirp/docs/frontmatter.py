@@ -79,8 +79,10 @@ def _meta_from_dict(d: dict[str, object]) -> DocMetadata:
     else:
         tags = frozenset()
 
+    order_val = d.get("order", 999)
+    order = order_val if isinstance(order_val, int) else int(str(order_val))
     return DocMetadata(
-        order=int(d.get("order", 999)),
+        order=order,
         category=str(d.get("category", "")),
         tags=tags,
         description=str(d.get("description", "")),
