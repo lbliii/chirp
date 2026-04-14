@@ -185,14 +185,15 @@ async def _dispatch(
     registry: ToolRegistry,
 ) -> Any:
     """Route a JSON-RPC method to the appropriate handler."""
-    if method == "initialize":
-        return _handle_initialize(params)
-    if method == "tools/list":
-        return _handle_tools_list(registry)
-    if method == "tools/call":
-        return await _handle_tools_call(params, registry)
-
-    return {"error": JsonRpcError(code=-32601, message=f"Method not found: {method!r}")}
+    match method:
+        case "initialize":
+            return _handle_initialize(params)
+        case "tools/list":
+            return _handle_tools_list(registry)
+        case "tools/call":
+            return await _handle_tools_call(params, registry)
+        case _:
+            return {"error": JsonRpcError(code=-32601, message=f"Method not found: {method!r}")}
 
 
 def _handle_initialize(params: dict[str, Any]) -> dict[str, Any]:

@@ -260,26 +260,27 @@ async def handle_request(
     # Dispatch based on response type — X-Request-ID injected at send time
     # to avoid an extra Response clone + tuple allocation per request.
     rid = request.request_id
-    if isinstance(response, SSEResponse):
-        from chirp.realtime.sse import handle_sse
+    match response:
+        case SSEResponse():
+            from chirp.realtime.sse import handle_sse
 
-        stream = response.event_stream
-        if stream.heartbeat_interval == 15.0:
-            stream = replace(stream, heartbeat_interval=sse_heartbeat_interval)
+            stream = response.event_stream
+            if stream.heartbeat_interval == 15.0:
+                stream = replace(stream, heartbeat_interval=sse_heartbeat_interval)
 
-        await handle_sse(
-            stream,
-            send,
-            receive,
-            kida_env=response.kida_env,
-            debug=debug,
-            retry_ms=sse_retry_ms,
-            close_event=sse_close_event,
-        )
-    elif isinstance(response, StreamingResponse):
-        await send_streaming_response(response, send, debug=debug, request_id=rid)
-    else:
-        await send_response(response, send, request_id=rid)
+            await handle_sse(
+                stream,
+                send,
+                receive,
+                kida_env=response.kida_env,
+                debug=debug,
+                retry_ms=sse_retry_ms,
+                close_event=sse_close_event,
+            )
+        case StreamingResponse():
+            await send_streaming_response(response, send, debug=debug, request_id=rid)
+        case _:
+            await send_response(response, send, request_id=rid)
 
 
 async def _invoke_handler(

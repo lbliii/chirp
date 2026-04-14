@@ -62,19 +62,20 @@ def handle_sync(
 
     # Fast negotiate for common types — use pre-encoded content-type when available
     content_type = getattr(plan, "response_content_type_bytes", None)
-    if isinstance(result, (dict, list)):
-        body = json.dumps(result, default=str, separators=(",", ":")).encode()
-        ct = content_type if content_type else b"application/json"
-        return RawResponse(200, ((b"content-type", ct),), body)
-    if isinstance(result, str):
-        body = result.encode()
-        ct = content_type if content_type else b"text/html; charset=utf-8"
-        return RawResponse(200, ((b"content-type", ct),), body)
-    if isinstance(result, bytes):
-        ct = content_type if content_type else b"application/octet-stream"
-        return RawResponse(200, ((b"content-type", ct),), result)
-
-    return None
+    match result:
+        case dict() | list():
+            body = json.dumps(result, default=str, separators=(",", ":")).encode()
+            ct = content_type if content_type else b"application/json"
+            return RawResponse(200, ((b"content-type", ct),), body)
+        case str():
+            body = result.encode()
+            ct = content_type if content_type else b"text/html; charset=utf-8"
+            return RawResponse(200, ((b"content-type", ct),), body)
+        case bytes():
+            ct = content_type if content_type else b"application/octet-stream"
+            return RawResponse(200, ((b"content-type", ct),), result)
+        case _:
+            return None
 
 
 def _build_sync_kwargs(
