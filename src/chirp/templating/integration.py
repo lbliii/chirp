@@ -13,6 +13,14 @@ from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
 from chirp.config import AppConfig
 from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
+
+
+def _is_chirp_ui_filter_override(name: str, func: Callable[..., Any]) -> bool:
+    """True when *func* is chirp-ui's implementation replacing chirp stubs for the UI kit."""
+
+    if name not in BUILTIN_FILTERS or func is BUILTIN_FILTERS[name]:
+        return False
+    return getattr(func, "__module__", "").startswith("chirp_ui")
 from chirp.templating.returns import Fragment, Template
 from chirp.templating.suspense import DEFERRED
 
@@ -135,12 +143,13 @@ def create_environment(
     if filters:
         for name, func in filters.items():
             if name in BUILTIN_FILTERS and func is not BUILTIN_FILTERS[name]:
-                warnings.warn(
-                    f"User filter {name!r} shadows built-in chirp filter. "
-                    "This may cause unexpected template behavior.",
-                    UserWarning,
-                    stacklevel=2,
-                )
+                if not _is_chirp_ui_filter_override(name, func):
+                    warnings.warn(
+                        f"User filter {name!r} shadows built-in chirp filter. "
+                        "This may cause unexpected template behavior.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
         env.update_filters(filters)
 
     # When chirp-ui templates are loadable, ensure required filters exist.
