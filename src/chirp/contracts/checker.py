@@ -71,7 +71,10 @@ from .template_scan import (
 )
 from .types import CheckResult, ContractIssue, Severity
 
-_TEMPLATE_CALL_PATTERN = re.compile(r'(?:Template|Fragment)\s*\(\s*["\']([^"\']+\.html)["\']')
+# Page/Suspense: filesystem and imperative routes return these with a template path.
+_TEMPLATE_CALL_PATTERN = re.compile(
+    r'(?:Template|Fragment|Page|Suspense)\s*\(\s*["\']([^"\']+\.html)["\']'
+)
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -108,11 +111,12 @@ def _route_prepass(
         if template is not None:
             referenced_templates.add(template)
         handler = route.handler
+        handler_for_source = getattr(handler, "__chirp_page_handler__", handler)
         try:
-            src = inspect.getsource(handler)
+            src = inspect.getsource(handler_for_source)
             for m in _TEMPLATE_CALL_PATTERN.finditer(src):
                 referenced_templates.add(m.group(1))
-        except TypeError, OSError:
+        except (TypeError, OSError):
             pass
         contract = getattr(handler, "_chirp_contract", None)
         if contract is None:
