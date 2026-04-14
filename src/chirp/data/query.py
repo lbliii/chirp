@@ -34,7 +34,6 @@ Free-threading safety:
     - No locks needed
 """
 
-
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING

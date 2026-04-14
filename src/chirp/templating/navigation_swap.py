@@ -6,7 +6,6 @@ uses ``HX-Target`` and :class:`FragmentTargetRegistry` at runtime; this module
 only helps authors avoid hand-authoring targets on every link.
 """
 
-
 import logging
 import posixpath
 from collections.abc import Mapping
@@ -110,7 +109,7 @@ def lookup_layout_chain_for_path(
     normalized = normalize_route_path(path)
     try:
         match = router.match("GET", normalized)
-    except (NotFound, MethodNotAllowed):
+    except NotFound, MethodNotAllowed:
         return None
     chain = route_layout_chains.get(match.route.path)
     return chain if isinstance(chain, LayoutChain) else None

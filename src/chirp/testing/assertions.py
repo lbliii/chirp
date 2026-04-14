@@ -126,7 +126,7 @@ def assert_hx_trigger(
         try:
             parsed = json_module.loads(raw)
             assert event in parsed, f"Event {event!r} not found in {header_name} header {raw!r}"
-        except (json_module.JSONDecodeError, TypeError):
+        except json_module.JSONDecodeError, TypeError:
             assert raw == event, f"Expected {header_name} to be {event!r}, got {raw!r}"
     else:
         parsed = json_module.loads(raw)

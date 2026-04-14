@@ -12,7 +12,6 @@ their stem to the path.
 Modeled on Bengal's ContentDiscovery but for routes instead of content.
 """
 
-
 import importlib.util
 import logging
 import re

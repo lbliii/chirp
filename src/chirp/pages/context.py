@@ -5,7 +5,6 @@ Child context overrides parent — like Bengal's cascade_snapshot but
 for live server requests instead of static site builds.
 """
 
-
 import inspect
 from typing import Any
 
@@ -104,7 +103,7 @@ def _call_provider(
             if param.annotation is not inspect.Parameter.empty:
                 try:
                     kwargs[name] = param.annotation(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     from chirp.errors import NotFound
 
                     raise NotFound(

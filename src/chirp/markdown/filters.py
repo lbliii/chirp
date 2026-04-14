@@ -4,7 +4,6 @@ Provides a one-liner to register a ``markdown`` filter on a chirp App
 so that templates can use ``{{ content | markdown }}``.
 """
 
-
 from typing import TYPE_CHECKING
 
 from chirp.markdown.renderer import MarkdownRenderer

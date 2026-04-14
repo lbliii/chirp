@@ -5,7 +5,6 @@ Validates DependencyIndex configuration at app.check() time:
 - Derivation graph is a DAG (no cycles)
 """
 
-
 from typing import TYPE_CHECKING
 
 from .types import ContractIssue, Severity

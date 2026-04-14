@@ -4,7 +4,6 @@ When config.debug is True, page handlers store route contract info on the
 request. LayoutDebugMiddleware reads it and emits X-Chirp-Route-* headers.
 """
 
-
 import json
 from dataclasses import dataclass
 from pathlib import Path

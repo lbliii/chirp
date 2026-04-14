@@ -31,7 +31,6 @@ Three modes controlled by ``AppConfig.view_transitions``:
 Injected into full-page HTML responses via ``HTMLInject`` middleware.
 """
 
-
 VIEW_TRANSITIONS_CSS = """\
 @view-transition { navigation: auto; }
 ::view-transition-old(root) { animation: chirp-vt-out 0.15s ease-out; }

@@ -5,8 +5,16 @@ import sys
 from typing import Any
 
 from chirp.server.debug.editor import _editor_url
-from chirp.server.debug.frames import _collapse_framework_frames, _extract_frames
-from chirp.server.debug.render_plan_snapshot import read_render_debug_from_request
+from chirp.server.debug.frames import (
+    CollapsedFrameGroup,
+    FrameInfo,
+    _collapse_framework_frames,
+    _extract_frames,
+)
+from chirp.server.debug.render_plan_snapshot import (
+    RenderPlanSnapshotDict,
+    read_render_debug_from_request,
+)
 from chirp.server.debug.request_context import _extract_request_context
 from chirp.server.debug.styles import _CSS, _TOGGLE_JS
 from chirp.server.debug.template_context import _extract_template_context
@@ -48,7 +56,7 @@ def _render_locals(local_vars: dict[str, str]) -> str:
     return f'<div class="locals-toggle">▸ locals</div><div class="locals">{items}</div>'
 
 
-def _render_frame(frame: dict[str, Any]) -> str:
+def _render_frame(frame: FrameInfo) -> str:
     """Render a single traceback frame."""
     filename = frame["filename"]
     lineno = frame["lineno"]
@@ -79,7 +87,7 @@ def _render_frame(frame: dict[str, Any]) -> str:
     )
 
 
-def _render_collapsed_frames(group: dict[str, Any]) -> str:
+def _render_collapsed_frames(group: CollapsedFrameGroup) -> str:
     """Render a collapsed group of framework frames with expand toggle."""
     summary = group["summary"]
     frames = group["frames"]
@@ -178,7 +186,7 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     return "".join(parts)
 
 
-def _render_render_plan_panel(snapshot: dict[str, Any]) -> str:
+def _render_render_plan_panel(snapshot: RenderPlanSnapshotDict) -> str:
     """Render stashed :class:`~chirp.templating.render_plan.RenderPlan` snapshot."""
     parts: list[str] = []
     parts.append('<div class="request-panel render-plan-panel">')

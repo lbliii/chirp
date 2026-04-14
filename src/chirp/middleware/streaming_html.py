@@ -5,7 +5,6 @@ Buffered ``Response`` bodies are handled by :class:`HTMLInject`. Streaming
 chunks is detected without materializing the entire body.
 """
 
-
 import inspect
 from collections.abc import AsyncIterator, Iterator
 from typing import cast

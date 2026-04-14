@@ -49,6 +49,7 @@ class McpContentBlock(TypedDict):
     type: str
     text: str
 
+
 # MCP protocol version
 _MCP_VERSION = "2024-11-05"
 

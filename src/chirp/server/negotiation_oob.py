@@ -1,6 +1,5 @@
 """OOB helpers for negotiation — shell actions, layout regions, streamed append."""
 
-
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
@@ -213,7 +212,7 @@ class _KidaBlockAdapter(KidaAdapter):
 
         try:
             return self._env.get_template(template).template_metadata()
-        except (TemplateNotFoundError, TemplateSyntaxError, AttributeError):
+        except TemplateNotFoundError, TemplateSyntaxError, AttributeError:
             return None
 
 

@@ -1,6 +1,5 @@
 """Reactive event bus for change event broadcasting."""
 
-
 import asyncio
 import contextlib
 import logging

@@ -1,6 +1,5 @@
 """Kida-backed implementation of TemplateAdapter."""
 
-
 from typing import Any
 
 from kida import Environment
@@ -42,5 +41,5 @@ class KidaAdapter:
         try:
             tmpl = self._env.get_template(template)
             return tmpl.template_metadata()
-        except (TemplateNotFoundError, TemplateSyntaxError):
+        except TemplateNotFoundError, TemplateSyntaxError:
             return None

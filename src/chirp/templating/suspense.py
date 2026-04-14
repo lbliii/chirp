@@ -32,7 +32,6 @@ Pipeline::
     7. Yield OOB swap chunks (htmx or <template>+<script>)
 """
 
-
 import inspect
 import logging
 from collections.abc import AsyncIterator, Awaitable

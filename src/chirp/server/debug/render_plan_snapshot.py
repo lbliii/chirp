@@ -4,7 +4,6 @@ Also provides :func:`get_render_plan` for public read-only access to the
 frozen ``RenderPlan`` that was used to render the current request.
 """
 
-
 from typing import Any, TypedDict
 
 from chirp.http.request import Request
@@ -50,6 +49,7 @@ class RenderPlanSnapshotDict(TypedDict):
     layouts_applied: list[str]
     layout_context_preview: list[tuple[str, str]]
     region_updates: list[RegionUpdateDict]
+
 
 RENDER_DEBUG_CACHE_KEY = "_chirp_render_debug"
 RENDER_PLAN_CACHE_KEY = "_chirp_render_plan"

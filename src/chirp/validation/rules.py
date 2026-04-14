@@ -129,7 +129,7 @@ def integer(value: str) -> str | None:
     """Value must be a valid integer."""
     try:
         int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "Must be a whole number"
     return None
 
@@ -138,6 +138,6 @@ def number(value: str) -> str | None:
     """Value must be a valid number (int or float)."""
     try:
         float(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "Must be a number"
     return None

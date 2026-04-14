@@ -45,7 +45,7 @@ class MessageCatalog:
                         data = json.load(f)
                     if isinstance(data, dict):
                         translations.update(data)
-                except (json.JSONDecodeError, OSError):
+                except json.JSONDecodeError, OSError:
                     logger.warning("Failed to load locale file: %s", path)
 
         self._catalogs[locale] = translations
@@ -63,7 +63,7 @@ class MessageCatalog:
         if kwargs:
             try:
                 return msg.format_map(kwargs)
-            except (KeyError, IndexError):
+            except KeyError, IndexError:
                 logger.warning("Translation interpolation failed: %r %r", msg, kwargs)
                 return msg
         return msg

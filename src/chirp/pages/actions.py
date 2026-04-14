@@ -3,7 +3,6 @@
 Discovers @action decorated functions and dispatches by _action form field.
 """
 
-
 import inspect
 from collections.abc import Callable
 from typing import Any
@@ -79,7 +78,7 @@ def _resolve_action_kwargs(
             if param.annotation is not inspect.Parameter.empty:
                 try:
                     kwargs[name] = param.annotation(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     from chirp.errors import NotFound
 
                     raise NotFound(

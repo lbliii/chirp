@@ -5,7 +5,6 @@ Kida internals. The KidaAdapter routes render_template, render_block,
 compose_layout, and template_metadata through Kida's public APIs.
 """
 
-
 from typing import Any, Protocol
 
 

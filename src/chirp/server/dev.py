@@ -4,7 +4,6 @@ Starts a pounce ASGI server with the live chirp App object.
 Uses single-worker mode with reload enabled for development.
 """
 
-
 from typing import TYPE_CHECKING, cast
 
 from pounce import ASGIApp

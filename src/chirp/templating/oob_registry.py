@@ -8,7 +8,6 @@ Convention fallback: unregistered blocks use ``block_name.removesuffix("_oob")``
 as target ID, ``outerHTML`` swap, and wrapper div.
 """
 
-
 import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any

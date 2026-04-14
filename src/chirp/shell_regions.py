@@ -9,7 +9,6 @@ Shell regions live **outside** ``#page-content``. They are updated via
 here so all shell ids live in one import path.
 """
 
-
 from chirp.shell_actions import SHELL_ACTIONS_TARGET
 
 DOCUMENT_TITLE_ELEMENT_ID = "chirpui-document-title"

@@ -3,7 +3,6 @@
 Warns when hx-swap-oob targets an ID not found in any template.
 """
 
-
 import re
 
 from .types import ContractIssue, Severity

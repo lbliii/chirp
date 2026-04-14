@@ -1,6 +1,5 @@
 """Dependency index mapping context paths to template blocks."""
 
-
 from typing import Any
 
 from kida import Environment

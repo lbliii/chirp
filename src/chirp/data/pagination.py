@@ -24,7 +24,6 @@ Free-threading safety:
     - No shared mutable state
 """
 
-
 import math
 from dataclasses import dataclass
 

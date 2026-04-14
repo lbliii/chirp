@@ -1,6 +1,5 @@
 """Route explorer — debug-only HTML endpoint for inspecting discovered routes."""
 
-
 import html
 import inspect
 import json

@@ -13,7 +13,6 @@ Resolution priority for each handler parameter:
 5. Extractable dataclasses — from query (GET) or body (POST)
 """
 
-
 import inspect
 import warnings
 from collections.abc import Callable

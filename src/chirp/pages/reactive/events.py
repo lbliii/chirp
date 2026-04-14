@@ -1,6 +1,5 @@
 """Change events, block references, and SSE swap element extraction."""
 
-
 import re
 import time
 from dataclasses import dataclass, field

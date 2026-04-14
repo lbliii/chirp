@@ -1,6 +1,5 @@
 """Unreachable block detection for filesystem page templates."""
 
-
 from collections.abc import Sequence
 from typing import Any
 

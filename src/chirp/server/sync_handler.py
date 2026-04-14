@@ -1,6 +1,5 @@
 """Fused sync handler — bypasses ASGI for simple request-response paths."""
 
-
 import json
 import logging
 from typing import Any
@@ -94,7 +93,7 @@ def _build_sync_kwargs(
             if spec.annotation is not None:
                 try:
                     kwargs[spec.name] = spec.annotation(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     kwargs[spec.name] = value
             else:
                 kwargs[spec.name] = value

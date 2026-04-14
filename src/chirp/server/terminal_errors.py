@@ -31,7 +31,6 @@ For non-template errors:
     by the ``CHIRP_TRACEBACK`` environment variable.
 """
 
-
 import errno
 import logging
 import os

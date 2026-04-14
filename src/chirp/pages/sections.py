@@ -4,7 +4,6 @@ Resolves section context (tab_items, breadcrumb_prefix) from RouteMeta.section
 and registered sections. Pure function — no side effects.
 """
 
-
 from typing import Any
 
 from chirp.pages.types import RouteMeta, Section, TabItem

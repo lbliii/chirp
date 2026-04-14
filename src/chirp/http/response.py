@@ -207,7 +207,7 @@ class Response:
                 else:
                     # Non-dict JSON (shouldn't happen, but be safe)
                     merged = {existing: True, **new_events}
-            except (json_module.JSONDecodeError, ValueError):
+            except json_module.JSONDecodeError, ValueError:
                 # Plain string event name
                 merged = {existing: True, **new_events}
             # Remove the old header, add the merged one
