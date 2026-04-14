@@ -66,7 +66,7 @@ def check_sse_speculation(
         # Fallback: inspect handler source for EventStream usage
         try:
             src = inspect.getsource(handler)
-        except TypeError, OSError:
+        except (TypeError, OSError):
             continue
         if any(indicator in src for indicator in _SSE_INDICATORS):
             issues.append(
@@ -174,7 +174,7 @@ def check_middleware_signatures(
         call_method = mw.__call__
         try:
             sig = inspect.signature(call_method)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             continue  # Can't inspect — skip
 
         # Filter out 'self' for bound methods

@@ -71,7 +71,7 @@ def _call_meta_provider(
             if param.annotation is not inspect.Parameter.empty:
                 try:
                     kwargs[name] = param.annotation(value)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     from chirp.errors import NotFound
 
                     raise NotFound(
