@@ -105,14 +105,34 @@ def _extract_toc(html: str) -> tuple[TocEntry, ...]:
     return tuple(entries)
 
 
+_INDEX_STEMS = frozenset({"index", "_index", "README"})
+
+
 def _slug_from_path(md_path: Path, content_dir: Path) -> str:
     """Derive a URL slug from a file path relative to content_dir.
 
+    Index-like files become the parent directory slug:
+
     ``content_dir/guides/getting-started.md`` → ``guides/getting-started``
-    ``content_dir/index.md`` → ``index``
+    ``content_dir/guides/index.md``           → ``guides``
+    ``content_dir/guides/_index.md``          → ``guides``
+    ``content_dir/guides/README.md``          → ``guides``
+    ``content_dir/index.md``                  → ``index``
+    ``content_dir/_index.md``                 → ``index``
     """
     rel = md_path.relative_to(content_dir)
-    return str(rel.with_suffix("")).replace("\\", "/")
+    slug = str(rel.with_suffix("")).replace("\\", "/")
+
+    # Normalize index files to parent directory slug
+    stem = md_path.stem
+    if stem in _INDEX_STEMS:
+        parent = str(rel.parent).replace("\\", "/")
+        if parent == ".":
+            # Root-level index → "index" (the site landing page)
+            return "index"
+        return parent
+
+    return slug
 
 
 def parse_file(md_path: Path, content_dir: Path) -> DocPage:

@@ -40,6 +40,8 @@ class DocsCollection:
 
     __slots__ = ("_by_slug", "_categories", "_nav", "_pages")
 
+    _INDEX_STEMS = frozenset({"index", "_index", "README"})
+
     def __init__(self, pages: tuple[DocPage, ...]) -> None:
         self._pages = pages
         self._by_slug: dict[str, DocPage] = {p.slug: p for p in pages}
@@ -47,13 +49,24 @@ class DocsCollection:
         for p in pages:
             cats.setdefault(p.metadata.category or "Uncategorized", []).append(p)
         self._categories = tuple(sorted(cats))
-        self._nav = tuple(
-            NavGroup(
-                category=cat,
-                pages=tuple(sorted(cats[cat], key=lambda p: (p.metadata.order, p.title))),
+
+        nav_groups: list[NavGroup] = []
+        for cat in sorted(cats):
+            landing = None
+            regular: list[DocPage] = []
+            for p in cats[cat]:
+                if p.source_path is not None and p.source_path.stem in self._INDEX_STEMS:
+                    landing = p
+                else:
+                    regular.append(p)
+            nav_groups.append(
+                NavGroup(
+                    category=cat,
+                    pages=tuple(sorted(regular, key=lambda p: (p.metadata.order, p.title))),
+                    landing_page=landing,
+                )
             )
-            for cat in sorted(cats)
-        )
+        self._nav = tuple(nav_groups)
 
     @classmethod
     def load(

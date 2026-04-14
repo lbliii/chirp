@@ -117,6 +117,106 @@ class TestDocsCollection:
         assert nav[1].pages[1].slug == "b"
 
 
+# ── Landing pages (index/README/_index convention) ──────────────────────
+
+
+class TestLandingPages:
+    def test_index_file_becomes_landing_page(self) -> None:
+        from chirp.docs.collection import DocsCollection
+
+        landing = DocPage(
+            slug="guides",
+            title="Guides Overview",
+            raw="# Guides",
+            html=Markup("<h1>Guides</h1>"),
+            toc=(),
+            metadata=DocMetadata(order=0, category="Guides"),
+            source=DocSource.MARKDOWN,
+            source_path=Path("/content/guides/_index.md"),
+        )
+        child = _make_page("guides/routing", category="Guides")
+        coll = DocsCollection((landing, child))
+        nav = coll.as_nav()
+
+        assert len(nav) == 1
+        assert nav[0].landing_page is not None
+        assert nav[0].landing_page.slug == "guides"
+        assert len(nav[0].pages) == 1
+        assert nav[0].pages[0].slug == "guides/routing"
+
+    def test_readme_becomes_landing_page(self) -> None:
+        from chirp.docs.collection import DocsCollection
+
+        landing = DocPage(
+            slug="api",
+            title="API Overview",
+            raw="# API",
+            html=Markup("<h1>API</h1>"),
+            toc=(),
+            metadata=DocMetadata(order=0, category="API"),
+            source=DocSource.MARKDOWN,
+            source_path=Path("/content/api/README.md"),
+        )
+        child = _make_page("api/endpoints", category="API")
+        coll = DocsCollection((landing, child))
+        nav = coll.as_nav()
+
+        assert nav[0].landing_page is not None
+        assert nav[0].landing_page.slug == "api"
+
+    def test_no_landing_page_without_index(self) -> None:
+        from chirp.docs.collection import DocsCollection
+
+        pages = (
+            _make_page("a", category="Guide"),
+            _make_page("b", category="Guide"),
+        )
+        coll = DocsCollection(pages)
+        nav = coll.as_nav()
+        assert nav[0].landing_page is None
+
+    def test_landing_page_excluded_from_pages_list(self) -> None:
+        from chirp.docs.collection import DocsCollection
+
+        landing = DocPage(
+            slug="guides",
+            title="Guides",
+            raw="# Guides",
+            html=Markup("<h1>Guides</h1>"),
+            toc=(),
+            metadata=DocMetadata(order=0, category="Guides"),
+            source=DocSource.MARKDOWN,
+            source_path=Path("/content/guides/index.md"),
+        )
+        child1 = _make_page("guides/a", category="Guides", order=1)
+        child2 = _make_page("guides/b", category="Guides", order=2)
+        coll = DocsCollection((landing, child1, child2))
+        nav = coll.as_nav()
+
+        # Landing page not in pages list
+        slugs = [p.slug for p in nav[0].pages]
+        assert "guides" not in slugs
+        assert "guides/a" in slugs
+        assert "guides/b" in slugs
+
+    def test_landing_page_still_accessible_by_slug(self) -> None:
+        from chirp.docs.collection import DocsCollection
+
+        landing = DocPage(
+            slug="guides",
+            title="Guides",
+            raw="# Guides",
+            html=Markup("<h1>Guides</h1>"),
+            toc=(),
+            metadata=DocMetadata(order=0, category="Guides"),
+            source=DocSource.MARKDOWN,
+            source_path=Path("/content/guides/_index.md"),
+        )
+        coll = DocsCollection((landing,))
+        assert coll.get("guides") is not None
+        assert coll.get("guides").title == "Guides"
+
+
 # ── Merge ────────────────────────────────────────────────────────────────
 
 

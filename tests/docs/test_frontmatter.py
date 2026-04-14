@@ -159,6 +159,42 @@ class TestSlugFromPath:
         slug = _slug_from_path(Path("/docs/guides/routing.md"), Path("/docs"))
         assert slug == "guides/routing"
 
+    def test_index_md(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/guides/index.md"), Path("/docs"))
+        assert slug == "guides"
+
+    def test_underscore_index_md(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/guides/_index.md"), Path("/docs"))
+        assert slug == "guides"
+
+    def test_readme_md(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/guides/README.md"), Path("/docs"))
+        assert slug == "guides"
+
+    def test_root_index_md(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/index.md"), Path("/docs"))
+        assert slug == "index"
+
+    def test_root_underscore_index_md(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/_index.md"), Path("/docs"))
+        assert slug == "index"
+
+    def test_nested_deep_index(self) -> None:
+        from chirp.docs.frontmatter import _slug_from_path
+
+        slug = _slug_from_path(Path("/docs/api/v2/_index.md"), Path("/docs"))
+        assert slug == "api/v2"
+
 
 # ── parse_file (integration) ────────────────────────────────────────────
 

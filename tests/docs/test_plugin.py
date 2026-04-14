@@ -201,3 +201,67 @@ class TestDraftHandling:
             resp = await client.get("/docs/draft")
             assert resp.status == 200
             assert "Draft" in resp.text
+
+
+# ── Index/landing page convention ────────────────────────────────────────
+
+
+class TestLandingPageRouting:
+    async def test_index_md_serves_at_directory_slug(self, tmp_path: Path) -> None:
+        from chirp.docs import DocsPlugin
+
+        content = tmp_path / "content"
+        content.mkdir()
+        (content / "guides").mkdir()
+        _write_md(
+            content / "guides/_index.md",
+            "---\ntitle: Guides\ncategory: Guides\norder: 0\n---\n# Guides\n\nGuide overview.",
+        )
+        _write_md(
+            content / "guides/routing.md",
+            "---\ntitle: Routing\ncategory: Guides\norder: 1\n---\n# Routing",
+        )
+
+        tpl_dir = tmp_path / "templates"
+        tpl_dir.mkdir()
+        app = App(AppConfig(template_dir=str(tpl_dir)))
+        app.mount("/docs", DocsPlugin(content_dir=content))
+
+        async with TestClient(app) as client:
+            # Landing page served at /docs/guides (not /docs/guides/_index)
+            resp = await client.get("/docs/guides")
+            assert resp.status == 200
+            assert "Guide overview" in resp.text
+
+            # Child page works normally
+            resp = await client.get("/docs/guides/routing")
+            assert resp.status == 200
+            assert "Routing" in resp.text
+
+    async def test_landing_page_linked_in_sidebar(self, tmp_path: Path) -> None:
+        from chirp.docs import DocsPlugin
+
+        content = tmp_path / "content"
+        content.mkdir()
+        (content / "guides").mkdir()
+        _write_md(
+            content / "guides/_index.md",
+            "---\ntitle: Guides\ncategory: Guides\n---\n# Guides",
+        )
+        _write_md(
+            content / "guides/routing.md",
+            "---\ntitle: Routing\ncategory: Guides\n---\n# Routing",
+        )
+
+        tpl_dir = tmp_path / "templates"
+        tpl_dir.mkdir()
+        app = App(AppConfig(template_dir=str(tpl_dir)))
+        app.mount("/docs", DocsPlugin(content_dir=content))
+
+        async with TestClient(app) as client:
+            resp = await client.get("/docs/")
+            body = resp.text
+            # Category heading links to landing page
+            assert 'href="/docs/guides"' in body
+            # Child page also linked
+            assert 'href="/docs/guides/routing"' in body

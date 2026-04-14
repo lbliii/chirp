@@ -1,16 +1,30 @@
 {# Default docs page template.
    Blocks: doc_content, doc_sidebar, doc_toc
-   Works with Page("chirp_docs/doc_page.html", "doc_content", doc=doc) #}
+   Works with Page("chirp_docs/doc_page.html", "doc_content", doc=doc)
+   Also works with Suspense — doc_content and doc_toc defer when doc is awaitable. #}
+
+{% include "chirp_docs/_docs_styles.html" %}
+
+<div class="chirp-docs-layout">
 
 {% block doc_sidebar %}
 <nav id="doc_sidebar" class="chirp-docs-sidebar">
   {% if docs_nav_items %}
   {% for group in docs_nav_items %}
   <details open>
-    <summary>{{ group.category }}</summary>
+    <summary>
+      {% if group.landing_page %}
+      <a href="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+         hx-get="{{ docs_prefix }}/{{ group.landing_page.slug }}"
+         hx-target="#doc_content"
+         hx-push-url="true">{{ group.category }}</a>
+      {% else %}
+      {{ group.category }}
+      {% endif %}
+    </summary>
     <ul>
       {% for page in group.pages %}
-      <li{% if page.slug == doc.slug %} class="active"{% endif %}>
+      <li{% if doc is not deferred and page.slug == doc.slug %} class="active"{% endif %}>
         <a href="{{ docs_prefix }}/{{ page.slug }}"
            hx-get="{{ docs_prefix }}/{{ page.slug }}"
            hx-target="#doc_content"
@@ -24,9 +38,12 @@
 </nav>
 {% endblock %}
 
+<div>
 {% block doc_toc %}
 <nav id="doc_toc" class="chirp-docs-toc">
-  {% if doc.toc %}
+  {% if doc is deferred %}
+  <div class="chirp-docs-skeleton">Loading...</div>
+  {% elif doc.toc %}
   <h3>On this page</h3>
   <ul>
     {% for entry in doc.toc %}
@@ -41,7 +58,13 @@
 
 {% block doc_content %}
 <article id="doc_content" class="chirp-docs-content">
-  <h1>{{ doc.title }}</h1>
+  {% if doc is deferred %}
+  <div class="chirp-docs-skeleton">Loading content...</div>
+  {% else %}
   {{ doc.html }}
+  {% endif %}
 </article>
 {% endblock %}
+</div>
+
+</div>

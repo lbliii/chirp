@@ -64,10 +64,16 @@ class DocPage:
 
 @dataclass(frozen=True, slots=True)
 class NavGroup:
-    """A group of pages for sidebar navigation."""
+    """A group of pages for sidebar navigation.
+
+    When a category directory contains an index file (``index.md``,
+    ``_index.md``, or ``README.md``), it becomes the ``landing_page``
+    and the category heading links to it.
+    """
 
     category: str
     pages: tuple[DocPage, ...]
+    landing_page: DocPage | None = None
 
 
 @dataclass(frozen=True, slots=True)
