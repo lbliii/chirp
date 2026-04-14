@@ -346,7 +346,7 @@ clean.help = "Remove build artifacts and caches"
 [tool.towncrier]
 directory = "changelog.d"
 filename = "CHANGELOG.md"
-package = "bengal-chirp"
+package = "chirp"
 package_dir = "src"
 title_format = "## [{version}] — {project_date}"
 issue_format = "[#{issue}](https://github.com/lbliii/chirp/issues/{issue})"
