@@ -32,7 +32,7 @@ class JsonRpcErrorResponse(TypedDict):
 
     jsonrpc: str
     error: JsonRpcError
-    id: str | int | None
+    id: str | int | float | None
 
 
 class JsonRpcSuccessResponse(TypedDict):
@@ -40,7 +40,7 @@ class JsonRpcSuccessResponse(TypedDict):
 
     jsonrpc: str
     result: Any
-    id: str | int | None
+    id: str | int | float | None
 
 
 class McpContentBlock(TypedDict):
