@@ -12,6 +12,7 @@ Usage::
     app.run()
 """
 
+import importlib
 import re
 from collections.abc import Callable
 from dataclasses import replace
@@ -123,11 +124,12 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
+        # importlib + getattr: optional peer dep; static import fails ty when chirp-ui
+        # is not on the type-check environment's path.
         make_route_link_attrs_fn: Callable[..., Any] | None = None
         try:
-            from chirp_ui.filters import make_route_link_attrs as _make_route_link_attrs
-
-            make_route_link_attrs_fn = _make_route_link_attrs
+            _filters = importlib.import_module("chirp_ui.filters")
+            make_route_link_attrs_fn = getattr(_filters, "make_route_link_attrs", None)
         except ImportError:
             pass
 
