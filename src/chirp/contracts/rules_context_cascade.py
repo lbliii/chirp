@@ -14,6 +14,9 @@ from typing import Any
 from .patterns import PATH_PARAM
 from .types import ContractIssue, Severity
 
+# Keys commonly re-declared in nested _context.py (showcase, shell demos) — intentional.
+_CONTEXT_INTENTIONAL_OVERRIDE_KEYS = frozenset({"shell_actions", "shell_mode", "Components"})
+
 _RETURN_DICT_LITERAL = re.compile(r"return\s*\{([^}]+)\}")
 _DICT_STRING_KEY = re.compile(r'["\'](\w+)["\']')
 _RETURN_DICT_CALL = re.compile(r"return\s+dict\(([^)]+)\)")
@@ -98,7 +101,7 @@ def check_context_cascade(
             for key in contributed:
                 if key in contributed_keys:
                     prior_depth = contributed_keys[key]
-                    if prior_depth < depth:
+                    if prior_depth < depth and key not in _CONTEXT_INTENTIONAL_OVERRIDE_KEYS:
                         issues.append(
                             ContractIssue(
                                 severity=Severity.INFO,
@@ -114,7 +117,21 @@ def check_context_cascade(
                 contributed_keys[key] = depth
                 available_keys.add(key)
 
-    return issues
+    return _dedupe_issues_by_message_route(issues)
+
+
+def _dedupe_issues_by_message_route(issues: list[ContractIssue]) -> list[ContractIssue]:
+    """Drop duplicate cascade messages (same route + message)."""
+
+    seen: set[tuple[str, str | None]] = set()
+    out: list[ContractIssue] = []
+    for issue in issues:
+        key = (issue.message, issue.route)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(issue)
+    return out
 
 
 def _extract_return_keys(source: str) -> set[str]:

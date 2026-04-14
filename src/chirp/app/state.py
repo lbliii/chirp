@@ -31,6 +31,8 @@ class PendingRoute:
     referenced: bool = False
     template: str | None = None
     inline: bool = False
+    #: Original page handler for contract checks (async wrapper hides user source).
+    page_source_handler: Callable[..., Any] | None = None
 
 
 @dataclass(slots=True)

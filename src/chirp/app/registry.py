@@ -294,5 +294,12 @@ class AppRegistry:
             )
 
         self._state.pending_routes.append(
-            PendingRoute(url_path, page_wrapper, methods, name=None, referenced=False)
+            PendingRoute(
+                url_path,
+                page_wrapper,
+                methods,
+                name=None,
+                referenced=False,
+                page_source_handler=_handler,
+            )
         )

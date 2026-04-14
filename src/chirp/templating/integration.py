@@ -17,6 +17,14 @@ from chirp.templating.returns import Fragment, Template
 from chirp.templating.suspense import DEFERRED
 
 
+def _is_chirp_ui_filter_override(name: str, func: Callable[..., Any]) -> bool:
+    """True when *func* is chirp-ui's implementation replacing chirp stubs for the UI kit."""
+
+    if name not in BUILTIN_FILTERS or func is BUILTIN_FILTERS[name]:
+        return False
+    return getattr(func, "__module__", "").startswith("chirp_ui")
+
+
 def _ensure_chirp_ui_filters(env: Environment) -> None:
     """Ensure chirp-ui required filters and globals exist when chirp-ui templates are loadable.
 
@@ -134,7 +142,11 @@ def create_environment(
     # Register user-defined filters (may override built-ins)
     if filters:
         for name, func in filters.items():
-            if name in BUILTIN_FILTERS and func is not BUILTIN_FILTERS[name]:
+            if (
+                name in BUILTIN_FILTERS
+                and func is not BUILTIN_FILTERS[name]
+                and not _is_chirp_ui_filter_override(name, func)
+            ):
                 warnings.warn(
                     f"User filter {name!r} shadows built-in chirp filter. "
                     "This may cause unexpected template behavior.",

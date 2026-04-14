@@ -1,6 +1,6 @@
 """Tests for dead template detection in check_hypermedia_surface."""
 
-from chirp import App
+from chirp import App, Page
 from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
@@ -100,6 +100,25 @@ class TestDeadTemplateDetection:
         @app.route("/search")
         @contract(returns=FragmentContract("search.html", "results"))
         async def search():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_page_return_template_not_dead(self, tmp_path):
+        """Page(\"*.html\", ...) in a route handler should count as a template reference."""
+        (tmp_path / "oops.html").write_text("{% block content %}oops{% endblock %}")
+        (tmp_path / "index.html").write_text("{% block content %}ok{% endblock %}")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/oops", referenced=True)
+        def oops():
+            return Page("oops.html", "content", title="x")
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
             return "ok"
 
         result = check_hypermedia_surface(app)

@@ -37,6 +37,8 @@ class Route:
     template: str | None = None
     invoke_plan: InvokePlan | None = None
     inline: bool = False
+    #: Original page handler when ``handler`` is an async wrapper (contract source scan).
+    page_source_handler: Callable[..., Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
