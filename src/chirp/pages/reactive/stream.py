@@ -31,7 +31,7 @@ def _context_builder_arity(fn: _ContextBuilder) -> int:
             in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
         ]
         return len(params)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return 0
 
 
