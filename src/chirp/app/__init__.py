@@ -56,6 +56,7 @@ class App:
         "_discovered_layout_chains",
         "_error_handlers",
         "_freeze_lock",
+        "_freeze_param_providers",
         "_frozen",
         "_kida_env",
         "_lazy_pages_dir",
@@ -151,6 +152,7 @@ class App:
         self._migrations_dir = self._mutable_state.migrations_dir
         self._custom_kida_env = self._mutable_state.custom_kida_env
         self._tool_events = self._mutable_state.tool_events
+        self._freeze_param_providers = self._mutable_state.freeze_param_providers
 
         self._frozen = self._runtime_state.frozen
         self._router = self._runtime_state.router
@@ -404,6 +406,33 @@ class App:
             router=self._router,
             route_layout_chains=self._runtime_state.route_layout_chains,
         )
+
+    def freeze_params(self, path: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register a parameter provider for ``chirp freeze``.
+
+        The decorated function must return a list of dicts, each mapping
+        parameter names to values.  Example::
+
+            @app.freeze_params("/docs/{slug:path}")
+            def docs_params():
+                return [{"slug": p.slug} for p in collection.pages]
+        """
+
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            self._mutable_state.freeze_param_providers[path] = fn
+            return fn
+
+        return decorator
+
+    def freeze_exclude(self, path: str) -> None:
+        """Exclude a route path from ``chirp freeze``.
+
+        Fragment-only or dynamic routes that should never be written
+        as static pages can call this during setup::
+
+            app.freeze_exclude("/docs/search")
+        """
+        self._mutable_state.freeze_exclude.add(path)
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

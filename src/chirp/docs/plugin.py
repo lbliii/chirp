@@ -163,12 +163,23 @@ class DocsPlugin:
 
         @app.route(f"{normalized_prefix}/")
         def docs_index():
+            from chirp.freeze import SearchEntry, search_contribute
+
+            search_contribute(
+                SearchEntry(
+                    url=f"{normalized_prefix}/",
+                    title=title,
+                    template_name=f"{_TEMPLATE_NS}/doc_list.html",
+                )
+            )
             return Template(
                 f"{_TEMPLATE_NS}/doc_list.html",
                 docs_title=title,
                 docs_nav_items=holder.collection.as_nav(),
                 docs_prefix=normalized_prefix,
             )
+
+        app.freeze_exclude(f"{normalized_prefix}/search")
 
         @app.route(f"{normalized_prefix}/search")
         def docs_search(request):
@@ -182,6 +193,10 @@ class DocsPlugin:
                 docs_prefix=normalized_prefix,
             )
 
+        @app.freeze_params(f"{normalized_prefix}/{{slug:path}}")
+        def _docs_freeze_params():
+            return [{"slug": p.slug} for p in holder.collection.list()]
+
         @app.route(f"{normalized_prefix}/{{slug:path}}")
         def docs_page(slug: str):
             doc = holder.collection.get(slug)
@@ -189,6 +204,21 @@ class DocsPlugin:
                 from chirp.errors import NotFound
 
                 raise NotFound()
+
+            from chirp.freeze import SearchEntry, search_contribute
+
+            search_contribute(
+                SearchEntry(
+                    url=f"{normalized_prefix}/{slug}",
+                    title=doc.title,
+                    description=doc.metadata.description,
+                    category=doc.metadata.category,
+                    tags=doc.metadata.tags,
+                    toc=tuple({"level": e.level, "id": e.id, "text": e.text} for e in doc.toc),
+                    template_name=f"{_TEMPLATE_NS}/doc_page.html",
+                    body=doc.raw[:500],
+                )
+            )
 
             if use_suspense:
 

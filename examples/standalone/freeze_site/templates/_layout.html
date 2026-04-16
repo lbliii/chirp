@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Freeze Demo{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; color: #1e293b; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: 1rem; }
+    h2 { margin: 1.5rem 0 0.75rem; }
+    p { line-height: 1.6; margin-bottom: 0.75rem; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #f1f5f9; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; }
+    pre code { background: none; padding: 0; }
+    ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; line-height: 1.8; }
+    .nav { display: flex; gap: 1.5rem; padding: 1rem 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 2rem; }
+    .nav a { font-weight: 500; }
+    .footer { margin-top: 3rem; padding: 1rem 0; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/">Home</a>
+  <a href="/docs/">Docs</a>
+</nav>
+
+{% block content %}{% endblock %}
+
+<div class="footer">Built with Chirp</div>
+
+</body>
+</html>

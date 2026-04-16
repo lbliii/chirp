@@ -1,0 +1,13 @@
+{% extends "_layout.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div id="page-root">
+  {% block page_content %}
+  <h1>Freeze Demo</h1>
+  <p>A Chirp app that serves live pages <em>and</em> freezes to static HTML.</p>
+  <p>Browse the <a href="/docs/">docs</a> — they're markdown files rendered by DocsPlugin.</p>
+  {% endblock %}
+</div>
+{% endblock %}

@@ -83,6 +83,8 @@ class MutableAppState:
     contract_checks: list[Callable[..., Any]] = field(default_factory=list)
     contract_check_data: dict[str, Any] = field(default_factory=dict)
     contract_severity_overrides: dict[str, Severity] = field(default_factory=dict)
+    freeze_param_providers: dict[str, Callable[..., Any]] = field(default_factory=dict)
+    freeze_exclude: set[str] = field(default_factory=set)
 
 
 @dataclass(slots=True)

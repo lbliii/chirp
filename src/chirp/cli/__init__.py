@@ -124,6 +124,26 @@ def main(argv: list[str] | None = None) -> None:
         help="Import string (e.g. myapp:app)",
     )
 
+    # -- chirp freeze -----------------------------------------------------
+    freeze_parser = subparsers.add_parser(
+        "freeze",
+        help="Render routes to static HTML files",
+    )
+    freeze_parser.add_argument(
+        "app",
+        help="Import string (e.g. myapp:app)",
+    )
+    freeze_parser.add_argument(
+        "output",
+        help="Output directory for frozen HTML files",
+    )
+    freeze_parser.add_argument(
+        "--exclude",
+        nargs="+",
+        default=None,
+        help="URL prefixes to exclude (e.g. /search)",
+    )
+
     # -- chirp makemigrations ---------------------------------------------
     mig_parser = subparsers.add_parser(
         "makemigrations",
@@ -176,6 +196,10 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._security_check import run_security_check
 
         run_security_check(args)
+    elif args.command == "freeze":
+        from chirp.cli._freeze import run_freeze
+
+        run_freeze(args)
     elif args.command == "makemigrations":
         from chirp.cli._makemigrations import run_makemigrations
 
