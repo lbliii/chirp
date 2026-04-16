@@ -9,6 +9,15 @@
 
 {% block doc_sidebar %}
 <nav id="doc_sidebar" class="chirp-docs-sidebar">
+  <div class="chirp-docs-search">
+    <input type="text" name="q" placeholder="Search docs..."
+           hx-get="{{ docs_prefix }}/search"
+           hx-target="#doc_list"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms, search"
+           hx-sync="this:replace"
+           aria-label="Search documentation">
+  </div>
   {% if docs_nav_items %}
   {% for group in docs_nav_items %}
   <details open>
@@ -38,7 +47,7 @@
 </nav>
 {% endblock %}
 
-<div>
+<div id="doc_list">
 {% block doc_toc %}
 <nav id="doc_toc" class="chirp-docs-toc">
   {% if doc is deferred %}
