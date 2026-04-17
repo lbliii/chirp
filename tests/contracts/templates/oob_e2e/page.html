@@ -1,0 +1,7 @@
+{% extends "oob_e2e/_layout.html" %}
+{% block content %}
+<article id="article">
+  <h1>{{ heading | default("Article") }}</h1>
+  <p>{{ body | default("body text") }}</p>
+</article>
+{% end %}

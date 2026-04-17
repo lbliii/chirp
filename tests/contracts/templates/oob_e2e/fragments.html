@@ -1,0 +1,24 @@
+{# Fragment templates referenced by OOB() return values in contract tests. #}
+
+{% block breadcrumbs_oob %}
+<span>{{ crumbs | default("Home") }}</span>
+{% end %}
+
+{% block sidebar_oob %}
+<a href="#">{{ link | default("Sidebar") }}</a>
+{% end %}
+
+{% block notif_feed_oob %}
+<li>{{ notif | default("New notif") }}</li>
+{% end %}
+
+{% block title_oob %}
+<title id="page-title" hx-swap-oob="true">{{ page_title | default("New Title") }}</title>
+{% end %}
+
+{% block article %}
+<article id="article">
+  <h1>{{ heading | default("Heading") }}</h1>
+  <p>{{ body | default("Body") }}</p>
+</article>
+{% end %}
