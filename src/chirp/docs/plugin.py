@@ -20,6 +20,7 @@ in via OOB swap.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,16 @@ if TYPE_CHECKING:
     from chirp.app import App
 
 _TEMPLATE_NS = "chirp_docs"
+
+_BLOCK_TAG_RE = re.compile(r"<[^>]+>")
+_BLOCK_WS_RE = re.compile(r"\s+")
+_BLOCK_BODY_MAX = 500
+
+
+def _block_body_text(html: object, max_len: int = _BLOCK_BODY_MAX) -> str:
+    """Strip tags + collapse whitespace for plain-text block-match scoring."""
+    stripped = _BLOCK_TAG_RE.sub(" ", str(html))
+    return _BLOCK_WS_RE.sub(" ", stripped).strip()[:max_len]
 
 
 class _CollectionHolder:
@@ -205,8 +216,18 @@ class DocsPlugin:
 
                 raise NotFound()
 
-            from chirp.freeze import SearchEntry, search_contribute
+            from chirp.freeze import BlockEntry, SearchEntry, search_contribute
 
+            block_entries = tuple(
+                BlockEntry(
+                    block_id=b.id,
+                    heading=b.heading,
+                    body=_block_body_text(b.html),
+                    anchor=b.anchor,
+                    depth=b.depth,
+                )
+                for b in doc.blocks
+            )
             search_contribute(
                 SearchEntry(
                     url=f"{normalized_prefix}/{slug}",
@@ -217,6 +238,7 @@ class DocsPlugin:
                     toc=tuple({"level": e.level, "id": e.id, "text": e.text} for e in doc.toc),
                     template_name=f"{_TEMPLATE_NS}/doc_page.html",
                     body=doc.raw[:500],
+                    blocks=block_entries,
                 )
             )
 

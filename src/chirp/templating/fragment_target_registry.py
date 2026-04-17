@@ -146,3 +146,15 @@ class FragmentTargetRegistry:
         return frozenset(
             config.fragment_block for config in self._targets.values() if config.required
         )
+
+    @staticmethod
+    def external_url(route_path: str, block_name: str) -> str:
+        """Resolve ``(route_path, block_name)`` to its block-fetch URL.
+
+        Thin wrapper around :func:`chirp.server.fragment_dispatch.fragment_url`.
+        Lives on the registry so code holding a registry reference doesn't need
+        to import the server module just to build a URL.
+        """
+        from chirp.server.fragment_dispatch import fragment_url
+
+        return fragment_url(route_path, block_name)

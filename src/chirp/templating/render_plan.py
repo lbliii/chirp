@@ -21,6 +21,18 @@ if TYPE_CHECKING:
     from chirp.templating.adapter import TemplateAdapter
 
 
+def _capture_render(template_name: str, context: dict[str, Any]) -> None:
+    """Record (template, context) for ``chirp freeze`` live-block rewriting.
+
+    Outside of freeze the capture ContextVar is ``None`` and this is a no-op.
+    """
+    from chirp.templating.integration import _render_capture
+
+    capture = _render_capture.get(None)
+    if capture is not None:
+        capture.append((template_name, dict(context)))
+
+
 type RenderIntent = str  # "full_page" | "page_fragment" | "local_fragment"
 
 
@@ -407,6 +419,7 @@ def execute_render_plan(
 
     # Render main content
     if plan.render_full_template:
+        _capture_render(plan.main_view.template, plan.main_view.context)
         main_html = adapter.render_template(
             plan.main_view.template,
             plan.main_view.context,

@@ -13,7 +13,8 @@ class TestCheckHypermediaSurface:
     def test_app_with_no_routes(self, tmp_path):
         app = App(AppConfig(template_dir=str(tmp_path)))
         result = check_hypermedia_surface(app)
-        assert result.routes_checked == 0
+        # Framework-internal /_frag/{path:path} is always registered; no user routes.
+        assert result.routes_checked == 1
 
     def test_detects_flask_style_route_path(self, tmp_path, monkeypatch):
         """Contract check reports route path using <param> instead of {param}."""
@@ -49,8 +50,9 @@ class TestCheckHypermediaSurface:
             return "ok"
 
         result = check_hypermedia_surface(app)
-        # Same path, different methods = 1 unique path
-        assert result.routes_checked == 1
+        # One user path (GET + POST share a path) plus the framework-internal
+        # /_frag/{path:path} dispatcher = 2 unique paths.
+        assert result.routes_checked == 2
         # No templates to scan, so no target issues
         assert result.ok
 

@@ -7,6 +7,7 @@ once during App._freeze() and passed through the request pipeline.
 
 import warnings
 from collections.abc import Callable
+from contextvars import ContextVar
 from typing import Any, cast
 
 from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
@@ -15,6 +16,14 @@ from chirp.config import AppConfig
 from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
 from chirp.templating.returns import Fragment, Template
 from chirp.templating.suspense import DEFERRED
+
+#: Capture (template_name, context) from every full-page render.
+#: ``chirp.freeze`` sets this ContextVar so it can re-render pages with
+#: live-block placeholders. Outside of freeze this is ``None`` and
+#: ``render_template`` skips the capture entirely.
+_render_capture: ContextVar[list[tuple[str, dict[str, Any]]] | None] = ContextVar(
+    "chirp_render_capture", default=None
+)
 
 
 def _is_chirp_ui_filter_override(name: str, func: Callable[..., Any]) -> bool:
@@ -185,6 +194,9 @@ def create_environment(
 def render_template(env: Environment, tpl: Template) -> str:
     """Render a full template to string."""
     template = env.get_template(tpl.template_name)
+    capture = _render_capture.get(None)
+    if capture is not None:
+        capture.append((tpl.template_name, dict(tpl.context)))
     return template.render(tpl.context)
 
 

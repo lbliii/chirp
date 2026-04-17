@@ -206,6 +206,27 @@ def _compile_routes(
     return router
 
 
+def _reject_reserved_prefix_collisions(pending_routes: list, prefix: str) -> None:
+    """Raise if any pending route starts with a framework-reserved URL prefix.
+
+    The block-fetch dispatcher owns ``/_frag/**`` — a user route like
+    ``/_frag/custom`` would either shadow the dispatcher or be shadowed by it,
+    and there's no policy where that ambiguity is a good idea. Fail fast with
+    a message that points the user at what to change.
+    """
+    bad = [r for r in pending_routes if r.path == prefix or r.path.startswith(prefix + "/")]
+    if not bad:
+        return
+    from chirp.errors import ConfigurationError
+
+    lines = "\n".join(f"  - {r.path}" for r in bad)
+    raise ConfigurationError(
+        f"Route path cannot start with reserved prefix {prefix!r}; "
+        "this prefix is owned by the block-fetch dispatcher. "
+        f"Rename the following route(s):\n{lines}"
+    )
+
+
 def _validate_middleware_ordering(middleware_list: list) -> None:
     """Check that middleware dependencies are satisfied.
 
@@ -271,6 +292,16 @@ class AppCompiler:
 
             self._mutable.pending_routes.append(make_dev_reload_pending_route(self._config))
 
+        from chirp.server.fragment_dispatch import (
+            FRAGMENT_ROUTE_PREFIX,
+            make_fragment_dispatch_pending_route,
+        )
+
+        _reject_reserved_prefix_collisions(
+            self._mutable.pending_routes, FRAGMENT_ROUTE_PREFIX
+        )
+        self._mutable.pending_routes.append(make_fragment_dispatch_pending_route(app))
+
         router = _compile_routes(
             self._mutable.pending_routes,
             self._mutable.providers,
@@ -300,6 +331,10 @@ class AppCompiler:
             from chirp.server.alpine import alpine_json_config
 
             self._mutable.template_globals.setdefault("alpine_json_config", alpine_json_config)
+
+        from chirp.server.fragment_dispatch import fragment_url as _fragment_url
+
+        self._mutable.template_globals.setdefault("fragment_url", _fragment_url)
 
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env
