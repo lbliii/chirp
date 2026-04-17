@@ -100,9 +100,7 @@ class TestNonOptionalRegionRaises:
 
 
 class TestOptionalRegionSkipped:
-    def test_optional_missing_block_drops_region_from_output(
-        self, kida_env: Environment
-    ) -> None:
+    def test_optional_missing_block_drops_region_from_output(self, kida_env: Environment) -> None:
         """optional=True missing block: region is absent from region_htmls (not
         emitted as an empty OOB wrapper, which would wipe existing DOM content)."""
         adapter = KidaAdapter(kida_env)
