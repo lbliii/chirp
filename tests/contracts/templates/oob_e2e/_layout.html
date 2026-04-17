@@ -1,0 +1,22 @@
+{# OOB end-to-end test layout — exercises every register_oob_region permutation #}
+{# target: body #}
+<!doctype html>
+<html><head>
+{% region title_oob() %}
+<title id="page-title">Default Title</title>
+{% end %}
+</head>
+<body>
+{% region breadcrumbs_oob() %}
+<nav id="breadcrumbs">Home</nav>
+{% end %}
+{% region sidebar_oob() %}
+<aside id="sidebar-nav">Sidebar default</aside>
+{% end %}
+{% region notif_feed_oob() %}
+<ul id="notif-feed"><li>Default notif</li></ul>
+{% end %}
+<main id="main">
+{% block content %}{% end %}
+</main>
+</body></html>

@@ -225,6 +225,16 @@ def render_template(env: Environment, tpl: Template) -> str:
 
 
 def render_fragment(env: Environment, frag: Fragment) -> str:
-    """Render a named block from a template to string."""
+    """Render a named block from a template to string.
+
+    Raises ``BlockNotFoundError`` (a ``KeyError`` subclass) when the named
+    block does not exist in the template. Unifies the error contract across
+    both OOB pipelines — region updates (PR #90) and ``OOB(...)`` return
+    values both surface the same exception type with the same message shape.
+    """
     template = env.get_template(frag.template_name)
+    if frag.block_name not in template.list_blocks():
+        from chirp.errors import BlockNotFoundError
+
+        raise BlockNotFoundError(template=frag.template_name, block=frag.block_name)
     return template.render_block(frag.block_name, frag.context)
