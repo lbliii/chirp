@@ -228,9 +228,7 @@ class TestSnippetExcludedFromFragmentResponses:
             return Fragment("spec_page.html", "snippet")
 
         async with TestClient(app) as client:
-            response = await client.get(
-                "/snippet", headers={"HX-Request": "true"}
-            )
+            response = await client.get("/snippet", headers={"HX-Request": "true"})
 
         assert response.status == 200
         # Fragment-style responses must not carry the speculation-rules snippet.

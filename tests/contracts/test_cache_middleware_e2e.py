@@ -306,8 +306,7 @@ class TestBackendExceptionLogged:
         assert "still served" in response.text
         # Exactly one warning from chirp.cache; message references the cache key.
         warnings = [
-            r for r in caplog.records
-            if r.name == "chirp.cache" and r.levelname == "WARNING"
+            r for r in caplog.records if r.name == "chirp.cache" and r.levelname == "WARNING"
         ]
         assert len(warnings) == 1, (
             f"Expected one chirp.cache WARNING, got: "

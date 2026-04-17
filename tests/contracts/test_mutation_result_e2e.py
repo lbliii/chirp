@@ -72,9 +72,7 @@ class TestMutationResultRegistryAwareFragments:
             )
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         assert response.status == 200
         body = response.text
@@ -106,9 +104,7 @@ class TestMutationResultRegistryAwareFragments:
             )
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         body = response.text
         assert 'id="sidebar-nav"' in body
@@ -131,9 +127,7 @@ class TestMutationResultHtmxRedirect:
             return MutationResult("/thanks")
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         assert response.status == 200
         assert _header(response, "HX-Redirect") == "/thanks"
@@ -203,9 +197,7 @@ class TestMutationResultHxTrigger:
             )
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         assert response.status == 200
         assert _header(response, "HX-Trigger") == "contactSaved"
@@ -221,9 +213,7 @@ class TestMutationResultHxTrigger:
             )
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         assert _header(response, "HX-Trigger") is None
 
@@ -267,9 +257,7 @@ class TestExplicitFragmentSwapOverridesRegistry:
             )
 
         async with TestClient(app) as client:
-            response = await client.post(
-                "/save", headers={"HX-Request": "true"}
-            )
+            response = await client.post("/save", headers={"HX-Request": "true"})
 
         body = response.text
         assert 'id="breadcrumbs"' in body

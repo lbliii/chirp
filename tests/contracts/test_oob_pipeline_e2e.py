@@ -41,7 +41,9 @@ class TestOOBHappyPath:
         def index():
             return OOB(
                 Fragment("fragments.html", "article", heading="Hi", body="hello"),
-                Fragment("fragments.html", "breadcrumbs_oob", target="breadcrumbs", crumbs="Home > Page"),
+                Fragment(
+                    "fragments.html", "breadcrumbs_oob", target="breadcrumbs", crumbs="Home > Page"
+                ),
             )
 
         async with TestClient(app) as client:
@@ -301,9 +303,7 @@ def _pages_mounted_app(tmp_path) -> App:
         encoding="utf-8",
     )
     (pages_dir / "page.py").write_text(
-        "from chirp import Page\n"
-        "def handler() -> Page:\n"
-        "    return Page('page.html', 'content')\n",
+        "from chirp import Page\ndef handler() -> Page:\n    return Page('page.html', 'content')\n",
         encoding="utf-8",
     )
     (pages_dir / "page.html").write_text(
@@ -327,9 +327,7 @@ class TestPR87RegressionReplay:
     proves the wiring is intact end-to-end via a pages-mounted app.
     """
 
-    def test_orphaned_oob_registration_flagged_at_startup_pr87(
-        self, tmp_path
-    ) -> None:
+    def test_orphaned_oob_registration_flagged_at_startup_pr87(self, tmp_path) -> None:
         """Required orphan → ERROR-severity issue under category oob_registry."""
         from chirp.contracts.checker import check_hypermedia_surface
         from chirp.contracts.types import Severity
@@ -350,8 +348,7 @@ class TestPR87RegressionReplay:
             f"All issues: {[(i.category, i.severity, i.message[:80]) for i in result.issues]}"
         )
         assert all(i.severity is Severity.ERROR for i in matching), (
-            f"Required orphan must be ERROR severity, got: "
-            f"{[i.severity for i in matching]}"
+            f"Required orphan must be ERROR severity, got: {[i.severity for i in matching]}"
         )
 
     def test_optional_orphan_downgraded_to_warning_pr87(self, tmp_path) -> None:
@@ -372,6 +369,5 @@ class TestPR87RegressionReplay:
         matching = [i for i in oob_issues if "ghost_optional_oob" in i.message]
         assert matching, "Expected an oob_registry issue for the optional orphan"
         assert all(i.severity is Severity.WARNING for i in matching), (
-            f"Optional orphan must be WARNING severity, got: "
-            f"{[i.severity for i in matching]}"
+            f"Optional orphan must be WARNING severity, got: {[i.severity for i in matching]}"
         )
