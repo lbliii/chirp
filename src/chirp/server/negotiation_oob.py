@@ -185,12 +185,14 @@ def render_layout_oob_blocks(
                 continue
             seen_targets.add(oob.target_id)
 
-            try:
-                template = kida_env.get_template(layout_info.template_name)
-                html = template.render_block(oob.block_name, context)
-            except Exception:
-                _log.debug("Skipping OOB block %s: render failed", oob.block_name)
-                html = ""
+            # build_layout_contract filters OOB blocks against the template's
+            # AST metadata (see render_plan.build_layout_contract), so reaching
+            # here means the block exists in the layout. Any exception from
+            # render_block is therefore a genuine render error (context missing
+            # keys, filter errors, etc.) and must propagate rather than being
+            # silently dropped to an empty OOB swap.
+            template = kida_env.get_template(layout_info.template_name)
+            html = template.render_block(oob.block_name, context)
 
             if oob_registry is not None:
                 swap, wrap = oob_registry.resolve_serialization(oob.target_id)

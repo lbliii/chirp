@@ -366,7 +366,11 @@ def build_layout_contract(
 
 
 def _validate_view_ref(adapter: TemplateAdapter, view: ViewRef) -> None:
-    """Validate that a view's block exists. Raises KeyError if missing."""
+    """Validate that a view's block exists. Raises BlockNotFoundError if missing.
+
+    BlockNotFoundError is a KeyError subclass, so ``except KeyError`` callers
+    continue to work unchanged.
+    """
     if not view.template or not view.block:
         return
     meta = adapter.template_metadata(view.template)
@@ -376,10 +380,9 @@ def _validate_view_ref(adapter: TemplateAdapter, view: ViewRef) -> None:
     if blocks is None:
         return
     if view.block not in blocks:
-        raise KeyError(
-            f"Block '{view.block}' not found in template '{view.template}'. "
-            f"Available blocks: {sorted(blocks.keys())}"
-        )
+        from chirp.errors import BlockNotFoundError
+
+        raise BlockNotFoundError(template=view.template, block=view.block)
 
 
 def execute_render_plan(
@@ -489,30 +492,61 @@ def execute_render_plan(
                     )
                 )
 
-    # Render region updates
+    # Render region updates.
+    #
+    # Pre-check pattern (Kida raises a bare KeyError for missing blocks, too
+    # ambiguous to narrow-catch): look up the block in the template's metadata
+    # first. If absent and the region is registered as optional=True, drop the
+    # region entirely — emitting an empty OOB wrapper would wipe existing DOM
+    # content on swap. If absent and non-optional, raise BlockNotFoundError so
+    # the failure is visible instead of silently substituting "". Any other
+    # render error propagates to the route error handler.
     region_htmls: dict[str, str] = {}
     for ru in region_updates_list:
-        if ru.view.template and ru.view.block:
-            try:
-                html = adapter.render_block(
-                    ru.view.template,
-                    ru.view.block,
-                    ru.view.context,
-                )
-            except Exception:
-                # Block may not exist (e.g. layout lacks ChirpUI OOB blocks)
-                _log.error(
-                    "RenderPlan: block %r in %r failed to render",
+        if not (ru.view.template and ru.view.block):
+            region_htmls[ru.region] = ""
+            continue
+        if not _block_exists(adapter, ru.view.template, ru.view.block):
+            if _region_is_optional(ru.view.block, oob_registry):
+                _log.debug(
+                    "RenderPlan: optional OOB region %r block=%r missing from %r; skipping",
+                    ru.region,
                     ru.view.block,
                     ru.view.template,
-                    exc_info=True,
                 )
-                html = ""
-        else:
-            html = ""
-        region_htmls[ru.region] = html
+                continue
+            from chirp.errors import BlockNotFoundError
+
+            raise BlockNotFoundError(
+                template=ru.view.template,
+                block=ru.view.block,
+                region=ru.region,
+            )
+        region_htmls[ru.region] = adapter.render_block(
+            ru.view.template,
+            ru.view.block,
+            ru.view.context,
+        )
 
     return RenderedPlan(main_html=main_html, region_htmls=region_htmls)
+
+
+def _block_exists(adapter: "TemplateAdapter", template: str, block: str) -> bool:
+    """Check template metadata for a named block. Returns False when the template
+    is missing/unparseable (adapter.template_metadata returns None)."""
+    meta = adapter.template_metadata(template)
+    if meta is None:
+        return False
+    blocks = getattr(meta, "blocks", None) or ()
+    return block in blocks
+
+
+def _region_is_optional(block_name: str, oob_registry: OOBRegistry | None) -> bool:
+    """True when the OOB region is explicitly registered as optional."""
+    if oob_registry is None:
+        return False
+    config = oob_registry.get(block_name)
+    return config is not None and config.optional
 
 
 def serialize_rendered_plan(

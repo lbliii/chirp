@@ -133,6 +133,29 @@ if not result:
     return ValidationError("page.html", "form_block", errors=result.errors, form=values)
 ```
 
+### OOB fail-loud policy
+
+Region updates (shell OOB swaps, Suspense deferred blocks) **must** resolve to a
+block that exists in the target template. Missing blocks raise
+`chirp.errors.BlockNotFoundError` rather than emitting empty swaps that would
+silently wipe live DOM content. Use `optional=True` only when the region is
+legitimately absent from some layouts (e.g. shell regions for apps without
+`chirp-ui`):
+
+```python
+app.register_oob_region(
+    "breadcrumbs_oob",
+    target_id="chirpui-topbar-breadcrumbs",
+    optional=True,   # silent-skip when layout does not define this block
+)
+```
+
+`app.check()` enforces this at startup via the `oob_registry` category: ERROR
+for non-optional orphans, WARNING for optional orphans. Do not use
+`optional=True` to paper over typos — fix the layout or the registration.
+`BlockNotFoundError` multi-inherits from `KeyError` for back-compat with existing
+`except KeyError` handlers. See `docs/guides/oob-registry.md`.
+
 ## Code Style
 
 - **Frozen dataclasses** for models and config (thread-safe, immutable)

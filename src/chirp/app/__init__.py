@@ -290,18 +290,30 @@ class App:
         target_id: str,
         swap: str = "innerHTML",
         wrap: bool = True,
+        optional: bool = False,
     ) -> None:
         """Register an OOB region for automatic layout-contract discovery.
 
         Call during setup (before app.run()). The block_name must match a
         ``{% region <block_name>(...) %}`` in your layout template.
+
+        optional: When True, layouts that omit the block are allowed — the
+            region is silently skipped at render time and the orphan-registration
+            check downgrades to WARNING. Default False means missing blocks are
+            ERRORs at ``app.check()`` and render-time KeyErrors become
+            ``BlockNotFoundError`` with a clear message.
         """
         from chirp.templating.oob_registry import OOBRegionConfig
 
         self._check_not_frozen()
         self._mutable_state.oob_registry.register(
             block_name,
-            OOBRegionConfig(target_id=target_id, swap=swap, wrap=wrap),
+            OOBRegionConfig(
+                target_id=target_id,
+                swap=swap,
+                wrap=wrap,
+                optional=optional,
+            ),
         )
 
     def register_fragment_target(

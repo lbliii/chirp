@@ -18,6 +18,33 @@ class ConfigurationError(ChirpError):
     """
 
 
+class BlockNotFoundError(ChirpError, KeyError):
+    """A named template block does not exist in the target template.
+
+    Raised at render time when a region update (OOB fragment, Suspense
+    deferred block, layout contract entry) references a block the
+    template does not define. App-level ``register_oob_region(..., optional=True)``
+    is the opt-out for shell regions that may legitimately be absent
+    from some layouts; non-optional misses reach here and propagate
+    so they're visible rather than silently producing empty swaps.
+
+    Multi-inherits from ``KeyError`` so existing ``except KeyError`` handlers
+    (including Kida's documented ``render_block`` contract) still catch it.
+    """
+
+    def __init__(self, *, template: str, block: str, region: str | None = None) -> None:
+        self.template = template
+        self.block = block
+        self.region = region
+        location = f" (OOB region {region!r})" if region else ""
+        message = (
+            f"Block {block!r} not found in template {template!r}{location}. "
+            "Either add the block to the layout template, or if this region is "
+            "legitimately optional, register it with optional=True."
+        )
+        super().__init__(message)
+
+
 @dataclass(frozen=True, slots=True)
 class HTTPError(ChirpError):
     """An error that maps directly to an HTTP status code.

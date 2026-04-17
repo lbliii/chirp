@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OOB render errors fail loud** — `execute_render_plan` previously caught every exception raised while rendering an OOB region and substituted `html = ""`, producing empty swaps that wiped existing DOM content. Missing blocks now raise `chirp.errors.BlockNotFoundError`; genuine render errors (context `KeyError`, filter errors) propagate to the route error handler. See `docs/guides/oob-registry.md`.
+- **Orphan OOB registrations error at freeze** — `app.check()` now emits `Severity.ERROR` (was `WARNING`) when the OOB registry contains a block no layout template defines. Non-optional orphans block debug-mode freeze; `app.override_contract_severity("oob_registry", Severity.WARNING)` restores prior behavior globally.
+
+### Added
+
+- **`register_oob_region(..., optional=True)`** — Opt-out for shell regions that legitimately appear in only some layouts. Optional orphans stay at `WARNING`; at render time, optional regions missing from the current layout are silently dropped (not emitted as empty OOB wrappers). `chirp.ext.chirp_ui`'s auto-registered breadcrumb, sidebar, title, and shell-actions regions all default to `optional=True`.
+- **`chirp.errors.BlockNotFoundError`** — Multi-inherits from `ChirpError` and `KeyError`, so existing `except KeyError` handlers (including Kida's documented `render_block` contract) continue to catch it. Carries `template`, `block`, and `region` attributes for structured error handling.
+
+### Migration
+
+If `app.check()` starts failing after upgrading with `oob_registry` ERRORs:
+1. If the layout legitimately omits the block (e.g. a marketing page without a sidebar), add `optional=True` to the `register_oob_region()` call.
+2. Otherwise, add `{% region <block_name> %}...{% end %}` to the layout template — `app.check()` is telling you the registration is a dead letter.
+3. To defer the fix temporarily, call `app.override_contract_severity("oob_registry", Severity.WARNING)` during app setup.
+
 ## [0.3.3] — 2026-03-30
 
 ### Fixed
