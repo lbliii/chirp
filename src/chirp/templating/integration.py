@@ -25,13 +25,35 @@ def _is_chirp_ui_filter_override(name: str, func: Callable[..., Any]) -> bool:
     return getattr(func, "__module__", "").startswith("chirp_ui")
 
 
+_CHIRP_UI_FILTER_NAMES = (
+    "bem",
+    "contrast_text",
+    "deprecate_param",
+    "field_errors",
+    "html_attrs",
+    "icon",
+    "resolve_color",
+    "resolve_status_variant",
+    "sanitize_color",
+    "shell_action_btn_variant",
+    "validate_size",
+    "validate_variant",
+    "validate_variant_block",
+    "value_type",
+)
+
+_CHIRP_UI_GLOBAL_NAMES = ("build_hx_attrs", "check_required_id")
+
+
 def _ensure_chirp_ui_filters(env: Environment) -> None:
     """Ensure chirp-ui required filters and globals exist when chirp-ui templates are loadable.
 
-    When chirp adds chirp-ui's PackageLoader, those templates require bem, field_errors,
-    html_attrs, validate_variant, validate_variant_block, validate_size, icon as filters
-    and build_hx_attrs, tab_is_active as globals. This fallback adds any missing entries
-    so the env is self-consistent.
+    When chirp adds chirp-ui's PackageLoader, those templates require a set of
+    filters and globals to compile. This fallback mirrors the surface registered
+    by ``chirp_ui.register_filters`` so the env is self-consistent even when
+    the app did not call ``use_chirp_ui``. Kept name-by-name (rather than calling
+    chirp-ui's own registrar) because Kida's ``Environment`` doesn't implement
+    the full ``TemplateFilterApp`` protocol.
     See docs/rfcs/001-component-filter-contract.md.
     """
     try:
@@ -39,51 +61,52 @@ def _ensure_chirp_ui_filters(env: Environment) -> None:
     except ImportError:
         return
     try:
-        from chirp_ui.filters import (
-            bem,
-            field_errors,
-            html_attrs,
-            validate_size,
-            validate_variant,
-            validate_variant_block,
-        )
+        import chirp_ui.filters as _filters
     except ImportError:
         return
-    try:
-        from chirp_ui.filters import icon
-    except ImportError:
-        from chirp_ui.icons import icon
-    chirp_ui_filters = {
-        "bem": bem,
-        "field_errors": field_errors,
-        "html_attrs": html_attrs,
-        "icon": icon,
-        "validate_size": validate_size,
-        "validate_variant": validate_variant,
-        "validate_variant_block": validate_variant_block,
-    }
-    missing = {k: v for k, v in chirp_ui_filters.items() if k not in env.filters}
-    if missing:
-        env.update_filters(cast(dict[str, Callable[..., Any]], missing))
+
+    # Overwrite chirp's stubs (e.g. ``bem``) with chirp-ui's real implementations
+    # when both exist — the stubs only accept a subset of the real kwargs, so
+    # letting the stub win breaks chirp-ui templates that pass newer kwargs.
+    # This matches what chirp_ui.register_filters would do if the user had
+    # called use_chirp_ui(app).
+    resolved: dict[str, Callable[..., Any]] = {}
+    for name in _CHIRP_UI_FILTER_NAMES:
+        func = getattr(_filters, name, None)
+        if func is None and name == "icon":
+            try:
+                from chirp_ui.icons import icon as _icon
+
+                func = _icon
+            except ImportError:
+                func = None
+        if func is not None:
+            resolved[name] = func
+    if resolved:
+        env.update_filters(cast(dict[str, Callable[..., Any]], resolved))
 
     # Ensure chirp-ui globals (functions used directly in templates, not as filters)
-    chirp_ui_globals: dict[str, Callable[..., Any]] = {}
-    try:
-        from chirp_ui.filters import build_hx_attrs
-
-        chirp_ui_globals["build_hx_attrs"] = build_hx_attrs
-    except ImportError:
-        pass
-    try:
-        from chirp_ui.route_tabs import tab_is_active
-
-        chirp_ui_globals["tab_is_active"] = tab_is_active
-    except ImportError:
-        pass
     env_globals = env.globals if hasattr(env, "globals") else {}
-    for name, func in chirp_ui_globals.items():
-        if name not in env_globals:
+    for name in _CHIRP_UI_GLOBAL_NAMES:
+        if name in env_globals:
+            continue
+        func = getattr(_filters, name, None)
+        if func is not None:
             env.add_global(name, func)
+    if "tab_is_active" not in env_globals:
+        try:
+            from chirp_ui.route_tabs import tab_is_active
+
+            env.add_global("tab_is_active", tab_is_active)
+        except ImportError:
+            pass
+    if "route_link_attrs" not in env_globals:
+        try:
+            from chirp_ui.filters import make_route_link_attrs
+
+            env.add_global("route_link_attrs", make_route_link_attrs())
+        except ImportError:
+            pass
 
 
 def create_environment(
@@ -139,6 +162,12 @@ def create_environment(
     # Register chirp's built-in filters (field_errors, qs, etc.)
     env.update_filters(BUILTIN_FILTERS)
 
+    # When chirp-ui templates are loadable, ensure required filters exist.
+    # Fallback for older chirp or apps that didn't call register_filters.
+    # Runs before user filters so user registrations still win.
+    # See docs/rfcs/001-component-filter-contract.md
+    _ensure_chirp_ui_filters(env)
+
     # Register user-defined filters (may override built-ins)
     if filters:
         for name, func in filters.items():
@@ -154,11 +183,6 @@ def create_environment(
                     stacklevel=2,
                 )
         env.update_filters(filters)
-
-    # When chirp-ui templates are loadable, ensure required filters exist.
-    # Fallback for older chirp or apps that didn't call register_filters.
-    # See docs/rfcs/001-component-filter-contract.md
-    _ensure_chirp_ui_filters(env)
 
     # Register user-defined globals
     for name, value in BUILTIN_GLOBALS.items():

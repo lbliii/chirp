@@ -20,7 +20,7 @@
       "<strong>" ~ stock.symbol ~ "</strong>",
       stock.name,
       "$" ~ stock.price,
-      badge(("+" if stock.change > 0 else "") ~ stock.change, variant="success" if stock.change > 0 else "danger"),
+      badge(("+" if stock.change > 0 else "") ~ stock.change, variant="success" if stock.change > 0 else "error"),
       stock.volume
     ) }}
     {% end %}
