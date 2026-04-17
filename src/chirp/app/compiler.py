@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
@@ -13,6 +13,9 @@ from chirp.tools.registry import compile_tools
 
 from .registry import AppRegistry
 from .state import MutableAppState, RuntimeAppState
+
+if TYPE_CHECKING:
+    from chirp.app import App
 
 
 def _collect_builtin_middleware(
@@ -297,10 +300,8 @@ class AppCompiler:
             make_fragment_dispatch_pending_route,
         )
 
-        _reject_reserved_prefix_collisions(
-            self._mutable.pending_routes, FRAGMENT_ROUTE_PREFIX
-        )
-        self._mutable.pending_routes.append(make_fragment_dispatch_pending_route(app))
+        _reject_reserved_prefix_collisions(self._mutable.pending_routes, FRAGMENT_ROUTE_PREFIX)
+        self._mutable.pending_routes.append(make_fragment_dispatch_pending_route(cast("App", app)))
 
         router = _compile_routes(
             self._mutable.pending_routes,

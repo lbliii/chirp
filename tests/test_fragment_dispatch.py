@@ -67,18 +67,14 @@ class TestFragmentDispatch:
             response = await client.get("/_frag/nope/zzz?_b=main")
             assert response.status == 404
 
-    async def test_handler_returning_fragment_passes_through(
-        self, app_with_blocks: App
-    ) -> None:
+    async def test_handler_returning_fragment_passes_through(self, app_with_blocks: App) -> None:
         async with TestClient(app_with_blocks) as client:
             response = await client.get("/_frag/plain/carol?_b=header")
             assert response.status == 200
             # Handler hard-codes block "header" and ignores _b — that's fine
             assert "Hello, carol" in response.text
 
-    async def test_referenced_routes_are_not_block_addressable(
-        self, app_with_blocks: App
-    ) -> None:
+    async def test_referenced_routes_are_not_block_addressable(self, app_with_blocks: App) -> None:
         async with TestClient(app_with_blocks) as client:
             response = await client.get("/_frag/events?_b=main")
             assert response.status == 404
@@ -182,9 +178,7 @@ class TestFragmentRouteRegistration:
         app = App(config=AppConfig(template_dir=str(tmp_path), debug=False))
         app.freeze()
         dispatcher = next(
-            r
-            for r in app._runtime_state.router.routes
-            if r.path == "/_frag/{path:path}"
+            r for r in app._runtime_state.router.routes if r.path == "/_frag/{path:path}"
         )
         assert dispatcher.referenced is True
         assert dispatcher.name == "chirp_fragment_dispatch"
