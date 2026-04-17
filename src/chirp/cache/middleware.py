@@ -54,10 +54,16 @@ class CacheMiddleware:
 
         response = await next(request)
 
-        # Only cache Response (not streaming/SSE) with status 200
+        # Only cache Response (not streaming/SSE) with status 200 and no
+        # Set-Cookie. Cookies arrive via two paths — ``with_cookie()`` writes
+        # to ``response.cookies`` (flattened to Set-Cookie headers later by
+        # sender.py); ``with_header("Set-Cookie", ...)`` writes to
+        # ``response.headers`` directly. Both must skip caching, otherwise
+        # one user's cookie would be replayed to others.
         if (
             isinstance(response, Response)
             and response.status == 200
+            and not response.cookies
             and not any(k.lower() == "set-cookie" for k, v in response.headers)
         ):
             try:
