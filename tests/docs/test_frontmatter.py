@@ -143,6 +143,124 @@ class TestTocExtraction:
         assert _extract_toc("<p>No headings here</p>") == ()
 
 
+# ── Block splitting ─────────────────────────────────────────────────────
+
+
+class TestSlugToIdentifier:
+    def test_kebab_to_snake(self) -> None:
+        from chirp.docs.frontmatter import _slug_to_identifier
+
+        assert _slug_to_identifier("section-overview") == "section_overview"
+
+    def test_strips_punctuation(self) -> None:
+        from chirp.docs.frontmatter import _slug_to_identifier
+
+        assert _slug_to_identifier("why?-how!") == "why_how"
+
+    def test_leading_digit_prefixed(self) -> None:
+        from chirp.docs.frontmatter import _slug_to_identifier
+
+        assert _slug_to_identifier("1-intro") == "s_1_intro"
+
+    def test_empty_fallback(self) -> None:
+        from chirp.docs.frontmatter import _slug_to_identifier
+
+        assert _slug_to_identifier("") == "section"
+        assert _slug_to_identifier("---") == "section"
+
+    def test_lowercases(self) -> None:
+        from chirp.docs.frontmatter import _slug_to_identifier
+
+        assert _slug_to_identifier("Section-One") == "section_one"
+
+
+class TestSplitBlocks:
+    def test_splits_on_h2(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = (
+            "<p>Lead in.</p>"
+            '<h2 id="alpha">Alpha</h2><p>A body.</p>'
+            '<h2 id="beta">Beta</h2><p>B body.</p>'
+        )
+        blocks = _split_blocks(html)
+        ids = [b.id for b in blocks]
+        assert ids == ["intro", "alpha", "beta"]
+        assert blocks[0].depth == 0
+        assert blocks[1].depth == 2
+        assert blocks[1].heading == "Alpha"
+        assert blocks[1].anchor == "alpha"
+        assert "A body." in blocks[1].html
+        assert "B body." not in blocks[1].html
+        assert "B body." in blocks[2].html
+
+    def test_falls_back_to_h3(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = '<h3 id="one">One</h3><p>x</p><h3 id="two">Two</h3><p>y</p>'
+        blocks = _split_blocks(html)
+        assert [b.id for b in blocks] == ["one", "two"]
+        assert all(b.depth == 3 for b in blocks)
+
+    def test_no_headings_single_intro(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        blocks = _split_blocks("<p>Just prose.</p>")
+        assert len(blocks) == 1
+        assert blocks[0].id == "intro"
+        assert blocks[0].depth == 0
+
+    def test_empty_html_returns_empty(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        assert _split_blocks("") == ()
+        assert _split_blocks("   \n  ") == ()
+
+    def test_no_intro_when_heading_is_first(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = '<h2 id="alpha">Alpha</h2><p>A.</p>'
+        blocks = _split_blocks(html)
+        assert [b.id for b in blocks] == ["alpha"]
+
+    def test_duplicate_ids_disambiguated(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = (
+            '<h2 id="dup">One</h2><p>a</p>'
+            '<h2 id="dup">Two</h2><p>b</p>'
+            '<h2 id="dup">Three</h2><p>c</p>'
+        )
+        blocks = _split_blocks(html)
+        assert [b.id for b in blocks] == ["dup", "dup_2", "dup_3"]
+        assert [b.anchor for b in blocks] == ["dup", "dup", "dup"]
+
+    def test_anchor_preserved_kebab(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = '<h2 id="section-overview">Overview</h2><p>x</p>'
+        blocks = _split_blocks(html)
+        assert blocks[0].id == "section_overview"
+        assert blocks[0].anchor == "section-overview"
+
+    def test_falls_back_to_heading_text_when_no_id(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = "<h2>Getting Started</h2><p>x</p>"
+        blocks = _split_blocks(html)
+        assert blocks[0].id == "getting_started"
+        assert blocks[0].anchor == ""
+
+    def test_h3_ignored_when_h2_present(self) -> None:
+        from chirp.docs.frontmatter import _split_blocks
+
+        html = '<h2 id="a">A</h2><p>x</p><h3 id="a1">A-sub</h3><p>y</p><h2 id="b">B</h2><p>z</p>'
+        blocks = _split_blocks(html)
+        assert [b.id for b in blocks] == ["a", "b"]
+        assert "A-sub" in blocks[0].html
+        assert "y" in blocks[0].html
+
+
 # ── Slug derivation ─────────────────────────────────────────────────────
 
 

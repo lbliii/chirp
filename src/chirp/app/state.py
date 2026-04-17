@@ -18,6 +18,7 @@ from chirp.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
     from chirp.data.database import Database
+    from chirp.live_blocks import LiveBlockSpec
 
 
 @dataclass(slots=True)
@@ -85,6 +86,7 @@ class MutableAppState:
     contract_severity_overrides: dict[str, Severity] = field(default_factory=dict)
     freeze_param_providers: dict[str, Callable[..., Any]] = field(default_factory=dict)
     freeze_exclude: set[str] = field(default_factory=set)
+    live_blocks: dict[tuple[str, str], LiveBlockSpec] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

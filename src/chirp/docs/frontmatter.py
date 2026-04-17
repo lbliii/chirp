@@ -10,7 +10,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from chirp.docs.models import DocMetadata, DocPage, DocSource, TocEntry
+from kida.template import Markup
+
+from chirp.docs.models import DocBlock, DocMetadata, DocPage, DocSource, TocEntry
 
 _FRONTMATTER_RE = re.compile(
     r"\A---\s*\n(.*?)\n---\s*\n",
@@ -107,6 +109,84 @@ def _extract_toc(html: str) -> tuple[TocEntry, ...]:
     return tuple(entries)
 
 
+_IDENT_CLEAN_RE = re.compile(r"[^a-zA-Z0-9_]+")
+
+
+def _slug_to_identifier(s: str) -> str:
+    """Convert kebab-case (or arbitrary text) to a snake_case Python identifier.
+
+    Kida block names must be valid Python identifiers, while heading ids
+    emitted by patitas are kebab-case (``section-overview``).
+    """
+    cleaned = _IDENT_CLEAN_RE.sub("_", s).strip("_").lower()
+    if not cleaned:
+        return "section"
+    if cleaned[0].isdigit():
+        cleaned = "s_" + cleaned
+    return cleaned
+
+
+def _split_blocks(html: str) -> tuple[DocBlock, ...]:
+    """Split rendered HTML into sections at H2 (or H3 fallback) boundaries.
+
+    Content before the first heading becomes a synthesized ``intro`` block
+    (``depth=0``, empty ``heading``/``anchor``).  Duplicate ids are
+    disambiguated with a numeric suffix.
+    """
+    matches = list(_HTML_HEADING_RE.finditer(html))
+
+    boundary_level: int | None = None
+    for lvl in (2, 3):
+        if any(int(m.group(1)) == lvl for m in matches):
+            boundary_level = lvl
+            break
+
+    if boundary_level is None:
+        if html.strip():
+            return (DocBlock(id="intro", heading="", html=Markup(html), depth=0, anchor=""),)
+        return ()
+
+    boundaries = [m for m in matches if int(m.group(1)) == boundary_level]
+    blocks: list[DocBlock] = []
+    seen_ids: dict[str, int] = {}
+
+    def _unique(base: str) -> str:
+        if base not in seen_ids:
+            seen_ids[base] = 1
+            return base
+        seen_ids[base] += 1
+        return f"{base}_{seen_ids[base]}"
+
+    intro_html = html[: boundaries[0].start()]
+    if intro_html.strip():
+        blocks.append(
+            DocBlock(
+                id=_unique("intro"),
+                heading="",
+                html=Markup(intro_html),
+                depth=0,
+                anchor="",
+            )
+        )
+
+    for i, m in enumerate(boundaries):
+        start = m.start()
+        end = boundaries[i + 1].start() if i + 1 < len(boundaries) else len(html)
+        anchor = m.group(2) or ""
+        heading_text = _TAG_RE.sub("", m.group(3)).strip()
+        base_id = _slug_to_identifier(anchor or heading_text)
+        blocks.append(
+            DocBlock(
+                id=_unique(base_id),
+                heading=heading_text,
+                html=Markup(html[start:end]),
+                depth=boundary_level,
+                anchor=anchor,
+            )
+        )
+    return tuple(blocks)
+
+
 _INDEX_STEMS = frozenset({"index", "_index", "README"})
 
 
@@ -154,7 +234,9 @@ def parse_file(md_path: Path, content_dir: Path) -> DocPage:
 
     renderer = MarkdownRenderer()
     html = renderer.render(body)
-    toc = _extract_toc(str(html))
+    html_str = str(html)
+    toc = _extract_toc(html_str)
+    blocks = _split_blocks(html_str)
 
     return DocPage(
         slug=slug,
@@ -165,4 +247,5 @@ def parse_file(md_path: Path, content_dir: Path) -> DocPage:
         metadata=metadata,
         source=DocSource.MARKDOWN,
         source_path=md_path,
+        blocks=blocks,
     )

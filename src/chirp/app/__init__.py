@@ -446,6 +446,48 @@ class App:
         """
         self._mutable_state.freeze_exclude.add(path)
 
+    def live_block(
+        self,
+        route: str,
+        block: str,
+        *,
+        trigger: str = "load",
+        swap: str = "innerHTML",
+        skeleton: str | None = None,
+        cache_seconds: int | None = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Declare a live block — a template block served dynamically from a frozen page.
+
+        At freeze time the named block is replaced in the emitted HTML with an
+        htmx placeholder that fetches from ``/_frag{route}?_b={block}``. At
+        request time the block-fetch dispatcher invokes the decorated handler
+        and returns only the named block.
+
+        ``route`` must match a registered route; ``block`` must be a named
+        block in that route's template. Both are validated at ``app.check()``::
+
+            @app.live_block("/docs/{slug:path}", "recent_updates")
+            async def recent_updates(request: Request) -> Fragment:
+                return Fragment("docs/page.html", "recent_updates", updates=...)
+        """
+        self._check_not_frozen()
+
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            from chirp.live_blocks import LiveBlockSpec
+
+            self._mutable_state.live_blocks[route, block] = LiveBlockSpec(
+                route=route,
+                block=block,
+                handler=fn,
+                trigger=trigger,
+                swap=swap,
+                skeleton=skeleton,
+                cache_seconds=cache_seconds,
+            )
+            return fn
+
+        return decorator
+
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.
 

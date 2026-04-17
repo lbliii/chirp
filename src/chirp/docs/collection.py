@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from chirp.docs.models import DocPage, NavGroup
+from chirp.docs.models import DocBlock, DocPage, NavGroup
 
 
 class DocsCollection:
@@ -101,6 +101,21 @@ class DocsCollection:
     def get(self, slug: str) -> DocPage | None:
         """Look up a page by slug.  Returns ``None`` if not found."""
         return self._by_slug.get(slug)
+
+    def get_block(self, slug: str, block_id: str) -> DocBlock | None:
+        """Look up a single section block on a page.
+
+        Returns ``None`` if the page or the block id is unknown.  Block
+        ids are the snake_case identifiers assigned by ``_split_blocks``
+        (see ``chirp.docs.frontmatter``).
+        """
+        page = self._by_slug.get(slug)
+        if page is None:
+            return None
+        for block in page.blocks:
+            if block.id == block_id:
+                return block
+        return None
 
     def list(self, *, category: str | None = None) -> tuple[DocPage, ...]:
         """Return pages sorted by (order, title).

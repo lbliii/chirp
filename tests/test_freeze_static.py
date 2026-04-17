@@ -328,7 +328,7 @@ class TestRichSearchIndex:
 
         raw = (output / "_search-index.js").read_text()
         data = json.loads(raw.removeprefix("window.__chirp_search=").removesuffix(";"))
-        assert data["version"] == 1
+        assert data["version"] == 2
         entries = data["entries"]
         # Find a doc page entry (not the index)
         doc_entries = [e for e in entries if "c" in e]

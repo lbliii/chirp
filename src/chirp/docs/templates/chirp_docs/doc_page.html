@@ -69,6 +69,8 @@
 <article id="doc_content" class="chirp-docs-content">
   {% if doc is deferred %}
   <div class="chirp-docs-skeleton">Loading content...</div>
+  {% elif doc.blocks %}
+  {%- for block in doc.blocks -%}{{ block.html }}{%- endfor %}
   {% else %}
   {{ doc.html }}
   {% endif %}

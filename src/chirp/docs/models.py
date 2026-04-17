@@ -33,6 +33,24 @@ class TocEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class DocBlock:
+    """One section of a doc page, split at an H2 (or H3) boundary.
+
+    ``id`` is a snake_case identifier suitable for a kida block name
+    (``section_<id>``).  ``anchor`` is the original kebab-case heading id
+    preserved for URL fragments (``#section-overview``).  Content before
+    the first heading becomes a synthesized ``intro`` block with
+    ``depth=0``.
+    """
+
+    id: str
+    heading: str
+    html: Markup
+    depth: int
+    anchor: str
+
+
+@dataclass(frozen=True, slots=True)
 class DocMetadata:
     """Frontmatter fields parsed from a markdown file header."""
 
@@ -60,6 +78,7 @@ class DocPage:
     metadata: DocMetadata
     source: DocSource
     source_path: Path | None = None
+    blocks: tuple[DocBlock, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

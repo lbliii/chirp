@@ -37,6 +37,7 @@ from .rules_htmx import (
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
+from .rules_live_blocks import check_live_blocks
 from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
 from .rules_page_shell import check_page_shell_contracts
@@ -596,6 +597,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_csrf_session_order(middleware_list))
     result.issues.extend(check_middleware_signatures(middleware_list))
     result.issues.extend(check_secret_key(app.config))
+
+    live_blocks = getattr(app._mutable_state, "live_blocks", {})
+    result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))
 
     # Run registered plugin checks
     registered_checks = getattr(app, "_mutable_state", None)

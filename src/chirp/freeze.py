@@ -10,6 +10,7 @@ S3, GitHub Pages, Cloudflare, or plain ``file://`` — without a
 server to resolve clean URLs.
 """
 
+import html as _html
 import json
 import logging
 import re
@@ -20,8 +21,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chirp.server.fragment_dispatch import fragment_url
+
 if TYPE_CHECKING:
     from chirp.app import App
+    from chirp.live_blocks import LiveBlockSpec
 
 _logger = logging.getLogger(__name__)
 
@@ -48,6 +52,22 @@ class FreezeResult:
 
 
 @dataclass(frozen=True, slots=True)
+class BlockEntry:
+    """One addressable section inside a ``SearchEntry``.
+
+    Block-grained entries enable deep-linking search results to
+    ``#anchor`` targets rather than only page URLs.  ``body`` should be
+    plain text (tags stripped) for direct match scoring.
+    """
+
+    block_id: str
+    heading: str
+    body: str
+    anchor: str
+    depth: int
+
+
+@dataclass(frozen=True, slots=True)
 class SearchEntry:
     """Structured search data captured at render time.
 
@@ -65,6 +85,7 @@ class SearchEntry:
     toc: tuple[dict[str, Any], ...] = ()
     template_name: str = ""
     body: str = ""
+    blocks: tuple[BlockEntry, ...] = ()
 
 
 _search_entries: ContextVar[list[SearchEntry] | None] = ContextVar(
@@ -190,18 +211,29 @@ _STATIC_SEARCH_JS = r"""(function(){
     var q=inp.value.toLowerCase().trim(),el=document.getElementById('doc_list');if(!el)return;
     if(!q&&!activeCat){el.innerHTML='<p class="chirp-docs-no-results">Type to search documentation.</p>';return}
 
-    /* Score and filter */
+    /* Score pages + best-matching block for each.  When a block's score
+       is at least as good as the page-level score, the block wins — the
+       result links to #anchor for deep-linking to that section. */
     var scored=[];
     entries.forEach(function(p){
       if(activeCat&&(p.c||'')!==activeCat)return;
-      var s=0,tl=p.t.toLowerCase(),dl=(p.d||'').toLowerCase(),bl=(p.body||'').toLowerCase();
-      if(q){
-        if(tl.includes(q))s+=5;
-        if(dl.includes(q))s+=3;
-        if(bl.includes(q))s+=1;
-        if(s===0)return;
-      }else{s=1;}
-      scored.push({s:s,p:p});
+      if(!q){scored.push({s:1,p:p});return;}
+      var tl=p.t.toLowerCase(),dl=(p.d||'').toLowerCase(),bdl=(p.body||'').toLowerCase(),ps=0;
+      if(tl.includes(q))ps+=5;
+      if(dl.includes(q))ps+=3;
+      if(bdl.includes(q))ps+=1;
+      var bestBlock=null,bestScore=0;
+      if(p.blocks){
+        for(var j=0;j<p.blocks.length;j++){
+          var b=p.blocks[j];
+          var hs=(b.h||'').toLowerCase(),bs=(b.b||'').toLowerCase(),s=0;
+          if(hs.includes(q))s+=4;
+          if(bs.includes(q))s+=1;
+          if(s>bestScore){bestScore=s;bestBlock=b;}
+        }
+      }
+      if(bestBlock&&bestScore>=ps)scored.push({s:bestScore+ps,p:p,block:bestBlock});
+      else if(ps>0)scored.push({s:ps,p:p});
     });
     scored.sort(function(a,b){return b.s-a.s;});
 
@@ -211,10 +243,16 @@ _STATIC_SEARCH_JS = r"""(function(){
     if(!scored.length){el.innerHTML=h+'<p class="chirp-docs-no-results">No pages found.</p>';return}
     h+='<ul>';
     for(var i=0;i<scored.length;i++){
-      var p=scored[i].p;
-      h+='<li><a href="'+base+p.u+'">';
-      h+='<strong>'+esc(p.t)+'</strong>';
-      if(p.d)h+='<span>'+esc(p.d)+'</span>';
+      var r=scored[i],p=r.p;
+      var href=base+p.u+(r.block&&r.block.a?'#'+r.block.a:'');
+      h+='<li><a href="'+href+'">';
+      if(r.block){
+        h+='<strong>'+esc(p.t)+' \u203a '+esc(r.block.h||'')+'</strong>';
+        if(r.block.b)h+='<span>'+esc(r.block.b.substring(0,150))+'</span>';
+      }else{
+        h+='<strong>'+esc(p.t)+'</strong>';
+        if(p.d)h+='<span>'+esc(p.d)+'</span>';
+      }
       if(p.c)h+='<small class="chirp-search-cat-label">'+esc(p.c)+'</small>';
       h+='</a></li>';
     }
@@ -285,13 +323,19 @@ def _build_rich_search_index(
     get full metadata (category, tags, TOC, description).  Pages without
     contributions fall back to HTML scraping for title + snippet.
 
-    The manifest format::
+    The manifest format (v2)::
 
         {
-            "version": 1,
+            "version": 2,
             "facets": {"category": [...], "tags": [...]},
-            "entries": [{"u", "t", "d", "c", "tags", "toc", "body"}, ...]
+            "entries": [{"u", "t", "d", "c", "tags", "toc", "body", "blocks"}, ...]
         }
+
+    Each block entry has ``{"id", "h", "b", "a", "d"}`` for block id,
+    heading, plain-text body, anchor (href fragment), and heading depth.
+
+    Version 2 is a superset of v1: readers that ignore ``blocks`` behave
+    identically to v1 readers.
     """
     entries: list[dict[str, Any]] = []
     contributed_urls: set[str] = set()
@@ -313,6 +357,17 @@ def _build_rich_search_index(
             entry["toc"] = list(contrib.toc)
         if contrib.body:
             entry["body"] = contrib.body
+        if contrib.blocks:
+            entry["blocks"] = [
+                {
+                    "id": b.block_id,
+                    "h": b.heading,
+                    "b": b.body,
+                    "a": b.anchor,
+                    "d": b.depth,
+                }
+                for b in contrib.blocks
+            ]
         entries.append(entry)
 
     # Fallback: pages without contributions get HTML-scraped entries.
@@ -340,7 +395,65 @@ def _build_rich_search_index(
     if tags:
         facets["tags"] = tags
 
-    return {"version": 1, "facets": facets, "entries": entries}
+    return {"version": 2, "facets": facets, "entries": entries}
+
+
+_HREF_RE = re.compile(r'<a\s+[^>]*?href="(/[^"]*)"', re.IGNORECASE)
+
+
+def _extract_internal_hrefs(html: str, known_urls: frozenset[str]) -> list[str]:
+    """Return the set of internal URLs referenced by ``<a href>`` in *html*.
+
+    Fragments (``#section``) and query strings (``?x=1``) are stripped
+    before matching against *known_urls*.  External links (``https:``,
+    ``mailto:``) are not captured because the regex anchors on ``href="/`` .
+    """
+    seen: dict[str, None] = {}  # preserves insertion order for determinism tests
+    for m in _HREF_RE.finditer(html):
+        url = m.group(1)
+        bare = url.split("#", 1)[0].split("?", 1)[0]
+        normalized = "/" + bare.strip("/") if bare != "/" else "/"
+        if normalized in known_urls and normalized not in seen:
+            seen[normalized] = None
+    return list(seen)
+
+
+def _build_xref_graph(
+    rendered: list[tuple[str, str]], known_urls: frozenset[str]
+) -> dict[str, Any]:
+    """Build the cross-reference graph from rendered pages.
+
+    Manifest format::
+
+        {
+            "version": 1,
+            "pages": {
+                "/docs/intro/": {
+                    "references": ["/docs/a/", "/docs/b/"],
+                    "referenced_by": ["/docs/c/"]
+                }
+            }
+        }
+
+    Lists are sorted alphabetically so the output is deterministic.  Self-
+    references are excluded.
+    """
+    forward: dict[str, list[str]] = {}
+    reverse: dict[str, set[str]] = {}
+    for url, html in rendered:
+        source = "/" + url.strip("/") if url != "/" else "/"
+        refs = [r for r in _extract_internal_hrefs(html, known_urls) if r != source]
+        forward[source] = refs
+        for target in refs:
+            reverse.setdefault(target, set()).add(source)
+
+    pages: dict[str, dict[str, list[str]]] = {}
+    for source in sorted(forward):
+        pages[source] = {
+            "references": sorted(forward[source]),
+            "referenced_by": sorted(reverse.get(source, set())),
+        }
+    return {"version": 1, "pages": pages}
 
 
 def _inject_static_search(html: str, depth: int, index_path: str) -> str:
@@ -406,6 +519,90 @@ def _enumerate_urls(app: App) -> tuple[list[str], list[str], list[str]]:
     return urls, skipped, warnings
 
 
+def _live_blocks_for_url(app: App, url: str) -> list[tuple[str, LiveBlockSpec]]:
+    """Return ``(route_path, spec)`` for live blocks matching *url*.
+
+    An empty list means this URL has no live-block rewrites to apply.
+    """
+    live_blocks = getattr(app._mutable_state, "live_blocks", None)
+    if not live_blocks:
+        return []
+    router = app._runtime_state.router
+    if router is None:
+        return []
+    try:
+        match = router.match("GET", url)
+    except Exception:
+        return []
+    route_path = match.route.path
+    return [
+        (route_path, spec) for (route, _block), spec in live_blocks.items() if route == route_path
+    ]
+
+
+def _live_placeholder_html(url: str, spec: LiveBlockSpec) -> str:
+    """Render the htmx placeholder that replaces a live block in frozen HTML."""
+    href = fragment_url(url, spec.block)
+    inner = spec.skeleton if spec.skeleton is not None else ""
+    return (
+        f'<div hx-get="{_html.escape(href, quote=True)}" '
+        f'hx-trigger="{_html.escape(spec.trigger, quote=True)}" '
+        f'hx-swap="{_html.escape(spec.swap, quote=True)}" '
+        f'hx-target="this" '
+        f'data-chirp-live="{_html.escape(spec.block, quote=True)}">'
+        f"{inner}</div>"
+    )
+
+
+def _apply_live_blocks(
+    html: str,
+    url: str,
+    app: App,
+    captures: list[tuple[str, dict[str, Any]]],
+    errors: list[str],
+) -> str:
+    """Rewrite declared live blocks in *html* as htmx placeholders.
+
+    Matches *url* to a registered route, then for each live block declared on
+    that route renders it in isolation with the captured template context and
+    replaces the exact string match in *html*. No-op when nothing matches.
+    """
+    specs = _live_blocks_for_url(app, url)
+    if not specs or not captures:
+        return html
+
+    env = app._runtime_state.kida_env
+    if env is None:
+        return html
+
+    # Use the first captured (template, context) pair — this is the leaf
+    # template rendered for the route (see render_plan._capture_render).
+    template_name, context = captures[0]
+    try:
+        template = env.get_template(template_name)
+    except Exception as exc:
+        errors.append(f"LIVE_BLOCK {url}: could not load template {template_name!r}: {exc}")
+        return html
+
+    for _, spec in specs:
+        try:
+            block_html = template.render_block(spec.block, context)
+        except Exception as exc:
+            errors.append(f"LIVE_BLOCK {url}: render_block('{spec.block}') failed: {exc}")
+            continue
+        if not block_html:
+            errors.append(
+                f"LIVE_BLOCK {url}: block '{spec.block}' rendered empty; skipping rewrite"
+            )
+            continue
+        if block_html not in html:
+            errors.append(f"LIVE_BLOCK {url}: block '{spec.block}' content not found in page HTML")
+            continue
+        placeholder = _live_placeholder_html(url, spec)
+        html = html.replace(block_html, placeholder, 1)
+    return html
+
+
 async def freeze(
     app: App,
     output_dir: Path,
@@ -440,19 +637,26 @@ async def freeze(
     # Phase 1: render all pages, collect HTML in memory.
     # Activate the search contribution ContextVar so route handlers can
     # register structured metadata during rendering.
+    from chirp.templating.integration import _render_capture
+
     contributions: list[SearchEntry] = []
     token = _search_entries.set(contributions)
     rendered: list[tuple[str, str]] = []  # (url, html)
+    render_captures: dict[str, list[tuple[str, dict[str, Any]]]] = {}
 
     try:
         async with TestClient(app) as client:
             for url in filtered_urls:
+                capture: list[tuple[str, dict[str, Any]]] = []
+                capture_token = _render_capture.set(capture)
                 try:
                     response = await client.get(url)
                 except Exception as exc:
                     errors.append(f"ERROR {url}: {exc}")
                     _logger.exception("Failed to render %s", url)
                     continue
+                finally:
+                    _render_capture.reset(capture_token)
 
                 if response.status != 200:
                     errors.append(f"ERROR {url}: status {response.status}")
@@ -465,6 +669,7 @@ async def freeze(
                     continue
 
                 rendered.append((url, response.text))
+                render_captures[url] = capture
     finally:
         _search_entries.reset(token)
 
@@ -480,8 +685,18 @@ async def freeze(
     index_js = "window.__chirp_search=" + json.dumps(manifest, separators=(",", ":")) + ";"
     (output_dir / "_search-index.js").write_text(index_js)
 
+    # Cross-link graph — deterministic JSON mapping each page to its
+    # internal references and who references it.  Written even when the
+    # graph is empty so downstream tooling has a stable artifact.
+    xref = _build_xref_graph(rendered, known_urls)
+    (output_dir / "_xref.json").write_text(json.dumps(xref, indent=2, sort_keys=False))
+
     for url, html in rendered:
         normalized = "/" + url.strip("/") if url != "/" else "/"
+        # Rewrite declared live blocks to htmx placeholders before any URL
+        # munging — placeholder hx-get values must use absolute paths so
+        # they still resolve after we relativize href/action attributes.
+        html = _apply_live_blocks(html, url, app, render_captures.get(url, []), errors)
         html = _relativize_html(html, normalized, known_urls)
         # Inject client-side search script (no-op if page has no search input).
         depth = _page_depth(url)
