@@ -177,23 +177,30 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     strict_value = strict if strict is not None else app.config.debug
     app.add_middleware(_ChirpUIStrictMiddleware(strict_value))
 
+    # Auto-registered shell regions: optional because apps with custom root
+    # layouts (no chirpui app-shell) don't need to define these blocks.
+    # When the layout does define them (via the chirp-ui app_shell_layout),
+    # they render normally; when absent, the render pipeline skips them.
     app.register_oob_region(
         "breadcrumbs_oob",
         target_id="chirpui-topbar-breadcrumbs",
         swap="innerHTML",
         wrap=True,
+        optional=True,
     )
     app.register_oob_region(
         "sidebar_oob",
         target_id="chirpui-sidebar-nav",
         swap="innerHTML",
         wrap=True,
+        optional=True,
     )
     app.register_oob_region(
         "title_oob",
         target_id="chirpui-document-title",
         swap="true",
         wrap=False,
+        optional=True,
     )
 
     app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)

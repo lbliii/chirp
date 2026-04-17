@@ -1,9 +1,20 @@
 """OOB registry / layout consistency check.
 
-Warns at startup when the OOB registry contains blocks (e.g. shell_actions_oob)
-that no layout template defines.  Without the matching ``{% region %}`` or
-``{% block %}``, the registered region is inert — OOB swaps silently fail,
-and the developer only discovers the mismatch via runtime errors.
+Fails loud at startup when the OOB registry contains blocks (e.g.
+shell_actions_oob) that no layout template defines.  Without the matching
+``{% region %}`` or ``{% block %}``, the registered region is inert — OOB
+swaps would silently fail at render time, so reaching ``app.check()`` with
+an orphaned registration is almost always a bug.
+
+Severity tiering:
+- ``optional=False`` (default): ERROR. Render-time pre-check would raise
+  ``BlockNotFoundError`` on a request hitting this layout, so flagging at
+  startup is the earlier, cheaper signal.
+- ``optional=True``: WARNING. Apps that intentionally register regions for
+  some-but-not-all layouts opt in; the render path silently skips them.
+
+Apps that need the pre-0.5.0 behavior can demote globally with
+``app.override_contract_severity("oob_registry", Severity.WARNING)``.
 """
 
 from kida import Environment
@@ -18,12 +29,11 @@ def check_oob_registry_coverage(
     layout_templates: list[str],
     kida_env: Environment | None,
 ) -> list[ContractIssue]:
-    """Warn when registered OOB blocks are absent from all layout templates.
+    """Emit ERROR/WARNING issues for OOB blocks absent from all layouts.
 
     For each block in the OOB registry, checks whether at least one layout
-    template defines that block.  Emits a WARNING for each orphaned
-    registration so the developer can add the missing ``{% region %}`` or
-    remove the registration.
+    template defines that block. Non-optional orphans emit ERROR (render
+    would raise); optional orphans emit WARNING (render silently skips).
     """
     if oob_registry is None or kida_env is None or not layout_templates:
         return []
@@ -32,7 +42,6 @@ def check_oob_registry_coverage(
     if not registered:
         return []
 
-    # Collect blocks defined across all layout templates
     defined_blocks: set[str] = set()
     for template_name in layout_templates:
         try:
@@ -45,17 +54,32 @@ def check_oob_registry_coverage(
             defined_blocks.update(blocks)
 
     orphaned = sorted(registered - defined_blocks)
-    return [
-        ContractIssue(
-            severity=Severity.WARNING,
-            category="oob_registry",
-            message=(
-                f"OOB region '{block}' is registered in the OOB registry "
-                f"(target: '{oob_registry.resolve_target(block)}') but no layout "
-                f"template defines a matching block. OOB swaps for this region "
-                f"will be skipped. Add {{% region {block} %}} to your layout, "
-                f"or remove the registration."
-            ),
+    issues: list[ContractIssue] = []
+    for block in orphaned:
+        config = oob_registry.get(block)
+        is_optional = config is not None and config.optional
+        severity = Severity.WARNING if is_optional else Severity.ERROR
+        if is_optional:
+            remedy = (
+                "This region is marked optional=True so OOB swaps for it are "
+                "silently skipped at render time; remove the registration if "
+                "it is no longer needed."
+            )
+        else:
+            remedy = (
+                f"Add {{% region {block} %}} to your layout, remove the "
+                "registration, or pass optional=True to register_oob_region "
+                "if layouts legitimately omit this block."
+            )
+        issues.append(
+            ContractIssue(
+                severity=severity,
+                category="oob_registry",
+                message=(
+                    f"OOB region '{block}' is registered in the OOB registry "
+                    f"(target: '{oob_registry.resolve_target(block)}') but no "
+                    f"layout template defines a matching block. {remedy}"
+                ),
+            )
         )
-        for block in orphaned
-    ]
+    return issues

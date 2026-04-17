@@ -31,6 +31,7 @@ class OOBRegionConfig:
     target_id: str
     swap: str = "innerHTML"
     wrap: bool = True
+    optional: bool = False
 
     def __post_init__(self) -> None:
         from chirp.templating.returns import _validate_swap

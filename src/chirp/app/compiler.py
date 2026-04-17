@@ -361,9 +361,17 @@ class AppCompiler:
         from chirp.templating.oob_registry import OOBRegionConfig
 
         if self._mutable.oob_registry.get("shell_actions_oob") is None:
+            # Auto-registered: layouts without an explicit shell_actions region
+            # are common (narrow apps, marketing pages), so mark optional so
+            # the contract check doesn't block freeze for them.
             self._mutable.oob_registry.register(
                 "shell_actions_oob",
-                OOBRegionConfig(target_id=SHELL_ACTIONS_TARGET, swap="innerHTML", wrap=True),
+                OOBRegionConfig(
+                    target_id=SHELL_ACTIONS_TARGET,
+                    swap="innerHTML",
+                    wrap=True,
+                    optional=True,
+                ),
             )
         self._mutable.oob_registry.freeze()
         self._runtime.oob_registry = self._mutable.oob_registry
