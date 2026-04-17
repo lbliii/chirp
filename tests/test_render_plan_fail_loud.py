@@ -177,7 +177,7 @@ class TestRealRenderErrorsStillPropagate:
 
         adapter = KidaAdapter(kida_env)
 
-        def boom(*args, **kwargs):  # noqa: ANN002
+        def boom(*args, **kwargs):
             raise RuntimeError("simulated template engine failure")
 
         plan = _plan_with_region_update(
@@ -188,9 +188,11 @@ class TestRealRenderErrorsStillPropagate:
             ),
             region="sidebar-oob",
         )
-        with patch.object(adapter, "render_block", side_effect=boom):
-            with pytest.raises(RuntimeError, match="simulated"):
-                execute_render_plan(plan, adapter=adapter, oob_registry=None)
+        with (
+            patch.object(adapter, "render_block", side_effect=boom),
+            pytest.raises(RuntimeError, match="simulated"),
+        ):
+            execute_render_plan(plan, adapter=adapter, oob_registry=None)
 
 
 class TestOrphanOOBSeverity:

@@ -531,7 +531,7 @@ def execute_render_plan(
     return RenderedPlan(main_html=main_html, region_htmls=region_htmls)
 
 
-def _block_exists(adapter: "TemplateAdapter", template: str, block: str) -> bool:
+def _block_exists(adapter: TemplateAdapter, template: str, block: str) -> bool:
     """Check template metadata for a named block. Returns False when the template
     is missing/unparseable (adapter.template_metadata returns None)."""
     meta = adapter.template_metadata(template)
