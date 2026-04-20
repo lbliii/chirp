@@ -73,21 +73,42 @@ def _cross_shell_boost_redirect(
     fragment_target_registry: FragmentTargetRegistry | None,
     swap_scope_map: Mapping[str, str] | None,
 ) -> Response | None:
-    """Redirect boosted GETs that do not match the expected shell target."""
+    """Redirect boosted GETs that would render into the wrong shell.
+
+    Emits ``HX-Redirect`` to the destination URL (forcing a full-page load
+    on the client) when the framework cannot guarantee a correct fragment
+    swap. The policy is conservative: only boosted GETs are affected, and
+    we always prefer redirect over rendering a fragment into a target the
+    destination shell cannot satisfy.
+
+    Cases handled:
+        1. App has shell configured but registries are inconsistent
+           (framework setup bug) — redirect rather than render broken.
+        2. Current and destination have separate layout chains with no
+           shared navigation ancestor (true cross-shell) — redirect.
+        3. Computed swap target does not match the client's ``HX-Target``
+           (existing behavior).
+
+    Apps without app-shell (empty ``swap_scope_map``) are unaffected:
+        their boosted responses pass through to normal fragment rendering.
+    """
     from chirp.pages.types import LayoutChain
     from chirp.templating.navigation_swap import (
+        common_navigation_prefix_len,
         lookup_layout_chain_for_path,
         resolve_navigation_swap,
     )
 
-    if (
-        request.method != "GET"
-        or not request.is_boosted
-        or route_layout_chains is None
-        or fragment_target_registry is None
-        or not swap_scope_map
-    ):
+    if request.method != "GET" or not request.is_boosted:
         return None
+    # No app-shell configured → this function is a no-op. Boosted fragments
+    # from non-shell apps render via the normal dispatch path.
+    if not swap_scope_map:
+        return None
+    # Case 1: shell configured but registries missing → inconsistent state.
+    # Redirect rather than render against partial metadata.
+    if route_layout_chains is None or fragment_target_registry is None:
+        return Response(body="").with_hx_redirect(_request_path_with_query(request))
     current_path = request.htmx_current_url_abs_path
     if current_path is None or not current_path.startswith("/"):
         # Cannot compute swap diff without a valid current URL — pass through
@@ -100,6 +121,16 @@ def _cross_shell_boost_redirect(
         router=router,
         route_layout_chains=route_layout_chains,
     )
+    # Case 2: both chains exist with layouts but share no navigation
+    # ancestor → true cross-shell. Render would target a DOM that does
+    # not exist in the current shell; redirect instead.
+    if (
+        isinstance(current_chain, LayoutChain)
+        and current_chain.layouts
+        and dest_chain.layouts
+        and common_navigation_prefix_len(current_chain, dest_chain) == 0
+    ):
+        return Response(body="").with_hx_redirect(_request_path_with_query(request))
     resolution = resolve_navigation_swap(
         current_path=current_path,
         destination_path=request.path,
@@ -109,11 +140,10 @@ def _cross_shell_boost_redirect(
         swap_scope_map=swap_scope_map,
     )
     if resolution is None:
-        # No swap resolution — let the request render normally
+        # Same shell, or no shared ancestor detected above — pass through
         return None
-    request_target = request.htmx_target.lstrip("#") if request.htmx_target is not None else None
-    expected_target = resolution.htmx_target.lstrip("#")
-    if request_target == expected_target:
+    # Case 3: computed target doesn't match client's HX-Target — redirect.
+    if request.htmx_target_id == resolution.target_id:
         return None
     return Response(body="").with_hx_redirect(_request_path_with_query(request))
 

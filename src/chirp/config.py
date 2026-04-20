@@ -253,6 +253,12 @@ class AppConfig:
     skip_contract_checks: bool = False
     lazy_pages: bool = False
 
+    # Debug fragment validator (debug mode only) — warns when fragment
+    # responses leak <!DOCTYPE or duplicate shell-region ids. Opt out by
+    # setting False for apps that render pre-serialized HTML fragments
+    # containing intentional id repetition.
+    debug_fragment_validator: bool = True
+
     def __post_init__(self) -> None:
         # Resolve dev_browser_reload sentinel: None → follow debug flag.
         if self.dev_browser_reload is None:

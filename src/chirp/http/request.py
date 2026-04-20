@@ -70,6 +70,19 @@ class HtmxDetails:
         return self._get("hx-target")
 
     @property
+    def target_id(self) -> str | None:
+        """HX-Target normalized to a bare DOM id (no leading ``#``).
+
+        Canonical form for registry lookups and layout-chain matching.
+        Returns ``None`` when HX-Target is absent or reduces to empty
+        after stripping (e.g. a bare ``#``).
+        """
+        raw = self.target
+        if raw is None:
+            return None
+        return raw.lstrip("#") or None
+
+    @property
     def trigger(self) -> str | None:
         """The trigger element ID from HX-Trigger header."""
         return self._get("hx-trigger")
@@ -295,6 +308,16 @@ class Request:
     def htmx_target(self) -> str | None:
         """The target element ID from HX-Target header."""
         return self.htmx.target
+
+    @property
+    def htmx_target_id(self) -> str | None:
+        """HX-Target normalized to a bare DOM id (no leading ``#``).
+
+        Canonical form used throughout the framework's request → registry
+        pipeline. Callers should prefer this over ``htmx_target`` unless
+        they specifically need the raw header value.
+        """
+        return self.htmx.target_id
 
     @property
     def htmx_trigger(self) -> str | None:

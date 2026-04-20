@@ -32,11 +32,25 @@ Build inclusive apps with Chirp.
 Complement htmx with Alpine for client-only interactivity.
 :::{/card}
 
+:::{card} Shells
+:icon: layout
+:link: ./shells
+:description: The three root layouts — boost, shell, app-shell
+Pick exactly one per app. Includes the decision table, the `hx-select` distinction, and what is *not* a shell.
+:::{/card}
+
 :::{card} App Shells
 :icon: layout
 :link: ./app-shell
-:description: Persistent layout with SPA-style navigation
-Sidebar, topbar, and fragment regions with zero client JS.
+:description: chirp-ui's app_shell_layout — sidebar, topbar, OOB regions
+The opinionated shell with persistent chrome. One of three shells; see [Shells](./shells) for the others.
+:::{/card}
+
+:::{card} Boosted Navigation
+:icon: arrow-right
+:link: ./boosted-navigation
+:description: hx-boost contract, cross-shell redirects, debug warnings
+How swaps work, when they redirect, and the tripwires that catch silent failures.
 :::{/card}
 
 :::{card} UI layers & shell regions

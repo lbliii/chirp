@@ -174,15 +174,23 @@ def _compute_layout_start_index(
     *,
     fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> int:
-    """Compute layout start index for HX-Target-aware depth."""
+    """Compute layout start index for HX-Target-aware depth.
+
+    ``htmx_target`` may be either ``#id`` or bare-id form; both are
+    normalized downstream by ``FragmentTargetRegistry`` and
+    ``LayoutChain``. New callers should prefer passing the bare form
+    from ``request.htmx_target_id``.
+    """
     if layout_chain is None or not layout_chain.layouts:
         return 0
     if is_history_restore or htmx_target is None:
         return 0
-    omit_targets = frozenset()
+    omit_targets: frozenset[str] = frozenset()
     if fragment_target_registry is not None:
         config = fragment_target_registry.get(htmx_target)
         if config is not None and config.omit_outer_layouts:
+            # LayoutChain.start_index_for_htmx_target matches omit_targets
+            # in bare-id form; normalize here defensively for either input.
             omit_targets = frozenset({htmx_target.lstrip("#")})
     idx = layout_chain.start_index_for_htmx_target(
         htmx_target,
@@ -230,7 +238,7 @@ def build_render_plan(
 ) -> RenderPlan:
     """Build a render plan from composition and request headers."""
     layout_chain = composition.layout_chain
-    htmx_target = request.htmx_target if request else None
+    htmx_target = request.htmx_target_id if request else None
     is_history_restore = request.is_history_restore if request else False
     is_htmx = request.is_htmx if request else False
 
