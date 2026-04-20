@@ -17,13 +17,23 @@ class ContractCheckRunner:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
+    def _registry(self, app: App) -> object | None:
+        state = getattr(app, "_mutable_state", None)
+        return getattr(state, "fragment_target_registry", None) if state else None
+
     def run_debug_checks(self, app: App) -> None:
         import sys
 
         from chirp.contracts import check_hypermedia_surface
 
         result = check_hypermedia_surface(app)
-        sys.stderr.write(format_check_result(result))
+        sys.stderr.write(
+            format_check_result(
+                result,
+                fragment_target_registry=self._registry(app),
+                verbose_registry=self._config.debug,
+            )
+        )
         if not result.ok:
             sys.exit(1)
 
@@ -31,7 +41,14 @@ class ContractCheckRunner:
         from chirp.contracts import check_hypermedia_surface
 
         result = check_hypermedia_surface(app)
-        print(format_check_result(result, color=None))
+        print(
+            format_check_result(
+                result,
+                color=None,
+                fragment_target_registry=self._registry(app),
+                verbose_registry=self._config.debug,
+            )
+        )
         has_warnings = len(result.warnings) > 0
         if not result.ok or (warnings_as_errors and has_warnings):
             raise SystemExit(1)

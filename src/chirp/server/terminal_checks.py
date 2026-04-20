@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from chirp.contracts import CheckResult, ContractIssue, Severity
+    from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
 # Banner width — matches terminal_errors._BANNER_WIDTH
 _W = 65
@@ -128,6 +129,71 @@ def _format_issue(issue: ContractIssue, c: _Palette) -> list[str]:
     return lines
 
 
+def _format_fragment_registry(
+    registry: FragmentTargetRegistry,
+    c: _Palette,
+) -> list[str]:
+    """Render the fragment target registry grouped by contract.
+
+    Returns a list of lines or an empty list when the registry has no
+    registered targets.
+    """
+    all_ids = sorted(registry.registered_targets)
+    if not all_ids:
+        return []
+
+    contracts = registry.registered_contracts
+    contract_target_ids: set[str] = set()
+    groups: list[tuple[str, list[tuple[str, Any]]]] = []
+    for contract in contracts:
+        rows: list[tuple[str, Any]] = []
+        for target in contract.targets:
+            tid = target.target_id.lstrip("#")
+            contract_target_ids.add(tid)
+            config = registry.get(tid)
+            if config is not None:
+                rows.append((tid, config))
+        if rows:
+            groups.append((contract.name, rows))
+
+    unscoped_rows: list[tuple[str, Any]] = []
+    for tid in all_ids:
+        if tid in contract_target_ids:
+            continue
+        config = registry.get(tid)
+        if config is not None:
+            unscoped_rows.append((tid, config))
+    if unscoped_rows:
+        groups.append(("unscoped", unscoped_rows))
+
+    if not groups:
+        return []
+
+    id_width = max(len(f"#{tid}") for tid, _ in (r for _, rows in groups for r in rows))
+    block_width = max(len(cfg.fragment_block) for _, rows in groups for _, cfg in rows)
+
+    lines: list[str] = []
+    lines.append(f"  {c.cyan}Fragment targets{c.reset}")
+    lines.append("")
+    for group_name, rows in groups:
+        header = group_name if group_name != "unscoped" else "unscoped"
+        lines.append(f"  {c.bold}{header}{c.reset} {c.dim}({len(rows)}){c.reset}")
+        for tid, cfg in rows:
+            shell = "yes" if cfg.triggers_shell_update else "no"
+            outer = "skip" if cfg.omit_outer_layouts else "keep"
+            required = "required" if cfg.required else "optional"
+            lines.append(
+                f"    {c.cyan}#{tid}{c.reset}{' ' * (id_width - len(tid) - 1)}"
+                f"  {c.dim}\u2192{c.reset}  "
+                f"{cfg.fragment_block}{' ' * (block_width - len(cfg.fragment_block))}"
+                f"  {c.dim}shell:{c.reset}{shell}"
+                f"  {c.dim}outer:{c.reset}{outer}"
+                f"  {c.dim}{required}{c.reset}"
+            )
+        lines.append("")
+    return lines[:-1] if lines[-1] == "" else lines
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -137,12 +203,20 @@ def format_check_result(
     result: CheckResult,
     *,
     color: bool | None = None,
+    fragment_target_registry: FragmentTargetRegistry | None = None,
+    verbose_registry: bool = False,
 ) -> str:
     """Format a CheckResult for rich terminal display.
 
     Args:
         result: The check result to format.
         color: Force color on/off.  ``None`` auto-detects from stderr.
+        fragment_target_registry: If provided and non-empty, a summary of
+            registered fragment targets is included — one stats entry for
+            contract count, and (when ``verbose_registry`` is True) a full
+            dump grouped by contract before the summary line.
+        verbose_registry: When True, render the full registry dump. Gated
+            by the caller on ``config.debug``.
 
     Returns:
         Multi-line string ready for ``sys.stderr.write()``.
@@ -176,6 +250,11 @@ def format_check_result(
         stats_parts.append(
             f"{c.bold}{result.hx_targets_validated}{c.reset} {c.dim}hx-target selectors{c.reset}"
         )
+    if fragment_target_registry is not None:
+        n_registered = len(fragment_target_registry.registered_targets)
+        if n_registered:
+            noun = "fragment target" if n_registered == 1 else "fragment targets"
+            stats_parts.append(f"{c.bold}{n_registered}{c.reset} {c.dim}{noun} registered{c.reset}")
     if stats_parts:
         lines.append(f"  {sep.join(stats_parts)}")
         lines.append("")
@@ -199,6 +278,13 @@ def format_check_result(
             route_shown = True
         for issue in issue_group:
             lines.extend(_format_issue(issue, c))
+            lines.append("")
+
+    # ── Fragment target registry dump (verbose only) ────────
+    if verbose_registry and fragment_target_registry is not None:
+        reg_lines = _format_fragment_registry(fragment_target_registry, c)
+        if reg_lines:
+            lines.extend(reg_lines)
             lines.append("")
 
     # ── Summary line ────────────────────────────────────────
