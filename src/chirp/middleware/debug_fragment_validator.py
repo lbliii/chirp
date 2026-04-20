@@ -90,9 +90,7 @@ class DebugFragmentValidator:
         intent = response.render_intent
         if intent == "fragment":
             return True
-        if intent == "unknown" and request.is_htmx:
-            return True
-        return False
+        return intent == "unknown" and request.is_htmx
 
     def _scan(self, body: str) -> list[str]:
         issues: list[str] = []

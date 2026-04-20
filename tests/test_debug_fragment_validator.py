@@ -4,14 +4,9 @@ from __future__ import annotations
 
 import logging
 
-import pytest
-
 from chirp import App, AppConfig
 from chirp.http.response import Response
-from chirp.middleware.debug_fragment_validator import (
-    DebugFragmentValidator,
-    FragmentValidationError,
-)
+from chirp.middleware.debug_fragment_validator import DebugFragmentValidator
 from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
 from chirp.testing import TestClient
 

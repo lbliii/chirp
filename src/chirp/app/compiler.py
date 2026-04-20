@@ -16,6 +16,7 @@ from .state import MutableAppState, RuntimeAppState
 
 if TYPE_CHECKING:
     from chirp.app import App
+    from chirp.templating.oob_registry import OOBRegistry
 
 
 def _collect_builtin_middleware(
@@ -23,7 +24,7 @@ def _collect_builtin_middleware(
     middleware_list: list,
     *,
     router: object | None = None,
-    oob_registry: object | None = None,
+    oob_registry: "OOBRegistry | None" = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first

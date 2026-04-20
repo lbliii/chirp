@@ -26,7 +26,6 @@ from chirp.routing.router import Router
 from chirp.server.handler import create_request_handler
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
-
 # ---------------------------------------------------------------------------
 # Fixture scaffolding
 # ---------------------------------------------------------------------------
