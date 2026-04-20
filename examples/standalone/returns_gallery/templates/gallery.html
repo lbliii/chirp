@@ -6,9 +6,11 @@
   <title>Chirp returns gallery</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <meta name="color-scheme" content="light">
   <style>
+    :root { color-scheme: light; }
     * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #ffffff; }
     h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
     p.lead { color: #475569; margin-bottom: 2rem; }
     h2 { font-size: 1rem; margin-top: 2rem; color: #0f172a; }
@@ -98,7 +100,9 @@
     </form>
     {% block demo_form_ok %}
     {% set _form = form | default(none) %}
-    <div class="ok">Form accepted: {{ _form.name if _form else '' }} &lt;{{ _form.email if _form else '' }}&gt;</div>
+    {% if _form %}
+    <div class="ok">Form accepted: {{ _form.name }} &lt;{{ _form.email }}&gt;</div>
+    {% endif %}
     {% endblock %}
   </div>
 
