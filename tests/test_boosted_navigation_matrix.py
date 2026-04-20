@@ -184,8 +184,10 @@ def _assert_boost_invariants(response: Response) -> None:
     )
     # Fragment responses must never leak <!DOCTYPE.
     if response.render_intent == "fragment":
-        body_text = response.text if isinstance(response.body, str) else response.body.decode(
-            "utf-8", "replace"
+        body_text = (
+            response.text
+            if isinstance(response.body, str)
+            else response.body.decode("utf-8", "replace")
         )
         assert "<!DOCTYPE" not in body_text.upper(), (
             "fragment body contains <!DOCTYPE (full page leaked into outlet)"
@@ -417,9 +419,7 @@ async def test_boosted_navigation_matrix(case: MatrixCase) -> None:
             f"[{case.id}] HX-Redirect={redirect!r}, expected {case.dest_path!r}"
         )
     else:
-        assert redirect is None, (
-            f"[{case.id}] unexpected HX-Redirect={redirect!r}"
-        )
+        assert redirect is None, f"[{case.id}] unexpected HX-Redirect={redirect!r}"
 
     if case.expected_body_contains is not None:
         assert case.expected_body_contains in response.text, (
