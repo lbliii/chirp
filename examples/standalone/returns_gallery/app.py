@@ -15,12 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import (
+    OOB,
     App,
     AppConfig,
     EventStream,
     Fragment,
     MutationResult,
-    OOB,
     Page,
     Redirect,
     Request,

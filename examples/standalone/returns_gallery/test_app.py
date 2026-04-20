@@ -38,7 +38,7 @@ class TestReturnsGallery:
         async with TestClient(example_app) as client:
             response = await client.post("/oob", headers={"HX-Request": "true"})
             assert response.status == 200
-            assert 'hx-swap-oob' in response.text
+            assert "hx-swap-oob" in response.text
             assert "oob-counter" in response.text
 
     async def test_stream_is_chunked(self, example_app) -> None:
