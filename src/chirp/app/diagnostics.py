@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from chirp.config import AppConfig
 from chirp.server.terminal_checks import format_check_result
+from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -17,9 +18,12 @@ class ContractCheckRunner:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
-    def _registry(self, app: App) -> object | None:
+    def _registry(self, app: App) -> FragmentTargetRegistry | None:
         state = getattr(app, "_mutable_state", None)
-        return getattr(state, "fragment_target_registry", None) if state else None
+        if state is None:
+            return None
+        registry = getattr(state, "fragment_target_registry", None)
+        return registry if isinstance(registry, FragmentTargetRegistry) else None
 
     def run_debug_checks(self, app: App) -> None:
         import sys
