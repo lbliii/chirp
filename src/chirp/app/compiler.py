@@ -9,6 +9,7 @@ from chirp.config import AppConfig
 from chirp.routing.route import Route
 from chirp.routing.router import Router, parse_path
 from chirp.templating.integration import create_environment
+from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.registry import compile_tools
 
 from .registry import AppRegistry
@@ -16,7 +17,6 @@ from .state import MutableAppState, RuntimeAppState
 
 if TYPE_CHECKING:
     from chirp.app import App
-    from chirp.templating.oob_registry import OOBRegistry
 
 
 def _collect_builtin_middleware(
@@ -24,7 +24,7 @@ def _collect_builtin_middleware(
     middleware_list: list,
     *,
     router: object | None = None,
-    oob_registry: "OOBRegistry | None" = None,
+    oob_registry: OOBRegistry | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first
