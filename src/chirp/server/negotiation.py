@@ -349,7 +349,11 @@ def negotiate(
                 msg = (
                     "OOB main cannot be a StreamingResponse "
                     "(e.g. EventStream, Suspense, Stream). "
-                    "OOB requires a buffered response to append fragments."
+                    "OOB requires a buffered response to append fragments. "
+                    "Buffered return types: Template, Fragment, Page, "
+                    "MutationResult/FormAction, ValidationError. Streaming types "
+                    "(Stream, Suspense, EventStream) cannot carry OOB siblings — "
+                    "yield additional Fragment values from inside the stream instead."
                 )
                 raise TypeError(msg)
             parts: list[str] = [main_response.text if isinstance(main_response, Response) else ""]

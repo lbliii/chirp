@@ -110,6 +110,7 @@ chirp new myapp && cd myapp && python app.py
 | **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
 | **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
 | **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
+| **Validation** | `chirp.validation` — composable rules (`required`, `email`, `max_length`, …) returning a `ValidationResult` | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
 | **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/streaming/) |
 | **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/streaming/server-sent-events/) |
 | **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
@@ -202,6 +203,35 @@ async def search(request: Request):
 
 Full page request renders everything. htmx request renders just the `results_list` block.
 Same template, same data, different scope. No separate "partials" directory.
+
+</details>
+
+<details>
+<summary><strong>Forms and validation</strong> — <code>chirp.validation</code> + <code>ValidationError</code></summary>
+
+`chirp.validation` is a small, composable rule library. Validators are plain
+callables (`(str) -> str | None`); rules compose into a dict; `validate()`
+returns a `ValidationResult` that's truthy iff the form is clean.
+
+```python
+from chirp import Page, ValidationError
+from chirp.validation import validate, required, email, max_length
+
+@app.route("/contacts", methods=["POST"])
+async def create_contact(request: Request):
+    form = await request.form()
+    result = validate(form, {
+        "name":  [required, max_length(200)],
+        "email": [required, email],
+    })
+    if not result:
+        return ValidationError("contacts.html", "form", errors=result.errors, form=form)
+    contacts.append(Contact(**result.data))
+    return Page("contacts.html", "list", contacts=contacts)
+```
+
+`ValidationError` returns a 422 with the re-rendered form fragment so htmx
+swaps the error inline; non-htmx requests get the full page back.
 
 </details>
 

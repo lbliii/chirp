@@ -23,9 +23,12 @@ from .rules_accessibility import (
     check_label_association,
     check_landmarks,
 )
+from .rules_alpine_cdn import check_alpine_cdn_urls
 from .rules_boundary import check_boundary_coverage
 from .rules_commands import check_command_values, check_commandfor_targets
+from .rules_composition import check_page_extends_layout
 from .rules_context_cascade import check_context_cascade
+from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
 from .rules_fragment_targets import check_fragment_target_orphans
@@ -406,6 +409,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 extras=snapshot.extras,
             )
         )
+        result.issues.extend(
+            check_page_extends_layout(
+                snapshot.page_leaf_templates,
+                snapshot.layout_chains,
+                kida_env,
+            )
+        )
         result.issues.extend(check_section_bindings(snapshot.route_metas, snapshot.sections))
         discovered = getattr(snapshot, "discovered_routes", [])
         meta_provider_paths = {
@@ -483,6 +493,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         )
         result.issues.extend(check_form_action_contracts(template_sources, router))
         result.issues.extend(check_boundary_coverage(template_sources))
+        result.issues.extend(check_alpine_cdn_urls(template_sources))
+        result.issues.extend(check_defer_falsy_conditionals(template_sources))
 
         # Reactive bus contract checks (if a DependencyIndex is registered)
         reactive_index = getattr(app, "_reactive_index", None)

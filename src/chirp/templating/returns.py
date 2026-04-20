@@ -255,6 +255,11 @@ class Action:
 class MutationResult:
     """Mutation success with progressive enhancement.
 
+    Also exported as ``FormAction`` — both names resolve to the same class.
+    Use ``FormAction`` when the mutation is a form submission and
+    ``MutationResult`` for non-form mutations (API endpoints, htmx-driven
+    actions); the behavior is identical.
+
     Auto-negotiates htmx vs non-htmx responses for any mutation
     (POST, PUT, PATCH, DELETE):
 
@@ -302,6 +307,7 @@ class MutationResult:
 
 
 FormAction = MutationResult
+"""Form-submission alias of :class:`MutationResult`. Same class, different name."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -655,7 +661,11 @@ class OOB:
             raise TypeError(
                 f"OOB main cannot be {type(main).__name__} "
                 "(a streaming response type). "
-                "OOB requires a buffered response to append fragments."
+                "OOB requires a buffered response to append fragments. "
+                "Buffered return types: Template, Fragment, Page, "
+                "MutationResult/FormAction, ValidationError. Streaming types "
+                "(Stream, Suspense, EventStream) cannot carry OOB siblings — "
+                "yield additional Fragment values from inside the stream instead."
             )
         object.__setattr__(self, "main", main)
         object.__setattr__(self, "oob_fragments", oob_fragments)
