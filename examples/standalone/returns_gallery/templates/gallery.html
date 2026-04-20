@@ -6,6 +6,7 @@
   <title>Chirp returns gallery</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <script src="https://unpkg.com/htmx-ext-response-targets@2.0.3/response-targets.js"></script>
   <meta name="color-scheme" content="light">
   <style>
     :root { color-scheme: light; }
@@ -87,7 +88,7 @@
 
   <div class="card">
     <span class="pill">ValidationError</span>
-    <form hx-post="/validate" hx-target="this" hx-swap="outerHTML">
+    <form hx-post="/validate" hx-target="this" hx-swap="outerHTML" hx-ext="response-targets" hx-target-422="this">
       {% block demo_form %}
       {% set _form = form | default(none) %}
       {% set _errors = errors | default({}) %}
