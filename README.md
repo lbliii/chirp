@@ -97,6 +97,20 @@ chirp new myapp && cd myapp && python app.py
 
 ---
 
+## Streaming: `Stream` vs `Suspense` vs `EventStream`
+
+Picking the wrong one is the most common return-type mistake. Use this table:
+
+| Type | Shell first? | Transport | Use for | Not for |
+|------|--------------|-----------|---------|---------|
+| `Stream` | No — flush blocks as they complete | Single chunked HTTP response | Slow first-byte pages with independent sections (SEO-friendly progressive render) | Post-load updates |
+| `Suspense` | Yes — shell renders, deferred blocks stream as OOB swaps | Single chunked HTTP response | Dashboards / detail pages with multiple slow data sources, one round trip | Post-load updates |
+| `EventStream` | N/A — pure event channel | SSE (`text/event-stream`, long-lived) | Notifications, tickers, chat tails *after* the page loads | Initial page render |
+
+**Rule of thumb**: initial render that streams → `Suspense` (or `Stream` for SEO-heavy sections); updates after the page loads → `EventStream`. If you're hesitating between `Suspense` and `EventStream`, ask: *is this the initial render or a post-load update?*
+
+---
+
 ## Features
 
 | Feature | Description | Docs |

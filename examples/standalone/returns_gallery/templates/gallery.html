@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chirp returns gallery</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <script src="https://unpkg.com/htmx-ext-response-targets@2.0.3/response-targets.js"></script>
+  <meta name="color-scheme" content="light">
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #ffffff; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    p.lead { color: #475569; margin-bottom: 2rem; }
+    h2 { font-size: 1rem; margin-top: 2rem; color: #0f172a; }
+    .route-list { border: 1px solid #e2e8f0; border-radius: 8px; padding: 0; list-style: none; }
+    .route-list li { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; display: grid; grid-template-columns: 8rem 1fr auto; gap: 1rem; align-items: center; }
+    .route-list li:last-child { border-bottom: none; }
+    .route-list code { color: #0369a1; font-size: 0.85rem; }
+    .route-list .kind { font-weight: 600; font-size: 0.85rem; }
+    .route-list .desc { font-size: 0.85rem; color: #475569; }
+    .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: #f8fafc; }
+    .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 9999px; background: #dbeafe; color: #1e40af; font-size: 0.75rem; font-weight: 600; }
+    button { padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem; }
+    button:hover { background: #f1f5f9; }
+    form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 320px; }
+    input { padding: 0.4rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .err { color: #b91c1c; font-size: 0.8rem; }
+    .ok { color: #15803d; font-size: 0.85rem; }
+    .skeleton { display: inline-block; width: 6rem; height: 1.2rem; background: #e2e8f0; border-radius: 4px; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .log { font-family: ui-monospace, monospace; font-size: 0.8rem; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border-radius: 6px; min-height: 4rem; }
+    .log > div { padding: 0.15rem 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Chirp returns gallery</h1>
+  <p class="lead">One route per response type. Read <code>app.py</code> alongside this page.</p>
+
+  <ol class="route-list">
+    {% for path, kind, desc in routes | default([]) %}
+    <li>
+      <span class="kind">{{ kind }}</span>
+      <span class="desc">{{ desc }}</span>
+      <a href="{{ path }}"><code>{{ path }}</code></a>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <h2>Try each one</h2>
+
+  <div class="card">
+    <span class="pill">Fragment</span>
+    <button hx-get="/fragment" hx-swap="outerHTML">Load fragment</button>
+    {% block demo_fragment %}
+    <div>Fragment value: <strong>{{ value | default("—") }}</strong></div>
+    {% endblock %}
+  </div>
+
+  <div class="card">
+    <span class="pill">Page</span>
+    <button hx-get="/page" hx-target="#page-target" hx-swap="innerHTML">Load via htmx</button>
+    <a href="/page">Load as full page</a>
+    <div id="page-target">
+      {% block demo_page %}
+      <div>Page value: <strong>{{ value | default("—") }}</strong></div>
+      {% endblock %}
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="pill">OOB</span>
+    <button hx-post="/oob" hx-target="#oob-primary" hx-swap="innerHTML" hx-disinherit="*">Trigger OOB swap</button>
+    <div id="oob-primary" hx-disinherit="*">
+      {% block demo_oob_primary %}
+      <div>Primary: <strong>{{ value | default("—") }}</strong></div>
+      {% endblock %}
+    </div>
+    <div id="oob-counter">
+      {% block demo_oob_counter %}
+      <div>Counter (OOB target): <strong>{{ value | default("—") }}</strong></div>
+      {% endblock %}
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="pill">ValidationError</span>
+    <form hx-post="/validate" hx-target="this" hx-swap="outerHTML" hx-ext="response-targets" hx-target-422="this">
+      {% block demo_form %}
+      {% set _form = form | default(none) %}
+      {% set _errors = errors | default({}) %}
+      <label>Name <input name="name" value="{{ _form.name if _form else '' }}"></label>
+      {% if _errors.name is defined %}<span class="err">{{ _errors.name }}</span>{% endif %}
+      <label>Email <input name="email" value="{{ _form.email if _form else '' }}"></label>
+      {% if _errors.email is defined %}<span class="err">{{ _errors.email }}</span>{% endif %}
+      <button type="submit">Submit</button>
+      {% endblock %}
+    </form>
+    {% block demo_form_ok %}
+    {% set _form = form | default(none) %}
+    {% if _form %}
+    <div class="ok">Form accepted: {{ _form.name }} &lt;{{ _form.email }}&gt;</div>
+    {% endif %}
+    {% endblock %}
+  </div>
+
+  <div class="card">
+    <span class="pill">MutationResult</span>
+    <button hx-post="/mutate" hx-target="this" hx-swap="none">Increment counter</button>
+    <div id="mutation-counter">
+      {% block demo_mutation_counter %}
+      <div>Counter: <strong>{{ count | default(0) }}</strong></div>
+      {% endblock %}
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="pill">EventStream</span>
+    <div hx-ext="sse" sse-connect="/events" hx-target="this" hx-disinherit="hx-target hx-swap">
+      <div class="log" id="sse-log" sse-swap="fragment" hx-target="this" hx-swap="beforeend">
+        Connecting…
+      </div>
+    </div>
+    {% block demo_sse_item %}
+    {% if index is defined %}
+    <div>[{{ index }}] value={{ value }}</div>
+    {% endif %}
+    {% endblock %}
+  </div>
+
+  <div class="card">
+    <span class="pill">Stream / Suspense</span>
+    <a href="/stream">Open Stream demo →</a> &nbsp;
+    <a href="/suspense">Open Suspense demo →</a>
+  </div>
+
+  <div class="card">
+    <span class="pill">Redirect</span>
+    <a href="/redirect">Hit the redirect (returns to this page)</a>
+  </div>
+</main>
+</body>
+</html>

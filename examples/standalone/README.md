@@ -19,6 +19,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 
 ## Representative Examples
 
+- `returns_gallery`: **start here** — every Chirp return type on one page
 - `hello`: minimal routing and return-value negotiation
 - `contacts`: canonical HTMX CRUD
 - `sse`: fragment-driven server-sent events
@@ -48,6 +49,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `oob_layout_chain`
 - `pokedex`
 - `production`
+- `returns_gallery`
 - `search`
 - `signup`
 - `sse`

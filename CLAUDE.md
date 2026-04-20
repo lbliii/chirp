@@ -174,7 +174,7 @@ for non-optional orphans, WARNING for optional orphans. Do not use
 - **ContextVar** for request-scoped state (`g`, `get_request()`)
 - **Protocol-based middleware** (no base class, just match the signature)
 - **Thread-safe stores** with `threading.Lock` for shared mutable state
-- **`app.check()`** validates hypermedia contracts at startup (routes, fragments, SSE)
+- **`app.check()`** validates hypermedia contracts at startup (routes, fragments, SSE). In debug mode this runs automatically on `app.run()`/`app.freeze()` and exits on ERROR. Opt out via `AppConfig(skip_contract_checks=True)` or `CHIRP_SKIP_CONTRACT_CHECKS=1`.
 - **Python 3.14 except syntax**: `except ValueError, TypeError:` is the canonical form (ruff-normalized). Do **not** add parens — this is valid 3.14+ syntax, not a Python 2 holdover.
 
 ## Custom Contract Checks

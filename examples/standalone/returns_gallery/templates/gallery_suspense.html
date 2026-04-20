@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }} — Chirp returns gallery</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <meta name="color-scheme" content="light">
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #ffffff; }
+    section { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; }
+    h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .skeleton { display: block; height: 1.2rem; background: #e2e8f0; border-radius: 4px; animation: pulse 1.2s ease-in-out infinite; margin: 0.25rem 0; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    ul { margin: 0; padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="/">← back to gallery</a></p>
+  <h1>{{ title }}</h1>
+  <p>Shell renders immediately. Slow blocks stream in as OOB swaps.</p>
+
+  {% block stats %}
+  <section id="stats">
+    <h2>Stats</h2>
+    {% if stats is deferred %}
+      <span class="skeleton" style="width: 60%;"></span>
+    {% else %}
+      <p>Users: <strong>{{ stats.users }}</strong> &middot; Sessions: <strong>{{ stats.sessions }}</strong></p>
+    {% endif %}
+  </section>
+  {% endblock %}
+
+  {% block feed %}
+  <section id="feed">
+    <h2>Feed</h2>
+    {% if feed is deferred %}
+      <span class="skeleton" style="width: 80%;"></span>
+      <span class="skeleton" style="width: 70%;"></span>
+      <span class="skeleton" style="width: 75%;"></span>
+    {% else %}
+      <ul>
+        {% for item in feed %}<li>#{{ item.id }} — {{ item.msg }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+  {% endblock %}
+</main>
+</body>
+</html>
