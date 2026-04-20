@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stream demo — Chirp returns gallery</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    section { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; }
+    h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="/">← back to gallery</a></p>
+  <h1>Stream — sections flush as they resolve</h1>
+  <p>Open devtools → Network → this doc. Watch chunks arrive as each block completes.</p>
+
+  <section>
+    <h2>{{ top.title }}</h2>
+    <p>value = <strong>{{ top.value }}</strong></p>
+  </section>
+
+  <section>
+    <h2>{{ middle.title }}</h2>
+    <p>value = <strong>{{ middle.value }}</strong></p>
+  </section>
+
+  <section>
+    <h2>{{ bottom.title }}</h2>
+    <p>value = <strong>{{ bottom.value }}</strong></p>
+  </section>
+</main>
+</body>
+</html>

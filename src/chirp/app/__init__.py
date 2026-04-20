@@ -584,6 +584,16 @@ class App:
         *,
         lifecycle_collector: LifecycleCollector | None = None,
     ) -> None:
+        """Freeze the app and start the development server.
+
+        In debug mode, freeze runs the full hypermedia contract suite
+        (routes, fragment targets, OOB regions, htmx attrs, SSE wiring,
+        layouts, alpine CDN, defer_falsy, composition_extends, plus any
+        registered custom checks) and prints a colored banner to stderr.
+        An ERROR-severity issue exits before the server starts. Disable
+        with ``AppConfig(skip_contract_checks=True)`` or
+        ``CHIRP_SKIP_CONTRACT_CHECKS=1``.
+        """
         self._ensure_frozen()
         self._server.run(
             self,
@@ -628,6 +638,11 @@ class App:
 
         Idempotent — safe to call multiple times.  After freezing, no
         further routes, middleware, or plugins can be registered.
+
+        In debug mode, freeze also runs the hypermedia contract checks
+        and exits on ERROR (same suite as ``app.check()``). Disable with
+        ``AppConfig(skip_contract_checks=True)`` or the
+        ``CHIRP_SKIP_CONTRACT_CHECKS`` env var.
 
         Useful in tests and CI to call ``app.check()`` without starting
         a server::

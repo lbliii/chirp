@@ -79,7 +79,7 @@ from .types import CheckResult, ContractIssue, Severity
 
 # Page/Suspense: filesystem and imperative routes return these with a template path.
 _TEMPLATE_CALL_PATTERN = re.compile(
-    r'(?:Template|Fragment|Page|Suspense)\s*\(\s*["\']([^"\']+\.html)["\']'
+    r'(?:Template|Fragment|Page|Suspense|Stream|TemplateStream)\s*\(\s*["\']([^"\']+\.html)["\']'
 )
 
 if TYPE_CHECKING:
