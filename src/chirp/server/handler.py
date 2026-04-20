@@ -30,6 +30,10 @@ from chirp.server.devtools import (
     handle_highlight_request,
 )
 from chirp.server.errors import handle_http_error, handle_internal_error
+from chirp.server.fragment_targets_debug import (
+    FRAGMENT_TARGETS_DEBUG_PATH,
+    render_fragment_targets_debug,
+)
 from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.negotiation import negotiate
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
@@ -179,6 +183,12 @@ def create_request_handler(
             body = handle_highlight_request(req.query)
             return Response(
                 body=body,
+                content_type="application/json; charset=utf-8",
+                render_intent="full_page",
+            )
+        if debug and req.path == FRAGMENT_TARGETS_DEBUG_PATH:
+            return Response(
+                body=render_fragment_targets_debug(fragment_target_registry),
                 content_type="application/json; charset=utf-8",
                 render_intent="full_page",
             )
