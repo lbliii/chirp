@@ -10,7 +10,12 @@ keywords: [app-shell, sidebar, navigation, fragment, page, boost, htmx]
 category: guide
 ---
 
-Also read: **[UI layers & shell regions](./ui-layers.md)** — glossary (app shell vs page chrome vs surface chrome) and stable OOB element ids (`chirp.shell_regions`). For the swap contract, cross-shell redirects, and debug warnings, see **[Boosted Navigation](./boosted-navigation.md)**.
+This guide is about chirp-ui's **`app_shell_layout.html`** — one of three
+shells you can extend. For the trifecta and the decision table, see
+**[Shells](./shells.md)**. Also read **[UI layers & shell regions](./ui-layers.md)**
+for the glossary (app shell vs page chrome vs surface chrome) and stable OOB
+element ids, and **[Boosted Navigation](./boosted-navigation.md)** for the
+swap contract, cross-shell redirects, and debug warnings.
 
 ## What Is an App Shell?
 
@@ -21,6 +26,11 @@ any dashboard.  The shell never reloads; only `#main` changes.
 Chirp + chirp-ui give you this pattern with zero client-side JavaScript
 frameworks.  The server renders exactly the right HTML for each request, and
 htmx swaps it in.
+
+> **Not a shell:** Feature modules like `chirp.docs` ship templates that look
+> shell-like (sidebar, search, content area) but render *inside* whichever
+> shell you choose. They don't establish the document root or the boost
+> contract. See [Shells › What is *not* a shell](./shells.md#what-is-not-a-shell).
 
 ## How It Works
 

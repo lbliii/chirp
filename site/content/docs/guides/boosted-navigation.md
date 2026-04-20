@@ -211,6 +211,7 @@ rather than quiet.
 
 ## Related
 
+- [[docs/guides/shells|Shells]] — the three shells you can extend, the `hx-select` distinction, and what is *not* a shell
 - [[docs/guides/app-shell|App Shells]] — building the shell that hosts boosted links
 - [[docs/guides/ui-layers|UI layers & shell regions]] — `swap_attrs`, layout scope comments, `{# domain: #}`
 - [[docs/guides/oob-registry|OOB Registry]] — registering shell regions and the fail-loud policy for missing blocks
