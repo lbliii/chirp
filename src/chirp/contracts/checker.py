@@ -28,6 +28,7 @@ from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_context_cascade import check_context_cascade
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
+from .rules_fragment_targets import check_fragment_target_orphans
 from .rules_htmx import (
     check_hx_boost,
     check_hx_indicator_selectors,
@@ -388,6 +389,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             check_page_shell_contracts(
                 snapshot.page_leaf_templates,
                 snapshot.fragment_target_registry,
+                kida_env,
+            )
+        )
+        result.issues.extend(
+            check_fragment_target_orphans(
+                snapshot.fragment_target_registry,
+                snapshot.page_leaf_templates,
                 kida_env,
             )
         )
