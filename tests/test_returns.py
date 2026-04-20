@@ -114,6 +114,16 @@ class TestOOB:
         with pytest.raises(AttributeError):
             oob.main = Fragment("c.html", "d")  # type: ignore[misc]
 
+    def test_streaming_main_message_explains_fix(self) -> None:
+        from chirp import Suspense
+
+        with pytest.raises(TypeError) as exc_info:
+            OOB(Suspense("page.html"), Fragment("a.html", "b"))
+        msg = str(exc_info.value)
+        assert "Buffered return types" in msg
+        assert "Streaming types" in msg
+        assert "yield additional Fragment" in msg
+
 
 class TestPage:
     def test_page_block_defaults_to_fragment_block(self) -> None:

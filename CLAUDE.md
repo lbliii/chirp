@@ -86,6 +86,18 @@ def events():
     return EventStream(generate())
 ```
 
+### Streaming types — pick the right one
+
+| Type | Shell first? | Transport | Use when | Don't use for |
+|------|--------------|-----------|----------|---------------|
+| `Stream` | No — flush blocks as they complete | Single chunked HTTP response | Slow first-byte pages where independent sections can paint progressively (SEO-friendly streaming render) | Updates after the page has loaded; long-lived connections |
+| `Suspense` | Yes — shell renders first with `None` placeholders, then deferred blocks stream as OOB swaps | Single chunked HTTP response (htmx OOB chunks fill placeholders) | Dashboards / detail pages with multiple slow data sources where you want one round trip and an instant shell | Post-load updates; cross-tab fan-out |
+| `EventStream` | N/A — pure event channel, no shell | SSE (`text/event-stream`, long-lived) | Realtime updates *after* the page is loaded (notifications, ticker, chat tail, live dashboards) | Initial page render; one-shot data fetches |
+
+If you're not sure: a one-shot dashboard that loads slow data → `Suspense`. A
+notifications feed that updates after the page loads → `EventStream`. A page
+where the *first* paint streams in section-by-section → `Stream`.
+
 ### Suspense (deferred blocks)
 ```python
 return Suspense("page.html",

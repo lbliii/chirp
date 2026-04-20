@@ -104,6 +104,21 @@ class TestMapping:
         with pytest.raises(TypeError, match="not a dataclass"):
             map_row(dict, {"a": 1})  # type: ignore[arg-type]
 
+    def test_map_row_non_dataclass_message_explains_fix(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            map_row(dict, {"a": 1})  # type: ignore[arg-type]
+        msg = str(exc_info.value)
+        assert "frozen=True" in msg
+        assert "slots=True" in msg
+        assert "free-threaded" in msg
+
+    def test_map_rows_non_dataclass_message_explains_fix(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            map_rows(dict, [{"a": 1}])  # type: ignore[arg-type]
+        msg = str(exc_info.value)
+        assert "frozen=True" in msg
+        assert "free-threaded" in msg
+
     def test_map_rows_basic(self) -> None:
         rows = [
             {"id": 1, "name": "Alice", "email": "a@b.com"},

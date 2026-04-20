@@ -658,6 +658,26 @@ class App:
         self._contract_checks.run_debug_checks(self)
 
     def check(self, *, warnings_as_errors: bool = False) -> None:
+        """Validate hypermedia contracts against the frozen app and print a report.
+
+        Runs every registered contract check (routes, fragment targets, OOB
+        regions, htmx attributes, SSE wiring, accessibility, layout chains, plus
+        any custom checks added via :meth:`register_contract_check`) and writes
+        a colored report to stdout.
+
+        Intended use: call from CI or a startup script. ``chirp check <app>``
+        wraps this method.
+
+        Args:
+            warnings_as_errors: When True, WARNING-severity issues fail the
+                check alongside errors (use this in CI to fail on drift).
+
+        Raises:
+            SystemExit: With code 1 when any ERROR issue is found, or any
+                WARNING when ``warnings_as_errors=True``.
+            RuntimeError: If called before :meth:`freeze` (the app must be
+                frozen to expose the snapshot checks read).
+        """
         self._ensure_frozen()
         self._assert_contracts_ready()
         self._contract_checks.check(self, warnings_as_errors=warnings_as_errors)

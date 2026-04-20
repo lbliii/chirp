@@ -63,7 +63,13 @@ def map_row[T](cls: type[T], row: dict[str, Any]) -> T:
     Raises ``TypeError`` if required fields are missing from the row.
     """
     if not dataclasses.is_dataclass(cls):
-        msg = f"{cls.__name__} is not a dataclass — chirp.data requires frozen dataclasses"
+        msg = (
+            f"{cls.__name__} is not a dataclass — chirp.data requires "
+            "@dataclass(frozen=True, slots=True) for row mapping. "
+            "(Frozen is the convention because Chirp targets free-threaded "
+            "Python 3.14: shared row-bound instances must not mutate across "
+            "threads.)"
+        )
         raise TypeError(msg)
 
     coercion = _build_coercion_map(cls)
@@ -74,7 +80,13 @@ def map_row[T](cls: type[T], row: dict[str, Any]) -> T:
 def map_rows[T](cls: type[T], rows: list[dict[str, Any]]) -> list[T]:
     """Map a list of dict-like rows to frozen dataclass instances."""
     if not dataclasses.is_dataclass(cls):
-        msg = f"{cls.__name__} is not a dataclass — chirp.data requires frozen dataclasses"
+        msg = (
+            f"{cls.__name__} is not a dataclass — chirp.data requires "
+            "@dataclass(frozen=True, slots=True) for row mapping. "
+            "(Frozen is the convention because Chirp targets free-threaded "
+            "Python 3.14: shared row-bound instances must not mutate across "
+            "threads.)"
+        )
         raise TypeError(msg)
 
     coercion = _build_coercion_map(cls)
