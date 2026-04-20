@@ -23,7 +23,10 @@ class SwapResolution:
     """Recommended swap for a boosted GET navigation."""
 
     htmx_target: str
-    """Value for ``hx-target`` (includes ``#`` prefix)."""
+    """Value for ``hx-target`` attribute (includes ``#`` prefix)."""
+
+    target_id: str
+    """Bare DOM id (no leading ``#``). Canonical form for comparisons."""
 
     scope: str
     """Symbolic scope name or concrete target id."""
@@ -247,6 +250,7 @@ def resolve_navigation_swap(
 
     return SwapResolution(
         htmx_target=f"#{tid}",
+        target_id=tid,
         scope=scope,
         fragment_block=cfg.fragment_block if cfg is not None else None,
     )

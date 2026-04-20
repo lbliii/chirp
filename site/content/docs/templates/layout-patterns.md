@@ -37,6 +37,8 @@ The critical distinction is whether your app includes a global `hx-select` on th
 
 ## Boost Layout
 
+For the full `hx-boost` contract — cross-shell redirects, `HX-Target` normalization, and debug warnings for fragment-leaked `<!DOCTYPE>` — see the [Boosted Navigation guide](/docs/guides/boosted-navigation/).
+
 The `chirp/layouts/boost.html` layout is the recommended base for htmx-boost + SSE apps:
 
 ```html

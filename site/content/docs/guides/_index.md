@@ -39,6 +39,13 @@ Complement htmx with Alpine for client-only interactivity.
 Sidebar, topbar, and fragment regions with zero client JS.
 :::{/card}
 
+:::{card} Boosted Navigation
+:icon: arrow-right
+:link: ./boosted-navigation
+:description: hx-boost contract, cross-shell redirects, debug warnings
+How swaps work, when they redirect, and the tripwires that catch silent failures.
+:::{/card}
+
 :::{card} UI layers & shell regions
 :icon: layers
 :link: ./ui-layers

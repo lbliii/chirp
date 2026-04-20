@@ -10,7 +10,7 @@ keywords: [app-shell, sidebar, navigation, fragment, page, boost, htmx]
 category: guide
 ---
 
-Also read: **[UI layers & shell regions](./ui-layers.md)** — glossary (app shell vs page chrome vs surface chrome) and stable OOB element ids (`chirp.shell_regions`).
+Also read: **[UI layers & shell regions](./ui-layers.md)** — glossary (app shell vs page chrome vs surface chrome) and stable OOB element ids (`chirp.shell_regions`). For the swap contract, cross-shell redirects, and debug warnings, see **[Boosted Navigation](./boosted-navigation.md)**.
 
 ## What Is an App Shell?
 

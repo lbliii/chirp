@@ -187,7 +187,7 @@ def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:
 
         layouts = plan.layout_chain.layouts
         chain_str = " > ".join(f"{lay.target}({i})" for i, lay in enumerate(layouts))
-        target_id = (request.htmx_target or "").lstrip("#")
+        target_id = request.htmx_target_id or ""
         rendered = len(layouts[plan.layout_start_index :])
         mode = "full" if plan.intent == "full_page" else "fragment"
         if plan.layout_start_index > 0 and plan.layout_start_index < len(layouts):

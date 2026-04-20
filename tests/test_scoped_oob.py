@@ -108,6 +108,7 @@ class _FakeRequest:
         self.is_history_restore = is_history_restore
         self.is_narrow_fragment = is_fragment and not is_boosted and not is_history_restore
         self.htmx_target = htmx_target
+        self.htmx_target_id = htmx_target.lstrip("#") or None if htmx_target else None
         self.path = path
 
 

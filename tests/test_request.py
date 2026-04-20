@@ -157,6 +157,32 @@ class TestRequestProperties:
 
         assert req.htmx_target == "#results"
 
+    def test_htmx_target_id_hashed(self) -> None:
+        scope = _make_scope(headers=[(b"hx-target", b"#results")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target_id == "results"
+        assert req.htmx.target_id == "results"
+
+    def test_htmx_target_id_bare(self) -> None:
+        scope = _make_scope(headers=[(b"hx-target", b"results")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target_id == "results"
+
+    def test_htmx_target_id_missing(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        assert req.htmx_target_id is None
+        assert req.htmx.target_id is None
+
+    def test_htmx_target_id_empty_hash(self) -> None:
+        scope = _make_scope(headers=[(b"hx-target", b"#")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target_id is None
+
+    def test_htmx_target_id_double_hash(self) -> None:
+        scope = _make_scope(headers=[(b"hx-target", b"##panel")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target_id == "panel"
+
     def test_htmx_trigger(self) -> None:
         scope = _make_scope(headers=[(b"hx-trigger", b"search-input")])
         req = Request.from_asgi(scope, _make_receive())

@@ -23,6 +23,7 @@ def _collect_builtin_middleware(
     middleware_list: list,
     *,
     router: object | None = None,
+    oob_registry: object | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first
@@ -174,6 +175,10 @@ def _collect_builtin_middleware(
             middleware_list.append(
                 HTMLInject(DEV_BROWSER_RELOAD_SNIPPET, full_page_only=True),
             )
+        if config.debug_fragment_validator and oob_registry is not None:
+            from chirp.middleware.debug_fragment_validator import DebugFragmentValidator
+
+            middleware_list.append(DebugFragmentValidator(oob_registry))
     return middleware_list
 
 
@@ -312,7 +317,12 @@ class AppCompiler:
 
         middleware_list = list(self._mutable.middleware_list)
         _validate_middleware_ordering(middleware_list)
-        middleware_list = _collect_builtin_middleware(self._config, middleware_list, router=router)
+        middleware_list = _collect_builtin_middleware(
+            self._config,
+            middleware_list,
+            router=router,
+            oob_registry=self._mutable.oob_registry,
+        )
         self._runtime.middleware = tuple(middleware_list)
 
         for middleware in self._runtime.middleware:
