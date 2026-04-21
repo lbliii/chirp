@@ -45,11 +45,9 @@ def test_scaffold_freezes_with_no_errors(
     project = scaffold(tmp_path, monkeypatch, mode=mode)
     result = run_and_parse(project, _FREEZE_CHECK_CODE)
     assert result.returncode == 0, (
-        f"Scaffold '{mode}' subprocess failed:\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        f"Scaffold '{mode}' subprocess failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert result.payload.get("ok") is True, (
-        f"Scaffold '{mode}' freeze produced ERROR issues: "
-        f"{result.payload.get('errors')}"
+        f"Scaffold '{mode}' freeze produced ERROR issues: {result.payload.get('errors')}"
     )
     assert result.payload["error_count"] == 0

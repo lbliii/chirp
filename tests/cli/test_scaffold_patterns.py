@@ -122,9 +122,7 @@ class TestAppImports:
         assert "EventStream" not in V2_APP_PY, (
             "V2_APP_PY imports EventStream but defines no SSE routes"
         )
-        assert "Fragment" not in V2_APP_PY, (
-            "V2_APP_PY imports Fragment but emits no fragments"
-        )
+        assert "Fragment" not in V2_APP_PY, "V2_APP_PY imports Fragment but emits no fragments"
 
     def test_v2_chirpui_has_no_bare_chirp_ui_import(self) -> None:
         # use_chirp_ui(app) handles registration — a bare ``import chirp_ui`` is dead.
@@ -162,7 +160,9 @@ class TestVersionFloors:
         import re
 
         match = re.search(r'ui\s*=\s*\[\s*"chirp-ui>=([\d.]+)"', root)
-        assert match, "Could not find chirp-ui pin in root pyproject's [project.optional-dependencies].ui"
+        assert match, (
+            "Could not find chirp-ui pin in root pyproject's [project.optional-dependencies].ui"
+        )
         expected = f'"chirp-ui>={match.group(1)}"'
         assert expected in PYPROJECT_TOML, (
             f"Scaffold PYPROJECT_TOML must pin {expected} to match root ui extra"

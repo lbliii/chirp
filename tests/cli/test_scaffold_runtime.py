@@ -120,9 +120,7 @@ asyncio.run(main())
 
 
 @pytest.mark.parametrize("mode", ["v2", "v2_plain"])
-def test_v2_scaffold_runtime(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
-) -> None:
+def test_v2_scaffold_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
     project = scaffold(tmp_path, monkeypatch, mode=mode)
     result = run_and_parse(project, _RUNTIME_CODE)
 
