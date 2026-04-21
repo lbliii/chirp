@@ -3,24 +3,13 @@
 V2_APP_PY = """\
 import os
 
-from chirp import (
-    App,
-    AppConfig,
-    EventStream,
-    Fragment,
-    Redirect,
-    Request,
-    get_user,
-    is_safe_url,
-    login,
-    logout,
-)
+from chirp import App, AppConfig, Redirect, logout
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
-from models import load_user, verify_user
+from models import load_user
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -56,19 +45,6 @@ app.add_middleware(SecurityHeadersMiddleware())
 app.mount_pages("pages")
 
 
-@app.route("/login", methods=["POST"])
-async def do_login(request: Request):
-    form = await request.form()
-    username = form.get("username", "")
-    password = form.get("password", "")
-    user = verify_user(username, password)
-    if user:
-        login(user)
-        next_url = request.query.get("next", "/dashboard")
-        return Redirect(next_url if is_safe_url(next_url) else "/dashboard")
-    return Redirect("/login?error=1")
-
-
 @app.route("/logout", methods=["POST"])
 def do_logout():
     logout()
@@ -81,17 +57,17 @@ if __name__ == "__main__":
 
 V2_APP_CHIRPUI_PY = """\
 import os
+from itertools import count as _counter
 
 from chirp import (
     App,
     AppConfig,
     EventStream,
     Fragment,
+    OOB,
     Redirect,
     Request,
-    get_user,
-    is_safe_url,
-    login,
+    login_required,
     logout,
     use_chirp_ui,
 )
@@ -100,8 +76,7 @@ from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
-import chirp_ui
-from models import load_user, verify_user
+from models import load_user
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -140,19 +115,6 @@ use_chirp_ui(app)
 app.mount_pages("pages")
 
 
-@app.route("/login", methods=["POST"])
-async def do_login(request: Request):
-    form = await request.form()
-    username = form.get("username", "")
-    password = form.get("password", "")
-    user = verify_user(username, password)
-    if user:
-        login(user)
-        next_url = request.query.get("next", "/dashboard")
-        return Redirect(next_url if is_safe_url(next_url) else "/dashboard")
-    return Redirect("/login?error=1")
-
-
 @app.route("/logout", methods=["POST"])
 def do_logout():
     logout()
@@ -170,6 +132,28 @@ async def time_stream(request: Request) -> EventStream:
             await asyncio.sleep(1)
 
     return EventStream(events())
+
+
+_refresh_counter = _counter(1)
+
+
+@app.route("/dashboard/refresh", methods=["POST"])
+@login_required
+def refresh_dashboard() -> OOB:
+    from datetime import datetime
+
+    n = next(_refresh_counter)
+    stamp = f"Refreshed at {datetime.now().strftime('%H:%M:%S')}"
+    return OOB(
+        Fragment("dashboard/page.html", "refresh_counter", count=n),
+        Fragment(
+            "dashboard/page.html",
+            "refresh_stamp",
+            target="refresh-stamp",
+            swap="innerHTML",
+            stamp=stamp,
+        ),
+    )
 
 
 if __name__ == "__main__":
@@ -275,45 +259,72 @@ V2_LAYOUT_CHIRPUI_HTML = """\
 """
 
 V2_INDEX_PAGE_PY = """\
-from chirp import Template
+from chirp import Page
 
 
-async def handler():
-    return Template("page.html")
+def get() -> Page:
+    return Page("page.html", "page_content", page_block_name="page_root")
 """
 
 V2_INDEX_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 <h1>Welcome</h1>
 <p>Sign in to access the dashboard.</p>
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 """
 
 V2_INDEX_CHIRPUI_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 {% from "chirpui/layout.html" import page_header %}
 {% call page_header("Welcome", subtitle="Sign in to access the dashboard.") %}
 {% end %}
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 """
 
 V2_LOGIN_PAGE_PY = """\
-from chirp import Request, Template
+from chirp import Page, Redirect, Request, is_safe_url, login
+
+from models import verify_user
 
 
-async def handler(request: Request):
-    error = request.query.get("error", "")
-    return Template("login/page.html", error="Invalid credentials" if error else "")
+def get(request: Request) -> Page:
+    return Page("login/page.html", "page_content", page_block_name="page_root", error="")
+
+
+async def post(request: Request) -> Page | Redirect:
+    form = await request.form()
+    username = form.get("username", "")
+    password = form.get("password", "")
+    user = verify_user(username, password)
+    if user:
+        login(user)
+        next_url = request.query.get("next", "/dashboard")
+        return Redirect(next_url if is_safe_url(next_url) else "/dashboard")
+    return Page(
+        "login/page.html",
+        "page_content",
+        page_block_name="page_root",
+        error="Invalid username or password",
+    )
 """
 
 V2_LOGIN_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 <h1>Login</h1>
 {% if error %}
 <p class="error">{{ error }}</p>
@@ -327,13 +338,17 @@ V2_LOGIN_HTML = """\
     <button type="submit">Sign in</button>
 </form>
 <p><small>Hint: admin / password</small></p>
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 """
 
 V2_LOGIN_CHIRPUI_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 {% from "chirpui/layout.html" import page_header, stack, block %}
 {% from "chirpui/forms.html" import text_field %}
 {% call page_header("Login", subtitle="Sign in to continue") %}
@@ -354,38 +369,53 @@ V2_LOGIN_CHIRPUI_HTML = """\
 {% end %}
 <p class="chirpui-text-muted">Hint: admin / password</p>
 {% end %}
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 """
 
 V2_DASHBOARD_PAGE_PY = """\
-from chirp import Template, get_user, login_required
+from chirp import Page, get_user, login_required
 
 
 _GRID_COLUMNS = [{"key": "name", "label": "Name"}, {"key": "role", "label": "Role"}]
 
 
 @login_required
-async def handler():
-    return Template("dashboard/page.html", user=get_user(), cols=_GRID_COLUMNS)
+def get() -> Page:
+    return Page(
+        "dashboard/page.html",
+        "page_content",
+        page_block_name="page_root",
+        user=get_user(),
+        cols=_GRID_COLUMNS,
+    )
 """
 
 V2_DASHBOARD_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 <h1>Dashboard</h1>
 <p>Welcome, <strong>{{ user.name }}</strong>!</p>
 <p>This page is protected by <code>@login_required</code>.</p>
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 """
 
 V2_DASHBOARD_CHIRPUI_HTML = """\
-{% extends "_layout.html" %}
-
-{% block content %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
 {% from "chirpui/layout.html" import container, stack, block, page_header %}
 {% from "chirpui/card.html" import card %}
 {% from "chirpui/state_primitives.html" import draft_store, grid_state %}
+{% from "chirpui/fragment_island.html" import safe_region %}
 {% call page_header("Dashboard", subtitle="Welcome, " ~ user.name) %}
 {% end %}
 {% call stack() %}
@@ -423,6 +453,17 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% end %}
 {% end %}
 {% call block() %}
+{% call card(title="OOB two-target swap") %}
+<p class="chirpui-text-muted">One POST updates both regions — main swap + hx-swap-oob.</p>
+{% call safe_region("refresh-counter") %}{% block refresh_counter %}<strong>Count: {{ count ?? 0 }}</strong>{% end %}{% end %}
+<div id="refresh-stamp" class="chirpui-text-muted">{% block refresh_stamp %}<small>{{ stamp ?? "Never refreshed" }}</small>{% end %}</div>
+<form hx-post="/dashboard/refresh" hx-target="#refresh-counter" hx-swap="innerHTML" style="margin:0">
+    {{ csrf_field() }}
+    <button type="submit" class="chirpui-btn chirpui-btn--sm">Refresh</button>
+</form>
+{% end %}
+{% end %}
+{% call block() %}
 {% call card(title="Live Clock") %}
 <div hx-ext="sse" sse-connect="/time" hx-disinherit="hx-target hx-swap">
     <div sse-swap="time_block" hx-target="this">
@@ -432,11 +473,14 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% end %}
 {% end %}
 {% end %}
-{% endblock %}
+{% end %}
+{% end %}
+</div>
+{% end %}
 
 {% block time_block %}
 <span>{{ now }}</span>
-{% endblock %}
+{% end %}
 """
 
 V2_STYLE_CSS = """\
@@ -543,8 +587,8 @@ async def test_login_failure():
                 "Cookie": f"chirp_session={{cookie}}",
             }},
         )
-        assert r.status == 302
-        assert "error=1" in r.header("location", "")
+        assert r.status == 200
+        assert "Invalid" in r.text
 
 
 async def test_dashboard_authenticated():
@@ -600,6 +644,46 @@ async def test_logout():
         assert r3.status == 302
         r4 = await client.get("/dashboard", headers={{"Cookie": _extract_cookie(r3) or ""}})
         assert r4.status == 302
+
+
+async def test_dashboard_refresh_oob():
+    \"\"\"Sprint 5 demo: POST /dashboard/refresh returns OOB two-target swap.
+
+    Only wired in the chirpui variant; on the plain variant the route returns
+    404 and the test short-circuits.
+    \"\"\"
+    from app import app
+    async with TestClient(app) as client:
+        r1 = await client.get("/login")
+        csrf = _extract_csrf_token(r1.text)
+        cookie1 = _extract_cookie(r1)
+        r2 = await client.post(
+            "/login",
+            body=f"username=admin&password=password&_csrf_token={{csrf}}".encode(),
+            headers={{
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Cookie": f"chirp_session={{cookie1}}",
+            }},
+        )
+        cookie = _extract_cookie(r2)
+        r_dash = await client.get("/dashboard", headers={{"Cookie": f"chirp_session={{cookie}}"}})
+        csrf2 = _extract_csrf_token(r_dash.text)
+        cookie_dash = _extract_cookie(r_dash) or cookie
+        r3 = await client.post(
+            "/dashboard/refresh",
+            body=f"_csrf_token={{csrf2}}".encode(),
+            headers={{
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Cookie": f"chirp_session={{cookie_dash}}",
+            }},
+        )
+        if r3.status == 404:
+            return  # non-chirpui variant: route not registered
+        assert r3.status == 200
+        assert "Count: 1" in r3.text
+        assert 'id="refresh-stamp"' in r3.text
+        assert 'hx-swap-oob="innerHTML"' in r3.text
+        assert "Refreshed at" in r3.text
 
 
 async def test_csrf_required():

@@ -1,8 +1,7 @@
 """Minimal project scaffolding templates (--minimal)."""
 
 MINIMAL_APP_PY = """\
-from chirp import App, Request
-from chirp.templating import Template
+from chirp import App, Request, Template
 
 app = App()
 
