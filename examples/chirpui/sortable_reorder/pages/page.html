@@ -53,11 +53,11 @@
       {% end %}
       {% end %}
 
-      {% call sortable_list(attrs='x-data
+      {% call sortable_list(attrs_unsafe='x-data
           @dragend="delete $el.dataset.draggingIdx; $el.querySelectorAll(\'.chirpui-sortable__item--dragging, .chirpui-sortable__item--over\').forEach(el => el.classList.remove(\'chirpui-sortable__item--dragging\', \'chirpui-sortable__item--over\'))"') %}
       {% if steps %}
         {% for step in steps %}
-        {% call sortable_item(attrs='x-data="{ overCount: 0 }" draggable="true"
+        {% call sortable_item(attrs_unsafe='x-data="{ overCount: 0 }" draggable="true"
             @dragstart="$el.closest(\'.chirpui-sortable\').dataset.draggingIdx = \'' ~ loop.index0 ~ '\'; $el.classList.add(\'chirpui-sortable__item--dragging\')"
             @dragover.prevent
             @dragenter="overCount++; if (overCount === 1) $el.classList.add(\'chirpui-sortable__item--over\')"

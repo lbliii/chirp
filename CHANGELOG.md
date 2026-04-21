@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OOB render errors fail loud** — `execute_render_plan` previously caught every exception raised while rendering an OOB region and substituted `html = ""`, producing empty swaps that wiped existing DOM content. Missing blocks now raise `chirp.errors.BlockNotFoundError`; genuine render errors (context `KeyError`, filter errors) propagate to the route error handler. See `docs/guides/oob-registry.md`.
 - **Orphan OOB registrations error at freeze** — `app.check()` now emits `Severity.ERROR` (was `WARNING`) when the OOB registry contains a block no layout template defines. Non-optional orphans block debug-mode freeze; `app.override_contract_severity("oob_registry", Severity.WARNING)` restores prior behavior globally.
+- **`AppConfig.strict_undefined` — `True` by default** — chirp now passes `strict_undefined` through to kida's `Environment`, matching kida 0.7.0's new default. Templates referencing a missing attribute/key raise `UndefinedError` instead of silently rendering empty. Opt out with `AppConfig(strict_undefined=False)` during migration.
+- **chirp-ui floor bumped to `>=0.5.0`, kida-templates to `>=0.7.0`** — picks up chirp-ui 0.5 (agent-grounding manifest, composite contract tests, `@layer chirpui.*` cascade public API, `set_strict("auto")` + `CHIRP_UI_DEV`), kida 0.7 (`strict_undefined=True` default, Jinja2 parser hints), and chirp-ui 0.4 sharp-edges audit. `use_chirp_ui(app, strict="auto")` now delegates to the `CHIRP_UI_DEV` env var so dev hosts opt in once without code changes. Per-request `_ChirpUIStrictMiddleware` retired — chirp-ui strict mode is now set once at `use_chirp_ui()` registration.
 
 ### Added
 
@@ -23,6 +25,16 @@ If `app.check()` starts failing after upgrading with `oob_registry` ERRORs:
 1. If the layout legitimately omits the block (e.g. a marketing page without a sidebar), add `optional=True` to the `register_oob_region()` call.
 2. Otherwise, add `{% region <block_name> %}...{% end %}` to the layout template — `app.check()` is telling you the registration is a dead letter.
 3. To defer the fix temporarily, call `app.override_contract_severity("oob_registry", Severity.WARNING)` during app setup.
+
+#### chirp-ui 0.5 / kida 0.7: `strict_undefined` default
+
+Templates rendering `{{ obj.attr }}` against missing attributes now raise `UndefinedError` instead of rendering empty. Fix callsites with one of:
+
+- `{{ obj.attr ?? "" }}` — null-coalescing
+- `{{ obj.attr | default("") }}` — default filter
+- `{% if obj.attr is defined %}...{% end %}` — conditional
+
+Transitional opt-out: `AppConfig(strict_undefined=False)`. chirp-ui 0.4 also renamed component `attrs=` → `attrs_unsafe=` on 37 macros with a deprecation filter warning; rename call sites to silence the warning.
 
 ## [0.3.3] — 2026-03-30
 
