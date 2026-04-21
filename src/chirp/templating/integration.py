@@ -161,6 +161,7 @@ def create_environment(
         auto_reload=config.debug,
         trim_blocks=config.trim_blocks,
         lstrip_blocks=config.lstrip_blocks,
+        strict_undefined=config.strict_undefined,
         static_context=dict(config.static_context) if config.static_context else None,
     )
 

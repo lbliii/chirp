@@ -183,7 +183,7 @@
   {{ select_field("group", group_options, selected=active_group, label="Group") }}
   {{ text_field("phone", label="Phone", placeholder="555-0100", required=false) }}
   {% call form_actions(align="end") %}
-    {{ btn("Cancel", variant="ghost", type="button", attrs='onclick="this.closest(\'dialog\').close()"') }}
+    {{ btn("Cancel", variant="ghost", type="button", attrs_unsafe='onclick="this.closest(\'dialog\').close()"') }}
     {{ btn("Add Contact", variant="primary") }}
   {% end %}
 </form>
