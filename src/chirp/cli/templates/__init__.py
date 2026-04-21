@@ -3,13 +3,6 @@
 Re-exports all template constants from submodules.
 """
 
-from chirp.cli.templates.full import (
-    APP_PY,
-    BASE_HTML,
-    INDEX_HTML,
-    STYLE_CSS,
-    TEST_APP_PY,
-)
 from chirp.cli.templates.minimal import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
@@ -33,6 +26,8 @@ from chirp.cli.templates.shell import (
 from chirp.cli.templates.sse import (
     SSE_APP_PY,
     SSE_INDEX_HTML,
+    STYLE_CSS,
+    TEST_APP_PY,
 )
 from chirp.cli.templates.v2 import (
     V2_APP_CHIRPUI_PY,
@@ -56,9 +51,6 @@ from chirp.cli.templates.v2 import (
 )
 
 __all__ = [
-    "APP_PY",
-    "BASE_HTML",
-    "INDEX_HTML",
     "MIGRATIONS_README",
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",

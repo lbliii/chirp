@@ -25,36 +25,49 @@ def _walk_block_parents(
     nodes: Sequence[Node],
     enclosing: str | None,
     parent_map: dict[str, str | None],
+    fragment_names: set[str],
 ) -> None:
-    """Map each block/region name to its nearest enclosing block/region name."""
+    """Map each block/region name to its nearest enclosing block/region name.
+
+    Fragment block names are collected in ``fragment_names`` so the caller can
+    skip them — ``{% fragment %}`` blocks are swap-only and never participate
+    in full-page composition, so they are reachable by definition via
+    ``render_block`` / ``render_fragment``.
+    """
     for node in nodes:
-        if isinstance(node, (Block, Region)):
+        if isinstance(node, Block):
             parent_map[node.name] = enclosing
-            _walk_block_parents(node.body, node.name, parent_map)
+            if getattr(node, "fragment", False):
+                fragment_names.add(node.name)
+            _walk_block_parents(node.body, node.name, parent_map, fragment_names)
+            continue
+        if isinstance(node, Region):
+            parent_map[node.name] = enclosing
+            _walk_block_parents(node.body, node.name, parent_map, fragment_names)
             continue
         if isinstance(node, Def):
-            _walk_block_parents(node.body, enclosing, parent_map)
+            _walk_block_parents(node.body, enclosing, parent_map, fragment_names)
             continue
         if isinstance(node, CallBlock):
             for slot_body in node.slots.values():
-                _walk_block_parents(slot_body, enclosing, parent_map)
+                _walk_block_parents(slot_body, enclosing, parent_map, fragment_names)
             continue
         if isinstance(node, AstTemplate):
-            _walk_block_parents(node.body, enclosing, parent_map)
+            _walk_block_parents(node.body, enclosing, parent_map, fragment_names)
             continue
 
         for attr in ("body", "else_", "empty"):
             children = getattr(node, attr, None)
             if children:
-                _walk_block_parents(children, enclosing, parent_map)
+                _walk_block_parents(children, enclosing, parent_map, fragment_names)
         elif_ = getattr(node, "elif_", None)
         if elif_:
             for _test, body in elif_:
-                _walk_block_parents(body, enclosing, parent_map)
+                _walk_block_parents(body, enclosing, parent_map, fragment_names)
         cases = getattr(node, "cases", None)
         if cases:
             for _pattern, _guard, body in cases:
-                _walk_block_parents(body, enclosing, parent_map)
+                _walk_block_parents(body, enclosing, parent_map, fragment_names)
 
 
 def _block_is_reachable(
@@ -120,10 +133,13 @@ def check_unreachable_blocks(
             continue
 
         parent_map: dict[str, str | None] = {}
-        _walk_block_parents(ast.body, None, parent_map)
+        fragment_names: set[str] = set()
+        _walk_block_parents(ast.body, None, parent_map, fragment_names)
 
         for block_name in sorted(page_blocks):
             if block_name not in parent_map:
+                continue
+            if block_name in fragment_names:
                 continue
             if _block_is_reachable(block_name, roots, parent_map):
                 continue

@@ -397,6 +397,7 @@ def filter_board_route(request: Request):
             "assignee": assignee_filter,
             "tag": tag_filter,
         },
+        current_user=get_user(),
     )
 
 

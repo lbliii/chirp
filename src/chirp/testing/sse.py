@@ -93,9 +93,7 @@ class _SseAttrExtractor(HTMLParser):
         self.sse_connects: list[str] = []
         self.sse_swaps: set[str] = set()
 
-    def handle_starttag(
-        self, tag: str, attrs: list[tuple[str, str | None]]
-    ) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         for name, value in attrs:
             if name == "sse-connect" and value:
                 self.sse_connects.append(value)
@@ -136,10 +134,7 @@ async def assert_sse_wired(
     """
     page = await client.get(page_path)
     connects, swaps = extract_sse_attrs(page.text)
-    assert connects, (
-        f"Page {page_path!r} has no sse-connect attribute; "
-        "cannot verify SSE wiring."
-    )
+    assert connects, f"Page {page_path!r} has no sse-connect attribute; cannot verify SSE wiring."
     assert swaps, (
         f"Page {page_path!r} has sse-connect={connects!r} but no sse-swap= "
         "attribute. htmx-sse will not wire up any listener without it."
