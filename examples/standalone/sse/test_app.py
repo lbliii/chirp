@@ -1,6 +1,6 @@
 """Tests for the SSE example — real-time event streaming."""
 
-from chirp.testing import TestClient
+from chirp.testing import TestClient, assert_sse_wired
 
 
 class TestSSEFeedPage:
@@ -82,3 +82,16 @@ class TestSSEEventStream:
 
         last = result.events[-1]
         assert last.event == "close"
+
+
+class TestSSEWiring:
+    """Page markup and stream event names agree.
+
+    Catches the class of bug where the page listens for ``sse-swap="X"``
+    but the stream emits events named ``Y`` — a silent failure in the
+    browser that curl and unit tests both miss.
+    """
+
+    async def test_wiring(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            await assert_sse_wired(client, "/", "/events", max_events=6)
