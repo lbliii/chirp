@@ -167,6 +167,7 @@ ignore = [
 "src/chirp/app/diagnostics.py" = ["T20"] # Startup diagnostics use print
 "src/chirp/app/server.py" = ["T20"]   # Server startup uses print
 "src/chirp/testing/assertions.py" = ["S101"] # Test assertion helpers use assert by design
+"src/chirp/testing/sse.py" = ["S101"] # Test assertion helpers use assert by design
 "src/chirp/app/__init__.py" = ["S101"] # Internal state assertions after freeze
 "src/chirp/app/runtime.py" = ["S101"] # Internal state assertions after freeze
 "src/chirp/data/query.py" = ["S608"]  # Query builder constructs SQL safely (parameterized)
