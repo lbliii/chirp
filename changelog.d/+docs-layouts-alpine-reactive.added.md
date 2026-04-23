@@ -1,1 +1,0 @@
-**Layouts, Alpine, & Reactive docs** — Filesystem routing (outlet + `main`), route contract reference, streaming HTML + Suspense + Alpine, built-in middleware, ReactiveBus API, DependencyIndex, derived paths, observability counters, thread safety stress test coverage, contract checks (reactive_block, reactive_cycle, oob_target, form_action), SSE monitoring, and shell tabs.
