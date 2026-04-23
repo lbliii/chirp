@@ -96,7 +96,7 @@ A change is done when all of these hold:
 - [ ] Tests exercise the *interesting* path: htmx vs non-htmx for `Page`, missing block for OOB, awaitable vs sync context value for Suspense, malformed form for `ValidationError`.
 - [ ] If you added a new way to render or wire HTML: there's an `app.check()` rule that catches the wrong way. Contracts beat docs.
 - [ ] Free-threading-sensitive change? Note in the PR what shared mutable state you touched and how it's protected (or why it doesn't need to be).
-- [ ] Public API changed → CHANGELOG fragment via towncrier (`changelog.d/`), migration note if breaking.
+- [ ] Public API changed → CHANGELOG fragment via towncrier (`changelog.d/`, see `changelog.d/README.md` for format — **no leading `-`**), migration note if breaking.
 - [ ] Error messages tell the reader what to do next: which template, which block, which registration, what config flag. `BlockNotFoundError`'s message is the bar.
 - [ ] PR description explains *why*. The diff explains *what*.
 

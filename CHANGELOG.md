@@ -5,36 +5,53 @@ All notable changes to chirp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- **OOB render errors fail loud** — `execute_render_plan` previously caught every exception raised while rendering an OOB region and substituted `html = ""`, producing empty swaps that wiped existing DOM content. Missing blocks now raise `chirp.errors.BlockNotFoundError`; genuine render errors (context `KeyError`, filter errors) propagate to the route error handler. See `docs/guides/oob-registry.md`.
-- **Orphan OOB registrations error at freeze** — `app.check()` now emits `Severity.ERROR` (was `WARNING`) when the OOB registry contains a block no layout template defines. Non-optional orphans block debug-mode freeze; `app.override_contract_severity("oob_registry", Severity.WARNING)` restores prior behavior globally.
-- **`AppConfig.strict_undefined` — `True` by default** — chirp now passes `strict_undefined` through to kida's `Environment`, matching kida 0.7.0's new default. Templates referencing a missing attribute/key raise `UndefinedError` instead of silently rendering empty. Opt out with `AppConfig(strict_undefined=False)` during migration.
-- **chirp-ui floor bumped to `>=0.5.0`, kida-templates to `>=0.7.0`** — picks up chirp-ui 0.5 (agent-grounding manifest, composite contract tests, `@layer chirpui.*` cascade public API, `set_strict("auto")` + `CHIRP_UI_DEV`), kida 0.7 (`strict_undefined=True` default, Jinja2 parser hints), and chirp-ui 0.4 sharp-edges audit. `use_chirp_ui(app, strict="auto")` now delegates to the `CHIRP_UI_DEV` env var so dev hosts opt in once without code changes. Per-request `_ChirpUIStrictMiddleware` retired — chirp-ui strict mode is now set once at `use_chirp_ui()` registration.
+## [0.5.0] — 2026-04-23
 
 ### Added
 
-- **`register_oob_region(..., optional=True)`** — Opt-out for shell regions that legitimately appear in only some layouts. Optional orphans stay at `WARNING`; at render time, optional regions missing from the current layout are silently dropped (not emitted as empty OOB wrappers). `chirp.ext.chirp_ui`'s auto-registered breadcrumb, sidebar, title, and shell-actions regions all default to `optional=True`.
+- **Alpine on streaming HTML** — `AlpineInject` rewrites `StreamingResponse` bodies (e.g. `Suspense`) to insert the Alpine bundle before `</body>`, with the same deduplication as buffered pages.
+- **Ancestor block pruning** — `_find_deferred_blocks` now drops blocks whose `depends_on` is a strict superset of another matched block, preventing large parent blocks (e.g. `page_content`) from being re-rendered as wasted OOB chunks.
+- **Concurrency stress tests** — 25 new tests covering all Lock-protected modules (bus, cache, rate-limiter, lockout, OOB registry), ContextVar isolation, and database pool stress.
+- **Configurable queue depth** — `ReactiveBus(maxsize=N)` controls per-subscriber queue size (default 256, unchanged).
+- **Contract checks — source-level SSE event inference** — ``check_sse_event_crossref`` now AST-walks each ``@contract(returns=SSEContract(...))`` handler for literal ``SSEEvent(event="...")`` and ``Fragment(target="...")`` yields. A ``sse-swap="X"`` on a child of ``sse-connect`` that matches neither the declared ``event_types`` nor any inferred literal is promoted from ``WARNING`` to ``ERROR`` at startup — the silent-mismatch class of bug (htmx drops unmatched events) now fails loud. Handlers with non-literal ``event=`` / ``target=`` (variable, f-string, or function call) disable inference for that route; an ``INFO`` issue is emitted so operators can annotate ``SSEContract.event_types`` to restore fail-loud coverage.
+- **Form action contract** — `chirp check` reports `<form action="/path" method="post">` targets that lack a `FormContract` declaration.
+- **Layout `HX-Target` + outlet** — `LayoutChain.find_start_index_for_target` matches `{# outlet: element_id #}` as well as `{# target: #}`, so boosted `HX-Target: #main` resolves for chirp-ui app shells (`{# target: body #}` + `{# outlet: main #}`).
+- **Layouts, Alpine, & Reactive docs** — Filesystem routing (outlet + `main`), route contract reference, streaming HTML + Suspense + Alpine, built-in middleware, ReactiveBus API, DependencyIndex, derived paths, observability counters, thread safety stress test coverage, contract checks (reactive_block, reactive_cycle, oob_target, form_action), SSE monitoring, and shell tabs.
+- **Native fragment blocks — ``{% fragment name %}...{% end %}``** — Chirp now recognises kida 0.6.0+'s native fragment directive as a swap-only target: the block body is suppressed during a full-template render (``Template("p.html", ...)``) and only emits content when addressed by ``Fragment("p.html", "name", ...)``, the ``/_frag{path}?_b=name`` dispatcher, or a ``{% fragment %}`` target in a ``PageShellContract``. Use this instead of the ``{% block %}`` + ``{% if foo is defined %}`` workaround for blocks that should never render inline — e.g. success panels, SSE payloads, OOB swap targets.
+
+  **Contract rules updated to match** — ``check_unreachable_blocks`` no longer flags ``fragment=True`` blocks as unreachable from composition roots: they are unreachable *by design*. Every other rule (``check_fragment_target_orphans``, ``check_page_shell_contracts``, ``rules_sse`` cross-reference) walks ``block_metadata()`` and already treats fragment and regular blocks identically.
+- **OOB target contract** — `chirp check` warns when `hx-swap-oob` elements reference IDs not found in any template.
+- **Reactive contract rules** — `chirp check` validates that `DependencyIndex` block references point to real template blocks and that derivation graphs are acyclic.
+- **ReactiveBus observability** — `emitted_count`, `dropped_count`, and `subscriber_count` properties for monitoring event throughput and back-pressure.
+- **Suspense templates docs** — Document `{% if key is not none %}` / `__chirp_defer_pending__` instead of bare `{% if key %}` (falsy empty results look like perpetual skeletons). Updated `return-values.md`, streaming guide, `CLAUDE.md`, and API reference.
+- **`Suspense.defer_blocks`** — optional explicit list of blocks to re-render as OOB chunks, bypassing `block_metadata()` static analysis. Use when deferred values are passed through macro arguments that the analyzer can't trace.
+- **`__chirp_defer_pending__` / `CHIRP_DEFER_PENDING_KEY`** — Suspense shell renders (and sync-only Suspense renders) inject a `frozenset` of context key names still awaiting resolution; deferred block re-renders use an empty frozenset. Templates can branch on membership instead of overloading `None` / truthiness.
+- **`alpine_json_config` docs** — Chirp `CLAUDE.md`, Alpine guide, and built-in middleware reference document the template global and its relationship to `AlpineInject`.
+- **`alpine_json_config` template global** — when `alpine=True`, templates can emit `<script type="application/json">` tags with safely escaped ids and JSON for Alpine components (`alpine_json_config("my-id", data)`).
 - **`chirp.errors.BlockNotFoundError`** — Multi-inherits from `ChirpError` and `KeyError`, so existing `except KeyError` handlers (including Kida's documented `render_block` contract) continue to catch it. Carries `template`, `block`, and `region` attributes for structured error handling.
+- **`register_oob_region(..., optional=True)`** — Opt-out for shell regions that legitimately appear in only some layouts. Optional orphans stay at `WARNING`; at render time, optional regions missing from the current layout are silently dropped (not emitted as empty OOB wrappers). `chirp.ext.chirp_ui`'s auto-registered breadcrumb, sidebar, title, and shell-actions regions all default to `optional=True`.
 
-### Migration
+### Changed
 
-If `app.check()` starts failing after upgrading with `oob_registry` ERRORs:
-1. If the layout legitimately omits the block (e.g. a marketing page without a sidebar), add `optional=True` to the `register_oob_region()` call.
-2. Otherwise, add `{% region <block_name> %}...{% end %}` to the layout template — `app.check()` is telling you the registration is a dead letter.
-3. To defer the fix temporarily, call `app.override_contract_severity("oob_registry", Severity.WARNING)` during app setup.
+- **Breaking — SSE event-name default** — ``EventStream`` now emits yielded ``Fragment`` payloads as **unnamed** SSE frames (matching htmx's default ``message`` event name). Previously the wire frame defaulted to ``event: fragment``, requiring every consumer to declare ``sse-swap="fragment"`` — a chirp-specific quirk that silently broke stock htmx-sse snippets.
 
-#### chirp-ui 0.5 / kida 0.7: `strict_undefined` default
+  **Migration** — In templates, change ``sse-swap="fragment"`` to ``sse-swap="message"`` (htmx-sse requires the attribute to be present to wire up the listener; ``"message"`` is the default event name emitted by untargeted ``Fragment`` yields). The ``chirp/sse.html`` macro now defaults to ``swap="message"``; pass ``sse_scope("/events", swap="status")`` to opt into a named channel. To keep the old wire shape explicitly, yield ``SSEEvent(data=rendered_fragment, event="fragment")`` instead of a bare ``Fragment``, or pass ``target="fragment"`` on the Fragment.
+- **Chirp-ui integration** — Suppress ``UserWarning`` when optional chirp-ui implementations replace Chirp’s built-in filter stubs (detected via ``__module__`` prefix).
 
-Templates rendering `{{ obj.attr }}` against missing attributes now raise `UndefinedError` instead of rendering empty. Fix callsites with one of:
+  **Contract checks** — ``Template``/``Page``/``Suspense``/``Fragment`` reference scan includes ``Page`` and ``Suspense`` paths; filesystem routes expose the original handler as ``Route.page_source_handler`` so dead-template and fragment checks see user source inside the async page wrapper. Import ``make_route_link_attrs`` via ``importlib`` when wiring ``route_link_attrs`` for ty-friendly optional installs.
 
-- `{{ obj.attr ?? "" }}` — null-coalescing
-- `{{ obj.attr | default("") }}` — default filter
-- `{% if obj.attr is defined %}...{% end %}` — conditional
+  **Context cascade** — Deduplicate identical override notices; omit INFO when child providers intentionally override ``shell_actions``, ``shell_mode``, or ``Components``.
+- **Dependencies** — `kida-templates>=0.6.0` (bumped from `>=0.3.0`), `bengal-pounce>=0.6.0` (bumped from `>=0.4.0`).
+- **Scaffold template** — `chirp new` now pins `bengal-chirp>=0.2.0` (was `>=0.1.9`). Existing projects are unaffected; new projects get the latest contract fixes and Alpine injection improvements from 0.2.x.
+- **OOB render errors fail loud** — `execute_render_plan` previously caught every exception raised while rendering an OOB region and substituted `html = ""`, producing empty swaps that wiped existing DOM content. Missing blocks now raise `chirp.errors.BlockNotFoundError`; genuine render errors (context `KeyError`, filter errors) propagate to the route error handler. See `docs/guides/oob-registry.md`.
+- **Orphan OOB registrations error at freeze** — `app.check()` now emits `Severity.ERROR` (was `WARNING`) when the OOB registry contains a block no layout template defines. Non-optional orphans block debug-mode freeze; `app.override_contract_severity("oob_registry", Severity.WARNING)` restores prior behavior globally. Add `optional=True` to `register_oob_region()` calls for regions that legitimately appear in only some layouts.
+- **`AppConfig.strict_undefined` — `True` by default** — chirp now passes `strict_undefined` through to kida's `Environment`, matching kida 0.7.0's new default. Templates referencing a missing attribute/key raise `UndefinedError` instead of silently rendering empty. Opt out with `AppConfig(strict_undefined=False)` during migration; fix callsites with `obj.attr ?? ""`, `| default(...)`, or `{% if obj.attr is defined %}`.
+- **chirp-ui floor bumped to `>=0.5.0`, kida-templates to `>=0.7.0`** — picks up chirp-ui 0.5 (agent-grounding manifest, composite contract tests, `@layer chirpui.*` cascade public API, `set_strict("auto")` + `CHIRP_UI_DEV`), kida 0.7 (`strict_undefined=True` default, Jinja2 parser hints), and chirp-ui 0.4 sharp-edges audit. `use_chirp_ui(app, strict="auto")` now delegates to the `CHIRP_UI_DEV` env var so dev hosts opt in once without code changes. Per-request `_ChirpUIStrictMiddleware` retired — chirp-ui strict mode is now set once at `use_chirp_ui()` registration.
+- Remove 49 no-op `from __future__ import annotations` imports (PEP 649 default on 3.14), add 11 TypedDicts for stable dict shapes in tools/debug modules, and convert 3 dispatch chains to `match/case`.
 
-Transitional opt-out: `AppConfig(strict_undefined=False)`. chirp-ui 0.4 also renamed component `attrs=` → `attrs_unsafe=` on 37 macros with a deprecation filter warning; rename call sites to silence the warning.
+### Fixed
+
+- **Route contract** — `chirp check` no longer reports missing `_meta.py` for routes whose `_meta.py` defines only `meta()` (dynamic metadata). Those routes register a meta provider at discovery time; the checker now treats that as satisfying the route metadata contract.
 
 ## [0.3.3] — 2026-03-30
 

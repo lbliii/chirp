@@ -30,6 +30,12 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: changelog-fragment-format
+        name: changelog fragment format (no leading dash)
+        entry: python scripts/check_changelog_fragments.py
+        language: system
+        files: ^changelog\.d/\+.*\.(added|changed|deprecated|removed|fixed|security)\.md$
+        pass_filenames: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
