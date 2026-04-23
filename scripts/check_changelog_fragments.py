@@ -24,7 +24,9 @@ def main(paths: list[str]) -> int:
         return 0
 
     print("error: changelog fragments must not start with a leading '-' bullet.")
-    print("       towncrier prepends the bullet itself; a leading '-' produces '- -' in CHANGELOG.md.")
+    print(
+        "       towncrier prepends the bullet itself; a leading '-' produces '- -' in CHANGELOG.md."
+    )
     print("       See changelog.d/README.md for format rules.")
     print()
     for path, first in bad:
