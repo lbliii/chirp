@@ -16,7 +16,7 @@ def main(paths: list[str]) -> int:
             continue
         text = path.read_text(encoding="utf-8")
         stripped = text.lstrip()
-        if stripped.startswith("- ") or stripped.startswith("-\t"):
+        if stripped.startswith(("- ", "-\t")):
             first_line = stripped.splitlines()[0] if stripped else ""
             bad.append((path, first_line))
 
