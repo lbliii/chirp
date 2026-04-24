@@ -27,14 +27,6 @@ type SwapStrategy = Literal[
     "true",
 ]
 
-_MISSING_BLOCK_NAME: Any = object()
-"""Sentinel — ``Page(template)`` with no block_name raises a guided error.
-
-See ``Page.__init__`` for the ergonomics fix (users reaching for ``Page``
-when they meant ``Template`` get a pointer to the right type).
-"""
-
-
 _VALID_SWAP_STRATEGIES: frozenset[str] = frozenset(
     {
         "innerHTML",
@@ -213,13 +205,13 @@ class Page:
     def __init__(
         self,
         template_name: str,
-        block_name: str = _MISSING_BLOCK_NAME,  # type: ignore[assignment]
+        block_name: str | None = None,
         /,
         *,
         page_block_name: str | None = None,
         **context: Any,
     ) -> None:
-        if block_name is _MISSING_BLOCK_NAME:
+        if block_name is None:
             raise TypeError(
                 'Page requires a block name: Page("page.html", "content_block").\n'
                 "For a plain full-page render without htmx negotiation, "

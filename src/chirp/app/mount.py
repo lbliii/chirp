@@ -23,7 +23,7 @@ collision handling.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from chirp.errors import ConfigurationError
 
@@ -149,22 +149,22 @@ def hoist(parent_state: MutableAppState, sub_state: MutableAppState, prefix: str
 
     def _setdefault_dict(
         kind: str,
-        parent: dict[str, object],
-        sub: dict[str, object],
+        parent: dict[Any, Any],
+        sub: dict[Any, Any],
     ) -> None:
         for key, value in sub.items():
             if key in parent:
-                parent_state.mount_app_skips.append(MountAppSkip(kind, key, prefix))
+                parent_state.mount_app_skips.append(MountAppSkip(kind, str(key), prefix))
             else:
                 parent[key] = value
 
-    _setdefault_dict("template_global", parent_state.template_globals, sub_state.template_globals)  # type: ignore[arg-type]
-    _setdefault_dict("template_filter", parent_state.template_filters, sub_state.template_filters)  # type: ignore[arg-type]
-    _setdefault_dict("provider", parent_state.providers, sub_state.providers)  # type: ignore[arg-type]
+    _setdefault_dict("template_global", parent_state.template_globals, sub_state.template_globals)
+    _setdefault_dict("template_filter", parent_state.template_filters, sub_state.template_filters)
+    _setdefault_dict("provider", parent_state.providers, sub_state.providers)
     _setdefault_dict(
         "freeze_param_provider",
-        parent_state.freeze_param_providers,  # type: ignore[arg-type]
-        sub_state.freeze_param_providers,  # type: ignore[arg-type]
+        parent_state.freeze_param_providers,
+        sub_state.freeze_param_providers,
     )
     _setdefault_dict(
         "contract_check_data",
@@ -173,8 +173,8 @@ def hoist(parent_state: MutableAppState, sub_state: MutableAppState, prefix: str
     )
     _setdefault_dict(
         "contract_severity_override",
-        parent_state.contract_severity_overrides,  # type: ignore[arg-type]
-        sub_state.contract_severity_overrides,  # type: ignore[arg-type]
+        parent_state.contract_severity_overrides,
+        sub_state.contract_severity_overrides,
     )
 
     for code_or_exc, handler in sub_state.error_handlers.items():
