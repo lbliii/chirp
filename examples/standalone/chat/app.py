@@ -170,7 +170,7 @@ def chat_page():
     return Template("chat.html", messages=messages, username=username)
 
 
-@app.route("/chat/send", methods=["POST"])
+@app.route("/chat/send", methods=["POST"], name="chat.send")
 async def send_message(request: Request):
     """Submit a message — broadcast via ChatBus, return 204."""
     session = get_session()

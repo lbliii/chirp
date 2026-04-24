@@ -16,7 +16,7 @@
 {% call container(max_width="52rem") %}
 {% call stack(gap="lg") %}
 
-{{ btn("← Back to directory", variant="ghost", size="sm", href="/contacts") }}
+{{ btn("← Back to directory", variant="ghost", size="sm", href=url_for("contacts")) }}
 
 {% call entity_header(
   title=contact.name,
@@ -25,7 +25,7 @@
 {% slot actions %}
 {{ badge(contact.group, variant=group_badge_variants.get(contact.group, "muted")) }}
 {{ btn("Edit", variant="primary", size="sm",
-       href="/contacts/" ~ contact.id ~ "/edit") }}
+       href=url_for("contacts.contact_id.edit", contact_id=contact.id)) }}
 {% end %}
 {% end %}
 

@@ -44,7 +44,7 @@
 
 <div class="search">
   <input type="text" name="q" placeholder="Search contacts..."
-         hx-get="/contacts/search" hx-target="#contact-table" hx-swap="outerHTML"
+         hx-get="{{ url_for('contacts.search') }}" hx-target="#contact-table" hx-swap="outerHTML"
          hx-trigger="input changed delay:300ms, search"
          hx-sync="this:replace"
          hx-indicator="#search-spinner">
@@ -55,7 +55,7 @@
 {% block contact_form %}
 {% set errors = errors ?? {} %}
 {% set form = form ?? None %}
-<form class="add-form" hx-post="/contacts" hx-target="#contact-table" hx-swap="outerHTML"
+<form class="add-form" hx-post="{{ url_for('contacts.add') }}" hx-target="#contact-table" hx-swap="outerHTML"
       hx-validate="true" hx-disabled-elt="find button"
       hx-on::after-request="if(event.detail.successful) this.reset()">
   <input type="text" name="name" placeholder="Name" value="{{ form?.name ?? '' }}">
@@ -85,8 +85,8 @@
       <td>{{ contact.name }}</td>
       <td>{{ contact.email }}</td>
       <td class="actions">
-        <button hx-get="/contacts/{{ contact.id }}/edit" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
-        <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
+        <button hx-get="{{ url_for('contacts.edit', contact_id=contact.id) }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
+        <button class="danger" hx-delete="{{ url_for('contacts.delete', contact_id=contact.id) }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
       </td>
     </tr>
     {% end %}
@@ -103,8 +103,8 @@
   <td>{{ contact.name }}</td>
   <td>{{ contact.email }}</td>
   <td class="actions">
-    <button hx-get="/contacts/{{ contact.id }}/edit" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
-    <button class="danger" hx-delete="/contacts/{{ contact.id }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
+    <button hx-get="{{ url_for('contacts.edit', contact_id=contact.id) }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML">edit</button>
+    <button class="danger" hx-delete="{{ url_for('contacts.delete', contact_id=contact.id) }}" hx-target="#contact-table" hx-swap="outerHTML" hx-confirm="Delete {{ contact.name }}?">delete</button>
   </td>
 </tr>
 {% end %}
@@ -127,11 +127,11 @@
     {% end %}
   </td>
   <td class="actions">
-    <form id="edit-{{ contact.id }}" hx-put="/contacts/{{ contact.id }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML"
+    <form id="edit-{{ contact.id }}" hx-put="{{ url_for('contacts.save', contact_id=contact.id) }}" hx-target="#contact-{{ contact.id }}" hx-swap="outerHTML"
           hx-encoding="application/x-www-form-urlencoded" style="display:inline;">
       <button type="submit">save</button>
     </form>
-    <button hx-get="/" hx-target="#contact-table" hx-swap="outerHTML">cancel</button>
+    <button hx-get="{{ url_for('index') }}" hx-target="#contact-table" hx-swap="outerHTML">cancel</button>
   </td>
 </tr>
 {% end %}

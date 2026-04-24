@@ -54,7 +54,7 @@
 
   <div class="card">
     <span class="pill">Fragment</span>
-    <button hx-get="/fragment" hx-swap="outerHTML">Load fragment</button>
+    <button hx-get="{{ url_for('fragment') }}" hx-swap="outerHTML">Load fragment</button>
     {% block demo_fragment %}
     <div>Fragment value: <strong>{{ value | default("—") }}</strong></div>
     {% endblock %}
@@ -62,8 +62,9 @@
 
   <div class="card">
     <span class="pill">Page</span>
-    <button hx-get="/page" hx-target="#page-target" hx-swap="innerHTML">Load via htmx</button>
-    <a href="/page">Load as full page</a>
+    {% set page_url = url_for("page") %}
+    <button hx-get="{{ page_url }}" hx-target="#page-target" hx-swap="innerHTML">Load via htmx</button>
+    <a href="{{ page_url }}">Load as full page</a>
     <div id="page-target">
       {% block demo_page %}
       <div>Page value: <strong>{{ value | default("—") }}</strong></div>
@@ -73,7 +74,7 @@
 
   <div class="card">
     <span class="pill">OOB</span>
-    <button hx-post="/oob" hx-target="#oob-primary" hx-swap="innerHTML" hx-disinherit="*">Trigger OOB swap</button>
+    <button hx-post="{{ url_for('oob') }}" hx-target="#oob-primary" hx-swap="innerHTML" hx-disinherit="*">Trigger OOB swap</button>
     <div id="oob-primary" hx-disinherit="*">
       {% block demo_oob_primary %}
       <div>Primary: <strong>{{ value | default("—") }}</strong></div>
@@ -88,7 +89,7 @@
 
   <div class="card">
     <span class="pill">ValidationError</span>
-    <form hx-post="/validate" hx-target="this" hx-swap="outerHTML" hx-ext="response-targets" hx-target-422="this">
+    <form hx-post="{{ url_for('validate') }}" hx-target="this" hx-swap="outerHTML" hx-ext="response-targets" hx-target-422="this">
       {% block demo_form %}
       {% set _form = form | default(none) %}
       {% set _errors = errors | default({}) %}
@@ -109,7 +110,7 @@
 
   <div class="card">
     <span class="pill">MutationResult</span>
-    <button hx-post="/mutate" hx-target="this" hx-swap="none">Increment counter</button>
+    <button hx-post="{{ url_for('mutate') }}" hx-target="this" hx-swap="none">Increment counter</button>
     <div id="mutation-counter">
       {% block demo_mutation_counter %}
       <div>Counter: <strong>{{ count | default(0) }}</strong></div>

@@ -44,7 +44,7 @@ reset()
 app.mount_pages(str(PAGES_DIR))
 
 
-@app.route("/steps", methods=["POST"])
+@app.route("/steps", methods=["POST"], name="steps.add")
 async def add_step_route(request: Request):
     form = await request.form()
     instruction = (form.get("instruction") or "").strip()
@@ -56,7 +56,7 @@ async def add_step_route(request: Request):
     return Fragment("page.html", "recipe_content", steps=steps)
 
 
-@app.route("/steps/delete", methods=["POST"])
+@app.route("/steps/delete", methods=["POST"], name="steps.delete")
 async def delete_step_route(request: Request):
     form = await request.form()
     step_id = int(form.get("step_id") or "0")
@@ -66,7 +66,7 @@ async def delete_step_route(request: Request):
     return Fragment("page.html", "recipe_content", steps=steps)
 
 
-@app.route("/reorder", methods=["POST"])
+@app.route("/reorder", methods=["POST"], name="reorder")
 async def reorder_route(request: Request):
     form = await request.form()
     from_idx = int(form.get("from_idx") or "0")

@@ -24,8 +24,9 @@
 {% block recipe_content %}
 <div id="recipe-content" class="chirpui-fragment-island" hx-disinherit="hx-select hx-target hx-swap">
 
-<form id="reorder-form" method="post" action="/reorder"
-      hx-post="/reorder" hx-target="#recipe-content" hx-select="#recipe-content" hx-swap="outerHTML"
+{% set reorder_url = url_for("reorder") %}
+<form id="reorder-form" method="post" action="{{ reorder_url }}"
+      hx-post="{{ reorder_url }}" hx-target="#recipe-content" hx-select="#recipe-content" hx-swap="outerHTML"
       style="display:none">
   <input type="hidden" name="from_idx" value="">
   <input type="hidden" name="to_idx" value="">
@@ -41,8 +42,9 @@
         {{ section_header("Steps") }}
         <p class="chirpui-text-muted chirpui-font-sm">Drag to reorder. Click × to remove.</p>
 
-        <form id="add-step-form" class="chirpui-form" method="post" action="/steps"
-              hx-post="/steps" hx-target="#recipe-content" hx-select="#recipe-content" hx-swap="outerHTML"
+        {% set add_step_url = url_for("steps.add") %}
+        <form id="add-step-form" class="chirpui-form" method="post" action="{{ add_step_url }}"
+              hx-post="{{ add_step_url }}" hx-target="#recipe-content" hx-select="#recipe-content" hx-swap="outerHTML"
               style="display:grid; grid-template-columns:1fr 8rem 10rem auto; gap:0.5rem; align-items:end;">
           {{ csrf_field() }}
           {{ text_field("instruction", label="Instruction", placeholder="e.g. Preheat oven to 350°F", required=true) }}
@@ -76,8 +78,8 @@
             <span class="chirpui-text-muted chirpui-font-sm"> — {{ step.note }}</span>
             {% end %}
           </div>
-          <form method="post" action="/steps/delete"
-                hx-post="/steps/delete"
+          <form method="post" action="{{ url_for('steps.delete') }}"
+                hx-post="{{ url_for('steps.delete') }}"
                 hx-target="#recipe-content" hx-select="#recipe-content" hx-swap="outerHTML"
                 style="display:inline;">
             {{ csrf_field() }}

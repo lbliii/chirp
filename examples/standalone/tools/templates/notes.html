@@ -106,7 +106,7 @@
       <!-- Notes panel -->
       <div class="panel">
         <h2>Notes</h2>
-        <form class="note-form" hx-post="/notes" hx-target="#note-list" hx-swap="outerHTML"
+        <form class="note-form" hx-post="{{ url_for('notes.add') }}" hx-target="#note-list" hx-swap="outerHTML"
               hx-on::after-request="this.reset()">
           <input name="text" placeholder="What's on your mind?" required autocomplete="off">
           <input name="tag" placeholder="Tag (optional)" autocomplete="off">

@@ -336,3 +336,31 @@ class PageRoute:
     actions: tuple[ActionInfo, ...] = ()
     viewmodel_provider: Callable[..., Any] | None = None
     kind: RouteKind = "page"
+
+
+type PageHandlerFindingKind = Literal["missing", "typo"]
+
+
+@dataclass(frozen=True, slots=True)
+class PageHandlerFinding:
+    """A diagnostic finding from page-handler discovery.
+
+    Emitted when a ``page.py`` file either has no recognized HTTP method
+    handler (``kind="missing"``) or defines a function whose name looks
+    like a handler attempt but isn't recognized (``kind="typo"``).
+
+    Surfaced to ``app.check()`` as ``page_handlers`` contract issues;
+    the severity mapping (ERROR for missing, WARNING for typo) is
+    applied there, not here.
+
+    Attributes:
+        kind: ``"missing"`` or ``"typo"``.
+        file: Filesystem path to the ``page.py`` that produced the finding.
+        url_path: URL pattern the ``page.py`` would have served.
+        function_name: For ``kind="typo"``, the mis-named function; ``None`` for missing.
+    """
+
+    kind: PageHandlerFindingKind
+    file: str
+    url_path: str
+    function_name: str | None = None

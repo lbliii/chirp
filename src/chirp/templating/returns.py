@@ -205,12 +205,20 @@ class Page:
     def __init__(
         self,
         template_name: str,
-        block_name: str,
+        block_name: str | None = None,
         /,
         *,
         page_block_name: str | None = None,
         **context: Any,
     ) -> None:
+        if block_name is None:
+            raise TypeError(
+                'Page requires a block name: Page("page.html", "content_block").\n'
+                "For a plain full-page render without htmx negotiation, "
+                'use Template("page.html", **ctx).\n'
+                "See the return-values docs for the decision tree: "
+                "docs/core-concepts/return-values.md"
+            )
         object.__setattr__(self, "template_name", template_name)
         object.__setattr__(self, "block_name", block_name)
         object.__setattr__(self, "page_block_name", page_block_name)

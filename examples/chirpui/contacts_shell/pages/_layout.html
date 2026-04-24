@@ -19,13 +19,13 @@
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Directory") %}
-    {{ sidebar_link("/contacts", "All contacts", icon="grid") }}
+    {{ sidebar_link(url_for("contacts"), "All contacts", icon="grid") }}
   {% end %}
   {% call sidebar_section("Groups") %}
-    {{ sidebar_link("/contacts?group=Engineering", "Engineering", icon="gear") }}
-    {{ sidebar_link("/contacts?group=Design", "Design", icon="pencil") }}
-    {{ sidebar_link("/contacts?group=Marketing", "Marketing", icon="bolt") }}
-    {{ sidebar_link("/contacts?group=Leadership", "Leadership", icon="star") }}
+    {{ sidebar_link(url_for("contacts", group="Engineering"), "Engineering", icon="gear") }}
+    {{ sidebar_link(url_for("contacts", group="Design"), "Design", icon="pencil") }}
+    {{ sidebar_link(url_for("contacts", group="Marketing"), "Marketing", icon="bolt") }}
+    {{ sidebar_link(url_for("contacts", group="Leadership"), "Leadership", icon="star") }}
   {% end %}
 {% end %}
 {% end %}

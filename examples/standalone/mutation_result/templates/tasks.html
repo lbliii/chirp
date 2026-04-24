@@ -50,7 +50,7 @@
   <p id="task-count" class="subtitle">{{ count }} task{{ 's' if count != 1 else '' }}</p>
   {% endblock %}
 
-  <form hx-post="/tasks" hx-target="#task-list" hx-swap="outerHTML">
+  <form hx-post="{{ url_for('tasks.add') }}" hx-target="#task-list" hx-swap="outerHTML">
     <input type="text" name="text" placeholder="Add a task..." required autocomplete="off">
     <button type="submit" class="btn-add">Add</button>
   </form>
@@ -63,13 +63,13 @@
         <span class="task-text">{{ task.text }}</span>
         <div class="actions">
           <button class="btn-toggle"
-                  hx-patch="/tasks/{{ task.id }}/toggle"
+                  hx-patch="{{ url_for('tasks.toggle', task_id=task.id) }}"
                   hx-target="#task-list"
                   hx-swap="outerHTML">
             {{ 'undo' if task.done else 'done' }}
           </button>
           <button class="btn-delete"
-                  hx-delete="/tasks/{{ task.id }}"
+                  hx-delete="{{ url_for('tasks.delete', task_id=task.id) }}"
                   hx-target="#task-list"
                   hx-swap="outerHTML"
                   hx-confirm="Delete this task?">

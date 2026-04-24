@@ -30,18 +30,18 @@
 <h1>Book Search</h1>
 
 <form class="search-form"
-      hx-get="/" hx-target="#results" hx-swap="outerHTML"
+      hx-get="{{ url_for('index') }}" hx-target="#results" hx-swap="outerHTML"
       hx-push-url="true" hx-trigger="submit">
   <div class="search-row">
     <input type="text" name="q" value="{{ query ?? '' }}"
            placeholder="Search by title or author..."
-           hx-get="/" hx-target="#results" hx-swap="outerHTML"
+           hx-get="{{ url_for('index') }}" hx-target="#results" hx-swap="outerHTML"
            hx-push-url="true" hx-trigger="input changed delay:300ms"
            hx-include="closest form">
   </div>
   <div class="filters">
     <select name="genre"
-            hx-get="/" hx-target="#results" hx-swap="outerHTML"
+            hx-get="{{ url_for('index') }}" hx-target="#results" hx-swap="outerHTML"
             hx-push-url="true" hx-trigger="change"
             hx-include="closest form">
       {% for key, label in genres %}
@@ -49,7 +49,7 @@
       {% end %}
     </select>
     <select name="sort"
-            hx-get="/" hx-target="#results" hx-swap="outerHTML"
+            hx-get="{{ url_for('index') }}" hx-target="#results" hx-swap="outerHTML"
             hx-push-url="true" hx-trigger="change"
             hx-include="closest form">
       {% for key, label in sort_options %}

@@ -9,7 +9,8 @@ from kida import Environment
 from chirp._internal.types import ErrorHandler, Handler
 from chirp.contracts.types import Severity
 from chirp.middleware.protocol import Middleware
-from chirp.pages.types import LayoutPreset, RouteMeta, Section
+from chirp.pages.types import LayoutPreset, PageHandlerFinding, RouteMeta, Section
+from chirp.routing.route import Route
 from chirp.routing.router import Router
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
@@ -45,6 +46,23 @@ class PendingTool:
     handler: Callable[..., Any]
 
 
+@dataclass(frozen=True, slots=True)
+class MountAppSkip:
+    """One entry dropped during ``App.mount_app`` merge (parent-wins).
+
+    Recorded on the parent's mutable state so a contract check can surface it
+    as an INFO issue in category ``mount_app_merge`` — users see what their
+    sub-app tried to register but was overridden.
+    """
+
+    kind: str
+    """One of ``"template_global"``, ``"template_filter"``, ``"error_handler"``,
+    ``"provider"``, ``"contract_severity_override"``, ``"freeze_param_provider"``."""
+
+    key: str
+    prefix: str
+
+
 @dataclass(slots=True)
 class MutableAppState:
     """Mutable setup-time state."""
@@ -77,6 +95,7 @@ class MutableAppState:
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
+    page_handler_findings: list[PageHandlerFinding] = field(default_factory=list)
     route_layout_chains: dict[str, Any] = field(default_factory=dict)
     swap_scope_map: dict[str, str] = field(default_factory=dict)
     layout_presets: dict[str, LayoutPreset] = field(default_factory=dict)
@@ -87,6 +106,11 @@ class MutableAppState:
     freeze_param_providers: dict[str, Callable[..., Any]] = field(default_factory=dict)
     freeze_exclude: set[str] = field(default_factory=set)
     live_blocks: dict[tuple[str, str], LiveBlockSpec] = field(default_factory=dict)
+    mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    #: Set when this app has been consumed by another app's ``mount_app``.
+    #: Subsequent ``freeze()``/``run()`` raise rather than produce a stale
+    #: standalone runtime. Carries the prefix for the error message.
+    consumed_by_mount_app_prefix: str | None = None
 
 
 @dataclass(slots=True)
@@ -104,6 +128,8 @@ class RuntimeAppState:
     discovered_routes: list[Any] = field(default_factory=list)
     route_layout_chains: dict[str, Any] = field(default_factory=dict)
     swap_scope_map: dict[str, str] = field(default_factory=dict)
+    routes_by_name: Any = None
+    route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,5 +156,8 @@ class ContractCheckSnapshot:
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
+    page_handler_findings: list[PageHandlerFinding] = field(default_factory=list)
+    route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
+    mount_app_skips: list[MountAppSkip] = field(default_factory=list)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)

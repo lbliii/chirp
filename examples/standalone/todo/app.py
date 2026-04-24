@@ -70,7 +70,7 @@ async def index(request: Request):
     return Template("index.html", todos=todos)
 
 
-@app.route("/todos", methods=["POST"])
+@app.route("/todos", methods=["POST"], name="todos.add")
 async def add_todo(request: Request):
     """Add a todo item — returns the list fragment or a 422 validation error."""
     form = await request.form()
@@ -88,7 +88,7 @@ async def add_todo(request: Request):
     return Fragment("index.html", "todo_list", todos=todos)
 
 
-@app.route("/todos/{todo_id}/toggle", methods=["POST"])
+@app.route("/todos/{todo_id}/toggle", methods=["POST"], name="todos.toggle")
 async def toggle_todo(todo_id: int):
     """Toggle a todo's completion state — returns the list fragment."""
     await app.db.execute("UPDATE todos SET done = NOT done WHERE id = ?", todo_id)
@@ -96,7 +96,7 @@ async def toggle_todo(todo_id: int):
     return Fragment("index.html", "todo_list", todos=todos)
 
 
-@app.route("/todos/{todo_id}", methods=["DELETE"])
+@app.route("/todos/{todo_id}", methods=["DELETE"], name="todos.delete")
 async def delete_todo(todo_id: int):
     """Delete a todo — returns the list fragment."""
     await app.db.execute("DELETE FROM todos WHERE id = ?", todo_id)

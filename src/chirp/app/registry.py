@@ -141,10 +141,13 @@ class AppRegistry:
         self.discover_and_register_pages(resolved)
 
     def discover_and_register_pages(self, pages_dir: str) -> None:
-        from chirp.pages.discovery import discover_pages
+        from chirp.pages.discovery import discover_pages_with_findings
 
-        page_routes = discover_pages(pages_dir, layout_presets=self._state.layout_presets)
+        page_routes, findings = discover_pages_with_findings(
+            pages_dir, layout_presets=self._state.layout_presets
+        )
         self._state.discovered_routes = page_routes
+        self._state.page_handler_findings.extend(findings)
         for page_route in page_routes:
             self._state.page_route_paths.add(page_route.url_path)
             self._state.route_metas[page_route.url_path] = page_route.meta
@@ -171,6 +174,7 @@ class AppRegistry:
                 actions=page_route.actions,
                 viewmodel_provider=page_route.viewmodel_provider,
                 kind=page_route.kind,
+                name=page_route.name,
             )
 
     def register_page_handler(
@@ -187,6 +191,7 @@ class AppRegistry:
         actions: tuple[Any, ...] = (),
         viewmodel_provider: Any = None,
         kind: str = "page",
+        name: str | None = None,
     ) -> None:
         from chirp._internal.invoke import invoke
         from chirp.pages.actions import dispatch_action
@@ -298,7 +303,7 @@ class AppRegistry:
                 url_path,
                 page_wrapper,
                 methods,
-                name=None,
+                name=name,
                 referenced=False,
                 page_source_handler=_handler,
             )

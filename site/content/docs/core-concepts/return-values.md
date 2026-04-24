@@ -28,6 +28,25 @@ return hx_redirect("/dashboard")                      # -> Location + HX-Redirec
 return Redirect("/login")                            # -> 302
 ```
 
+## Decision tree — which return type?
+
+When you're about to render HTML, pick the type by answering these questions in order:
+
+1. **Is this a full page with no htmx awareness?** → `Template("page.html", **ctx)`
+2. **Full page for browsers, fragment for htmx requests?** → `Page("page.html", "content_block", **ctx)`
+3. **Just a named block of a template?** → `Fragment("page.html", "block_name", **ctx)`
+4. **Multiple swap targets in one response?** → `OOB(main, *oob_fragments)`
+5. **Shell first, slow sections stream in?** → `Suspense("page.html", stats=get_stats())`
+6. **Stream sections as they complete (no shell-first)?** → `Stream("page.html", **async_ctx)`
+7. **Server-sent events after the page loads?** → `EventStream(async_generator())`
+8. **Validation failed, re-render the form with errors?** → `ValidationError("page.html", "form", errors=e)`
+9. **Form mutation — fragments for htmx, redirect for plain POST?** → `FormAction(redirect, *fragments)`
+10. **Just a redirect?** → `Redirect("/login")` (plain) or `hx_redirect("/dashboard")` (htmx-aware)
+
+:::{tip}
+**`Page` vs `Template` — the common mixup.** `Page` requires a block name because it serves *two* rendering modes: the full template for browsers, the block for htmx. If you find yourself writing `Page("page.html", **ctx)` with no second positional argument, you probably want `Template("page.html", **ctx)` — that's the plain full-page render without htmx negotiation. Chirp will raise a guided `TypeError` to nudge you toward the right type.
+:::
+
 ## InlineTemplate (Prototyping)
 
 Renders a template from a string instead of a file. Useful for prototyping and scripts where you don't want to set up a `templates/` directory:

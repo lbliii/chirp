@@ -91,7 +91,7 @@ def index():
     return Template("notes.html", notes=list_notes())
 
 
-@app.route("/notes", methods=["POST"])
+@app.route("/notes", methods=["POST"], name="notes.add")
 async def post_note(request: Request):
     """Add a note via form submission — returns the notes list fragment."""
     form = await request.form()

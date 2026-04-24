@@ -211,7 +211,7 @@ def _search_books(
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", name="index")
 def search_page(request: Request):
     """Search page with filtering and sorting."""
     query = request.query.get("q", "")

@@ -56,7 +56,7 @@ async def index() -> Template:
     )
 
 
-@app.route("/ask", methods=["POST"], template="playground.html")
+@app.route("/ask", methods=["POST"], template="playground.html", name="ask")
 async def ask(request: Request):
     form = await request.form()
     prompt = (form.get("prompt") or "").strip()
