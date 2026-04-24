@@ -3,6 +3,13 @@
 from chirp.testing import TestClient
 
 
+class TestContracts:
+    """The example should stay clean under startup contract checks."""
+
+    def test_app_check_passes(self, example_app) -> None:
+        example_app.check()
+
+
 class TestStoryList:
     """The front page renders the story list with seed data."""
 

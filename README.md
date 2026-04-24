@@ -40,6 +40,7 @@ async def search(request: Request):
 - **MCP tools** — Register functions as tools callable by LLMs and MCP clients.
 
 Read the [Philosophy](docs/philosophy.md) for the full picture.
+See [Public API](docs/public-api.md) for the stable/provisional import surface.
 
 ## Use Chirp For
 

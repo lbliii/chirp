@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from chirp.contracts import CheckResult
+from chirp.contracts import CheckResult, ContractIssue, Severity
 from chirp.server.terminal_checks import format_check_result
 from chirp.templating.fragment_target_registry import (
     FragmentTargetRegistry,
@@ -148,3 +148,41 @@ class TestFormatterVerboseDump:
         assert "#main" not in out
         assert "page_root" not in out
         assert "2 fragment targets registered" in out
+
+
+class TestFormatterConcernGroups:
+    def test_groups_issues_by_contract_concern(self) -> None:
+        result = CheckResult(
+            issues=[
+                ContractIssue(
+                    Severity.WARNING,
+                    "a11y_label",
+                    "<input> has no label",
+                    template="form.html",
+                ),
+                ContractIssue(
+                    Severity.ERROR,
+                    "route_contract",
+                    "route metadata is invalid",
+                    route="/docs",
+                ),
+                ContractIssue(
+                    Severity.INFO,
+                    "form_contract",
+                    "form has no contract",
+                    template="form.html",
+                    route="/submit",
+                ),
+            ]
+        )
+        out = _strip_ansi(format_check_result(result, color=False))
+
+        assert "Routing" in out
+        assert "Accessibility" in out
+        assert "Forms" in out
+        assert out.index("Routing") < out.index("Forms") < out.index("Accessibility")
+
+    def test_elapsed_time_is_shown_in_stats(self) -> None:
+        result = CheckResult(routes_checked=2, templates_scanned=3, elapsed_ms=12.345)
+        out = _strip_ansi(format_check_result(result, color=False))
+        assert "12.3ms elapsed" in out

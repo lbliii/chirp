@@ -13,6 +13,13 @@ from chirp.testing import (
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
 
 
+class TestContracts:
+    """The example should stay clean under startup contract checks."""
+
+    def test_app_check_passes(self, example_app) -> None:
+        example_app.check()
+
+
 # ---------------------------------------------------------------------------
 # Auth helpers (CSRF-aware)
 # ---------------------------------------------------------------------------

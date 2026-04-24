@@ -614,6 +614,17 @@ def move_task(task_id: int, new_status: str):
     )
 
 
+@app.route("/tasks/last-deleted", referenced=True)
+@login_required
+def last_deleted_task():
+    """Return the undo surface after a delete notification.
+
+    The demo does not persist deleted tasks for undo yet, so the target clears
+    itself when the taskDeleted event fires.
+    """
+    return ""
+
+
 @app.route("/tasks/{task_id}", methods=["DELETE"])
 @login_required
 def delete_task_route(task_id: int):

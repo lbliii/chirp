@@ -7,7 +7,8 @@ enabling live agent-activity dashboards.
 Free-threading safety:
     - ToolCallEvent is a frozen dataclass (immutable, safe to share)
     - ToolEventBus uses a Lock to protect the subscriber set
-    - Each subscriber gets its own asyncio.Queue (no shared mutable state)
+    - Each subscriber gets its own asyncio.Queue on its owning event loop
+    - Cross-thread emitters schedule queue mutation with call_soon_threadsafe
 """
 
 import asyncio
@@ -34,6 +35,9 @@ class ToolCallEvent:
     call_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
 
+_Sub = tuple[asyncio.Queue[ToolCallEvent | None], asyncio.AbstractEventLoop]
+
+
 class ToolEventBus:
     """Async broadcast channel for tool call events.
 
@@ -52,16 +56,40 @@ class ToolEventBus:
     __slots__ = ("_lock", "_subscribers")
 
     def __init__(self) -> None:
-        self._subscribers: set[asyncio.Queue[ToolCallEvent | None]] = set()
+        self._subscribers: set[_Sub] = set()
         self._lock = threading.Lock()
 
     async def emit(self, event: ToolCallEvent) -> None:
         """Broadcast an event to all active subscribers."""
         with self._lock:
             subscribers = set(self._subscribers)
-        for queue in subscribers:
-            with contextlib.suppress(asyncio.QueueFull):
-                queue.put_nowait(event)
+        for queue, loop in subscribers:
+            self._schedule_event(loop, queue, event)
+
+    def _schedule_event(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[ToolCallEvent | None],
+        event: ToolCallEvent,
+    ) -> None:
+        """Enqueue *event* on the queue's owning loop."""
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._deliver_event(queue, event)
+            return
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(self._deliver_event, queue, event)
+
+    def _deliver_event(
+        self,
+        queue: asyncio.Queue[ToolCallEvent | None],
+        event: ToolCallEvent,
+    ) -> None:
+        with contextlib.suppress(asyncio.QueueFull):
+            queue.put_nowait(event)
 
     async def subscribe(self) -> AsyncIterator[ToolCallEvent]:
         """Subscribe to tool call events.
@@ -70,8 +98,10 @@ class ToolEventBus:
         The subscription is automatically cleaned up when the iterator exits.
         """
         queue: asyncio.Queue[ToolCallEvent | None] = asyncio.Queue(maxsize=256)
+        loop = asyncio.get_running_loop()
+        sub: _Sub = (queue, loop)
         with self._lock:
-            self._subscribers.add(queue)
+            self._subscribers.add(sub)
         try:
             while True:
                 event = await queue.get()
@@ -80,7 +110,7 @@ class ToolEventBus:
                 yield event
         finally:
             with self._lock:
-                self._subscribers.discard(queue)
+                self._subscribers.discard(sub)
 
     def close(self) -> None:
         """Signal all subscribers to stop.
@@ -89,7 +119,32 @@ class ToolEventBus:
         to break cleanly.
         """
         with self._lock:
-            for queue in self._subscribers:
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(None)
+            subscribers = set(self._subscribers)
             self._subscribers.clear()
+        for queue, loop in subscribers:
+            self._schedule_close(loop, queue)
+
+    def _schedule_close(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[ToolCallEvent | None],
+    ) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._deliver_close(queue)
+            return
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(self._deliver_close, queue)
+
+    def _deliver_close(self, queue: asyncio.Queue[ToolCallEvent | None]) -> None:
+        # Drain one event if needed to guarantee the sentinel lands.
+        try:
+            queue.put_nowait(None)
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+            with contextlib.suppress(asyncio.QueueFull):
+                queue.put_nowait(None)

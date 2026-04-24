@@ -460,6 +460,10 @@ class Database:
         # Open a dedicated connection for LISTEN (not from pool)
         conn = await asyncpg.connect(self._config.url)
         queue: asyncio.Queue[Notification] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def _enqueue_notification(channel: str, payload: str) -> None:
+            queue.put_nowait(Notification(channel=channel, payload=payload))
 
         def _on_notify(
             conn: Any,
@@ -467,7 +471,8 @@ class Database:
             channel: str,
             payload: str,
         ) -> None:
-            queue.put_nowait(Notification(channel=channel, payload=payload))
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(_enqueue_notification, channel, payload)
 
         try:
             for channel in channels:

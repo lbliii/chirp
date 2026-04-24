@@ -2,6 +2,11 @@
 
 Synthetic benchmarks comparing Chirp vs FastAPI vs Flask on JSON and CPU-bound workloads. Designed to demonstrate free-threaded Python performance benefits when using Chirp + Pounce on Python 3.14t.
 
+This directory has two benchmark families:
+
+- `benchmarks.run`: networked framework comparison, useful for Chirp vs FastAPI vs Flask.
+- `benchmarks.core`: in-process Chirp regression workloads, useful for release gates and hot-path tracking.
+
 ## Quick Start
 
 ```bash
@@ -12,6 +17,10 @@ uv sync --extra benchmark
 # Run all benchmarks
 uv run poe benchmark
 # or: python -m benchmarks.run all
+
+# Run Chirp core regression workloads and write a JSON artifact
+uv run poe benchmark-core
+# or: python -m benchmarks.core --output .benchmarks/core-latest.json
 
 # Run a single framework
 python -m benchmarks.run chirp
@@ -36,7 +45,7 @@ poe benchmark-mixed
 PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client shared-limits
 ```
 
-## Methodology
+## Networked Methodology
 
 | Variable | Value | Notes |
 |----------|-------|-------|
@@ -66,6 +75,34 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 
 > **Python 3.14t recommended.** Chirp and Pounce are designed for free-threaded Python. Run on 3.14t to see the full benefit. On GIL builds, Pounce falls back to multi-process workers.
 
+## Core Regression Workloads
+
+`python -m benchmarks.core` emits a reproducible JSON artifact with:
+
+- Python build metadata, including whether the GIL is enabled.
+- OS, CPU, and package versions for Chirp, Pounce, and Kida.
+- Per-workload `avg_us`, `p50_us`, and `p99_us` values.
+
+Tracked workloads:
+
+| Workload | What It Measures |
+|----------|------------------|
+| `template_render` | Full template negotiation and render |
+| `fragment_render` | Named block rendering for htmx fragments |
+| `oob_serialization` | Primary fragment plus OOB fragment serialization |
+| `suspense_first_chunk` | Suspense shell/first-chunk path with deferred blocks |
+| `sse_fanout` | Tool event bus fanout plus SSE event encoding |
+| `filesystem_route_dispatch` | Discovered filesystem routes compiled into router dispatch |
+
+These are internal regression benchmarks. They are not evidence that Chirp is faster than another framework; they tell us when Chirp got slower at being Chirp.
+
+Example:
+
+```bash
+python -m benchmarks.core --iterations 250 --route-count 100 \
+  --output .benchmarks/core-latest.json
+```
+
 ## Output
 
 ```
@@ -92,6 +129,7 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 benchmarks/
 ├── README.md           # This file
 ├── run.py              # Orchestrator: start server, load test, report
+├── core.py             # In-process Chirp hot-path regression workloads
 └── apps/
     ├── chirp_app.py    # Chirp + Pounce
     ├── fastapi_app.py  # FastAPI + Uvicorn

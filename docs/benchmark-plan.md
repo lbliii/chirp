@@ -90,7 +90,14 @@ chirp/
 
 ## 7. Phases
 
-### Phase 1: Minimal (1–2 days)
+### Phase 0: Chirp Core Regression Harness (landed)
+
+- [x] In-process `python -m benchmarks.core` runner
+- [x] Reproducible JSON artifact with Python, platform, Pounce, Chirp, and Kida metadata
+- [x] Template, fragment, OOB, Suspense first chunk, SSE fanout, and filesystem route dispatch workloads
+- [x] Smoke test for report shape
+
+### Phase 1: Minimal Server Comparison (1–2 days)
 
 - [ ] JSON + CPU workloads only
 - [ ] Chirp vs FastAPI vs Flask

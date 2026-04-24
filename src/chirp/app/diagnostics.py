@@ -1,5 +1,6 @@
 """Diagnostics and contract checking for App."""
 
+import time
 from typing import TYPE_CHECKING
 
 from chirp.config import AppConfig
@@ -30,7 +31,9 @@ class ContractCheckRunner:
 
         from chirp.contracts import check_hypermedia_surface
 
+        started = time.perf_counter()
         result = check_hypermedia_surface(app)
+        result.elapsed_ms = (time.perf_counter() - started) * 1000
         sys.stderr.write(
             format_check_result(
                 result,
@@ -44,7 +47,9 @@ class ContractCheckRunner:
     def check(self, app: App, *, warnings_as_errors: bool = False) -> None:
         from chirp.contracts import check_hypermedia_surface
 
+        started = time.perf_counter()
         result = check_hypermedia_surface(app)
+        result.elapsed_ms = (time.perf_counter() - started) * 1000
         print(
             format_check_result(
                 result,

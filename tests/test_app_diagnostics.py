@@ -40,6 +40,18 @@ def test_check_allows_warning_by_default(monkeypatch: pytest.MonkeyPatch) -> Non
     runner.check(object())
 
 
+def test_check_records_elapsed_time(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Terminal output should include total contract-check duration."""
+    monkeypatch.setattr("chirp.contracts.check_hypermedia_surface", lambda app: CheckResult())
+    runner = ContractCheckRunner(AppConfig())
+
+    runner.check(object())
+
+    assert "elapsed" in capsys.readouterr().out
+
+
 def test_check_fails_when_warnings_as_errors_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Strict warning mode should turn warning-only checks into failures."""
     monkeypatch.setattr(

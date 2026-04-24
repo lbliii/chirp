@@ -129,6 +129,108 @@ def _format_issue(issue: ContractIssue, c: _Palette) -> list[str]:
     return lines
 
 
+_CONCERN_ORDER: tuple[str, ...] = (
+    "Setup",
+    "Routing",
+    "Templates",
+    "HTMX",
+    "OOB / Suspense / SSE",
+    "Forms",
+    "Layouts",
+    "Accessibility",
+    "Components",
+    "Reactive",
+    "Production Safety",
+    "Plugins",
+    "Docs",
+    "Other",
+)
+
+_CATEGORY_CONCERNS: dict[str, str] = {
+    # Setup / routing
+    "setup": "Setup",
+    "routing": "Routing",
+    "route": "Routing",
+    "route_contract": "Routing",
+    "method": "Routing",
+    "target": "Routing",
+    "orphan": "Routing",
+    "htmx_partial": "Routing",
+    # Templates
+    "template_contract": "Templates",
+    "inline_template": "Templates",
+    "dead": "Templates",
+    "component": "Components",
+    "page_context": "Templates",
+    "unreachable_block": "Templates",
+    "context_cascade": "Templates",
+    "composition_extends": "Templates",
+    "boundary": "Templates",
+    # HTMX / browser wiring
+    "selector_syntax": "HTMX",
+    "swap_safety": "HTMX",
+    "select_inheritance": "HTMX",
+    "vary": "HTMX",
+    "command": "HTMX",
+    "commandfor": "HTMX",
+    "alpine_cdn_url": "HTMX",
+    "islands": "HTMX",
+    "fragment_island": "HTMX",
+    # Streaming / OOB
+    "fragment": "OOB / Suspense / SSE",
+    "fragment_target_orphan": "OOB / Suspense / SSE",
+    "oob_target": "OOB / Suspense / SSE",
+    "oob_registry": "OOB / Suspense / SSE",
+    "defer_falsy": "OOB / Suspense / SSE",
+    "sse": "OOB / Suspense / SSE",
+    "sse_self_swap": "OOB / Suspense / SSE",
+    "sse_scope": "OOB / Suspense / SSE",
+    "sse_crossref": "OOB / Suspense / SSE",
+    "live_block_unknown": "OOB / Suspense / SSE",
+    "live_block_unreachable_route": "OOB / Suspense / SSE",
+    # Forms / layouts / accessibility
+    "form": "Forms",
+    "form_contract": "Forms",
+    "layout_chain": "Layouts",
+    "layout_outlet": "Layouts",
+    "layout_frame": "Layouts",
+    "page_shell": "Layouts",
+    "a11y_interactive": "Accessibility",
+    "a11y_label": "Accessibility",
+    "a11y_alt": "Accessibility",
+    "a11y_heading": "Accessibility",
+    "a11y_landmark": "Accessibility",
+    # Runtime systems
+    "reactive_block": "Reactive",
+    "reactive_cycle": "Reactive",
+    # Safety / plugins / docs
+    "sse_speculation": "Production Safety",
+    "csrf_session": "Production Safety",
+    "middleware_signature": "Production Safety",
+    "secret_key": "Production Safety",
+    "plugin_check_error": "Plugins",
+    "chirpui_import": "Plugins",
+    "design_system": "Plugins",
+    "blog": "Plugins",
+    "docs_parse": "Docs",
+    "docs_duplicate_slug": "Docs",
+    "docs_cross_ref": "Docs",
+    "docs_draft_exposed": "Docs",
+}
+
+
+def _concern_for_category(category: str) -> str:
+    """Return the terminal output group for a contract category."""
+    return _CATEGORY_CONCERNS.get(category, "Other")
+
+
+def _group_issues_by_concern(issues: list[ContractIssue]) -> list[tuple[str, list[ContractIssue]]]:
+    grouped: dict[str, list[ContractIssue]] = {name: [] for name in _CONCERN_ORDER}
+    for issue in issues:
+        grouped[_concern_for_category(issue.category)].append(issue)
+    return [(name, grouped[name]) for name in _CONCERN_ORDER if grouped[name]]
+
+
 def _format_fragment_registry(
     registry: FragmentTargetRegistry,
     c: _Palette,
@@ -255,11 +357,13 @@ def format_check_result(
         if n_registered:
             noun = "fragment target" if n_registered == 1 else "fragment targets"
             stats_parts.append(f"{c.bold}{n_registered}{c.reset} {c.dim}{noun} registered{c.reset}")
+    if result.elapsed_ms is not None:
+        stats_parts.append(f"{c.bold}{result.elapsed_ms:.1f}ms{c.reset} {c.dim}elapsed{c.reset}")
     if stats_parts:
         lines.append(f"  {sep.join(stats_parts)}")
         lines.append("")
 
-    # ── Issues (errors first, then warnings, then info) ─────
+    # ── Issues grouped by concern, severity within concern ──
     by_severity: dict[Any, list[Any]] = defaultdict(list)
     for i in result.issues:
         by_severity[i.severity].append(i)
@@ -267,18 +371,15 @@ def format_check_result(
     warnings = by_severity[Severity.WARNING]
     infos = by_severity[Severity.INFO]
 
-    route_shown = False
-    for issue_group in (errors, warnings, infos):
-        if (
-            any(getattr(i, "category", "") == "route_contract" for i in issue_group)
-            and not route_shown
-        ):
-            lines.append(f"  {c.cyan}Route contract{c.reset}")
-            lines.append("")
-            route_shown = True
-        for issue in issue_group:
-            lines.extend(_format_issue(issue, c))
-            lines.append("")
+    ordered_issues = [*errors, *warnings, *infos]
+    for concern, issue_group in _group_issues_by_concern(ordered_issues):
+        lines.append(f"  {c.cyan}{concern}{c.reset}")
+        lines.append("")
+        for severity_group in (Severity.ERROR, Severity.WARNING, Severity.INFO):
+            severity_issues = [i for i in issue_group if i.severity == severity_group]
+            for issue in severity_issues:
+                lines.extend(_format_issue(issue, c))
+                lines.append("")
 
     # ── Fragment target registry dump (verbose only) ────────
     if verbose_registry and fragment_target_registry is not None:

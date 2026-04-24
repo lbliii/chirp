@@ -4,6 +4,85 @@ import pytest
 
 import chirp
 
+EXPECTED_PUBLIC_API = [
+    "CHIRP_CAPABILITIES",
+    "CHIRP_DEFER_PENDING_KEY",
+    "DEFERRED",
+    "OOB",
+    "STOP_POLLING",
+    "Action",
+    "AnyResponse",
+    "App",
+    "AppConfig",
+    "BlockRef",
+    "ChangeEvent",
+    "CheckResult",
+    "ChirpError",
+    "ChirpPlugin",
+    "ConfigurationError",
+    "ContractCheck",
+    "ContractCheckSnapshot",
+    "ContractIssue",
+    "DependencyIndex",
+    "EventStream",
+    "FormAction",
+    "FormBindingError",
+    "Fragment",
+    "HTTPError",
+    "HtmxDetails",
+    "InlineTemplate",
+    "MarkdownRenderer",
+    "MethodNotAllowed",
+    "Middleware",
+    "MutationResult",
+    "Next",
+    "NotFound",
+    "Page",
+    "PageComposition",
+    "ReactiveBus",
+    "Redirect",
+    "RegionUpdate",
+    "RenderPlan",
+    "Request",
+    "Response",
+    "SSEEvent",
+    "Severity",
+    "ShellAction",
+    "ShellActionZone",
+    "ShellActions",
+    "ShellMenuItem",
+    "ShellSubmitSurface",
+    "Stream",
+    "Suspense",
+    "SwapResolution",
+    "Template",
+    "TemplateStream",
+    "ToolCallEvent",
+    "ToolDef",
+    "ToolEventBus",
+    "ToolRegistry",
+    "ValidationError",
+    "ViewRef",
+    "cache_view",
+    "form_from",
+    "form_or_errors",
+    "form_values",
+    "g",
+    "get_cache",
+    "get_render_plan",
+    "get_request",
+    "get_user",
+    "hx_redirect",
+    "is_safe_url",
+    "login",
+    "login_required",
+    "logout",
+    "reactive_stream",
+    "requires",
+    "resolve_navigation_swap",
+    "use_chirp_ui",
+]
+
 
 @pytest.mark.parametrize("name", chirp.__all__)
 def test_all_names_resolve(name: str) -> None:
@@ -34,3 +113,14 @@ def test_unknown_name_raises_attribute_error() -> None:
     """Accessing an unregistered name raises AttributeError."""
     with pytest.raises(AttributeError, match="no attribute"):
         chirp.__getattr__("ThisDoesNotExist")
+
+
+def test_public_api_snapshot() -> None:
+    """Top-level imports should change deliberately, not by accident."""
+    assert chirp.__all__ == EXPECTED_PUBLIC_API
+
+
+def test_public_api_status_covers_all_exports() -> None:
+    """Every public export has an explicit stability classification."""
+    assert set(chirp._API_STATUS) == set(chirp.__all__)
+    assert set(chirp._API_STATUS.values()) == {"debug", "provisional", "stable"}

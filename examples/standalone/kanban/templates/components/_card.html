@@ -7,13 +7,14 @@
 
 {% def task_card(task) %}
 {% set me = current_user() %}
-<div id="task-{{ task.id }}" class="card priority-{{ task.priority }}{{ " is-mine" if me.name is eq(task?.assignee) else "" }}"
+{% set my_name = me?.name ?? "" %}
+<div id="task-{{ task.id }}" class="card priority-{{ task.priority }}{{ " is-mine" if my_name is eq(task?.assignee) else "" }}"
      draggable="true" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
   <div class="card-header">
     {{ priority_badge(task.priority) }}
     <span class="assignee">
       {{ task?.assignee ?? "Unassigned" }}
-      {% if me.name is eq(task?.assignee) %}
+      {% if my_name is eq(task?.assignee) %}
         <span class="you-badge">you</span>
       {% end %}
     </span>

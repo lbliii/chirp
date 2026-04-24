@@ -2,6 +2,22 @@
 {% from "chirp/sse.html" import sse_scope %}
 {% from "chirp/nav.html" import nav_link %}
 {% end %}
+{% def render_comment(comment, depth) %}
+<div class="comment">
+  <div class="comment-meta">
+    <span class="author">{{ comment.by }}</span>
+    &middot; {{ comment.time | timeago }}
+  </div>
+  <div class="comment-text">{{ comment.text | safe }}</div>
+  {% if comment.replies %}
+  <div class="comment-replies">
+    {% for reply in comment.replies %}
+    {{ render_comment(reply, depth + 1) }}
+    {% end %}
+  </div>
+  {% end %}
+</div>
+{% end %}
 <html>
 
 <head>
@@ -424,23 +440,6 @@
 
       {% if comments %}
       <div class="comments-header">{{ comments | length | pluralize("comment") }}</div>
-
-      {% def render_comment(comment, depth) %}
-      <div class="comment">
-        <div class="comment-meta">
-          <span class="author">{{ comment.by }}</span>
-          &middot; {{ comment.time | timeago }}
-        </div>
-        <div class="comment-text">{{ comment.text | safe }}</div>
-        {% if comment.replies %}
-        <div class="comment-replies">
-          {% for reply in comment.replies %}
-          {{ render_comment(reply, depth + 1) }}
-          {% end %}
-        </div>
-        {% end %}
-      </div>
-      {% end %}
 
       {% for comment in comments %}
       {{ render_comment(comment, 0) }}

@@ -97,6 +97,50 @@ class TestToolEventBus:
         await asyncio.wait_for(task, timeout=2.0)
         assert count == 0
 
+    @pytest.mark.asyncio
+    async def test_emit_from_other_thread_reaches_subscriber_loop(self) -> None:
+        bus = ToolEventBus()
+        received: list[ToolCallEvent] = []
+
+        async def collector():
+            async for event in bus.subscribe():
+                received.append(event)
+                break
+
+        task = asyncio.create_task(collector())
+        await asyncio.sleep(0.01)
+
+        event = ToolCallEvent(
+            tool_name="threaded",
+            arguments={"from": "worker"},
+            result="ok",
+            timestamp=time.time(),
+        )
+
+        await asyncio.to_thread(lambda: asyncio.run(bus.emit(event)))
+
+        await asyncio.wait_for(task, timeout=2.0)
+        assert received == [event]
+
+    @pytest.mark.asyncio
+    async def test_close_from_other_thread_stops_subscriber_loop(self) -> None:
+        bus = ToolEventBus()
+        subscriber_done = False
+
+        async def collector():
+            nonlocal subscriber_done
+            async for _event in bus.subscribe():
+                pass
+            subscriber_done = True
+
+        task = asyncio.create_task(collector())
+        await asyncio.sleep(0.01)
+
+        await asyncio.to_thread(bus.close)
+
+        await asyncio.wait_for(task, timeout=2.0)
+        assert subscriber_done
+
     def test_event_frozen(self) -> None:
         event = ToolCallEvent(
             tool_name="test",
