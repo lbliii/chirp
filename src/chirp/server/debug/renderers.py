@@ -405,7 +405,7 @@ def render_debug_page(
             if "collapsed" in item:
                 sections.append(_render_collapsed_frames(cast(CollapsedFrameGroup, item)))
             else:
-                sections.append(_render_frame(cast(FrameInfo, item)))
+                sections.append(_render_frame(item))
 
     # Request context
     sections.append("<h2>Request</h2>")

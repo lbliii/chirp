@@ -68,6 +68,7 @@ class CheckResult:
     forms_validated: int = 0
     component_calls_validated: int = 0
     page_context_warnings: int = 0
+    elapsed_ms: float | None = None
 
     @property
     def errors(self) -> list[ContractIssue]:
@@ -101,6 +102,8 @@ class CheckResult:
             extras.append(f"{self.component_calls_validated} component call(s) validated")
         if self.page_context_warnings:
             extras.append(f"{self.page_context_warnings} Page context warning(s)")
+        if self.elapsed_ms is not None:
+            extras.append(f"{self.elapsed_ms:.1f}ms elapsed")
         if extras:
             lines.append(", ".join(extras) + ".")
         if self.ok and not self.warnings:

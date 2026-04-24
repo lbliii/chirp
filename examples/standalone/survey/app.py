@@ -94,7 +94,13 @@ def survey_form():
         experience_levels=EXPERIENCE_LEVELS,
         countries=COUNTRIES,
         errors={},
-        form={},
+        form={
+            "name": "",
+            "age": "",
+            "experience": "",
+            "country": "",
+            "comments": "",
+        },
         selected_interests=[],
     )
 

@@ -57,8 +57,9 @@
     {% block header_user %}
     <div class="user-info">
       {% set user = current_user() %}
-      <span class="avatar">{{ user.name | first | upper }}</span>
-      <span class="name">{{ user.name }}</span>
+      {% set user_name = user?.name ?? "" %}
+      <span class="avatar">{{ user_name | first | upper }}</span>
+      <span class="name">{{ user_name }}</span>
       <form method="post" action="/logout" style="margin:0">
         {{ csrf_field() }}
         <button type="submit" class="btn-logout">Logout</button>
@@ -183,7 +184,7 @@
 </div>
 
 {# SSE connection for live updates #}
-<div hx-ext="sse" sse-connect="/events">
+<div hx-ext="sse" sse-connect="/events" hx-disinherit="hx-target hx-swap">
   <div sse-swap="fragment" style="display:none;"></div>
 </div>
 

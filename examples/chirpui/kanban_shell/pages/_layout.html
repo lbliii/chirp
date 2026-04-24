@@ -18,7 +18,7 @@
 
 {% block topbar_end %}
 {{ theme_toggle() }}
-{% if current_user.is_authenticated %}
+{% if current_user?.is_authenticated %}
 <div class="kanban-user-info">
   <span class="kanban-avatar">{{ current_user.name | first | upper }}</span>
   <span class="kanban-name">{{ current_user.name }}</span>
@@ -34,7 +34,7 @@
 {% call sidebar() %}
   {% call sidebar_section("Boards") %}
     {{ sidebar_link("/", "Board", icon="grid", match="exact") }}
-    {% if not current_user.is_authenticated %}
+    {% if not current_user?.is_authenticated %}
     {{ sidebar_link("/login", "Login", icon="user") }}
     {% end %}
   {% end %}

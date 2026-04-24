@@ -50,6 +50,9 @@ class ChatMessage:
     timestamp: float
 
 
+_ChatSub = tuple[asyncio.Queue[ChatMessage | None], asyncio.AbstractEventLoop]
+
+
 # ---------------------------------------------------------------------------
 # ChatBus — async broadcast modeled on ToolEventBus
 # ---------------------------------------------------------------------------
@@ -62,22 +65,46 @@ class ChatBus:
     own ``asyncio.Queue``.  When ``emit()`` is called, the message is
     placed into every active subscriber's queue.
 
-    Thread-safe: the subscriber set is protected by a Lock.
+    Thread-safe: the subscriber set is protected by a Lock, and cross-thread
+    emitters hand queue mutation back to each subscriber's event loop.
     """
 
     __slots__ = ("_lock", "_subscribers")
 
     def __init__(self) -> None:
-        self._subscribers: set[asyncio.Queue[ChatMessage | None]] = set()
+        self._subscribers: set[_ChatSub] = set()
         self._lock = threading.Lock()
 
     async def emit(self, message: ChatMessage) -> None:
         """Broadcast a message to all active subscribers."""
         with self._lock:
             subscribers = set(self._subscribers)
-        for queue in subscribers:
-            with contextlib.suppress(asyncio.QueueFull):
-                queue.put_nowait(message)
+        for queue, loop in subscribers:
+            self._schedule_message(loop, queue, message)
+
+    def _schedule_message(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[ChatMessage | None],
+        message: ChatMessage,
+    ) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._deliver_message(queue, message)
+            return
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(self._deliver_message, queue, message)
+
+    def _deliver_message(
+        self,
+        queue: asyncio.Queue[ChatMessage | None],
+        message: ChatMessage,
+    ) -> None:
+        with contextlib.suppress(asyncio.QueueFull):
+            queue.put_nowait(message)
 
     async def subscribe(self) -> AsyncIterator[ChatMessage]:
         """Subscribe to chat messages.
@@ -86,8 +113,10 @@ class ChatBus:
         Cleaned up automatically when the iterator exits.
         """
         queue: asyncio.Queue[ChatMessage | None] = asyncio.Queue(maxsize=256)
+        loop = asyncio.get_running_loop()
+        sub: _ChatSub = (queue, loop)
         with self._lock:
-            self._subscribers.add(queue)
+            self._subscribers.add(sub)
         try:
             while True:
                 message = await queue.get()
@@ -96,7 +125,7 @@ class ChatBus:
                 yield message
         finally:
             with self._lock:
-                self._subscribers.discard(queue)
+                self._subscribers.discard(sub)
 
 
 _bus = ChatBus()

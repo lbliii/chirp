@@ -12,8 +12,8 @@ from chirp.pages.reactive.events import ChangeEvent, ConnectionInfo
 
 logger = logging.getLogger("chirp.reactive")
 
-# Internal subscriber record: queue + optional connection info
-_Sub = tuple[asyncio.Queue[ChangeEvent | None], ConnectionInfo | None]
+# Internal subscriber record: queue + optional connection info + owning event loop.
+_Sub = tuple[asyncio.Queue[ChangeEvent | None], ConnectionInfo | None, asyncio.AbstractEventLoop]
 
 #: Type for the on_drop callback: (scope, event) -> None
 OnDropCallback = Callable[[str, ChangeEvent], Any]
@@ -88,21 +88,55 @@ class ReactiveBus:
         with self._lock:
             subs = set(self._subscribers.get(event.scope, set()))
             self._emitted_count += 1
-        for queue, conn in subs:
+        for queue, conn, loop in subs:
             # Audience filtering: skip subscribers not in the audience
             if event.audience is not None and (conn is None or conn.user_id not in event.audience):
                 continue
+            self._schedule_event(loop, queue, event)
+
+    def _schedule_event(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[ChangeEvent | None],
+        event: ChangeEvent,
+    ) -> None:
+        """Enqueue *event* on the queue's owning loop.
+
+        ``asyncio.Queue`` is not safe to mutate from arbitrary threads.  The
+        bus is explicitly thread-safe, so cross-thread emitters hand delivery
+        to the subscriber's event loop.
+        """
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._deliver_event(queue, event)
+            return
+        try:
+            loop.call_soon_threadsafe(self._deliver_event, queue, event)
+        except RuntimeError:
+            self._record_drop(event)
+
+    def _deliver_event(
+        self,
+        queue: asyncio.Queue[ChangeEvent | None],
+        event: ChangeEvent,
+    ) -> None:
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            self._record_drop(event)
+
+    def _record_drop(self, event: ChangeEvent) -> None:
+        with self._lock:
+            self._dropped_count += 1
+            self._log_drop(event)
+        if self._on_drop is not None:
             try:
-                queue.put_nowait(event)
-            except asyncio.QueueFull:
-                with self._lock:
-                    self._dropped_count += 1
-                    self._log_drop(event)
-                if self._on_drop is not None:
-                    try:
-                        self._on_drop(event.scope, event)
-                    except Exception:
-                        logger.exception("on_drop callback failed for scope=%s", event.scope)
+                self._on_drop(event.scope, event)
+            except Exception:
+                logger.exception("on_drop callback failed for scope=%s", event.scope)
 
     def _log_drop(self, event: ChangeEvent) -> None:
         """Log a dropped event, throttled to once per scope per interval."""
@@ -147,7 +181,8 @@ class ReactiveBus:
                 exits (normal or exception).  Receives ``(scope, connection)``.
         """
         queue: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(maxsize=self._maxsize)
-        sub: _Sub = (queue, connection)
+        loop = asyncio.get_running_loop()
+        sub: _Sub = (queue, connection, loop)
         with self._lock:
             self._subscribers.setdefault(scope, set()).add(sub)
         try:
@@ -189,16 +224,34 @@ class ReactiveBus:
                     subs |= self._subscribers.pop(s)
                 self._drop_log_last.clear()
                 self._drop_log_counts.clear()
-        for queue, _conn in subs:
-            # Drain one event if needed to guarantee the sentinel lands.
-            # This ensures close() is reliable even with small maxsize.
-            try:
+        for queue, _conn, loop in subs:
+            self._schedule_close(loop, queue)
+
+    def _schedule_close(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        queue: asyncio.Queue[ChangeEvent | None],
+    ) -> None:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._deliver_close(queue)
+            return
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(self._deliver_close, queue)
+
+    def _deliver_close(self, queue: asyncio.Queue[ChangeEvent | None]) -> None:
+        # Drain one event if needed to guarantee the sentinel lands.
+        # This ensures close() is reliable even with small maxsize.
+        try:
+            queue.put_nowait(None)
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+            with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(None)
-            except asyncio.QueueFull:
-                with contextlib.suppress(asyncio.QueueEmpty):
-                    queue.get_nowait()
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(None)
 
     # -- Presence --
 
@@ -210,7 +263,7 @@ class ReactiveBus:
         """
         with self._lock:
             subs = self._subscribers.get(scope, set())
-            return frozenset(conn for _, conn in subs if conn is not None)
+            return frozenset(conn for _, conn, _loop in subs if conn is not None)
 
     # -- Observability --
 
