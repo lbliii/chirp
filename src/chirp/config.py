@@ -123,6 +123,7 @@ class AppConfig:
     autoescape: bool = True
     trim_blocks: bool = True
     lstrip_blocks: bool = True
+    strict_undefined: bool = True
     static_context: MappingProxyType[str, Any] | dict[str, Any] | None = (
         None  # Compile-time constants for kida partial evaluator; frozen to MappingProxyType
     )

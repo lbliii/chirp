@@ -276,7 +276,7 @@ def internal_error(request: Request, exc: Exception):
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", name="index")
 async def index(request: Request):
     """Pokedex browser UI — full page or fragment."""
     page = max(request.query.get_int("page", default=1) or 1, 1)
@@ -308,7 +308,7 @@ async def index(request: Request):
     )
 
 
-@app.route("/pokemon/{pokemon_id}")
+@app.route("/pokemon/{pokemon_id}", name="pokemon.detail")
 async def pokemon_detail(pokemon_id: int, request: Request):
     """Single Pokemon detail view with prev/next navigation."""
     pokemon = await Query(Pokemon, "pokemon").where("id = ?", pokemon_id).fetch_one(app.db)

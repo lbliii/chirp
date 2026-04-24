@@ -36,7 +36,7 @@ def index(request: Request):
     return Template("index.html", has_widget=False)
 
 
-@app.route("/widget")
+@app.route("/widget", name="widget")
 def widget_fragment(request: Request):
     """Fragment containing an island — swapped in by htmx."""
     return Fragment("_widget.html", "widget_block", initial_count=0)

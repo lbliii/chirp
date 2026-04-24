@@ -55,7 +55,7 @@
     {% for key, label in experience_levels %}
     <label>
       <input type="radio" name="experience" value="{{ key }}"
-             {{ 'checked' if form?.experience == key else '' }}>
+             {{ 'checked' if (form?.experience ?? '') == key else '' }}>
       {{ label }}
     </label>
     {% end %}
@@ -71,7 +71,7 @@
           class="{{ 'error' if 'country' in errors else '' }}">
     {% for key, label in countries %}
     <option value="{{ key }}"
-            {{ 'selected' if form?.country == key else '' }}>
+            {{ 'selected' if (form?.country ?? '') == key else '' }}>
       {{ label }}
     </option>
     {% end %}

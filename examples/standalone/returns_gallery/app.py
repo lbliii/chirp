@@ -62,7 +62,7 @@ def index():
 # ---------------------------------------------------------------------------
 
 
-@app.route("/fragment")
+@app.route("/fragment", name="fragment")
 def fragment_demo():
     """Fragment — render a named block independently.
 
@@ -77,7 +77,7 @@ def fragment_demo():
 # ---------------------------------------------------------------------------
 
 
-@app.route("/page")
+@app.route("/page", name="page")
 def page_demo():
     """Page — fragment for htmx requests, full page for browser navigation.
 
@@ -93,7 +93,7 @@ def page_demo():
 # ---------------------------------------------------------------------------
 
 
-@app.route("/oob", methods=["POST"])
+@app.route("/oob", methods=["POST"], name="oob")
 def oob_demo():
     """OOB — primary fragment plus out-of-band swaps to unrelated regions.
 
@@ -217,7 +217,7 @@ class _Form:
     email: str = ""
 
 
-@app.route("/validate", methods=["POST"])
+@app.route("/validate", methods=["POST"], name="validate")
 async def validate_demo(request: Request):
     """ValidationError — 422 status with the form fragment re-rendered.
 
@@ -254,7 +254,7 @@ async def validate_demo(request: Request):
 _counter = {"n": 0}
 
 
-@app.route("/mutate", methods=["POST"])
+@app.route("/mutate", methods=["POST"], name="mutate")
 def mutate_demo():
     """MutationResult — one handler, three UX flows.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.4.0"
+version = "0.5.0"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -35,7 +35,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "kida-templates>=0.6.0", # Template engine (same ecosystem, same author)
+    "kida-templates>=0.7.0", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
     "bengal-pounce>=0.6.0",  # ASGI server (public PounceError et al. from pounce)
 ]
@@ -63,7 +63,7 @@ ai = ["httpx>=0.27.0"]
 markdown = ["patitas[syntax]>=0.3.5"]
 
 # chirp-ui component library (CSS, themes, layout macros)
-ui = ["chirp-ui>=0.3.0"]
+ui = ["chirp-ui>=0.5.0"]
 
 # Config from env (python-dotenv for local .env loading)
 config = ["python-dotenv>=1.0.0"]
@@ -167,6 +167,7 @@ ignore = [
 "src/chirp/app/diagnostics.py" = ["T20"] # Startup diagnostics use print
 "src/chirp/app/server.py" = ["T20"]   # Server startup uses print
 "src/chirp/testing/assertions.py" = ["S101"] # Test assertion helpers use assert by design
+"src/chirp/testing/sse.py" = ["S101"] # Test assertion helpers use assert by design
 "src/chirp/app/__init__.py" = ["S101"] # Internal state assertions after freeze
 "src/chirp/app/runtime.py" = ["S101"] # Internal state assertions after freeze
 "src/chirp/data/query.py" = ["S608"]  # Query builder constructs SQL safely (parameterized)
@@ -276,7 +277,7 @@ dev = [
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
-    "chirp-ui>=0.3.0",          # Layout macros for llm_playground example tests
+    "chirp-ui>=0.5.0",          # Layout macros for llm_playground example tests
 ]
 
 # =============================================================================

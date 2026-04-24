@@ -274,7 +274,8 @@
 
 {% def pokemon_card(p) %}
 {% set primary_type = p.types.split(",")[0] %}
-<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
+{% set detail_url = url_for("pokemon.detail", pokemon_id=p.id) %}
+<a href="{{ detail_url }}" hx-get="{{ detail_url }}" hx-target="#main" hx-push-url="true">
 <div class="card" style="background: linear-gradient(135deg, {{ primary_type | type_color }}25, var(--card) 55%)">
   <span class="card-id">#{{ p.id }}</span>
   <img class="card-sprite" src="{{ p.id | sprite }}" alt="{{ p.name }}" width="80" height="80" loading="lazy">
@@ -296,7 +297,8 @@
 
 {% def pokemon_row(p) %}
 {% set primary_type = p.types.split(",")[0] %}
-<a href="/pokemon/{{ p.id }}" hx-get="/pokemon/{{ p.id }}" hx-target="#main" hx-push-url="true">
+{% set detail_url = url_for("pokemon.detail", pokemon_id=p.id) %}
+<a href="{{ detail_url }}" hx-get="{{ detail_url }}" hx-target="#main" hx-push-url="true">
 <div class="list-row" style="background: linear-gradient(90deg, {{ primary_type | type_color }}18, var(--card) 40%)">
   <img class="list-row-sprite" src="{{ p.id | sprite }}" alt="{{ p.name }}" width="48" height="48" loading="lazy">
   <span class="list-row-id">#{{ p.id }}</span>
@@ -326,10 +328,10 @@
   {% set current_view = view ?? "grid" %}
   <div class="view-controls" style="display:flex;gap:0.4rem;margin-left:1rem;">
     <button class="type-btn {{ 'active' if current_view == 'grid' else '' }}" style="background:#555;"
-            hx-get="/?view=grid" hx-target="#main" hx-push-url="true"
+            hx-get="{{ url_for('index', view='grid') }}" hx-target="#main" hx-push-url="true"
             hx-include="[name=q],[name=type]">Grid</button>
     <button class="type-btn {{ 'active' if current_view == 'list' else '' }}" style="background:#555;"
-            hx-get="/?view=list" hx-target="#main" hx-push-url="true"
+            hx-get="{{ url_for('index', view='list') }}" hx-target="#main" hx-push-url="true"
             hx-include="[name=q],[name=type]">List</button>
   </div>
   <span class="count">{{ total ?? "" }}{{ " Pokemon" if (total ?? none) else "" }}</span>
@@ -342,13 +344,16 @@
 {% if (detail ?? none) %}
 <div class="detail-container">
   <div class="detail-nav">
-    <a href="/" hx-get="/" hx-target="#main" hx-push-url="true" class="back-link">&larr; All Pokemon</a>
+    {% set index_url = url_for("index") %}
+    <a href="{{ index_url }}" hx-get="{{ index_url }}" hx-target="#main" hx-push-url="true" class="back-link">&larr; All Pokemon</a>
     <div class="nav-spacer"></div>
     {% if (prev_id ?? none) %}
-    <a href="/pokemon/{{ prev_id }}" hx-get="/pokemon/{{ prev_id }}" hx-target="#main" hx-push-url="true">&larr; #{{ prev_id }}</a>
+    {% set prev_url = url_for("pokemon.detail", pokemon_id=prev_id) %}
+    <a href="{{ prev_url }}" hx-get="{{ prev_url }}" hx-target="#main" hx-push-url="true">&larr; #{{ prev_id }}</a>
     {% end %}
     {% if (next_id ?? none) %}
-    <a href="/pokemon/{{ next_id }}" hx-get="/pokemon/{{ next_id }}" hx-target="#main" hx-push-url="true">#{{ next_id }} &rarr;</a>
+    {% set next_url = url_for("pokemon.detail", pokemon_id=next_id) %}
+    <a href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#main" hx-push-url="true">#{{ next_id }} &rarr;</a>
     {% end %}
   </div>
   <div class="detail" style="background: linear-gradient(180deg, {{ detail.types.split(',')[0] | type_color }}30, var(--card) 40%)">
@@ -398,11 +403,12 @@ requestAnimationFrame(function() {
 <input type="hidden" name="view" value="{{ v }}">
 <div class="controls">
   <div class="search-bar">
+    {% set grid_index_url = url_for("index") %}
     <input type="search"
            name="q"
            placeholder="Search Pokemon..."
            value="{{ search ?? '' }}"
-           hx-get="/"
+           hx-get="{{ grid_index_url }}"
            hx-target="#main"
            hx-trigger="input changed delay:300ms, search"
            hx-push-url="true"
@@ -412,7 +418,7 @@ requestAnimationFrame(function() {
   <div class="type-filters">
     <button class="type-btn {{ 'active' if not current_type else '' }}"
             style="background: #555;"
-            hx-get="/"
+            hx-get="{{ grid_index_url }}"
             hx-target="#main"
             hx-push-url="true"
             hx-include="[name=q],[name=view]">All</button>
@@ -421,7 +427,7 @@ requestAnimationFrame(function() {
             name="type"
             value="{{ t }}"
             style="background: {{ t | type_color }}"
-            hx-get="/?type={{ t }}"
+            hx-get="{{ url_for('index', type=t) }}"
             hx-target="#main"
             hx-push-url="true"
             hx-include="[name=q],[name=view]">{{ t }}</button>
@@ -452,12 +458,11 @@ requestAnimationFrame(function() {
   {% end %}
 
   {% if total_pages > 1 %}
-  {% set base = "&view=" + v %}
-  {% if current_type %}{% set base = base + "&type=" + current_type %}{% end %}
-  {% if search %}{% set base = base + "&q=" + search %}{% end %}
+  {% set type_param = current_type or none %}
+  {% set search_param = search or none %}
 
   {% if page < total_pages and v == "grid" %}
-  <div hx-get="/?page={{ page + 1 }}{{ base }}"
+  <div hx-get="{{ url_for('index', page=page + 1, view=v, type=type_param, q=search_param) }}"
        hx-trigger="revealed"
        hx-target=".pokemon-grid"
        hx-swap="beforeend"
@@ -467,13 +472,13 @@ requestAnimationFrame(function() {
 
   <div class="pagination">
     <button class="page-btn"
-            hx-get="/?page={{ page - 1 }}{{ base }}"
+            hx-get="{{ url_for('index', page=page - 1, view=v, type=type_param, q=search_param) }}"
             hx-target="#main"
             hx-push-url="true"
             {% if page <= 1 %}disabled{% end %}>&laquo; Prev</button>
     <span class="page-info">{{ page }} / {{ total_pages }}</span>
     <button class="page-btn"
-            hx-get="/?page={{ page + 1 }}{{ base }}"
+            hx-get="{{ url_for('index', page=page + 1, view=v, type=type_param, q=search_param) }}"
             hx-target="#main"
             hx-push-url="true"
             {% if page >= total_pages %}disabled{% end %}>Next &raquo;</button>

@@ -24,13 +24,14 @@
 <input id="contacts-query-state" type="hidden" name="q" value="{{ query }}">
 <input id="contacts-group-state" type="hidden" name="group" value="{{ active_group }}">
 
+{% set contacts_url = url_for("contacts") %}
 {% call search_header(
   active_group ~ " Team" if active_group else "Team Directory",
-  form_action="/contacts",
+  form_action=contacts_url,
   query=query,
   subtitle=visible_count ~ " contacts" ~ (" in " ~ active_group if active_group else ""),
   search_placeholder="Search by name, email, or role...",
-  form_attrs_map={"hx-get": "/contacts", "hx-target": "#contacts-page", "hx-swap": "outerHTML", "hx-push-url": "true"}
+  form_attrs_map={"hx-get": contacts_url, "hx-target": "#contacts-page", "hx-swap": "outerHTML", "hx-push-url": "true"}
 ) %}
 {% slot actions %}
 {{ hidden_field("group", active_group) }}
@@ -44,7 +45,13 @@
 {% end %}
 
 {% call cluster(gap="sm") %}
-  {% set tabs = [("All", "/contacts"), ("Engineering", "/contacts?group=Engineering"), ("Design", "/contacts?group=Design"), ("Marketing", "/contacts?group=Marketing"), ("Leadership", "/contacts?group=Leadership")] %}
+  {% set tabs = [
+    ("All", url_for("contacts")),
+    ("Engineering", url_for("contacts", group="Engineering")),
+    ("Design", url_for("contacts", group="Design")),
+    ("Marketing", url_for("contacts", group="Marketing")),
+    ("Leadership", url_for("contacts", group="Leadership")),
+  ] %}
   {% for tab_label, tab_href in tabs %}
   {% set is_active = (tab_label == active_group) or (tab_label == "All" and not active_group) %}
   {% set tab_count = total_count if tab_label == "All" else group_counts.get(tab_label, 0) %}
@@ -98,9 +105,10 @@
           </select>
         </td>
         <td class="chirpui-table__td">
+          {% set contact_url = url_for("contacts.contact_id", contact_id=contact.id) %}
           <form id="contact-edit-{{ contact.id }}"
-                action="/contacts/{{ contact.id }}" method="post"
-                hx-post="/contacts/{{ contact.id }}"
+                action="{{ contact_url }}" method="post"
+                hx-post="{{ contact_url }}"
                 hx-target="#contacts-page" hx-swap="outerHTML">
             {{ hidden_field("_action", "save") }}
             {{ hidden_field("q", query) }}
@@ -108,7 +116,7 @@
             {% call button_group() %}
             {{ btn("Save", variant="primary", size="sm", loading=true) }}
             {{ btn("Cancel", variant="ghost", size="sm", type="button",
-                   hx_get="/contacts/" ~ contact.id ~ "/cancel",
+                   hx_get=url_for("contacts.contact_id.cancel", contact_id=contact.id),
                    hx_target="#contacts-page", hx_swap="outerHTML",
                    hx_include="#contacts-query-state,#contacts-group-state") }}
             {% end %}
@@ -116,7 +124,7 @@
         </td>
         {% else %}
         <td class="chirpui-table__td">
-          <a href="/contacts/{{ contact.id }}" class="chirpui-link">
+          <a href="{{ url_for('contacts.contact_id', contact_id=contact.id) }}" class="chirpui-link">
             <strong>{{ contact.name }}</strong>
           </a>
         </td>
@@ -127,7 +135,7 @@
         <td class="chirpui-table__td">
           {% call button_group() %}
           {{ btn("Edit", variant="ghost", size="sm",
-                 hx_get="/contacts/" ~ contact.id ~ "/edit",
+                 hx_get=url_for("contacts.contact_id.edit", contact_id=contact.id),
                  hx_target="#contacts-page", hx_swap="outerHTML",
                  hx_include="#contacts-query-state,#contacts-group-state") }}
           {{ confirm_trigger("delete-contact-" ~ contact.id, label="Delete", cls="chirpui-btn chirpui-btn--danger chirpui-btn--sm") }}
@@ -139,7 +147,7 @@
             confirm_label="Delete",
             cancel_label="Keep",
             variant="danger",
-            confirm_url="/contacts/" ~ contact.id,
+            confirm_url=url_for("contacts.contact_id", contact_id=contact.id),
             confirm_method="POST",
             hx_target="#contacts-page",
             hx_swap="outerHTML"
@@ -169,8 +177,8 @@
 
 {% call modal("new-contact-modal", title="New Contact") %}
 <form id="contact-add-form" class="chirpui-stack chirpui-stack--sm"
-      action="/contacts" method="post"
-      hx-post="/contacts"
+      action="{{ contacts_url }}" method="post"
+      hx-post="{{ contacts_url }}"
       hx-target="#contacts-page" hx-swap="outerHTML"
       hx-disabled-elt="find button"
       hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
@@ -183,7 +191,7 @@
   {{ select_field("group", group_options, selected=active_group, label="Group") }}
   {{ text_field("phone", label="Phone", placeholder="555-0100", required=false) }}
   {% call form_actions(align="end") %}
-    {{ btn("Cancel", variant="ghost", type="button", attrs='onclick="this.closest(\'dialog\').close()"') }}
+    {{ btn("Cancel", variant="ghost", type="button", attrs_unsafe='onclick="this.closest(\'dialog\').close()"') }}
     {{ btn("Add Contact", variant="primary") }}
   {% end %}
 </form>

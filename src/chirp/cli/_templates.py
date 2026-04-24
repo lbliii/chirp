@@ -4,9 +4,6 @@ Backward-compatible shim. All constants live in chirp.cli.templates.
 """
 
 from chirp.cli.templates import (
-    APP_PY,
-    BASE_HTML,
-    INDEX_HTML,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
     SHELL_APP_PY,
@@ -43,9 +40,6 @@ from chirp.cli.templates import (
 )
 
 __all__ = [
-    "APP_PY",
-    "BASE_HTML",
-    "INDEX_HTML",
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",
     "SHELL_APP_PY",

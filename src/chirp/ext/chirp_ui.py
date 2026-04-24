@@ -17,7 +17,7 @@ import re
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -25,9 +25,7 @@ if TYPE_CHECKING:
     from chirp.contracts.types import CheckResult
 
 from chirp.contracts.types import ContractIssue, Severity
-from chirp.http.request import Request
 from chirp.middleware.inject import StreamingHTMLInject
-from chirp.middleware.protocol import AnyResponse, Middleware, Next
 from chirp.pages.types import LayoutPreset
 from chirp.templating.fragment_target_registry import PageShellContract, PageShellTarget
 
@@ -74,21 +72,6 @@ CHIRPUI_APP_SHELL_PRESET = LayoutPreset(
 )
 
 
-class _ChirpUIStrictMiddleware(Middleware):
-    """Middleware that sets chirp-ui strict mode per request for variant validation."""
-
-    __slots__ = ("_strict",)
-
-    def __init__(self, strict: bool) -> None:
-        self._strict = strict
-
-    async def __call__(self, request: Request, next: Next) -> AnyResponse:
-        from chirp_ui import set_strict
-
-        set_strict(self._strict)
-        return await next(request)
-
-
 def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     normalized = "/" + prefix.strip("/")
     return (
@@ -96,7 +79,11 @@ def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     )
 
 
-def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) -> None:
+def use_chirp_ui(
+    app: App,
+    prefix: str = "/static",
+    strict: bool | Literal["auto"] | None = None,
+) -> None:
     """Register chirp-ui static files (CSS, themes) and filters with the app.
 
     Call after App creation. Serves chirpui.css, chirpui-alpine.js, themes/,
@@ -110,8 +97,11 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
     single authority for Alpine injection — the ``app_shell_layout.html`` does
     not include its own Alpine scripts.
 
-    When strict is None, uses app.config.debug. When True, invalid component
-    variants log warnings during template render. When False, no validation.
+    ``strict`` controls chirp-ui variant validation (invalid variants escalate
+    from warning to ``ValueError``). ``None`` (default) mirrors
+    ``app.config.debug``. ``True``/``False`` set the mode explicitly.
+    ``"auto"`` delegates to chirp-ui's ``CHIRP_UI_DEV`` env var so dev hosts
+    opt in without code changes.
 
     Raises ImportError if chirp-ui is not installed.
     """
@@ -174,8 +164,8 @@ def use_chirp_ui(app: App, prefix: str = "/static", strict: bool | None = None) 
             app.add_reload_dir(str(chirp_ui_root))
     except AttributeError, OSError:
         pass
-    strict_value = strict if strict is not None else app.config.debug
-    app.add_middleware(_ChirpUIStrictMiddleware(strict_value))
+    strict_value: bool | Literal["auto"] = strict if strict is not None else app.config.debug
+    chirp_ui.set_strict(strict_value)
 
     # Auto-registered shell regions: optional because apps with custom root
     # layouts (no chirpui app-shell) don't need to define these blocks.

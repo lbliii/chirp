@@ -52,7 +52,7 @@ SHELL_PAGE_PY = """\
 from chirp import Template
 
 
-async def handler():
+def get() -> Template:
     return Template("page.html")
 """
 
@@ -81,7 +81,7 @@ SHELL_ITEMS_PAGE_PY = """\
 from chirp import Template
 
 
-async def handler():
+def get() -> Template:
     return Template("items/page.html")
 """
 

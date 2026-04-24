@@ -7,7 +7,7 @@
 {% call stack(gap="lg") %}
 
 <form class="search-form"
-      hx-post="/ask"
+      hx-post="{{ url_for('ask') }}"
       hx-target="#conversation"
       hx-swap="afterbegin transition:true"
       aria-label="Ask a question about the docs"

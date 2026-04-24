@@ -78,7 +78,7 @@
       <label>
         <input type="checkbox" name="priority" value="{{ p }}"
                {{ "checked" if p in active_filters.priority else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ p | capitalize }}
       </label>
@@ -93,7 +93,7 @@
       <label>
         <input type="checkbox" name="assignee" value="{{ person }}"
                {{ "checked" if person in active_filters.assignee else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ person }}
       </label>
@@ -108,7 +108,7 @@
       <label>
         <input type="checkbox" name="tag" value="{{ tag }}"
                {{ "checked" if tag in active_filters.tag else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ tag }}
       </label>
@@ -143,7 +143,7 @@
     {# --- Quick-add form --- #}
     {% block add_form %}
     {% set errors = errors ?? {} %}
-    <form class="add-form" hx-post="/tasks" hx-swap="none"
+    <form class="add-form" hx-post="{{ url_for('tasks.add') }}" hx-swap="none"
           hx-indicator="#board-spinner" hx-disabled-elt="find button">
       {{ field("title", "Task", placeholder="What needs doing?") }}
       <div class="form-field">

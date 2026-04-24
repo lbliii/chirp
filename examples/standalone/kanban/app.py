@@ -450,13 +450,13 @@ def _stats_fragment(tasks: list[Task] | None = None) -> Fragment:
 # ---------------------------------------------------------------------------
 
 
-@app.route("/login")
+@app.route("/login", name="login")
 def login_page():
     """Show the login form."""
     return Template("login.html", error="", users=_get_users())
 
 
-@app.route("/login", methods=["POST"])
+@app.route("/login", methods=["POST"], name="login.submit")
 async def do_login(request: Request):
     """Handle login form submission."""
     form = await request.form()
@@ -474,11 +474,11 @@ async def do_login(request: Request):
     return Template("login.html", error="Invalid username or password", users=_get_users())
 
 
-@app.route("/logout", methods=["POST"])
+@app.route("/logout", methods=["POST"], name="logout")
 def do_logout():
     """Log out and redirect to login."""
     logout()
-    return Redirect("/login")
+    return Redirect(app.url_for("login"))
 
 
 # ---------------------------------------------------------------------------
@@ -486,7 +486,7 @@ def do_logout():
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", name="index")
 @login_required
 def index(request: Request):
     """Full board page or board fragment depending on htmx request."""
@@ -494,7 +494,7 @@ def index(request: Request):
     return Page("board.html", "board", **ctx)
 
 
-@app.route("/tasks", methods=["POST"])
+@app.route("/tasks", methods=["POST"], name="tasks.add")
 @login_required
 async def add_task(request: Request):
     """Add a task — returns OOB (column + stats) or ValidationError."""
@@ -530,7 +530,7 @@ async def add_task(request: Request):
     )
 
 
-@app.route("/tasks/{task_id}/edit")
+@app.route("/tasks/{task_id}/edit", name="tasks.edit")
 @login_required
 def edit_task(task_id: int):
     """Return the inline edit form for a task card."""
@@ -540,7 +540,7 @@ def edit_task(task_id: int):
     return Fragment("task_form.html", "edit_form", task=task)
 
 
-@app.route("/tasks/{task_id}", methods=["PUT"])
+@app.route("/tasks/{task_id}", methods=["PUT"], name="tasks.save")
 @login_required
 async def save_task(request: Request, task_id: int):
     """Save an edited task — returns OOB (card + stats) or ValidationError."""
@@ -589,7 +589,7 @@ async def save_task(request: Request, task_id: int):
     )
 
 
-@app.route("/tasks/{task_id}/move/{new_status}", methods=["POST"])
+@app.route("/tasks/{task_id}/move/{new_status}", methods=["POST"], name="tasks.move")
 @login_required
 def move_task(task_id: int, new_status: str):
     """Move a task to a different column — returns OOB for both columns + stats."""
@@ -625,7 +625,7 @@ def last_deleted_task():
     return ""
 
 
-@app.route("/tasks/{task_id}", methods=["DELETE"])
+@app.route("/tasks/{task_id}", methods=["DELETE"], name="tasks.delete")
 @login_required
 def delete_task_route(task_id: int):
     """Delete a task — returns updated column + stats with HX-Trigger."""
@@ -647,7 +647,7 @@ def delete_task_route(task_id: int):
     )
 
 
-@app.route("/filter")
+@app.route("/filter", name="filter")
 @login_required
 def filter_board(request: Request):
     """Filter the board by priority, assignee, or tag."""

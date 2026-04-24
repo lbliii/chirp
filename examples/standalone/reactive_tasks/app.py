@@ -141,7 +141,7 @@ def index():
     return Template("board.html", **_context())
 
 
-@app.route("/tasks", methods=["POST"])
+@app.route("/tasks", methods=["POST"], name="tasks.add")
 async def add_task(request: Request):
     """Add a task and notify all connected clients."""
     form = await request.form()
@@ -158,7 +158,7 @@ async def add_task(request: Request):
     return Fragment("board.html", "task_list", **_context())
 
 
-@app.route("/tasks/{task_id}/toggle", methods=["POST"])
+@app.route("/tasks/{task_id}/toggle", methods=["POST"], name="tasks.toggle")
 def toggle_task(task_id: int):
     """Toggle a task's done state."""
     store.toggle(task_id)
@@ -166,7 +166,7 @@ def toggle_task(task_id: int):
     return Fragment("board.html", "task_list", **_context())
 
 
-@app.route("/tasks/{task_id}", methods=["DELETE"])
+@app.route("/tasks/{task_id}", methods=["DELETE"], name="tasks.delete")
 def delete_task(task_id: int):
     """Delete a task."""
     store.delete(task_id)

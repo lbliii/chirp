@@ -71,13 +71,13 @@ def _toggle_task(task_id: int) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", name="index")
 def index():
     tasks = _get_tasks()
     return Page("tasks.html", "task_list", tasks=tasks, count=len(tasks))
 
 
-@app.route("/tasks", methods=["POST"])
+@app.route("/tasks", methods=["POST"], name="tasks.add")
 async def add_task(request: Request):
     """Add a task — htmx gets updated list + count, plain POST gets redirect."""
     form = await request.form()
@@ -93,7 +93,7 @@ async def add_task(request: Request):
     )
 
 
-@app.route("/tasks/{task_id}", methods=["DELETE"])
+@app.route("/tasks/{task_id}", methods=["DELETE"], name="tasks.delete")
 def delete_task(task_id: int):
     """Delete a task — htmx gets updated list, plain request gets redirect."""
     _delete_task(task_id)
@@ -106,7 +106,7 @@ def delete_task(task_id: int):
     )
 
 
-@app.route("/tasks/{task_id}/toggle", methods=["PATCH"])
+@app.route("/tasks/{task_id}/toggle", methods=["PATCH"], name="tasks.toggle")
 def toggle_task(task_id: int):
     """Toggle done/undone — htmx gets updated list, plain request gets redirect."""
     _toggle_task(task_id)

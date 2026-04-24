@@ -282,7 +282,7 @@ async def share(slug: str) -> Template:
     )
 
 
-@app.route("/ask", methods=["POST"], template="ask.html")
+@app.route("/ask", methods=["POST"], template="ask.html", name="ask")
 async def ask(request: Request):
     """Handle form submit: return sources + scaffolding with sse-connect.
 

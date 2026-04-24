@@ -1,9 +1,50 @@
 """SSE project scaffolding templates (--sse)."""
 
+STYLE_CSS = """\
+*,
+*::before,
+*::after {{
+    box-sizing: border-box;
+}}
+
+body {{
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    max-width: 40rem;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    color: #1a1a1a;
+}}
+
+h1 {{
+    font-weight: 600;
+}}
+"""
+
+TEST_APP_PY = """\
+\"\"\"Basic smoke tests for {name}.\"\"\"
+
+from chirp import App
+from chirp.testing import TestClient
+
+
+app = App()
+
+
+@app.route("/")
+async def index():
+    return "Hello, world!"
+
+
+class TestSmoke:
+    def test_index(self) -> None:
+        client = TestClient(app)
+        response = client.get("/")
+        assert response.status == 200
+"""
+
 SSE_APP_PY = """\
-from chirp import App, Request
-from chirp.streaming import EventStream, Fragment
-from chirp.templating import Template
+from chirp import App, EventStream, Fragment, Request, Template
 
 app = App()
 

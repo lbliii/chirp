@@ -79,7 +79,7 @@
 </div>
 
 <form id="send-form"
-      hx-post="/chat/send"
+      hx-post="{{ url_for('chat.send') }}"
       hx-swap="none"
       hx-disabled-elt="#send-btn"
       hx-on::after-request="this.reset()">

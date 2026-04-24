@@ -316,6 +316,12 @@ class AppCompiler:
         self._runtime.router = router
         self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
+        from chirp.app.url_for import build_routes_by_name
+
+        routes_by_name, name_collisions = build_routes_by_name(router.routes)
+        self._runtime.routes_by_name = routes_by_name
+        self._runtime.route_name_collisions = name_collisions
+
         middleware_list = list(self._mutable.middleware_list)
         _validate_middleware_ordering(middleware_list)
         middleware_list = _collect_builtin_middleware(
@@ -347,6 +353,7 @@ class AppCompiler:
         from chirp.server.fragment_dispatch import fragment_url as _fragment_url
 
         self._mutable.template_globals.setdefault("fragment_url", _fragment_url)
+        self._mutable.template_globals.setdefault("url_for", cast("App", app).url_for)
 
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env

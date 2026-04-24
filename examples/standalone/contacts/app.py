@@ -113,7 +113,7 @@ _CONTACT_RULES = {
 # ---------------------------------------------------------------------------
 
 
-@app.route("/")
+@app.route("/", name="index")
 def index(request: Request):
     """Full page or fragment depending on htmx request."""
     contacts = _get_contacts()
@@ -122,7 +122,7 @@ def index(request: Request):
     )
 
 
-@app.route("/contacts", methods=["POST"])
+@app.route("/contacts", methods=["POST"], name="contacts.add")
 async def add_contact(request: Request):
     """Add a contact — returns OOB (table + count) or ValidationError."""
     form = await request.form()
@@ -151,7 +151,7 @@ async def add_contact(request: Request):
     )
 
 
-@app.route("/contacts/search")
+@app.route("/contacts/search", name="contacts.search")
 def search(request: Request):
     """Search contacts by name — returns the table fragment."""
     q = (request.query.get("q") or "").strip().lower()
@@ -161,7 +161,7 @@ def search(request: Request):
     return Fragment("contacts.html", "contact_table", contacts=contacts)
 
 
-@app.route("/contacts/{contact_id}/edit")
+@app.route("/contacts/{contact_id}/edit", name="contacts.edit")
 def edit_contact(contact_id: int):
     """Return the inline edit form for a contact row."""
     contact = _get_contact(contact_id)
@@ -174,7 +174,7 @@ def edit_contact(contact_id: int):
     )
 
 
-@app.route("/contacts/{contact_id}", methods=["PUT"])
+@app.route("/contacts/{contact_id}", methods=["PUT"], name="contacts.save")
 async def save_contact(request: Request, contact_id: int):
     """Save an edited contact — returns OOB (row + count) or ValidationError."""
     form = await request.form()
@@ -212,7 +212,7 @@ async def save_contact(request: Request, contact_id: int):
     )
 
 
-@app.route("/contacts/{contact_id}", methods=["DELETE"])
+@app.route("/contacts/{contact_id}", methods=["DELETE"], name="contacts.delete")
 def delete_contact_route(contact_id: int):
     """Delete a contact — returns updated table with HX-Trigger event."""
     _delete_contact(contact_id)

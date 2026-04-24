@@ -500,6 +500,42 @@ class App:
             raise ConfigurationError(msg)
         register(self, prefix)
 
+    def mount_app(self, prefix: str, sub_app: App) -> None:
+        """Mount another Chirp :class:`App` at ``prefix``, consuming it.
+
+        Hoists the sub-app's pending routes (prefixed), middleware, lifecycle
+        hooks, template globals/filters, and other registrations onto ``self``.
+        Parent wins on template-global / filter / error-handler / provider
+        collisions (see :mod:`chirp.app.mount` for the full merge matrix).
+
+        After this call, ``sub_app`` is consumed — calling
+        ``sub_app.freeze()`` or ``sub_app.run()`` raises ``RuntimeError``. Use
+        this during migrations when you need two full apps on one port, not as
+        a permanent composition pattern. See ``docs/rfcs/005-mount-app.md``.
+        """
+        from .mount import hoist, normalize_prefix
+
+        self._check_not_frozen()
+        if not isinstance(sub_app, App):
+            msg = (
+                f"mount_app expected a chirp.App, got {type(sub_app).__name__}. "
+                "For plugin-style composition, use app.mount(prefix, plugin) instead."
+            )
+            raise ConfigurationError(msg)
+        if sub_app is self:
+            msg = "mount_app cannot mount an app into itself."
+            raise ConfigurationError(msg)
+        sub_app._check_not_frozen()
+        if sub_app._mutable_state.consumed_by_mount_app_prefix is not None:
+            msg = (
+                f"Sub-app was already consumed by mount_app(prefix="
+                f"{sub_app._mutable_state.consumed_by_mount_app_prefix!r}). "
+                "Create a fresh App for the new mount point."
+            )
+            raise ConfigurationError(msg)
+        normalized = normalize_prefix(prefix)
+        hoist(self._mutable_state, sub_app._mutable_state, normalized)
+
     def add_loader(self, loader: object) -> None:
         """Add a template loader (e.g., from a plugin's PackageLoader)."""
         self._registry.add_loader(loader)
@@ -564,6 +600,21 @@ class App:
         name: str | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.template_global(name)
+
+    def url_for(self, name: str, /, **params: Any) -> str:
+        """Reverse a named route to a URL path.
+
+        Path-param kwargs substitute into ``{braces}`` and are percent-encoded;
+        any leftover kwargs become a urlencoded query string.
+
+        Raises ``LookupError`` when ``name`` is not registered (the message
+        lists every known name) and ``KeyError`` when a required path param
+        is missing. Also registered as the ``url_for`` template global.
+        """
+        from chirp.app.url_for import resolve_url
+
+        self._ensure_frozen()
+        return resolve_url(self._runtime_state.routes_by_name or {}, name, **params)
 
     def on_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
         return self._registry.on_startup(func)
@@ -655,6 +706,14 @@ class App:
     def _ensure_frozen(self) -> None:
         if self._runtime_state.frozen:
             return
+        consumed_prefix = self._mutable_state.consumed_by_mount_app_prefix
+        if consumed_prefix is not None:
+            msg = (
+                f"This App was consumed by mount_app(prefix={consumed_prefix!r}) "
+                "and cannot be frozen or run independently. Serve requests through "
+                "the parent app, or remove the mount_app call to keep this app standalone."
+            )
+            raise RuntimeError(msg)
         with self._freeze_lock:
             if self._runtime_state.frozen:
                 return
@@ -764,6 +823,9 @@ class App:
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
             discovered_routes=self._mutable_state.discovered_routes,
+            page_handler_findings=list(self._mutable_state.page_handler_findings),
+            route_name_collisions=dict(self._runtime_state.route_name_collisions),
+            mount_app_skips=list(self._mutable_state.mount_app_skips),
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),
         )

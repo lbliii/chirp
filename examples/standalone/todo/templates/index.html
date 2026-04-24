@@ -39,7 +39,7 @@
   });
 </script>
 <h1>Todos</h1>
-<form hx-post="/todos" hx-target="#todo-list" hx-swap="outerHTML"
+<form hx-post="{{ url_for('todos.add') }}" hx-target="#todo-list" hx-swap="outerHTML"
       hx-validate="true" hx-disabled-elt="#add-btn" hx-indicator="#adding">
   <input type="text" name="text" placeholder="What needs to be done?" required autofocus>
   <button id="add-btn" type="submit">
@@ -54,10 +54,10 @@
   {% for todo in todos %}
   <li>
     <span class="{{ 'done' if todo.done else '' }}">{{ todo.text }}</span>
-    <button hx-post="/todos/{{ todo.id }}/toggle" hx-target="#todo-list" hx-swap="outerHTML">
+    <button hx-post="{{ url_for('todos.toggle', todo_id=todo.id) }}" hx-target="#todo-list" hx-swap="outerHTML">
       {{ "done" if todo.done else "todo" }}
     </button>
-    <button hx-delete="/todos/{{ todo.id }}" hx-target="#todo-list" hx-swap="outerHTML">
+    <button hx-delete="{{ url_for('todos.delete', todo_id=todo.id) }}" hx-target="#todo-list" hx-swap="outerHTML">
       remove
     </button>
   </li>

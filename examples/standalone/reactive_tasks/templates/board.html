@@ -54,7 +54,7 @@
     </span>
   </header>
 
-  <form hx-post="/tasks" hx-target="#task_list" hx-swap="innerHTML">
+  <form hx-post="{{ url_for('tasks.add') }}" hx-target="#task_list" hx-swap="innerHTML">
     <input type="text" name="title" placeholder="Add a task..." required autofocus>
     <button type="submit">Add</button>
   </form>
@@ -68,10 +68,10 @@
       {% for task in tasks %}
       <li>
         <span class="{{ 'done' if task.done else '' }}">{{ task.title }}</span>
-        <button hx-post="/tasks/{{ task.id }}/toggle" hx-target="#task_list" hx-swap="innerHTML">
+        <button hx-post="{{ url_for('tasks.toggle', task_id=task.id) }}" hx-target="#task_list" hx-swap="innerHTML">
           {{ "undo" if task.done else "done" }}
         </button>
-        <button hx-delete="/tasks/{{ task.id }}" hx-target="#task_list" hx-swap="innerHTML">
+        <button hx-delete="{{ url_for('tasks.delete', task_id=task.id) }}" hx-target="#task_list" hx-swap="innerHTML">
           del
         </button>
       </li>
