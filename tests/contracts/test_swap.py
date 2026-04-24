@@ -59,6 +59,50 @@ class TestSwapSafetyWarnings:
         assert len(issues) == 1
         assert issues[0].category == "swap_safety"
 
+    def test_relative_extends_chain_scopes_select_inheritance(self):
+        """Relative extends should still find inherited broad hx-select scopes."""
+        template_sources = {
+            "_layouts/base.html": (
+                '<main hx-boost="true" hx-select="#page-content">'
+                "{% block content %}{% endblock %}"
+                "</main>"
+            ),
+            "pages/edit.html": (
+                '{% extends "../_layouts/base.html" %}'
+                "{% block content %}"
+                '<form hx-post="/save"><button>Save</button></form>'
+                "{% endblock %}"
+            ),
+        }
+
+        issues = check_swap_safety(template_sources)
+
+        assert len(issues) == 1
+        assert issues[0].category == "select_inheritance"
+        assert '"#page-content" (_layouts/base.html)' in (issues[0].details or "")
+
+    def test_alias_extends_chain_scopes_select_inheritance(self):
+        """Alias extends should use the configured Kida alias map for swap checks."""
+        template_sources = {
+            "_layouts/base.html": (
+                '<main hx-boost="true" hx-select="#page-content">'
+                "{% block content %}{% endblock %}"
+                "</main>"
+            ),
+            "pages/edit.html": (
+                '{% extends "@layouts/base.html" %}'
+                "{% block content %}"
+                '<form hx-post="/save"><button>Save</button></form>'
+                "{% endblock %}"
+            ),
+        }
+
+        issues = check_swap_safety(template_sources, template_aliases={"layouts": "_layouts"})
+
+        assert len(issues) == 1
+        assert issues[0].category == "select_inheritance"
+        assert '"#page-content" (_layouts/base.html)' in (issues[0].details or "")
+
     def test_warns_for_sse_swap_without_local_target(self):
         template_sources = {
             "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',

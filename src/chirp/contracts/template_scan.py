@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -202,6 +203,34 @@ def extract_static_ids(source: str) -> set[str]:
 def extract_template_references(source: str) -> set[str]:
     """Extract static template references from Kida template tags."""
     return {m.group(1) for m in _TEMPLATE_REF_PATTERN.finditer(source)}
+
+
+def resolve_template_reference(
+    reference: str,
+    caller: str,
+    template_aliases: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve a Kida cross-template reference for contract bookkeeping.
+
+    Kida 0.8 lets templates use ``./`` and ``../`` references relative to the
+    caller, plus ``@alias/`` namespace prefixes. Chirp's contract rules compare
+    references against the root-relative names returned by loaders, so keep the
+    same canonicalization here.
+    """
+    if reference.startswith("@"):
+        alias, sep, rest = reference[1:].partition("/")
+        if sep and template_aliases and alias in template_aliases:
+            root = template_aliases[alias].strip("/")
+            return f"{root}/{rest}" if rest else root
+        return reference
+
+    from kida.exceptions import TemplateNotFoundError
+    from kida.utils.template_keys import resolve_template_name
+
+    try:
+        return resolve_template_name(reference, caller=caller)
+    except TemplateNotFoundError:
+        return reference
 
 
 def extract_fragment_island_ids(source: str) -> set[str]:

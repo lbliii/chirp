@@ -4,6 +4,7 @@ from chirp.contracts.template_scan import (
     extract_legacy_action_contracts,
     extract_targets_from_source,
     extract_template_references,
+    resolve_template_reference,
 )
 
 
@@ -168,3 +169,22 @@ class TestExtractTemplateReferences:
     def test_ignores_dynamic_variable(self):
         source = "{% include template_name %}"
         assert extract_template_references(source) == set()
+
+    def test_resolves_relative_reference(self):
+        assert resolve_template_reference("./_card.html", "pages/about.html") == "pages/_card.html"
+
+    def test_resolves_parent_relative_reference(self):
+        assert (
+            resolve_template_reference("../shared/_card.html", "pages/about/index.html")
+            == "pages/shared/_card.html"
+        )
+
+    def test_resolves_alias_reference(self):
+        assert (
+            resolve_template_reference(
+                "@components/card.html",
+                "pages/about.html",
+                {"components": "ui/components"},
+            )
+            == "ui/components/card.html"
+        )

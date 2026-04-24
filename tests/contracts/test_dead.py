@@ -1,5 +1,7 @@
 """Tests for dead template detection in check_hypermedia_surface."""
 
+from kida import Environment, FileSystemLoader
+
 from chirp import App, Page
 from chirp.config import AppConfig
 from chirp.contracts import (
@@ -50,6 +52,48 @@ class TestDeadTemplateDetection:
         )
         (tmp_path / "nav.html").write_text("<nav>links</nav>")
         app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_relative_included_template_not_dead(self, tmp_path):
+        """Kida 0.8 relative include references should be resolved before dead checks."""
+        pages = tmp_path / "pages"
+        pages.mkdir()
+        (pages / "index.html").write_text(
+            '{% block content %}{% include "./_card.html" %}{% endblock %}'
+        )
+        (pages / "_card.html").write_text("<article>card</article>")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        @contract(returns=FragmentContract("pages/index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        dead = _user_dead(result)
+        assert len(dead) == 0
+
+    def test_alias_included_template_not_dead(self, tmp_path):
+        """Kida 0.8 alias references should resolve when the custom env exposes aliases."""
+        components = tmp_path / "components"
+        components.mkdir()
+        (tmp_path / "index.html").write_text(
+            '{% block content %}{% include "@components/card.html" %}{% endblock %}'
+        )
+        (components / "card.html").write_text("<article>card</article>")
+        env = Environment(
+            loader=FileSystemLoader(str(tmp_path)),
+            template_aliases={"components": "components"},
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)), kida_env=env)
 
         @app.route("/")
         @contract(returns=FragmentContract("index.html", "content"))
