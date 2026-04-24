@@ -50,9 +50,16 @@ def save():
 from chirp import Page
 
 def get(items, app):
-    return Page("page.html", "content", items=items, app=app, page_title="Home")
+    return Page(
+        "page.html",
+        "content",
+        page_block_name="content",
+        items=items,
+        app=app,
+        page_title="Home",
+    )
 def post():
-    return Page("page.html", "content", msg="post")
+    return Page("page.html", "content", page_block_name="content", msg="post")
 """
     )
     (pages_dir / "page.html").write_text(
@@ -131,7 +138,7 @@ def test_backward_compat_app_without_new_files(tmp_path: Path) -> None:
         """
 from chirp import Page
 def get():
-    return Page("page.html", "content", msg="hello")
+    return Page("page.html", "content", page_block_name="content", msg="hello")
 """
     )
     (pages_dir / "page.html").write_text(

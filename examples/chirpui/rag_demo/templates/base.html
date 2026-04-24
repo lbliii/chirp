@@ -5,6 +5,14 @@
 {% block title %}{{ title ?? "Docs" }}{% end %}
 
 {% block head_extra %}
+<style>
+  .chirpui-app-shell,
+  .chirpui-app-shell__main,
+  .chirpui-app-shell__sidebar {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+  }
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from chirp.templating.filters import BUILTIN_FILTERS, attr, field_errors, html_attrs, qs
 
 # ── attr ──────────────────────────────────────────────────────────────────
@@ -192,11 +194,12 @@ class TestCreateEnvironmentChirpUIFallback:
             return "custom"
 
         config = AppConfig(template_dir=str(tmp_path))
-        env = create_environment(
-            config,
-            filters={"html_attrs": custom_html_attrs},
-            globals_={},
-        )
+        with pytest.warns(UserWarning, match="User filter 'html_attrs' shadows"):
+            env = create_environment(
+                config,
+                filters={"html_attrs": custom_html_attrs},
+                globals_={},
+            )
         assert env.filters["html_attrs"] is custom_html_attrs
 
 

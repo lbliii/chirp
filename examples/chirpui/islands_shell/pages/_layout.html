@@ -18,6 +18,14 @@
   <script src="/static/chirpui.js"></script>
   <link rel="stylesheet" href="/static/chirpui.css">
   <link rel="stylesheet" href="/static/chirpui-transitions.css">
+  <style>
+    .chirpui-app-shell,
+    .chirpui-app-shell__main,
+    .chirpui-app-shell__sidebar {
+      background: var(--chirpui-bg);
+      color: var(--chirpui-text);
+    }
+  </style>
 </head>
 <body>
 {% from "chirpui/app_shell.html" import app_shell %}

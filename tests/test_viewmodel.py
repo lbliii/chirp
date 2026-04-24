@@ -57,7 +57,7 @@ def viewmodel():
 from chirp import Page
 
 def get(items, from_vm):
-    return Page("page.html", "content", items=items, from_vm=from_vm)
+    return Page("page.html", "content", page_block_name="content", items=items, from_vm=from_vm)
 """
     )
     (pages_dir / "page.html").write_text(
@@ -102,7 +102,7 @@ def viewmodel(name, shared):
 from chirp import Page
 
 def get(name, msg):
-    return Page("{name}/page.html", "content", msg=msg)
+    return Page("{name}/page.html", "content", page_block_name="content", msg=msg)
 """
     )
     (child / "page.html").write_text(

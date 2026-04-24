@@ -43,7 +43,7 @@ def context():
 from chirp import Page
 
 def get(extra):
-    return Page("page.html", "content", extra=extra)
+    return Page("page.html", "content", page_block_name="content", extra=extra)
 """
     )
     (pages / "page.html").write_text(

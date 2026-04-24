@@ -147,7 +147,9 @@ class TestLayoutPageSlotContext:
             encoding="utf-8",
         )
         env = create_environment(
-            AppConfig(template_dir=tmp_path), filters={}, globals_={"shell_actions": None}
+            AppConfig(template_dir=tmp_path),
+            filters={},
+            globals_={"shell_actions": None, "csrf_token": lambda: "test-csrf"},
         )
 
         result = negotiate(Template("page.html"), kida_env=env)
@@ -169,7 +171,9 @@ class TestLayoutPageSlotContext:
             encoding="utf-8",
         )
         env = create_environment(
-            AppConfig(template_dir=tmp_path), filters={}, globals_={"shell_actions": None}
+            AppConfig(template_dir=tmp_path),
+            filters={},
+            globals_={"shell_actions": None, "csrf_token": lambda: "test-csrf"},
         )
 
         result = negotiate(Template("page.html"), kida_env=env)

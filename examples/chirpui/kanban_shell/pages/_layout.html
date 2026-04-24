@@ -6,6 +6,14 @@
 {% block title %}Kanban{% end %}
 
 {% block head_extra %}
+<style>
+  .chirpui-app-shell,
+  .chirpui-app-shell__main,
+  .chirpui-app-shell__sidebar {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+  }
+</style>
 <link rel="stylesheet" href="/static/board.css">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 {% end %}

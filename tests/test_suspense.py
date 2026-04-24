@@ -794,14 +794,18 @@ class TestDeferBlocks:
             auto_reload=False,
         )
         _register_deferred_test(env)
+        stars = _delayed_value("33")
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_stars", "nonexistent_block"),
             title="Repo",
-            stars=_delayed_value("33"),
+            stars=stars,
         )
-        with pytest.raises(ConfigurationError, match="nonexistent_block"):
-            await _collect_chunks(env, s, is_htmx=True)
+        try:
+            with pytest.raises(ConfigurationError, match="nonexistent_block"):
+                await _collect_chunks(env, s, is_htmx=True)
+        finally:
+            stars.close()
 
     async def test_unknown_defer_blocks_raises_in_debug(self):
         """In debug mode (auto_reload), unknown defer_blocks also raises ConfigurationError."""
@@ -812,14 +816,18 @@ class TestDeferBlocks:
             auto_reload=True,
         )
         _register_deferred_test(env)
+        stars = _delayed_value("33")
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_stars", "nonexistent_block"),
             title="Repo",
-            stars=_delayed_value("33"),
+            stars=stars,
         )
-        with pytest.raises(ConfigurationError, match="nonexistent_block"):
-            await _collect_chunks(env, s, is_htmx=True)
+        try:
+            with pytest.raises(ConfigurationError, match="nonexistent_block"):
+                await _collect_chunks(env, s, is_htmx=True)
+        finally:
+            stars.close()
 
     async def test_unknown_defer_blocks_suggests_close_match(self):
         """Error message includes 'did you mean' suggestion for close block names."""
@@ -830,14 +838,18 @@ class TestDeferBlocks:
             auto_reload=False,
         )
         _register_deferred_test(env)
+        stars = _delayed_value("33")
         s = Suspense(
             "shared_key.html",
             defer_blocks=("hero_star",),  # close to "hero_stars"
             title="Repo",
-            stars=_delayed_value("33"),
+            stars=stars,
         )
-        with pytest.raises(ConfigurationError, match="did you mean 'hero_stars'"):
-            await _collect_chunks(env, s, is_htmx=True)
+        try:
+            with pytest.raises(ConfigurationError, match="did you mean 'hero_stars'"):
+                await _collect_chunks(env, s, is_htmx=True)
+        finally:
+            stars.close()
 
 
 # ---------------------------------------------------------------------------

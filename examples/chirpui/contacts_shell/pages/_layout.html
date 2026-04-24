@@ -6,6 +6,21 @@
 
 {% block title %}Team Directory{% end %}
 
+{% block head_extra %}
+<style>
+  .chirpui-app-shell,
+  .chirpui-app-shell__main,
+  .chirpui-app-shell__sidebar {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+  }
+</style>
+{% end %}
+
+{% block title_oob %}
+<title id="chirpui-document-title">Team Directory</title>
+{% end %}
+
 {% block brand %}Team Directory{% end %}
 
 {% block topbar_center %}
@@ -14,9 +29,36 @@
 </span>
 {% end %}
 
+{% block breadcrumbs_oob %}
+<span class="chirpui-text-muted chirpui-font-sm">
+  Rolodex-style contacts with group tabs, search, and modal forms
+</span>
+{% end %}
+
 {% block topbar_end %}{{ theme_toggle() }}{% end %}
 
+{% block shell_actions_oob %}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+{% if shell_actions %}
+{{ shell_actions_bar(shell_actions) }}
+{% end %}
+{% end %}
+
 {% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Directory") %}
+    {{ sidebar_link(url_for("contacts"), "All contacts", icon="grid") }}
+  {% end %}
+  {% call sidebar_section("Groups") %}
+    {{ sidebar_link(url_for("contacts", group="Engineering"), "Engineering", icon="gear") }}
+    {{ sidebar_link(url_for("contacts", group="Design"), "Design", icon="pencil") }}
+    {{ sidebar_link(url_for("contacts", group="Marketing"), "Marketing", icon="bolt") }}
+    {{ sidebar_link(url_for("contacts", group="Leadership"), "Leadership", icon="star") }}
+  {% end %}
+{% end %}
+{% end %}
+
+{% block sidebar_oob %}
 {% call sidebar() %}
   {% call sidebar_section("Directory") %}
     {{ sidebar_link(url_for("contacts"), "All contacts", icon="grid") }}

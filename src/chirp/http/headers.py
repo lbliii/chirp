@@ -5,6 +5,7 @@ Stores raw byte pairs from the ASGI scope; decodes on access.
 """
 
 from collections.abc import Iterator, Mapping
+from typing import overload
 
 # Headers whose values should be masked in debug output
 SENSITIVE_HEADER_NAMES: frozenset[str] = frozenset(
@@ -67,7 +68,13 @@ class Headers(Mapping[str, str]):
         items = ", ".join(f"{k!r}: {self[k]!r}" for k in self)
         return f"Headers({{{items}}})"
 
-    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
+    @overload
+    def get(self, key: str, default: None = None) -> str | None: ...
+
+    @overload
+    def get[T](self, key: str, default: T) -> str | T: ...
+
+    def get(self, key: str, default: object = None) -> object:
         """Return the first value for *key*, or *default* if missing."""
         try:
             return self[key]

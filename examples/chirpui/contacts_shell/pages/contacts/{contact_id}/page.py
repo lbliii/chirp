@@ -1,5 +1,3 @@
-from contacts_shell_store import GROUP_BADGE_VARIANTS
-
 from chirp import Page
 
 
@@ -9,7 +7,6 @@ def get(contact) -> Page:
         "page_content",
         page_block_name="page_root",
         contact=contact,
-        group_badge_variants=GROUP_BADGE_VARIANTS,
     )
 
 

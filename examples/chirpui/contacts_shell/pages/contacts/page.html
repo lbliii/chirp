@@ -73,6 +73,7 @@
         {% if editing_contact_id == contact.id %}
         <td class="chirpui-table__td">
           <input class="chirpui-field__input" type="text" name="name"
+                 aria-label="Name for {{ contact.name }}"
                  value="{{ edit_form?.name ?? contact.name }}"
                  form="contact-edit-{{ contact.id }}">
           {% for msg in (edit_errors ?? {}).get("name", []) %}
@@ -81,11 +82,13 @@
         </td>
         <td class="chirpui-table__td">
           <input class="chirpui-field__input" type="text" name="role"
+                 aria-label="Role for {{ contact.name }}"
                  value="{{ edit_form?.role ?? contact.role }}"
                  form="contact-edit-{{ contact.id }}">
         </td>
         <td class="chirpui-table__td">
           <input class="chirpui-field__input" type="email" name="email"
+                 aria-label="Email for {{ contact.name }}"
                  value="{{ edit_form?.email ?? contact.email }}"
                  form="contact-edit-{{ contact.id }}">
           {% for msg in (edit_errors ?? {}).get("email", []) %}
@@ -94,11 +97,14 @@
         </td>
         <td class="chirpui-table__td">
           <input class="chirpui-field__input" type="tel" name="phone"
+                 aria-label="Phone for {{ contact.name }}"
                  value="{{ edit_form?.phone ?? contact.phone }}"
                  form="contact-edit-{{ contact.id }}">
         </td>
         <td class="chirpui-table__td">
-          <select class="chirpui-field__input" name="group" form="contact-edit-{{ contact.id }}">
+          <select class="chirpui-field__input" name="group"
+                  aria-label="Group for {{ contact.name }}"
+                  form="contact-edit-{{ contact.id }}">
             {% for g in groups %}
             <option value="{{ g }}" {{ "selected" if g == contact.group else "" }}>{{ g }}</option>
             {% end %}
@@ -110,6 +116,7 @@
                 action="{{ contact_url }}" method="post"
                 hx-post="{{ contact_url }}"
                 hx-target="#contacts-page" hx-swap="outerHTML">
+            {{ csrf_field() }}
             {{ hidden_field("_action", "save") }}
             {{ hidden_field("q", query) }}
             {{ hidden_field("group", active_group) }}
@@ -131,7 +138,7 @@
         <td class="chirpui-table__td chirpui-text-muted">{{ contact.role }}</td>
         <td class="chirpui-table__td">{{ contact.email }}</td>
         <td class="chirpui-table__td chirpui-text-muted">{{ contact.phone }}</td>
-        <td class="chirpui-table__td">{{ badge(contact.group, variant=group_badge_variants.get(contact.group, "muted")) }}</td>
+        <td class="chirpui-table__td">{{ badge(contact.group, color=contact.group) }}</td>
         <td class="chirpui-table__td">
           {% call button_group() %}
           {{ btn("Edit", variant="ghost", size="sm",
@@ -153,6 +160,7 @@
             hx_swap="outerHTML"
           ) %}
             {% slot form_content %}
+            {{ csrf_field() }}
             {{ hidden_field("_action", "delete") }}
             {{ hidden_field("q", query) }}
             {{ hidden_field("group", active_group) }}
@@ -182,6 +190,7 @@
       hx-target="#contacts-page" hx-swap="outerHTML"
       hx-disabled-elt="find button"
       hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
+  {{ csrf_field() }}
   {{ hidden_field("_action", "create") }}
   {{ hidden_field("q", query) }}
   {{ hidden_field("group_filter", active_group) }}

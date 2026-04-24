@@ -89,7 +89,7 @@ class TestCustomErrorHandlersWithRequest:
 
         @app.error(404)
         def not_found(request: Request):
-            if request.is_fragment:
+            if request.is_htmx:
                 return '<div id="error">Not found (fragment)</div>'
             return "Page not found"
 
@@ -197,7 +197,7 @@ class TestAsyncErrorHandlers:
 
         @app.error(404)
         async def not_found(request: Request):
-            if request.is_fragment:
+            if request.is_htmx:
                 return '<span class="err">gone</span>'
             return "not found"
 

@@ -23,7 +23,7 @@
   meta=contact.role ~ " · " ~ contact.group
 ) %}
 {% slot actions %}
-{{ badge(contact.group, variant=group_badge_variants.get(contact.group, "muted")) }}
+{{ badge(contact.group, color=contact.group) }}
 {{ btn("Edit", variant="primary", size="sm",
        href=url_for("contacts.contact_id.edit", contact_id=contact.id)) }}
 {% end %}

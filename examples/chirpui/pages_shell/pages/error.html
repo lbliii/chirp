@@ -9,6 +9,17 @@
 
 {% block brand_link %}<a href="/projects" class="chirpui-app-shell__brand">Docs Hub</a>{% end %}
 
+{% block head_extra %}
+<style>
+  .chirpui-app-shell,
+  .chirpui-app-shell__main,
+  .chirpui-app-shell__sidebar {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+  }
+</style>
+{% end %}
+
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Documentation") %}

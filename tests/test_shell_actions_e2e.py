@@ -57,7 +57,7 @@ from chirp import Page
 
 
 def handler() -> Page:
-    return Page("forum/page.html", "content")
+    return Page("forum/page.html", "content", page_block_name="content")
 """,
         encoding="utf-8",
     )
@@ -89,7 +89,7 @@ from chirp import Page
 
 
 def handler() -> Page:
-    return Page("forum/thread/page.html", "content")
+    return Page("forum/thread/page.html", "content", page_block_name="content")
 """,
         encoding="utf-8",
     )
@@ -120,7 +120,7 @@ from chirp import Page
 
 
 def handler() -> Page:
-    return Page("forum/archived/page.html", "content")
+    return Page("forum/archived/page.html", "content", page_block_name="content")
 """,
         encoding="utf-8",
     )

@@ -110,7 +110,7 @@ class TestFragmentRendering:
         @app.route("/search")
         def search(request: Request):
             results = ["alpha", "beta"]
-            if request.is_fragment:
+            if request.is_htmx:
                 return Fragment("search.html", "results_list", results=results)
             return Template("search.html", results=results)
 
