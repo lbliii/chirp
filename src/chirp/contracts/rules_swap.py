@@ -1,6 +1,7 @@
 """Swap safety checks for broad inherited hx-target scopes."""
 
 import re
+from collections.abc import Mapping
 
 from .patterns import METHOD_POST as _FORM_POST_PATTERN
 from .patterns import SSE_CONNECT_TAG_BASIC as _SSE_CONNECT_TAG_PATTERN
@@ -8,6 +9,7 @@ from .template_scan import (
     extract_ids_with_disinherit,
     extract_mutation_target_ids,
     extract_static_ids,
+    resolve_template_reference,
 )
 from .types import ContractIssue, Severity
 
@@ -78,7 +80,11 @@ _BROAD_CONTAINER_TAGS = frozenset(
 )
 
 
-def _extends_ancestors(start: str, template_sources: dict[str, str]) -> set[str]:
+def _extends_ancestors(
+    start: str,
+    template_sources: dict[str, str],
+    template_aliases: Mapping[str, str] | None = None,
+) -> set[str]:
     """Return all templates reachable upward from *start* via {% extends %} chains."""
     ancestors: set[str] = set()
     queue = [start]
@@ -87,7 +93,10 @@ def _extends_ancestors(start: str, template_sources: dict[str, str]) -> set[str]
         if name in ancestors or name not in template_sources:
             continue
         ancestors.add(name)
-        queue.extend(m.group(1) for m in _EXTENDS_PATTERN.finditer(template_sources[name]))
+        queue.extend(
+            resolve_template_reference(m.group(1), name, template_aliases)
+            for m in _EXTENDS_PATTERN.finditer(template_sources[name])
+        )
     return ancestors
 
 
@@ -270,6 +279,7 @@ def check_swap_safety(
     *,
     all_ids: set[str] | None = None,
     all_ids_with_disinherit: set[str] | None = None,
+    template_aliases: Mapping[str, str] | None = None,
 ) -> list[ContractIssue]:
     """Warn when mutating swaps may inherit broad container targets or selects."""
     issues: list[ContractIssue] = []
@@ -286,7 +296,7 @@ def check_swap_safety(
                 continue
             # Walk this template's extends chain; collect only the broad selects from
             # layouts that are actually in its inheritance hierarchy.
-            ancestors = _extends_ancestors(template_name, template_sources)
+            ancestors = _extends_ancestors(template_name, template_sources, template_aliases)
             relevant_selects: list[str] = []
             for ancestor, selects in broad_selects_map.items():
                 if ancestor in ancestors:
@@ -331,7 +341,7 @@ def check_swap_safety(
         for template_name, source in template_sources.items():
             if template_name.startswith(("chirp/", "chirpui/")):
                 continue
-            ancestors = _extends_ancestors(template_name, template_sources)
+            ancestors = _extends_ancestors(template_name, template_sources, template_aliases)
             if not any(a in broad_selects_map for a in ancestors):
                 continue
             for match in _MUTATING_TAG_PATTERN.finditer(source):

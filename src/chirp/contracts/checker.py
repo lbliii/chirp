@@ -77,6 +77,7 @@ from .template_scan import (
     extract_template_references,
     extract_wizard_form_ids,
     load_template_sources,
+    resolve_template_reference,
 )
 from .types import CheckResult, ContractIssue, Severity
 
@@ -276,6 +277,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         if not template_sources:
             template_sources = load_template_sources(kida_env)
         result.templates_scanned = len(template_sources)
+        template_aliases = getattr(kida_env, "template_aliases", None)
         referenced_paths: set[str] = set()
         static_routes, parametric_routes = build_route_index(route_paths)
 
@@ -339,7 +341,10 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             all_ids.update(extract_fragment_island_ids(source))
             all_ids.update(extract_wizard_form_ids(source))
             ids_with_disinherit.update(extract_ids_with_disinherit(source))
-            referenced_templates_from_sources.update(extract_template_references(source))
+            referenced_templates_from_sources.update(
+                resolve_template_reference(ref, template_name, template_aliases)
+                for ref in extract_template_references(source)
+            )
             for href_url in extract_href_references(source):
                 href_match = find_matching_route(href_url, static_routes, parametric_routes)
                 if href_match is not None:
@@ -375,6 +380,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 template_sources,
                 all_ids=static_ids,
                 all_ids_with_disinherit=ids_with_disinherit,
+                template_aliases=template_aliases,
             )
         )
         result.issues.extend(check_view_transition_safety(template_sources))
