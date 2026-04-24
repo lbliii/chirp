@@ -145,6 +145,20 @@ class TestChirpNewShell:
         compile(app_source, "app.py", "exec")
         compile(context_source, "_context.py", "exec")
 
+    def test_plain_shell_keeps_transition_off_broad_main(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The plain shell scaffold avoids broad View Transitions around live content."""
+        from chirp.cli import _new
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(_new, "_has_chirpui", lambda: False)
+        main(["new", "myapp", "--shell"])
+
+        layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text()
+        main_tag = next(line for line in layout.splitlines() if 'id="main"' in line)
+        assert "transition:true" not in main_tag
+
 
 class TestChirpNewGuards:
     def test_existing_directory_exits_one(

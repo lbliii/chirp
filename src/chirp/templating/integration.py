@@ -164,6 +164,11 @@ def create_environment(
         strict_undefined=config.strict_undefined,
         static_context=dict(config.static_context) if config.static_context else None,
     )
+    # Chirp owns CSRF via CSRFMiddleware.template_globals. Kida ships a generic
+    # csrf_token() helper that warns and returns an empty hidden input when no
+    # render-context token is set; remove it so ``csrf_token is defined`` means
+    # Chirp CSRF middleware is actually present.
+    env.globals.pop("csrf_token", None)
 
     # Register the ``deferred`` template test for Suspense sentinel checks.
     # Usage: ``{% if x is deferred %}`` — preferred over ``{% if x is not none %}``.

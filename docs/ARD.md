@@ -361,7 +361,7 @@ sequenceDiagram
     participant Kida
 
     Browser->>Chirp: GET /search?q=foo (HX-Request: true)
-    Note over Chirp: match route, request.is_fragment = True
+    Note over Chirp: match route, request.is_htmx = True
     Chirp->>Chirp: handler returns Fragment("search.html", "results_list")
     Chirp->>Kida: render block only
     Kida-->>Chirp: block HTML

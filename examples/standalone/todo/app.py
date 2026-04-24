@@ -7,8 +7,7 @@ Demonstrates two killer features together:
 Add todos, restart the server, and they're still there.
 
 Run:
-    pip install chirp[data]
-    python app.py
+    uv run python examples/standalone/todo/app.py
 """
 
 import os

@@ -26,7 +26,7 @@ SHELL_LAYOUT_HTML = """\
     <a href="/" style="font-weight:600">{{ current_path or "App" }}</a>
 </header>
 <main id="main" hx-boost="true" hx-target="#main"
-      hx-swap="innerHTML transition:true" hx-select="#page-content">
+      hx-swap="innerHTML" hx-select="#page-content">
     <div id="page-content">
         {% block content %}{% end %}
     </div>

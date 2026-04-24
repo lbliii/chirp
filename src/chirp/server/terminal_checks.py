@@ -170,6 +170,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "selector_syntax": "HTMX",
     "swap_safety": "HTMX",
     "select_inheritance": "HTMX",
+    "view_transition_scope": "HTMX",
     "vary": "HTMX",
     "command": "HTMX",
     "commandfor": "HTMX",

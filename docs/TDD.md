@@ -261,8 +261,8 @@ class Request:
     # -- Computed properties --
 
     @property
-    def is_fragment(self) -> bool:
-        """True if this is an htmx fragment request (HX-Request header)."""
+    def is_htmx(self) -> bool:
+        """True if this is an htmx request (HX-Request header)."""
         return self.headers.get("hx-request") == "true"
 
     @property

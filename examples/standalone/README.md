@@ -26,6 +26,8 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `streaming`: `Stream()` with concurrent context loading
 - `ollama`: local LLM chat without ChirpUI
 - `kanban`: auth, CSRF, OOB, and live updates without app shell
+- `docs_site`: DocsPlugin, autodoc, search, and tool docs without ChirpUI
+- `freeze_site`: markdown content and static output with layout composition
 - `production`: security stack
 
 ## Inventory
@@ -38,7 +40,9 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `custom_middleware`
 - `dashboard`
 - `dashboard_live`
+- `docs_site`
 - `form_get`
+- `freeze_site`
 - `hackernews`
 - `hello`
 - `islands`
@@ -65,3 +69,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 ## Validation Expectation
 
 If a standalone example requires a ChirpUI shell or `delegation=True`, treat that as a bug in the standalone support lane.
+
+Keep standalone and ChirpUI examples separate on purpose: standalone examples
+make the raw return-type and htmx contracts easy to reason about, while ChirpUI
+examples prove the same contracts inside app-shell and component composition.

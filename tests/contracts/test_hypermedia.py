@@ -376,6 +376,30 @@ class TestCheckHypermediaSurface:
         assert len(swap_warnings) == 1
         assert "Action()" in swap_warnings[0].message
 
+    def test_view_transition_scope_warning_surfaces(self, tmp_path):
+        """Broad live-update containers should not use View Transitions."""
+        write_layout_page(
+            tmp_path,
+            '<body hx-boost="true" hx-target="#main" hx-swap="innerHTML transition:true">'
+            '{% block sse_scope %}<div sse-connect="/stream"></div>{% endblock %}'
+            '<main id="main">{% block content %}{% endblock %}</main>'
+            "</body>",
+            "{% block content %}<h1>Live</h1>{% endblock %}",
+            page_name="index.html",
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream", referenced=True)
+        async def stream():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        transition_warnings = [
+            issue for issue in result.warnings if issue.category == "view_transition_scope"
+        ]
+        assert len(transition_warnings) == 1
+        assert "transition:true" in transition_warnings[0].message
+
 
 class TestAccessibilityFullPipeline:
     """Integration test: deliberately broken app triggers all a11y_* categories."""
