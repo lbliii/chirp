@@ -6,7 +6,7 @@
 {% set errors = errors ?? {} %}
 {% from "components/_field.html" import field %}
 <form id="task-{{ task.id }}" class="card edit-mode"
-      hx-put="/tasks/{{ task.id }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
+      hx-put="{{ url_for('tasks.save', task_id=task.id) }}" hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
 
   {{ field("title", "Title", value=task.title) }}
 
@@ -38,7 +38,7 @@
   <div class="edit-actions">
     <button type="submit" class="btn-save">Save</button>
     <button type="button" class="btn-cancel"
-            hx-get="/" hx-target="#board" hx-swap="outerHTML">Cancel</button>
+            hx-get="{{ url_for('index') }}" hx-target="#board" hx-swap="outerHTML">Cancel</button>
   </div>
 </form>
 {% end %}

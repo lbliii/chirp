@@ -28,7 +28,7 @@
 {% call surface(variant="elevated") %}
 {% call stack(gap="lg") %}
 <form class="chirpui-form"
-      hx-post="/ask"
+      hx-post="{{ url_for('ask') }}"
       hx-target="#results"
       hx-swap="innerHTML"
       aria-label="Compare models">

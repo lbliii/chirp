@@ -153,3 +153,47 @@ Same pattern as shell_context.py and actions.py (already fixed). Python 3 requir
 
 
 **All items complete.** All 405 example tests pass. Chirp check reports "All clear" for dashboard_live and pages_shell.
+
+---
+
+## Tracked upstream
+
+### Kida: relative `{% include %}` paths
+
+**Status:** Upstream feature request (not in this repo).
+
+**Problem:** Kida's `{% include "path" %}` always resolves paths relative to the
+`template_dir` root. File moves inside a `pages/` tree break every include in
+the moved subtree because each included path is written out in full:
+`{% include "components/_card.html" %}`, `{% include "_partials/header.html" %}`,
+etc.
+
+The user-feedback scenario: a large IA refactor in a Chirp app (dashboard →
+console) where every directory rename required a manual sweep of every
+`{% include %}` inside the affected subtree. A **relative** include syntax
+(`{% include "./_card.html" %}` or `{% include "../shared/_header.html" %}`)
+that resolves relative to the current template's directory would make file
+moves local and composable — the way Python imports and ES-module imports
+already work.
+
+**Proposal to file upstream** (`kida-templates`):
+
+> Add relative include resolution. When the first path segment is `.` or `..`,
+> resolve the include relative to the current template's on-disk directory
+> (rather than the loader's root). Leave absolute paths (no leading `./`)
+> behaving exactly as today for backwards compatibility. This makes
+> component-style layouts (`page.html` + co-located `_partials/…`) movable
+> without a template-path sweep.
+>
+> Reference use case: Chirp's filesystem-routing convention (`pages/<route>/page.html`)
+> where each route directory often has its own co-located component partials.
+> See chirp issue `<link>` for the user-feedback motivation.
+
+**Tracking:**
+
+- Upstream issue: *to be filed — paste link here once created on `kida-templates` repo*
+- Chirp-side workaround: document that includes should use **template_dir-absolute**
+  paths (the current Kida behavior) and that refactors will require an in-tree
+  sweep until the upstream feature lands.
+- Related work in this repo: the epic tracked in
+  `docs/plan-dx-feedback-console-migration.md` — Sprint 5 Task 5.2 (this entry).

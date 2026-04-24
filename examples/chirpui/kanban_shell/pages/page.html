@@ -33,7 +33,7 @@
       <label>
         <input type="checkbox" name="priority" value="{{ p }}"
                {{ "checked" if p in active_filters.priority else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ p | capitalize }}
       </label>
@@ -48,7 +48,7 @@
       <label>
         <input type="checkbox" name="assignee" value="{{ person }}"
                {{ "checked" if person in active_filters.assignee else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ person }}
       </label>
@@ -63,7 +63,7 @@
       <label>
         <input type="checkbox" name="tag" value="{{ tag }}"
                {{ "checked" if tag in active_filters.tag else "" }}
-               hx-get="/filter" hx-target="#board" hx-swap="outerHTML"
+               hx-get="{{ url_for('filter') }}" hx-target="#board" hx-swap="outerHTML"
                hx-include=".sidebar input">
         {{ tag }}
       </label>
@@ -94,7 +94,7 @@
       {% block add_form %}
       {% set form_errors = errors ?? none %}
       {% call modal("new-task-modal", title="New Task") %}
-      <form id="add-form" class="chirpui-stack chirpui-stack--sm" hx-post="/tasks" hx-swap="none"
+      <form id="add-form" class="chirpui-stack chirpui-stack--sm" hx-post="{{ url_for('tasks.add') }}" hx-swap="none"
             hx-indicator="#board-spinner" hx-disabled-elt="find button"
             hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
         {{ field("title", "Task", placeholder="What needs doing?") }}

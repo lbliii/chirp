@@ -213,13 +213,13 @@ app.add_middleware(CSRFMiddleware(CSRFConfig()))
 # ---------------------------------------------------------------------------
 
 
-@app.route("/logout", methods=["POST"])
+@app.route("/logout", methods=["POST"], name="logout")
 def do_logout():
     logout()
-    return Redirect("/login")
+    return Redirect(app.url_for("login"))
 
 
-@app.route("/tasks", methods=["POST"])
+@app.route("/tasks", methods=["POST"], name="tasks.add")
 @login_required
 async def add_task_route(request: Request):
     result = await form_or_errors(
@@ -256,7 +256,7 @@ async def add_task_route(request: Request):
     )
 
 
-@app.route("/tasks/{task_id}/edit")
+@app.route("/tasks/{task_id}/edit", name="tasks.edit")
 @login_required
 def edit_task_route(task_id: int):
     task = get_task(task_id)
@@ -265,7 +265,7 @@ def edit_task_route(task_id: int):
     return Fragment("task_form.html", "edit_form", task=task)
 
 
-@app.route("/tasks/{task_id}", methods=["PUT"])
+@app.route("/tasks/{task_id}", methods=["PUT"], name="tasks.save")
 @login_required
 async def save_task_route(request: Request, task_id: int):
     task = get_task(task_id)
@@ -314,7 +314,7 @@ async def save_task_route(request: Request, task_id: int):
     )
 
 
-@app.route("/tasks/{task_id}/move/{new_status}", methods=["POST"])
+@app.route("/tasks/{task_id}/move/{new_status}", methods=["POST"], name="tasks.move")
 @login_required
 def move_task_route(task_id: int, new_status: str):
     from store import COLUMN_IDS
@@ -342,7 +342,7 @@ def move_task_route(task_id: int, new_status: str):
     )
 
 
-@app.route("/tasks/{task_id}", methods=["DELETE"])
+@app.route("/tasks/{task_id}", methods=["DELETE"], name="tasks.delete")
 @login_required
 def delete_task_route(task_id: int):
     task = get_task(task_id)
@@ -369,7 +369,7 @@ def delete_task_route(task_id: int):
     )
 
 
-@app.route("/filter")
+@app.route("/filter", name="filter")
 @login_required
 def filter_board_route(request: Request):
     priority_filter = request.query.get_list("priority")

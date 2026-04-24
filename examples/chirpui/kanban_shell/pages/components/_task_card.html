@@ -14,7 +14,7 @@
     </span>
   </div>
   <button class="kanban-card__title"
-          hx-get="/tasks/{{ task.id }}/edit"
+          hx-get="{{ url_for('tasks.edit', task_id=task.id) }}"
           hx-target="#task-{{ task.id }}" hx-swap="outerHTML">
     {{ task.title }}
   </button>
@@ -33,29 +33,29 @@
     <div class="kanban-card__actions">
       {% match task.status %}
         {% case "backlog" %}
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/in_progress"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='in_progress') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to In Progress">&rarr;</button>
         {% case "in_progress" %}
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/backlog"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='backlog') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Backlog">&larr;</button>
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/review"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='review') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Review">&rarr;</button>
         {% case "review" %}
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/in_progress"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='in_progress') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move back">&larr;</button>
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/done"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='done') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move to Done">&rarr;</button>
         {% case "done" %}
-          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="/tasks/{{ task.id }}/move/review"
+          <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm" hx-post="{{ url_for('tasks.move', task_id=task.id, new_status='review') }}"
                   hx-swap="none" hx-sync="closest .kanban-column:replace"
                   hx-disabled-elt="this" title="Move back">&larr;</button>
       {% end %}
-      <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm kanban-card__delete" hx-delete="/tasks/{{ task.id }}"
+      <button class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm kanban-card__delete" hx-delete="{{ url_for('tasks.delete', task_id=task.id) }}"
               hx-swap="none" hx-confirm="Delete &quot;{{ task.title }}&quot;?"
               title="Delete task">&times;</button>
     </div>

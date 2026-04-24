@@ -231,7 +231,7 @@
     <h1>Ollama Chat</h1>
     {% if models %}
     <select class="model-select" name="model" id="model-selector"
-            hx-post="/model" hx-target="#model-confirm" hx-swap="innerHTML">
+            hx-post="{{ url_for('model.set') }}" hx-target="#model-confirm" hx-swap="innerHTML">
       {% for m in models %}
       <option value="{{ m }}" {% if m == model %}selected{% end %}>{{ m }}</option>
       {% endfor %}
@@ -266,7 +266,7 @@
         {% end %}
       </div>
 
-      <form class="input-bar" hx-post="/chat" hx-target="#messages" hx-swap="beforeend"
+      <form class="input-bar" hx-post="{{ url_for('chat.post') }}" hx-target="#messages" hx-swap="beforeend"
             hx-indicator="#thinking"
             hx-on::after-request="this.reset(); document.getElementById('welcome')?.remove()">
         <input type="text" name="message" placeholder="Ask me anything..." required autocomplete="off" autofocus>
@@ -277,7 +277,7 @@
         </label>
         <button type="submit">Send</button>
         <button type="button" class="clear-btn"
-                hx-post="/clear" hx-target="#messages" hx-swap="innerHTML">Clear</button>
+                hx-post="{{ url_for('chat.clear') }}" hx-target="#messages" hx-swap="innerHTML">Clear</button>
       </form>
       <div class="spinner htmx-indicator" id="thinking">Thinking</div>
     </div>
@@ -299,7 +299,7 @@
   {% block chat_pending %}
   {% if (user_content ?? none) %}
   <div class="msg msg-user">{{ user_content }}</div>
-  <div class="spinner" hx-get="/chat/complete" hx-trigger="load" hx-target="this" hx-swap="outerHTML">Thinking</div>
+  <div class="spinner" hx-get="{{ url_for('chat.complete') }}" hx-trigger="load" hx-target="this" hx-swap="outerHTML">Thinking</div>
   {% end %}
   {% end %}
 

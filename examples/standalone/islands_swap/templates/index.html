@@ -51,7 +51,7 @@
 
   <div id="widget-area">
     <p style="color:#94a3b8;">No widget loaded yet.</p>
-    <button hx-get="/widget"
+    <button hx-get="{{ url_for('widget') }}"
             hx-target="#widget-area"
             hx-swap="innerHTML"
             hx-trigger="click">

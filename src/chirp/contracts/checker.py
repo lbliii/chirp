@@ -42,8 +42,10 @@ from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_layout import check_layout_chains
 from .rules_live_blocks import check_live_blocks
+from .rules_mount_app import check_mount_app_merge
 from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
+from .rules_page_handlers import check_page_handlers
 from .rules_page_shell import check_page_shell_contracts
 from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
 from .rules_route_contract import (
@@ -55,6 +57,7 @@ from .rules_route_contract import (
     check_section_tab_hrefs,
     check_shell_mode_blocks,
 )
+from .rules_route_names import check_route_names
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,
@@ -229,6 +232,9 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
         discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
+        page_handler_findings=list(getattr(app._mutable_state, "page_handler_findings", [])),
+        route_name_collisions=dict(getattr(app._runtime_state, "route_name_collisions", {})),
+        mount_app_skips=list(getattr(app._mutable_state, "mount_app_skips", [])),
         template_sources=ts,
         extras=dict(getattr(app._mutable_state, "contract_check_data", {})),
     )
@@ -253,6 +259,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
     route_paths = collect_route_paths(router)
     result.routes_checked = len(route_paths)
+
+    # Page-handler findings don't require a kida env — emit them unconditionally
+    # so action-only / API-only apps still get the startup signal.
+    result.issues.extend(check_page_handlers(snapshot.page_handler_findings))
+    result.issues.extend(check_route_names(snapshot.route_name_collisions))
+    result.issues.extend(check_mount_app_merge(snapshot.mount_app_skips))
 
     referenced_templates_from_routes, referenced_route_paths = _route_prepass(
         router, kida_env, result

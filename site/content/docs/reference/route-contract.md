@@ -108,12 +108,24 @@ Beyond route-level checks, `app.check()` also validates hypermedia surface contr
 
 | Check | Severity | What it catches |
 |---|---|---|
+| `page_handlers` | ERROR / WARNING | `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler` fallback). Handler-shaped typos (`def handle`, `def GET`, `def index`) emit WARNING; an entirely missing handler emits ERROR — the file would register no routes and requests 404/500 at runtime. |
+| `route_names` | ERROR | Two routes at *different* paths claim the same name — `app.url_for(name)` would ambiguously resolve. Method variants of the same URL (e.g. GET from `page.py` + POST from `_actions.py`) are *not* flagged. Fix by renaming one of the pages or setting a module-level `name = "…"` override. |
+| `mount_app_merge` | INFO | `app.mount_app(prefix, sub_app)` dropped a sub-app template global, filter, provider, error handler, or severity override because the parent had already registered one. Parent-wins is intentional; promote via `override_contract_severity("mount_app_merge", Severity.WARNING)` if you want CI to flag them. |
 | `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |
 | `reactive_cycle` | WARNING | Derivation graph contains a cycle (`index.derive()` forms a loop) |
 | `oob_target` | WARNING | `hx-swap-oob` element references an `id` not found in any template |
 | `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |
 
 These checks run automatically as part of `chirp check myapp:app`. Reactive checks are only active when the app uses `ReactiveBus` and `DependencyIndex`.
+
+Any category can be tuned with `app.override_contract_severity()` — for example,
+demote the missing-handler ERROR during a migration:
+
+```python
+from chirp.contracts.types import Severity
+
+app.override_contract_severity("page_handlers", Severity.WARNING)
+```
 
 ## Introspection
 

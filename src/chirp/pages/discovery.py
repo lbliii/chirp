@@ -28,6 +28,7 @@ from chirp.pages.types import (
     LayoutInfo,
     LayoutPreset,
     OutletSwapMode,
+    PageHandlerFinding,
     PageRoute,
     RouteKind,
     RouteMeta,
@@ -37,6 +38,28 @@ _logger = logging.getLogger("chirp.pages")
 
 # HTTP method names recognised as handler functions
 _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
+
+
+def default_route_name(url_path: str) -> str:
+    """Derive a dotted default route name from a URL path.
+
+    Parameter braces are stripped and the param name is kept bare:
+    ``/contacts/{contact_id}`` → ``"contacts.contact_id"``.
+    Typed params drop the type: ``/{id:int}`` → ``"id"``.
+    The root path ``/`` becomes ``"index"`` so every route has a non-empty name.
+    """
+    segments = [s for s in url_path.strip("/").split("/") if s]
+    if not segments:
+        return "index"
+    cleaned: list[str] = []
+    for seg in segments:
+        if seg.startswith("{") and seg.endswith("}"):
+            inner = seg[1:-1]
+            cleaned.append(inner.split(":", 1)[0])
+        else:
+            cleaned.append(seg)
+    return ".".join(cleaned)
+
 
 # Names that look like handler attempts but aren't recognised
 _HANDLER_LIKE = frozenset(
@@ -92,11 +115,28 @@ def discover_pages(
         List of discovered :class:`PageRoute` objects ready for
         registration with the chirp app.
     """
+    routes, _ = discover_pages_with_findings(pages_dir, layout_presets=layout_presets)
+    return routes
+
+
+def discover_pages_with_findings(
+    pages_dir: str | Path,
+    *,
+    layout_presets: Mapping[str, LayoutPreset] | None = None,
+) -> tuple[list[PageRoute], list[PageHandlerFinding]]:
+    """Walk a pages directory and discover routes plus handler-discovery findings.
+
+    Same as :func:`discover_pages` but also returns a list of
+    :class:`PageHandlerFinding` objects describing ``page.py`` files
+    that have no recognised handler or define handler-shaped typos.
+    Findings are consumed by the ``page_handlers`` contract check.
+    """
     root = Path(pages_dir).resolve()
     if not root.is_dir():
         raise FileNotFoundError(f"Pages directory not found: {root}")
 
     routes: list[PageRoute] = []
+    findings: list[PageHandlerFinding] = []
     _walk_directory(
         root,
         root,
@@ -105,9 +145,10 @@ def discover_pages(
         context_providers=[],
         depth=0,
         routes=routes,
+        findings=findings,
         layout_presets=layout_presets or {},
     )
-    return routes
+    return routes, findings
 
 
 def _walk_directory(
@@ -119,6 +160,7 @@ def _walk_directory(
     context_providers: list[ContextProvider],
     depth: int,
     routes: list[PageRoute],
+    findings: list[PageHandlerFinding],
     layout_presets: Mapping[str, LayoutPreset],
 ) -> None:
     """Recursively walk a directory, discovering routes and layouts.
@@ -205,6 +247,7 @@ def _walk_directory(
             layout_chain=layout_chain,
             context_providers=provider_tuple,
             routes=routes,
+            findings=findings,
             route_meta=route_meta,
             meta_provider=meta_provider,
             actions=route_actions,
@@ -228,6 +271,7 @@ def _walk_directory(
             context_providers=current_providers,
             depth=depth + 1,
             routes=routes,
+            findings=findings,
             layout_presets=layout_presets,
         )
 
@@ -497,6 +541,7 @@ def _process_route_file(
     layout_chain: LayoutChain,
     context_providers: tuple[ContextProvider, ...],
     routes: list[PageRoute],
+    findings: list[PageHandlerFinding],
     route_meta: RouteMeta | None = None,
     meta_provider: Any = None,
     actions: tuple[ActionInfo, ...] = (),
@@ -568,10 +613,39 @@ def _process_route_file(
                     attr_name,
                     ", ".join(sorted(_HTTP_METHODS)),
                 )
+                findings.append(
+                    PageHandlerFinding(
+                        kind="typo",
+                        file=str(file),
+                        url_path=url_path,
+                        function_name=attr_name,
+                    )
+                )
+
+    # No handler found at all — record a missing finding so app.check() can fail fast
+    # instead of the request hitting a nonexistent handler at runtime.
+    if not found_handlers:
+        findings.append(
+            PageHandlerFinding(
+                kind="missing",
+                file=str(file),
+                url_path=url_path,
+            )
+        )
 
     # Check for sibling template (same stem, .html extension).
     # Convention: page.py renders page.html in the same directory.
     template_name = str(sibling_html.relative_to(root)) if sibling_html.is_file() else None
+
+    # Derive route name: dotted path segments, with an optional module-level
+    # ``name = "..."`` override. Default flows so ``url_for`` can reverse every
+    # page-discovered route without per-file opt-in.
+    module_name_attr = getattr(module, "name", None)
+    route_name = (
+        module_name_attr
+        if isinstance(module_name_attr, str) and module_name_attr
+        else default_route_name(url_path)
+    )
 
     # Register each handler
     for method, func in found_handlers.items():
@@ -582,7 +656,7 @@ def _process_route_file(
             layout_chain=layout_chain,
             context_providers=context_providers,
             template_name=template_name,
-            name=None,
+            name=route_name,
             meta=route_meta,
             meta_provider=meta_provider,
             actions=actions,

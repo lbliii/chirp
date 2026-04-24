@@ -7,7 +7,7 @@
   </div>
   <p style="margin-top:1rem;">
     <button class="secondary"
-            hx-get="/widget"
+            hx-get="{{ url_for('widget') }}"
             hx-target="#widget-area"
             hx-swap="innerHTML"
             hx-trigger="click">

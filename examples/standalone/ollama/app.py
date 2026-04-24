@@ -388,7 +388,7 @@ async def index():
     )
 
 
-@app.route("/model", methods=["POST"])
+@app.route("/model", methods=["POST"], name="model.set")
 async def set_model(request: Request):
     """Switch the active model."""
     form = await request.form()
@@ -398,7 +398,7 @@ async def set_model(request: Request):
     return Fragment("chat.html", "model_updated", model=name)
 
 
-@app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST"], name="chat.post")
 async def post_chat(request: Request):
     """Handle a chat message.
 
@@ -426,7 +426,7 @@ async def post_chat(request: Request):
     return Fragment("chat.html", "chat_pending", user_content=user_message)
 
 
-@app.route("/chat/complete")
+@app.route("/chat/complete", name="chat.complete")
 async def chat_complete():
     """Run the full agent loop and return the assistant response.
 
@@ -553,7 +553,7 @@ def feed():
     return EventStream(generate())
 
 
-@app.route("/clear", methods=["POST"])
+@app.route("/clear", methods=["POST"], name="chat.clear")
 def clear():
     """Reset conversation history."""
     _clear_history()
