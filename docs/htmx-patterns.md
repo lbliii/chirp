@@ -198,7 +198,7 @@ async def add_contact(request: Request, form: ContactForm):
     _add_contact(form.name, form.email)
     contacts = _get_contacts()
 
-    if request.is_fragment:
+    if request.is_htmx:
         return OOB(
             Fragment("contacts.html", "table", contacts=contacts),
             Fragment("contacts.html", "count", target="count", count=len(contacts)),

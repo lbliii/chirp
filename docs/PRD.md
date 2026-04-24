@@ -130,7 +130,7 @@ and thread-based interactions.
 | ID | Requirement | Acceptance Criteria |
 |----|-------------|---------------------|
 | F-015 | Fragment return type | `return Fragment("page.html", "block_name", **ctx)` |
-| F-016 | Fragment request detection | `request.is_fragment` detects HX-Request header |
+| F-016 | Htmx request detection | `request.is_htmx` detects HX-Request header |
 | F-017 | Block-level rendering in kida | Render a named block without the full template |
 
 ### 4.4 Middleware (P1 -- Should Have) -- IMPLEMENTED
@@ -254,7 +254,7 @@ and thread-based interactions.
 ### 7.2 v0.2.0 (Phase 2-3)
 
 - Template and Fragment return types work
-- `request.is_fragment` detects htmx requests
+- `request.is_htmx` detects htmx requests
 - Block-level rendering produces correct HTML
 - A simple htmx search example works end-to-end
 
@@ -282,7 +282,7 @@ and thread-based interactions.
 | ~~Kida lacks streaming rendering~~ | ~~Blocks Phase 5~~ | ~~Medium~~ | **RESOLVED**: Kida `render_stream()` implemented via dual-mode compiler; `StreamingResponse` + chunked ASGI in chirp |
 | ~~Streaming HTML mid-stream errors~~ | ~~Poor UX on failure~~ | ~~Medium~~ | **RESOLVED**: Mid-stream errors emit HTML comment and gracefully close stream; debug mode includes traceback |
 | anyio compatibility issues on 3.14t | Blocks free-threading | Low | anyio already tests on 3.14; monitor upstream |
-| htmx changes fragment detection pattern | Breaks `is_fragment` | Low | Abstract detection behind a method; easy to update |
+| htmx changes request detection pattern | Breaks `is_htmx` | Low | Abstract detection behind a method; easy to update |
 | Scope creep toward "full framework" | Dilutes focus | High | Non-goals list is enforced; review each addition |
 
 ---

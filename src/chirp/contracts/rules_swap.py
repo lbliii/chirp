@@ -20,6 +20,14 @@ _TAG_WITH_SELECT_PATTERN = re.compile(
     r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bhx-select\s*=\s*[\"'](?P<select>[^\"']+)[\"'][^>]*)>",
     re.IGNORECASE,
 )
+_TAG_WITH_SWAP_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bhx-swap\s*=\s*[\"'](?P<swap>[^\"']+)[\"'][^>]*)>",
+    re.IGNORECASE,
+)
+_TAG_WITH_ID_PATTERN = re.compile(
+    r"<(?P<tag>\w+)\b(?P<attrs>[^>]*\bid\s*=\s*[\"'](?P<id>[^\"']+)[\"'][^>]*)>",
+    re.IGNORECASE,
+)
 _HX_SELECT_COVERAGE_PATTERN = re.compile(
     r'hx-select\s*=|hx-disinherit\s*=\s*["\'][^"\']*\bhx-select\b',
     re.IGNORECASE,
@@ -40,6 +48,13 @@ _SSE_SWAP_TAG_PATTERN = re.compile(
 _HX_BOOST_TRUE = re.compile(r'hx-boost\s*=\s*["\']true["\']', re.IGNORECASE)
 _HX_BOOST_FALSE = re.compile(r'hx-boost\s*=\s*["\']false["\']', re.IGNORECASE)
 _HX_SWAP_NONE = re.compile(r'hx-swap\s*=\s*["\']none["\']', re.IGNORECASE)
+_TRANSITION_TRUE = re.compile(r"(?:^|\s)transition:true(?:\s|$)", re.IGNORECASE)
+_LIVE_UPDATE_MARKERS = re.compile(r"\b(?:hx-swap-oob|sse-connect)\b", re.IGNORECASE)
+_INLINE_VIEW_TRANSITION_NAME = re.compile(r"view-transition-name\s*:", re.IGNORECASE)
+_STYLE_ID_VIEW_TRANSITION = re.compile(
+    r"#(?P<id>[A-Za-z_][\w:-]*)\s*\{[^}]*\bview-transition-name\s*:",
+    re.IGNORECASE | re.DOTALL,
+)
 
 _BROAD_CONTAINER_TAGS = frozenset(
     {
@@ -132,6 +147,122 @@ def collect_broad_targets(template_sources: dict[str, str]) -> set[str]:
             if tag_name in {"body", "main"} or has_boost:
                 broad_targets.add(f"{target} ({template_name})")
     return broad_targets
+
+
+def _has_live_updates(template_sources: dict[str, str]) -> bool:
+    """Return True if any template uses OOB or SSE live-update markers."""
+    return any(_LIVE_UPDATE_MARKERS.search(source) for source in template_sources.values())
+
+
+def _collect_broad_target_ids(template_sources: dict[str, str]) -> set[str]:
+    """Collect static broad hx-target IDs without template-name decoration."""
+    target_ids: set[str] = set()
+    for source in template_sources.values():
+        for match in _TAG_WITH_TARGET_PATTERN.finditer(source):
+            tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
+            target = match.group("target")
+            if "{{" in target or "{%" in target:
+                continue
+            attrs_lower = match.group("attrs").lower()
+            has_boost = bool(_HX_BOOST_TRUE.search(attrs_lower))
+            if tag_name in {"body", "main"} or has_boost:
+                target_ids.add(target.removeprefix("#"))
+    return target_ids
+
+
+def check_view_transition_safety(template_sources: dict[str, str]) -> list[ContractIssue]:
+    """Warn when View Transitions are scoped to broad live-update containers.
+
+    OOB swaps and SSE fragments update descendants after the page has loaded.
+    If a broad content container owns ``transition:true`` or a CSS
+    ``view-transition-name``, those child updates can animate the entire content
+    region and make the UI appear to disappear.
+    """
+    if not _has_live_updates(template_sources):
+        return []
+
+    issues: list[ContractIssue] = []
+    broad_target_ids = _collect_broad_target_ids(template_sources)
+
+    for template_name, source in template_sources.items():
+        if template_name.startswith(("chirp/", "chirpui/")):
+            continue
+        for match in _TAG_WITH_SWAP_PATTERN.finditer(source):
+            tag_name = match.group("tag").lower()
+            if tag_name not in _BROAD_CONTAINER_TAGS:
+                continue
+            attrs = match.group("attrs")
+            attrs_lower = attrs.lower()
+            has_boost = bool(_HX_BOOST_TRUE.search(attrs_lower))
+            is_broad = tag_name in {"body", "main"} or has_boost or "hx-target=" in attrs_lower
+            if not is_broad or not _TRANSITION_TRUE.search(match.group("swap")):
+                continue
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="view_transition_scope",
+                    message=(
+                        "Broad htmx container uses transition:true while the app also "
+                        "uses OOB/SSE updates. Child live updates can trigger a "
+                        "full-region View Transition and make content flicker or "
+                        "disappear. Remove transition:true from the container and put "
+                        "it on navigation links instead."
+                    ),
+                    template=template_name,
+                )
+            )
+            break
+
+    if not broad_target_ids:
+        return issues
+
+    for template_name, source in template_sources.items():
+        if template_name.startswith(("chirp/", "chirpui/")):
+            continue
+        for match in _STYLE_ID_VIEW_TRANSITION.finditer(source):
+            target_id = match.group("id")
+            if target_id not in broad_target_ids:
+                continue
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="view_transition_scope",
+                    message=(
+                        f"#{target_id} has view-transition-name while the app also "
+                        "uses OOB/SSE updates. Scope view-transition-name to an "
+                        "element that changes only during navigation, not the broad "
+                        "swap container that contains live-update targets."
+                    ),
+                    template=template_name,
+                )
+            )
+            break
+
+        for match in _TAG_WITH_ID_PATTERN.finditer(source):
+            target_id = match.group("id")
+            if target_id not in broad_target_ids:
+                continue
+            attrs = match.group("attrs")
+            if not _INLINE_VIEW_TRANSITION_NAME.search(attrs):
+                continue
+            issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="view_transition_scope",
+                    message=(
+                        f"#{target_id} has inline view-transition-name while the app "
+                        "also uses OOB/SSE updates. Scope the transition to "
+                        "navigation-only content instead of the broad live-update "
+                        "container."
+                    ),
+                    template=template_name,
+                )
+            )
+            break
+
+    return issues
 
 
 def check_swap_safety(

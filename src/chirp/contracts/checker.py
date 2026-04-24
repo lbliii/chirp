@@ -63,7 +63,7 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
-from .rules_swap import check_swap_safety, collect_broad_targets
+from .rules_swap import check_swap_safety, check_view_transition_safety, collect_broad_targets
 from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
 from .template_scan import (
@@ -377,6 +377,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 all_ids_with_disinherit=ids_with_disinherit,
             )
         )
+        result.issues.extend(check_view_transition_safety(template_sources))
         result.issues.extend(check_sse_self_swap(template_sources))
         broad_targets = collect_broad_targets(template_sources)
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))

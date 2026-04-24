@@ -190,7 +190,7 @@ Register custom error handlers for specific status codes:
 ```python
 @app.error(404)
 def not_found(request, exc):
-    if request.is_fragment:
+    if request.is_htmx:
         return '<div class="error">Page not found</div>'
     return "Page not found"
 

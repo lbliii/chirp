@@ -4,7 +4,7 @@ A minimal app with hand-written guides and auto-generated API reference,
 all served from a single DocsPlugin mount.
 
 Run:
-    python app.py
+    uv run python examples/standalone/docs_site/app.py
 
 Browse:
     http://localhost:8000/docs/          — docs index with search
@@ -18,10 +18,16 @@ MCP:
       -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_docs","arguments":{"query":"contacts"}}}'
 """
 
+from pathlib import Path
+
 from chirp import App, AppConfig, Request
 from chirp.docs import DocsPlugin
 
-app = App(AppConfig(template_dir="templates"))
+BASE_DIR = Path(__file__).parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+CONTENT_DIR = BASE_DIR / "content"
+
+app = App(AppConfig(template_dir=TEMPLATES_DIR))
 
 # ── Routes ──────────────────────────────────────────────────────────────
 
@@ -147,7 +153,7 @@ def create_note(contact_id: int, text: str, priority: str = "normal") -> dict:
 app.mount(
     "/docs",
     DocsPlugin(
-        content_dir="content",
+        content_dir=CONTENT_DIR,
         title="Docs Site",
         autodoc=True,
         tools=True,

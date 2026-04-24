@@ -165,7 +165,7 @@ pytest examples/chirpui/pages_shell/
 | `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | | | | | |
 | `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | | | | | |
 | `TemplateStream` | | | | | | x | | | | | | | | | | | | | | | | | | | | | | |
-| `request.is_fragment` | | x | | | | | x | | | | | | | | | | | | | | | | | | | | | |
+| `request.is_htmx` | | x | | | | | x | | | | | | | | | | | | | | | | | | | | | |
 | `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x | | | | |
 | `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | x | | x | | x | | | | | | |
 | `request.json()` | | | | | | | | | | | | | | | | | | | | | | | | x | | | | |
@@ -208,6 +208,9 @@ pytest examples/chirpui/pages_shell/
 | `Redirect` | | | | | | | | | | x | x | | x | x | | x | | x | | x | | | | | | | | |
 | `validate()` + built-in rules | | | | | | | | | | | | | x | | x | x | x | | | | | x | | | | | | |
 | `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | x | | x | | x | | | | | x | | | | | | | | |
+
+See `docs/hypermedia-footguns.md` for the running matrix of example patterns
+that Chirp now protects with return types, helpers, and startup contracts.
 | `UploadFile` / multipart | | | | | | | | | | | | | | | x | | | | | | | | | | | | | |
 | `form.files` / `file.save()` | | | | | | | | | | | | | | | x | | | | | | | | | | | | | |
 | `form.get_list()` (multi-value) | | | | | | | | | | | | | | | | x | | | | | | | | | | | | |

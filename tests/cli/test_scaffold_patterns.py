@@ -15,7 +15,9 @@ import pytest
 from chirp.cli.templates import (
     PYPROJECT_TOML,
     SHELL_ITEMS_PAGE_PY,
+    SHELL_LAYOUT_HTML,
     SHELL_PAGE_PY,
+    SSE_INDEX_HTML,
     V2_APP_CHIRPUI_PY,
     V2_APP_PY,
     V2_DASHBOARD_CHIRPUI_HTML,
@@ -184,3 +186,17 @@ class TestOOBShowcase:
         # Mutation target (hx-target=#refresh-counter) must use safe_region
         # so htmx doesn't inherit shell-level hx-select/hx-target/hx-swap.
         assert 'safe_region("refresh-counter")' in V2_DASHBOARD_CHIRPUI_HTML
+
+
+class TestLiveUpdateScaffolds:
+    """Live-update scaffolds keep listeners and transitions scoped safely."""
+
+    def test_sse_template_uses_persistent_sse_scope_block(self) -> None:
+        assert "{% block sse_scope %}" in SSE_INDEX_HTML
+        assert '{{ sse_scope("/stream", swap="stream_block") }}' in SSE_INDEX_HTML
+        content = SSE_INDEX_HTML.split("{% block content %}", 1)[1].split("{% end %}", 1)[0]
+        assert "sse-connect" not in content
+
+    def test_plain_shell_does_not_transition_broad_main(self) -> None:
+        main_tag = next(line for line in SHELL_LAYOUT_HTML.splitlines() if 'id="main"' in line)
+        assert "transition:true" not in main_tag

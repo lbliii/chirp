@@ -270,6 +270,14 @@ def _should_wrap_in_layouts(
     return not getattr(request, "is_narrow_fragment", False)
 
 
+def _close_unstarted_awaitables(awaitables: dict[str, Awaitable[Any]]) -> None:
+    """Close coroutine awaitables that validation rejected before scheduling."""
+    for awaitable in awaitables.values():
+        close = getattr(awaitable, "close", None)
+        if callable(close):
+            close()
+
+
 async def render_suspense(
     env: Environment,
     suspense: Suspense,
@@ -339,6 +347,7 @@ async def render_suspense(
             from chirp.contracts.utils import closest_match
             from chirp.errors import ConfigurationError
 
+            _close_unstarted_awaitables(pending)
             hints = []
             for name in unknown:
                 suggestion = closest_match(name, available, max_dist=3)

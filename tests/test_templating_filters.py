@@ -202,6 +202,15 @@ class TestCreateEnvironmentChirpUIFallback:
             )
         assert env.filters["html_attrs"] is custom_html_attrs
 
+    def test_env_does_not_expose_generic_csrf_token_helper(self, tmp_path: Path) -> None:
+        """Chirp owns csrf_token via CSRFMiddleware, not Kida's generic helper."""
+        from chirp.config import AppConfig
+        from chirp.templating.integration import create_environment
+
+        config = AppConfig(template_dir=str(tmp_path))
+        env = create_environment(config, filters={}, globals_={})
+        assert "csrf_token" not in env.globals
+
 
 # ── create_environment extra_loaders ──────────────────────────────────────
 

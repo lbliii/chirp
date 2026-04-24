@@ -1,7 +1,7 @@
 """Tests for swap safety — broad hx-target + mutating requests."""
 
 from chirp.contracts import Severity
-from chirp.contracts.rules_swap import check_swap_safety
+from chirp.contracts.rules_swap import check_swap_safety, check_view_transition_safety
 
 
 class TestSwapSafetyWarnings:
@@ -114,4 +114,88 @@ class TestSwapSafetyWarnings:
             ),
         }
         issues = check_swap_safety(template_sources)
+        assert issues == []
+
+
+class TestViewTransitionSafetyWarnings:
+    """Warnings for broad View Transition scopes with OOB/SSE updates."""
+
+    def test_warns_for_transition_true_on_broad_live_container(self):
+        template_sources = {
+            "_layout.html": (
+                '<main id="main" hx-boost="true" hx-target="#main" '
+                'hx-swap="innerHTML transition:true">'
+                "{% block content %}{% endblock %}"
+                "</main>"
+            ),
+            "events.html": (
+                '<div hx-ext="sse" sse-connect="/events" hx-disinherit="hx-target hx-swap"></div>'
+            ),
+        }
+
+        issues = check_view_transition_safety(template_sources)
+
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "view_transition_scope"
+        assert "Remove transition:true from the container" in issues[0].message
+
+    def test_warns_for_view_transition_name_on_broad_live_container(self):
+        template_sources = {
+            "_layout.html": (
+                '<main id="main" hx-boost="true" hx-target="#main">'
+                "{% block content %}{% endblock %}"
+                "</main>"
+                "<style>#main { view-transition-name: page-content; }</style>"
+            ),
+            "events.html": '<div id="status" hx-swap-oob="outerHTML">ok</div>',
+        }
+
+        issues = check_view_transition_safety(template_sources)
+
+        assert len(issues) == 1
+        assert issues[0].category == "view_transition_scope"
+        assert "#main has view-transition-name" in issues[0].message
+
+    def test_warns_for_inline_view_transition_name_on_broad_live_container(self):
+        template_sources = {
+            "_layout.html": (
+                '<main id="main" style="view-transition-name: page-content" '
+                'hx-boost="true" hx-target="#main">'
+                "{% block content %}{% endblock %}"
+                "</main>"
+            ),
+            "events.html": '<div id="status" hx-swap-oob="outerHTML">ok</div>',
+        }
+
+        issues = check_view_transition_safety(template_sources)
+
+        assert len(issues) == 1
+        assert issues[0].category == "view_transition_scope"
+        assert "inline view-transition-name" in issues[0].message
+
+    def test_allows_transition_true_without_live_updates(self):
+        template_sources = {
+            "_layout.html": (
+                '<main id="main" hx-boost="true" hx-target="#main" '
+                'hx-swap="innerHTML transition:true"></main>'
+            ),
+        }
+
+        issues = check_view_transition_safety(template_sources)
+
+        assert issues == []
+
+    def test_allows_view_transition_name_on_navigation_only_region(self):
+        template_sources = {
+            "_layout.html": (
+                '<main id="main" hx-boost="true" hx-target="#main">'
+                "<style>.story-detail { view-transition-name: page-content; }</style>"
+                "</main>"
+            ),
+            "events.html": '<div id="status" hx-swap-oob="outerHTML">ok</div>',
+        }
+
+        issues = check_view_transition_safety(template_sources)
+
         assert issues == []

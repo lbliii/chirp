@@ -12,13 +12,14 @@ Exercises:
 - Relative URL rewriting for truly static output
 
 Run live:
-    python app.py
+    uv run python examples/standalone/freeze_site/app.py
 
 Freeze:
-    PYTHONPATH=. chirp freeze app dist/
+    cd examples/standalone/freeze_site
+    uv run chirp freeze app:app dist/
 
 Preview frozen:
-    open dist/docs/index.html
+    python -m http.server --directory dist 8001
 """
 
 from pathlib import Path

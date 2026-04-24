@@ -67,11 +67,12 @@ SSE_INDEX_HTML = """\
 {% block title %}{{ greeting }}{% end %}
 {% block content %}
 <h1>{{ greeting }}</h1>
-<div hx-ext="sse" sse-connect="/stream" hx-disinherit="hx-target hx-swap">
-  <div sse-swap="stream_block" hx-target="this">
-    <span>Waiting for stream...</span>
-  </div>
-</div>
+<p>Waiting for stream...</p>
+{% end %}
+
+{% block sse_scope %}
+{% from "chirp/sse.html" import sse_scope %}
+{{ sse_scope("/stream", swap="stream_block") }}
 {% end %}
 
 {% block stream_block %}
