@@ -44,7 +44,7 @@ def context(id: str, shared: str) -> dict:
 from chirp import Page
 
 def get(doc_id: str, shared: str) -> Page:
-    return Page("doc/{id}/page.html", "content", doc_id=doc_id, shared=shared)
+    return Page("doc/{id}/page.html", "content", page_block_name="content", doc_id=doc_id, shared=shared)
 """
     )
 

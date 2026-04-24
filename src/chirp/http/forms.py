@@ -16,7 +16,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, cast, get_type_hints
+from typing import Any, cast, get_type_hints, overload
 
 from chirp.templating.returns import ValidationError
 
@@ -102,7 +102,13 @@ class FormData(Mapping[str, str]):
         items = ", ".join(f"{k!r}: {self[k]!r}" for k in self)
         return f"FormData({{{items}}})"
 
-    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
+    @overload
+    def get(self, key: str, default: None = None) -> str | None: ...
+
+    @overload
+    def get[T](self, key: str, default: T) -> str | T: ...
+
+    def get(self, key: str, default: object = None) -> object:
         """Return the first value for *key*, or *default* if missing."""
         values = self._data.get(key)
         if values:

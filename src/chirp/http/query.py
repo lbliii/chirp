@@ -4,6 +4,7 @@ Implements ``Mapping[str, str]`` and the ``MultiValueMapping`` protocol.
 """
 
 from collections.abc import Iterator, Mapping
+from typing import overload
 from urllib.parse import parse_qs
 
 
@@ -44,7 +45,13 @@ class QueryParams(Mapping[str, str]):
         items = ", ".join(f"{k!r}: {self[k]!r}" for k in self)
         return f"QueryParams({{{items}}})"
 
-    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
+    @overload
+    def get(self, key: str, default: None = None) -> str | None: ...
+
+    @overload
+    def get[T](self, key: str, default: T) -> str | T: ...
+
+    def get(self, key: str, default: object = None) -> object:
         """Return the first value for *key*, or *default* if missing."""
         values = self._data.get(key)
         if values:

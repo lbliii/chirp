@@ -135,11 +135,13 @@ class TestRequestProperties:
         scope = _make_scope(headers=[(b"hx-request", b"true")])
         req = Request.from_asgi(scope, _make_receive())
 
-        assert req.is_fragment is True
+        with pytest.warns(DeprecationWarning, match="request.is_fragment is ambiguous"):
+            assert req.is_fragment is True
 
     def test_is_fragment_false(self) -> None:
         req = Request.from_asgi(_make_scope(), _make_receive())
-        assert req.is_fragment is False
+        with pytest.warns(DeprecationWarning, match="request.is_fragment is ambiguous"):
+            assert req.is_fragment is False
 
     def test_is_boosted_true(self) -> None:
         scope = _make_scope(headers=[(b"hx-boosted", b"true")])

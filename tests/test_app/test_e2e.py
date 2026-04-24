@@ -209,7 +209,7 @@ class TestAppE2E:
 
         @app.route("/search")
         def search(request: Request):
-            if request.is_fragment:
+            if request.is_htmx:
                 return "fragment only"
             return "full page"
 
@@ -251,7 +251,7 @@ class TestAppE2E:
         def page(request: Request):
             if request.is_history_restore:
                 return "full restore"
-            if request.is_fragment:
+            if request.is_htmx:
                 return "fragment"
             return "full page"
 

@@ -8,11 +8,11 @@ from chirp.validation import max_length, required
 
 GROUPS = ("Engineering", "Design", "Marketing", "Leadership")
 
-GROUP_BADGE_VARIANTS: dict[str, str] = {
-    "Engineering": "info",
-    "Design": "success",
-    "Marketing": "warning",
-    "Leadership": "primary",
+GROUP_COLORS: dict[str, str] = {
+    "Engineering": "#38bdf8",
+    "Design": "#a78bfa",
+    "Marketing": "#fbbf24",
+    "Leadership": "#f472b6",
 }
 
 _SEED_CONTACTS = (
@@ -171,7 +171,6 @@ def page_context(
         "total_count": len(all_contacts),
         "groups": GROUPS,
         "group_options": [{"value": g, "label": g} for g in GROUPS],
-        "group_badge_variants": GROUP_BADGE_VARIANTS,
         "group_counts": group_counts(),
         "add_form": add_form or {},
         "add_errors": add_errors or {},

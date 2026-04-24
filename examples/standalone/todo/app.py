@@ -65,7 +65,7 @@ app.add_middleware(CSRFMiddleware())
 async def index(request: Request):
     """Full page or fragment depending on htmx request."""
     todos = await ALL_TODOS.fetch(app.db)
-    if request.is_fragment:
+    if request.is_htmx:
         return Fragment("index.html", "todo_list", todos=todos)
     return Template("index.html", todos=todos)
 

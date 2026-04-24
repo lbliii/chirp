@@ -284,7 +284,7 @@ class TestUpgradeResult:
     """upgrade_result converts Page to LayoutPage, passes others through."""
 
     def test_page_to_layout_page(self) -> None:
-        result = Page("page.html", "content", title="Home")
+        result = Page("page.html", "content", page_block_name="content", title="Home")
         cascade_ctx = {"nav": "main"}
 
         upgraded = upgrade_result(result, cascade_ctx, layout_chain=None, context_providers=())
@@ -316,7 +316,7 @@ class TestUpgradeResult:
 
     def test_page_context_overrides_cascade(self) -> None:
         """Page's own context takes precedence over cascade context."""
-        result = Page("page.html", "content", title="Page Title")
+        result = Page("page.html", "content", page_block_name="content", title="Page Title")
         cascade_ctx = {"title": "Cascade Title", "extra": "value"}
 
         upgraded = upgrade_result(result, cascade_ctx, layout_chain=None, context_providers=())
@@ -329,6 +329,7 @@ class TestUpgradeResult:
         result = Page(
             "page.html",
             "content",
+            page_block_name="content",
             shell_actions=ShellActions(
                 primary=ShellActionZone(
                     items=(ShellAction(id="reply", label="Reply", href="/reply"),),
@@ -352,7 +353,7 @@ class TestUpgradeResult:
         assert [item.id for item in shell_actions.primary.items] == ["reply"]
 
     def test_layout_chain_passed_through(self) -> None:
-        result = Page("page.html", "content")
+        result = Page("page.html", "content", page_block_name="content")
         sentinel = object()  # stand-in for LayoutChain
 
         upgraded = upgrade_result(
@@ -403,7 +404,7 @@ class TestUpgradeResult:
         assert result is None
 
     def test_oob_main_page_is_upgraded(self) -> None:
-        result = OOB(Page("page.html", "content", title="Home"))
+        result = OOB(Page("page.html", "content", page_block_name="content", title="Home"))
 
         upgraded = upgrade_result(result, {"nav": "main"}, layout_chain=None, context_providers=())
 

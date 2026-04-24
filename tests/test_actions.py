@@ -72,9 +72,9 @@ def save():
 from chirp import Page
 
 def get():
-    return Page("page.html", "content", msg="get")
+    return Page("page.html", "content", page_block_name="content", msg="get")
 def post():
-    return Page("page.html", "content", msg="post")
+    return Page("page.html", "content", page_block_name="content", msg="post")
 """
     )
     (pages_dir / "page.html").write_text(
@@ -122,9 +122,9 @@ def test_action(name: str, shared: str):
 from chirp import Page
 
 def get(name: str):
-    return Page("{name}/page.html", "content", msg="get")
+    return Page("{name}/page.html", "content", page_block_name="content", msg="get")
 def post(name: str):
-    return Page("{name}/page.html", "content", msg="post")
+    return Page("{name}/page.html", "content", page_block_name="content", msg="post")
 """
     )
     (child / "page.html").write_text(
@@ -163,9 +163,9 @@ def custom():
 from chirp import Page
 
 def get():
-    return Page("page.html", "content", msg="get")
+    return Page("page.html", "content", page_block_name="content", msg="get")
 def post():
-    return Page("page.html", "content", msg="from-post")
+    return Page("page.html", "content", page_block_name="content", msg="from-post")
 """
     )
     (pages_dir / "page.html").write_text(

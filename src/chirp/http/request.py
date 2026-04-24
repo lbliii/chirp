@@ -6,7 +6,7 @@ what it is: received data that doesn't change.
 
 from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 from urllib.parse import unquote, urlparse
 
 from chirp._internal.asgi import Receive, Scope
@@ -171,7 +171,13 @@ class _LazyQueryParams(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._ensure())
 
-    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
+    @overload
+    def get(self, key: str, default: None = None) -> str | None: ...
+
+    @overload
+    def get[T](self, key: str, default: T) -> str | T: ...
+
+    def get(self, key: str, default: object = None) -> object:
         return self._ensure().get(key, default)
 
     def get_list(self, key: str) -> list[str]:
@@ -212,7 +218,13 @@ class _LazyCookies(Mapping[str, str]):
     def __len__(self) -> int:
         return len(self._ensure())
 
-    def get(self, key: str, default: str | None = None) -> str | None:  # type: ignore[override]
+    @overload
+    def get(self, key: str, default: None = None) -> str | None: ...
+
+    @overload
+    def get[T](self, key: str, default: T) -> str | T: ...
+
+    def get(self, key: str, default: object = None) -> object:
         return self._ensure().get(key, default)
 
 
