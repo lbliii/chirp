@@ -8,6 +8,7 @@ Creates a new chirp project directory with starter files.  Three modes:
 """
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -71,6 +72,14 @@ def _write_scaffold_extras(project_dir: Path, name: str) -> None:
     mig.mkdir(exist_ok=True)
     (mig / ".gitkeep").write_text("", encoding="utf-8")
     (mig / "README.md").write_text(MIGRATIONS_README, encoding="utf-8")
+
+
+def _copy_chirpui_app_theme(static_dir: Path) -> None:
+    """Seed the app-owned ChirpUI theme layer from chirp-ui's starter."""
+    import chirp_ui
+
+    source = Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css"
+    shutil.copyfile(source, static_dir / "app-theme.css")
 
 
 def create_project(args: argparse.Namespace) -> None:
@@ -156,6 +165,8 @@ def _create_v2(project_dir: Path, name: str) -> None:
     (static_dir / "style.css").write_text(
         V2_STYLE_CHIRPUI_CSS if use_chirpui else V2_STYLE_CSS,
     )
+    if use_chirpui:
+        _copy_chirpui_app_theme(static_dir)
 
     (tests_dir / "conftest.py").write_text(V2_CONFTEST_PY)
     (tests_dir / "test_app.py").write_text(V2_TEST_APP_PY.format(name=name))
@@ -190,6 +201,8 @@ def _create_shell(project_dir: Path, name: str) -> None:
 
     _write_scaffold_extras(project_dir, name)
     (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+    if use_chirpui:
+        _copy_chirpui_app_theme(static_dir)
 
 
 def _create_minimal(project_dir: Path, name: str) -> None:

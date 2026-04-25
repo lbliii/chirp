@@ -50,6 +50,13 @@ async def main():
         r = await client.get("/")
         out["steps"]["index"] = {"status": r.status, "has_welcome": "Welcome" in r.text or "Dashboard" in r.text}
 
+        # 1b. ChirpUI scaffold owns a copied theme token layer.
+        r = await client.get("/static/app-theme.css")
+        out["steps"]["app_theme"] = {
+            "status": r.status,
+            "has_system_theme": '[data-theme="system"]' in r.text,
+        }
+
         # 2. GET /login — grab CSRF + session cookie
         r = await client.get("/login")
         csrf = _extract_csrf(r.text)
@@ -132,6 +139,11 @@ def test_v2_scaffold_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mo
 
     # 1. index
     assert steps["index"]["status"] == 200
+    if mode == "v2":
+        assert steps["app_theme"]["status"] == 200
+        assert steps["app_theme"]["has_system_theme"] is True
+    else:
+        assert steps["app_theme"]["status"] == 404
 
     # 2. login GET
     assert steps["login_get"]["status"] == 200

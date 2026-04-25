@@ -36,6 +36,23 @@ SHELL_LAYOUT_HTML = """\
 
 SHELL_LAYOUT_CHIRPUI_HTML = """\
 {% extends "chirpui/app_shell_layout.html" %}
+{% block head %}
+{% if csrf_token is defined %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% end %}
+<link rel="stylesheet" href="/static/chirpui.css">
+<link rel="stylesheet" href="/static/app-theme.css">
+<link rel="stylesheet" href="/static/chirpui-transitions.css">
+<script>
+(function(){
+  var t = localStorage.getItem("chirpui-theme") || "system";
+  var s = localStorage.getItem("chirpui-style") || "default";
+  document.documentElement.setAttribute("data-theme", t);
+  document.documentElement.setAttribute("data-style", s);
+})();
+</script>
+{% block head_extra %}{% end %}
+{% end %}
 {% block brand %}{{ current_path or "App" }}{% end %}
 {% block sidebar %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}

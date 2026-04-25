@@ -230,6 +230,8 @@ V2_LAYOUT_CHIRPUI_HTML = """\
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}App{% endblock %}</title>
     <link rel="stylesheet" href="/static/chirpui.css">
+    <link rel="stylesheet" href="/static/app-theme.css">
+    <link rel="stylesheet" href="/static/chirpui-transitions.css">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>

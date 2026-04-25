@@ -1,0 +1,1 @@
+**`chirp new` Chirp-UI theme scaffold** — new Chirp-UI projects now copy `themes/app-theme-starter.css` into `static/app-theme.css` and load it after `chirpui.css` so apps own their theme tokens from the first render.

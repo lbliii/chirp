@@ -15,6 +15,7 @@ import pytest
 from chirp.cli.templates import (
     PYPROJECT_TOML,
     SHELL_ITEMS_PAGE_PY,
+    SHELL_LAYOUT_CHIRPUI_HTML,
     SHELL_LAYOUT_HTML,
     SHELL_PAGE_PY,
     SSE_INDEX_HTML,
@@ -26,6 +27,7 @@ from chirp.cli.templates import (
     V2_INDEX_CHIRPUI_HTML,
     V2_INDEX_HTML,
     V2_INDEX_PAGE_PY,
+    V2_LAYOUT_CHIRPUI_HTML,
     V2_LOGIN_CHIRPUI_HTML,
     V2_LOGIN_HTML,
     V2_LOGIN_PAGE_PY,
@@ -132,6 +134,30 @@ class TestAppImports:
             assert line.strip() != "import chirp_ui", (
                 "V2_APP_CHIRPUI_PY must not contain bare 'import chirp_ui'"
             )
+
+
+class TestChirpUIThemeScaffold:
+    """ChirpUI scaffolds load the app-owned theme between base CSS and transitions."""
+
+    def test_v2_chirpui_stylesheet_order(self) -> None:
+        assert (
+            '<link rel="stylesheet" href="/static/chirpui.css">\n'
+            '    <link rel="stylesheet" href="/static/app-theme.css">\n'
+            '    <link rel="stylesheet" href="/static/chirpui-transitions.css">'
+        ) in V2_APP_CHIRPUI_PY + V2_LAYOUT_CHIRPUI_HTML
+
+    def test_shell_chirpui_stylesheet_order(self) -> None:
+        assert (
+            '<link rel="stylesheet" href="/static/chirpui.css">\n'
+            '<link rel="stylesheet" href="/static/app-theme.css">\n'
+            '<link rel="stylesheet" href="/static/chirpui-transitions.css">'
+        ) in SHELL_LAYOUT_CHIRPUI_HTML
+
+    def test_shell_chirpui_preserves_prepaint_theme_script(self) -> None:
+        assert 'localStorage.getItem("chirpui-theme") || "system"' in SHELL_LAYOUT_CHIRPUI_HTML
+        assert 'document.documentElement.setAttribute("data-theme", t)' in (
+            SHELL_LAYOUT_CHIRPUI_HTML
+        )
 
 
 class TestVersionFloors:

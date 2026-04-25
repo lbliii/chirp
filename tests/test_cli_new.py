@@ -40,6 +40,36 @@ class TestChirpNewDefaultV2:
         assert (project / "tests" / "conftest.py").is_file()
         assert (project / "tests" / "test_app.py").is_file()
 
+    def test_chirpui_v2_copies_app_theme_starter(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chirp_ui = pytest.importorskip("chirp_ui", reason="chirp-ui not installed")
+
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp"])
+
+        project = tmp_path / "myapp"
+        starter = (Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css").read_text(
+            encoding="utf-8"
+        )
+        app_theme = (project / "static" / "app-theme.css").read_text(encoding="utf-8")
+        assert app_theme == starter
+
+    def test_chirpui_v2_layout_loads_app_theme_after_chirpui_css(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pytest.importorskip("chirp_ui", reason="chirp-ui not installed")
+
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp"])
+
+        layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text(encoding="utf-8")
+        assert (
+            '<link rel="stylesheet" href="/static/chirpui.css">\n'
+            '    <link rel="stylesheet" href="/static/app-theme.css">\n'
+            '    <link rel="stylesheet" href="/static/chirpui-transitions.css">'
+        ) in layout
+
     def test_generated_v2_app_contains_security_defaults(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -133,6 +163,36 @@ class TestChirpNewShell:
         assert (project / "pages" / "items" / "page.html").is_file()
         assert (project / "pyproject.toml").is_file()
         assert (project / "static" / "theme.css").is_file()
+
+    def test_chirpui_shell_copies_app_theme_starter(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chirp_ui = pytest.importorskip("chirp_ui", reason="chirp-ui not installed")
+
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--shell"])
+
+        project = tmp_path / "myapp"
+        starter = (Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css").read_text(
+            encoding="utf-8"
+        )
+        app_theme = (project / "static" / "app-theme.css").read_text(encoding="utf-8")
+        assert app_theme == starter
+
+    def test_chirpui_shell_layout_loads_app_theme_after_chirpui_css(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pytest.importorskip("chirp_ui", reason="chirp-ui not installed")
+
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--shell"])
+
+        layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text(encoding="utf-8")
+        assert (
+            '<link rel="stylesheet" href="/static/chirpui.css">\n'
+            '<link rel="stylesheet" href="/static/app-theme.css">\n'
+            '<link rel="stylesheet" href="/static/chirpui-transitions.css">'
+        ) in layout
 
     def test_shell_app_is_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
