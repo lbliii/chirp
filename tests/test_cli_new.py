@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from chirp.cli import main
+from chirp.cli.templates import APP_THEME_CSS_FALLBACK
 
 
 def test_templates_shim_import() -> None:
@@ -49,8 +50,11 @@ class TestChirpNewDefaultV2:
         main(["new", "myapp"])
 
         project = tmp_path / "myapp"
-        starter = (Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css").read_text(
-            encoding="utf-8"
+        starter_path = Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css"
+        starter = (
+            starter_path.read_text(encoding="utf-8")
+            if starter_path.is_file()
+            else APP_THEME_CSS_FALLBACK
         )
         app_theme = (project / "static" / "app-theme.css").read_text(encoding="utf-8")
         assert app_theme == starter
@@ -173,8 +177,11 @@ class TestChirpNewShell:
         main(["new", "myapp", "--shell"])
 
         project = tmp_path / "myapp"
-        starter = (Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css").read_text(
-            encoding="utf-8"
+        starter_path = Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css"
+        starter = (
+            starter_path.read_text(encoding="utf-8")
+            if starter_path.is_file()
+            else APP_THEME_CSS_FALLBACK
         )
         app_theme = (project / "static" / "app-theme.css").read_text(encoding="utf-8")
         assert app_theme == starter

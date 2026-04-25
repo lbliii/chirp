@@ -8,11 +8,11 @@ Creates a new chirp project directory with starter files.  Three modes:
 """
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
 from chirp.cli.templates import (
+    APP_THEME_CSS_FALLBACK,
     MIGRATIONS_README,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
@@ -79,7 +79,8 @@ def _copy_chirpui_app_theme(static_dir: Path) -> None:
     import chirp_ui
 
     source = Path(chirp_ui.static_path()) / "themes" / "app-theme-starter.css"
-    shutil.copyfile(source, static_dir / "app-theme.css")
+    content = source.read_text(encoding="utf-8") if source.is_file() else APP_THEME_CSS_FALLBACK
+    (static_dir / "app-theme.css").write_text(content, encoding="utf-8")
 
 
 def create_project(args: argparse.Namespace) -> None:

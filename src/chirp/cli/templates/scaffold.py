@@ -28,3 +28,37 @@ Place SQL migration scripts here when using ``chirp.data`` or another migration 
 
 THEME_CSS_STUB = """/* Optional ChirpUI design-token overrides — see chirp-ui docs/TOKENS.md */
 """
+
+APP_THEME_CSS_FALLBACK = """/* App-owned ChirpUI theme tokens.
+ *
+ * Generated because this installed chirp-ui package does not include
+ * themes/app-theme-starter.css yet. Load after /static/chirpui.css.
+ * Keep app brand values here; Chirp and Chirp-UI own only the token names.
+ */
+
+@layer app.theme {
+    :root {
+        color-scheme: light dark;
+    }
+
+    [data-theme="light"] {
+        color-scheme: light;
+    }
+
+    [data-theme="dark"] {
+        color-scheme: dark;
+    }
+
+    @media (prefers-color-scheme: light) {
+        [data-theme="system"] {
+            color-scheme: light;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        [data-theme="system"] {
+            color-scheme: dark;
+        }
+    }
+}
+"""

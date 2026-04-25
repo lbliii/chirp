@@ -8,6 +8,7 @@ from chirp.cli.templates.minimal import (
     MINIMAL_INDEX_HTML,
 )
 from chirp.cli.templates.scaffold import (
+    APP_THEME_CSS_FALLBACK,
     MIGRATIONS_README,
     PYPROJECT_TOML,
     THEME_CSS_STUB,
@@ -51,6 +52,7 @@ from chirp.cli.templates.v2 import (
 )
 
 __all__ = [
+    "APP_THEME_CSS_FALLBACK",
     "MIGRATIONS_README",
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",
