@@ -32,7 +32,7 @@ app.mount_pages(str(PAGES_DIR))
 def index():
     from chirp import Redirect
 
-    return Redirect("/boards")
+    return Redirect(app.url_for("boards"))
 
 
 @app.route("/mentionables/search")

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from chirp.cli.templates import (
+    AGENTS_MD,
     MIGRATIONS_README,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
@@ -63,6 +64,7 @@ def _has_chirpui() -> bool:
 
 def _write_scaffold_extras(project_dir: Path, name: str) -> None:
     """pyproject.toml, migrations/, optional theme.css hook."""
+    (project_dir / "AGENTS.md").write_text(AGENTS_MD, encoding="utf-8")
     (project_dir / "pyproject.toml").write_text(
         PYPROJECT_TOML.format(name=name),
         encoding="utf-8",

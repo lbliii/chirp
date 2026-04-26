@@ -67,6 +67,9 @@ def test_htmx_debug_js_s_tier_features() -> None:
     assert "Pause capture" in HTMX_DEBUG_BOOT_JS
     assert "Redact curl" in HTMX_DEBUG_BOOT_JS
     assert "Copy curl" in HTMX_DEBUG_BOOT_JS
+    assert "CH.help = function" in HTMX_DEBUG_BOOT_JS
+    assert "enabledBy" in HTMX_DEBUG_BOOT_JS
+    assert "exportRecordsJson" in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_v3_sse_monitor() -> None:
@@ -106,6 +109,33 @@ def test_htmx_debug_js_v3_render_plan() -> None:
     assert "decodeRenderPlan" in HTMX_DEBUG_BOOT_JS
     assert "formatRenderPlan" in HTMX_DEBUG_BOOT_JS
     assert "renderPlan" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_swap_doctor() -> None:
+    """DevTools explains swap behavior instead of only logging htmx events."""
+    assert "Swap Doctor" in HTMX_DEBUG_BOOT_JS
+    assert "buildSwapDoctor" in HTMX_DEBUG_BOOT_JS
+    assert "renderSwapDoctorHTML" in HTMX_DEBUG_BOOT_JS
+    assert "responseContainsSelector" in HTMX_DEBUG_BOOT_JS
+    assert "selectMatched" in HTMX_DEBUG_BOOT_JS
+    assert "full HTML document arrived for an htmx request" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_request_correlation() -> None:
+    """Overlapping htmx requests are correlated by XHR when available."""
+    assert "recordByXhr" in HTMX_DEBUG_BOOT_JS
+    assert "WeakMap" in HTMX_DEBUG_BOOT_JS
+    assert "getRecordForDetail" in HTMX_DEBUG_BOOT_JS
+    assert "rememberRecordForDetail" in HTMX_DEBUG_BOOT_JS
+
+
+def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:
+    """Inspector records whether hx-* values are direct, inherited, blocked, or default."""
+    assert "getEffectiveConfigDetails" in HTMX_DEBUG_BOOT_JS
+    assert "formatConfigDetails" in HTMX_DEBUG_BOOT_JS
+    assert "hx-disinherit" in HTMX_DEBUG_BOOT_JS
+    assert '"direct" : "inherited"' in HTMX_DEBUG_BOOT_JS
+    assert 'source: "blocked"' in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_v3_syntax_highlight() -> None:

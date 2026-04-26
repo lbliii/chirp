@@ -17,6 +17,7 @@ When `debug=True` and an unhandled exception occurs:
 
 - **Console**: Full traceback is always logged via `logger.exception()` (even when `debug=False`)
 - **Browser**: A rich error page with source context, locals, request info, and template diagnostics
+- **DevTools**: Full-page responses load Chirp DevTools for htmx, SSE, View Transition, render-plan, and Swap Doctor diagnostics. See `docs/devtools.md`.
 
 When `debug=False` (production):
 
@@ -42,6 +43,23 @@ The debug page renders without depending on your template environment (kida). If
 ### Fragment Mode
 
 For htmx fragment requests (`HX-Request: true`), the debug page renders as a compact `<div>` instead of a full HTML document. It fits into the existing page layout where the fragment would have appeared.
+
+## DevTools For Hypermedia Debugging
+
+Debug mode also injects Chirp DevTools into full-page responses. Open the app in
+a browser, press `Ctrl+Shift+D`, and inspect htmx activity, effective `hx-*`
+inheritance, render-plan headers, SSE events, View Transitions, DOM diffs, and
+Swap Doctor warnings.
+
+For agent-readable diagnostics, browser-capable agents can evaluate:
+
+```javascript
+window.ChirpHtmxDebug.help()
+window.ChirpHtmxDebug.exportRecordsJson()
+```
+
+Use this before guessing from screenshots when debugging htmx swaps, OOB
+regions, Suspense blocks, SSE, or fragment targets.
 
 ## Editor Integration
 

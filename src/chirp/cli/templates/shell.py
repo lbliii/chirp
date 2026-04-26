@@ -36,6 +36,9 @@ SHELL_LAYOUT_HTML = """\
 
 SHELL_LAYOUT_CHIRPUI_HTML = """\
 {% extends "chirpui/app_shell_layout.html" %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/theme.css">
+{% end %}
 {% block brand %}{{ current_path or "App" }}{% end %}
 {% block sidebar %}
 {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}

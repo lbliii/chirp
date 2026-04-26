@@ -9,6 +9,8 @@ plans, layout chains, route metadata, DOM diffs, and provides an element inspect
 
 Shortcuts: Ctrl+Shift+D toggles the drawer; Ctrl+Shift+K toggles the inspector.
 Set ``localStorage`` key ``chirp-debug-verbose`` to ``1`` to log boot to console.
+Browser-capable agents can call ``window.ChirpHtmxDebug.help()`` after loading
+a debug page to discover the machine-readable API.
 
 Features (v3):
 

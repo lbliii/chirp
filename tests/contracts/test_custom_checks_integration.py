@@ -111,6 +111,40 @@ class TestMountedPagesWithCustomCheck:
 class TestChirpUIContractCheck:
     """The chirp-ui contract check catches invalid component imports."""
 
+    def test_chirpui_import_without_use_chirp_ui_gets_runtime_hint(self, tmp_path: Path) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
+        assert len(runtime_issues) == 1
+        assert runtime_issues[0].severity == Severity.INFO
+        assert "use_chirp_ui(app)" in runtime_issues[0].message
+
+    def test_use_chirp_ui_reports_manifest_stats(self, tmp_path: Path) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        from chirp.ext.chirp_ui import use_chirp_ui
+
+        use_chirp_ui(app)
+        result = check_hypermedia_surface(app)
+        messages = [i.message for i in result.issues if i.category == "design_system"]
+        assert any("chirpui-manifest@" in msg for msg in messages)
+        assert any("requirements:" in msg for msg in messages)
+
     def test_valid_import_no_issues(self, tmp_path: Path) -> None:
         (tmp_path / "page.html").write_text(
             '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'

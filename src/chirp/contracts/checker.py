@@ -25,6 +25,7 @@ from .rules_accessibility import (
 )
 from .rules_alpine_cdn import check_alpine_cdn_urls
 from .rules_boundary import check_boundary_coverage
+from .rules_chirpui_runtime import check_chirpui_runtime_registration
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_composition import check_page_extends_layout
 from .rules_context_cascade import check_context_cascade
@@ -308,6 +309,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         if not template_sources:
             template_sources = load_template_sources(kida_env)
         result.templates_scanned = len(template_sources)
+        result.issues.extend(check_chirpui_runtime_registration(template_sources, snapshot.extras))
         template_aliases = getattr(kida_env, "template_aliases", None)
         referenced_paths: set[str] = set()
         static_routes, parametric_routes = build_route_index(route_paths)

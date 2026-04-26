@@ -104,9 +104,43 @@ PROJECTS = (
 )
 
 
+def _project_nav_items() -> tuple[dict, ...]:
+    return (
+        {
+            "title": "Documentation",
+            "href": "/projects",
+            "open": True,
+            "icon": "grid",
+            "children": (
+                {
+                    "title": "All Projects",
+                    "href": "/projects",
+                    "badge": len(PROJECTS),
+                    "hint": "Project index and shell action cascade.",
+                },
+            ),
+        },
+        {
+            "title": "Projects",
+            "href": "/projects",
+            "open": True,
+            "icon": "link",
+            "children": tuple(
+                {
+                    "title": project["name"],
+                    "href": f"/projects/{project['slug']}",
+                    "badge": project["status"],
+                }
+                for project in PROJECTS
+            ),
+        },
+    )
+
+
 def context() -> dict:
     return {
         "projects": PROJECTS,
+        "project_nav_items": _project_nav_items(),
         "shell_actions": ShellActions(
             primary=ShellActionZone(
                 items=(ShellAction(id="new-project", label="New project", href="/projects"),)
