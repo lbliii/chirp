@@ -82,12 +82,14 @@ chirp new myapp && cd myapp && python app.py
 | `chirp run <app>` | Start the dev server from an import string |
 | `chirp check <app>` | Validate hypermedia contracts |
 | `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
+| `chirp check <app> --coverage` | Show form, mounted-page, shell, and OOB coverage |
 | `chirp routes <app>` | Print the registered route table |
 | `App()` | Create an application |
 | `@app.route(path)` | Register a route handler |
 | `Template(name, **ctx)` | Render a full template |
 | `Template.inline(src, **ctx)` | Render from string (prototyping) |
 | `Page(name, block, **ctx)` | Auto Fragment or Template based on request |
+| `Page.mounted(name, **ctx)` | Page-directory helper for `page_content` inside `page_root` |
 | `PageComposition(template, fragment_block, ...)` | Python-first composition with regions |
 | `Fragment(name, block, **ctx)` | Render a named template block |
 | `Stream(name, **ctx)` | Stream HTML progressively |
@@ -169,7 +171,9 @@ return "Hello"                                  # -> 200, text/html
 return {"users": [...]}                         # -> 200, application/json
 return Template("page.html", title="Home")      # -> 200, rendered via Kida
 return Page("search.html", "results", items=x)  # -> Fragment or Template (auto)
+return Page.mounted("contacts/page.html")       # -> page_content inside page_root
 return Fragment("page.html", "results", items=x) # -> 200, rendered block
+return JSONResponse.from_value({"items": items}) # -> narrow data island
 return Stream("dashboard.html", **async_ctx)    # -> 200, streamed HTML
 return Suspense("dashboard.html", stats=...)    # -> shell + OOB swaps
 return EventStream(generator())                 # -> SSE stream
@@ -178,7 +182,10 @@ return Response(body=b"...", status=201)         # -> explicit control
 return Redirect("/login")                       # -> 302
 ```
 
-No `make_response()`. No `jsonify()`. The type *is* the intent.
+No `make_response()`. No `jsonify()`. The type *is* the intent. Use
+`JSONResponse` only for narrow progressive-enhancement data islands such as
+autocomplete or mention search; rich app workflows should still return HTML
+types like `Page`, `Fragment`, `OOB`, `Suspense`, and `EventStream`.
 
 For htmx-driven form posts or mutations that should trigger a full-page
 navigation, prefer `hx_redirect()` so both plain browser and htmx requests
@@ -222,6 +229,24 @@ Same template, same data, different scope. No separate "partials" directory.
 </details>
 
 <details>
+<summary><strong>Mounted app-shell pages</strong> — The common page-directory shape</summary>
+
+For mounted page apps that use the conventional `page_root` / `page_content`
+blocks, `Page.mounted()` removes the repeated block boilerplate:
+
+```python
+from chirp import Page
+
+def get(projects):
+    return Page.mounted("projects/page.html", projects=projects)
+```
+
+Normal browser navigation renders the composed page. Narrow htmx swaps render
+`page_content`; boosted shell navigation can render `page_root`.
+
+</details>
+
+<details>
 <summary><strong>Forms and validation</strong> — <code>chirp.validation</code> + <code>ValidationError</code></summary>
 
 `chirp.validation` is a small, composable rule library. Validators are plain
@@ -247,6 +272,25 @@ async def create_contact(request: Request):
 
 `ValidationError` returns a 422 with the re-rendered form fragment so htmx
 swaps the error inline; non-htmx requests get the full page back.
+
+`form_from()` binds repeated browser fields into `list[T]`, which is useful
+for checkbox groups, multi-selects, and PBP-style participant pickers:
+
+```python
+from dataclasses import dataclass
+
+from chirp import form_from
+
+@dataclass(frozen=True, slots=True)
+class ThreadForm:
+    title: str
+    participant_ids: list[int]
+
+@app.route("/threads", methods=["POST"])
+async def create_thread(request: Request):
+    form = await form_from(request, ThreadForm)
+    # participant_ids is a list[int], even when the browser submitted repeated fields.
+```
 
 </details>
 
@@ -329,6 +373,15 @@ For strict CI:
 ```bash
 chirp check myapp:app --warnings-as-errors
 ```
+
+For release readiness and hero apps, add coverage output:
+
+```bash
+chirp check myapp:app --coverage
+```
+
+Coverage shows POST routes with `FormContract`, mounted page routes carrying
+contracts, page-shell targets, and registered OOB regions.
 
 </details>
 

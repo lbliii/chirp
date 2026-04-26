@@ -79,6 +79,14 @@ def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     )
 
 
+def _chirpui_empty_csrf_token() -> str:
+    """Quiet fallback for chirp-ui shells in apps without CSRFMiddleware."""
+    return ""
+
+
+_chirpui_empty_csrf_token.__dict__["__chirpui_csrf_fallback__"] = True
+
+
 def use_chirp_ui(
     app: App,
     prefix: str = "/static",
@@ -148,6 +156,8 @@ def use_chirp_ui(
             app.template_global("route_link_attrs")(
                 make_route_link_attrs_fn(swap_resolver=_swap_resolver)
             )
+        if "csrf_token" not in app._mutable_state.template_globals:
+            app.template_global("csrf_token")(_chirpui_empty_csrf_token)
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     app.add_middleware(
         StreamingHTMLInject(

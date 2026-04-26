@@ -6,7 +6,8 @@ Implements ``MultiValueMapping`` for consistent access across
 ``form_from()`` provides lightweight dataclass binding: define a
 frozen dataclass, pass it to ``form_from(request, MyForm)``, and get
 a populated instance. No magic validation — just binding with type
-coercion for ``str``, ``int``, ``float``, and ``bool``.
+coercion for ``str``, ``int``, ``float``, ``bool``, and ``list[T]``
+for repeated fields such as checkbox groups and multi-selects.
 
 ``python-multipart`` is an optional dependency (``pip install chirp[forms]``).
 URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
@@ -16,7 +17,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, cast, get_type_hints, overload
+from typing import Any, cast, get_args, get_origin, get_type_hints, overload
 
 from chirp.templating.returns import ValidationError
 
@@ -149,9 +150,10 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
     Fields with defaults are optional; fields without defaults are required.
     String fields are stripped of whitespace by default.
 
-    Supports ``str``, ``int``, ``float``, and ``bool`` type coercion.
-    Raises ``FormBindingError`` with a dict of errors for missing or
-    invalid fields.
+    Supports ``str``, ``int``, ``float``, ``bool``, and ``list[T]``
+    type coercion. Missing list fields bind to ``[]`` because browsers
+    omit unchecked checkbox groups entirely. Raises ``FormBindingError``
+    with a dict of errors for missing or invalid fields.
 
     Usage::
 
@@ -160,6 +162,7 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
             title: str
             description: str = ""
             priority: str = "medium"
+            tags: list[str] = field(default_factory=list)
 
         @app.route("/tasks", methods=["POST"])
         async def add_task(request: Request):
@@ -186,11 +189,16 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
     values: dict[str, Any] = {}
 
     for f in field_defs:
+        hint = hints.get(f.name, str)
+        base_type = _unwrap_optional(hint)
+        list_item_type = _list_item_type(base_type)
         raw = form.get(f.name)
 
         if raw is None:
             # Field missing from form data entirely
-            if f.default is not MISSING:
+            if list_item_type is not None:
+                values[f.name] = []
+            elif f.default is not MISSING:
                 values[f.name] = f.default
             elif f.default_factory is not MISSING:
                 values[f.name] = f.default_factory()
@@ -199,15 +207,23 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
             continue
 
         # Coerce to target type
-        hint = hints.get(f.name, str)
-        base_type = _unwrap_optional(hint)
+        if list_item_type is not None:
+            item_coerce = _COERCIONS.get(list_item_type, list_item_type)
+            try:
+                values[f.name] = [item_coerce(item) for item in form.get_list(f.name)]
+            except ValueError, TypeError:
+                errors.setdefault(f.name, []).append(
+                    f"Invalid value for {f.name}: expected list[{_type_name(list_item_type)}]."
+                )
+            continue
+
         coerce = _COERCIONS.get(base_type, base_type)
 
         try:
             values[f.name] = coerce(raw)
         except ValueError, TypeError:
             errors.setdefault(f.name, []).append(
-                f"Invalid value for {f.name}: expected {base_type.__name__}."
+                f"Invalid value for {f.name}: expected {_type_name(base_type)}."
             )
 
     if errors:
@@ -289,7 +305,7 @@ def form_values(form: Any) -> dict[str, str]:
     return {}
 
 
-def _unwrap_optional(hint: Any) -> type:
+def _unwrap_optional(hint: Any) -> Any:
     """Extract the base type from ``X | None`` or plain ``X``."""
     import types
 
@@ -298,7 +314,24 @@ def _unwrap_optional(hint: Any) -> type:
         args = [a for a in hint.__args__ if a is not type(None)]
         if args:
             return args[0]
-    return hint if isinstance(hint, type) else str
+    return hint if isinstance(hint, type) or get_origin(hint) is not None else str
+
+
+def _list_item_type(hint: Any) -> type | None:
+    """Return the item type for ``list[T]`` hints."""
+    origin = get_origin(hint)
+    if origin is not list:
+        return None
+    args = get_args(hint)
+    if not args:
+        return str
+    item_type = _unwrap_optional(args[0])
+    return item_type if isinstance(item_type, type) else str
+
+
+def _type_name(value: Any) -> str:
+    """Best-effort type name for binding errors."""
+    return getattr(value, "__name__", str(value))
 
 
 async def parse_form_data(

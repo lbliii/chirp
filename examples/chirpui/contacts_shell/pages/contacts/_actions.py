@@ -30,10 +30,8 @@ def create_contact(
 
     store.add(name=name, email=email, group=group, role=role, phone=phone)
     return (
-        Page(
+        Page.mounted(
             "contacts/page.html",
-            "page_content",
-            page_block_name="page_root",
             **page_context(query, gf),
         ),
         200,

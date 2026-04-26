@@ -4,7 +4,7 @@ Demonstrates:
 - ``app.mount_pages()``
 - co-located ``page.py`` / ``page.html``
 - ``_context.py`` cascade with shell action merging
-- ``Page(..., page_block_name="page_root")`` for list pages
+- ``Page.mounted(...)`` for conventional page-shell blocks
 - ``Suspense(...)`` on a nested detail page
 
 Run:
@@ -19,7 +19,6 @@ PAGES_DIR = Path(__file__).parent / "pages"
 
 app = App(AppConfig(template_dir=PAGES_DIR, debug=True))
 use_chirp_ui(app)
-app.template_global("csrf_token")(lambda: "")
 app.mount_pages(str(PAGES_DIR))
 
 

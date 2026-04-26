@@ -1,0 +1,1 @@
+**Form list binding** — `form_from()` now binds repeated browser fields into `list[T]`, and `TestClient` can submit repeated form/query values with `data={"ids": ["1", "2"]}` or `query={"tag": ["a", "b"]}`.

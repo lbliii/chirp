@@ -2,10 +2,8 @@ from chirp import Page
 
 
 def get(contact) -> Page:
-    return Page(
+    return Page.mounted(
         "contacts/{contact_id}/page.html",
-        "page_content",
-        page_block_name="page_root",
         contact=contact,
     )
 

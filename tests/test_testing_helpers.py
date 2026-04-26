@@ -2,10 +2,14 @@
 
 import pytest
 
+from chirp import App
+from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.testing import (
+    TestClient,
     assert_fragment_contains,
     assert_fragment_not_contains,
+    assert_has_id,
     assert_hx_push_url,
     assert_hx_redirect,
     assert_hx_reswap,
@@ -13,6 +17,8 @@ from chirp.testing import (
     assert_hx_trigger,
     assert_is_error_fragment,
     assert_is_fragment,
+    assert_is_full_page,
+    assert_no_full_document,
     hx_headers,
 )
 
@@ -47,6 +53,35 @@ class TestAssertIsFragment:
         response = Response(body="<HTML><BODY>loud</BODY></HTML>", status=200)
         with pytest.raises(AssertionError, match="full page"):
             assert_is_fragment(response)
+
+
+class TestDocumentAssertions:
+    def test_assert_no_full_document_passes_for_fragment(self) -> None:
+        response = Response(body='<div id="content">ok</div>')
+        assert_no_full_document(response)
+
+    def test_assert_no_full_document_fails_for_full_page(self) -> None:
+        response = Response(body="<!doctype html><html><body>ok</body></html>")
+        with pytest.raises(AssertionError, match="full document"):
+            assert_no_full_document(response)
+
+    def test_assert_is_full_page_passes(self) -> None:
+        response = Response(body="<html><body>ok</body></html>")
+        assert_is_full_page(response)
+
+    def test_assert_is_full_page_fails_for_fragment(self) -> None:
+        response = Response(body="<div>ok</div>")
+        with pytest.raises(AssertionError, match="full page"):
+            assert_is_full_page(response)
+
+    def test_assert_has_id_passes(self) -> None:
+        response = Response(body='<main id="page-root">ok</main>')
+        assert_has_id(response, "page-root")
+
+    def test_assert_has_id_fails(self) -> None:
+        response = Response(body="<main>ok</main>")
+        with pytest.raises(AssertionError, match="page-root"):
+            assert_has_id(response, "page-root")
 
 
 class TestAssertFragmentContains:
@@ -235,3 +270,30 @@ class TestAssertHxPushUrl:
         r = Response()
         with pytest.raises(AssertionError, match="no HX-Push-Url"):
             assert_hx_push_url(r, "/new")
+
+
+class TestClientFormEncoding:
+    async def test_post_data_encodes_repeated_values(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await request.form()
+            return ",".join(form.get_list("ids"))
+
+        async with TestClient(app) as client:
+            response = await client.post("/submit", data={"ids": ["1", "2", "3"]})
+
+        assert response.text == "1,2,3"
+
+    async def test_get_query_encodes_repeated_values(self) -> None:
+        app = App()
+
+        @app.route("/search")
+        async def search(request: Request):
+            return ",".join(request.query.get_list("tag"))
+
+        async with TestClient(app) as client:
+            response = await client.get("/search", query={"tag": ["plot", "wanted"]})
+
+        assert response.text == "plot,wanted"

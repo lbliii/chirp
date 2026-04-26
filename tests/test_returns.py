@@ -138,6 +138,22 @@ class TestPage:
         assert page.page_block_name == "page_root"
         assert page.effective_page_block_name == "page_root"
 
+    def test_mounted_defaults_to_page_shell_blocks(self) -> None:
+        page = Page.mounted("dashboard/page.html", title="Dashboard")
+        assert page.template_name == "dashboard/page.html"
+        assert page.block_name == "page_content"
+        assert page.page_block_name == "page_root"
+        assert page.context == {"title": "Dashboard"}
+
+    def test_mounted_allows_custom_blocks(self) -> None:
+        page = Page.mounted(
+            "dashboard/page.html",
+            block_name="results",
+            page_block_name="results_root",
+        )
+        assert page.block_name == "results"
+        assert page.page_block_name == "results_root"
+
 
 class TestTopLevelImports:
     """New return types are importable from the top-level chirp package."""

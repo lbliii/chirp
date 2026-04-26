@@ -94,6 +94,11 @@ class TestResponse:
         assert isinstance(r, JSONResponse)
         assert ("X-Test", "1") in r.headers
 
+    def test_json_response_is_top_level_provisional_export(self) -> None:
+        from chirp import JSONResponse as ExportedJSONResponse
+
+        assert ExportedJSONResponse is JSONResponse
+
     def test_frozen(self) -> None:
         r = Response()
         with pytest.raises(AttributeError):

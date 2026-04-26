@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from chirp import App, AppConfig
+from chirp.contracts import check_hypermedia_surface
 from chirp.pages.types import Section, TabItem
 from chirp.testing import TestClient
 
@@ -158,3 +159,51 @@ def get():
             assert "hello" in r.body.decode("utf-8")
 
     asyncio.run(_())
+
+
+def test_mounted_page_wrapper_preserves_route_contract(tmp_path: Path) -> None:
+    """Contracts declared on filesystem page handlers reach app.check()."""
+    pages_dir = tmp_path / "pages"
+    pages_dir.mkdir()
+    (pages_dir / "_layout.html").write_text(
+        "<html><body>{% block page_root %}{% block content %}{% end %}{% end %}</body></html>"
+    )
+    (pages_dir / "page.py").write_text(
+        """
+from dataclasses import dataclass
+
+from chirp import Page
+from chirp.contracts import FormContract, contract
+
+
+@dataclass(frozen=True, slots=True)
+class ThreadForm:
+    title: str
+    body: str
+
+
+def get():
+    return Page("page.html", "content", page_block_name="content")
+
+
+@contract(form=FormContract(ThreadForm, "page.html", "thread_form"))
+def post():
+    return Page("page.html", "content", page_block_name="content")
+"""
+    )
+    (pages_dir / "page.html").write_text(
+        "{% block page_root %}{% block content %}"
+        "{% block thread_form %}"
+        '<form method="post"><input name="title"><textarea name="body"></textarea></form>'
+        "{% end %}"
+        "{% end %}{% end %}"
+    )
+
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    app.mount_pages(str(pages_dir))
+
+    result = check_hypermedia_surface(app)
+    assert result.forms_validated == 1
+    assert result.coverage.mounted_page_routes == 2
+    assert result.coverage.mounted_page_routes_with_contract == 1
+    assert [issue for issue in result.issues if issue.category == "form"] == []

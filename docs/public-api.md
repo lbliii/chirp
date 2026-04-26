@@ -44,11 +44,21 @@ shape may still evolve before 1.0:
 | Contracts | `CheckResult`, `ContractCheck`, `ContractCheckSnapshot`, `ContractIssue`, `Severity`, `ChirpPlugin`, `CHIRP_CAPABILITIES` |
 | Suspense internals exposed for templates/checks | `CHIRP_DEFER_PENDING_KEY`, `DEFERRED` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
+| Narrow data islands | `JSONResponse` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `get_cache`, `cache_view` |
 | Optional UI bridge | `use_chirp_ui` |
+
+`JSONResponse` is for small progressive-enhancement endpoints where HTML is not the right payload,
+such as autocomplete data for a browser widget. It is intentionally provisional and narrow; Chirp's
+default app surface should still return `Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, or
+another HTML-native type instead of growing a parallel REST API.
+
+`CheckResult.coverage` exposes app-level counters for `chirp check --coverage`, including
+POST routes with `FormContract`, mounted page routes with contract metadata, page-shell targets,
+and OOB regions. Treat these as release-readiness signals, not runtime authorization checks.
 
 ## Debug And Advanced
 

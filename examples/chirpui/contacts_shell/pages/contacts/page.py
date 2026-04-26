@@ -6,10 +6,8 @@ from chirp import Page, Request
 def get(request: Request) -> Page:
     query = normalize_query(request.query.get("q"))
     group = normalize_query(request.query.get("group"))
-    return Page(
+    return Page.mounted(
         "contacts/page.html",
-        "page_content",
-        page_block_name="page_root",
         **page_context(query, group),
     )
 
@@ -19,9 +17,7 @@ async def post(request: Request) -> Page:
     form = await request.form()
     query = normalize_query(form.get("q"))
     group = normalize_query(form.get("group") or form.get("group_filter"))
-    return Page(
+    return Page.mounted(
         "contacts/page.html",
-        "page_content",
-        page_block_name="page_root",
         **page_context(query, group),
     )

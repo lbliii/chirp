@@ -24,6 +24,32 @@ def assert_is_fragment(response: Response, *, status: int = 200) -> None:
     assert len(response.text.strip()) > 0, "Fragment body is empty"
 
 
+def assert_no_full_document(response: Response) -> None:
+    """Assert an htmx response did not accidentally return a full HTML document."""
+    lower = response.text.lower()
+    assert "<html" not in lower, "Response contains a full document <html> tag"
+    assert "<!doctype" not in lower, "Response contains a full document doctype"
+
+
+def assert_is_full_page(response: Response, *, status: int = 200) -> None:
+    """Assert the response is a full page document."""
+    assert response.status == status, f"Expected status {status}, got {response.status}"
+    lower = response.text.lower()
+    assert "<html" in lower or "<!doctype" in lower, (
+        f"Response does not look like a full page document.\nResponse body: {response.text[:500]}"
+    )
+
+
+def assert_has_id(response: Response, element_id: str) -> None:
+    """Assert the response body contains an element with the given id."""
+    import re
+
+    pattern = rf"""id\s*=\s*["']{re.escape(element_id)}["']"""
+    assert re.search(pattern, response.text), (
+        f"Response has no element id={element_id!r}.\nResponse body: {response.text[:500]}"
+    )
+
+
 def assert_fragment_contains(response: Response, text: str) -> None:
     """Assert the fragment response body contains the given text."""
     assert text in response.text, (

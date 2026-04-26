@@ -44,10 +44,8 @@ def save_contact(contact, name="", email="", group="", role="", phone="", q=""):
         return ("Contact not found", 404)
 
     return (
-        Page(
+        Page.mounted(
             "contacts/page.html",
-            "page_content",
-            page_block_name="page_root",
             **page_context(query, group_filter),
         ),
         200,
@@ -61,10 +59,8 @@ def delete_contact(contact, q="", group=""):
     group_filter = normalize_query(group)
     store.delete(contact.id)
     return (
-        Page(
+        Page.mounted(
             "contacts/page.html",
-            "page_content",
-            page_block_name="page_root",
             **page_context(query, group_filter),
         ),
         200,

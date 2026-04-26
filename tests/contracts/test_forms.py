@@ -164,3 +164,27 @@ class TestFormFieldValidation:
         form_issues = [i for i in result.issues if i.category == "form"]
         # "search" is in header block, not task_form — should not warn
         assert len(form_issues) == 0
+
+    def test_coverage_counts_post_form_contracts(self, tmp_path):
+        """CheckResult exposes POST/FormContract coverage for CI reporting."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+
+        (tmp_path / "tasks.html").write_text('<form><input name="title"></form>')
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "tasks.html"))
+        async def add_task():
+            return "ok"
+
+        @app.route("/unchecked", methods=["POST"])
+        async def unchecked():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        assert result.coverage.post_routes == 2
+        assert result.coverage.post_routes_with_form_contract == 1
+        assert result.coverage.post_routes_without_form_contract == 1

@@ -336,7 +336,11 @@ class AppCompiler:
             mw_globals = getattr(middleware, "template_globals", None)
             if mw_globals and isinstance(mw_globals, dict):
                 for name, func in mw_globals.items():
-                    self._mutable.template_globals.setdefault(name, func)
+                    current = self._mutable.template_globals.get(name)
+                    if name not in self._mutable.template_globals or getattr(
+                        current, "__chirpui_csrf_fallback__", False
+                    ):
+                        self._mutable.template_globals[name] = func
 
         # Register i18n template global if enabled
         if self._config.i18n_enabled:

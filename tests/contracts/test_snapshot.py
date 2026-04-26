@@ -4,6 +4,7 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
+    ContractCoverage,
     ContractIssue,
     Severity,
 )
@@ -72,3 +73,15 @@ class TestCheckResult:
         summary = result.summary()
         assert "1 error" in summary
         assert "/missing" in summary
+
+    def test_coverage_reports_uncovered_counts(self):
+        result = CheckResult(
+            coverage=ContractCoverage(
+                post_routes=3,
+                post_routes_with_form_contract=2,
+                mounted_page_routes=4,
+                mounted_page_routes_with_contract=1,
+            )
+        )
+        assert result.coverage.post_routes_without_form_contract == 1
+        assert result.coverage.mounted_page_routes_without_contract == 3

@@ -67,6 +67,7 @@ Rails popularized "convention over configuration." Chirp takes a different posit
 
 ```bash
 chirp check myapp:app
+chirp check myapp:app --coverage
 ```
 
 At startup (or in CI), chirp validates the full hypermedia surface:
@@ -75,6 +76,7 @@ At startup (or in CI), chirp validates the full hypermedia surface:
 - Every `Fragment` return → does the block exist in that template?
 - Every `sse-connect` / `sse-swap` → is the SSE structure valid?
 - Every `target` → does the element ID exist?
+- Coverage output → which POST routes, mounted pages, shell targets, and OOB regions are contract-covered?
 
 Convention tells you where to put files. Contracts tell you when the system is broken. Chirp chooses the one that catches bugs.
 

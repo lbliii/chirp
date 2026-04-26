@@ -9,7 +9,7 @@ from kida import Environment
 
 from chirp.routing.router import _route_path_has_flask_syntax
 
-from .declarations import FragmentContract, SSEContract
+from .declarations import FormContract, FragmentContract, SSEContract
 from .routes import (
     attr_to_method,
     build_route_index,
@@ -78,7 +78,7 @@ from .template_scan import (
     extract_wizard_form_ids,
     load_template_sources,
 )
-from .types import CheckResult, ContractIssue, Severity
+from .types import CheckResult, ContractCoverage, ContractIssue, Severity
 
 # Page/Suspense: filesystem and imperative routes return these with a template path.
 _TEMPLATE_CALL_PATTERN = re.compile(
@@ -88,6 +88,42 @@ _TEMPLATE_CALL_PATTERN = re.compile(
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
+
+
+def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
+    """Build high-level contract coverage counters from the frozen route snapshot."""
+    routes = tuple(getattr(snapshot.router, "routes", ()))
+    post_routes = 0
+    post_routes_with_form_contract = 0
+    mounted_page_routes = 0
+    mounted_page_routes_with_contract = 0
+
+    for route in routes:
+        methods = getattr(route, "methods", frozenset())
+        contract = getattr(route.handler, "_chirp_contract", None)
+        if "POST" in methods:
+            post_routes += 1
+            if contract is not None and isinstance(getattr(contract, "form", None), FormContract):
+                post_routes_with_form_contract += 1
+        if getattr(route, "page_source_handler", None) is not None:
+            mounted_page_routes += 1
+            if contract is not None:
+                mounted_page_routes_with_contract += 1
+
+    fragment_registry = snapshot.fragment_target_registry
+    shell_contracts = fragment_registry.registered_contracts
+    oob_registry = snapshot.oob_registry
+
+    return ContractCoverage(
+        post_routes=post_routes,
+        post_routes_with_form_contract=post_routes_with_form_contract,
+        mounted_page_routes=mounted_page_routes,
+        mounted_page_routes_with_contract=mounted_page_routes_with_contract,
+        page_shell_contracts=len(shell_contracts),
+        page_shell_required_blocks=len(fragment_registry.required_fragment_blocks),
+        fragment_targets_registered=len(fragment_registry.registered_targets),
+        oob_regions_registered=len(oob_registry.registered_blocks) if oob_registry else 0,
+    )
 
 
 def _route_prepass(
@@ -256,6 +292,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         return result
     router = snapshot.router
     kida_env = snapshot.kida_env
+    result.coverage = _build_coverage(snapshot)
 
     route_paths = collect_route_paths(router)
     result.routes_checked = len(route_paths)

@@ -4,6 +4,8 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
 from chirp.ext.chirp_ui import CHIRPUI_PAGE_SHELL_CONTRACT, use_chirp_ui
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from tests.helpers.contract_fixtures import write_layout_page
 
 
@@ -17,6 +19,30 @@ class TestPageShellContractValidation:
         assert registry.required_fragment_blocks == frozenset(
             {"page_root", "page_root_inner", "page_content"}
         )
+
+    def test_use_chirp_ui_adds_quiet_csrf_token_fallback_without_middleware(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        use_chirp_ui(app)
+
+        app._ensure_frozen()
+
+        env = app._runtime_state.kida_env
+        assert env is not None
+        csrf_token = env.globals["csrf_token"]
+        assert csrf_token() == ""
+
+    def test_real_csrf_middleware_replaces_chirp_ui_fallback(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        use_chirp_ui(app)
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig()))
+
+        app._ensure_frozen()
+
+        env = app._runtime_state.kida_env
+        assert env is not None
+        csrf_token = env.globals["csrf_token"]
+        assert getattr(csrf_token, "__chirpui_csrf_fallback__", False) is False
 
     def test_checker_reports_missing_required_page_shell_blocks(self, tmp_path):
         write_layout_page(

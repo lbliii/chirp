@@ -1,0 +1,1 @@
+**Mounted page contracts** — filesystem page handlers now propagate `@contract(...)` metadata onto their generated route wrappers so `app.check()` sees form and return contracts without app-level shims.

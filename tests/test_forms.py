@@ -215,6 +215,13 @@ class OptionalForm:
     nickname: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class MultiValueForm:
+    title: str
+    participant_ids: list[int]
+    tags: list[str]
+
+
 class TestFormFrom:
     """Tests for form_from() — dataclass form binding."""
 
@@ -368,6 +375,55 @@ class TestFormFrom:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             assert response.text == "Alice|None"
+
+    async def test_list_field_binds_repeated_values(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, MultiValueForm)
+            return f"{form.title}|{form.participant_ids}|{form.tags}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "title": "Thread",
+                    "participant_ids": ["1", "2", "3"],
+                    "tags": ["intro", "wanted"],
+                },
+            )
+            assert response.text == "Thread|[1, 2, 3]|['intro', 'wanted']"
+
+    async def test_missing_list_field_binds_empty_list(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, MultiValueForm)
+            return f"{form.participant_ids}|{form.tags}"
+
+        async with TestClient(app) as client:
+            response = await client.post("/submit", data={"title": "Thread"})
+            assert response.text == "[]|[]"
+
+    async def test_invalid_list_item_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, MultiValueForm)
+                return "ok"
+            except FormBindingError as e:
+                return e.errors["participant_ids"][0]
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={"title": "Thread", "participant_ids": ["1", "nope"]},
+            )
+            assert "expected list[int]" in response.text
 
 
 # ---------------------------------------------------------------------------
