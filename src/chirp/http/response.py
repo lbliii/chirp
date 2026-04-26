@@ -331,7 +331,12 @@ class Response:
 
 @dataclass(frozen=True, slots=True)
 class JSONResponse(Response):
-    """A compact JSON response serialized directly to bytes."""
+    """A compact JSON response serialized directly to bytes.
+
+    Use this for narrow progressive-enhancement endpoints such as typeahead
+    data islands. Chirp's primary response model remains HTML return types;
+    ``JSONResponse`` is not a parallel REST serialization layer.
+    """
 
     body: bytes = b""
     content_type: str = "application/json; charset=utf-8"

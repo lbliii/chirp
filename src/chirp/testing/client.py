@@ -12,7 +12,7 @@ fail at runtime (e.g. rag_demo _db_var, ollama _client_var).
 import asyncio
 import contextlib
 import inspect
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any
 
 from chirp.app import App
@@ -99,9 +99,14 @@ class TestClient:
         path: str,
         *,
         headers: dict[str, str] | None = None,
-        query: dict[str, str] | None = None,
+        query: Mapping[str, str | Sequence[str]] | None = None,
     ) -> Response:
         """Send a GET request."""
+        if query:
+            from urllib.parse import urlencode
+
+            sep = "&" if "?" in path else "?"
+            path = f"{path}{sep}{urlencode(query, doseq=True)}"
         return await self.request("GET", path, headers=headers)
 
     async def post(
@@ -110,7 +115,7 @@ class TestClient:
         *,
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
-        data: dict[str, str] | None = None,
+        data: Mapping[str, str | Sequence[str]] | None = None,
         json: dict[str, object] | None = None,
     ) -> Response:
         """Send a POST request.
@@ -133,7 +138,7 @@ class TestClient:
         elif data is not None:
             from urllib.parse import urlencode
 
-            request_body = urlencode(data).encode("utf-8")
+            request_body = urlencode(data, doseq=True).encode("utf-8")
             extra_headers["content-type"] = "application/x-www-form-urlencoded"
 
         merged = {**extra_headers, **(headers or {})}

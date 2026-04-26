@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import FormContract, check_hypermedia_surface, contract
-from chirp.contracts.rules_forms import extract_form_field_names
+from chirp.contracts.rules_forms import extract_form_field_names, extract_template_block_source
 
 
 class TestExtractFormFieldNames:
@@ -41,6 +41,41 @@ class TestExtractFormFieldNames:
 
     def test_empty_source(self):
         assert extract_form_field_names("") == set()
+
+
+class TestExtractTemplateBlockSource:
+    """Unit tests for block-aware template source extraction."""
+
+    def test_extracts_simple_block(self):
+        source = '{% block task_form %}<input name="title">{% endblock %}'
+        assert extract_template_block_source(source, "task_form") == '<input name="title">'
+
+    def test_extracts_block_after_nested_block(self):
+        source = (
+            "{% block page_content %}"
+            '{% block table %}<input name="search">{% endblock %}'
+            '<form><input name="title"></form>'
+            "{% end %}"
+        )
+        block_source = extract_template_block_source(source, "page_content")
+        assert block_source is not None
+        assert extract_form_field_names(block_source) == {"search", "title"}
+
+    def test_extracts_block_with_nested_call_and_generic_end(self):
+        source = (
+            "{% block page_content %}"
+            "{% call container() %}"
+            '{% if visible %}<input name="title">{% end %}'
+            "{% end %}"
+            '<input name="body">'
+            "{% endblock %}"
+        )
+        block_source = extract_template_block_source(source, "page_content")
+        assert block_source is not None
+        assert extract_form_field_names(block_source) == {"body", "title"}
+
+    def test_returns_none_for_missing_block(self):
+        assert extract_template_block_source("{% block other %}{% end %}", "missing") is None
 
 
 class TestFormFieldValidation:
@@ -164,3 +199,27 @@ class TestFormFieldValidation:
         form_issues = [i for i in result.issues if i.category == "form"]
         # "search" is in header block, not task_form — should not warn
         assert len(form_issues) == 0
+
+    def test_block_scoped_extraction_handles_nested_blocks(self, tmp_path):
+        """Nested template blocks should not truncate the scanned parent block."""
+
+        @dataclass
+        class TaskForm:
+            title: str
+
+        (tmp_path / "page.html").write_text(
+            "{% block page_content %}"
+            '{% block table %}<input name="search">{% endblock %}'
+            '<form><input name="title" type="text"></form>'
+            "{% end %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/tasks", methods=["POST"])
+        @contract(form=FormContract(TaskForm, "page.html", block="page_content"))
+        async def add_task():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        form_errors = [i for i in result.errors if i.category == "form"]
+        assert len(form_errors) == 0

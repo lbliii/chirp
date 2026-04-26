@@ -31,6 +31,7 @@ EXPECTED_PUBLIC_API = [
     "HTTPError",
     "HtmxDetails",
     "InlineTemplate",
+    "JSONResponse",
     "MarkdownRenderer",
     "MethodNotAllowed",
     "Middleware",

@@ -298,6 +298,10 @@ class AppRegistry:
                 template_name=_template,
             )
 
+        route_contract = getattr(_handler, "_chirp_contract", None)
+        if route_contract is not None:
+            page_wrapper.__dict__["_chirp_contract"] = route_contract
+
         self._state.pending_routes.append(
             PendingRoute(
                 url_path,

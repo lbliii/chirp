@@ -1,0 +1,1 @@
+**`examples/chirpui/forum_shell`** — added a compact forum/PBP reference app showing mounted pages, app-shell OOB state, typed reply forms with repeated mention fields, and a JSON mention-search endpoint.

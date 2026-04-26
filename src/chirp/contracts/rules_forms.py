@@ -10,7 +10,83 @@ _FORM_FIELD_PATTERN = re.compile(
     r"<(?:input|select|textarea)\b[^>]*?\bname\s*=\s*[\"']([^\"']+)[\"']",
     re.IGNORECASE,
 )
+_TEMPLATE_TAG_PATTERN = re.compile(r"\{%-?\s*(.*?)\s*-?%\}", re.DOTALL)
 _FORM_EXCLUDED_FIELDS = frozenset({"_csrf_token", "csrf_token", "_method"})
+_BLOCK_OPENERS = frozenset(
+    {
+        "autoescape",
+        "block",
+        "cache",
+        "call",
+        "def",
+        "filter",
+        "for",
+        "if",
+        "imports",
+        "macro",
+        "match",
+        "raw",
+        "set",
+        "slot",
+        "trans",
+        "try",
+        "unless",
+        "with",
+    }
+)
+_BLOCK_MIDPOINTS = frozenset({"case", "else", "elif", "except", "fallback"})
+
+
+def extract_template_block_source(source: str, block_name: str) -> str | None:
+    """Return source inside a named template block, respecting nested tags.
+
+    This is intentionally a small structural scanner instead of a full template
+    parser. Form contracts only need the body of ``{% block name %}``, but a
+    regex stops at the first nested ``{% endblock %}`` and misses fields later
+    in the block.
+    """
+    stack: list[str] = []
+    target_start: int | None = None
+
+    for match in _TEMPLATE_TAG_PATTERN.finditer(source):
+        keyword, name = _template_tag_head(match.group(1))
+        if keyword is None:
+            continue
+
+        if target_start is None:
+            if keyword == "block" and name == block_name:
+                target_start = match.end()
+                stack.append("block")
+            continue
+
+        if keyword in _BLOCK_MIDPOINTS:
+            continue
+        if keyword == "end" or keyword.startswith("end"):
+            if not stack:
+                continue
+            closed = stack.pop()
+            if not stack and closed == "block":
+                return source[target_start : match.start()]
+            continue
+        if keyword in _BLOCK_OPENERS and _opens_body(keyword, match.group(1)):
+            stack.append(keyword)
+
+    return None
+
+
+def _template_tag_head(tag_body: str) -> tuple[str | None, str | None]:
+    normalized = tag_body.strip()
+    if not normalized:
+        return None, None
+    parts = normalized.split(None, 2)
+    keyword = parts[0]
+    name = parts[1] if len(parts) > 1 else None
+    return keyword, name
+
+
+def _opens_body(keyword: str, tag_body: str) -> bool:
+    # Inline assignments use `{% set name = value %}`; block-style set opens a body.
+    return keyword != "set" or "=" not in tag_body
 
 
 def extract_form_field_names(source: str) -> set[str]:
@@ -57,13 +133,9 @@ def validate_form_contracts(
             continue
 
         if form_contract.block is not None:
-            block_match = re.search(
-                rf"\{{% block {re.escape(form_contract.block)} %\}}(.*?)\{{% endblock",
-                template_source,
-                re.DOTALL,
-            )
-            if block_match:
-                template_source = block_match.group(1)
+            block_source = extract_template_block_source(template_source, form_contract.block)
+            if block_source is not None:
+                template_source = block_source
 
         html_fields = extract_form_field_names(template_source)
         try:

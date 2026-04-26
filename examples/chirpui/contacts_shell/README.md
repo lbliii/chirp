@@ -10,6 +10,7 @@ It demonstrates:
 - route-scoped `ShellActions`
 - query-backed search state
 - inline row editing without stale filtered results
+- a typed repeated-field endpoint using `form_from()` with `list[int]`
 
 ## Run
 

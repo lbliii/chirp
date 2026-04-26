@@ -1,6 +1,6 @@
 """Tests for the contacts shell example."""
 
-from chirp.testing import TestClient, assert_hx_trigger
+from chirp.testing import TestClient, assert_hx_trigger, assert_no_full_document
 from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -57,6 +57,19 @@ class TestContactsShell:
             assert response.status == 200
             assert "Carol Williams" in response.text
             assert "Alice Chen" not in response.text
+
+    async def test_selection_preview_binds_repeated_contact_ids(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            headers = await _csrf_headers(client)
+            response = await client.post(
+                "/contacts/selection",
+                data={"contact_ids": ["1", "3"]},
+                headers=headers,
+            )
+            assert response.status == 200
+            assert_no_full_document(response)
+            assert "Alice Chen" in response.text
+            assert "Carol Williams" in response.text
 
     async def test_edit_route_opens_inline_editor(self, example_app) -> None:
         async with TestClient(example_app) as client:

@@ -1,0 +1,27 @@
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<main id="board-page" class="forum-page">
+  {% if board %}
+  <header>
+    <p class="forum-meta">Board</p>
+    <h1>{{ board.name }}</h1>
+    <p>{{ board.description }}</p>
+  </header>
+  <section class="forum-grid" aria-label="Threads">
+    {% for thread in threads %}
+    <article class="forum-card">
+      <h2><a href="/boards/{{ board.slug }}/threads/{{ thread.slug }}">{{ thread.title }}</a></h2>
+      <p class="forum-meta">{{ thread.posts | length }} posts · {{ thread.unread }} unread</p>
+    </article>
+    {% end %}
+  </section>
+  {% else %}
+  <h1>Board not found</h1>
+  {% end %}
+</main>
+{% endblock %}
+{% end %}
+</div>
+{% end %}

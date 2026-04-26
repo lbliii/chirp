@@ -215,6 +215,12 @@ class OptionalForm:
     nickname: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ListForm:
+    title: str
+    item_ids: list[int]
+
+
 class TestFormFrom:
     """Tests for form_from() — dataclass form binding."""
 
@@ -368,6 +374,51 @@ class TestFormFrom:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             assert response.text == "Alice|None"
+
+    async def test_repeated_list_field_binding(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, ListForm)
+            return f"{form.title}|{form.item_ids}|{type(form.item_ids[0]).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={"title": "Batch", "item_ids": ["1", "3"]},
+            )
+            assert response.text == "Batch|[1, 3]|int"
+
+    async def test_missing_list_field_defaults_to_empty_list(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, ListForm)
+            return f"{form.title}|{form.item_ids}"
+
+        async with TestClient(app) as client:
+            response = await client.post("/submit", data={"title": "Batch"})
+            assert response.text == "Batch|[]"
+
+    async def test_invalid_list_item_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, ListForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['item_ids'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={"title": "Batch", "item_ids": ["1", "nope"]},
+            )
+            assert "expected list[int]" in response.text
 
 
 # ---------------------------------------------------------------------------

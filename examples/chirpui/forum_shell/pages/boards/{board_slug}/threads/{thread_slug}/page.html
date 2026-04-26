@@ -1,0 +1,64 @@
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<main id="thread-page" class="forum-page" hx-disinherit="hx-select hx-target hx-swap">
+  {% if thread %}
+  <p class="forum-meta"><a href="/boards/{{ thread.board_slug }}">Back to board</a></p>
+  <h1>{{ thread.title }}</h1>
+  <section id="thread-posts" class="chirpui-stack chirpui-stack--md" aria-label="Posts">
+    {% for post in thread.posts %}
+    <article class="forum-post" id="post-{{ post.id }}">
+      <strong>{{ character_name(post.character_id) }}</strong>
+      <p>{{ post.body }}</p>
+      {% if post.mention_ids %}
+      <p class="forum-meta">Mentions:
+        {% for mention_id in post.mention_ids %}
+        {{ character_name(mention_id) }}{% if not loop.last %}, {% end %}
+        {% end %}
+      </p>
+      {% end %}
+    </article>
+    {% end %}
+  </section>
+
+  {% block reply_form %}
+  <form id="reply-form"
+        class="forum-reply"
+        action="/boards/{{ thread.board_slug }}/threads/{{ thread.slug }}"
+        method="post"
+        hx-post="/boards/{{ thread.board_slug }}/threads/{{ thread.slug }}"
+        hx-target="#thread-page"
+        hx-swap="outerHTML">
+    <label>
+      Active character
+      <select name="character_id">
+        {% for character in characters %}
+        <option value="{{ character.id }}">{{ character.name }}</option>
+        {% end %}
+      </select>
+    </label>
+    <label>
+      Reply
+      <textarea name="body" required></textarea>
+    </label>
+    <fieldset>
+      <legend>Mention characters</legend>
+      {% for character in characters %}
+      <label>
+        <input type="checkbox" name="mention_ids" value="{{ character.id }}">
+        {{ character.name }}
+      </label>
+      {% end %}
+    </fieldset>
+    <button type="submit">Post reply</button>
+  </form>
+  {% endblock %}
+  {% else %}
+  <h1>Thread not found</h1>
+  {% end %}
+</main>
+{% endblock %}
+{% end %}
+</div>
+{% end %}
