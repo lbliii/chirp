@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.5.0"
+version = "0.6.0"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -322,8 +322,8 @@ check = { sequence = [
 dist = { shell = "rm -rf dist/ && uv build && ls -la dist/", help = "Build distribution" }
 
 # Changelog (towncrier)
-changelog = { cmd = "towncrier build --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
-changelog-draft = { cmd = "towncrier build --draft", help = "Preview changelog from fragments (stdout)" }
+changelog = { cmd = "towncrier build --version 0.6.0 --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
+changelog-draft = { cmd = "towncrier build --version 0.6.0 --draft", help = "Preview changelog from fragments (stdout)" }
 changelog-check = { cmd = "towncrier check --compare-with origin/main", help = "Verify branch adds a fragment (vs main)" }
 
 # Benchmarks

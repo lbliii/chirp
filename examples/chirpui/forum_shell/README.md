@@ -6,6 +6,7 @@ It demonstrates:
 
 - mounted page-directory routing
 - `Page.mounted(...)`
+- named route reversal with `url_for(...)`
 - app-shell layout contracts
 - `FormContract` on mounted POST routes
 - `form_from()` with repeated `list[int]` fields
@@ -18,3 +19,11 @@ Run:
 ```bash
 python app.py
 ```
+
+Interesting paths:
+
+- `/boards` renders the mounted page shell.
+- `/boards/ic` swaps the board list/detail area under the shell.
+- `/boards/ic/threads/market-rain` posts replies, binds repeated mention ids, and updates the
+  unread count with an OOB fragment.
+- `/mentionables/search?q=jun` returns the JSON data island used by mention search.

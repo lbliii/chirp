@@ -103,6 +103,22 @@ python -m benchmarks.core --iterations 250 --route-count 100 \
   --output .benchmarks/core-latest.json
 ```
 
+### Release Smoke
+
+For release prep, run the core suite with a stable iteration count and keep the JSON artifact with
+the release notes or CI artifacts:
+
+```bash
+uv run python -m benchmarks.core --iterations 250 --route-count 100 \
+  --output .benchmarks/core-0.6.0.json
+```
+
+Compare the workload names, package versions, Python free-threading flags, and broad timing shape
+against the previous artifact. Treat large unexplained movement in `template_render`,
+`fragment_render`, `oob_serialization`, `suspense_first_chunk`, `sse_fanout`, or
+`filesystem_route_dispatch` as a release blocker until it is explained. Do not use this artifact
+as a public framework comparison; it is a Chirp hot-path regression check.
+
 ## Output
 
 ```
