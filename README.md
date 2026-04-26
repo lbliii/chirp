@@ -332,6 +332,28 @@ chirp check myapp:app --warnings-as-errors
 
 </details>
 
+<details>
+<summary><strong>Debug DevTools</strong> — Browser-side diagnostics for htmx and hypermedia</summary>
+
+Run the app in debug mode:
+
+```bash
+chirp dev myapp:app
+```
+
+Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools. The drawer
+shows htmx activity, effective `hx-*` inheritance, render plans, SSE events,
+View Transitions, DOM diffs, and Swap Doctor warnings.
+
+Browser-capable agents can discover and export diagnostics with:
+
+```javascript
+window.ChirpHtmxDebug.help()
+window.ChirpHtmxDebug.exportRecordsJson()
+```
+
+</details>
+
 ---
 
 ## Development

@@ -140,6 +140,16 @@ document.addEventListener("keydown", function(e) {
 var CH = (window.ChirpHtmxDebug = window.ChirpHtmxDebug || {});
 CH.version = 3;
 CH.getState = function() { return state; };
+CH.help = function() {
+  return {
+    enabledBy: "AppConfig(debug=True) or chirp dev app:app",
+    drawer: "Press Ctrl+Shift+D to toggle the Chirp DevTools drawer.",
+    inspector: "Press Ctrl+Shift+K to inspect effective hx-* attributes.",
+    exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, SSE, View Transition, render-plan, and Swap Doctor records.",
+    getState: "Call window.ChirpHtmxDebug.getState() for the live in-browser state object.",
+    verboseBootLog: "Set localStorage['chirp-debug-verbose']='1' before reload to log boot.",
+  };
+};
 CH.exportRecordsJson = function() {
   return JSON.stringify({
     records: state.records,

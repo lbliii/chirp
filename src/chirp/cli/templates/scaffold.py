@@ -1,4 +1,30 @@
-"""Shared files for ``chirp new`` (pyproject, migrations, theme hook)."""
+"""Shared files for ``chirp new`` (pyproject, agent guidance, migrations, theme hook)."""
+
+AGENTS_MD = """\
+# AGENTS.md
+
+This is a Chirp app. Chirp renders server-side HTML and uses return types
+(`Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, `ValidationError`) to
+declare browser behavior.
+
+## Debugging
+
+When debugging htmx swaps, OOB updates, Suspense blocks, SSE, fragment targets,
+or content negotiation, activate debug mode before guessing from screenshots:
+
+- Prefer `chirp dev app:app` when the CLI is available. It forces
+  `debug=True` for the running app.
+- Otherwise set `AppConfig(debug=True)` temporarily. If this app uses
+  `AppConfig.from_env()`, `CHIRP_DEBUG=1` also works.
+- Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools.
+- Press `Ctrl+Shift+K` to inspect inherited/direct/blocked `hx-*` settings.
+- For agent-readable diagnostics, evaluate
+  `window.ChirpHtmxDebug.help()` and
+  `window.ChirpHtmxDebug.exportRecordsJson()` in the browser context.
+
+Run `chirp check app:app` before shipping changes that touch routes, templates,
+fragments, OOB regions, Suspense, or SSE.
+"""
 
 PYPROJECT_TOML = """\
 [build-system]

@@ -122,6 +122,8 @@ if (document.startViewTransition) {
 }
 
 // --- HTMX Event Collector ---
+var recordByXhr = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
 function findPendingRecord(hasSent, hasResponse) {
   for (var i = 0; i < state.records.length; i++) {
     var r = state.records[i];
@@ -130,6 +132,25 @@ function findPendingRecord(hasSent, hasResponse) {
     return r;
   }
   return null;
+}
+
+function rememberRecordForDetail(detail, record) {
+  if (!detail || !detail.xhr || !recordByXhr || !record) return;
+  try { recordByXhr.set(detail.xhr, record); } catch (e) {}
+}
+
+function getRecordForDetail(detail, hasSent, hasResponse) {
+  if (detail && detail.xhr && recordByXhr) {
+    try {
+      var existing = recordByXhr.get(detail.xhr);
+      if (existing) return existing;
+    } catch (e) {}
+  }
+  var r = findPendingRecord(hasSent, hasResponse);
+  if (!r && hasSent && !hasResponse) r = findPendingRecord(false, false);
+  if (!r && hasSent && hasResponse) r = findPendingRecord(true, false) || findPendingRecord(false, false);
+  rememberRecordForDetail(detail, r);
+  return r;
 }
 
 function createRecord() {
@@ -157,6 +178,11 @@ function createRecord() {
     bodyPreview: "",
     contentType: "",
     renderPlan: null,
+    effectiveConfigDetails: null,
+    select: "",
+    selectMatched: null,
+    targetExistsBefore: null,
+    targetBefore: "",
     domBefore: null,
     domAfter: null,
     domDiff: null,
@@ -180,6 +206,7 @@ document.body.addEventListener("htmx:configRequest", function(evt) {
     d.elt.getAttribute("hx-delete") ? "DELETE" : "GET"
   ));
   r.elt = d.elt;
+  r.effectiveConfigDetails = getEffectiveConfigDetails(d.elt);
   r.timing.config = Date.now();
   try {
     r.requestHeaders = {};
@@ -197,13 +224,14 @@ document.body.addEventListener("htmx:configRequest", function(evt) {
 });
 
 document.body.addEventListener("htmx:beforeRequest", function(evt) {
-  var r = findPendingRecord(false, false);
+  var d = evt.detail || {};
+  var r = getRecordForDetail(d, false, false);
   if (r) r.timing.sent = Date.now();
 });
 
 document.body.addEventListener("htmx:afterRequest", function(evt) {
   var d = evt.detail || {};
-  var r = findPendingRecord(true, false);
+  var r = getRecordForDetail(d, true, false);
   if (!r) return;
   var xhr = d.xhr;
   if (xhr) {
@@ -283,12 +311,22 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
 
 document.body.addEventListener("htmx:beforeSwap", function(evt) {
   var d = evt.detail || {};
-  var r = findPendingRecord(true, true);
+  var r = getRecordForDetail(d, true, true);
   if (!r) return;
   var t = d.target;
   r.target = (t && t.id) ? "#" + t.id : (t && t.className && String(t.className).trim()) ? "." + String(t.className).split(/\s+/)[0] : (t ? "this" : "");
   r.swap = (d.swapStyle && d.swapStyle) || "innerHTML";
   r.timing.beforeSwap = Date.now();
+  r.targetExistsBefore = !!t;
+  r.targetBefore = t ? desc(t) : "";
+
+  var cfg = r.effectiveConfigDetails || (r.elt ? getEffectiveConfigDetails(r.elt) : {});
+  var select = cfg["hx-select"] && cfg["hx-select"].value;
+  var xhr = d.xhr;
+  if (select && select !== "(default)" && xhr && xhr.responseText) {
+    r.select = select;
+    r.selectMatched = responseContainsSelector(xhr.responseText, select);
+  }
 
   if (t) {
     try { r.domBefore = t.innerHTML.slice(0, 8192); } catch (e) {}
@@ -297,7 +335,7 @@ document.body.addEventListener("htmx:beforeSwap", function(evt) {
 
 document.body.addEventListener("htmx:afterSwap", function(evt) {
   var d = evt.detail || {};
-  var r = findPendingRecord(true, true);
+  var r = getRecordForDetail(d, true, true);
   if (!r) return;
   r.timing.afterSwap = Date.now();
   if (state.flash && d.target) flashTarget(d.target, r.failed ? "error" : "normal");
@@ -313,7 +351,8 @@ document.body.addEventListener("htmx:afterSwap", function(evt) {
 });
 
 document.body.addEventListener("htmx:afterSettle", function(evt) {
-  var r = findPendingRecord(true, true);
+  var d = evt.detail || {};
+  var r = getRecordForDetail(d, true, true);
   if (r) r.timing.settle = Date.now();
 });
 

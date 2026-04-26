@@ -93,6 +93,12 @@ function injectStyles() {
     ".chirp-dbg-sse-evt .evt-type{font-weight:bold;min-width:60px;display:inline-block}",
     ".chirp-dbg-vt-row{padding:8px 12px;border-radius:4px;margin-bottom:4px;display:flex;align-items:center;gap:10px;background:#1e1f2e;border-left:3px solid var(--chirp-vt)}",
     ".chirp-dbg-vt-row .vt-label{color:var(--chirp-vt);font-weight:bold}",
+    ".chirp-dbg-doctor{display:flex;flex-direction:column;gap:8px}",
+    ".chirp-dbg-doctor-status{display:inline-block;width:max-content;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:bold}",
+    ".chirp-dbg-doctor-status.ok{background:#9ece6a20;color:var(--chirp-success);border:1px solid #9ece6a40}",
+    ".chirp-dbg-doctor-status.warn{background:#e0af6820;color:var(--chirp-warning);border:1px solid #e0af6840}",
+    ".chirp-dbg-doctor ul{margin:0;padding-left:18px}",
+    ".chirp-dbg-doctor li{margin:2px 0}",
     ".chirp-dbg-section{margin:8px 0}",
     ".chirp-dbg-section-header{cursor:pointer;color:var(--chirp-info);font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:4px 0;user-select:none}",
     ".chirp-dbg-section-header:hover{color:#9bb8ff}",
@@ -197,6 +203,28 @@ function makeSection(title, contentHTML, startOpen) {
   sec.appendChild(hdr);
   sec.appendChild(body);
   return sec;
+}
+
+// --- Swap Doctor ---
+function renderSwapDoctorHTML(record) {
+  var diagnosis = buildSwapDoctor(record);
+  var html = '<div class="chirp-dbg-doctor">';
+  html += '<span class="chirp-dbg-doctor-status ' + (diagnosis.ok ? "ok" : "warn") + '">';
+  html += diagnosis.ok ? "Swap looks coherent" : diagnosis.warnings.length + " thing" + (diagnosis.warnings.length === 1 ? "" : "s") + " to check";
+  html += '</span>';
+
+  if (diagnosis.warnings.length) {
+    html += '<div><strong style="color:' + COLORS.warning + '">Likely causes</strong><ul>';
+    for (var wi = 0; wi < diagnosis.warnings.length; wi++) {
+      html += '<li>' + esc(diagnosis.warnings[wi]) + '</li>';
+    }
+    html += '</ul></div>';
+  }
+
+  html += '<div><strong style="color:' + COLORS.info + '">Swap evidence</strong>';
+  html += '<div class="chirp-dbg-hl" style="margin-top:4px">' + esc(diagnosis.lines.join("\n")) + '</div></div>';
+  html += '</div>';
+  return html;
 }
 
 // --- Panel DOM ---
@@ -573,6 +601,11 @@ function renderActivityLog() {
         dc.appendChild(hlSection("Route", esc(rl.join("\n")), false));
       }
 
+      if (!r.isOob) {
+        var diagnosis = buildSwapDoctor(r);
+        dc.appendChild(makeSection("Swap Doctor", renderSwapDoctorHTML(r), !diagnosis.ok));
+      }
+
       if (r.renderPlan) {
         dc.appendChild(makeSection("Render Plan", '<div class="chirp-dbg-hl">' + renderRenderPlanHTML(r.renderPlan) + '</div>', true));
       }
@@ -624,7 +657,7 @@ function renderActivityLog() {
       dc.appendChild(hlSection("Replay (curl)", esc(buildCurl(r)), false));
 
       if (r.elt) {
-        dc.appendChild(hlSection("Effective hx-*", esc(formatConfig(getEffectiveConfig(r.elt))), false));
+        dc.appendChild(hlSection("Effective hx-*", esc(formatConfigDetails(r.effectiveConfigDetails || getEffectiveConfigDetails(r.elt))), false));
       }
 
       var btnRow = document.createElement("div");

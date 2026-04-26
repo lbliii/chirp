@@ -35,6 +35,7 @@ class TestChirpNewDefaultV2:
         assert (project / "pages" / "dashboard" / "page.html").is_file()
         assert (project / "static" / "style.css").is_file()
         assert (project / "static" / "theme.css").is_file()
+        assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
         assert (project / "migrations" / ".gitkeep").is_file()
         assert (project / "tests" / "conftest.py").is_file()
@@ -80,6 +81,17 @@ class TestChirpNewDefaultV2:
         assert "Created project 'myapp'" in captured.out
         assert "Login: admin / password" in captured.out
 
+    def test_generated_agents_md_points_agents_to_devtools(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp"])
+
+        guidance = (tmp_path / "myapp" / "AGENTS.md").read_text()
+        assert "chirp dev app:app" in guidance
+        assert "window.ChirpHtmxDebug.help()" in guidance
+        assert "window.ChirpHtmxDebug.exportRecordsJson()" in guidance
+
 
 class TestChirpNewMinimal:
     def test_creates_minimal_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,6 +101,7 @@ class TestChirpNewMinimal:
 
         project = tmp_path / "myapp"
         assert (project / "app.py").is_file()
+        assert (project / "AGENTS.md").is_file()
         assert (project / "templates" / "index.html").is_file()
         assert not (project / "pages").exists()
         assert not (project / "static").exists()
@@ -111,6 +124,7 @@ class TestChirpNewSSE:
 
         project = tmp_path / "myapp"
         assert (project / "app.py").is_file()
+        assert (project / "AGENTS.md").is_file()
         assert (project / "templates" / "index.html").is_file()
         assert (project / "static" / "style.css").is_file()
         assert (project / "tests" / "test_app.py").is_file()
@@ -131,6 +145,7 @@ class TestChirpNewShell:
         assert (project / "pages" / "items" / "_layout.html").is_file()
         assert (project / "pages" / "items" / "page.py").is_file()
         assert (project / "pages" / "items" / "page.html").is_file()
+        assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
         assert (project / "static" / "theme.css").is_file()
 

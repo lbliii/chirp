@@ -3,15 +3,20 @@
 var overlayEl, tooltipEl, highlightEl, pinnedEl;
 
 function buildTooltip(el, pinRect) {
-  var cfg = getEffectiveConfig(el);
-  var hasHx = Object.keys(cfg).some(function(k) { return cfg[k] !== "(default)"; });
+  var cfg = getEffectiveConfigDetails(el);
+  var hasHx = Object.keys(cfg).some(function(k) { return cfg[k].value !== "(default)"; });
   if (!hasHx && !pinRect) {
     tooltipEl.style.display = "none";
     return;
   }
   var lines = [desc(el)];
   for (var k in cfg) {
-    lines.push(k + ": " + cfg[k] + (pinRect ? "" : cfg[k] === "(default)" ? "" : " (direct)"));
+    var d = cfg[k];
+    var suffix = "";
+    if (!pinRect && d.source && d.source !== "default") {
+      suffix = " (" + d.source + (d.element ? " from " + d.element : "") + ")";
+    }
+    lines.push(k + ": " + d.value + suffix);
   }
   tooltipEl.textContent = lines.join("\n");
   tooltipEl.style.display = "block";
