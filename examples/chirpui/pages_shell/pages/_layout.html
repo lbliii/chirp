@@ -1,7 +1,8 @@
 {# target: body #}
 {# outlet: main #}
 {% extends "chirpui/app_shell_layout.html" %}
-{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/nav_tree.html" import nav_tree %}
+{% from "chirpui/sidebar.html" import sidebar %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 
 {% block title %}Docs Hub{% end %}
@@ -37,13 +38,6 @@
 
 {% block sidebar %}
 {% call sidebar() %}
-  {% call sidebar_section("Documentation") %}
-    {{ sidebar_link("/projects", "All Projects", icon="grid", match="prefix") }}
-  {% end %}
-  {% call sidebar_section("Projects") %}
-    {% for p in (projects ?? ()) %}
-    {{ sidebar_link("/projects/" ~ p.slug, p.name, icon="link") }}
-    {% end %}
-  {% end %}
+  {{ nav_tree(project_nav_items ?? (), show_icons=true, branch_mode="linked") }}
 {% end %}
 {% end %}

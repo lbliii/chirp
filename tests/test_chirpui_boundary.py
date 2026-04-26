@@ -288,6 +288,14 @@ class TestChirpUIIntegration:
             assert resp.status == 200
             assert "chirpuiDropdown" in resp.text
 
+    async def test_static_app_theme_served(self):
+        """ChirpUI token starter theme is served from the package."""
+        app = _make_chirpui_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/static/themes/app-theme-starter.css")
+            assert resp.status == 200
+            assert "app theme starter" in resp.text
+
     @pytest.mark.skipif(
         not (Path(chirp_ui.static_path()) / "chirpui-alpine.js").exists(),
         reason="chirp-ui Alpine runtime not available in this version",
@@ -300,6 +308,14 @@ class TestChirpUIIntegration:
             assert resp.status == 200
             assert 'data-chirp="chirpui-alpine"' in resp.text
             assert "/static/chirpui-alpine.js" in resp.text
+            assert 'data-chirp="chirpui-app-theme"' in resp.text
+            assert "/static/themes/app-theme-starter.css" in resp.text
+            assert resp.text.index("/static/chirpui.css") < resp.text.index(
+                "/static/themes/app-theme-starter.css"
+            )
+            check = chirp_ui.check_alpine_runtime(resp.text)
+            assert check.ok
+            assert check.script_loaded
 
     async def test_sequential_requests_through_middleware(self):
         """Multiple requests through ChirpUI middleware all see ContextVar."""

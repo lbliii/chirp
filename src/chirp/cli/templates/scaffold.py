@@ -42,7 +42,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["chirp-ui>=0.5.0"]
+ui = ["chirp-ui>=0.6.0"]
 auth = ["argon2-cffi>=23.1.0", "itsdangerous>=2.2.0"]
 forms = ["python-multipart>=0.0.18"]
 """
@@ -52,5 +52,6 @@ MIGRATIONS_README = """# Migrations
 Place SQL migration scripts here when using ``chirp.data`` or another migration tool.
 """
 
-THEME_CSS_STUB = """/* Optional ChirpUI design-token overrides — see chirp-ui docs/TOKENS.md */
+THEME_CSS_STUB = """/* Optional app-owned ChirpUI token overrides.
+   Loaded after /static/themes/app-theme-starter.css. See chirp-ui docs/APP-THEME.md. */
 """

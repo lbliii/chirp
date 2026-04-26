@@ -11,6 +11,7 @@ class TestPagesShell:
             assert "Projects" in response.text
             assert "New project" in response.text
             assert "Apollo" in response.text
+            assert "chirpui-nav-tree--linked-branches" in response.text
 
     async def test_boosted_detail_streams_suspense_shell(self, example_app) -> None:
         async with TestClient(example_app) as client:

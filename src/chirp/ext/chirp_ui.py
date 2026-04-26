@@ -19,13 +19,18 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from chirp.http.request import Request
+from chirp.middleware.protocol import AnyResponse, Next
+
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
     from chirp.contracts.types import CheckResult
 
 from chirp.contracts.types import ContractIssue, Severity
+from chirp.http.response import Response, StreamingResponse
 from chirp.middleware.inject import StreamingHTMLInject
+from chirp.middleware.streaming_html import async_stream_inject_before_body
 from chirp.pages.types import LayoutPreset
 from chirp.templating.fragment_target_registry import PageShellContract, PageShellTarget
 
@@ -79,8 +84,76 @@ def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     )
 
 
+def _chirpui_app_theme_snippet(prefix: str) -> str:
+    normalized = "/" + prefix.strip("/")
+    return (
+        f'<link rel="stylesheet" href="{normalized}/themes/app-theme-starter.css" '
+        'data-chirp="chirpui-app-theme">'
+    )
+
+
 def _chirpui_empty_csrf_token() -> str:
     return ""
+
+
+class _ChirpUIAppThemeInject:
+    """Inject ChirpUI's token-only app theme after the base stylesheet."""
+
+    __slots__ = ("_chirpui_css_markers", "_dedup_marker", "_snippet")
+
+    def __init__(self, prefix: str) -> None:
+        normalized = "/" + prefix.strip("/")
+        self._snippet = _chirpui_app_theme_snippet(prefix)
+        self._dedup_marker = 'data-chirp="chirpui-app-theme"'
+        self._chirpui_css_markers = (
+            f'<link rel="stylesheet" href="{normalized}/chirpui.css">',
+            f"<link rel='stylesheet' href='{normalized}/chirpui.css'>",
+        )
+
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        response = await next(request)
+        if isinstance(response, StreamingResponse):
+            return self._streaming(response, request)
+        if not isinstance(response, Response):
+            return response
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_htmx:
+            return response
+
+        body = response.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        if self._dedup_marker in body or "app-theme-starter.css" in body:
+            return response
+
+        for marker in self._chirpui_css_markers:
+            if marker in body:
+                body = body.replace(marker, marker + "\n" + self._snippet, 1)
+                return replace(response, body=body)
+
+        if "</head>" in body:
+            body = body.replace("</head>", self._snippet + "</head>", 1)
+            return replace(response, body=body)
+        return response
+
+    def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_htmx:
+            return response
+        new_chunks = async_stream_inject_before_body(
+            response.chunks,
+            snippet=self._snippet,
+            before="</head>",
+            dedup_marker=self._dedup_marker,
+            full_page_only=True,
+        )
+        return replace(response, chunks=new_chunks)
 
 
 def use_chirp_ui(
@@ -160,6 +233,7 @@ def use_chirp_ui(
                 make_route_link_attrs_fn(swap_resolver=_swap_resolver)
             )
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
+    app.add_middleware(_ChirpUIAppThemeInject(prefix))
     app.add_middleware(
         StreamingHTMLInject(
             _chirpui_alpine_runtime_snippet(prefix),
@@ -297,6 +371,7 @@ def check_design_system_surface(
     templates need descriptors immediately).
     """
     try:
+        import chirp_ui
         from chirp_ui.components import COMPONENTS, design_system_report
     except ImportError:
         return
@@ -306,16 +381,33 @@ def check_design_system_surface(
         return
 
     report = design_system_report()
-    stats = report.get("stats", {})
+    manifest: dict[str, Any] = {}
+    load_manifest = getattr(chirp_ui, "load_manifest", None)
+    if callable(load_manifest):
+        try:
+            manifest = load_manifest()
+        except Exception:
+            manifest = {}
+    stats = manifest.get("stats") or report.get("stats", {})
+    schema = manifest.get("schema")
+    version = manifest.get("version")
+    requirements = stats.get("component_requirements") or {}
+    requirement_summary = ""
+    if requirements:
+        requirement_summary = "; requirements: " + ", ".join(
+            f"{name}={count}" for name, count in sorted(requirements.items())
+        )
+    manifest_label = f" ({schema} {version})" if schema and version else ""
 
     result.issues.append(
         ContractIssue(
             severity=Severity.INFO,
             category="design_system",
             message=(
-                f"chirp-ui design system: "
+                f"chirp-ui design system{manifest_label}: "
                 f"{stats.get('total_components', 0)} components, "
                 f"{stats.get('total_tokens', 0)} tokens"
+                f"{requirement_summary}"
             ),
         )
     )

@@ -54,6 +54,23 @@ class TestChirpNewDefaultV2:
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source
 
+    def test_generated_v2_chirpui_layout_loads_theme_override_slot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from chirp.cli import _new
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(_new, "_has_chirpui", lambda: True)
+        main(["new", "myapp"])
+
+        layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text()
+        assert "/static/chirpui.css" in layout
+        assert "/static/theme.css" in layout
+        assert layout.index("/static/chirpui.css") < layout.index("/static/theme.css")
+
+        theme = (tmp_path / "myapp" / "static" / "theme.css").read_text()
+        assert "app-theme-starter.css" in theme
+
     def test_generated_v2_files_are_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

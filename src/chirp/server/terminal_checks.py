@@ -211,6 +211,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "secret_key": "Production Safety",
     "plugin_check_error": "Plugins",
     "chirpui_import": "Plugins",
+    "chirpui_runtime": "Plugins",
     "design_system": "Plugins",
     "blog": "Plugins",
     "docs_parse": "Docs",
