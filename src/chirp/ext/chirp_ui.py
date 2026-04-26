@@ -79,6 +79,10 @@ def _chirpui_alpine_runtime_snippet(prefix: str) -> str:
     )
 
 
+def _chirpui_empty_csrf_token() -> str:
+    return ""
+
+
 def use_chirp_ui(
     app: App,
     prefix: str = "/static",
@@ -114,6 +118,13 @@ def use_chirp_ui(
 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
+        template_globals = getattr(getattr(app, "_mutable_state", None), "template_globals", {})
+        current_csrf_token = template_globals.get("csrf_token")
+        if current_csrf_token is None or getattr(current_csrf_token, "__module__", "").startswith(
+            "chirp_ui"
+        ):
+            app.template_global("csrf_token")(_chirpui_empty_csrf_token)
+
         # importlib + getattr: optional peer dep; static import fails ty when chirp-ui
         # is not on the type-check environment's path.
         make_route_link_attrs_fn: Callable[..., Any] | None = None

@@ -53,6 +53,20 @@ class ContractIssue:
     details: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ContractCoverage:
+    """High-level coverage counters for serious hypermedia apps."""
+
+    post_routes: int = 0
+    post_routes_with_form_contract: int = 0
+    mounted_page_routes: int = 0
+    mounted_page_routes_with_contract: int = 0
+    page_shell_contracts: int = 0
+    page_shell_required_blocks: int = 0
+    fragment_targets_registered: int = 0
+    oob_regions_registered: int = 0
+
+
 @dataclass(slots=True)
 class CheckResult:
     """Result of a hypermedia surface check."""
@@ -69,6 +83,7 @@ class CheckResult:
     component_calls_validated: int = 0
     page_context_warnings: int = 0
     elapsed_ms: float | None = None
+    coverage: ContractCoverage = field(default_factory=ContractCoverage)
 
     @property
     def errors(self) -> list[ContractIssue]:

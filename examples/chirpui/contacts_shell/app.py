@@ -11,9 +11,10 @@ Run:
 """
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, use_chirp_ui
+from chirp import App, AppConfig, Fragment, Request, form_from, use_chirp_ui
 from chirp.middleware.csrf import CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
@@ -24,7 +25,13 @@ sys.path.insert(0, str(ROOT_DIR))
 sys.modules.pop("contacts_shell_store", None)
 
 from chirp_ui import register_colors
-from contacts_shell_store import GROUP_COLORS, reset_store
+from contacts_shell_store import GROUP_COLORS, reset_store, store
+
+
+@dataclass(frozen=True, slots=True)
+class ContactSelectionForm:
+    contact_ids: list[int]
+
 
 config = AppConfig(template_dir=PAGES_DIR, debug=True)
 app = App(config=config)
@@ -35,6 +42,13 @@ app.add_middleware(SessionMiddleware(SessionConfig(secret_key="contacts-shell-de
 app.add_middleware(CSRFMiddleware())
 reset_store()
 app.mount_pages(str(PAGES_DIR))
+
+
+@app.route("/contacts/selection", methods=["POST"])
+async def select_contacts(request: Request):
+    form = await form_from(request, ContactSelectionForm)
+    selected = [contact for contact_id in form.contact_ids if (contact := store.get(contact_id))]
+    return Fragment("contacts/selection.html", "selection_preview", selected_contacts=selected)
 
 
 if __name__ == "__main__":

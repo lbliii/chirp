@@ -1,0 +1,14 @@
+{% block selection_preview %}
+<div id="contacts-selection-preview"
+     class="chirpui-text-muted chirpui-font-sm"
+     hx-disinherit="hx-select hx-target hx-swap">
+  {% if selected_contacts %}
+  Selected:
+  {% for contact in selected_contacts %}
+    {{ contact.name }}{% if not loop.last %}, {% end %}
+  {% end %}
+  {% else %}
+  No contacts selected.
+  {% end %}
+</div>
+{% endblock %}

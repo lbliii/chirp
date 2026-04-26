@@ -1,0 +1,23 @@
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<main id="boards-page" class="forum-page">
+  <header>
+    <p class="forum-meta">Reference pattern</p>
+    <h1>Boards</h1>
+    <p>Small forum shell showing mounted pages, app-shell navigation, contracts, and data islands.</p>
+  </header>
+  <section class="forum-grid" aria-label="Boards">
+    {% for board in boards %}
+    <article class="forum-card">
+      <h2><a href="/boards/{{ board.slug }}">{{ board.name }}</a></h2>
+      <p>{{ board.description }}</p>
+    </article>
+    {% end %}
+  </section>
+</main>
+{% endblock %}
+{% end %}
+</div>
+{% end %}

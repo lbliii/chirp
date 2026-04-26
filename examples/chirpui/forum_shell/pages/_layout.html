@@ -1,0 +1,69 @@
+{# target: body #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+
+{% block title %}Forum Shell{% end %}
+
+{% block head_extra %}
+<style>
+  .forum-page { padding-block: 1.5rem 2rem; }
+  .forum-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+  .forum-card { border: 1px solid var(--chirpui-border); border-radius: .5rem; padding: 1rem; background: var(--chirpui-surface); }
+  .forum-post { border-left: 3px solid var(--chirpui-accent); padding: .75rem 1rem; background: var(--chirpui-surface); }
+  .forum-meta { color: var(--chirpui-text-muted); font-size: .875rem; }
+  .forum-reply { display: grid; gap: .75rem; max-width: 48rem; }
+  .forum-reply textarea { min-height: 8rem; }
+</style>
+{% end %}
+
+{% block title_oob %}
+<title id="chirpui-document-title">Forum Shell</title>
+{% end %}
+
+{% block brand %}Forum Shell{% end %}
+{% block topbar_center %}
+<span class="chirpui-text-muted chirpui-font-sm">Mounted pages, contracts, mentions, and OOB updates</span>
+{% end %}
+
+{% block breadcrumbs_oob %}
+<span class="chirpui-text-muted chirpui-font-sm">Mounted pages, contracts, mentions, and OOB updates</span>
+{% end %}
+
+{% block topbar_end %}
+<span id="forum-unread-count">{{ unread_count }} unread</span>
+{{ theme_toggle() }}
+{% end %}
+
+{% block unread_count_oob %}
+{{ unread_count }} unread
+{% end %}
+
+{% block shell_actions_oob %}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+{% if shell_actions %}
+{{ shell_actions_bar(shell_actions) }}
+{% end %}
+{% end %}
+
+{% block sidebar %}
+{% call sidebar() %}
+  {% call sidebar_section("Boards") %}
+    {{ sidebar_link("/boards", "All boards", icon="grid") }}
+    {% for board in boards %}
+    {{ sidebar_link("/boards/" ~ board.slug, board.name, icon="link") }}
+    {% end %}
+  {% end %}
+{% end %}
+{% end %}
+
+{% block sidebar_oob %}
+{% call sidebar() %}
+  {% call sidebar_section("Boards") %}
+    {{ sidebar_link("/boards", "All boards", icon="grid") }}
+    {% for board in boards %}
+    {{ sidebar_link("/boards/" ~ board.slug, board.name, icon="link") }}
+    {% end %}
+  {% end %}
+{% end %}
+{% end %}

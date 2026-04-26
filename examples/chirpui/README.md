@@ -20,6 +20,7 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 ## Representative Examples
 
 - `contacts_shell`: ChirpUI shell companion to the standalone contacts CRUD example
+- `forum_shell`: compact forum/PBP app shell with mounted pages, form contracts, repeated fields, JSON data islands, and OOB shell updates
 - `pages_shell`: mounted pages and shell actions
 - `shell_oob`: app shell with AST-driven OOB updates
 - `islands_shell`: islands inside a shell-aware layout
@@ -29,6 +30,7 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 ## Inventory
 
 - `contacts_shell`
+- `forum_shell`
 - `islands_shell`
 - `kanban_shell`
 - `llm_playground`

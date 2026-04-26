@@ -195,6 +195,11 @@ class Page:
             page_block_name="page_root",
             stats=stats,
         )
+
+    For page-directory/app-shell templates that follow Chirp's conventional
+    ``page_root`` / ``page_content`` blocks::
+
+        return Page.mounted("dashboard/page.html", stats=stats)
     """
 
     template_name: str
@@ -238,6 +243,23 @@ class Page:
     def effective_page_block_name(self) -> str:
         """Block used when a full page fragment root is required."""
         return self.page_block_name or self.block_name
+
+    @staticmethod
+    def mounted(
+        template_name: str,
+        /,
+        *,
+        block_name: str = "page_content",
+        page_block_name: str = "page_root",
+        **context: Any,
+    ) -> Page:
+        """Create a Page for mounted page-directory/app-shell templates."""
+        return Page(
+            template_name,
+            block_name,
+            page_block_name=page_block_name,
+            **context,
+        )
 
 
 @dataclass(frozen=True, slots=True)
