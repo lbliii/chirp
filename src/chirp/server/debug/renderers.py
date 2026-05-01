@@ -20,8 +20,8 @@ from chirp.server.debug.styles import _CSS, _TOGGLE_JS
 from chirp.server.debug.template_context import _extract_template_context
 
 
-def _esc(text: str) -> str:
-    """HTML-escape a string."""
+def _esc(text: object) -> str:
+    """HTML-escape a display value."""
     return html.escape(str(text), quote=True)
 
 

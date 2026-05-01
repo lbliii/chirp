@@ -1,6 +1,6 @@
 # Chirp Roadmap
 
-Status: active roadmap for 0.5.x maturity work.
+Status: active roadmap for 0.6.x maturity work.
 
 Chirp's north star is unchanged: Python developers should be able to build
 hypermedia-native applications with server-rendered HTML, typed return values,
@@ -15,10 +15,24 @@ turns that thesis into something an outside developer can trust.
 - Examples are treated as executable documentation and must stay under test.
 - Contract checks are the framework's flagship reliability feature, not an optional nicety.
 
+Steward check-in on 2026-05-01:
+
+- `uv run ruff check .` and `uv run ruff format . --check` passed.
+- `uv run ty check src/chirp/` passed.
+- `uv run pytest tests/ -q --tb=short --timeout=60 -m "not slow"` passed.
+- `uv run pytest examples/ -q --tb=short --timeout=60 -m "not slow"` passed.
+- `uv run pytest tests/contracts -q --tb=short --timeout=60` passed.
+- `uv run pytest tests/test_concurrency -q --tb=short --timeout=60` passed.
+- `uv run python -m benchmarks.core --iterations 250 --route-count 100 --output /tmp/chirp-core-steward-smoke.json` passed.
+
 ## Phase 0: Make Main Boring
 
 Goal: `main` should feel calm. A contributor should be able to run the standard checks and
 believe the result.
+
+Status: current release-gate checks are green as of the 2026-05-01 steward check-in. Keep this
+phase active as a regression guard; any failing example, noisy warning, or free-threaded warning
+should be treated as release-blocking until classified.
 
 Deliverables:
 
@@ -39,6 +53,10 @@ Acceptance:
 
 Goal: `app.check()` should be the thing people remember. If an app starts clean, its
 hypermedia surface should be coherent.
+
+Status: grouped terminal output by concern and elapsed timing diagnostics are implemented and
+covered by `tests/test_terminal_checks.py`. Remaining work should focus on preserving message
+actionability, adding checks only for user-visible failure modes, and keeping debug startup fast.
 
 Deliverables:
 
