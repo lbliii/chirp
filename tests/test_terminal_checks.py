@@ -186,3 +186,11 @@ class TestFormatterConcernGroups:
         result = CheckResult(routes_checked=2, templates_scanned=3, elapsed_ms=12.345)
         out = _strip_ansi(format_check_result(result, color=False))
         assert "12.3ms elapsed" in out
+
+    def test_coverage_block_is_optional(self) -> None:
+        result = CheckResult()
+        without = _strip_ansi(format_check_result(result, color=False))
+        with_coverage = _strip_ansi(format_check_result(result, color=False, show_coverage=True))
+        assert "Coverage" not in without
+        assert "Coverage" in with_coverage
+        assert "POST FormContract" in with_coverage

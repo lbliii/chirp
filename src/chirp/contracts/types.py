@@ -66,6 +66,16 @@ class ContractCoverage:
     fragment_targets_registered: int = 0
     oob_regions_registered: int = 0
 
+    @property
+    def post_routes_without_form_contract(self) -> int:
+        """POST routes that do not declare a FormContract."""
+        return max(0, self.post_routes - self.post_routes_with_form_contract)
+
+    @property
+    def mounted_page_routes_without_contract(self) -> int:
+        """Mounted page routes whose handlers do not carry any route contract."""
+        return max(0, self.mounted_page_routes - self.mounted_page_routes_with_contract)
+
 
 @dataclass(slots=True)
 class CheckResult:

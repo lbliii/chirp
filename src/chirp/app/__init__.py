@@ -731,7 +731,7 @@ class App:
         self._assert_contracts_ready()
         self._contract_checks.run_debug_checks(self)
 
-    def check(self, *, warnings_as_errors: bool = False) -> None:
+    def check(self, *, warnings_as_errors: bool = False, coverage: bool = False) -> None:
         """Validate hypermedia contracts against the frozen app and print a report.
 
         Runs every registered contract check (routes, fragment targets, OOB
@@ -745,6 +745,9 @@ class App:
         Args:
             warnings_as_errors: When True, WARNING-severity issues fail the
                 check alongside errors (use this in CI to fail on drift).
+            coverage: When True, include contract coverage counters for POST
+                form contracts, mounted page contracts, app-shell targets, and
+                OOB regions.
 
         Raises:
             SystemExit: With code 1 when any ERROR issue is found, or any
@@ -754,7 +757,11 @@ class App:
         """
         self._ensure_frozen()
         self._assert_contracts_ready()
-        self._contract_checks.check(self, warnings_as_errors=warnings_as_errors)
+        self._contract_checks.check(
+            self,
+            warnings_as_errors=warnings_as_errors,
+            coverage=coverage,
+        )
 
     def render(self, value: Fragment | Template | InlineTemplate) -> str:
         """Render a Fragment, Template, or InlineTemplate to HTML without an HTTP request.

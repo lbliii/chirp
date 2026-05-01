@@ -52,6 +52,18 @@ def test_check_records_elapsed_time(
     assert "elapsed" in capsys.readouterr().out
 
 
+def test_check_can_print_coverage(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Coverage output is explicit so normal check output stays compact."""
+    monkeypatch.setattr("chirp.contracts.check_hypermedia_surface", lambda app: CheckResult())
+    runner = ContractCheckRunner(AppConfig())
+
+    runner.check(object(), coverage=True)
+
+    assert "Coverage" in capsys.readouterr().out
+
+
 def test_check_fails_when_warnings_as_errors_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Strict warning mode should turn warning-only checks into failures."""
     monkeypatch.setattr(

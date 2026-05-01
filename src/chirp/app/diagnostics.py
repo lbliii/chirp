@@ -44,7 +44,13 @@ class ContractCheckRunner:
         if not result.ok:
             sys.exit(1)
 
-    def check(self, app: App, *, warnings_as_errors: bool = False) -> None:
+    def check(
+        self,
+        app: App,
+        *,
+        warnings_as_errors: bool = False,
+        coverage: bool = False,
+    ) -> None:
         from chirp.contracts import check_hypermedia_surface
 
         started = time.perf_counter()
@@ -56,6 +62,7 @@ class ContractCheckRunner:
                 color=None,
                 fragment_target_registry=self._registry(app),
                 verbose_registry=self._config.debug,
+                show_coverage=coverage,
             )
         )
         has_warnings = len(result.warnings) > 0

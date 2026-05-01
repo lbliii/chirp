@@ -106,6 +106,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Exit with code 1 if contract warnings are present",
     )
+    check_parser.add_argument(
+        "--coverage",
+        action="store_true",
+        help="Show route/template contract coverage counters",
+    )
 
     # -- chirp routes -----------------------------------------------------
     routes_parser = subparsers.add_parser("routes", help="List registered routes")

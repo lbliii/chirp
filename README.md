@@ -82,6 +82,7 @@ chirp new myapp && cd myapp && python app.py
 | `chirp run <app>` | Start the dev server from an import string |
 | `chirp check <app>` | Validate hypermedia contracts |
 | `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
+| `chirp check <app> --coverage` | Show contract coverage counters |
 | `chirp routes <app>` | Print the registered route table |
 | `App()` | Create an application |
 | `@app.route(path)` | Register a route handler |
