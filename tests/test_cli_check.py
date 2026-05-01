@@ -42,7 +42,13 @@ class TestChirpCheck:
         """check forwards strict warning mode to App.check()."""
         fake_check.return_value = None
         main(["check", "_check_test_app:app", "--warnings-as-errors"])
-        fake_check.assert_called_once_with(warnings_as_errors=True)
+        fake_check.assert_called_once_with(warnings_as_errors=True, coverage=False)
+
+    def test_coverage_flag_is_forwarded(self, fake_check: MagicMock) -> None:
+        """check forwards coverage reporting to App.check()."""
+        fake_check.return_value = None
+        main(["check", "_check_test_app:app", "--coverage"])
+        fake_check.assert_called_once_with(warnings_as_errors=False, coverage=True)
 
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """check exits 1 with error message for bad import string."""

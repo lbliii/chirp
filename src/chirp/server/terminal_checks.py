@@ -298,6 +298,47 @@ def _format_fragment_registry(
     return lines[:-1] if lines[-1] == "" else lines
 
 
+def _format_coverage(result: CheckResult, c: _Palette) -> list[str]:
+    """Render high-level contract coverage counters."""
+    coverage = result.coverage
+    lines = [f"  {c.cyan}Coverage{c.reset}", ""]
+    rows = (
+        (
+            "POST FormContract",
+            coverage.post_routes_with_form_contract,
+            coverage.post_routes,
+            coverage.post_routes_without_form_contract,
+        ),
+        (
+            "Mounted page contracts",
+            coverage.mounted_page_routes_with_contract,
+            coverage.mounted_page_routes,
+            coverage.mounted_page_routes_without_contract,
+        ),
+    )
+    for label, covered, total, missing in rows:
+        if total == 0:
+            lines.append(f"  {label}: {c.dim}n/a{c.reset}")
+            continue
+        status = f"{covered}/{total}"
+        suffix = "" if missing == 0 else f" {c.dim}({missing} uncovered){c.reset}"
+        lines.append(f"  {label}: {c.bold}{status}{c.reset}{suffix}")
+    lines.append(
+        f"  Page shell contracts: {c.bold}{coverage.page_shell_contracts}{c.reset}"
+        f" {c.dim}({coverage.page_shell_required_blocks} required block"
+        f"{'s' if coverage.page_shell_required_blocks != 1 else ''}){c.reset}"
+    )
+    lines.append(
+        f"  Fragment targets: {c.bold}{coverage.fragment_targets_registered}{c.reset}"
+        f" {c.dim}registered{c.reset}"
+    )
+    lines.append(
+        f"  OOB regions: {c.bold}{coverage.oob_regions_registered}{c.reset}"
+        f" {c.dim}registered{c.reset}"
+    )
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -309,6 +350,7 @@ def format_check_result(
     color: bool | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
     verbose_registry: bool = False,
+    show_coverage: bool = False,
 ) -> str:
     """Format a CheckResult for rich terminal display.
 
@@ -321,6 +363,8 @@ def format_check_result(
             dump grouped by contract before the summary line.
         verbose_registry: When True, render the full registry dump. Gated
             by the caller on ``config.debug``.
+        show_coverage: When True, render route/template coverage counters
+            that make form, mounted-page, shell, and OOB contract coverage visible.
 
     Returns:
         Multi-line string ready for ``sys.stderr.write()``.
@@ -363,6 +407,10 @@ def format_check_result(
         stats_parts.append(f"{c.bold}{result.elapsed_ms:.1f}ms{c.reset} {c.dim}elapsed{c.reset}")
     if stats_parts:
         lines.append(f"  {sep.join(stats_parts)}")
+        lines.append("")
+
+    if show_coverage:
+        lines.extend(_format_coverage(result, c))
         lines.append("")
 
     # ── Issues grouped by concern, severity within concern ──
