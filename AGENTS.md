@@ -68,6 +68,71 @@ Forks where I want a check-in, not a judgment call:
 
 ---
 
+## Scoped stewards
+
+Root `AGENTS.md` is the constitution. It explains the project thesis, safety rules, and review
+bar. Nested `AGENTS.md` files are local steward notes: they define the package boundary, what that
+domain protects, and the checks that give the fastest signal for that slice.
+
+- When editing a subtree, read the nearest `AGENTS.md` before changing files there.
+- When a change spans multiple subtrees, read each affected steward file and include short
+  **Steward Notes** in the PR description.
+- Scoped steward files do not override this root guidance. If they disagree, root wins and the
+  nested file should be fixed.
+- Keep steward notes lightweight. They are there to sharpen judgment, not create process theatre.
+
+Current steward map:
+
+| Domain | Steward file |
+| --- | --- |
+| Public API, config, top-level errors, plugins | `src/chirp/AGENTS.md` |
+| App lifecycle, freeze, registries, mounting | `src/chirp/app/AGENTS.md` |
+| HTTP primitives and request/response contracts | `src/chirp/http/AGENTS.md` |
+| Routing and path resolution | `src/chirp/routing/AGENTS.md` |
+| Request handling, negotiation, debug, sync path | `src/chirp/server/AGENTS.md` |
+| Templates, return types, render plans, OOB, Suspense | `src/chirp/templating/AGENTS.md` |
+| Startup contract checks | `src/chirp/contracts/AGENTS.md` |
+| Filesystem pages, shells, sections, reactive pages | `src/chirp/pages/AGENTS.md` |
+| Middleware and request pipeline safety | `src/chirp/middleware/AGENTS.md` |
+| Security primitives | `src/chirp/security/AGENTS.md` |
+| Cache backends and cache middleware | `src/chirp/cache/AGENTS.md` |
+| Data, schema, migrations, query helpers | `src/chirp/data/AGENTS.md` |
+| SSE and reactive events | `src/chirp/realtime/AGENTS.md` |
+| MCP/tools integration | `src/chirp/tools/AGENTS.md` |
+| CLI and scaffolds | `src/chirp/cli/AGENTS.md` |
+| Test helpers | `src/chirp/testing/AGENTS.md` |
+| Test suite ownership | `tests/AGENTS.md` |
+| Contract test suite ownership | `tests/contracts/AGENTS.md` |
+| Examples as executable docs | `examples/AGENTS.md` |
+| Narrative docs and release policy | `docs/AGENTS.md` |
+| Bengal docs site content/config | `site/AGENTS.md` |
+| Benchmarks and performance claims | `benchmarks/AGENTS.md` |
+
+### "ask stewards" workflow
+
+When the user says **"ask stewards"**, run a steward consultation before prioritizing or making
+cross-cutting implementation choices.
+
+1. Verify the checkout/ref is current enough for the question: run `git status --short --branch`;
+   if network is available and freshness matters, compare with upstream (`git fetch`, then inspect
+   branch/ahead-behind). Record any inability to verify freshness.
+2. Enumerate steward files with `find . -name AGENTS.md -not -path './.git/*' | sort`.
+3. For implementation work, consult the root file plus stewards for the files/subtrees likely to
+   change. For backlog, roadmap, or prioritization work, consult all stewards.
+4. Ask each steward lens for: top priority, confidence, evidence, dependencies, risks, tempting
+   "not now" items, and upstream/downstream service opportunities.
+5. Synthesize with weighted voting. Give more weight to convergence, blast radius, dependency
+   order, public contract risk, user-visible correctness, risk reduction, and reversibility.
+6. Preserve minority reports when a steward has a credible dissent, especially around public API,
+   render pipeline, contract severity, free-threading, or performance claims.
+7. Produce a short rollup report: recommendation, top 3 priorities, evidence, risks, dependencies,
+   minority reports, and "not now" list.
+
+For PRs that used this workflow, add **Steward Notes** with the consulted steward files, the chosen
+priority order, and any dissent that reviewers should see.
+
+---
+
 ## Anti-patterns
 
 Things that look reasonable and are wrong here:
