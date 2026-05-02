@@ -65,7 +65,7 @@ rendering over chunked transfer.
 :::{/card}
 
 :::{card} Server-Sent Events
-:icon: radio
+:icon: network
 Push kida-rendered HTML fragments to the browser in real time. Combined with htmx, this
 enables live UI updates with zero client-side JavaScript.
 :::{/card}

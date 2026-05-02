@@ -20,21 +20,21 @@ cascade:
 
 :::{card} Routes
 :icon: map
-:link: ./routes
+:link: /chirp/docs/routing/routes/
 :description: Route registration and path parameters
 Decorators, methods, typed parameters, and catch-all routes.
 :::{/card}
 
 :::{card} Filesystem Routing
 :icon: folder
-:link: ./filesystem-routing
+:link: /chirp/docs/routing/filesystem-routing/
 :description: Route discovery from the pages/ directory
 Layout nesting, context cascade, and co-located handlers.
 :::{/card}
 
 :::{card} Request & Response
-:icon: arrow-right-left
-:link: ./request-response
+:icon: workflow
+:link: /chirp/docs/routing/request-response/
 :description: Immutable Request, chainable Response
 The frozen request object and the .with_*() response API.
 :::{/card}

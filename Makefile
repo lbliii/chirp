@@ -70,7 +70,7 @@ changelog-check:
 build:
 	@echo "Building distribution packages..."
 	rm -rf dist/
-	uv build
+	uv build --out-dir dist/
 	@echo "✓ Built:"
 	@ls -la dist/
 

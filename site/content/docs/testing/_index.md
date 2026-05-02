@@ -20,14 +20,14 @@ cascade:
 
 :::{card} Test Client
 :icon: terminal
-:link: ./test-client
+:link: /chirp/docs/testing/test-client/
 :description: TestClient with async context manager
 Make requests against your app without a running server.
 :::{/card}
 
 :::{card} Assertions
 :icon: check
-:link: ./assertions
+:link: /chirp/docs/testing/assertions/
 :description: Fragment and SSE assertion helpers
 Specialized assertions for htmx fragment and SSE testing.
 :::{/card}

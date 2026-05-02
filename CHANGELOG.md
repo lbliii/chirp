@@ -5,6 +5,40 @@ All notable changes to chirp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-05-02
+
+### Added
+
+- **DevTools Swap Doctor** — expanded htmx activity rows now explain swap behavior with effective `hx-*` inheritance, selector-match checks, target presence, render intent, render-plan context, broad-target warnings, full-document fragment smells, and no-op swap detection. Request records are correlated by XHR when available so overlapping htmx requests keep their diagnostics attached to the right row. New scaffolded apps include `AGENTS.md` guidance for activating DevTools, and browser-capable agents can discover the diagnostics API with `window.ChirpHtmxDebug.help()`.
+- **Hero-app enablers** — added `Page.mounted(...)`, top-level `JSONResponse`, repeated `form_from()` list binding, contract coverage counters, and stricter testing helpers for full-page/fragment/id assertions.
+- **Named routes and `url_for`** — Routes mounted via `app.mount_pages()` now carry a default dotted name (`/contacts/{contact_id}` → `"contacts.contact_id"`, `/` → `"index"`). Override per-page by setting `name = "…"` at module level in `page.py`. Reverse names to URLs with `app.url_for("contacts.contact_id", contact_id=42)` or the matching `{{ url_for(...) }}` template global (registered via `setdefault`, so user overrides still win). Path params are percent-encoded; remaining kwargs become a urlencoded query string; `None` values are dropped. A new `route_names` contract check fails `app.check()` when two routes at *different* paths claim the same name (method variants at the same path are not collisions).
+- **`app.mount_app(prefix, sub_app)`** — hoist a pre-freeze Chirp `App` into a parent app at a URL prefix. Sub-app's pending routes are path-prefixed, middleware / hooks / loaders / contract checks are appended, and template globals / filters / providers / error handlers / severity overrides merge with parent-wins semantics (dropped entries surface as INFO issues in a new `mount_app_merge` contract category). Sub-app is **consumed** — `sub_app.freeze()` / `sub_app.run()` raise `RuntimeError` after the mount, so you can't accidentally serve a half-mounted standalone runtime. Designed for transitional migrations where two full apps need to share one port; see `docs/routing/mounting.md` and `docs/rfcs/005-mount-app.md` for merge rules and unsupported sub-app state.
+- **`chirp check --coverage`** — show contract coverage counters for POST form contracts, mounted page contracts, app-shell targets, and OOB regions.
+- **`examples/chirpui/forum_shell`** — added a compact forum/PBP reference app showing mounted pages, app-shell OOB state, typed reply forms with repeated mention fields, and a JSON mention-search endpoint.
+- **`page_handlers` contract check** — `app.check()` now fails fast at startup when a `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler`), instead of letting requests hit a 404/500 at runtime. Handler-shaped typos (`def handle`, `def GET`, `def index`) emit a WARNING; a fully missing handler emits an ERROR. Tune via `app.override_contract_severity("page_handlers", …)`.
+- Add an in-process Chirp core benchmark suite for template, fragment, OOB, Suspense, SSE fanout, and filesystem route dispatch workloads with reproducible JSON output.
+- Document the top-level public API stability tiers and add tests that snapshot exported names and require every export to have a stability classification.
+- Grouped `app.check()` terminal output by contract concern and included total elapsed time in contract check reports.
+- Replaced the legacy roadmap narrative with an executable maturity roadmap for 0.5.x reliability, contracts, performance, API discipline, and the PBP forum proof app.
+
+### Changed
+
+- **In-repo examples migrated to `url_for`** — every chirpui and standalone example now reverses URLs through `app.url_for` / `{{ url_for(...) }}` instead of hardcoded `hx-get`/`hx-post`/… strings. `rg 'hx-(get|post|put|delete|patch)="/' examples/` drops from 88 hits to 3 (the remaining hits are an intentional 404 sentinel URL and two test assertions verifying rendered HTML). Route names follow the RFC 003 dotted-path convention for `@app.route(...)` handlers (`index`, `tasks.add`, `tasks.move`, etc.).
+- **Railway env config** — `AppConfig.from_env()` now falls back to Railway's `PORT`, binds to `0.0.0.0` when a Railway environment is detected, and includes `RAILWAY_PUBLIC_DOMAIN` plus `healthcheck.railway.app` in `allowed_hosts` when `CHIRP_ALLOWED_HOSTS` is not set.
+- **`Page(...)` TypeError ergonomics** — Calling `Page("page.html", **ctx)` without a block name now raises a `TypeError` that points at `Template("page.html", **ctx)` (the correct type for full-page renders without htmx negotiation) and references the return-values decision tree. Users reaching for `Page` when they mean `Template` no longer get a generic "missing positional argument" traceback.
+- Raised Chirp's `chirp-ui` dependency floor to `>=0.6.0` for the optional `ui` extra, development example tests, and newly scaffolded projects. `use_chirp_ui(app)` now injects ChirpUI's packaged `themes/app-theme-starter.css` after `chirpui.css` so the theme toggle has light/dark/system tokens by default, and new scaffolds load app-owned `static/theme.css` as the override slot. Chirp now surfaces ChirpUI 0.6 manifest/runtime metadata in `app.check()`, emits an informational `chirpui_runtime` issue when app templates import ChirpUI without `use_chirp_ui(app)`, and updates the mounted-pages shell example to use `nav_tree(branch_mode="linked")`.
+- Raised Chirp's docs build dependency floor to `bengal>=0.3.2` so non-workspace documentation builds pick up the latest Bengal production-build fixes.
+
+### Fixed
+
+- **Cache keys** — default cache keys now include the query string and htmx response shape so paginated forum views, full-page responses, boosted responses, and local fragments do not collide under `CacheMiddleware`.
+- **Form contracts** — block-scoped `FormContract` validation now respects nested template blocks and Kida control tags instead of truncating at the first nested `{% endblock %}`.
+- **Kida 0.8** — bump the minimum `kida-templates` version to `>=0.8.0` and resolve relative template references (`./`, `../`) plus configured `@alias/` prefixes before dead-template and inherited swap-safety analysis.
+- **Shell outlets** — boosted navigation into an app-shell outlet now keeps responses selectable by inherited `hx-select` contracts, with `chirpui/app_shell_layout.html` layouts using the registered `chirpui-app-shell` preset automatically and `app.check()` warning when a broad `hx-target`/`hx-select` shell is missing `{# outlet: ... #}` metadata.
+- Fixed example drift against current Kida and Chirp contracts, including Hacker News nested macros, Kanban anonymous-user rendering, Survey default form values, and Kanban startup contract errors.
+- Made `ReactiveBus.emit_sync()` and `ReactiveBus.close()` hand off cross-thread queue delivery to each subscriber's owning event loop instead of mutating `asyncio.Queue` from arbitrary threads.
+- Make `ToolEventBus`, the PostgreSQL LISTEN helper, and the standalone chat example hand cross-thread event delivery back to each subscriber's owning event loop.
+
 ## [0.5.0] — 2026-04-23
 
 ### Added

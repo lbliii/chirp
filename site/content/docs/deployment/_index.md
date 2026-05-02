@@ -19,7 +19,7 @@ cascade:
 Chirp apps run on [Pounce](https://github.com/lbliii/pounce), a production-grade ASGI server with enterprise features built-in.
 
 :::{card} Production Deployment
-:link: ./production
+:link: /chirp/docs/deployment/production/
 :description: Full guide to deploying Chirp in production
 Phase 5 & 6 features, Docker, Kubernetes, and configuration.
 :::{/card}

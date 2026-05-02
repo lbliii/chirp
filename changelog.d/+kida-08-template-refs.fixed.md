@@ -1,1 +1,0 @@
-**Kida 0.8** — bump the minimum `kida-templates` version to `>=0.8.0` and resolve relative template references (`./`, `../`) plus configured `@alias/` prefixes before dead-template and inherited swap-safety analysis.

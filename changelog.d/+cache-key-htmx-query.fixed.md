@@ -1,1 +1,0 @@
-**Cache keys** — default cache keys now include the query string and htmx response shape so paginated forum views, full-page responses, boosted responses, and local fragments do not collide under `CacheMiddleware`.

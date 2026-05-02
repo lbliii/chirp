@@ -20,35 +20,35 @@ cascade:
 
 :::{card} Rendering
 :icon: monitor
-:link: ./rendering
+:link: /chirp/docs/templates/rendering/
 :description: Template rendering and context passing
 How Template works with kida under the hood.
 :::{/card}
 
 :::{card} Fragments
-:icon: scissors
-:link: ./fragments
+:icon: file-code
+:link: /chirp/docs/templates/fragments/
 :description: Fragment, Page, and OOB rendering
 Render named blocks independently for htmx.
 :::{/card}
 
 :::{card} Layout Patterns
-:icon: layout
-:link: ./layout-patterns
+:icon: sidebar
+:link: /chirp/docs/templates/layout-patterns/
 :description: Block-heavy layouts, boost pattern, outer vs inner
 When to use block, include, and call.
 :::{/card}
 
 :::{card} Filters
 :icon: filter
-:link: ./filters
+:link: /chirp/docs/templates/filters/
 :description: Custom template filters and globals
 Register filters and globals on your app.
 :::{/card}
 
 :::{card} Kida Integration
 :icon: puzzle
-:link: ./kida-integration
+:link: /chirp/docs/templates/kida-integration/
 :description: AST-driven OOB discovery and regions
 How Chirp uses template_metadata() for block validation.
 :::{/card}

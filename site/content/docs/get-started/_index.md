@@ -20,21 +20,21 @@ cascade:
 
 :::{card} Installation
 :icon: download
-:link: ./installation
+:link: /chirp/docs/get-started/installation/
 :description: Install Chirp with pip, uv, or from source
 Get Chirp running in your environment.
 :::{/card}
 
 :::{card} Quickstart
 :icon: zap
-:link: ./quickstart
+:link: /chirp/docs/get-started/quickstart/
 :description: Build your first Chirp app in 5 minutes
 From hello world to fragment rendering.
 :::{/card}
 
 :::{card} Project Layout
 :icon: folder
-:link: ./project-layout
+:link: /chirp/docs/get-started/project-layout/
 :description: Recommended directory structure
 Conventions used by chirp new.
 :::{/card}

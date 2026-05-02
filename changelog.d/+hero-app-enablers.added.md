@@ -1,1 +1,0 @@
-**Hero-app enablers** — added `Page.mounted(...)`, top-level `JSONResponse`, repeated `form_from()` list binding, contract coverage counters, and stricter testing helpers for full-page/fragment/id assertions.

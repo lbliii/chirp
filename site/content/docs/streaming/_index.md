@@ -20,28 +20,28 @@ cascade:
 
 :::{card} Streaming HTML & Suspense
 :icon: monitor
-:link: ./html-streaming
+:link: /chirp/docs/streaming/html-streaming/
 :description: Progressive page rendering
 Send the shell immediately, fill in content as data arrives. Suspense streams deferred blocks via OOB swaps.
 :::{/card}
 
 :::{card} Server-Sent Events
-:icon: radio
-:link: ./server-sent-events
+:icon: network
+:link: /chirp/docs/streaming/server-sent-events/
 :description: Real-time HTML updates
 Push kida-rendered fragments to the browser over SSE.
 :::{/card}
 
 :::{card} Reactive System
 :icon: refresh-cw
-:link: ./reactive-system
+:link: /chirp/docs/streaming/reactive-system/
 :description: Automatic SSE from data changes
 ReactiveBus, DependencyIndex, derived paths, and observability counters.
 :::{/card}
 
 :::{card} SSE Patterns
 :icon: layers
-:link: ./sse-patterns
+:link: /chirp/docs/streaming/sse-patterns/
 :description: Four update patterns
 Display-only, client-managed, streaming append, and one-shot mutations.
 :::{/card}

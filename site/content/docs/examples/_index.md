@@ -8,7 +8,7 @@ type: doc
 tags: [examples, demos, rag, sse, streaming]
 keywords: [examples, demos, rag, sse, streaming, fragments]
 category: tutorial
-icon: box
+icon: cube
 
 cascade:
   type: doc
@@ -19,8 +19,8 @@ cascade:
 :gap: medium
 
 :::{card} RAG Demo
-:icon: message-circle
-:link: ./rag-demo
+:icon: ai-chatgpt
+:link: /chirp/docs/examples/rag-demo/
 :description: Streaming AI Q&A with cited sources, dual-model comparison, and zero client JS
 The flagship Chirp example: fragments, SSE, event delegation, and free-threading.
 :::{/card}
@@ -33,7 +33,7 @@ Full CRUD app with app shell, boosted navigation, and fragment swaps.
 :::{/card}
 
 :::{card} Kanban Shell
-:icon: layout
+:icon: sidebar
 :link: https://github.com/lbliii/chirp/tree/main/examples/chirpui/kanban_shell
 :description: Drag-and-drop Kanban board with OOB swaps, SSE, and toast notifications
 Real-time board with multi-fragment updates and SSE live sync.

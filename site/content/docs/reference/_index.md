@@ -20,14 +20,14 @@ cascade:
 
 :::{card} API Reference
 :icon: code
-:link: ./api
+:link: /chirp/docs/reference/api/
 :description: Public API exports and signatures
 Everything exported from `chirp.__init__`.
 :::{/card}
 
 :::{card} Errors
 :icon: alert-triangle
-:link: ./errors
+:link: /chirp/docs/reference/errors/
 :description: Error hierarchy and error handlers
 Built-in exceptions and how to handle them.
 :::{/card}
