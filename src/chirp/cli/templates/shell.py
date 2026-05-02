@@ -17,6 +17,8 @@ def context(request) -> dict:
 """
 
 SHELL_LAYOUT_HTML = """\
+{# target: body #}
+{# outlet: main #}
 {% extends "chirp/layouts/shell.html" %}
 {% block head %}
 <link rel="stylesheet" href="/static/style.css">
@@ -35,6 +37,8 @@ SHELL_LAYOUT_HTML = """\
 """
 
 SHELL_LAYOUT_CHIRPUI_HTML = """\
+{# target: body #}
+{# outlet: main #}
 {% extends "chirpui/app_shell_layout.html" %}
 {% block head_extra %}
 <link rel="stylesheet" href="/static/theme.css">

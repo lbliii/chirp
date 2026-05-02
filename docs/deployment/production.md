@@ -2,6 +2,9 @@
 
 Guide to deploying chirp apps in production with pounce's enterprise features.
 
+For Railway-specific environment variables, healthchecks, pre-deploy migrations,
+and replica caveats, see [Railway Deployment](railway.md).
+
 ## Overview
 
 Chirp apps run on [pounce](https://github.com/yourusername/pounce), a production-grade ASGI server with:

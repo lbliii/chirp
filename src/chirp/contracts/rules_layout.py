@@ -9,6 +9,8 @@ from .patterns import ID_ATTR as _ID_ATTR_RE
 from .types import ContractIssue, Severity
 
 _EXTENDS_TAG = re.compile(r"\{%\s*extends\s+")
+_HX_TARGET_ATTR = re.compile(r"\bhx-target\s*=\s*([\"'])(?P<target>.*?)\1", re.IGNORECASE)
+_HX_SELECT_ATTR = re.compile(r"\bhx-select\s*=\s*([\"'])(?P<select>.*?)\1", re.IGNORECASE)
 
 
 def _all_dom_ids(template_sources: dict[str, str]) -> frozenset[str]:
@@ -198,6 +200,27 @@ def check_layout_chains(
             source = template_sources.get(layout.template_name)
             if source is None:
                 continue
+            if not getattr(layout, "outlet_target_id", None) and "hx-boost" in source.lower():
+                hx_target = _HX_TARGET_ATTR.search(source)
+                hx_select = _HX_SELECT_ATTR.search(source)
+                if hx_target and hx_select:
+                    target = hx_target.group("target").strip().lstrip("#")
+                    select = hx_select.group("select").strip()
+                    if target and target != layout.target:
+                        issues.append(
+                            ContractIssue(
+                                severity=Severity.WARNING,
+                                category="layout_outlet",
+                                message=(
+                                    f"Layout {layout.template_name} targets #{target} with "
+                                    f'hx-select="{select}" but does not declare an outlet. '
+                                    f"Boosted navigation can render a response without "
+                                    f"{select}, causing htmx to empty #{target}. Add "
+                                    f"{{# outlet: {target} #}} to the layout."
+                                ),
+                                template=layout.template_name,
+                            )
+                        )
             if layout.depth > 0 and _EXTENDS_TAG.search(source):
                 issues.append(
                     ContractIssue(

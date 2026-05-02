@@ -7,6 +7,15 @@ import pytest
 
 from chirp.config import AppConfig
 
+_ENV_KEYS_TO_CLEAR = ("PORT", "RAILWAY_ENVIRONMENT_ID", "RAILWAY_PUBLIC_DOMAIN")
+
+
+def _pop_app_env() -> dict[str, str]:
+    keys = [
+        k for k in os.environ if k.startswith(("CHIRP_", "RAILWAY_")) or k in _ENV_KEYS_TO_CLEAR
+    ]
+    return {k: os.environ.pop(k) for k in keys}
+
 
 class TestAppConfig:
     def test_defaults(self) -> None:
@@ -98,7 +107,7 @@ class TestAppConfig:
     def test_from_env_defaults(self) -> None:
         """from_env uses defaults when env is empty."""
         # Clear chirp-related env to avoid leakage from test runner
-        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        env_backup = _pop_app_env()
         try:
             cfg = AppConfig.from_env()
             assert cfg.host == "127.0.0.1"
@@ -114,7 +123,7 @@ class TestAppConfig:
 
     def test_from_env_overrides(self) -> None:
         """from_env reads CHIRP_* env vars."""
-        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        env_backup = _pop_app_env()
         try:
             os.environ["CHIRP_HOST"] = "0.0.0.0"
             os.environ["CHIRP_PORT"] = "3000"
@@ -125,6 +134,7 @@ class TestAppConfig:
             os.environ["CHIRP_HTTP_TIMEOUT"] = "60"
             os.environ["CHIRP_HTTP_RETRIES"] = "3"
             os.environ["CHIRP_LOG_FORMAT"] = "json"
+            os.environ["CHIRP_ALLOWED_HOSTS"] = "example.com,.example.com"
             cfg = AppConfig.from_env()
             assert cfg.host == "0.0.0.0"
             assert cfg.port == 3000
@@ -135,12 +145,45 @@ class TestAppConfig:
             assert cfg.http_timeout == 60.0
             assert cfg.http_retries == 3
             assert cfg.log_format == "json"
+            assert cfg.allowed_hosts == ("example.com", ".example.com")
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_railway_port_host_and_healthcheck_hosts(self) -> None:
+        env_backup = _pop_app_env()
+        try:
+            os.environ["PORT"] = "4732"
+            os.environ["RAILWAY_ENVIRONMENT_ID"] = "env_123"
+            os.environ["RAILWAY_PUBLIC_DOMAIN"] = "forum.example.up.railway.app"
+            cfg = AppConfig.from_env()
+            assert cfg.host == "0.0.0.0"
+            assert cfg.port == 4732
+            assert cfg.allowed_hosts == (
+                "forum.example.up.railway.app",
+                "healthcheck.railway.app",
+            )
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_chirp_port_and_hosts_override_railway_defaults(self) -> None:
+        env_backup = _pop_app_env()
+        try:
+            os.environ["PORT"] = "4732"
+            os.environ["CHIRP_PORT"] = "9000"
+            os.environ["CHIRP_HOST"] = "127.0.0.1"
+            os.environ["CHIRP_ALLOWED_HOSTS"] = "forum.example.com healthcheck.railway.app"
+            os.environ["RAILWAY_ENVIRONMENT_ID"] = "env_123"
+            os.environ["RAILWAY_PUBLIC_DOMAIN"] = "forum.example.up.railway.app"
+            cfg = AppConfig.from_env()
+            assert cfg.host == "127.0.0.1"
+            assert cfg.port == 9000
+            assert cfg.allowed_hosts == ("forum.example.com", "healthcheck.railway.app")
         finally:
             os.environ.update(env_backup)
 
     def test_from_env_invalid_log_format_ignored(self) -> None:
         """Invalid CHIRP_LOG_FORMAT falls back to default."""
-        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        env_backup = _pop_app_env()
         try:
             os.environ["CHIRP_LOG_FORMAT"] = "xml"
             cfg = AppConfig.from_env()
@@ -168,7 +211,7 @@ class TestAppConfig:
 
     def test_from_env_feature_flags(self) -> None:
         """from_env parses CHIRP_FEATURE_* vars."""
-        env_backup = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("CHIRP_")}
+        env_backup = _pop_app_env()
         try:
             os.environ["CHIRP_FEATURE_X"] = "true"
             os.environ["CHIRP_FEATURE_Y"] = "false"

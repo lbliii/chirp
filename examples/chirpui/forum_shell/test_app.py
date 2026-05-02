@@ -20,7 +20,7 @@ class TestForumShell:
         assert "Boards" in response.text
         assert_has_id(response, "boards-page")
 
-    async def test_boosted_board_page_renders_fragment_not_document(self, example_app) -> None:
+    async def test_boosted_board_page_renders_selectable_shell_outlet(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.fragment(
                 "/boards/ic",
@@ -28,7 +28,7 @@ class TestForumShell:
                 headers={"HX-Boosted": "true"},
             )
         assert response.status == 200
-        assert_no_full_document(response)
+        assert_has_id(response, "page-content")
         assert_has_id(response, "page-root")
         assert "Rain over the night market" in response.text
 

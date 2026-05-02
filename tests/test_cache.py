@@ -79,9 +79,52 @@ def test_cache_key_basic():
         method = "GET"
         path = "/products"
         query_string = ""
+        query = None
 
     key = default_cache_key(FakeReq())
     assert key.startswith("chirp:GET:/products:")
+
+
+def test_cache_key_includes_query_string():
+    class FakeQuery:
+        _raw = b"page=2&q=forum"
+
+    class FakeReq:
+        method = "GET"
+        path = "/threads"
+        query = FakeQuery()
+
+    class OtherReq:
+        method = "GET"
+        path = "/threads"
+        query_string = "page=3&q=forum"
+        query = None
+
+    assert default_cache_key(FakeReq()) != default_cache_key(OtherReq())
+
+
+def test_cache_key_includes_htmx_shape():
+    class FullReq:
+        method = "GET"
+        path = "/threads"
+        query_string = ""
+        query = None
+        is_htmx = False
+        is_boosted = False
+        is_history_restore = False
+        htmx_target_id = None
+
+    class FragmentReq:
+        method = "GET"
+        path = "/threads"
+        query_string = ""
+        query = None
+        is_htmx = True
+        is_boosted = False
+        is_history_restore = False
+        htmx_target_id = "thread-list"
+
+    assert default_cache_key(FullReq()) != default_cache_key(FragmentReq())
 
 
 def test_get_cache_default():

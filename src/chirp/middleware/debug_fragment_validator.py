@@ -69,7 +69,7 @@ class DebugFragmentValidator:
         if not body:
             return response
 
-        issues = self._scan(body)
+        issues = self._scan(body, request=request)
         if not issues:
             return response
 
@@ -92,8 +92,10 @@ class DebugFragmentValidator:
             return True
         return intent == "unknown" and request.is_htmx
 
-    def _scan(self, body: str) -> list[str]:
+    def _scan(self, body: str, *, request: Request) -> list[str]:
         issues: list[str] = []
+        if _is_selectable_shell_outlet_response(body, request):
+            return issues
         if _DOCTYPE_RE.search(body):
             issues.append("<!DOCTYPE> in fragment body (full page rendered into outlet)")
 
@@ -121,3 +123,20 @@ def _count_id_occurrences(body: str, target_id: str) -> int:
     double = body.count(f'id="{target_id}"')
     single = body.count(f"id='{target_id}'")
     return double + single
+
+
+def _is_selectable_shell_outlet_response(body: str, request: Request) -> bool:
+    """True for app-shell boosted responses meant to be narrowed by hx-select.
+
+    The browser owns the inherited ``hx-select="#page-content"`` attribute; it
+    is not sent as a request header. In debug mode this validator sees the
+    pre-selection response, so a correctly selectable shell-outlet response can
+    look like a full document with duplicate shell-region ids. Treat the
+    canonical app-shell shape as valid when the response contains the selector
+    target htmx will extract.
+    """
+    return (
+        request.is_boosted
+        and request.htmx_target_id == "main"
+        and ('id="page-content"' in body or "id='page-content'" in body)
+    )

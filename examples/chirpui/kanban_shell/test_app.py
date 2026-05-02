@@ -207,7 +207,9 @@ class TestBoard:
                 target="main",
                 headers={**auth, "HX-Boosted": "true"},
             )
-            assert_is_fragment(response)
+            assert response.status == 200
+            assert_fragment_contains(response, 'id="page-content"')
+            assert_fragment_contains(response, 'id="page-root"')
             assert_fragment_contains(response, 'id="board"')
 
     async def test_index_contains_stats(self, example_app) -> None:

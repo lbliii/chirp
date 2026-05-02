@@ -165,6 +165,34 @@ def test_layout_comments_override_preset_defaults(tmp_path: Path) -> None:
     assert layout.outlet_target_id == "main"
 
 
+def test_chirpui_app_shell_extends_uses_registered_preset_defaults(tmp_path: Path) -> None:
+    pages = tmp_path / "pages"
+    pages.mkdir()
+    (pages / "_layout.html").write_text(
+        '{# target: body #}\n{% extends "chirpui/app_shell_layout.html" %}\n'
+        "{% block content %}{% end %}\n",
+        encoding="utf-8",
+    )
+    _write_page(pages)
+
+    routes = discover_pages(
+        pages,
+        layout_presets={
+            "chirpui-app-shell": LayoutPreset(
+                name="chirpui-app-shell",
+                target="body",
+                swap_scope_name="shell",
+                outlet_target_id="main",
+            )
+        },
+    )
+
+    layout = routes[0].layout_chain.layouts[0]
+    assert layout.target == "body"
+    assert layout.swap_scope_name == "shell"
+    assert layout.outlet_target_id == "main"
+
+
 def test_unknown_layout_preset_raises_clear_error(tmp_path: Path) -> None:
     pages = tmp_path / "pages"
     pages.mkdir()

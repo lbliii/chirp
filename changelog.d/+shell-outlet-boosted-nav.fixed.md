@@ -1,0 +1,1 @@
+**Shell outlets** — boosted navigation into an app-shell outlet now keeps responses selectable by inherited `hx-select` contracts, with `chirpui/app_shell_layout.html` layouts using the registered `chirpui-app-shell` preset automatically and `app.check()` warning when a broad `hx-target`/`hx-select` shell is missing `{# outlet: ... #}` metadata.
