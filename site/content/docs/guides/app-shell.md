@@ -433,7 +433,7 @@ region needs its own `hx-target` / `hx-swap` defaults:
 **Important:** `fragment_island` is not the same as Chirp's `data-island` islands.
 `fragment_island` is a swap-safety boundary (no client runtime). Chirp islands
 (`data-island`) are client-managed surfaces with mount/unmount lifecycle. See
-[Islands Contract](islands.md) for the distinction.
+[Islands Contract](/chirp/docs/guides/islands/) for the distinction.
 
 ## Custom Shells
 

@@ -144,4 +144,4 @@ Run `rg '{% if .* is defined %}'` afterwards — any remaining hits are either l
 ## Reference
 
 - Directive: [kida `{% fragment %}` docs](https://lbliii.github.io/kida/docs/directives/fragment/)
-- Related: [OOB Registry & Fail-Loud Rendering](oob-registry.md), [App Shells](app-shell.md), [Streaming: Suspense](/docs/streaming/)
+- Related: [OOB Registry & Fail-Loud Rendering](/chirp/docs/guides/oob-registry/), [App Shells](/chirp/docs/guides/app-shell/), [Streaming: Suspense](/docs/streaming/)

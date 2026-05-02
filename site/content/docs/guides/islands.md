@@ -86,7 +86,7 @@ from inherited `hx-*` behavior. They use `hx-disinherit` to prevent shell-level
 Relevant files:
 
 - `src/chirp_ui/templates/chirpui/fragment_island.html`
-- [App Shells](app-shell.md)
+- [App Shells](/chirp/docs/guides/app-shell/)
 
 **`fragment_island` is a swap-safety boundary, not the same thing as a
 client-runtime island.** Use it when you need semantic grouping or when a
@@ -118,7 +118,7 @@ Document three ownership classes:
 
 This ownership model is implied by [SSE Patterns](/docs/streaming/sse-patterns/):
 client-managed surfaces should not be reactively re-rendered. Do not register
-client-owned blocks in the reactive dependency index. See [App Shells](app-shell.md)
+client-owned blocks in the reactive dependency index. See [App Shells](/chirp/docs/guides/app-shell/)
 for how islands fit inside shell layouts and OOB regions.
 
 ## Shell Constraints
