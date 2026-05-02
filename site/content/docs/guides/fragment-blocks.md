@@ -93,7 +93,7 @@ Use a regular `{% block %}` with a loading check:
 {% endblock %}
 ```
 
-See the [Suspense documentation](../streaming/_index.md) for the full pattern.
+See the [Suspense documentation](/docs/streaming/) for the full pattern.
 
 ## Migration recipe
 
@@ -144,4 +144,4 @@ Run `rg '{% if .* is defined %}'` afterwards — any remaining hits are either l
 ## Reference
 
 - Directive: [kida `{% fragment %}` docs](https://lbliii.github.io/kida/docs/directives/fragment/)
-- Related: [OOB Registry & Fail-Loud Rendering](oob-registry.md), [App Shells](app-shell.md), [Streaming: Suspense](../streaming/_index.md)
+- Related: [OOB Registry & Fail-Loud Rendering](/chirp/docs/guides/oob-registry/), [App Shells](/chirp/docs/guides/app-shell/), [Streaming: Suspense](/docs/streaming/)

@@ -64,7 +64,7 @@ A `role="switch"` button toggles `aria-checked` and enables/disables the second 
 ## Run
 
 ```bash
-pip install chirp[ai,data]
+pip install bengal-chirp[ai,data]
 ollama serve   # Start Ollama first
 PYTHONPATH=src python examples/chirpui/rag_demo/app.py
 ```

@@ -5,3 +5,4 @@
 
 fonts:
   display: "Inter:400,600,700"
+  preload: "Outfit:700"

@@ -61,7 +61,7 @@ jobs:
 
       - name: Build documentation site
         working-directory: site
-        run: uv run bengal site build --environment production
+        run: uv run bengal build --environment production
         env:
           PYTHON_GIL: "0"
 

@@ -22,36 +22,36 @@ Chirp focuses on server-rendered UI, HTML fragments, and browser-native interact
 This section explains the framework's structure and where it fits.
 
 :::{card} Architecture
-:icon: box
-:link: ./architecture
+:icon: cube
+:link: /chirp/docs/about/architecture/
 :description: Three-layer design
 Surface, core, and engine layers.
 :::{/card}
 
 :::{card} Philosophy
 :icon: compass
-:link: ./philosophy
+:link: /chirp/docs/about/philosophy/
 :description: Design principles
 The instincts that shape every decision.
 :::{/card}
 
 :::{card} Comparison
-:icon: bar-chart
-:link: ./comparison
+:icon: workflow
+:link: /chirp/docs/about/comparison/
 :description: Chirp vs Flask vs FastAPI vs Django
 When to use what, and why Chirp exists as a framework for HTML over the wire.
 :::{/card}
 
 :::{card} Thread Safety
 :icon: shield
-:link: ./thread-safety
+:link: /chirp/docs/about/thread-safety/
 :description: Free-threading patterns
 How Chirp makes data races structurally impossible.
 :::{/card}
 
 :::{card} Ecosystem
 :icon: layers
-:link: ./ecosystem
+:link: /chirp/docs/about/ecosystem/
 :description: The Bengal stack
 All seven projects in the reactive Python stack.
 :::{/card}

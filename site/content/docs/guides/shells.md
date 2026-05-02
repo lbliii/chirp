@@ -33,8 +33,8 @@ Chirp ships two; chirp-ui adds one more.
 The decisive question is whether your app needs **persistent chrome** —
 sidebar, topbar, breadcrumbs that survive boosted navigation:
 
-- **Yes** → `app_shell_layout.html`. See [App Shells](./app-shell.md).
-- **No, but you want SPA-style nav** → `boost.html`. See [Boosted Navigation](./boosted-navigation.md).
+- **Yes** → `app_shell_layout.html`. See [App Shells](/docs/guides/app-shell/).
+- **No, but you want SPA-style nav** → `boost.html`. See [Boosted Navigation](/docs/guides/boosted-navigation/).
 - **No, fragment swaps only** → `shell.html`.
 
 ## The `hx-select` distinction
@@ -105,7 +105,7 @@ element. See `examples/chirpui/kanban_shell` for a worked example.
 
 ## Related
 
-- [App Shells](./app-shell.md) — building with chirp-ui's `app_shell_layout.html`
-- [Boosted Navigation](./boosted-navigation.md) — the boost contract, cross-shell redirects, debug warnings
-- [UI layers & shell regions](./ui-layers.md) — vocabulary for app shell vs page chrome vs surface chrome
-- [Layout Patterns](../templates/layout-patterns.md) — block, include, call constructs inside any shell
+- [App Shells](/docs/guides/app-shell/) — building with chirp-ui's `app_shell_layout.html`
+- [Boosted Navigation](/docs/guides/boosted-navigation/) — the boost contract, cross-shell redirects, debug warnings
+- [UI layers & shell regions](/docs/guides/ui-layers/) — vocabulary for app shell vs page chrome vs surface chrome
+- [Layout Patterns](/docs/templates/layout-patterns/) — block, include, call constructs inside any shell

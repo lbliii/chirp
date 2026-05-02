@@ -20,21 +20,21 @@ cascade:
 
 :::{card} View Transitions + OOB
 :icon: zap
-:link: ./view-transitions-oob
+:link: /chirp/docs/tutorials/view-transitions-oob/
 :description: Stable pattern for htmx-boost, View Transitions, and live OOB/SSE updates
 Avoid flicker and content disappearing when mixing navigation with live updates.
 :::{/card}
 
 :::{card} Coming from Flask
 :icon: arrow-right
-:link: ./coming-from-flask
+:link: /chirp/docs/tutorials/coming-from-flask/
 :description: Migration guide with side-by-side examples
 Translate your Flask knowledge to Chirp.
 :::{/card}
 
 :::{card} htmx Patterns
-:icon: repeat
-:link: ./htmx-patterns
+:icon: recycle
+:link: /chirp/docs/tutorials/htmx-patterns/
 :description: Common htmx + Chirp patterns
 Search, inline edit, infinite scroll, and more.
 :::{/card}

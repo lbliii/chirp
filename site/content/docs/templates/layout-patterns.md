@@ -18,7 +18,7 @@ construct and composing pages inside a shell.
 
 > **Pick a shell first.** Your templates `{% extends %}` one of three root
 > layouts (`boost.html`, `shell.html`, or chirp-ui's `app_shell_layout.html`).
-> See [Shells](../guides/shells.md) for the decision table and the
+> See [Shells](/docs/guides/shells/) for the decision table and the
 > `hx-select` distinction. This guide assumes a shell is already chosen.
 
 For **fixed column ratios** on page content (`grid()` + `block(span=…)`),
@@ -44,7 +44,7 @@ The core shells expose the same block names — `title`, `head`, `body_before`,
 `content`, `sse_scope`, `body_after` — so migrating between them is a
 one-line change. chirp-ui's `app_shell_layout.html` adds shell-specific
 blocks (`brand`, `sidebar`, `page_root`, `page_content`); see
-[App Shells](../guides/app-shell.md).
+[App Shells](/docs/guides/app-shell/).
 
 **Important:** Put `sse_scope` *outside* `#main`. If it's inside `content`,
 it gets replaced on navigation and live updates stop.

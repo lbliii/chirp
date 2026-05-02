@@ -1,1 +1,0 @@
-**Railway env config** — `AppConfig.from_env()` now falls back to Railway's `PORT`, binds to `0.0.0.0` when a Railway environment is detected, and includes `RAILWAY_PUBLIC_DOMAIN` plus `healthcheck.railway.app` in `allowed_hosts` when `CHIRP_ALLOWED_HOSTS` is not set.

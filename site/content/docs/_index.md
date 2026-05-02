@@ -24,25 +24,25 @@ move into templates, routing, streaming, and production deployment.
 
 :::{card} Get Started
 :icon: rocket
-:link: ./get-started/
+:link: /chirp/docs/get-started/
 Install Chirp and build your first app in minutes.
 :::{/card}
 
 :::{card} Core Concepts
 :icon: book-open
-:link: ./core-concepts/
+:link: /chirp/docs/core-concepts/
 App lifecycle, return values, and configuration.
 :::{/card}
 
 :::{card} Templates
 :icon: layers
-:link: ./templates/
+:link: /chirp/docs/templates/
 Rendering, fragments, Page, OOB swaps, and filters.
 :::{/card}
 
 :::{card} Routing
 :icon: git-branch
-:link: ./routing/
+:link: /chirp/docs/routing/
 Routes, path parameters, request, and response.
 :::{/card}
 
@@ -57,38 +57,38 @@ Routes, path parameters, request, and response.
 :gap: medium
 
 :::{card} Middleware
-:icon: sliders
-:link: ./middleware/
+:icon: settings
+:link: /chirp/docs/middleware/
 Protocol definition, built-in middleware, custom middleware.
 :::{/card}
 
 :::{card} Streaming
 :icon: zap
-:link: ./streaming/
+:link: /chirp/docs/streaming/
 Streaming HTML, Server-Sent Events, real-time patterns.
 :::{/card}
 
 :::{card} Data
 :icon: database
-:link: ./data/
+:link: /chirp/docs/data/
 Database access, form parsing, and validation.
 :::{/card}
 
 :::{card} Testing
 :icon: check-circle
-:link: ./testing/
+:link: /chirp/docs/testing/
 TestClient, fragment assertions, SSE testing.
 :::{/card}
 
 :::{card} Deployment
 :icon: server
-:link: ./deployment/
+:link: /chirp/docs/deployment/
 Production deployment with `chirp run myapp:app --production` and Pounce.
 :::{/card}
 
 ::::{card} htmx Patterns
-:icon: repeat
-:link: ./tutorials/htmx-patterns
+:icon: recycle
+:link: /chirp/docs/tutorials/htmx-patterns/
 Search, inline edit, infinite scroll, and fragment-based interaction patterns.
 ::::{/card}
 
@@ -104,31 +104,31 @@ Search, inline edit, infinite scroll, and fragment-based interaction patterns.
 
 :::{card} About
 :icon: info
-:link: ./about/
+:link: /chirp/docs/about/
 Architecture, philosophy, framework comparisons, and thread safety.
 :::{/card}
 
 :::{card} Tutorials
 :icon: graduation-cap
-:link: ./tutorials/
+:link: /chirp/docs/tutorials/
 Step-by-step guides for common patterns and migrations.
 :::{/card}
 
 :::{card} Guides
 :icon: book
-:link: ./guides/
+:link: /chirp/docs/guides/
 Accessibility, best practices, and patterns.
 :::{/card}
 
 :::{card} Examples
-:icon: box
-:link: ./examples/
+:icon: cube
+:link: /chirp/docs/examples/
 Full-featured apps: RAG demo with streaming AI, fragments, and SSE.
 :::{/card}
 
 :::{card} Reference
 :icon: file-text
-:link: ./reference/
+:link: /chirp/docs/reference/
 Complete API reference, error codes, and configuration.
 :::{/card}
 

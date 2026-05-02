@@ -20,21 +20,21 @@ cascade:
 
 :::{card} App Lifecycle
 :icon: refresh-cw
-:link: ./app-lifecycle
+:link: /chirp/docs/core-concepts/app-lifecycle/
 :description: Mutable setup, frozen runtime
 How Chirp's App transitions from configuration to serving.
 :::{/card}
 
 :::{card} Return Values
-:icon: corner-down-right
-:link: ./return-values
+:icon: arrow-right
+:link: /chirp/docs/core-concepts/return-values/
 :description: The type is the intent
 All the types route handlers can return and what they mean.
 :::{/card}
 
 :::{card} Configuration
 :icon: settings
-:link: ./configuration
+:link: /chirp/docs/core-concepts/configuration/
 :description: AppConfig frozen dataclass
 Every configuration option with IDE autocomplete.
 :::{/card}

@@ -12,9 +12,9 @@ category: guide
 
 This guide is about chirp-ui's **`app_shell_layout.html`** — one of three
 shells you can extend. For the trifecta and the decision table, see
-**[Shells](./shells.md)**. Also read **[UI layers & shell regions](./ui-layers.md)**
+**[Shells](/docs/guides/shells/)**. Also read **[UI layers & shell regions](/docs/guides/ui-layers/)**
 for the glossary (app shell vs page chrome vs surface chrome) and stable OOB
-element ids, and **[Boosted Navigation](./boosted-navigation.md)** for the
+element ids, and **[Boosted Navigation](/docs/guides/boosted-navigation/)** for the
 swap contract, cross-shell redirects, and debug warnings.
 
 ## What Is an App Shell?
@@ -30,7 +30,7 @@ htmx swaps it in.
 > **Not a shell:** Feature modules like `chirp.docs` ship templates that look
 > shell-like (sidebar, search, content area) but render *inside* whichever
 > shell you choose. They don't establish the document root or the boost
-> contract. See [Shells › What is *not* a shell](./shells.md#what-is-not-a-shell).
+> contract. See [Shells › What is *not* a shell](/docs/guides/shells/#what-is-not-a-shell).
 
 ## How It Works
 
@@ -433,7 +433,7 @@ region needs its own `hx-target` / `hx-swap` defaults:
 **Important:** `fragment_island` is not the same as Chirp's `data-island` islands.
 `fragment_island` is a swap-safety boundary (no client runtime). Chirp islands
 (`data-island`) are client-managed surfaces with mount/unmount lifecycle. See
-[Islands Contract](islands.md) for the distinction.
+[Islands Contract](/chirp/docs/guides/islands/) for the distinction.
 
 ## Custom Shells
 
