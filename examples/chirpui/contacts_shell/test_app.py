@@ -28,7 +28,7 @@ class TestContactsShell:
             assert "New contact" in response.text
             assert 'id="contacts-page"' in response.text
 
-    async def test_boosted_contacts_page_renders_fragment_only(self, example_app) -> None:
+    async def test_boosted_contacts_page_renders_selectable_shell_outlet(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.fragment(
                 "/contacts",
@@ -36,9 +36,9 @@ class TestContactsShell:
                 headers={"HX-Boosted": "true"},
             )
             assert response.status == 200
+            assert 'id="page-content"' in response.text
             assert 'id="contacts-page"' in response.text
             assert 'id="page-root"' in response.text
-            assert "chirpui-app-shell__sidebar" not in response.text
 
     async def test_add_success(self, example_app) -> None:
         async with TestClient(example_app) as client:

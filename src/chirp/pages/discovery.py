@@ -90,6 +90,9 @@ _HANDLER_LIKE = frozenset(
 # Regex to extract layout shell comments from _layout.html
 _TARGET_RE = re.compile(r"\{#\s*target:\s*(\S+)\s*#\}")
 _PRESET_RE = re.compile(r"\{#\s*preset:\s*(\S+)\s*#\}")
+_CHIRPUI_APP_SHELL_EXTENDS_RE = re.compile(
+    r"\{%\s*extends\s+[\"']chirpui/app_shell_layout\.html[\"']\s*%\}"
+)
 _DOMAIN_RE = re.compile(r"\{#\s*domain:\s*(\S+)\s*#\}")
 _SHELL_RE = re.compile(r"\{#\s*shell:\s*(\S+)\s*#\}")
 _SWAP_SCOPE_RE = re.compile(r"\{#\s*swap_scope:\s*(\S+)\s*#\}")
@@ -306,6 +309,12 @@ def _parse_layout_metadata(
     content = layout_file.read_text(encoding="utf-8")
     preset_m = _PRESET_RE.search(content)
     preset_name = preset_m.group(1) if preset_m else None
+    if (
+        preset_name is None
+        and _CHIRPUI_APP_SHELL_EXTENDS_RE.search(content)
+        and "chirpui-app-shell" in layout_presets
+    ):
+        preset_name = "chirpui-app-shell"
     preset = _resolve_layout_preset(layout_file, preset_name, layout_presets)
 
     target_m = _TARGET_RE.search(content)

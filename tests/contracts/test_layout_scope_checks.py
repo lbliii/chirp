@@ -74,6 +74,44 @@ def test_outlet_registered_no_warning() -> None:
     assert not outlet_issues
 
 
+def test_boosted_hx_select_shell_without_outlet_warns() -> None:
+    layout = LayoutInfo("root.html", "body", 0)
+    chain = LayoutChain((layout,))
+    sources = {
+        "root.html": (
+            '<main id="main" hx-boost="true" hx-target="#main" '
+            'hx-swap="innerHTML" hx-select="#page-content">'
+            '<div id="page-content">{% block content %}{% end %}</div>'
+            "</main>"
+        )
+    }
+
+    issues = check_layout_chains([chain], sources)
+
+    outlet_issues = [i for i in issues if i.category == "layout_outlet"]
+    assert len(outlet_issues) == 1
+    assert "{# outlet: main #}" in outlet_issues[0].message
+    assert "#page-content" in outlet_issues[0].message
+
+
+def test_boosted_hx_select_shell_with_outlet_has_no_missing_outlet_warning() -> None:
+    layout = LayoutInfo("root.html", "body", 0, outlet_target_id="main")
+    chain = LayoutChain((layout,))
+    sources = {
+        "root.html": (
+            '<main id="main" hx-boost="true" hx-target="#main" '
+            'hx-swap="innerHTML" hx-select="#page-content">'
+            '<div id="page-content">{% block content %}{% end %}</div>'
+            "</main>"
+        )
+    }
+
+    issues = check_layout_chains([chain], sources)
+
+    missing_outlet_issues = [i for i in issues if "does not declare an outlet" in i.message]
+    assert not missing_outlet_issues
+
+
 def test_outlet_registration_check_skipped_without_registry() -> None:
     layout = LayoutInfo("root.html", "body", 0, outlet_target_id="site-content")
     chain = LayoutChain((layout,))

@@ -116,6 +116,40 @@ class TestDebugFragmentValidatorDirect:
         assert response.status == 200
         assert any("DOCTYPE" in rec.message for rec in caplog.records)
 
+    async def test_boosted_shell_outlet_response_with_page_content_is_allowed(
+        self,
+        caplog,
+    ) -> None:
+        app = App()
+        app.add_middleware(DebugFragmentValidator(_make_registry()))
+
+        @app.route("/")
+        def index():
+            return Response(
+                body=(
+                    "<!DOCTYPE html><html><body>"
+                    '<main id="main"><div id="page-content">ok</div></main>'
+                    '<div id="site-content">A</div><div id="site-content">B</div>'
+                    "</body></html>"
+                ),
+                render_intent="fragment",
+            )
+
+        with caplog.at_level(logging.WARNING, "chirp.middleware.debug_fragment_validator"):
+            async with TestClient(app) as client:
+                response = await client.get(
+                    "/",
+                    headers={
+                        "HX-Request": "true",
+                        "HX-Boosted": "true",
+                        "HX-Target": "main",
+                    },
+                )
+        assert response.status == 200
+        assert not any(
+            rec.name == "chirp.middleware.debug_fragment_validator" for rec in caplog.records
+        )
+
     async def test_unknown_intent_non_htmx_skipped(self, caplog) -> None:
         app = App()
         app.add_middleware(DebugFragmentValidator(_make_registry()))
