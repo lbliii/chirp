@@ -68,6 +68,47 @@ class TestCacheMissThenHit:
         assert r1.text == r2.text
         assert "hit 1" in r2.text
 
+    async def test_distinct_query_strings_do_not_collide(self) -> None:
+        app = _app()
+        _wire_cache(app)
+        counter = {"calls": 0}
+
+        @app.route("/threads")
+        def threads(request):
+            counter["calls"] += 1
+            return f"<p>page {request.query.get('page')} call {counter['calls']}</p>"
+
+        async with TestClient(app) as client:
+            page_one = await client.get("/threads", query={"page": "1"})
+            page_two = await client.get("/threads", query={"page": "2"})
+            page_one_again = await client.get("/threads", query={"page": "1"})
+
+        assert "page 1 call 1" in page_one.text
+        assert "page 2 call 2" in page_two.text
+        assert page_one_again.text == page_one.text
+        assert counter["calls"] == 2
+
+    async def test_htmx_and_full_page_shapes_do_not_collide(self) -> None:
+        app = _app()
+        _wire_cache(app)
+        counter = {"calls": 0}
+
+        @app.route("/threads")
+        def threads(request):
+            counter["calls"] += 1
+            shape = "fragment" if request.is_htmx else "full"
+            return f"<p>{shape} call {counter['calls']}</p>"
+
+        async with TestClient(app) as client:
+            full = await client.get("/threads")
+            fragment = await client.fragment("/threads", target="thread-list")
+            full_again = await client.get("/threads")
+
+        assert "full call 1" in full.text
+        assert "fragment call 2" in fragment.text
+        assert full_again.text == full.text
+        assert counter["calls"] == 2
+
 
 # ---------------------------------------------------------------------------
 # 4.2 — Non-GET bypass

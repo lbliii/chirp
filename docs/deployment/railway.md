@@ -4,6 +4,9 @@ This guide is the recommended production shape for Chirp apps on Railway,
 especially logged-in forum-style apps with htmx navigation, sessions, database
 writes, and SSE updates.
 
+For database indexes, cache scope, and SSE fanout in forum-shaped apps, see
+[Forum Production Checklist](forum-production.md).
+
 ## App Config
 
 Use `AppConfig.from_env()` so Railway deployment variables are handled in one
