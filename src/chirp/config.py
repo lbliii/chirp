@@ -27,6 +27,14 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def _env_int_first(keys: tuple[str, ...], default: int) -> int:
+    """Read the first present integer env var from *keys*."""
+    for key in keys:
+        if key in os.environ:
+            return _env_int(key, default)
+    return default
+
+
 def _env_float(key: str, default: float) -> float:
     val = os.environ.get(key)
     if val is None:
@@ -35,6 +43,18 @@ def _env_float(key: str, default: float) -> float:
         return float(val)
     except ValueError:
         return default
+
+
+def _env_allowed_hosts(prefix: str) -> tuple[str, ...]:
+    """Read allowed hosts, with Railway healthcheck support when detectable."""
+    raw = os.environ.get(f"{prefix}ALLOWED_HOSTS")
+    if raw:
+        hosts = tuple(part.strip() for part in raw.replace(",", " ").split() if part.strip())
+        return hosts or ("*",)
+    railway_public_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    if railway_public_domain:
+        return (railway_public_domain, "healthcheck.railway.app")
+    return ("*",)
 
 
 def _env_log_format(key: str, default: str) -> str:
@@ -301,12 +321,19 @@ class AppConfig:
         loads ``.env`` from the current directory before reading env.
 
         Env vars (with CHIRP_ prefix):
-            SECRET_KEY, DEBUG, ENV, HOST, PORT,
+            SECRET_KEY, DEBUG, ENV, HOST, PORT, ALLOWED_HOSTS,
             LOG_FORMAT (auto|text|json — forwarded to Pounce),
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
             REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
             HTTP_TIMEOUT, HTTP_RETRIES,
             FEATURE_<NAME>=true|false (e.g. CHIRP_FEATURE_X=true)
+
+        Railway compatibility:
+            If CHIRP_PORT is unset, from_env() falls back to Railway's PORT.
+            If CHIRP_HOST is unset in a Railway environment, host defaults to
+            "0.0.0.0". If CHIRP_ALLOWED_HOSTS is unset and
+            RAILWAY_PUBLIC_DOMAIN is present, allowed_hosts includes that
+            domain and healthcheck.railway.app.
         """
         try:
             from dotenv import load_dotenv
@@ -330,6 +357,7 @@ class AppConfig:
                 {
                     "HOST",
                     "PORT",
+                    "ALLOWED_HOSTS",
                     "DEBUG",
                     "SECRET_KEY",
                     "ENV",
@@ -347,9 +375,19 @@ class AppConfig:
             ),
         )
 
+        host = os.environ.get(f"{p}HOST")
+        if host is None:
+            host = (
+                "0.0.0.0"  # noqa: S104 - Railway requires binding the public service port.
+                if os.environ.get("RAILWAY_ENVIRONMENT_ID")
+                or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+                else "127.0.0.1"
+            )
+
         return cls(
-            host=os.environ.get(f"{p}HOST", "127.0.0.1"),
-            port=_env_int(f"{p}PORT", 8000),
+            host=host,
+            port=_env_int_first((f"{p}PORT", "PORT"), 8000),
+            allowed_hosts=_env_allowed_hosts(p),
             log_format=_env_log_format(f"{p}LOG_FORMAT", "auto"),
             debug=debug,
             secret_key=os.environ.get(f"{p}SECRET_KEY", ""),
