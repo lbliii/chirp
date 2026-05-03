@@ -43,7 +43,7 @@ Pick exactly one per app. Includes the decision table, the `hx-select` distincti
 :icon: sidebar
 :link: /chirp/docs/guides/app-shell/
 :description: chirp-ui's app_shell_layout — sidebar, topbar, OOB regions
-The opinionated shell with persistent chrome. One of three shells; see [Shells](/docs/guides/shells/) for the others.
+The opinionated shell with persistent chrome. One of three shells; see [Shells](/chirp/docs/guides/shells/) for the others.
 :::{/card}
 
 :::{card} Boosted Navigation

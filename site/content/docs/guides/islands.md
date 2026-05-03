@@ -116,7 +116,7 @@ Document three ownership classes:
 - **Shared boundaries**: coarse remount/invalidation boundaries where server
   swaps may replace an island root but should not patch inside it
 
-This ownership model is implied by [SSE Patterns](/docs/streaming/sse-patterns/):
+This ownership model is implied by [SSE Patterns](/chirp/docs/streaming/sse-patterns/):
 client-managed surfaces should not be reactively re-rendered. Do not register
 client-owned blocks in the reactive dependency index. See [App Shells](/chirp/docs/guides/app-shell/)
 for how islands fit inside shell layouts and OOB regions.

@@ -23,7 +23,7 @@ config = AppConfig(alpine=True)
 app = App(config=config)
 ```
 
-Chirp auto-injects both htmx and Alpine into full-page HTML responses. For named components that must survive htmx boosted navigation, use `Alpine.safeData()` instead of `Alpine.data()` (see the [Alpine guide](/docs/guides/alpine/#registering-custom-components-alpinesafedata)).
+Chirp auto-injects both htmx and Alpine into full-page HTML responses. For named components that must survive htmx boosted navigation, use `Alpine.safeData()` instead of `Alpine.data()` (see the [Alpine guide](/chirp/docs/guides/alpine/#registering-custom-components-alpinesafedata)).
 
 ## Dropdown with htmx Form
 

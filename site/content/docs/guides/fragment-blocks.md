@@ -69,7 +69,7 @@ Rule of thumb: **ask whether the region exists on page load.** If yes → `{% bl
 
 ## Full example: returns gallery
 
-[`examples/standalone/returns_gallery/templates/gallery.html`](https://github.com/nvidia/chirp/blob/main/examples/standalone/returns_gallery/templates/gallery.html) is the reference consumer. It mixes both directives:
+[`examples/standalone/returns_gallery/templates/gallery.html`](https://github.com/lbliii/chirp/blob/main/examples/standalone/returns_gallery/templates/gallery.html) is the reference consumer. It mixes both directives:
 
 - `demo_fragment`, `demo_page`, `demo_oob_primary` — inline-rendered and swap-addressable (`{% block %}`)
 - `demo_form` — inline-rendered, also the re-render target on 422 (`{% block %}`)
@@ -93,7 +93,7 @@ Use a regular `{% block %}` with a loading check:
 {% endblock %}
 ```
 
-See the [Suspense documentation](/docs/streaming/) for the full pattern.
+See the [Suspense documentation](/chirp/docs/streaming/) for the full pattern.
 
 ## Migration recipe
 
@@ -144,4 +144,4 @@ Run `rg '{% if .* is defined %}'` afterwards — any remaining hits are either l
 ## Reference
 
 - Directive: [kida `{% fragment %}` docs](https://lbliii.github.io/kida/docs/directives/fragment/)
-- Related: [OOB Registry & Fail-Loud Rendering](/chirp/docs/guides/oob-registry/), [App Shells](/chirp/docs/guides/app-shell/), [Streaming: Suspense](/docs/streaming/)
+- Related: [OOB Registry & Fail-Loud Rendering](/chirp/docs/guides/oob-registry/), [App Shells](/chirp/docs/guides/app-shell/), [Streaming: Suspense](/chirp/docs/streaming/)
