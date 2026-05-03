@@ -10,9 +10,7 @@ _SITE_DOCS = _ROOT / "site" / "content" / "docs"
 _SITE_CONTENT = _ROOT / "site" / "content"
 
 _INDEX_STEMS = frozenset({"index", "_index", "README"})
-_CHIRP_DOC_LINK_RE = re.compile(
-    r"(?:https://lbliii\.github\.io)?/chirp/docs/[^\s\])\"'<>]+"
-)
+_CHIRP_DOC_LINK_RE = re.compile(r"(?:https://lbliii\.github\.io)?/chirp/docs/[^\s\])\"'<>]+")
 
 
 def _site_markdown_files() -> tuple[Path, ...]:
