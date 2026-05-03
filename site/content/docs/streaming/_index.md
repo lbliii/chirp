@@ -1,11 +1,11 @@
 ---
-title: Streaming
-description: Streaming HTML and Server-Sent Events
+title: Stream and Push Updates
+description: Streaming HTML, Suspense, Server-Sent Events, and reactive updates
 draft: false
-weight: 60
+weight: 40
 lang: en
 type: doc
-tags: [streaming, sse, real-time]
+tags: [streaming, suspense, sse, real-time]
 keywords: [streaming, html, sse, server-sent-events, real-time, chunked]
 category: guide
 icon: zap
@@ -13,6 +13,9 @@ icon: zap
 cascade:
   type: doc
 ---
+
+Use this section when content should arrive over time: initial page rendering
+with `Stream` or `Suspense`, or post-load updates with `EventStream`.
 
 :::{cards}
 :columns: 2

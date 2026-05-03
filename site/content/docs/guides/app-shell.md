@@ -199,7 +199,7 @@ extend pattern above remains valid for apps that don't need OOB.
 
 ## Route Contract and Sections
 
-With the [route directory contract](/chirp/docs/reference/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/chirp/docs/guides/route-directory/) for recommended patterns.
+With the [route directory contract](/chirp/docs/contracts/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/chirp/docs/guides/route-directory/) for recommended patterns.
 
 ## Forms Inside the Shell
 

@@ -109,7 +109,7 @@ If the response shape is unclear, start at [[docs/core-concepts/return-values|Re
 
 ## Related
 
-- [[docs/reference/route-contract|Route Directory Contract]]
+- [[docs/contracts/route-contract|Route Directory Contract]]
 - [[docs/guides/oob-registry|OOB Registry]]
 - [[docs/guides/boosted-navigation|Boosted Navigation]]
 - [[docs/streaming/html-streaming|Streaming HTML]]

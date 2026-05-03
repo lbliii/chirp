@@ -2,7 +2,7 @@
 title: Get Started
 description: Install Chirp and build your first HTMX-friendly, server-rendered web application
 draft: false
-weight: 10
+weight: 2
 lang: en
 type: doc
 tags: [getting-started, installation, quickstart]

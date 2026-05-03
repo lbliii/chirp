@@ -121,7 +121,7 @@ These checks run automatically as part of `chirp check myapp:app`. Reactive chec
 `app.check()` is not a style linter. It exists to catch wiring that can make
 the browser swap the wrong thing, silently skip an OOB update, or route a page
 into the wrong shell. For visual symptoms and browser-side diagnostics, start
-with [[docs/guides/debugging-swaps|Debugging Swaps]].
+with [[docs/contracts/debugging-swaps|Debugging Swaps]].
 
 Any category can be tuned with `app.override_contract_severity()` — for example,
 demote the missing-handler ERROR during a migration:

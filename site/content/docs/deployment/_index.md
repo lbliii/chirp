@@ -1,11 +1,11 @@
 ---
-title: Deployment
-description: Deploy Chirp apps in production with Pounce
+title: Ship and Operate Apps
+description: Production deployment, Pounce, Docker, Kubernetes, metrics, and runtime configuration
 draft: false
-weight: 95
+weight: 80
 lang: en
 type: doc
-tags: [deployment, production, pounce, docker]
+tags: [deployment, production, pounce, docker, operations]
 keywords: [deploy, production, pounce, docker, metrics, rate-limit]
 category: guide
 icon: server

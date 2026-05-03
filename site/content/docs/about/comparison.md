@@ -89,4 +89,4 @@ Suspense, and SSE access patterns.
 
 - [[docs/get-started/first-fragment-app|First Fragment App]] — Try the smallest complete htmx-backed Chirp app
 - [[docs/core-concepts/return-values|Return Values]] — Learn the type-driven response model
-- [[docs/guides/debugging-swaps|Debugging Swaps]] — See how `chirp check` and DevTools catch broken UI wiring
+- [[docs/contracts/debugging-swaps|Debugging Swaps]] — See how `chirp check` and DevTools catch broken UI wiring

@@ -2,7 +2,7 @@
 title: About
 description: Architecture, philosophy, framework comparisons, and thread-safety guidance for Chirp
 draft: false
-weight: 100
+weight: 1
 lang: en
 type: doc
 tags: [about, architecture, philosophy]

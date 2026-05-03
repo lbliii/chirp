@@ -1,11 +1,11 @@
 ---
-title: Core Concepts
-description: Understand the fundamental building blocks of Chirp
+title: Understand Chirp
+description: Learn the return-type model, app lifecycle, and configuration surface
 draft: false
-weight: 20
+weight: 5
 lang: en
 type: doc
-tags: [concepts, architecture, fundamentals]
+tags: [concepts, architecture, fundamentals, return-values]
 keywords: [app, lifecycle, return values, configuration, concepts]
 category: explanation
 icon: book-open
@@ -17,6 +17,10 @@ cascade:
 :::{cards}
 :columns: 2
 :gap: medium
+
+Chirp's core model is type-driven: route handlers return values that carry
+rendering intent, the app freezes before serving, and configuration is explicit.
+Start here when you need the mental model behind the task-oriented sections.
 
 :::{card} App Lifecycle
 :icon: refresh-cw

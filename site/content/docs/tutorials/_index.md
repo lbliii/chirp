@@ -1,6 +1,6 @@
 ---
-title: Tutorials
-description: Step-by-step guides for common HTMX patterns, framework migrations, and Chirp workflows
+title: Applied Tutorials
+description: Step-by-step walkthroughs that apply Chirp patterns in context
 draft: false
 weight: 110
 lang: en

@@ -1,11 +1,11 @@
 ---
-title: Templates
-description: Rendering, fragments, and template integration with kida
+title: Render HTML Fragments
+description: Templates, named blocks, Page, Fragment, OOB swaps, and kida integration
 draft: false
-weight: 30
+weight: 20
 lang: en
 type: doc
-tags: [templates, kida, rendering, fragments]
+tags: [templates, kida, rendering, fragments, oob]
 keywords: [templates, kida, rendering, fragments, page, oob, filters]
 category: guide
 icon: layers
@@ -17,6 +17,9 @@ cascade:
 :::{cards}
 :columns: 2
 :gap: medium
+
+Use this section when one template needs to serve full pages, htmx fragments,
+OOB updates, Suspense blocks, and SSE payloads.
 
 :::{card} Rendering
 :icon: monitor

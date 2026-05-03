@@ -2,7 +2,7 @@
 title: Examples
 description: Runnable Chirp applications organized by the framework surface they teach
 draft: false
-weight: 105
+weight: 100
 lang: en
 type: doc
 tags: [examples, demos, rag, sse, streaming]

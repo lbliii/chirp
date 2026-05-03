@@ -1,11 +1,11 @@
 ---
-title: Data
-description: Database access, form parsing, and validation
+title: Handle Forms and Data
+description: Form parsing, validation, database access, query helpers, and migrations
 draft: false
-weight: 70
+weight: 30
 lang: en
 type: doc
-tags: [data, database, forms, validation]
+tags: [data, database, forms, validation, mutations]
 keywords: [database, sqlite, postgresql, forms, multipart, validation]
 category: guide
 icon: database
@@ -13,6 +13,10 @@ icon: database
 cascade:
   type: doc
 ---
+
+Use this section when request data becomes application data: parse forms,
+validate mutations, query storage, paginate results, and keep optional data
+extras explicit.
 
 :::{cards}
 :columns: 3

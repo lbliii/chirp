@@ -122,7 +122,7 @@ Picking the wrong one is the most common return-type mistake. Use this table:
 | **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
 | **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/routing/filesystem-routing/) |
 | **Route directory contract** | `_meta.py`, `_context.py`, `_actions.py`, sections, shell context, and route validation | [Route Directory →](https://lbliii.github.io/chirp/docs/guides/route-directory/) |
-| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/reference/route-contract/) |
+| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/contracts/route-contract/) |
 | **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
 | **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
 | **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |

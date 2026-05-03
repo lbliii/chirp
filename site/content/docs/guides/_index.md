@@ -1,18 +1,22 @@
 ---
-title: Guides
-description: Best practices and patterns for building accessible, secure, server-rendered Chirp applications
+title: Shape UI and Extensions
+description: Shells, debugging, accessibility, Alpine, ChirpUI, islands, tools, and extension patterns
 draft: false
-weight: 105
+weight: 50
 lang: en
 type: doc
-tags: [guides, best-practices, accessibility]
-keywords: [guides, htmx, server-rendered, accessibility, best-practices]
+tags: [guides, best-practices, accessibility, shells, extensions]
+keywords: [guides, htmx, server-rendered, accessibility, shells, extensions]
 category: guide
 icon: book
 
 cascade:
   type: doc
 ---
+
+Use this section for UI surfaces that sit around or beyond a single route:
+shells, swap debugging, accessibility, client-owned islands, ChirpUI, and tool
+registration.
 
 :::{cards}
 :columns: 2
@@ -23,13 +27,6 @@ cascade:
 :link: /chirp/docs/guides/accessibility/
 :description: Semantic markup, ARIA, and WCAG alignment
 Build inclusive apps with Chirp.
-:::{/card}
-
-:::{card} Debugging Swaps
-:icon: shield
-:link: /chirp/docs/guides/debugging-swaps/
-:description: chirp check, DevTools, debug headers, and swap failure modes
-Diagnose broken htmx, OOB, Suspense, SSE, and boosted navigation updates.
 :::{/card}
 
 :::{card} Alpine.js

@@ -1,11 +1,11 @@
 ---
-title: Middleware
-description: Protocol-based middleware system
+title: Shape Requests
+description: Middleware for CORS, static files, sessions, auth, CSRF, security headers, and custom request pipelines
 draft: false
-weight: 50
+weight: 60
 lang: en
 type: doc
-tags: [middleware, pipeline, protocol]
+tags: [middleware, pipeline, protocol, requests]
 keywords: [middleware, cors, static, sessions, auth, csrf, protocol]
 category: guide
 icon: settings
@@ -13,6 +13,10 @@ icon: settings
 cascade:
   type: doc
 ---
+
+Use this section when behavior belongs around route handlers rather than inside
+them: security headers, sessions, CSRF, static files, CORS, auth, and custom
+pipeline logic.
 
 :::{cards}
 :columns: 2

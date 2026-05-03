@@ -14,19 +14,31 @@ cascade:
 
 ## Get Oriented
 
-Chirp's docs are organized around the work you are trying to do: start an app,
-build pages, render fragments, handle mutations, stream updates, validate
-contracts, and ship safely. Start with **Get Started** if you are new; otherwise
-jump to the cluster that matches the surface you are changing.
+Chirp's docs are organized around durable jobs: understand the framework,
+start an app, build pages, render fragments, handle forms and data, stream
+updates, shape UI, test contracts, and ship safely. Start with **About** for
+the why and fit, then **Get Started** for the first working app.
 
 :::{cards}
 :columns: 2
 :gap: medium
 
+:::{card} About
+:icon: info
+:link: /chirp/docs/about/
+Architecture, philosophy, framework comparisons, and thread safety.
+:::{/card}
+
 :::{card} Get Started
 :icon: rocket
 :link: /chirp/docs/get-started/
 Install Chirp, scaffold an app, and build the first fragment-backed page.
+:::{/card}
+
+:::{card} Understand Chirp
+:icon: book-open
+:link: /chirp/docs/core-concepts/
+Return values, app lifecycle, configuration, and the type-driven model.
 :::{/card}
 
 :::{card} Build Pages and Navigation
@@ -41,10 +53,10 @@ Routes, filesystem pages, app lifecycle, shells, and boosted navigation.
 Templates, `Page`, `Fragment`, OOB swaps, block targets, and render plans.
 :::{/card}
 
-:::{card} Handle Forms and Mutations
+:::{card} Handle Forms and Data
 :icon: check-square
-:link: /chirp/docs/data/forms-validation/
-Form parsing, validation, CSRF-aware mutations, redirects, and inline edits.
+:link: /chirp/docs/data/
+Form parsing, validation, query helpers, migrations, and optional data extras.
 :::{/card}
 
 :::{/cards}
@@ -65,26 +77,32 @@ Form parsing, validation, CSRF-aware mutations, redirects, and inline edits.
 
 :::{card} Validate Contracts and Debug UI
 :icon: shield
-:link: /chirp/docs/guides/debugging-swaps/
+:link: /chirp/docs/contracts/debugging-swaps/
 `app.check`, `chirp check`, DevTools, debug headers, and swap failure modes.
+:::{/card}
+
+:::{card} Shape UI and Extensions
+:icon: wrench
+:link: /chirp/docs/guides/
+Shells, swap debugging, accessibility, Alpine, ChirpUI, islands, and tools.
+:::{/card}
+
+:::{card} Shape Requests
+:icon: settings
+:link: /chirp/docs/middleware/
+Middleware for CORS, static files, sessions, auth, CSRF, and custom pipelines.
+:::{/card}
+
+:::{card} Test Apps and Contracts
+:icon: check-circle
+:link: /chirp/docs/testing/
+`TestClient`, fragment assertions, SSE testing, and executable contracts.
 :::{/card}
 
 :::{card} Ship and Operate Apps
 :icon: server
 :link: /chirp/docs/deployment/
-Configuration, middleware, sessions, security headers, static files, and deploys.
-:::{/card}
-
-:::{card} Use Data Safely
-:icon: database
-:link: /chirp/docs/data/
-Database helpers, query builder, migrations, pagination, and optional extras.
-:::{/card}
-
-:::{card} Extend Chirp
-:icon: wrench
-:link: /chirp/docs/guides/tools/
-Middleware, template filters, MCP tools, plugins, and extension boundaries.
+Production deployment, Pounce, Docker, Kubernetes, metrics, and runtime config.
 :::{/card}
 
 :::{/cards}
@@ -96,18 +114,6 @@ Middleware, template filters, MCP tools, plugins, and extension boundaries.
 :::{cards}
 :columns: 2
 :gap: medium
-
-:::{card} Core Concepts
-:icon: book-open
-:link: /chirp/docs/core-concepts/
-Return values, app lifecycle, configuration, and the type-driven model.
-:::{/card}
-
-:::{card} Guides
-:icon: book
-:link: /chirp/docs/guides/
-Focused how-to material for shells, accessibility, Alpine, islands, and tools.
-:::{/card}
 
 :::{card} Examples
 :icon: cube
@@ -121,16 +127,10 @@ Full-featured apps: contacts, dashboards, RAG, streaming, fragments, and SSE.
 Complete API reference, error codes, and configuration.
 :::{/card}
 
-:::{card} Testing
-:icon: check-circle
-:link: /chirp/docs/testing/
-`TestClient`, fragment assertions, SSE testing, and executable contracts.
-:::{/card}
-
-:::{card} About
-:icon: info
-:link: /chirp/docs/about/
-Architecture, philosophy, framework comparisons, and thread safety.
+:::{card} Applied Tutorials
+:icon: graduation-cap
+:link: /chirp/docs/tutorials/
+Step-by-step walkthroughs for migrations, htmx patterns, and UI interactions.
 :::{/card}
 
 :::{/cards}
