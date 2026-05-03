@@ -2,7 +2,12 @@
 
 **Version**: 0.1.0-draft
 **Date**: 2026-02-07
-**Status**: Draft
+**Status**: Historical draft (superseded for release planning by `docs/release-policy.md` and
+current `docs/plan-*.md` files)
+
+This document records the original product requirements and early milestone framing. Do not use it
+as the current release roadmap without checking the active release policy, public API notes, and
+plan files.
 
 ---
 

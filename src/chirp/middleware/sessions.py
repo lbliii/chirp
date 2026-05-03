@@ -140,7 +140,11 @@ class CookieSessionStore:
             )
             raise ConfigurationError(msg) from None
         if not config.secret_key:
-            msg = "SessionConfig.secret_key must not be empty."
+            msg = (
+                "SessionConfig.secret_key must not be empty. "
+                "Pass SessionConfig(secret_key=app.config.secret_key) or set "
+                "AppConfig(secret_key=...) / CHIRP_SECRET_KEY before adding SessionMiddleware."
+            )
             raise ConfigurationError(msg)
         self._config = config
         self._serializer = URLSafeTimedSerializer(config.secret_key)

@@ -216,6 +216,9 @@ class TestRouterMethods:
 
         err = exc_info.value
         assert err.status == 405
+        assert "POST" in err.detail
+        assert "/users" in err.detail
+        assert "Allowed methods: GET" in err.detail
         allow_headers = dict(err.headers)
         assert "GET" in allow_headers["Allow"]
 

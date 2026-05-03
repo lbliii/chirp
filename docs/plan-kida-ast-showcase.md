@@ -1,5 +1,11 @@
 # Plan: Showcase Chirp's Use of Kida's AST (Regions, OOB, Metadata)
 
+**Status**: Backlog
+**Created**: 2026-03-22
+**Owner**: Narrative Docs Steward
+
+---
+
 ## Goal
 
 Make Chirp's AST-driven integration with Kida visible and understandable — so developers see why Chirp + Kida enables declarative OOB regions, block validation, and zero-duplication patterns without hard-coded logic.

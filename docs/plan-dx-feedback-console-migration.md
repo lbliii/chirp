@@ -1,15 +1,41 @@
 # Epic: Refactor-Friendly Chirp — DX Feedback from Console Migration
 
-**Status**: Draft
+**Status**: Completed
 **Created**: 2026-04-23
 **Target**: chirp 0.6
 **Estimated Effort**: 18–26 h
 **Dependencies**: kida-templates (upstream, out of scope for this plan)
 **Source**: User feedback from migrating dashboard → new console architecture (5 friction points observed during large-scale IA refactor)
 
+**Completed**: 2026-05-03
+**Verification**:
+
+- `src/chirp/app/url_for.py`
+- `src/chirp/app/mount.py`
+- `src/chirp/contracts/rules_page_handlers.py`
+- `src/chirp/contracts/rules_route_names.py`
+- `tests/test_url_for.py`
+- `tests/test_mount_app.py`
+- `tests/test_page_handler_check.py`
+- `tests/test_page_error.py`
+- `docs/routing/mounting.md`
+
 ---
 
-## Why This Matters
+## Current Status
+
+This plan is now a historical implementation record. The in-repo work landed
+for Chirp 0.6: named routes, `url_for`, page-handler contract checks, guided
+`Page(...)` errors, `mount_app`, and example migration coverage all exist in
+the current tree.
+
+The remaining dependency-thread is external: Kida relative include behavior is
+tracked outside this repository and should not be treated as an open Chirp
+implementation task.
+
+---
+
+## Why This Mattered
 
 A user completing a large IA refactor of a Chirp app surfaced five DX friction points where the framework forces manual fan-out work or fails late instead of early. The common thread: **Chirp has good contracts but leaky identifiers** — hardcoded URL strings, template paths, and handler names that don't participate in the framework's existing validation story.
 

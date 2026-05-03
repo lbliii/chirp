@@ -129,8 +129,20 @@ class TestParseUrlEncoded:
 
 class TestParseUnsupported:
     async def test_unsupported_content_type(self) -> None:
-        with pytest.raises(ValueError, match="Unsupported form content type"):
+        with pytest.raises(ValueError, match="Unsupported form content type") as exc_info:
             await parse_form_data(b"data", "application/json")
+        msg = str(exc_info.value)
+        assert "Unsupported form content type" in msg
+        assert "application/x-www-form-urlencoded" in msg
+        assert "multipart/form-data" in msg
+        assert "request.body" in msg
+
+    async def test_multipart_missing_boundary_message_is_actionable(self) -> None:
+        with pytest.raises(ValueError, match="missing boundary") as exc_info:
+            await parse_form_data(b"data", "multipart/form-data")
+        msg = str(exc_info.value)
+        assert "missing boundary" in msg
+        assert "multipart/form-data; boundary=..." in msg
 
 
 # ---------------------------------------------------------------------------

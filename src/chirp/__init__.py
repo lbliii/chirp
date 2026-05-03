@@ -120,7 +120,7 @@ _API_STATUS: dict[str, str] = {
     "ContractIssue": "provisional",
     "DependencyIndex": "provisional",
     "HtmxDetails": "provisional",
-    "JSONResponse": "provisional",
+    "JSONResponse": "stable",
     "ReactiveBus": "provisional",
     "Severity": "provisional",
     "ShellAction": "provisional",

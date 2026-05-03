@@ -1,17 +1,45 @@
 # Epic: Contract Tests for Framework Reliability — Close the Gaps That Shipped Bugs
 
-**Status**: Draft
+**Status**: Completed
 **Created**: 2026-04-17
 **Target**: chirp 0.x (next reliability cut)
 **Estimated Effort**: 14–22 hours
 **Dependencies**: None (additive — no production code changes)
 **Source**: User-cited reliability gap; recent regressions PR #90 (fail-loud OOB) and PR #87 (startup OOB validation) shipped because no end-to-end test covered the path
 
+**Completed**: 2026-05-03
+**Verification**:
+
+- `tests/contracts/test_oob_pipeline_e2e.py`
+- `tests/contracts/test_register_oob_region_matrix.py`
+- `tests/contracts/test_mutation_result_e2e.py`
+- `tests/contracts/test_cache_middleware_e2e.py`
+- `tests/contracts/test_speculation_rules_e2e.py`
+- Release gate run on 2026-05-03: ruff, format check, ty, tests, examples,
+  core benchmark, changelog draft, and build all passed.
+
 ---
 
-## Why This Matters
+## Current Status
 
-The chirp framework has solid unit-level coverage of its serialization primitives and registry data structures, but the **request → response contract** for several first-party features is exercised only indirectly. Two production bugs in the last week (PRs #87 and #90) were caused by behaviors that "should have been obvious" — the missing test was a TestClient round-trip that registers a region, makes a boosted request, and asserts the response body. We are missing that test for OOB and three sibling features (`MutationResult`, `CacheMiddleware`, `AppConfig.speculation_rules`).
+This plan is now a historical implementation record, not an open roadmap. The
+request-to-response gaps it identified are covered by end-to-end contract test
+modules under `tests/contracts/`.
+
+Keep this document around because it explains why those tests exist and what
+regression class they protect. Do not use it as evidence of current missing
+coverage without first checking the test suite.
+
+## Why This Mattered
+
+At the time this plan was written, the chirp framework had solid unit-level
+coverage of its serialization primitives and registry data structures, but the
+**request → response contract** for several first-party features was exercised
+only indirectly. Two production bugs in the same week (PRs #87 and #90) were
+caused by behaviors that "should have been obvious" — the missing test was a
+TestClient round-trip that registers a region, makes a boosted request, and
+asserts the response body. The original gaps covered OOB and three sibling
+features (`MutationResult`, `CacheMiddleware`, `AppConfig.speculation_rules`).
 
 **Concrete consequences:**
 
@@ -22,7 +50,8 @@ The chirp framework has solid unit-level coverage of its serialization primitive
 5. **`speculation_rules` HTML injection is untested.** The JSON snippet builder in `src/chirp/server/speculation_rules.py:1` is well unit-tested, but no test verifies the `<script type="speculationrules">` tag actually lands in `<head>` of a real response.
 6. **No reproducer for the recent regressions.** A test that replays PR #90's bug against the pre-fix commit would lock in the fix forever; without it, the next refactor of the negotiation layer is one careless change away from re-introducing silent empty swaps.
 
-**The fix:** Add ~5 new test modules (~30–40 tests) that exercise these four features end-to-end via `TestClient`, with one parametrized matrix per registration knob.
+**The fix:** Add test modules that exercise these features end-to-end via
+`TestClient`, with one parametrized matrix per registration knob.
 
 ### Evidence Table
 
