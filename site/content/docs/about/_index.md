@@ -63,25 +63,4 @@ All seven projects in the reactive Python stack.
 How return values, freezing, configuration, and contracts fit together.
 :::{/card}
 
-:::{card} Return Values
-:icon: arrow-right
-:link: /chirp/docs/about/return-values/
-:description: The type is the intent
-All the types route handlers can return and what they mean.
-:::{/card}
-
-:::{card} App Lifecycle
-:icon: refresh-cw
-:link: /chirp/docs/about/app-lifecycle/
-:description: Mutable setup, frozen runtime
-How Chirp's App transitions from configuration to serving.
-:::{/card}
-
-:::{card} Configuration
-:icon: settings
-:link: /chirp/docs/about/configuration/
-:description: AppConfig frozen dataclass
-Every configuration option with IDE autocomplete.
-:::{/card}
-
 :::{/cards}

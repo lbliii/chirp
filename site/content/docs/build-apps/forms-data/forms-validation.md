@@ -254,10 +254,10 @@ async def register(form: RegisterForm):
 - **Non-htmx**: redirects to `/welcome`
 - **htmx**: sends `HX-Redirect` (or renders fragments if you provide them)
 
-See [[docs/about/return-values|Return Values]] for the full `FormAction` API.
+See [[docs/about/core-concepts/return-values|Return Values]] for the full `FormAction` API.
 
 ## Next Steps
 
 - [[docs/build-apps/forms-data/database|Database]] -- Async database access
 - [[docs/build-apps/html-fragments/fragments|Fragments]] -- Fragment rendering for forms
-- [[docs/about/return-values|Return Values]] -- ValidationError, FormAction, and other types
+- [[docs/about/core-concepts/return-values|Return Values]] -- ValidationError, FormAction, and other types

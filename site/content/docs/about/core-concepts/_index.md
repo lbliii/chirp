@@ -21,21 +21,21 @@ Start here when you need the mental model behind the task-oriented sections.
 
 :::{card} App Lifecycle
 :icon: refresh-cw
-:link: /chirp/docs/about/app-lifecycle/
+:link: /chirp/docs/about/core-concepts/app-lifecycle/
 :description: Mutable setup, frozen runtime
 How Chirp's App transitions from configuration to serving.
 :::{/card}
 
 :::{card} Return Values
 :icon: arrow-right
-:link: /chirp/docs/about/return-values/
+:link: /chirp/docs/about/core-concepts/return-values/
 :description: The type is the intent
 All the types route handlers can return and what they mean.
 :::{/card}
 
 :::{card} Configuration
 :icon: settings
-:link: /chirp/docs/about/configuration/
+:link: /chirp/docs/about/core-concepts/configuration/
 :description: AppConfig frozen dataclass
 Every configuration option with IDE autocomplete.
 :::{/card}

@@ -186,4 +186,4 @@ chirp[ai]         → httpx            (LLM streaming)
 
 - [[docs/about/philosophy|Philosophy]] -- Design principles
 - [[docs/about/thread-safety|Thread Safety]] -- Free-threading patterns
-- [[docs/about/app-lifecycle|App Lifecycle]] -- The freeze transition
+- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- The freeze transition

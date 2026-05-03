@@ -223,6 +223,6 @@ app = App(config=AppConfig())
 
 ## Next Steps
 
-- [[docs/about/app-lifecycle|App Lifecycle]] -- How the app freezes
+- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- How the app freezes
 - [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] -- Middleware that uses config
 - [[docs/reference/api|API Reference]] -- Complete API surface

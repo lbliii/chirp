@@ -105,7 +105,7 @@ Most swap bugs reduce to the wrong return type:
 | Initial shell plus deferred blocks | `Suspense(...)` |
 | Post-load long-lived updates | `EventStream(...)` |
 
-If the response shape is unclear, start at [[docs/about/return-values|Return Values]].
+If the response shape is unclear, start at [[docs/about/core-concepts/return-values|Return Values]].
 
 ## Related
 

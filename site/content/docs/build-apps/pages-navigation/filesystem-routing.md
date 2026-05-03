@@ -507,6 +507,6 @@ You can mix both: `app.mount_pages("pages")` for the main app shell, and `@app.r
 ## Related
 
 - [[docs/build-apps/pages-navigation/routes|Routes]] — Decorator-based route registration
-- [[docs/about/return-values|Return Values]] — `Page` and `LayoutPage`
+- [[docs/about/core-concepts/return-values|Return Values]] — `Page` and `LayoutPage`
 - [[docs/build-apps/html-fragments/fragments|Fragments]] — Block-level rendering for htmx
 - [[docs/tutorials/view-transitions-oob|View Transitions]] — Boosted navigation with layouts

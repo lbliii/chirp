@@ -168,6 +168,6 @@ def archive_item(id: int):
 
 ## Next Steps
 
-- [[docs/about/return-values|Return Values]] -- All return types
+- [[docs/about/core-concepts/return-values|Return Values]] -- All return types
 - [[docs/build-apps/request-pipeline/overview|Middleware]] -- Intercept and transform responses
 - [[docs/build-apps/html-fragments/fragments|Fragments]] -- Fragment-aware request handling

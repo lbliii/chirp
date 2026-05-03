@@ -142,7 +142,7 @@ The `<app>` argument is an import string in `module:attribute` format. The attri
 
 ### AppConfig
 
-Frozen dataclass for application configuration. See [[docs/about/configuration|Configuration]].
+Frozen dataclass for application configuration. See [[docs/about/core-concepts/configuration|Configuration]].
 
 ## HTTP
 
@@ -244,5 +244,5 @@ See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup a
 ## Next Steps
 
 - [[docs/reference/errors|Errors]] -- Error handling in detail
-- [[docs/about/return-values|Return Values]] -- Return type guide
-- [[docs/about/configuration|Configuration]] -- AppConfig options
+- [[docs/about/core-concepts/return-values|Return Values]] -- Return type guide
+- [[docs/about/core-concepts/configuration|Configuration]] -- AppConfig options

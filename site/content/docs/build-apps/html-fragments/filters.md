@@ -230,5 +230,5 @@ def truncate(value: str, length: int = 50, suffix: str = "...") -> str:
 ## Next Steps
 
 - [[docs/build-apps/html-fragments/rendering|Rendering]] -- How templates are rendered
-- [[docs/about/app-lifecycle|App Lifecycle]] -- When filters are registered
+- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- When filters are registered
 - [[docs/reference/api|API Reference]] -- Complete API surface

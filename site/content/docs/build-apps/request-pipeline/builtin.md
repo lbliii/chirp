@@ -433,4 +433,4 @@ Useful for development tools, analytics scripts, or debug toolbars.
 
 - [[docs/build-apps/request-pipeline/custom|Custom Middleware]] -- Write your own
 - [[docs/build-apps/request-pipeline/overview|Overview]] -- How the middleware pipeline works
-- [[docs/about/configuration|Configuration]] -- AppConfig and secret_key
+- [[docs/about/core-concepts/configuration|Configuration]] -- AppConfig and secret_key

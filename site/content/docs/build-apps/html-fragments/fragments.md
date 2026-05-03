@@ -264,6 +264,6 @@ Define fragment blocks inside the block that gets swapped. For example, if `page
 
 ## Next Steps
 
-- [[docs/about/return-values|Return Values]] -- All return types
+- [[docs/about/core-concepts/return-values|Return Values]] -- All return types
 - [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Push fragments in real-time
 - [[docs/tutorials/htmx-patterns|htmx Patterns]] -- Common fragment patterns

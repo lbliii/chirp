@@ -253,5 +253,5 @@ Use `Template` when:
 ## Next Steps
 
 - [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Real-time push updates
-- [[docs/about/return-values|Return Values]] -- All return types
+- [[docs/about/core-concepts/return-values|Return Values]] -- All return types
 - [[docs/build-apps/html-fragments/rendering|Rendering]] -- Standard template rendering

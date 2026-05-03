@@ -113,6 +113,6 @@ The first request (or `app.run()`) triggers the freeze. Concurrent requests bloc
 
 ## Next Steps
 
-- [[docs/about/return-values|Return Values]] -- What route handlers can return
-- [[docs/about/configuration|Configuration]] -- All AppConfig fields
+- [[docs/about/core-concepts/return-values|Return Values]] -- What route handlers can return
+- [[docs/about/core-concepts/configuration|Configuration]] -- All AppConfig fields
 - [[docs/build-apps/pages-navigation/routes|Routes]] -- Route registration in detail

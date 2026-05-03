@@ -186,5 +186,5 @@ Every Lock-protected module has concurrency stress tests in `tests/test_concurre
 ## Next Steps
 
 - [[docs/about/architecture|Architecture]] -- System design
-- [[docs/about/app-lifecycle|App Lifecycle]] -- The freeze transition
+- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- The freeze transition
 - [[docs/build-apps/request-pipeline/custom|Custom Middleware]] -- Thread-safe middleware patterns

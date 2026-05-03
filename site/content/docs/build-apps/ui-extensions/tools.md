@@ -139,5 +139,5 @@ The tools system is designed for Python 3.14 free-threading:
 ## Next Steps
 
 - See the **tools example** (`examples/standalone/tools/`) for a complete working app
-- [[docs/about/return-values|Return Values]] -- All return types including EventStream
+- [[docs/about/core-concepts/return-values|Return Values]] -- All return types including EventStream
 - [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- SSE patterns for real-time feeds

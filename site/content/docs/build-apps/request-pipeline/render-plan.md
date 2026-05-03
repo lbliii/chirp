@@ -121,5 +121,5 @@ async def debug_middleware(request, next):
 
 ## Next Steps
 
-- [[docs/about/return-values|Return Values]] -- How return types drive rendering decisions
+- [[docs/about/core-concepts/return-values|Return Values]] -- How return types drive rendering decisions
 - [[docs/build-apps/request-pipeline/custom|Custom Middleware]] -- Writing middleware in Chirp
