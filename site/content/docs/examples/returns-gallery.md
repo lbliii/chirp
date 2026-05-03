@@ -58,6 +58,6 @@ pytest examples/standalone/returns_gallery/
 
 ## Next
 
-- [[docs/core-concepts/return-values|Return Values]]
-- [[docs/guides/fragment-blocks|Fragment Blocks]]
-- [[docs/streaming|Streaming]]
+- [[docs/about/return-values|Return Values]]
+- [[docs/build-apps/html-fragments/fragment-blocks|Fragment Blocks]]
+- [[docs/build-apps/streaming-updates|Streaming]]

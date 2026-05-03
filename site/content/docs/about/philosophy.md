@@ -2,7 +2,7 @@
 title: Philosophy
 description: The design principles that shape every Chirp decision
 draft: false
-weight: 20
+weight: 10
 lang: en
 type: doc
 tags: [philosophy, design, principles]

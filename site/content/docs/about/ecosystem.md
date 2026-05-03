@@ -1,5 +1,5 @@
 ---
-title: The Bengal Ecosystem
+title: Bengal Ecosystem
 description: A structured reactive stack — every layer written in pure Python for 3.14t free-threading
 draft: false
 weight: 50

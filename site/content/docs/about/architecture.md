@@ -2,7 +2,7 @@
 title: Architecture
 description: Chirp's three-layer architecture
 draft: false
-weight: 10
+weight: 20
 lang: en
 type: doc
 tags: [architecture, design, layers]
@@ -157,7 +157,7 @@ flowchart LR
     end
 ```
 
-See [[docs/templates/kida-integration|Kida Integration]] for the full flow.
+See [[docs/build-apps/html-fragments/kida-integration|Kida Integration]] for the full flow.
 
 ## Dependencies
 
@@ -186,4 +186,4 @@ chirp[ai]         → httpx            (LLM streaming)
 
 - [[docs/about/philosophy|Philosophy]] -- Design principles
 - [[docs/about/thread-safety|Thread Safety]] -- Free-threading patterns
-- [[docs/core-concepts/app-lifecycle|App Lifecycle]] -- The freeze transition
+- [[docs/about/app-lifecycle|App Lifecycle]] -- The freeze transition

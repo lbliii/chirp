@@ -249,7 +249,7 @@ See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full 
 
 ## Next Steps
 
-- [[docs/core-concepts/return-values|Return Values]] -- All the types you can return
-- [[docs/templates/fragments|Fragments]] -- Deep dive into fragment rendering
-- [[docs/streaming/html-streaming|Streaming HTML]] -- Progressive page rendering
-- [[docs/streaming/server-sent-events|Server-Sent Events]] -- Real-time updates
+- [[docs/about/return-values|Return Values]] -- All the types you can return
+- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Deep dive into fragment rendering
+- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] -- Progressive page rendering
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Real-time updates

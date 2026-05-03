@@ -48,6 +48,6 @@ targets.
 
 ## Next
 
-- [[docs/streaming/server-sent-events|Server-Sent Events]]
-- [[docs/streaming/sse-patterns|SSE Patterns]]
-- [[docs/testing/assertions|Testing Assertions]]
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]]
+- [[docs/build-apps/streaming-updates/sse-patterns|SSE Patterns]]
+- [[docs/quality/testing/assertions|Testing Assertions]]

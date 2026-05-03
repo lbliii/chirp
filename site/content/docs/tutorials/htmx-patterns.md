@@ -319,6 +319,6 @@ The same pattern works for toggles, compare switches, and any interactive elemen
 
 ## Next Steps
 
-- [[docs/templates/fragments|Fragments]] -- Fragment rendering in depth
-- [[docs/streaming/server-sent-events|Server-Sent Events]] -- Real-time patterns
+- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Fragment rendering in depth
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Real-time patterns
 - [[docs/tutorials/coming-from-flask|Coming from Flask]] -- Migration guide

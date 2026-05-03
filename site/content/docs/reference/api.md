@@ -142,7 +142,7 @@ The `<app>` argument is an import string in `module:attribute` format. The attri
 
 ### AppConfig
 
-Frozen dataclass for application configuration. See [[docs/core-concepts/configuration|Configuration]].
+Frozen dataclass for application configuration. See [[docs/about/configuration|Configuration]].
 
 ## HTTP
 
@@ -207,7 +207,7 @@ headers so the same handler works for normal and htmx navigation:
 
 | Export | Description |
 |--------|-------------|
-| `CHIRP_DEFER_PENDING_KEY` | String ``__chirp_defer_pending__`` — Suspense injects this key into template context (see [[docs/streaming/html-streaming|Streaming HTML]]) |
+| `CHIRP_DEFER_PENDING_KEY` | String ``__chirp_defer_pending__`` — Suspense injects this key into template context (see [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]]) |
 
 ## Auth
 
@@ -220,7 +220,7 @@ headers so the same handler works for normal and htmx navigation:
 | `@requires(*permissions, policy=None)` | Decorator: require permissions plus optional object-level policy callback |
 | `is_safe_url(url)` | Check whether a redirect URL is safe (relative, same origin) |
 
-See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
+See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup and usage.
 
 ## Forms
 
@@ -244,5 +244,5 @@ See [[docs/middleware/builtin|Built-in Middleware]] for setup and usage.
 ## Next Steps
 
 - [[docs/reference/errors|Errors]] -- Error handling in detail
-- [[docs/core-concepts/return-values|Return Values]] -- Return type guide
-- [[docs/core-concepts/configuration|Configuration]] -- AppConfig options
+- [[docs/about/return-values|Return Values]] -- Return type guide
+- [[docs/about/configuration|Configuration]] -- AppConfig options

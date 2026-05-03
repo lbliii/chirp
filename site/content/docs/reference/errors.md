@@ -205,5 +205,5 @@ Debug pages expose internal details. Never enable `debug=True` in production.
 ## Next Steps
 
 - [[docs/reference/api|API Reference]] -- Complete API surface
-- [[docs/routing/routes|Routes]] -- Error handlers and route registration
-- [[docs/core-concepts/configuration|Configuration]] -- Debug mode settings
+- [[docs/build-apps/pages-navigation/routes|Routes]] -- Error handlers and route registration
+- [[docs/about/configuration|Configuration]] -- Debug mode settings

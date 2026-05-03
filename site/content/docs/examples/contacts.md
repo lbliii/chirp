@@ -52,6 +52,6 @@ separate `#contact-count` target.
 
 ## Next
 
-- [[docs/data/forms-validation|Forms and Validation]]
-- [[docs/guides/oob-registry|OOB Registry]]
+- [[docs/build-apps/forms-data/forms-validation|Forms and Validation]]
+- [[docs/quality/contracts-debugging/oob-registry|OOB Registry]]
 - [[docs/tutorials/htmx-patterns|htmx Patterns]]

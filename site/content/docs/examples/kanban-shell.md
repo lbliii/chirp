@@ -52,6 +52,6 @@ auth middleware setup, or route/page conventions.
 
 ## Next
 
-- [[docs/guides/app-shell|App Shells]]
-- [[docs/guides/oob-registry|OOB Registry]]
-- [[docs/streaming/server-sent-events|Server-Sent Events]]
+- [[docs/build-apps/ui-extensions/app-shell|App Shells]]
+- [[docs/quality/contracts-debugging/oob-registry|OOB Registry]]
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]]
