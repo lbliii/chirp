@@ -118,6 +118,11 @@ Beyond route-level checks, `app.check()` also validates hypermedia surface contr
 
 These checks run automatically as part of `chirp check myapp:app`. Reactive checks are only active when the app uses `ReactiveBus` and `DependencyIndex`.
 
+`app.check()` is not a style linter. It exists to catch wiring that can make
+the browser swap the wrong thing, silently skip an OOB update, or route a page
+into the wrong shell. For visual symptoms and browser-side diagnostics, start
+with [[docs/guides/debugging-swaps|Debugging Swaps]].
+
 Any category can be tuned with `app.override_contract_severity()` — for example,
 demote the missing-handler ERROR during a migration:
 
@@ -134,3 +139,6 @@ When `config.debug=True`:
 - **Debug headers**: `X-Chirp-Route-Kind`, `X-Chirp-Route-Files`, `X-Chirp-Route-Meta`, `X-Chirp-Route-Section`, `X-Chirp-Context-Chain`, `X-Chirp-Shell-Context`
 - **Route explorer**: `GET /__chirp/routes` shows the full route tree with drill-down
 - **HTMX panel**: Activity log entries show route metadata when expanded
+
+For htmx request records and Swap Doctor diagnostics, open Chirp DevTools with
+`Ctrl+Shift+D` in debug mode.

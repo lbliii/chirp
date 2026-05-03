@@ -32,6 +32,13 @@ Get Chirp running in your environment.
 From hello world to fragment rendering.
 :::{/card}
 
+:::{card} First Fragment App
+:icon: layers
+:link: /chirp/docs/get-started/first-fragment-app/
+:description: Build a small htmx app with one template
+Routes, `Page`, `Fragment`, a form POST, and `chirp check`.
+:::{/card}
+
 :::{card} Project Layout
 :icon: folder
 :link: /chirp/docs/get-started/project-layout/

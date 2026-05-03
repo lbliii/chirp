@@ -72,3 +72,4 @@ Adds `EventStream` route, boost layout, and `sse-connect` in the template.
 
 - [[docs/get-started/installation|Installation]] — Install Chirp
 - [[docs/get-started/quickstart|Quickstart]] — Build your first app
+- [[docs/get-started/first-fragment-app|First Fragment App]] — Build the smallest complete htmx-backed app

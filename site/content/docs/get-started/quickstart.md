@@ -57,6 +57,9 @@ chirp new myapp --minimal
 
 This generates only `app.py` and `templates/index.html`.
 
+If you want to learn the fragment loop without scaffolded auth and middleware,
+use [[docs/get-started/first-fragment-app|First Fragment App]] after this page.
+
 ## Hello World (Manual)
 
 You can also create a project by hand. Create a file called `app.py`:

@@ -25,6 +25,13 @@ cascade:
 Build inclusive apps with Chirp.
 :::{/card}
 
+:::{card} Debugging Swaps
+:icon: shield
+:link: /chirp/docs/guides/debugging-swaps/
+:description: chirp check, DevTools, debug headers, and swap failure modes
+Diagnose broken htmx, OOB, Suspense, SSE, and boosted navigation updates.
+:::{/card}
+
 :::{card} Alpine.js
 :icon: layers
 :link: /chirp/docs/guides/alpine/
@@ -43,7 +50,7 @@ Pick exactly one per app. Includes the decision table, the `hx-select` distincti
 :icon: sidebar
 :link: /chirp/docs/guides/app-shell/
 :description: chirp-ui's app_shell_layout — sidebar, topbar, OOB regions
-The opinionated shell with persistent chrome. One of three shells; see [Shells](/docs/guides/shells/) for the others.
+The opinionated shell with persistent chrome. One of three shells; see [Shells](/chirp/docs/guides/shells/) for the others.
 :::{/card}
 
 :::{card} Boosted Navigation

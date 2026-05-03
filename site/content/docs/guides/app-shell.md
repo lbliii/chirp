@@ -12,9 +12,9 @@ category: guide
 
 This guide is about chirp-ui's **`app_shell_layout.html`** — one of three
 shells you can extend. For the trifecta and the decision table, see
-**[Shells](/docs/guides/shells/)**. Also read **[UI layers & shell regions](/docs/guides/ui-layers/)**
+**[Shells](/chirp/docs/guides/shells/)**. Also read **[UI layers & shell regions](/chirp/docs/guides/ui-layers/)**
 for the glossary (app shell vs page chrome vs surface chrome) and stable OOB
-element ids, and **[Boosted Navigation](/docs/guides/boosted-navigation/)** for the
+element ids, and **[Boosted Navigation](/chirp/docs/guides/boosted-navigation/)** for the
 swap contract, cross-shell redirects, and debug warnings.
 
 ## What Is an App Shell?
@@ -30,7 +30,7 @@ htmx swaps it in.
 > **Not a shell:** Feature modules like `chirp.docs` ship templates that look
 > shell-like (sidebar, search, content area) but render *inside* whichever
 > shell you choose. They don't establish the document root or the boost
-> contract. See [Shells › What is *not* a shell](/docs/guides/shells/#what-is-not-a-shell).
+> contract. See [Shells > What is *not* a shell](/chirp/docs/guides/shells/#what-is-not-a-shell).
 
 ## How It Works
 
@@ -199,7 +199,7 @@ extend pattern above remains valid for apps that don't need OOB.
 
 ## Route Contract and Sections
 
-With the [route directory contract](/docs/reference/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/docs/guides/route-directory/) for recommended patterns.
+With the [route directory contract](/chirp/docs/reference/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/chirp/docs/guides/route-directory/) for recommended patterns.
 
 ## Forms Inside the Shell
 

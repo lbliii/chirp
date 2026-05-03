@@ -10,8 +10,8 @@ keywords: [hx-boost, HX-Target, boosted, cross-shell, swap_attrs, route_link_att
 category: guide
 ---
 
-Also read: **[App Shells](/docs/guides/app-shell/)** (how shells host boosted links) and
-**[UI layers & shell regions](/docs/guides/ui-layers/)** (the `swap_attrs` global, layout
+Also read: **[App Shells](/chirp/docs/guides/app-shell/)** (how shells host boosted links) and
+**[UI layers & shell regions](/chirp/docs/guides/ui-layers/)** (the `swap_attrs` global, layout
 scope comments).
 
 ## What Boosted Navigation Is

@@ -140,7 +140,7 @@ swaps) from a single definition:
 {% end %}
 ```
 
-See [App Shells → Regions](/docs/guides/app-shell/#regions-recommended-for-oob) for the
+See [App Shells → Regions](/chirp/docs/guides/app-shell/#regions-recommended-for-oob) for the
 full pattern. Plain `{% block breadcrumbs_oob %}...{% endblock %}` also works
 for cases where you don't need the dual full-page / OOB output.
 
@@ -172,6 +172,6 @@ The error points at the three real fixes:
 
 ## Related
 
-- [App Shells](/docs/guides/app-shell/) — the regions pattern and shell actions
-- [UI Layers & Shell Regions](/docs/guides/ui-layers/) — vocabulary and swap scopes
-- [RenderPlan Middleware](/docs/guides/render-plan/) — inspecting the plan from middleware
+- [App Shells](/chirp/docs/guides/app-shell/) — the regions pattern and shell actions
+- [UI Layers & Shell Regions](/chirp/docs/guides/ui-layers/) — vocabulary and swap scopes
+- [RenderPlan Middleware](/chirp/docs/guides/render-plan/) — inspecting the plan from middleware
