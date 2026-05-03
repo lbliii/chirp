@@ -25,6 +25,13 @@ cascade:
 Build inclusive apps with Chirp.
 :::{/card}
 
+:::{card} Debugging Swaps
+:icon: shield
+:link: /chirp/docs/guides/debugging-swaps/
+:description: chirp check, DevTools, debug headers, and swap failure modes
+Diagnose broken htmx, OOB, Suspense, SSE, and boosted navigation updates.
+:::{/card}
+
 :::{card} Alpine.js
 :icon: layers
 :link: /chirp/docs/guides/alpine/

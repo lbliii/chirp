@@ -65,7 +65,7 @@ Form parsing, validation, CSRF-aware mutations, redirects, and inline edits.
 
 :::{card} Validate Contracts and Debug UI
 :icon: shield
-:link: /chirp/docs/reference/route-contract/
+:link: /chirp/docs/guides/debugging-swaps/
 `app.check`, `chirp check`, DevTools, debug headers, and swap failure modes.
 :::{/card}
 
