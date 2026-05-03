@@ -240,7 +240,7 @@ def dashboard():
 :::{/tab-item}
 :::{/tab-set}
 
-Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/middleware/builtin|Built-in Middleware]] for setup.
+Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup.
 
 ## What Chirp Adds
 
@@ -277,4 +277,4 @@ Beyond Flask equivalents, Chirp offers:
 
 - [[docs/tutorials/htmx-patterns|htmx Patterns]] -- Common htmx + Chirp workflows
 - [[docs/get-started/quickstart|Quickstart]] -- Build your first app
-- [[docs/templates/fragments|Fragments]] -- The key differentiator
+- [[docs/build-apps/html-fragments/fragments|Fragments]] -- The key differentiator

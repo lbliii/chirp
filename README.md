@@ -119,20 +119,20 @@ Picking the wrong one is the most common return-type mistake. Use this table:
 |---------|-------------|------|
 | **HTMX Patterns** | Search, inline edit, infinite scroll, modal, and fragment workflows | [htmx Patterns →](https://lbliii.github.io/chirp/docs/tutorials/htmx-patterns/) |
 | **Comparison** | When Chirp fits compared with Flask, FastAPI, and Django | [When to Use Chirp →](https://lbliii.github.io/chirp/docs/about/comparison/) |
-| **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/routing/) |
-| **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/routing/filesystem-routing/) |
-| **Route directory contract** | `_meta.py`, `_context.py`, `_actions.py`, sections, shell context, and route validation | [Route Directory →](https://lbliii.github.io/chirp/docs/guides/route-directory/) |
-| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/reference/route-contract/) |
-| **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/templates/) |
-| **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/templates/fragments/) |
-| **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
-| **Validation** | `chirp.validation` — composable rules (`required`, `email`, `max_length`, …) returning a `ValidationResult` | [Forms →](https://lbliii.github.io/chirp/docs/data/forms-validation/) |
-| **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/streaming/) |
-| **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/streaming/server-sent-events/) |
-| **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/middleware/) |
-| **Contracts** | Validate htmx attrs, form actions, and route-bearing dialog args | [Reference →](https://lbliii.github.io/chirp/docs/reference/) |
-| **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/testing/) |
-| **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/data/) |
+| **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/) |
+| **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/filesystem-routing/) |
+| **Route directory contract** | `_meta.py`, `_context.py`, `_actions.py`, sections, shell context, and route validation | [Route Directory →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/route-directory/) |
+| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/quality/contracts-debugging/route-contract/) |
+| **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/build-apps/html-fragments/) |
+| **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/build-apps/html-fragments/fragments/) |
+| **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/forms-validation/) |
+| **Validation** | `chirp.validation` — composable rules (`required`, `email`, `max_length`, …) returning a `ValidationResult` | [Forms →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/forms-validation/) |
+| **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/) |
+| **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/server-sent-events/) |
+| **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/build-apps/request-pipeline/) |
+| **Contracts** | Validate htmx attrs, form actions, and route-bearing dialog args | [Contracts →](https://lbliii.github.io/chirp/docs/quality/contracts-debugging/) |
+| **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/quality/testing/) |
+| **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/) |
 | **Optional UI layer** | `chirp-ui` companion components and styles | [chirp-ui →](https://github.com/lbliii/chirp-ui) |
 
 📚 **Full documentation**: [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
@@ -154,7 +154,7 @@ See [`benchmarks/README.md`](benchmarks/README.md) for how the benchmarks work, 
 
 ## Production Deployment
 
-Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. See the [deployment guide](https://lbliii.github.io/chirp/docs/deployment/production/) for details.
+Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/) for details.
 
 ---
 

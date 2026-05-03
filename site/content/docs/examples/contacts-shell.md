@@ -50,6 +50,6 @@ Use it when changing pages, shells, route contracts, or ChirpUI-facing docs.
 
 ## Next
 
-- [[docs/guides/app-shell|App Shells]]
-- [[docs/guides/route-directory|Route Directory]]
-- [[docs/guides/chirp-ui|chirp-ui]]
+- [[docs/build-apps/ui-extensions/app-shell|App Shells]]
+- [[docs/build-apps/pages-navigation/route-directory|Route Directory]]
+- [[docs/build-apps/ui-extensions/chirp-ui|chirp-ui]]

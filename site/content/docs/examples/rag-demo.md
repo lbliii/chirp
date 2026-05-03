@@ -37,7 +37,7 @@ The RAG (Retrieval Augmented Generation) demo is Chirp's most comprehensive exam
 - **Inner** `.answer-body` — `data-copy-text`; no extra padding (avoids double borders)
 - **Content** `.answer-content.prose` — markdown-rendered answer
 
-Use `hx-disinherit="hx-target hx-swap"` on `sse-connect` and `hx-target="this"` on each `sse-swap` element. See [[docs/streaming/sse-patterns|SSE patterns]] for the multi-swap layout.
+Use `hx-disinherit="hx-target hx-swap"` on `sse-connect` and `hx-target="this"` on each `sse-swap` element. See [[docs/build-apps/streaming-updates/sse-patterns|SSE patterns]] for the multi-swap layout.
 
 ### Copy Button
 
@@ -84,7 +84,7 @@ The RAG demo uses custom logic for streaming states; the macro suits the final "
 
 ## Next Steps
 
-- [[docs/streaming/sse-patterns|SSE patterns]] — Multi-swap layout, hx-target, compile-time checks
-- [[docs/streaming/server-sent-events|Server-Sent Events]] — SSE in depth
-- [[docs/templates/fragments|Fragments]] — Block-level rendering
+- [[docs/build-apps/streaming-updates/sse-patterns|SSE patterns]] — Multi-swap layout, hx-target, compile-time checks
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — SSE in depth
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — Block-level rendering
 - [[docs/tutorials/htmx-patterns|htmx Patterns]] — Event delegation and more

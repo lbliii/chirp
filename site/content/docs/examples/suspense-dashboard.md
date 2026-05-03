@@ -52,6 +52,6 @@ warns about the common footgun when templates self-declare deferred keys.
 
 ## Next
 
-- [[docs/streaming/html-streaming|Streaming HTML]]
-- [[docs/core-concepts/return-values|Return Values]]
-- [[docs/guides/fragment-blocks|Fragment Blocks]]
+- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]]
+- [[docs/about/core-concepts/return-values|Return Values]]
+- [[docs/build-apps/html-fragments/fragment-blocks|Fragment Blocks]]

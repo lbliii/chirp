@@ -194,6 +194,6 @@ pytest
 
 ## Where To Go Next
 
-- [[docs/core-concepts/return-values|Return Values]] explains when to choose `Template`, `Page`, `Fragment`, `OOB`, `Suspense`, `Stream`, and `EventStream`.
-- [[docs/templates/fragments|Fragments]] covers named block rendering and htmx targeting in more detail.
+- [[docs/about/core-concepts/return-values|Return Values]] explains when to choose `Template`, `Page`, `Fragment`, `OOB`, `Suspense`, `Stream`, and `EventStream`.
+- [[docs/build-apps/html-fragments/fragments|Fragments]] covers named block rendering and htmx targeting in more detail.
 - [[docs/examples|Examples]] points to larger runnable apps with validation, OOB updates, SSE, and app shells.
