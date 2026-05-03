@@ -10,7 +10,7 @@ keywords: [route directory, _meta.py, sections, app-shell, golden path]
 category: guide
 ---
 
-## The Recommended App Shell Route
+## App Shell Route
 
 A section-member page route with minimal boilerplate:
 
@@ -43,7 +43,7 @@ def get():
 
 No `_context.py` needed when the section provides tabs and breadcrumbs.
 
-## The Recommended Section Setup
+## Section Setup
 
 Register sections in `app.py` before `mount_pages()`:
 
@@ -62,7 +62,7 @@ app.register_section(Section(
 app.mount_pages("pages")
 ```
 
-## The Recommended Detail Route
+## Detail Route
 
 For `{param}/` directories:
 
