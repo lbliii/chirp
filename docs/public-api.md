@@ -14,6 +14,8 @@ This page classifies exported names by stability:
 - **Internal**: any module or name not exported from `chirp.__all__`. Importing it is allowed in
   experiments, but it is not a compatibility promise.
 
+For the pre-1.0 audit queue, see `docs/plan-1-0-public-surface-audit.md`.
+
 ## Stable Core
 
 These are the everyday imports for Chirp apps:
@@ -49,6 +51,26 @@ shape may still evolve before 1.0:
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `get_cache`, `cache_view` |
 | Optional UI bridge | `use_chirp_ui` |
+
+## 1.0 Audit Decisions
+
+The 2026-05-03 public-surface audit made one stability correction:
+`JSONResponse` is stable. It is an HTTP primitive for narrow progressive-enhancement data islands,
+not a parallel REST serialization layer.
+
+Everything else in the provisional table stays provisional for 1.0 unless a focused follow-up
+hardens and documents that surface:
+
+| Area | 1.0 Decision | Reason |
+|------|--------------|--------|
+| Contracts and plugin protocol | Keep provisional | Contract category shape, severity defaults, and extension hooks are still active design space. |
+| Suspense sentinels | Keep provisional | They expose render-pipeline internals for templates and checkers. |
+| HTMX details and `STOP_POLLING` | Keep provisional | Header parsing and polling semantics need their own public contract before stabilization. |
+| Reactive pages | Keep provisional | The free-threaded event story is tested, but the app-author API and examples are still settling. |
+| Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
+| Tool registry/events | Keep provisional | MCP/tool integration is useful but young compared with the core hypermedia surface. |
+| Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |
+| `use_chirp_ui` bridge | Keep provisional | It couples this package to `chirp-ui` runtime and manifest behavior. |
 
 ## Debug And Advanced
 

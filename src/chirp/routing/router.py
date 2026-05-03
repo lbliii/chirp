@@ -251,7 +251,14 @@ class Router:
         # Method not allowed?
         if node.routes_by_method:
             all_methods = frozenset(node.routes_by_method)
-            raise MethodNotAllowed(all_methods)
+            allow_value = ", ".join(sorted(all_methods))
+            raise MethodNotAllowed(
+                all_methods,
+                detail=(
+                    f"Method {method} is not allowed for route {path!r}. "
+                    f"Allowed methods: {allow_value}."
+                ),
+            )
 
         raise NotFound(f"No route matches {method} {path!r}")
 

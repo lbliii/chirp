@@ -23,8 +23,12 @@ class TestSessionConfig:
         assert config.samesite == "lax"
 
     def test_empty_secret_key_raises(self) -> None:
-        with pytest.raises(ConfigurationError, match="secret_key must not be empty"):
+        with pytest.raises(ConfigurationError) as exc_info:
             SessionMiddleware(SessionConfig(secret_key=""))
+        msg = str(exc_info.value)
+        assert "secret_key must not be empty" in msg
+        assert "SessionConfig(secret_key=app.config.secret_key)" in msg
+        assert "CHIRP_SECRET_KEY" in msg
 
 
 class TestSessionMiddlewareInit:

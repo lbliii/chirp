@@ -1,0 +1,1 @@
+Document the 2026-05-03 release-readiness gate run, mark completed/stale planning docs with current status, complete the initial 1.0 public surface, `AppConfig`, and stable error-message audits, correct the configuration guide, promote `JSONResponse` to stable, and make selected routing/forms/session errors more actionable.

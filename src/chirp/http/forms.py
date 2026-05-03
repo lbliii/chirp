@@ -363,7 +363,11 @@ async def parse_form_data(
     if ct_lower == "multipart/form-data":
         return await _parse_multipart(body, content_type)
 
-    msg = f"Unsupported form content type: {content_type!r}"
+    msg = (
+        f"Unsupported form content type: {content_type!r}. "
+        "Chirp form parsing supports 'application/x-www-form-urlencoded' and "
+        "'multipart/form-data'. Use request.body for JSON or another custom payload."
+    )
     raise ValueError(msg)
 
 
@@ -395,7 +399,11 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
     _, options = parse_options_header(content_type.encode("latin-1"))
     boundary = options.get(b"boundary")
     if boundary is None:
-        msg = "Multipart form data missing boundary parameter"
+        msg = (
+            "Multipart form data missing boundary parameter. "
+            "Set Content-Type to 'multipart/form-data; boundary=...'; browsers do "
+            "this automatically for normal file-upload forms."
+        )
         raise ValueError(msg)
 
     # Use multipart parser

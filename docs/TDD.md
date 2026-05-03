@@ -2,7 +2,7 @@
 
 **Version**: 0.2.0
 **Date**: 2026-02-07
-**Status**: Active (Phases 0-7 implemented, documentation site pending)
+**Status**: Active technical baseline (Phases 0-7 implemented; docs site is ongoing)
 
 ---
 
