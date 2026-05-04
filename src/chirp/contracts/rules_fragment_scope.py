@@ -137,17 +137,19 @@ def _check_nodes(
                 and binding.name not in env_global_names
             ]
             if hidden:
-                names = ", ".join(sorted({binding.name for binding in hidden}))
+                hidden_names = sorted({binding.name for binding in hidden})
+                names = ", ".join(hidden_names)
                 owner_names = ", ".join(
                     sorted({f"block '{binding.owner_block}'" for binding in hidden})
                 )
+                verb = "is" if len(hidden_names) == 1 else "are"
                 issues.append(
                     ContractIssue(
                         severity=Severity.WARNING,
                         category="fragment_scope",
                         message=(
                             f"Fragment block '{block_name}' references {names}, but "
-                            f"{names} is defined inside {owner_names}. Move imports or "
+                            f"{names} {verb} defined inside {owner_names}. Move imports or "
                             "bindings required by fragment blocks to template top level."
                         ),
                         template=template_name,

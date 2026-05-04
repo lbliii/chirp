@@ -1,6 +1,7 @@
 """Tests for chirp.testing — fragment and htmx assertion helpers."""
 
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -194,6 +195,16 @@ class TestAssertRouteSmoke:
                             "/", mode="fragment", name="home", block="content", status=201
                         )
                     ],
+                )
+
+        asyncio.run(run())
+
+    def test_invalid_mode_fails_loudly(self) -> None:
+        async def run() -> None:
+            with pytest.raises(ValueError, match="Unsupported route smoke mode 'fullpage'"):
+                await assert_route_smoke(
+                    _FakeSmokeClient(),
+                    [RouteSmokeCase("/", mode=cast(Any, "fullpage"))],
                 )
 
         asyncio.run(run())

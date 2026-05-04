@@ -11,7 +11,10 @@ def _check(source: str) -> list[ContractIssue]:
         loader=DictLoader(
             {
                 "page.html": source,
-                "surface.html": "{% def surface() %}<section>surface</section>{% end %}",
+                "surface.html": (
+                    "{% def panel() %}<div>panel</div>{% end %}"
+                    "{% def surface() %}<section>surface</section>{% end %}"
+                ),
             }
         )
     )
@@ -89,3 +92,17 @@ def test_warns_when_fragment_block_uses_ancestor_set_binding() -> None:
     issue = next(issue for issue in issues if issue.category == "fragment_scope")
     assert "Fragment block 'status' references label" in issue.message
     assert "block 'main'" in issue.message
+
+
+def test_pluralizes_multiple_ancestor_bindings() -> None:
+    issues = _check(
+        """
+{% block main %}
+{% from "surface.html" import panel, surface %}
+{% block island_mount %}{{ panel() }}{{ surface() }}{% end %}
+{% end %}
+""",
+    )
+
+    issue = next(issue for issue in issues if issue.category == "fragment_scope")
+    assert "panel, surface are defined inside block 'main'" in issue.message

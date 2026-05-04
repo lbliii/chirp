@@ -101,4 +101,9 @@ async def assert_route_smoke(
         elif case.mode == "both":
             responses[(case.path, "full_page")] = await _assert_full(client, case)
             responses[(case.path, "fragment")] = await _assert_fragment(client, case)
+        else:
+            raise ValueError(
+                f"Unsupported route smoke mode {case.mode!r} for {case.path!r}. "
+                "Expected 'status', 'full_page', 'fragment', or 'both'."
+            )
     return responses
