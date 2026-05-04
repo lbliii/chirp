@@ -1,85 +1,82 @@
-# AGENTS.md
+# Chirp Agent Constitution
 
-Chirp renders the HTML that end users actually see. A bug in a return type, an OOB swap, or a Suspense block doesn't corrupt a database — it corrupts trust. The user clicks Save, the row vanishes from view, and the app dev has to explain why. They can't audit Chirp; they only see the gap. Treat the rules below as safety rules, not style rules.
+## North Star
 
----
+Chirp exists to prove that Python apps can stay hypermedia-native: the server renders HTML, the browser renders UI, and typed return values connect the two without an SPA, JSON serialization layer, or JavaScript build pipeline. A single template with named blocks must safely serve full pages, htmx fragments, Suspense chunks, streaming HTML, and SSE payloads.
 
-## North star
+## Non-Negotiables
 
-**The server renders HTML, the browser renders UI, and the return type connects them.** Chirp exists so Python developers can build hypermedia-native apps without an SPA, an API serialization layer, or a JavaScript build pipeline. Every decision routes back to that: a single template serving full pages, fragments, SSE payloads, and Suspense blocks; intent expressed as types, not config; contracts validated before they reach a user. If a change fights that model, it isn't worth shipping.
+- The return type is the architecture. `Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, `ValidationError`, `FormAction`, `MutationResult`, `Action`, `Stream`, and `Redirect` drive negotiation, status, htmx awareness, and rendering.
+- Use the right streaming type: `Stream` for progressive first-byte HTML, `Suspense` for initial shell-plus-deferred OOB blocks, `EventStream` for post-load SSE updates.
+- One template, many access patterns. Named blocks are the unit; do not split a parallel partials or API serialization system.
+- Frozen/slotted dataclasses are the default for config, return types, validation results, freeze results, and registry entries. Shared mutability needs an explicit lock or lifecycle boundary.
+- `app.check()` is part of the product. New render wiring needs a startup contract that catches wrong usage before users see broken HTML.
+- Fail loud. Missing OOB blocks raise `BlockNotFoundError`; orphan non-optional registry entries are ERROR; silent empty swaps are trust bugs.
+- Layouts use composition, not page-template inheritance. Pages render into the layout content block via `render_with_blocks`; they do not override sibling layout blocks.
+- Debug with Chirp DevTools before guessing at htmx/OOB/Suspense/SSE behavior: run with `debug=True`, open the app, press `Ctrl+Shift+D`, then inspect `window.ChirpHtmxDebug`.
+- No silent `except`, unexplained `# type: ignore`, vague errors, or speculative config.
 
----
+## Architecture Boundaries
 
-## Design philosophy
-
-- **The return type is the architecture.** `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense`, `ValidationError`, `FormAction`, `MutationResult` — the type drives content negotiation, htmx-awareness, status codes, and streaming. There is no `make_response()` and no `jsonify()`. If you find yourself reaching for one, you're solving the wrong problem.
-- **Three streaming types, three jobs.** `Stream` flushes blocks as they complete inside one chunked HTTP response (use for slow first-byte pages with independent sections). `Suspense` ships the shell first with `None` placeholders and streams deferred blocks as htmx OOB swaps inside one response (use for dashboards with multiple slow data sources). `EventStream` is SSE — a long-lived channel for updates *after* the page is loaded (notifications, tickers, chat tails). Picking wrong is the most common return-type mistake. If you're hesitating between Suspense and EventStream, ask "is this the initial render or a post-load update?" — Suspense for initial, EventStream for post-load.
-- **One template, many access patterns.** A template with named blocks serves as full page, htmx fragment, SSE event payload, and Suspense deferred block. Don't split into a "partials" directory. Don't introduce a serialization layer. The block is the unit.
-- **Frozen by default.** `AppConfig`, all return types, `ValidationResult`, `FreezeResult`, registry entries — `@dataclass(frozen=True, slots=True)`. Thread-safe by construction matters because we run on free-threaded Python. Mutability is a deliberate choice with a `threading.Lock`, not a default.
-- **Contracts, not conventions.** `app.check()` validates the hypermedia surface at startup: routes, fragments, SSE references, OOB regions, layout scope. If you add a new way to render or wire HTML, add the check that catches it being wrong. Discoverability beats documentation. In debug mode this runs automatically on `app.run()`/`app.freeze()` and exits on ERROR — agents don't have to remember to invoke it. Disable with `AppConfig(skip_contract_checks=True)` or `CHIRP_SKIP_CONTRACT_CHECKS=1` only when you understand what you're turning off.
-- **DevTools are opt-in, but agent-readable.** When debugging htmx swaps, OOB regions, Suspense blocks, SSE, fragment targets, or content negotiation, run with `debug=True` first (`chirp dev app:app`, temporary `AppConfig(debug=True)`, or `CHIRP_DEBUG=1` for apps using `AppConfig.from_env()`). Open the app in a browser, press `Ctrl+Shift+D`, and inspect `window.ChirpHtmxDebug.help()` / `window.ChirpHtmxDebug.exportRecordsJson()` before guessing from screenshots.
-- **Fail loud.** Missing OOB blocks raise `BlockNotFoundError`. Orphan registry entries are ERROR at freeze. Silent empty swaps wipe live DOM — a user sees a blank section and assumes data was lost. Don't paper over a typo with `optional=True`; fix the layout or the registration.
-- **Composition, not inheritance, for layouts.** Page templates are injected into the layout's `{% block content %}` via `render_with_blocks`. Page templates **cannot** override sibling layout blocks like `page_scripts` or `head_extra`. If you're tempted to "just let pages extend the layout" — stop. That breaks the model and the checks won't catch every regression.
-- **Sharp edges are bugs.** Silent `except`, `# type: ignore`, ambiguous flags, error messages that don't tell the reader what to do next — not taste, bugs. Ruff/ty catch some; the rest is on you.
-
----
+- Public surface: `src/chirp/__init__.py`, `AppConfig`, top-level errors, plugins, context helpers, and stable/provisional names documented in `docs/public-api.md`.
+- App lifecycle: registration, freeze, runtime publication, service injection, mounting, URL generation, and worker/lifespan hooks live under `src/chirp/app/`.
+- HTTP primitives: immutable request/response/headers/cookies/query/forms and sync request types live under `src/chirp/http/`.
+- Routing: path matching, params, named routes, and URL generation live under `src/chirp/routing/`; filesystem page discovery lives under `src/chirp/pages/`.
+- Request handling: ASGI, negotiation, htmx awareness, fragment dispatch, debug pages, sender behavior, sync fast path, and dev server live under `src/chirp/server/`.
+- Rendering: return types, Kida integration, render plans, fragments, OOB regions, navigation swaps, `Stream`, and `Suspense` live under `src/chirp/templating/`.
+- Contract checks: `app.check()` categories, severities, snapshots, template scans, and custom check protocols live under `src/chirp/contracts/`.
+- Middleware/security/cache/data/realtime/tools/validation/docs tooling are separate public or optional surfaces; keep their dependencies optional unless the project deliberately changes that contract.
+- Docs, examples, scaffolds, tests, benchmarks, and release notes are collateral surfaces. User-facing behavior is incomplete until they agree.
 
 ## Stakes
 
-When you change something in Chirp, the blast radius is:
+- Return-type regressions send full documents into fragment targets, choose wrong status codes, or bypass htmx negotiation.
+- OOB/Suspense regressions wipe visible DOM, leave deferred blocks unresolved, or target non-existent IDs without a useful error.
+- SSE regressions silently close long-lived dashboards or widen per-event failures into stream failures.
+- Free-threaded races corrupt shared registries, middleware state, context, cache, or reactive buses under Python 3.14t.
+- `app.check()` regressions remove the only startup warning many app authors get before broken hypermedia ships.
+- `chirp freeze` regressions break static docs and customer sites through bad links, missing search metadata, or wrong relative URLs.
+- Scaffold/example drift teaches unsafe patterns that real users copy.
 
-- **Return-type bugs** → wrong status code, wrong content negotiation, htmx fragment served as full page. Harm: an htmx swap pastes an entire `<html>` document into a `<div>`. The app looks broken to the user; the dev has no idea why.
-- **OOB / Suspense rendering bugs** → silent empty swaps, deferred blocks that never resolve, ancestor blocks emitted as OOB chunks targeting non-existent ids. Harm: parts of the UI go blank mid-interaction. There is no error in the console. Users assume data was destroyed.
-- **SSE error handling** → a single bad event closes a stream that was supposed to last for hours. Harm: a real-time dashboard goes silent and nobody notices until the on-call gets paged. Per-event boundaries exist for a reason — don't widen them.
-- **Free-threaded races** → no GIL safety net on 3.14t. Mutable shared state in middleware, registries, or context will corrupt requests across threads. Chirp is one of the apps proving free-threading is real; a race we ship damages that case for everyone downstream.
-- **`app.check()` regressions** → contracts that used to catch broken hypermedia stop catching it. The bug ships to a real app. Coverage of the check matters as much as the framework code.
-- **`chirp freeze` (SSG) bugs** → wrong relative URLs, missing search index entries, broken OOB regions in static output. Harm: the docs site (or a customer's static site) ships with broken links and nothing in the browser tells them.
+## Stop And Ask
 
-Chirp is pre-1.0 but powering real apps (including its own docs). Calibrate accordingly.
+Check in before:
 
----
+- Changing public API, protocol shapes, return-type semantics, top-level exports, plugin protocols, CLI commands, or scaffold defaults.
+- Adding a return type, `AppConfig` field, mandatory runtime dependency, optional extra, migration surface, release/build surface, or public config flag.
+- Touching the render pipeline: `templating/render_plan.py`, `templating/returns.py`, Suspense block discovery, ancestor pruning, or `BlockNotFoundError` propagation.
+- Promoting/demoting `app.check()` severities or changing default contract semantics.
+- Changing data models, schema/migration output, cache key semantics, auth/security behavior, lifecycle/freeze behavior, or free-threaded shared state.
+- Touching the sync fast path (`App.handle_sync`, `SyncRequest`, pre-encoded content types) without a measurement plan.
+- Performing irreversible operations, deleting dead-looking code, or resolving test/code disagreement.
+- Fixing a bug you cannot reproduce; ask for a minimal repro or environment dump.
 
-## Who reads your output
+## Anti-Patterns
 
-- **App devs writing routes.** They read tracebacks, error messages, `chirp check` output, and the type of whatever they returned. If they have to read Chirp source to figure out why their fragment didn't swap, we failed.
-- **Ops / freezers.** They run `chirp freeze` in CI and read the output. Errors must be actionable: which template, which block, which registration.
-- **Plugin authors** (chirp-ui, future ext modules). They read protocols (`ChirpPlugin`, `ContractCheck`, `Middleware`) and the surface of `app.register_*` / `app.set_*`. Stable shapes matter more than ergonomic shortcuts.
-- **Contributors.** They know htmx and ASGI but not our internals. They read the return-type module, the render plan, and the contract checks.
-- **Me (Lawrence).** I read diffs. Put the *what* in code, the *why* in the PR.
+- Adding `make_response()`, `jsonify()`, `to_json()`, or a REST-style side channel to solve a hypermedia return-type problem.
+- Using `{% if key %}` for Suspense deferred values. Use `{% if key is not none %}` or `"key" in __chirp_defer_pending__`.
+- Using bare jsDelivr package URLs for Alpine/plugins. Use explicit `/dist/cdn.min.js`.
+- Setting `optional=True` on an OOB region to hide a typo.
+- Mutating registries after freeze.
+- Putting route dispatch, rendering, app lifecycle, and middleware concerns in one package because it is convenient.
+- Refactoring adjacent issues during a bug fix unless the refactor is the fix.
+- Adding parens to Python 3.14 multi-exception syntax that Ruff normalizes as `except ValueError, TypeError:`.
 
----
+## Steward System
 
-## Escape hatches — stop and ask
+Agents read this root file plus the closest scoped `AGENTS.md` for every file they edit. Root is the constitution, routing guide, and swarm protocol; scoped files are domain stewards.
 
-Forks where I want a check-in, not a judgment call:
+Scoped stewards own local invariants, refusal patterns, docs, tests, examples, fixtures, generated artifacts, and maintenance checks. They advocate for their domain, serve upstream/downstream peers with clearer contracts and diagnostics, and protect concrete quality bars. Cross-boundary work needs **Steward Notes** in the PR description naming consulted files, accepted/deferred findings, required proof, collateral updates, and dissent.
 
-- **New return type.** The list (`Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, `ValidationError`, `FormAction`, `MutationResult`, `Action`, `Stream`, `Redirect`) is load-bearing. Adding one means new content-negotiation rules, new contract checks, new docs, new tests. Sketch the case and ask first.
-- **New `AppConfig` field.** The surface is already wide. Reshape an existing field before adding one. Configs are easier to add than to remove.
-- **Touching the render pipeline** (`templating/render_plan.py`, `templating/returns.py`, Suspense block discovery, ancestor pruning). Sketch the change. These have subtle invariants — falsy `None`, `__chirp_defer_pending__`, `BlockNotFoundError` propagation — that are easy to break in ways tests don't catch.
-- **Changing `app.check()` semantics.** Promoting WARNING → ERROR breaks people's CI. Demoting ERROR → WARNING hides bugs. Either way, ask, and use `app.override_contract_severity` as the user-facing escape valve before touching defaults.
-- **Public API change** to App, return types, `ServerConfig`-equivalent, CLI, or registered protocol shapes. Migration cost is real; ask whether the break is worth it.
-- **Adding a runtime dependency.** Chirp's optional-extra story is deliberate (`forms`, `sessions`, `auth`, `markdown`, `ui`, `redis`, `data-pg`, `ai`). New mandatory deps need a strong case; new extras need a name and a use case.
-- **Touching the sync fast path** (`App.handle_sync`, `SyncRequest`, pre-encoded content types). Performance numbers are load-bearing; show before/after if you change anything here.
-- **Free-threaded shared state.** Any new mutable singleton, registry, or cache. Sketch the locking story and ask before implementing.
-- **Dead code you found.** Flag it in the PR; don't delete silently. It might be load-bearing for an example app, an extension, or a documented escape hatch.
-- **Test disagrees with code.** Ask which is authoritative before "fixing" either. Contract tests in particular encode intentional behavior.
-- **Can't reproduce a reported bug.** Stop. Ask for a minimal repro or env dump. Don't guess.
-- **Adjacent issues found mid-task.** List in the PR description. Don't fold them in. Exception: refactors renaming a concept across many files — one bundled PR beats review churn.
+Every steward uses this operating model:
 
----
-
-## Scoped stewards
-
-Root `AGENTS.md` is the constitution. It explains the project thesis, safety rules, and review
-bar. Nested `AGENTS.md` files are local steward notes: they define the package boundary, what that
-domain protects, and the checks that give the fastest signal for that slice.
-
-- When editing a subtree, read the nearest `AGENTS.md` before changing files there.
-- When a change spans multiple subtrees, read each affected steward file and include short
-  **Steward Notes** in the PR description.
-- Scoped steward files do not override this root guidance. If they disagree, root wins and the
-  nested file should be fixed.
-- Keep steward notes lightweight. They are there to sharpen judgment, not create process theatre.
+- Point Of View: who or what the domain represents.
+- Protect: invariants, contracts, quality bars, and failure modes.
+- Contract Checklist: concrete surfaces to inspect when this domain changes.
+- Advocate: features, fixes, and investments this domain should push for.
+- Serve Peers: upstream/downstream domains needing clearer contracts, diagnostics, docs, tests, or ergonomics.
+- Do Not: local anti-patterns.
+- Own: tests, docs, examples, fixtures, checks, and maintenance chores.
 
 Current steward map:
 
@@ -98,6 +95,12 @@ Current steward map:
 | Cache backends and cache middleware | `src/chirp/cache/AGENTS.md` |
 | Data, schema, migrations, query helpers | `src/chirp/data/AGENTS.md` |
 | SSE and reactive events | `src/chirp/realtime/AGENTS.md` |
+| Validation rules and form-result contracts | `src/chirp/validation/AGENTS.md` |
+| Docs tooling, autodoc, search, docs plugin | `src/chirp/docs/AGENTS.md` |
+| Markdown optional extra | `src/chirp/markdown/AGENTS.md` |
+| i18n optional surface | `src/chirp/i18n/AGENTS.md` |
+| AI/LLM optional extra | `src/chirp/ai/AGENTS.md` |
+| Extension adapters, especially chirp-ui | `src/chirp/ext/AGENTS.md` |
 | MCP/tools integration | `src/chirp/tools/AGENTS.md` |
 | CLI and scaffolds | `src/chirp/cli/AGENTS.md` |
 | Test helpers | `src/chirp/testing/AGENTS.md` |
@@ -105,82 +108,100 @@ Current steward map:
 | Contract test suite ownership | `tests/contracts/AGENTS.md` |
 | Examples as executable docs | `examples/AGENTS.md` |
 | Narrative docs and release policy | `docs/AGENTS.md` |
+| Changelog fragments and release-note inputs | `changelog.d/AGENTS.md` |
+| Planning and roadmap artifacts | `plan/AGENTS.md` |
 | Bengal docs site content/config | `site/AGENTS.md` |
 | Benchmarks and performance claims | `benchmarks/AGENTS.md` |
 
-### "ask stewards" workflow
+## Contract Checklist
 
-When the user says **"ask stewards"**, run a steward consultation before prioritizing or making
-cross-cutting implementation choices.
+For cross-surface changes, identify every surface that should agree: CLI/API, programmatic use, protocol, schema/types, UI, docs, examples, scaffold/templates, tests, benchmarks, and changelog.
 
-1. Verify the checkout/ref is current enough for the question: run `git status --short --branch`;
-   if network is available and freshness matters, compare with upstream (`git fetch`, then inspect
-   branch/ahead-behind). Record any inability to verify freshness.
-2. Enumerate steward files with `find . -name AGENTS.md -not -path './.git/*' | sort`.
-3. For implementation work, consult the root file plus stewards for the files/subtrees likely to
-   change. For backlog, roadmap, or prioritization work, consult all stewards.
-4. Ask each steward lens for: top priority, confidence, evidence, dependencies, risks, tempting
-   "not now" items, and upstream/downstream service opportunities.
-5. Synthesize with weighted voting. Give more weight to convergence, blast radius, dependency
-   order, public contract risk, user-visible correctness, risk reduction, and reversibility.
-6. Preserve minority reports when a steward has a credible dissent, especially around public API,
-   render pipeline, contract severity, free-threading, or performance claims.
-7. Produce a short rollup report: recommendation, top 3 priorities, evidence, risks, dependencies,
-   minority reports, and "not now" list.
+Every accepted finding must name required proof and collateral updates, or explicitly say `no collateral: <reason>`. Docs/examples/scaffold move in the same PR as user-facing behavior unless synthesis records why they are unaffected. Contract-affecting PRs include a parity matrix when behavior spans multiple entrypoints.
 
-For PRs that used this workflow, add **Steward Notes** with the consulted steward files, the chosen
-priority order, and any dissent that reviewers should see.
+## Steward Signal Format
 
----
+Steward findings should be contract-oriented, evidence-backed, and collateral-aware.
 
-## Anti-patterns
+- Steward:
+- Area:
+- Severity: P0/P1/P2/P3
+- Invariant:
+- Evidence:
+- User Impact:
+- Required Fix:
+- Required Proof:
+- Collateral:
+- Confidence:
 
-Things that look reasonable and are wrong here:
+## Steward Swarms
 
-- **Adding a `to_json()` / `make_response()` / API serialization layer** "for the JSON case." Chirp is not a REST framework. If you genuinely need JSON, use FastAPI for that route. Don't bolt a parallel response model onto Chirp.
-- **`{% if key %}` for Suspense deferred values.** Empty list, empty string, 0 — all falsy after resolution. Use `{% if key is not none %}` or `"key" in __chirp_defer_pending__`. The bug only surfaces with realistic data; tests with stub values miss it. Enforced at startup by `app.check()` (category `defer_falsy`, WARNING) when the template self-declares the defer key via `__chirp_defer_pending__` membership or `is deferred`; promote to ERROR in CI via `app.override_contract_severity("defer_falsy", Severity.ERROR)`.
-- **Bare jsDelivr URLs for Alpine or plugins.** `https://cdn.jsdelivr.net/npm/alpinejs@3.15.8` resolves to CommonJS, throws a silent `ReferenceError`, and CORS masks it as `"Script error."` Use explicit `/dist/cdn.min.js`. Enforced at startup by `app.check()` (category `alpine_cdn_url`, ERROR) and by `tests/test_alpine.py::test_no_bare_package_urls`; don't disable either.
-- **`optional=True` on an OOB region to silence a `BlockNotFoundError`.** That's papering over a typo. `optional=True` is for regions legitimately absent from some layouts (apps without `chirp-ui`). If the block should be there, fix the layout.
-- **`try: ... except Exception: pass`.** Ruff S110 catches some; the rest is on you. If you must swallow, log what and why in one line. Per-event SSE error boundaries are *not* this — they're explicit, scoped, and tested.
-- **`# type: ignore`** without a comment explaining why. Target is zero. Narrow the type or fix the code.
-- **Speculative config options** for "future flexibility." If no one's asking for it, don't add it. The `AppConfig` surface is already wide.
-- **Defensive validation inside internal code.** Validate at the boundary (request parsing, form binding, registry registration). Internal code trusts its callers — that's why frozen dataclasses exist.
-- **Adding `extends` to a page template** so it can override layout blocks. The composition model is intentional. If you need to inject into the head or scripts region, use the layout's existing extension points or propose a new region. Enforced at startup by `app.check()` (category `composition_extends`, WARNING) when a page-leaf template extends a layout that is registered in this app's chain — block overrides are silently lost AND the layout structure renders twice. Promote to ERROR in CI via `app.override_contract_severity("composition_extends", Severity.ERROR)`. Extending a non-registered kida partial (see `examples/standalone/oob_layout_chain/`) is intentionally allowed.
-- **Mutating a registry after freeze.** Registries are intentionally locked at startup so `app.check()` can validate them. Runtime registration is a lifecycle bug waiting to happen.
-- **Refactoring during a bug fix.** Separate PR. Exception: the refactor *is* the fix.
-- **Adding a parens to a 3.14 multi-exception except.** `except ValueError, TypeError:` is canonical 3.14+ syntax. Ruff normalizes to no-parens. Don't "fix" it.
+When the user asks for `ask stewards`, `bugbash`, `review swarm`, or `steward synthesis`, and delegation is available:
 
----
+- Spawn independent steward agents for affected domains.
+- Each steward reads root plus its closest scoped `AGENTS.md`.
+- Each steward advocates only for that domain's interests.
+- Each steward returns findings in the Steward Signal Format.
+- The implementing agent owns synthesis and final decisions.
+- Stewards advise and create useful tension; they do not own the integrated implementation.
+- Keep PR scope bounded to accepted findings and their proof/collateral.
+- Defer unrelated steward suggestions to not-now/follow-up.
 
-## Done criteria
+For backlog, roadmap, or prioritization work, consult all scoped stewards and produce raw steward signals, confidence, dependencies, risks, convergence, minority reports, ranked backlog, and not-now items.
 
-A change is done when all of these hold:
+## Steward Feedback Loop
 
-- [ ] `uv run ruff check .` and `uv run ruff format . --check` clean. No new `# type: ignore` or `# noqa: S110`.
-- [ ] `uv run pytest` passes. Coverage stays ≥ 80%.
-- [ ] If you touched the hypermedia surface (return types, OOB, Suspense, SSE, fragment dispatch): there's a contract test in `tests/contracts/` exercising the public path end-to-end via `TestClient`. Unit tests are not enough.
-- [ ] Tests exercise the *interesting* path: htmx vs non-htmx for `Page`, missing block for OOB, awaitable vs sync context value for Suspense, malformed form for `ValidationError`.
-- [ ] If you added a new way to render or wire HTML: there's an `app.check()` rule that catches the wrong way. Contracts beat docs.
-- [ ] Free-threading-sensitive change? Note in the PR what shared mutable state you touched and how it's protected (or why it doesn't need to be).
-- [ ] Public API changed → CHANGELOG fragment via towncrier (`changelog.d/`, see `changelog.d/README.md` for format — **no leading `-`**), migration note if breaking.
-- [ ] Error messages tell the reader what to do next: which template, which block, which registration, what config flag. `BlockNotFoundError`'s message is the bar.
-- [ ] PR description explains *why*. The diff explains *what*.
+- Steward miss: when a bug escapes an applicable steward, update the checklist, add a regression test, add a docs/snippet check, refine routing, or record why the miss should not become policy.
+- Steward overreach: when a steward repeatedly pulls unrelated work into PRs, narrow the checklist, split the steward, or move the concern to follow-up.
+- Repeated high-quality findings should become checklist items.
+- Repeated noisy findings should be pruned or clarified.
+- Steward guidance evolves from escaped bugs, late collateral updates, CI/review misses, and recurring review comments.
 
-"Tests pass" is not "done." Tests pass on broken hypermedia all the time — the contract is what catches it.
+## When To Consult
 
----
+- Proactively consult stewards for cross-boundary, public-facing, hard-to-reverse, performance-sensitive, concurrency-sensitive, security-sensitive, or contract-affecting work.
+- Use the nearest steward for local work.
+- Use multiple stewards when ownership lines cross.
+- Parallelize steward consultation only when questions are independent.
+- Keep final synthesis and implementation accountability with the implementing agent.
 
-## Review and assimilation
+## Ask Stewards
 
-- **I read diff-first, description-second.** Tight diff + clear why merges fast; sprawling diff gets questions.
-- **One concern per PR.** If the diff needs section headers, it's two PRs. Exception: refactors renaming a concept across many files — one bundled PR beats review churn (e.g. the OOB fail-loud sweep).
-- **Commit style:** see `git log`. `feat:` / `fix:` / `refactor:` / `build:` / `deps:` prefixes, imperative, body = motivation. Not enforced — PR title quality matters more than commit prefix.
-- **Don't trailing-summary me.** If the diff is readable, I can read it.
-- **Flag surprises.** Weird test, unused config, dead-looking code path, an example that does something none of the others do — put it in the PR description. Don't fix silently, don't ignore.
-- **Examples are documentation.** If you change a return type or a config field, check whether `examples/` needs updating. A broken example is a broken doc.
+Trigger phrase: `ask stewards`.
 
----
+For implementation work, consult affected stewards and return synthesis before or during the change. Include accepted/deferred findings, merged duplicates, minority reports, required proof, collateral updates, and not-now items.
 
-## When this file is wrong
+For multi-surface work, include a parity matrix like:
 
-It will be. Tell me. The worst outcome is that it sits here for a year contradicting how the project actually works. Updates to AGENTS.md are a first-class PR — short, focused, and welcome.
+| Contract | API/CLI | Programmatic | Protocol | Schema/Types | Docs | Examples | Tests |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+
+## Extension Routing
+
+- Chirp plugin protocols and app registration live in `src/chirp/plugin.py`, `src/chirp/app/`, and `src/chirp/contracts/`.
+- MCP/tool extensions live under `src/chirp/tools/`.
+- chirp-ui integration lives in `src/chirp/ext/chirp_ui.py` and related template/filter contracts.
+- Optional extras are routed by package: `forms`, `sessions`, `auth`, `markdown`, `ui`, `redis`, `data-pg`, `ai`, and `config`.
+
+## Done Criteria
+
+- `uv run ruff check .` and `uv run ruff format . --check` clean; no new unexplained `# type: ignore` or `# noqa: S110`.
+- `uv run ty check src/chirp/` clean when Python code or public typing changes.
+- `uv run pytest` passes for release-class changes; use the narrowest relevant subsets first while developing. Coverage stays at or above 80 percent.
+- Hypermedia surface changes include end-to-end `tests/contracts/` coverage through `TestClient` or `app.check()`.
+- Tests exercise the interesting path: htmx vs non-htmx, missing block, awaitable vs sync context, malformed form, production vs debug where relevant.
+- Public API changes include a towncrier fragment in `changelog.d/` and migration notes if behavior breaks.
+- Docs/changelog/migration notes, examples/scaffold/templates, benchmarks, and performance/concurrency/security notes move with the behavior where relevant.
+- Every accepted steward finding has test/docs/example/benchmark proof or an explicit no-impact note.
+- Error messages name what to fix: template, block, route, selector, registration, config flag, or import string.
+
+## Review Notes
+
+- Commit/PR titles usually use `feat:`, `fix:`, `refactor:`, `build:`, or `deps:` in imperative voice, but PR clarity matters more than prefix.
+- Keep one concern per PR unless a concept rename across many files is the safer review unit.
+- Flag surprises: weird tests, unused public names, suppressions, dead-looking code, benchmark gaps, free-threading assumptions, steward disagreement, and deferred/not-now findings.
+- Put the why in the PR description. Let the diff show the what.
+
+## When This File Is Wrong
+
+Update it. Root and scoped `AGENTS.md` files are first-class project artifacts; they should evolve when evidence proves the current guidance misses real failures or creates noise.

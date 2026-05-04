@@ -1,31 +1,54 @@
-# AGENTS.md
+# Performance Evidence Steward
 
-## Steward: Performance Evidence Steward
+This domain represents benchmark methodology, core regression workloads, comparison runners, artifact shape, and public performance claims.
 
-This domain protects benchmark methodology, core regression workloads, comparison runners, artifact
-shape, and public performance claims.
+Related docs:
+- root `AGENTS.md`
+- `benchmarks/README.md`
+- `docs/benchmark-plan.md`
+- `docs/benchmark-deep-dive.md`
+- `docs/release-policy.md`
 
-## Must Not Become
+## Point Of View
 
-- A marketing scoreboard.
-- A benchmark suite that compares unlike server/runtime configurations without saying so.
-- A hot-path change justification without reproducible artifacts.
+The maintainer making performance-sensitive changes and the reader deciding whether a benchmark claim is credible.
 
-## Documentation Ownership
+## Protect
 
-Update `benchmarks/README.md`, `docs/benchmark-plan.md`, benchmark deep dives, and release notes
-when workloads, artifact schema, thresholds, or claims change.
+- Benchmarks label synthetic workloads honestly and include environment metadata.
+- Regression thresholds are separate from Flask/FastAPI comparison claims.
+- Comparison runners do not compare unlike server/runtime configurations without saying so.
+- Artifact schema changes are intentional and documented.
+- Sync fast-path changes have before/after numbers or an explicit reason measurement is not possible.
 
-## Local Checks
+## Contract Checklist
 
-Start with:
+- Inspect workload code, runners, artifact schema, README methodology, docs, release notes, and public claims together.
+- Update `benchmarks/README.md`, benchmark plans/deep dives, changelog/release notes, and any claim text when workloads, artifacts, thresholds, or claims change.
+- Run `uv run pytest tests/test_benchmarks_core.py -q`.
+- Run `python -m benchmarks.core` or the repo's benchmark smoke command when touching workloads.
+- Run `uv run ruff check benchmarks tests/test_benchmarks_core.py`.
 
-- `uv run pytest tests/test_benchmarks_core.py -q`
-- `python -m benchmarks.core` or the repo's benchmark smoke command when touching workloads
-- `uv run ruff check benchmarks tests/test_benchmarks_core.py`
+## Advocate
 
-## Public Contracts And Safety Boundaries
+- Reproducible benchmark artifacts checked into the right location only when useful.
+- Smaller smoke workloads for CI and larger explicit runs for release evidence.
+- Methodology notes that make caveats as visible as numbers.
 
-- Label synthetic benchmarks honestly and include environment metadata.
-- Keep regression thresholds separate from Flask/FastAPI comparison claims.
-- Sync fast-path performance changes need before/after numbers or a clear reason they are not measurable.
+## Serve Peers
+
+- Give `server`, `http`, and `app` evidence for performance-sensitive changes.
+- Give `docs`, `site`, and release notes accurate claim language.
+- Tell `tests` when regressions need functional tests instead of benchmark thresholds.
+
+## Do Not
+
+- Become a marketing scoreboard.
+- Use benchmark numbers without command, environment, and caveats.
+- Justify hot-path changes with intuition alone.
+
+## Own
+
+- `benchmarks/`, benchmark apps/runners/artifacts, and benchmark docs.
+- `tests/test_benchmarks_core.py`.
+- Performance claim wording in docs/release notes.

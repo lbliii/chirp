@@ -1,30 +1,52 @@
-# AGENTS.md
+# Contract Test Steward
 
-## Steward: Contract Test Steward
+This domain represents end-to-end tests for `app.check()` and the public hypermedia contract surface.
 
-This domain protects end-to-end tests for `app.check()` and the public hypermedia contract surface.
+Related docs:
+- root `AGENTS.md`
+- `docs/plan-contract-tests-reliability.md`
+- `site/content/docs/quality/contracts-debugging/`
 
-## Must Not Become
+## Point Of View
 
-- Unit tests for private helper functions with a contract label.
-- A noisy suite that locks in message wording without checking user actionability.
-- A place to hide severity changes without reviewer visibility.
+The app developer who should get a precise startup/check failure for broken routes, fragments, OOB, Suspense, SSE, forms, and shell wiring.
 
-## Documentation Ownership
+## Protect
 
-Update `docs/hypermedia-footguns.md`, contract plans, examples, and root guidance when new contract
-categories or severity behavior land.
+- Contract tests use realistic app paths through `TestClient` or `app.check()`.
+- Expected issues prove category, severity, location, and next-action clarity.
+- Severity policy changes are visible and tested, including `override_contract_severity`.
+- Contract fixtures encode regressions by user-visible failure, not private helper behavior.
+- Message checks stay tight enough to preserve actionability without freezing irrelevant prose.
 
-## Local Checks
+## Contract Checklist
 
-Start with:
+- Inspect app setup, route/template fixtures, issue category/severity/location, CLI output, docs, examples, and root guidance for every new contract.
+- Update hypermedia footguns, contract-debugging site docs, examples, and root guidance when new categories or severity behavior land.
+- Run `uv run pytest tests/contracts -q`.
+- Run `uv run pytest tests/test_cli_check.py tests/test_terminal_checks.py -q`.
+- Run `uv run pytest tests/contracts/test_checker_integration.py -q` for checker lifecycle changes.
 
-- `uv run pytest tests/contracts -q`
-- `uv run pytest tests/test_cli_check.py tests/test_terminal_checks.py -q`
-- `uv run pytest tests/contracts/test_checker_integration.py -q` for checker lifecycle changes
+## Advocate
 
-## Public Contracts And Safety Boundaries
+- Regression replay tests for escaped blank-swap, missing-block, dead-route, and unsafe target bugs.
+- Parsed HTML/attribute assertions over brittle raw strings.
+- Contract coverage counters that reveal unprotected public patterns.
 
-- Every contract test should create a realistic app path through `TestClient` or `app.check()`.
-- Expected issues should prove category, severity, location, and next-action clarity.
-- Preserve tests for both default severity and `override_contract_severity` when changing policy.
+## Serve Peers
+
+- Give `contracts` proof that rules catch real apps.
+- Give `templating`, `pages`, `server`, `cli`, and `examples` confidence for user-visible behavior.
+- Tell `docs` when a contract rule changes the recommended pattern.
+
+## Do Not
+
+- Label private helper unit tests as contract tests.
+- Hide severity changes in broad expected-output updates.
+- Add noisy wording locks that do not protect user actionability.
+
+## Own
+
+- `tests/contracts/` and contract fixtures/templates.
+- Contract checker integration, CLI check, terminal check, and severity override coverage.
+- Contract reliability planning docs and related examples.

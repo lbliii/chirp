@@ -1,30 +1,52 @@
-# AGENTS.md
+# Testing Helpers Steward
 
-## Steward: Testing Helpers Steward
+This domain represents `TestClient`, assertion helpers, SSE testing utilities, and public testing ergonomics for Chirp app authors.
 
-This domain protects `TestClient`, assertion helpers, SSE testing utilities, and public testing
-ergonomics for Chirp app authors.
+Related docs:
+- root `AGENTS.md`
+- `site/content/docs/quality/testing/`
+- `docs/public-api.md`
 
-## Must Not Become
+## Point Of View
 
-- A private shortcut that depends on app internals staying mutable.
-- A test-only behavior fork from real ASGI/request handling.
-- A helper layer that makes broken hypermedia look green.
+The app developer writing tests and the framework maintainer ensuring helpers exercise real runtime behavior instead of a test-only shortcut.
 
-## Documentation Ownership
+## Protect
 
-Update README, testing docs, and public API docs when helper APIs or assertions change.
+- Test helpers follow the same return negotiation and contract paths users hit in apps.
+- Assertions fail with actionable detail, not just mismatched strings.
+- SSE helpers preserve event boundaries and stream semantics.
+- Helpers do not depend on app internals staying mutable after freeze.
+- Helper convenience does not make broken hypermedia look green.
 
-## Local Checks
+## Contract Checklist
 
-Start with:
+- Inspect client request path, assertions, SSE helpers, public exports, docs, examples, and contract tests together.
+- Update README, testing docs, public API docs, and changelog when helper APIs or assertions change.
+- Run `uv run pytest tests/test_testing_helpers.py tests/test_app/test_e2e.py -q`.
+- Run `uv run pytest tests/test_sse_integration.py tests/contracts -q` when helper behavior affects contracts.
+- Run `uv run ruff check src/chirp/testing`.
 
-- `uv run pytest tests/test_testing_helpers.py tests/test_app/test_e2e.py -q`
-- `uv run pytest tests/test_sse_integration.py tests/contracts -q` when helper behavior affects contracts
-- `uv run ruff check src/chirp/testing`
+## Advocate
 
-## Public Contracts And Safety Boundaries
+- More helper assertions for fragments, OOB swaps, SSE events, and contract issues.
+- Failure messages that name expected route/template/block/selector.
+- Docs that teach testing realistic htmx vs full-page flows.
 
-- Test helpers should exercise the same return negotiation and contract paths users hit in apps.
-- Assertions should fail with actionable detail, not just mismatched strings.
-- Keep helpers small; app behavior belongs in runtime tests, not helper magic.
+## Serve Peers
+
+- Give `tests/contracts` reliable end-to-end helpers.
+- Give `examples` simple smoke tests that still use real behavior.
+- Tell `server`, `templating`, and `app` when helper ergonomics expose runtime friction.
+
+## Do Not
+
+- Fork behavior from real ASGI/request handling.
+- Mutate frozen app internals for convenience.
+- Hide response negotiation details in magic assertions.
+
+## Own
+
+- `src/chirp/testing/`.
+- Testing helper, app e2e, SSE integration, and contract helper tests.
+- Testing docs and helper examples.

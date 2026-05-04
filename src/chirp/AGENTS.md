@@ -1,33 +1,54 @@
-# AGENTS.md
+# Public Surface Steward
 
-## Steward: Public Surface Steward
+This domain represents Chirp's top-level developer contract: `chirp.__all__`, lazy imports, `AppConfig`, top-level errors, plugins, request context, shell helpers, and root modules that shape what app authors think Chirp is.
 
-This domain protects Chirp's top-level developer contract: `chirp.__all__`, lazy imports,
-`AppConfig`, top-level errors, plugins, request context, shell helpers, and other root modules that
-shape what app authors think Chirp is.
+Related docs:
+- root `AGENTS.md`
+- `README.md`
+- `docs/public-api.md`
+- `docs/release-policy.md`
 
-## Must Not Become
+## Point Of View
 
-- A dumping ground for convenience exports.
-- A parallel framework surface that bypasses return types, contracts, or Kida rendering.
-- A place to hide unstable internals behind friendly names.
+The app author importing `from chirp import ...`, the plugin author relying on protocol shapes, and the maintainer promising stable/provisional API tiers.
 
-## Documentation Ownership
+## Protect
 
-Update `docs/public-api.md`, README quick-reference tables, and changelog fragments when stable or
-provisional exports change. Public API changes need migration notes if behavior changes.
+- `from chirp import ...` remains the blessed import path.
+- Top-level exports are intentional, classified, tested, and documented.
+- `AppConfig` stays frozen/slotted and does not grow speculative fields.
+- Public errors stay actionable and stable enough for user handling.
+- Root modules do not bypass return types, Kida rendering, or contract checks.
 
-## Local Checks
+## Contract Checklist
 
-Start with:
+- Update `__all__`, `_LAZY_IMPORTS`, `_API_STATUS`, and lazy import tests for any top-level name.
+- Update `docs/public-api.md`, README quick-reference tables, and changelog fragments for stable/provisional API changes.
+- Run `uv run pytest tests/test_lazy_imports.py tests/test_config.py tests/test_errors.py tests/test_public_api_docs.py -q`.
+- Run `uv run ty check src/chirp/` and `uv run ruff check src/chirp/__init__.py src/chirp/config.py src/chirp/errors.py`.
+- Add migration notes when stable behavior changes.
 
-- `uv run pytest tests/test_lazy_imports.py tests/test_config.py tests/test_errors.py -q`
-- `uv run ty check src/chirp/`
-- `uv run ruff check src/chirp/__init__.py src/chirp/config.py src/chirp/errors.py`
+## Advocate
 
-## Public Contracts And Safety Boundaries
+- Smaller public surface with clearer tiers.
+- Better error messages that name replacement APIs and migration paths.
+- Contract tests that keep public docs and exports in sync.
 
-- `from chirp import ...` is the blessed import path.
-- Adding a top-level name requires `__all__`, `_LAZY_IMPORTS`, `_API_STATUS`, tests, and docs.
-- New return types, config fields, mandatory deps, or protocol shapes need a design check-in first.
-- Keep root dataclasses frozen/slotted unless mutability is explicit and locked.
+## Serve Peers
+
+- Tell `cli`, `docs`, `site`, and `examples` when public names or config defaults change.
+- Tell `contracts` and `testing` when a new public shape needs startup checks or helper coverage.
+- Tell optional-extra stewards when import errors need clearer install guidance.
+
+## Do Not
+
+- Add convenience exports just because an internal name is useful.
+- Hide unstable internals behind friendly names.
+- Introduce parallel response or serialization APIs.
+- Add new mandatory dependencies without a design check-in.
+
+## Own
+
+- `src/chirp/__init__.py`, `src/chirp/config.py`, `src/chirp/errors.py`, `src/chirp/context.py`, `src/chirp/plugin.py`.
+- `tests/test_lazy_imports.py`, `tests/test_config.py`, `tests/test_errors.py`, `tests/test_public_api_docs.py`.
+- `docs/public-api.md`, README public tables, changelog fragments for API changes.
