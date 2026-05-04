@@ -18,6 +18,7 @@ _CONFIG_DOC = (
     / "site"
     / "content"
     / "docs"
+    / "about"
     / "core-concepts"
     / "configuration.md"
 )
@@ -90,7 +91,8 @@ def test_configuration_guide_documents_every_app_config_field() -> None:
     missing = expected_fields - documented_fields
 
     assert not missing, (
-        "Add these AppConfig fields to site/content/docs/core-concepts/configuration.md: "
+        "Add these AppConfig fields to "
+        "site/content/docs/about/core-concepts/configuration.md: "
         f"{sorted(missing)}"
     )
 

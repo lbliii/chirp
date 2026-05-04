@@ -32,6 +32,7 @@ from .rules_context_cascade import check_context_cascade
 from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
+from .rules_fragment_scope import check_fragment_block_scope
 from .rules_fragment_targets import check_fragment_target_orphans
 from .rules_htmx import (
     check_hx_boost,
@@ -547,6 +548,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_boundary_coverage(template_sources))
         result.issues.extend(check_alpine_cdn_urls(template_sources))
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
+        result.issues.extend(check_fragment_block_scope(template_sources, kida_env))
 
         # Reactive bus contract checks (if a DependencyIndex is registered)
         reactive_index = getattr(app, "_reactive_index", None)

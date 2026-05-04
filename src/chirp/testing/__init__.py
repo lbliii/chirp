@@ -27,9 +27,11 @@ from chirp.testing.assertions import (
     hx_headers,
 )
 from chirp.testing.client import TestClient
+from chirp.testing.route_smoke import RouteSmokeCase, assert_route_smoke
 from chirp.testing.sse import SSETestResult, assert_sse_wired, extract_sse_attrs
 
 __all__ = [
+    "RouteSmokeCase",
     "SSETestResult",
     "TestClient",
     "assert_fragment_contains",
@@ -47,6 +49,7 @@ __all__ = [
     "assert_mutation_redirect",
     "assert_no_full_document",
     "assert_oob_targets",
+    "assert_route_smoke",
     "assert_sse_wired",
     "assert_status",
     "extract_sse_attrs",
