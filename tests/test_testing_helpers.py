@@ -1,9 +1,12 @@
 """Tests for chirp.testing — fragment and htmx assertion helpers."""
 
+import asyncio
+
 import pytest
 
 from chirp.http.response import Response
 from chirp.testing import (
+    RouteSmokeCase,
     assert_fragment_contains,
     assert_fragment_not_contains,
     assert_hx_push_url,
@@ -13,6 +16,7 @@ from chirp.testing import (
     assert_hx_trigger,
     assert_is_error_fragment,
     assert_is_fragment,
+    assert_route_smoke,
     hx_headers,
 )
 
@@ -140,6 +144,59 @@ class TestHxHeaders:
         assert result["HX-Retarget"] == "#errors"
         assert result["HX-Reswap"] == "innerHTML"
         assert result["HX-Trigger"] == "flash"
+
+
+class _FakeSmokeClient:
+    def __init__(self) -> None:
+        self.fragment_targets: list[str | None] = []
+
+    async def get(self, path: str) -> Response:
+        if path == "/plain":
+            return Response(body="ok", status=204)
+        return Response(body="<html><body>ok</body></html>", status=200)
+
+    async def fragment(self, path: str, *, target: str | None = None) -> Response:
+        self.fragment_targets.append(target)
+        return Response(body=f'<div id="{path.strip("/") or "root"}">ok</div>', status=200)
+
+
+class TestAssertRouteSmoke:
+    def test_accepts_full_fragment_both_and_status_cases(self) -> None:
+        async def run() -> None:
+            client = _FakeSmokeClient()
+            responses = await assert_route_smoke(
+                client,
+                [
+                    "/",
+                    RouteSmokeCase("/widget", mode="fragment", block="widget", target="widget"),
+                    RouteSmokeCase("/dashboard", mode="both", template="dashboard.html"),
+                    RouteSmokeCase("/plain", mode="status", status=204),
+                ],
+            )
+            assert responses[("/", "full_page")].status == 200
+            assert responses[("/widget", "fragment")].status == 200
+            assert responses[("/dashboard", "full_page")].status == 200
+            assert responses[("/dashboard", "fragment")].status == 200
+            assert responses[("/plain", "status")].status == 204
+            assert client.fragment_targets == ["widget", None]
+
+        asyncio.run(run())
+
+    def test_failure_names_route_context(self) -> None:
+        async def run() -> None:
+            with pytest.raises(
+                AssertionError, match=r"intent=fragment.*name='home'.*block='content'"
+            ):
+                await assert_route_smoke(
+                    _FakeSmokeClient(),
+                    [
+                        RouteSmokeCase(
+                            "/", mode="fragment", name="home", block="content", status=201
+                        )
+                    ],
+                )
+
+        asyncio.run(run())
 
 
 class TestAssertHxRedirect:

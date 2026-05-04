@@ -94,6 +94,27 @@ async def test_fragment_convenience():
         assert response.status == 200
 ```
 
+## Route Smoke Tests
+
+Use `assert_route_smoke` when a route set should stay renderable as full pages,
+fragments, or both:
+
+```python
+from chirp.testing import RouteSmokeCase, TestClient, assert_route_smoke
+
+async def test_showcase_routes(app):
+    async with TestClient(app) as client:
+        await assert_route_smoke(client, [
+            RouteSmokeCase("/", mode="full_page", name="home"),
+            RouteSmokeCase("/islands/remount", mode="both",
+                           template="islands/remount.html", block="island_mount"),
+            RouteSmokeCase("/health", mode="status"),
+        ])
+```
+
+Failures include the path, render intent, and any supplied route name, template,
+or block so template render errors point back to the broken route contract.
+
 ## Cookies
 
 ```python

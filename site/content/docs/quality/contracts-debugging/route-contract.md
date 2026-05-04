@@ -114,6 +114,7 @@ Beyond route-level checks, `app.check()` also validates hypermedia surface contr
 | `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |
 | `reactive_cycle` | WARNING | Derivation graph contains a cycle (`index.derive()` forms a loop) |
 | `oob_target` | WARNING | `hx-swap-oob` element references an `id` not found in any template |
+| `fragment_scope` | WARNING | A nested fragment block references an import or binding defined only inside an ancestor block; direct `render_block()` or block-fetch rendering skips that ancestor scope |
 | `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |
 
 These checks run automatically as part of `chirp check myapp:app`. Reactive checks are only active when the app uses `ReactiveBus` and `DependencyIndex`.
