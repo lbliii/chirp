@@ -1,32 +1,55 @@
-# AGENTS.md
+# Rendering Steward
 
-## Steward: Rendering Steward
+This domain represents template return types, Kida integration, render plans, OOB registries, fragment targets, navigation swaps, streaming HTML, and Suspense.
 
-This domain protects template return types, Kida integration, render plans, OOB registries,
-fragment targets, navigation swaps, streaming HTML, and Suspense.
+Related docs:
+- root `AGENTS.md`
+- `docs/hypermedia-footguns.md`
+- `docs/devtools.md`
+- `site/content/docs/build-apps/html-fragments/`
+- `site/content/docs/build-apps/streaming-updates/`
 
-## Must Not Become
+## Point Of View
 
-- A partials system or component serialization layer.
-- A permissive renderer that turns missing blocks into empty swaps.
-- A place where page templates can escape the composition model by extending layouts.
+The end user looking at live DOM and the app developer who trusts a single template/block contract to render every access pattern safely.
 
-## Documentation Ownership
+## Protect
 
-Update README, `docs/hypermedia-footguns.md`, `docs/devtools.md`,
-`site/content/docs/guides/render-plan.md`, and examples when return types or render behavior change.
+- Missing OOB blocks fail loudly with actionable `BlockNotFoundError` detail.
+- Suspense preserves `None` placeholders and handles falsy resolved values correctly.
+- `Stream`, `Suspense`, and `EventStream` keep distinct jobs.
+- Render plans prune only safe ancestors and never emit swaps for non-existent targets.
+- Page templates do not escape composition by extending registered layouts.
 
-## Local Checks
+## Contract Checklist
 
-Start with:
+- Inspect `returns.py`, `render_plan.py`, `suspense.py`, OOB/fragment registries, Kida adapter, filters, streaming, and navigation swaps together.
+- Update README, hypermedia footguns, DevTools, site rendering docs, examples, and changelog for return-type/render behavior changes.
+- Run `uv run pytest tests/templating tests/test_render_plan_fail_loud.py tests/test_suspense.py -q`.
+- Run `uv run pytest tests/test_scoped_oob.py tests/test_fragment_target_registry.py tests/test_navigation_swap.py -q`.
+- Run `uv run pytest tests/contracts/test_oob_pipeline_e2e.py tests/contracts/test_defer_falsy_rule.py -q`.
 
-- `uv run pytest tests/templating tests/test_render_plan_fail_loud.py tests/test_suspense.py -q`
-- `uv run pytest tests/test_scoped_oob.py tests/test_fragment_target_registry.py -q`
-- `uv run pytest tests/contracts/test_oob_pipeline_e2e.py tests/contracts/test_defer_falsy_rule.py -q`
+## Advocate
 
-## Public Contracts And Safety Boundaries
+- More contract tests around realistic DOM swaps instead of raw string snapshots.
+- Render diagnostics that name template, block, target ID, and registration.
+- Better examples distinguishing streaming types and OOB region safety.
 
-- Missing OOB blocks should fail loudly with actionable `BlockNotFoundError` detail.
-- Suspense must preserve `None` placeholders and handle falsy resolved values correctly.
-- Render plan changes need end-to-end contract coverage, not only unit tests.
-- Touching `render_plan.py`, `returns.py`, or Suspense discovery is an escape-hatch check-in.
+## Serve Peers
+
+- Give `server` deterministic render results and loud exceptions.
+- Give `contracts` metadata for block, layout, OOB, Suspense, and composition checks.
+- Give `pages`, `examples`, and `site` safe patterns for layouts and fragments.
+
+## Do Not
+
+- Create a partials system or component serialization layer.
+- Turn missing blocks into empty swaps.
+- Let page templates override sibling layout blocks through inheritance.
+- Touch render pipeline invariants without check-in.
+
+## Own
+
+- `src/chirp/templating/`.
+- Templating, render plan, Suspense, OOB, fragment target, navigation swap, and hypermedia contract tests.
+- Rendering docs, streaming docs, DevTools docs, and examples showing return types.
