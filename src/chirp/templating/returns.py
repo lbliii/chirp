@@ -124,7 +124,7 @@ class Fragment:
       block name is used as the target ID.
     - **SSE streams**: *target* becomes the SSE event name.  Templates
       use ``sse-swap="{target}"`` to receive the fragment.  If *target*
-      is ``None``, the event name defaults to ``"fragment"``.
+      is ``None``, the event name defaults to htmx's ``"message"`` channel.
 
     Usage::
 

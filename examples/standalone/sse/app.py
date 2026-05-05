@@ -46,13 +46,13 @@ def index():
 def events():
     """Stream a mix of event types over SSE.
 
-    Yields string events, structured SSEEvent objects, and kida
-    Fragment objects — demonstrating all three SSE payload types.
+    Yields structured SSEEvent objects and kida Fragment objects,
+    demonstrating custom event names and default message-channel fragments.
     """
 
     async def generate():
-        # 1. Plain string event
-        yield "connected"
+        # 1. Lifecycle status event; keep it off the htmx message channel.
+        yield SSEEvent(data="connected", event="status")
 
         await asyncio.sleep(EVENT_DELAY)
 

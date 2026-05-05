@@ -149,7 +149,7 @@ def _make_chirpui_app() -> App:
             value = _api_client_var.get()
             for i in range(3):
                 yield SSEEvent(
-                    event="fragment",
+                    event="message",
                     data=f'<span class="token">{i}:{value}</span>',
                 )
             yield SSEEvent(event="done", data="complete")

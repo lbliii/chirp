@@ -128,7 +128,12 @@ async def time_stream(request: Request) -> EventStream:
 
     async def events():
         while True:
-            yield Fragment("dashboard/page.html", "time_block", now=datetime.now().isoformat())
+            yield Fragment(
+                "dashboard/page.html",
+                "time_block",
+                target="time_block",
+                now=datetime.now().isoformat(),
+            )
             await asyncio.sleep(1)
 
     return EventStream(events())

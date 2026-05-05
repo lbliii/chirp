@@ -58,7 +58,7 @@ def _infer_emitted_events(handler: Any) -> set[str] | None:
     try:
         source = inspect.getsource(inspect.unwrap(handler))
         tree = ast.parse(textwrap.dedent(source))
-    except (OSError, SyntaxError, TypeError):
+    except OSError, SyntaxError, TypeError:
         return None
 
     emitted: set[str] = set()
@@ -155,10 +155,7 @@ def check_sse_event_crossref(
     for route in router.routes:
         contract = getattr(route.handler, "_chirp_contract", None)
         declared = frozenset()
-        if (
-            contract is not None
-            and isinstance(contract.returns, SSEContract)
-        ):
+        if contract is not None and isinstance(contract.returns, SSEContract):
             declared = contract.returns.event_types
         inferred = _infer_emitted_events(route.handler)
         if declared or inferred:

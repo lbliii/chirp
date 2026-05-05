@@ -121,7 +121,7 @@ def _context(changed_paths: frozenset[str] | None = None) -> dict:
         "tasks": tasks,
         "count": len(tasks),
         "last_update": _last_update,
-        "viewer_count": bus.subscriber_count("board"),
+        "viewer_count": len(bus.presence("board")),
     }
 
 

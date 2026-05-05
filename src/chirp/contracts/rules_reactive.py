@@ -7,6 +7,7 @@ Validates DependencyIndex configuration at app.check() time:
 - Audience-filtered scopes have connection-aware subscribers
 """
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from .types import ContractIssue, Severity
@@ -120,29 +121,34 @@ def check_reactive_derivation_dag(
     return issues
 
 
+def _string_set(
+    value: object, *, category: str, message: str
+) -> tuple[set[str], ContractIssue | None]:
+    if value is None:
+        return set(), None
+    if isinstance(value, str):
+        return {value}, None
+    if not isinstance(value, Iterable):
+        return set(), ContractIssue(
+            severity=Severity.WARNING,
+            category=category,
+            message=message,
+        )
+    return {item for item in value if isinstance(item, str)}, None
+
+
 def check_reactive_emitted_paths(
     dep_index: DependencyIndex,
     emitted_paths: object,
 ) -> list[ContractIssue]:
     """Warn when declared ChangeEvent paths are not registered in the index."""
-    if emitted_paths is None:
-        return []
-    if isinstance(emitted_paths, str):
-        paths = {emitted_paths}
-    else:
-        try:
-            paths = set(emitted_paths)
-        except TypeError:
-            return [
-                ContractIssue(
-                    severity=Severity.WARNING,
-                    category="reactive_paths",
-                    message=(
-                        "reactive_emitted_paths contract data must be an iterable "
-                        "of path strings."
-                    ),
-                )
-            ]
+    paths, issue = _string_set(
+        emitted_paths,
+        category="reactive_paths",
+        message="reactive_emitted_paths contract data must be an iterable of path strings.",
+    )
+    if issue is not None:
+        return [issue]
 
     registered = set(dep_index._path_to_blocks)
     missing = sorted(path for path in paths if isinstance(path, str) and path not in registered)
@@ -165,29 +171,33 @@ def check_reactive_audience_scopes(
     connection_scopes: object,
 ) -> list[ContractIssue]:
     """Warn when audience-filtered events target scopes without ConnectionInfo."""
-    if audience_scopes is None:
+    audiences, audience_issue = _string_set(
+        audience_scopes,
+        category="reactive_audience",
+        message=(
+            "reactive_audience_scopes and reactive_connection_scopes contract data "
+            "must be iterables of scope strings."
+        ),
+    )
+    if audience_issue is not None:
+        return [audience_issue]
+    if not audiences:
         return []
 
-    try:
-        audiences = set(audience_scopes) if not isinstance(audience_scopes, str) else {audience_scopes}
-        connections = (
-            set(connection_scopes)
-            if connection_scopes is not None and not isinstance(connection_scopes, str)
-            else ({connection_scopes} if isinstance(connection_scopes, str) else set())
-        )
-    except TypeError:
-        return [
-            ContractIssue(
-                severity=Severity.WARNING,
-                category="reactive_audience",
-                message=(
-                    "reactive_audience_scopes and reactive_connection_scopes "
-                    "contract data must be iterables of scope strings."
-                ),
-            )
-        ]
+    connections, connection_issue = _string_set(
+        connection_scopes,
+        category="reactive_audience",
+        message=(
+            "reactive_audience_scopes and reactive_connection_scopes contract data "
+            "must be iterables of scope strings."
+        ),
+    )
+    if connection_issue is not None:
+        return [connection_issue]
 
-    missing = sorted(scope for scope in audiences if isinstance(scope, str) and scope not in connections)
+    missing = sorted(
+        scope for scope in audiences if isinstance(scope, str) and scope not in connections
+    )
     return [
         ContractIssue(
             severity=Severity.WARNING,
