@@ -1,17 +1,28 @@
 # Epic: `fragment_only` Blocks + SSE Event Default — "One Template, Many Modes" Without the Footguns
 
-**Status**: Draft
+**Status**: Mostly implemented; retained as historical plan plus follow-up audit notes
 **Created**: 2026-04-20
 **Target**: next chirp minor (breaking)
-**Estimated Effort**: 20–28h
+**Estimated Effort**: 20–28h original estimate; remaining work is verification/audit only
 **Dependencies**: `kida-templates >= 0.6.0` (Extension API)
 **Source**: Field report from PR #98 (`examples/standalone/returns_gallery`) — real-browser testing surfaced two traps every chirp user hits. See `/tmp/attachments/pasted_text_2026-04-20_17-59-46.txt`.
 
 ---
 
+## Current Status
+
+The core implementation has landed: yielded `Fragment` SSE payloads use the
+htmx `message` channel unless explicitly targeted, `sse_scope()` defaults to
+`message`, native kida `{% fragment %}` blocks are documented and tested, and
+the SSE cross-reference check can infer literal emitted events from route
+source. Treat the sprint plan below as historical context unless you are doing
+the remaining browser-smoke and broader example-audit follow-through.
+
+---
+
 ## Why This Matters
 
-Chirp's headline story is "one template, many modes" — a single block serves as a page region, an htmx swap target, an SSE payload, and a Suspense deferred slot. Today that story costs every user two pieces of tribal knowledge, and the failure modes are silent:
+Chirp's headline story is "one template, many modes" — a single block serves as a page region, an htmx swap target, an SSE payload, and a Suspense deferred slot. At the time this plan was drafted, that story cost every user two pieces of tribal knowledge, and the failure modes were silent:
 
 1. **SSE events default to `event: fragment`**, not the htmx-default `message`. Users copying a stock htmx-sse snippet get a "Connecting…" spinner forever: the stream connects, bytes arrive, nothing swaps, nothing logs. Found in `src/chirp/realtime/sse.py:279` (`event_name = value.target or "fragment"`).
 2. **Blocks intended only as swap targets still render into full pages.** The gallery has three such blocks (`demo_form_ok`, `demo_sse_item`, `demo_mutation_counter`) that leak stale/empty-state content on first paint. Workaround: wrap every body in `{% if trigger_var is defined %}`. Every chirp example has to remember this.
