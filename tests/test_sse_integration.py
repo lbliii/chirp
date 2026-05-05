@@ -226,7 +226,7 @@ class TestDictEvents:
 
 
 class TestFragmentSSE:
-    """Fragment objects are rendered via kida and sent with event: fragment."""
+    """Fragment objects are rendered via kida and sent on the message channel."""
 
     async def test_fragment_event(self) -> None:
         app = _app()
@@ -243,7 +243,7 @@ class TestFragmentSSE:
 
         assert len(result.events) == 1
         evt = result.events[0]
-        assert evt.event == "fragment"
+        assert evt.event is None
         assert '<div id="results">' in evt.data
         assert "x" in evt.data
         assert "y" in evt.data

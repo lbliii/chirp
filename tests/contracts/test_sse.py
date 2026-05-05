@@ -1,6 +1,6 @@
 """Tests for SSE contract validation — fragments, self-swap, scope, event crossref."""
 
-from chirp import App
+from chirp import App, EventStream, Fragment, SSEEvent
 from chirp.config import AppConfig
 from chirp.contracts import (
     FragmentContract,
@@ -103,7 +103,7 @@ class TestSSESelfSwap:
         template_sources = {
             "chat.html": (
                 '<div hx-ext="sse" sse-connect="/chat/stream" '
-                'sse-swap="fragment" hx-swap="beforeend">'
+                'sse-swap="message" hx-swap="beforeend">'
                 "</div>"
             ),
         }
@@ -112,13 +112,13 @@ class TestSSESelfSwap:
         assert issues[0].severity == Severity.ERROR
         assert issues[0].category == "sse_self_swap"
         assert "querySelectorAll" in issues[0].message
-        assert 'sse-swap="fragment"' in issues[0].message
+        assert 'sse-swap="message"' in issues[0].message
 
     def test_no_error_when_sse_swap_on_child(self):
         template_sources = {
             "chat.html": (
                 '<div hx-ext="sse" sse-connect="/chat/stream">'
-                '<span sse-swap="fragment" hx-swap="beforeend"></span>'
+                '<span sse-swap="message" hx-swap="beforeend"></span>'
                 "</div>"
             ),
         }
@@ -202,10 +202,10 @@ class TestSSEEventCrossref:
 
         result = check_hypermedia_surface(app)
         crossref = [i for i in result.issues if i.category == "sse_crossref"]
-        # typo_event is undeclared (WARNING)
-        warnings = [i for i in crossref if i.severity == Severity.WARNING]
-        assert len(warnings) == 1
-        assert "typo_event" in warnings[0].message
+        # typo_event is undeclared and not inferred (ERROR)
+        errors = [i for i in crossref if i.severity == Severity.ERROR]
+        assert len(errors) == 1
+        assert "typo_event" in errors[0].message
 
         # presence is declared but has no sse-swap (INFO)
         infos = [i for i in crossref if i.severity == Severity.INFO]
@@ -236,7 +236,7 @@ class TestSSEEventCrossref:
         assert crossref == []
 
     def test_skipped_when_no_event_types_declared(self, tmp_path):
-        """SSEContract without event_types -> no cross-reference."""
+        """SSEContract without event_types and no inferable events -> no cross-reference."""
         (tmp_path / "page.html").write_text(
             '<div hx-ext="sse" sse-connect="/stream"><span sse-swap="whatever">x</span></div>'
         )
@@ -250,6 +250,51 @@ class TestSSEEventCrossref:
         result = check_hypermedia_surface(app)
         crossref = [i for i in result.issues if i.category == "sse_crossref"]
         assert crossref == []
+
+    def test_infers_literal_fragment_and_sse_events(self, tmp_path):
+        """Literal yielded Fragment/SSEEvent names protect routes without declarations."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/stream">'
+            '<span sse-swap="message">msg</span>'
+            '<span sse-swap="status">ok</span>'
+            "</div>"
+        )
+        (tmp_path / "items.html").write_text("{% block row %}<p>{{ item }}</p>{% endblock %}")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream")
+        def stream():
+            async def gen():
+                yield Fragment("items.html", "row", item="a")
+                yield SSEEvent(data="ok", event="status")
+
+            return EventStream(gen())
+
+        result = check_hypermedia_surface(app)
+        crossref = [i for i in result.issues if i.category == "sse_crossref"]
+        assert crossref == []
+
+    def test_inferred_events_catch_bad_swap(self, tmp_path):
+        """A bad listener on an inferred route fails at startup."""
+        (tmp_path / "page.html").write_text(
+            '<div hx-ext="sse" sse-connect="/stream">'
+            '<span sse-swap="status">ok</span>'
+            '<span sse-swap="missing">bad</span>'
+            "</div>"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/stream")
+        def stream():
+            async def gen():
+                yield SSEEvent(data="ok", event="status")
+
+            return EventStream(gen())
+
+        result = check_hypermedia_surface(app)
+        errors = [i for i in result.errors if i.category == "sse_crossref"]
+        assert len(errors) == 1
+        assert 'sse-swap="missing"' in errors[0].message
 
     def test_handles_kida_urls(self, tmp_path):
         """sse-connect with Kida expressions should match parameterized routes."""

@@ -28,7 +28,7 @@ Chirp handler
     ↓ db.fetch(Document, ...) — retrieve relevant docs from SQLite
     ↓ llm.stream(prompt) — stream LLM answer with docs as context
     ↓ yield Fragment("ask.html", "answer", text=accumulated)
-SSE event: fragment
+SSE event: message
     ↓ htmx swaps #answer div with re-rendered block
 Browser shows streaming text
 ```

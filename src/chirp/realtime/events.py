@@ -40,7 +40,8 @@ class EventStream:
 
     - ``str``: sent as data
     - ``dict``: JSON-serialized as data
-    - ``Fragment``: rendered via kida, sent with ``event: fragment``
+    - ``Fragment``: rendered via kida, sent on the htmx ``message`` channel
+      unless the fragment has a target
     - ``SSEEvent``: sent as-is
 
     Usage::

@@ -493,7 +493,7 @@ empty fragment and put everything else in the OOB positions.
 
 When you yield a `Fragment` with a `target` in an SSE generator,
 `_format_event` uses the target as the SSE event name (e.g.,
-`"column-backlog"`). But `sse-swap="fragment"` only listens for events
+`"column-backlog"`). But `sse-swap="message"` only listens for events
 literally named `"fragment"`. Everything else is silently ignored.
 
 **Fix:** Create template blocks with `hx-swap-oob` baked into the HTML, and

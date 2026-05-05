@@ -295,10 +295,8 @@ Content-Type: text/event-stream
 Cache-Control: no-cache
 Connection: keep-alive
 
-event: fragment
 data: <div class="notification">New message</div>
 
-event: fragment
 data: <div class="notification">User joined</div>
 
 : heartbeat
@@ -324,7 +322,8 @@ via task cancellation.
 
 **Event formatting:** `_format_event()` handles multiple yield types:
 - `SSEEvent` → full SSE wire format with optional `event:`, `id:`, `retry:` fields
-- `Fragment` → rendered via kida, sent as `event: fragment\ndata: <html>...`
+- `Fragment` → rendered via kida; untargeted fragments use the htmx `message`
+  channel, while targeted fragments use the target as the SSE event name
 - `str` → sent as `data: <string>`
 - `dict` → JSON-serialized, sent as `data: {"json": ...}`
 
@@ -405,11 +404,11 @@ sequenceDiagram
 
     App->>Chirp: event from bus
     Chirp->>App: render Fragment
-    Chirp-->>Browser: event: fragment, data: <div>...</div>
+    Chirp-->>Browser: data: <div>...</div> (message channel)
 
     App->>Chirp: event from bus
     Chirp->>App: render Fragment
-    Chirp-->>Browser: event: fragment, data: <div>...</div>
+    Chirp-->>Browser: data: <div>...</div> (message channel)
 
     Browser->>Chirp: disconnect
     Chirp->>App: cancel generator

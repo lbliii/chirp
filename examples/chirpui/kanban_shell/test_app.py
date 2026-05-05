@@ -508,8 +508,8 @@ class TestSSE:
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 3
 
-    async def test_sse_events_all_named_fragment(self, example_app) -> None:
-        """All SSE events are named 'fragment' so sse-swap='fragment' receives them."""
+    async def test_sse_events_use_message_channel(self, example_app) -> None:
+        """Fragment SSE events use htmx's message channel by default."""
         from store import notify
 
         async with TestClient(example_app) as client:
@@ -519,7 +519,9 @@ class TestSSE:
         html_events = [e for e in result.events if e.data]
         assert len(html_events) >= 3
         for evt in html_events:
-            assert evt.event == "fragment", f"Expected event='fragment', got '{evt.event}'"
+            assert (evt.event or "message") == "message", (
+                f"Expected message channel, got {evt.event!r}"
+            )
             assert "{{" not in evt.data
             assert "{%" not in evt.data
 

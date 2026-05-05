@@ -141,7 +141,7 @@ class TestSSE:
         """When score changes, fragment events include hx-swap-oob."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=3, timeout=12.0)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         if fragment_events:
             oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
             assert len(oob_events) >= 1
@@ -150,7 +150,7 @@ class TestSSE:
         """Fragment events contain story metadata (points, comments)."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=3, timeout=12.0)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         if fragment_events:
             assert "point" in fragment_events[0].data
 

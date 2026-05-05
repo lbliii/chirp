@@ -1,6 +1,10 @@
 """SSE contract cross-checks."""
 
+import ast
+import inspect
 import re
+import textwrap
+from typing import Any
 
 from chirp.routing.router import Router
 
@@ -21,6 +25,62 @@ def normalize_sse_url(url: str) -> str:
 def extract_sse_swap_values(source: str) -> set[str]:
     """Extract all sse-swap event names from source."""
     return {match.group(1) for match in _SSE_SWAP_VALUE_PATTERN.finditer(source)}
+
+
+def _call_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _string_kwarg(node: ast.Call, name: str) -> tuple[bool, str | None]:
+    """Return ``(confident, value)`` for a string keyword argument."""
+    for kw in node.keywords:
+        if kw.arg != name:
+            continue
+        if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+            return True, kw.value.value
+        if isinstance(kw.value, ast.Constant) and kw.value.value is None:
+            return True, None
+        return False, None
+    return True, None
+
+
+def _infer_emitted_events(handler: Any) -> set[str] | None:
+    """Infer literal SSE event names emitted by a route handler.
+
+    Returns ``None`` when source is unavailable or a relevant event name is
+    dynamic. Dynamic cases are skipped by the cross-reference check so the
+    contract errs toward silence instead of false positives.
+    """
+    try:
+        source = inspect.getsource(inspect.unwrap(handler))
+        tree = ast.parse(textwrap.dedent(source))
+    except OSError, SyntaxError, TypeError:
+        return None
+
+    emitted: set[str] = set()
+    saw_sse_call = False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func_name = _call_name(node.func)
+        if func_name == "SSEEvent":
+            saw_sse_call = True
+            confident, value = _string_kwarg(node, "event")
+            if not confident:
+                return None
+            emitted.add(value or "message")
+        elif func_name == "Fragment":
+            saw_sse_call = True
+            confident, value = _string_kwarg(node, "target")
+            if not confident:
+                return None
+            emitted.add(value or "message")
+
+    return emitted if saw_sse_call else set()
 
 
 def check_sse_self_swap(template_sources: dict[str, str]) -> list[ContractIssue]:
@@ -89,17 +149,17 @@ def check_sse_event_crossref(
     template_sources: dict[str, str],
     router: Router,
 ) -> list[ContractIssue]:
-    """Cross-reference sse-swap values against SSEContract.event_types."""
+    """Cross-reference sse-swap values against declared and inferred events."""
     issues: list[ContractIssue] = []
-    sse_routes: dict[str, SSEContract] = {}
+    sse_routes: dict[str, tuple[frozenset[str], set[str] | None]] = {}
     for route in router.routes:
         contract = getattr(route.handler, "_chirp_contract", None)
-        if (
-            contract is not None
-            and isinstance(contract.returns, SSEContract)
-            and contract.returns.event_types
-        ):
-            sse_routes[route.path] = contract.returns
+        declared = frozenset()
+        if contract is not None and isinstance(contract.returns, SSEContract):
+            declared = contract.returns.event_types
+        inferred = _infer_emitted_events(route.handler)
+        if declared or inferred:
+            sse_routes[route.path] = (declared, inferred)
     if not sse_routes:
         return issues
 
@@ -118,28 +178,34 @@ def check_sse_event_crossref(
             if match is None:
                 continue
             matched_route, _ = match
-            matched_contract = sse_routes[matched_route]
+            declared, inferred = sse_routes[matched_route]
 
-            declared = matched_contract.event_types
-            undeclared = swap_values - declared
+            known = set(declared)
+            if inferred is not None:
+                known.update(inferred)
+            undeclared = swap_values - known
+            severity = Severity.INFO if inferred is None and not declared else Severity.ERROR
             issues.extend(
                 ContractIssue(
-                    severity=Severity.WARNING,
+                    severity=severity,
                     category="sse_crossref",
                     message=(
                         f'sse-swap="{event_name}" listens for an event that '
-                        f"route '{matched_route}' does not declare in "
-                        "SSEContract.event_types. Possible typo or missing "
-                        "event_types entry."
+                        f"route '{matched_route}' does not emit or declare. "
+                        "Possible typo or missing SSEContract.event_types entry."
                     ),
                     template=template_name,
                     route=matched_route,
-                    details=f"Declared event_types: {', '.join(sorted(declared))}",
+                    details=(
+                        f"Declared event_types: {', '.join(sorted(declared)) or '(none)'}; "
+                        f"Inferred event types: "
+                        f"{', '.join(sorted(inferred)) if inferred is not None else '(dynamic)'}"
+                    ),
                 )
                 for event_name in sorted(undeclared)
             )
 
-            unlistened = declared - swap_values
+            unlistened = set(declared) - swap_values
             issues.extend(
                 ContractIssue(
                     severity=Severity.INFO,

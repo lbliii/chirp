@@ -69,7 +69,7 @@ Open http://127.0.0.1:8000 and watch the scores update.
    connection is active.
 
 4. **Open DevTools → Network** — Filter by `EventSource`. You'll see an initial
-   `event: ping` (connection confirm), then `event: fragment` frames when scores
+   `event: ping` (connection confirm), then message-channel frames when scores
    change. That's the server doing the work, not the browser.
 
 ## Zero JavaScript
@@ -78,7 +78,7 @@ The real-time behavior is three HTML attributes:
 
 ```html
 <div hx-ext="sse" sse-connect="/events">
-    <div sse-swap="fragment"></div>
+    <div sse-swap="message"></div>
 </div>
 ```
 

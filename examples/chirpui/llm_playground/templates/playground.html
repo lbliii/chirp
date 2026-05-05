@@ -20,7 +20,7 @@
     </header>
     <div class="chirpui-card__body">
       {% call message_bubble(align="left") %}
-      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+      <div sse-swap="message" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Generating…</span>
         {{ typing_indicator() }}
       </div>
@@ -39,7 +39,7 @@
     </header>
     <div class="chirpui-card__body">
       {% call message_bubble(align="left") %}
-      <div sse-swap="fragment" hx-target="this" aria-live="polite" aria-atomic="true">
+      <div sse-swap="message" hx-target="this" aria-live="polite" aria-atomic="true">
         <span class="chirpui-text-muted">Generating…</span>
         {{ typing_indicator() }}
       </div>

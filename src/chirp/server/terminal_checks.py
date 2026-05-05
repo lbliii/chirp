@@ -204,6 +204,8 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     # Runtime systems
     "reactive_block": "Reactive",
     "reactive_cycle": "Reactive",
+    "reactive_paths": "Reactive",
+    "reactive_audience": "Reactive",
     # Safety / plugins / docs
     "sse_speculation": "Production Safety",
     "csrf_session": "Production Safety",

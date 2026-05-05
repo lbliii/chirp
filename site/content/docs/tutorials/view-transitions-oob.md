@@ -71,7 +71,7 @@ If you place `sse_scope` inside `{% block content %}`, it gets replaced when you
 
 ```html
 <div hx-ext="sse" sse-connect="/events" hx-disinherit="hx-target hx-swap">
-  <div sse-swap="fragment" hx-target="this" class="sse-sink"></div>
+  <div sse-swap="message" hx-target="this" class="sse-sink"></div>
 </div>
 ```
 

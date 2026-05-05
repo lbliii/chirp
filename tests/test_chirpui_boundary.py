@@ -149,7 +149,7 @@ def _make_chirpui_app() -> App:
             value = _api_client_var.get()
             for i in range(3):
                 yield SSEEvent(
-                    event="fragment",
+                    event="message",
                     data=f'<span class="token">{i}:{value}</span>',
                 )
             yield SSEEvent(event="done", data="complete")
@@ -255,7 +255,7 @@ class TestChirpUIIntegration:
         async with TestClient(app) as client:
             result = await client.sse("/stream", max_events=5)
             assert result.status == 200
-            fragment_events = [e for e in result.events if e.event == "fragment"]
+            fragment_events = [e for e in result.events if (e.event or "message") == "message"]
             assert len(fragment_events) >= 1
             assert "chirpui-client" in fragment_events[0].data, (
                 f"SSE through ChirpUI lost ContextVar: {fragment_events[0].data}"
@@ -457,7 +457,7 @@ class TestComparativeAB:
             ui_result = await client.sse("/stream", max_events=5)
 
         bare_tokens = [e for e in bare_result.events if e.event == "token"]
-        ui_fragments = [e for e in ui_result.events if e.event == "fragment"]
+        ui_fragments = [e for e in ui_result.events if (e.event or "message") == "message"]
 
         assert len(bare_tokens) >= 1, "CHIRP: SSE produced no events"
         assert len(ui_fragments) >= 1, "CHIRPUI: SSE produced no events through middleware"

@@ -174,5 +174,5 @@ class TestSSEStream:
 
             result = await asyncio.wait_for(sse_task, timeout=3.0)
             assert len(result.events) == 1
-            assert result.events[0].event == "fragment"
+            assert (result.events[0].event or "message") == "message"
             assert "hello world" in result.events[0].data

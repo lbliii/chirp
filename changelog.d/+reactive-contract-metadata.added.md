@@ -1,0 +1,1 @@
+Reactive apps can now expose `reactive_index`, `reactive_emitted_paths`, `reactive_audience_scopes`, and `reactive_connection_scopes` through `app.set_contract_check_data()` so `app.check()` can warn about emitted paths missing from the `DependencyIndex` and audience-filtered scopes that lack `ConnectionInfo` subscribers.

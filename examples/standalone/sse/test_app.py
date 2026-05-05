@@ -19,7 +19,7 @@ class TestSSEEventStream:
     """Events stream through the full pipeline."""
 
     async def test_collects_all_events(self, example_app) -> None:
-        """The generator yields 1 string + 1 SSEEvent + 4 Fragments + 1 close = 7 total."""
+        """The generator yields 2 status events + 4 Fragments + 1 close = 7 total."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=7)
 
@@ -27,13 +27,13 @@ class TestSSEEventStream:
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) == 7
 
-    async def test_first_event_is_string(self, example_app) -> None:
+    async def test_first_event_is_status(self, example_app) -> None:
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=6)
 
         first = result.events[0]
         assert first.data == "connected"
-        assert first.event is None  # plain string, no event type
+        assert first.event == "status"
 
     async def test_second_event_is_structured(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -49,7 +49,7 @@ class TestSSEEventStream:
             result = await client.sse("/events", max_events=6)
 
         # Events 2-5 are Fragments (rendered via kida)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert len(fragment_events) == 4
 
         # Each fragment should contain rendered HTML, not template syntax
@@ -61,7 +61,7 @@ class TestSSEEventStream:
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=6)
 
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert "Welcome" in fragment_events[0].data
         assert "New deployment started" in fragment_events[1].data
         assert "CPU usage above 90%" in fragment_events[2].data

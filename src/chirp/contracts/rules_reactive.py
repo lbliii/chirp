@@ -3,8 +3,11 @@
 Validates DependencyIndex configuration at app.check() time:
 - Block references point to real template blocks
 - Derivation graph is a DAG (no cycles)
+- Declared emitted paths are registered in the dependency index
+- Audience-filtered scopes have connection-aware subscribers
 """
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from .types import ContractIssue, Severity
@@ -116,3 +119,94 @@ def check_reactive_derivation_dag(
             dfs(node, [])
 
     return issues
+
+
+def _string_set(
+    value: object, *, category: str, message: str
+) -> tuple[set[str], ContractIssue | None]:
+    if value is None:
+        return set(), None
+    if isinstance(value, str):
+        return {value}, None
+    if not isinstance(value, Iterable):
+        return set(), ContractIssue(
+            severity=Severity.WARNING,
+            category=category,
+            message=message,
+        )
+    return {item for item in value if isinstance(item, str)}, None
+
+
+def check_reactive_emitted_paths(
+    dep_index: DependencyIndex,
+    emitted_paths: object,
+) -> list[ContractIssue]:
+    """Warn when declared ChangeEvent paths are not registered in the index."""
+    paths, issue = _string_set(
+        emitted_paths,
+        category="reactive_paths",
+        message="reactive_emitted_paths contract data must be an iterable of path strings.",
+    )
+    if issue is not None:
+        return [issue]
+
+    registered = set(dep_index._path_to_blocks)
+    missing = sorted(path for path in paths if isinstance(path, str) and path not in registered)
+    return [
+        ContractIssue(
+            severity=Severity.WARNING,
+            category="reactive_paths",
+            message=(
+                f"Reactive ChangeEvent path '{path}' is declared as emitted but "
+                "is not registered in the DependencyIndex. Register the path or "
+                "remove it from app.set_contract_check_data('reactive_emitted_paths', ...)."
+            ),
+        )
+        for path in missing
+    ]
+
+
+def check_reactive_audience_scopes(
+    audience_scopes: object,
+    connection_scopes: object,
+) -> list[ContractIssue]:
+    """Warn when audience-filtered events target scopes without ConnectionInfo."""
+    audiences, audience_issue = _string_set(
+        audience_scopes,
+        category="reactive_audience",
+        message=(
+            "reactive_audience_scopes and reactive_connection_scopes contract data "
+            "must be iterables of scope strings."
+        ),
+    )
+    if audience_issue is not None:
+        return [audience_issue]
+    if not audiences:
+        return []
+
+    connections, connection_issue = _string_set(
+        connection_scopes,
+        category="reactive_audience",
+        message=(
+            "reactive_audience_scopes and reactive_connection_scopes contract data "
+            "must be iterables of scope strings."
+        ),
+    )
+    if connection_issue is not None:
+        return [connection_issue]
+
+    missing = sorted(
+        scope for scope in audiences if isinstance(scope, str) and scope not in connections
+    )
+    return [
+        ContractIssue(
+            severity=Severity.WARNING,
+            category="reactive_audience",
+            message=(
+                f"Reactive scope '{scope}' declares audience-filtered events but "
+                "no connection-aware reactive_stream. Pass ConnectionInfo to "
+                "reactive_stream(..., connection=...) for that scope."
+            ),
+        )
+        for scope in missing
+    ]

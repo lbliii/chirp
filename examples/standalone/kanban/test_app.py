@@ -531,7 +531,7 @@ class TestSSE:
         async with TestClient(example_app) as client:
             auth = await _login(client)
             result = await client.sse("/events", max_events=3, headers=auth)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert len(fragment_events) >= 3
         for evt in fragment_events:
             assert "{{" not in evt.data
@@ -542,6 +542,6 @@ class TestSSE:
         async with TestClient(example_app) as client:
             auth = await _login(client)
             result = await client.sse("/events", max_events=3, headers=auth)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
         assert len(oob_events) >= 1

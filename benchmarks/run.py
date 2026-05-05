@@ -34,6 +34,7 @@ CONCURRENCY = 100
 WORKERS = 10
 ROUNDS = 3
 BASE_PORT = 9000
+NETWORKED_WORKLOADS = (("json", "/json"), ("cpu", "/cpu"), ("template", "/template"))
 
 
 @dataclass
@@ -311,7 +312,7 @@ def run_framework(
             print(f"  {name}: server failed to start", file=sys.stderr)
             return []
 
-        for workload, path in [("json", "/json"), ("cpu", "/cpu")]:
+        for workload, path in NETWORKED_WORKLOADS:
             url = f"{base}{path}"
             warmup_endpoint(url)
             workload_rounds: list[BenchResult] = []
