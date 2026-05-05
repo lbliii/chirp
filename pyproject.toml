@@ -81,12 +81,14 @@ all = [
     "patitas[syntax]>=0.3.5",
 ]
 
-# Benchmark suite (Chirp vs FastAPI vs Flask)
+# Benchmark suite (Chirp vs FastAPI vs Flask vs Starlette vs Litestar)
 benchmark = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "flask>=3.0.0",
     "gunicorn>=23.0.0",
+    "starlette>=0.40.0",
+    "litestar>=2.13.0",
     "httpx>=0.27.0",
 ]
 
@@ -327,7 +329,7 @@ changelog-draft = { cmd = "towncrier build --version 0.6.0 --draft", help = "Pre
 changelog-check = { cmd = "towncrier check --compare-with origin/main", help = "Verify branch adds a fragment (vs main)" }
 
 # Benchmarks
-benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask benchmarks" }
+benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask vs Starlette vs Litestar benchmarks" }
 benchmark-core = { cmd = "python -m benchmarks.core", help = "Run Chirp core regression benchmarks and emit JSON" }
 benchmark-mixed = { cmd = "python -m benchmarks.run_mixed", help = "Mixed workload (JSON + SSE) — verifies adaptive handoff" }
 

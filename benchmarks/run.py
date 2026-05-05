@@ -1,7 +1,7 @@
 """Benchmark runner — start server, run load test, report.
 
 Usage:
-    uv run python -m benchmarks.run [chirp|fastapi|flask|chirp-uvicorn|all]
+    uv run python -m benchmarks.run [chirp|fastapi|flask|starlette|litestar|chirp-uvicorn|all]
     uv run python -m benchmarks.run all  # default
 
     # Experiments (from benchmark-pounce-chirp-deep-dive.md):
@@ -12,13 +12,14 @@ Usage:
     # Run on Python 3.14t (free-threaded) to see Chirp benefit:
     uv run --python 3.14t python -m benchmarks.run all
 
-Requires: chirp, fastapi, uvicorn, flask, gunicorn, httpx
+Requires: chirp, fastapi, uvicorn, flask, gunicorn, starlette, litestar, httpx
 Install: uv sync --extra benchmark  (or pip install chirp[benchmark])
 """
 
 import argparse
 import contextlib
 import os
+import platform
 import statistics
 import subprocess
 import sys
@@ -34,7 +35,15 @@ CONCURRENCY = 100
 WORKERS = 10
 ROUNDS = 3
 BASE_PORT = 9000
-NETWORKED_WORKLOADS = (("json", "/json"), ("cpu", "/cpu"), ("template", "/template"))
+NETWORKED_WORKLOADS = (
+    ("json", "/json"),
+    ("cpu", "/cpu"),
+    ("db", "/db"),
+    ("template", "/template"),
+)
+DEFAULT_TARGETS = ["chirp", "fastapi", "flask", "starlette", "litestar"]
+EXPERIMENT_TARGETS = ["chirp-sync", "chirp-fused", "chirp-async", "chirp-uvicorn"]
+ALL_FRAMEWORKS = [*DEFAULT_TARGETS, *EXPERIMENT_TARGETS]
 
 
 @dataclass
@@ -51,6 +60,30 @@ class BenchResult:
     p50_ms: float
     p99_ms: float
     rounds: int = 1
+
+
+def python_runtime_metadata() -> dict[str, str | bool]:
+    """Return Python runtime metadata for comparison reports."""
+    try:
+        gil_enabled = sys._is_gil_enabled()
+    except AttributeError:
+        gil_enabled = True
+    return {
+        "version": platform.python_version(),
+        "implementation": platform.python_implementation(),
+        "cache_tag": sys.implementation.cache_tag,
+        "gil_enabled": gil_enabled,
+        "free_threaded": not gil_enabled,
+    }
+
+
+def python_runtime_label() -> str:
+    """Return a compact Python label that makes GIL mode explicit."""
+    metadata = python_runtime_metadata()
+    gil_mode = "free-threaded, GIL disabled" if metadata["free_threaded"] else "GIL enabled"
+    return (
+        f"{metadata['implementation']} {metadata['version']} ({metadata['cache_tag']}; {gil_mode})"
+    )
 
 
 def wait_for_server(url: str, timeout: float = 15.0) -> bool:
@@ -256,6 +289,50 @@ def run_flask(port: int) -> subprocess.Popen[bytes]:
     return proc
 
 
+def run_starlette(port: int) -> subprocess.Popen[bytes]:
+    """Start Starlette server via uvicorn."""
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "benchmarks.apps.starlette_app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--workers",
+            str(WORKERS),
+        ],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return proc
+
+
+def run_litestar(port: int) -> subprocess.Popen[bytes]:
+    """Start Litestar server via uvicorn."""
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "benchmarks.apps.litestar_app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--workers",
+            str(WORKERS),
+        ],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return proc
+
+
 def run_chirp_uvicorn(port: int) -> subprocess.Popen[bytes]:
     """Start Chirp app via Uvicorn (experiment: Chirp without Pounce)."""
     proc = subprocess.Popen(
@@ -301,6 +378,10 @@ def run_framework(
         proc = run_fastapi(port)
     elif name == "flask":
         proc = run_flask(port)
+    elif name == "starlette":
+        proc = run_starlette(port)
+    elif name == "litestar":
+        proc = run_litestar(port)
     else:
         return []
 
@@ -343,18 +424,13 @@ def print_report(
     """Print formatted benchmark report."""
     frameworks = sorted({r.framework for r in results})
     workloads = sorted({r.workload for r in results})
-    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-    try:
-        free_threaded = not sys._is_gil_enabled()
-    except AttributeError:
-        free_threaded = False
-    py_label = f"{py_ver}t" if free_threaded else py_ver
 
     print()
     print("=" * 60)
-    print("  CHIRP vs FASTAPI vs FLASK (synthetic benchmarks)")
+    print("  CHIRP vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR")
+    print("  Synthetic benchmarks")
     print(
-        f"  Python {py_label} | {NUM_REQUESTS} req, {concurrency} concurrent | "
+        f"  Python {python_runtime_label()} | {NUM_REQUESTS} req, {concurrency} concurrent | "
         f"{WORKERS} workers | client={client_strategy} | median of {ROUNDS} rounds"
     )
     print("=" * 60)
@@ -392,14 +468,17 @@ def print_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Benchmark Chirp vs FastAPI vs Flask",
+        description="Benchmark Chirp vs FastAPI vs Flask vs Starlette vs Litestar",
         epilog="Experiments: chirp --concurrency 10 | chirp --client per-request | chirp-uvicorn",
     )
     parser.add_argument(
         "targets",
         nargs="*",
         default=["all"],
-        help="chirp, chirp-sync, chirp-fused, chirp-async, fastapi, flask, chirp-uvicorn, or all",
+        help=(
+            "chirp, fastapi, flask, starlette, litestar, chirp-sync, chirp-fused, "
+            "chirp-async, chirp-uvicorn, or all"
+        ),
     )
     parser.add_argument(
         "--concurrency",
@@ -421,20 +500,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    targets = args.targets if args.targets != ["all"] else ["chirp", "fastapi", "flask"]
+    targets = args.targets if args.targets != ["all"] else DEFAULT_TARGETS
     if "all" in targets:
-        targets = ["chirp", "fastapi", "flask"]
+        targets = DEFAULT_TARGETS
 
-    all_frameworks = [
-        "chirp",
-        "chirp-sync",
-        "chirp-fused",
-        "chirp-async",
-        "chirp-uvicorn",
-        "fastapi",
-        "flask",
-    ]
-    ports = {name: BASE_PORT + i for i, name in enumerate(all_frameworks)}
+    ports = {name: BASE_PORT + i for i, name in enumerate(ALL_FRAMEWORKS)}
 
     all_results: list[BenchResult] = []
     for name in targets:
