@@ -18,6 +18,7 @@
       background: #3b82f6; color: #fff; font-size: 0.75rem;
       padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 600;
     }
+    .presence { font-size: 0.75rem; color: #94a3b8; }
     .timestamp { font-size: 0.75rem; color: #64748b; margin-left: auto; }
     ul { list-style: none; padding: 0; }
     li {
@@ -48,6 +49,9 @@
     <h1>Reactive Tasks</h1>
     <span id="task_count" sse-swap="task_count" hx-swap="innerHTML">
       {% block task_count %}<span class="badge">{{ count }}</span>{% endblock %}
+    </span>
+    <span id="presence_count" class="presence" sse-swap="presence_count" hx-swap="innerHTML">
+      {% block presence_count %}{{ viewer_count }} viewing{% endblock %}
     </span>
     <span id="last_update" class="timestamp" sse-swap="last_update" hx-swap="innerHTML">
       {% block last_update %}{{ last_update }}{% endblock %}

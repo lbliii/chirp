@@ -8,9 +8,12 @@ Covers:
 from kida import Environment, FileSystemLoader
 
 from chirp.contracts.rules_reactive import (
+    check_reactive_audience_scopes,
     check_reactive_block_existence,
     check_reactive_derivation_dag,
+    check_reactive_emitted_paths,
 )
+from chirp.contracts.types import Severity
 from chirp.pages.reactive.events import BlockRef
 from chirp.pages.reactive.index import DependencyIndex
 
@@ -151,3 +154,43 @@ class TestReactiveDerivationDag:
         index.derive("b", from_paths={"a"})
         issues = check_reactive_derivation_dag(index)
         assert issues[0].severity.value == "warning"
+
+
+# ---------------------------------------------------------------------------
+# Emitted path and audience metadata
+# ---------------------------------------------------------------------------
+
+
+class TestReactiveMetadataChecks:
+    """Contract metadata should catch reactive stream wiring drift."""
+
+    def test_emitted_paths_registered_pass(self):
+        index = DependencyIndex()
+        index.register("tasks", BlockRef(template_name="board.html", block_name="task_list"))
+
+        issues = check_reactive_emitted_paths(index, {"tasks"})
+
+        assert issues == []
+
+    def test_unregistered_emitted_path_warns(self):
+        index = DependencyIndex()
+        index.register("tasks", BlockRef(template_name="board.html", block_name="task_list"))
+
+        issues = check_reactive_emitted_paths(index, {"tasks", "presence"})
+
+        assert len(issues) == 1
+        assert issues[0].category == "reactive_paths"
+        assert issues[0].severity == Severity.WARNING
+        assert "presence" in issues[0].message
+
+    def test_audience_scope_without_connection_warns(self):
+        issues = check_reactive_audience_scopes({"thread-1"}, {"thread-2"})
+
+        assert len(issues) == 1
+        assert issues[0].category == "reactive_audience"
+        assert "ConnectionInfo" in issues[0].message
+
+    def test_audience_scope_with_connection_passes(self):
+        issues = check_reactive_audience_scopes({"thread-1"}, {"thread-1"})
+
+        assert issues == []

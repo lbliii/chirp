@@ -4,10 +4,11 @@ Demonstrates Chirp's reactive system: when one browser tab mutates data,
 all other connected tabs update automatically via Server-Sent Events.
 No polling. No client-side JavaScript beyond htmx.
 
-Three reactive blocks update in real time:
+Four reactive blocks update in real time:
   - task_list:   the full list of tasks
   - task_count:  a badge showing the total count
   - last_update: a timestamp of the most recent change
+  - presence_count: connected viewers for the board scope
 
 Run:
     python app.py
@@ -22,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
-from chirp.pages.reactive import BlockRef, ChangeEvent, DependencyIndex, ReactiveBus
+from chirp.pages.reactive import BlockRef, ChangeEvent, ConnectionInfo, DependencyIndex, ReactiveBus
 from chirp.pages.reactive.stream import reactive_stream
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -96,6 +97,7 @@ bus = ReactiveBus()
 dep_index = DependencyIndex()
 for block_name in ("task_list", "task_count", "last_update"):
     dep_index.register("tasks", BlockRef(template_name="board.html", block_name=block_name))
+dep_index.register("presence", BlockRef(template_name="board.html", block_name="presence_count"))
 
 
 config = AppConfig(
@@ -104,16 +106,22 @@ config = AppConfig(
     sse_close_event="close",
 )
 app = App(config=config)
+app.set_contract_check_data("reactive_index", dep_index)
+app.set_contract_check_data("reactive_emitted_paths", {"tasks", "presence"})
+app.set_contract_check_data("reactive_connection_scopes", {"board"})
 
 _last_update = ""
 
 
-def _context() -> dict:
+def _context(changed_paths: frozenset[str] | None = None) -> dict:
     """Build the current context for reactive re-renders."""
+    _ = changed_paths
+    tasks = store.all()
     return {
-        "tasks": store.all(),
-        "count": len(store.all()),
+        "tasks": tasks,
+        "count": len(tasks),
         "last_update": _last_update,
+        "viewer_count": bus.subscriber_count("board"),
     }
 
 
@@ -126,6 +134,16 @@ def _notify(origin: str | None = None) -> None:
             scope="board",
             changed_paths=frozenset({"tasks"}),
             origin=origin,
+        )
+    )
+
+
+def _notify_presence() -> None:
+    """Emit a presence-only update for other connected clients."""
+    bus.emit_sync(
+        ChangeEvent(
+            scope="board",
+            changed_paths=frozenset({"presence"}),
         )
     )
 
@@ -175,13 +193,17 @@ def delete_task(task_id: int):
 
 
 @app.route("/events", referenced=True)
-def events():
+def events(request: Request):
     """SSE stream — auto-pushes reactive block updates."""
+    session_id = request.headers.get("x-session-id") or f"anon-{id(request)}"
+    _notify_presence()
     return reactive_stream(
         bus,
         scope="board",
         index=dep_index,
         context_builder=_context,
+        connection=ConnectionInfo(session_id=session_id),
+        on_disconnect=lambda _scope, _connection: _notify_presence(),
     )
 
 

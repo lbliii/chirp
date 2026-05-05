@@ -49,7 +49,12 @@ from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
 from .rules_page_handlers import check_page_handlers
 from .rules_page_shell import check_page_shell_contracts
-from .rules_reactive import check_reactive_block_existence, check_reactive_derivation_dag
+from .rules_reactive import (
+    check_reactive_audience_scopes,
+    check_reactive_block_existence,
+    check_reactive_derivation_dag,
+    check_reactive_emitted_paths,
+)
 from .rules_route_contract import (
     check_context_provider_signatures,
     check_duplicate_routes,
@@ -551,10 +556,24 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_fragment_block_scope(template_sources, kida_env))
 
         # Reactive bus contract checks (if a DependencyIndex is registered)
-        reactive_index = getattr(app, "_reactive_index", None)
+        reactive_index = getattr(app, "_reactive_index", None) or snapshot.extras.get(
+            "reactive_index"
+        )
         if reactive_index is not None:
             result.issues.extend(check_reactive_block_existence(reactive_index, kida_env))
             result.issues.extend(check_reactive_derivation_dag(reactive_index))
+            result.issues.extend(
+                check_reactive_emitted_paths(
+                    reactive_index,
+                    snapshot.extras.get("reactive_emitted_paths"),
+                )
+            )
+        result.issues.extend(
+            check_reactive_audience_scopes(
+                snapshot.extras.get("reactive_audience_scopes"),
+                snapshot.extras.get("reactive_connection_scopes"),
+            )
+        )
 
         page_route_paths = snapshot.page_route_paths
         for route_path in route_paths:

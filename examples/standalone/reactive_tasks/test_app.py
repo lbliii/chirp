@@ -16,6 +16,7 @@ class TestPageRender:
             # All sse-swap elements must be inside the sse-connect div
             assert 'id="task_list"' in response.text
             assert 'id="task_count"' in response.text
+            assert 'id="presence_count"' in response.text
             assert 'id="last_update"' in response.text
 
     async def test_index_shows_seed_tasks(self, example_app) -> None:
