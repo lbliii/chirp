@@ -30,8 +30,9 @@ for Chirp 0.6: named routes, `url_for`, page-handler contract checks, guided
 the current tree.
 
 The remaining dependency-thread is external: Kida relative include behavior is
-tracked outside this repository and should not be treated as an open Chirp
-implementation task.
+tracked outside this repository in
+[lbliii/kida#126](https://github.com/lbliii/kida/issues/126) and should not be
+treated as an open Chirp implementation task.
 
 ---
 

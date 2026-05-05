@@ -176,7 +176,7 @@ that resolves relative to the current template's directory would make file
 moves local and composable — the way Python imports and ES-module imports
 already work.
 
-**Proposal to file upstream** (`kida-templates`):
+**Filed upstream** (`lbliii/kida`):
 
 > Add relative include resolution. When the first path segment is `.` or `..`,
 > resolve the include relative to the current template's on-disk directory
@@ -191,7 +191,7 @@ already work.
 
 **Tracking:**
 
-- Upstream issue: *to be filed — paste link here once created on `kida-templates` repo*
+- Upstream issue: [lbliii/kida#126](https://github.com/lbliii/kida/issues/126)
 - Chirp-side workaround: document that includes should use **template_dir-absolute**
   paths (the current Kida behavior) and that refactors will require an in-tree
   sweep until the upstream feature lands.
