@@ -6,11 +6,17 @@ from pathlib import Path
 import pytest
 
 _CORE_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "core.py"
+_RUN_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "run.py"
 _SPEC = importlib.util.spec_from_file_location("benchmarks.core", _CORE_PATH)
 assert _SPEC is not None
 assert _SPEC.loader is not None
 _CORE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_CORE)
+_RUN_SPEC = importlib.util.spec_from_file_location("benchmarks.run", _RUN_PATH)
+assert _RUN_SPEC is not None
+assert _RUN_SPEC.loader is not None
+_RUN = importlib.util.module_from_spec(_RUN_SPEC)
+_RUN_SPEC.loader.exec_module(_RUN)
 
 
 @pytest.mark.asyncio
@@ -45,3 +51,11 @@ async def test_core_benchmarks_return_reproducible_json_shape(tmp_path: Path) ->
     output = tmp_path / "core.json"
     _CORE.write_report(report, output)
     assert output.read_text(encoding="utf-8").startswith("{\n")
+
+
+def test_networked_benchmarks_include_template_workload() -> None:
+    assert _RUN.NETWORKED_WORKLOADS == (
+        ("json", "/json"),
+        ("cpu", "/cpu"),
+        ("template", "/template"),
+    )

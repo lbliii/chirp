@@ -99,17 +99,18 @@ chirp/
 
 ### Phase 1: Minimal Server Comparison (1–2 days)
 
-- [ ] JSON + CPU workloads only
-- [ ] Chirp vs FastAPI vs Flask
+- [x] JSON + CPU workloads only
+- [x] Chirp vs FastAPI vs Flask
 - [ ] Single Python version (3.14t)
-- [ ] `benchmarks/` in chirp repo, runnable via `uv run` or `poe benchmark`
+- [x] `benchmarks/` in chirp repo, runnable via `uv run` or `poe benchmark`
 
 ### Phase 2: Full Matrix (2–3 days)
 
-- [ ] Add DB + Template workloads
+- [x] Add Template workload
+- [ ] Add DB workload
 - [ ] Add Starlette, Litestar
 - [ ] Add 3.14 (GIL) vs 3.14t comparison
-- [ ] Document methodology in README
+- [x] Document methodology in README
 
 ### Phase 3: Ecosystem Integration (1 day)
 

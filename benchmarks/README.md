@@ -1,6 +1,6 @@
 # Chirp Web Framework Benchmarks
 
-Synthetic benchmarks comparing Chirp vs FastAPI vs Flask on JSON and CPU-bound workloads. Designed to demonstrate free-threaded Python performance benefits when using Chirp + Pounce on Python 3.14t.
+Synthetic benchmarks comparing Chirp vs FastAPI vs Flask on JSON, CPU-bound, and template-rendering workloads. Designed to demonstrate free-threaded Python performance benefits when using Chirp + Pounce on Python 3.14t.
 
 This directory has two benchmark families:
 
@@ -53,12 +53,13 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 | Concurrent clients | 100 | Matches Barq PR |
 | Workers | 10 | Per-framework optimal |
 | Rounds | 3 | Reported values are medians across rounds |
-| Workloads | JSON, CPU | Phase 1; DB + Template in Phase 2 |
+| Workloads | JSON, CPU, Template | DB remains planned |
 | Client | Shared pooled httpx.Client | Measures server behavior without per-request client setup churn |
 
 **Workloads:**
 - **JSON** — Return `{"message": "hello", "count": 42}`. Minimal framework overhead.
 - **CPU** — 50k hash iterations per request. CPU-bound; free-threading benefit most visible.
+- **Template** — Render a 20-item HTML list from Kida (Chirp) or Jinja2 (FastAPI/Flask).
 
 **Servers:**
 - Chirp: Pounce (threads on 3.14t, processes on GIL), request queue disabled for benchmarks
@@ -67,7 +68,7 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 
 ## Caveats
 
-> **Synthetic benchmarks.** These tests use controlled workloads (JSON, CPU) to compare framework performance. They are *not* representative of production traffic. Use "various workloads" or "synthetic benchmarks" in any external claims — avoid "real workloads."
+> **Synthetic benchmarks.** These tests use controlled workloads (JSON, CPU, template) to compare framework performance. They are *not* representative of production traffic. Use "various workloads" or "synthetic benchmarks" in any external claims — avoid "real workloads."
 
 > **Configuration matters.** Results depend on worker count, Python version (GIL vs free-threaded), and load-test parameters. We document our configs; your mileage may vary.
 
@@ -173,6 +174,5 @@ Run `python -m benchmarks.run chirp-sync -c 10` to validate JSON/CPU targets.
 ## Phase 2 (Planned)
 
 - DB workload (SQLite)
-- Template workload (Kida vs Jinja2)
 - Starlette, Litestar
 - GIL vs free-threaded comparison (3.14 vs 3.14t)
