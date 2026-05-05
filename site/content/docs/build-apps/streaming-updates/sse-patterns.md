@@ -142,7 +142,7 @@ async def post(doc_id: str, request: Request) -> Fragment:
      hx-ext="sse"
      sse-connect="/doc/{{ doc_id }}/chat/stream"
      sse-close="done">
-  <span class="tokens" sse-swap="fragment" hx-swap="beforeend"></span>
+  <span class="tokens" sse-swap="message" hx-swap="beforeend"></span>
   <span class="typing-cursor"></span>
 </div>
 {% endblock %}

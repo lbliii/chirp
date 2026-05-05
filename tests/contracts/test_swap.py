@@ -108,7 +108,7 @@ class TestSwapSafetyWarnings:
             "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
             "chat.html": (
                 '<div hx-ext="sse" sse-connect="/chat/events">'
-                '<span sse-swap="fragment" hx-swap="beforeend"></span>'
+                '<span sse-swap="message" hx-swap="beforeend"></span>'
                 "</div>"
             ),
         }
@@ -123,7 +123,7 @@ class TestSwapSafetyWarnings:
             "_layout.html": '<body hx-boost="true" hx-target="#app-content"></body>',
             "chat.html": (
                 '<div hx-ext="sse" sse-connect="/chat/events">'
-                '<span sse-swap="fragment" hx-swap="beforeend" hx-target="this"></span>'
+                '<span sse-swap="message" hx-swap="beforeend" hx-target="this"></span>'
                 "</div>"
             ),
         }

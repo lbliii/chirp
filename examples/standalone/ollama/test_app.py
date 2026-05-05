@@ -413,7 +413,7 @@ class TestChatStreaming:
             result = await client.sse("/chat/stream", max_events=5)
 
         assert result.status == 200
-        fragments = [e for e in result.events if e.event == "fragment"]
+        fragments = [e for e in result.events if (e.event or "message") == "message"]
         text = "".join(e.data for e in fragments)
         # SSE data fields strip trailing whitespace, so assert on content
         assert "Hello" in text
@@ -440,7 +440,7 @@ class TestChatStreaming:
         assert result.status == 200
         # Model made 2 non-streaming calls: tool round + probe
         assert state["count"] == 2
-        fragments = [e for e in result.events if e.event == "fragment"]
+        fragments = [e for e in result.events if (e.event or "message") == "message"]
         text = "".join(e.data for e in fragments)
         assert "noon" in text
         assert "UTC" in text

@@ -286,7 +286,7 @@
     <div class="activity-panel">
       <h2>Tool Activity</h2>
       <div class="activity-feed" id="activity"
-           hx-ext="sse" sse-connect="/feed" sse-swap="fragment" hx-swap="afterbegin">
+           hx-ext="sse" sse-connect="/feed" sse-swap="message" hx-swap="afterbegin">
         <p class="empty">Waiting for tool calls&hellip;</p>
       </div>
     </div>
@@ -319,7 +319,7 @@
   <div class="msg-streaming"
        hx-ext="sse"
        sse-connect="/chat/stream"
-       sse-swap="fragment"
+       sse-swap="message"
        hx-swap="beforeend"
        sse-close="done"><span class="cursor"></span></div>
   {% end %}

@@ -257,7 +257,7 @@ def _format_event(
 
     Dispatch:
         - ``SSEEvent`` -> encode as-is
-        - ``Fragment`` -> render via kida, wrap with event: fragment
+        - ``Fragment`` -> render via kida, using its target as event name when set
         - ``str`` -> wrap as data
         - ``dict`` -> JSON-serialize as data
     """
@@ -276,7 +276,7 @@ def _format_event(
         # Note: no OOB wrapper — sse-swap matches on event name alone,
         # and OOB would replace the target element, destroying the
         # sse-swap attribute and breaking subsequent updates.
-        event_name = value.target or "fragment"
+        event_name = value.target or default_event
         event = SSEEvent(data=html, event=event_name)
         return event.encode()
 

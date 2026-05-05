@@ -185,7 +185,7 @@
 
 {# SSE connection for live updates #}
 <div hx-ext="sse" sse-connect="/events" hx-disinherit="hx-target hx-swap">
-  <div sse-swap="fragment" style="display:none;"></div>
+  <div sse-swap="message" style="display:none;"></div>
 </div>
 
 {# Toast for delete notifications — uses htmx.process() to activate any

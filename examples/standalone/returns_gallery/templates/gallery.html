@@ -121,7 +121,7 @@
   <div class="card">
     <span class="pill">EventStream</span>
     <div hx-ext="sse" sse-connect="/events" hx-target="this" hx-disinherit="hx-target hx-swap">
-      <div class="log" id="sse-log" sse-swap="fragment" hx-target="this" hx-swap="beforeend">
+      <div class="log" id="sse-log" sse-swap="message" hx-target="this" hx-swap="beforeend">
         Connecting…
       </div>
     </div>

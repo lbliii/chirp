@@ -35,7 +35,7 @@ class TestSseScope:
         assert 'sse-connect="/events"' in html
         assert "hx-disinherit" in html
         assert "hx-target" in html
-        assert 'sse-swap="fragment"' in html
+        assert 'sse-swap="message"' in html
         assert "sse-sink" in html
 
     def test_with_options(self) -> None:

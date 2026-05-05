@@ -224,7 +224,7 @@ document.body.addEventListener("click", function(event) {
 
 {# OOB-aware fragments for SSE — hx-swap-oob is baked into the HTML
    so they can be yielded without a Fragment target and still route
-   correctly via the sse-swap="fragment" listener. #}
+   correctly via the sse-swap="message" listener. #}
 {% fragment column_block_oob %}
 {% if (column_id ?? none) %}
 {% call column(column_id, column_name, tasks | length, oob=true) %}

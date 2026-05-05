@@ -79,7 +79,7 @@ class TestDashboardSSE:
         """SSE events are rendered HTML fragments, not raw templates."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=2, timeout=8.0)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert len(fragment_events) >= 1
         for evt in fragment_events:
             assert "{{" not in evt.data

@@ -49,7 +49,7 @@ class TestSSEEventStream:
             result = await client.sse("/events", max_events=6)
 
         # Events 2-5 are Fragments (rendered via kida)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert len(fragment_events) == 4
 
         # Each fragment should contain rendered HTML, not template syntax
@@ -61,7 +61,7 @@ class TestSSEEventStream:
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=6)
 
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert "Welcome" in fragment_events[0].data
         assert "New deployment started" in fragment_events[1].data
         assert "CPU usage above 90%" in fragment_events[2].data

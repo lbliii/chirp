@@ -50,7 +50,7 @@ class TestDashboardSSE:
         """Fragment events contain rendered HTML, not template syntax."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=2)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         assert len(fragment_events) >= 2
         for evt in fragment_events:
             assert "{{" not in evt.data  # no raw template tags
@@ -59,7 +59,7 @@ class TestDashboardSSE:
         """Sensor card fragments include hx-swap-oob for targeted updates."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=2)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         # At least one fragment should have hx-swap-oob (the sensor card)
         oob_events = [e for e in fragment_events if "hx-swap-oob" in e.data]
         assert len(oob_events) >= 1
@@ -68,7 +68,7 @@ class TestDashboardSSE:
         """Summary bar fragment includes aggregate stats."""
         async with TestClient(example_app) as client:
             result = await client.sse("/events", max_events=2)
-        fragment_events = [e for e in result.events if e.event == "fragment"]
+        fragment_events = [e for e in result.events if (e.event or "message") == "message"]
         summary_events = [e for e in fragment_events if 'id="summary"' in e.data]
         assert len(summary_events) >= 1
         assert "Avg temp:" in summary_events[0].data
