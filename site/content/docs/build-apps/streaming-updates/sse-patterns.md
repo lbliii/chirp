@@ -171,7 +171,8 @@ Key rules:
 - `sse-swap` is on the inner `<span>`, not the `sse-connect` div.
 - `hx-swap="beforeend"` appends tokens instead of replacing.
 - `sse-close="done"` closes the connection when streaming finishes.
-- The `Fragment.target` defaults to `"fragment"` when not set.
+- A yielded `Fragment` with no `target` emits an unnamed SSE frame, so the
+  default htmx `sse-swap="message"` listener receives it.
 
 ## Pattern 4: One-Shot Mutations
 
