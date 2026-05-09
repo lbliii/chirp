@@ -137,3 +137,15 @@ non-htmx clients.
 - Use explicit `intent`/`_action` fields for multi-intent forms.
 - Test full-page and htmx fragment paths for validation failures.
 - Keep redirects local and safe; preserve scoped `next` values deliberately.
+
+## Startup Diagnostics
+
+`app.check()` uses these categories for production form wiring:
+
+- `csrf_session`: `CSRFMiddleware` is missing `SessionMiddleware` or runs before
+  it.
+- `csrf_form`: CSRF middleware is active and a static mutating form has no
+  token field.
+- `form`: a declared `FormContract` disagrees with the template's fields.
+- `form_contract`: a static mutating form targets a POST route without a
+  declared `FormContract`.
