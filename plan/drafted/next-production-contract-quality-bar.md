@@ -144,6 +144,8 @@ and generated wrappers. Route reversal, request URL scope, route explorer, and
 
 ## Phase 4: Free-Threaded Shared State
 
+**Status**: Complete on `codex/production-contract-quality-bar`.
+
 **Why**: Chirp targets Python 3.14t. Shared registries, caches, event buses,
 middleware state, and context publication need locks or clear lifecycle
 boundaries.
@@ -168,6 +170,17 @@ boundaries.
 
 - Every changed shared mutable structure has an explicit synchronization or
   lifecycle argument, plus a test that would have caught the risky interleaving.
+
+**Completed proof**:
+
+- Closed a lifecycle gap where `freeze_params(...)` and `freeze_exclude(...)`
+  could mutate freeze setup state after runtime publication.
+- Added concurrency coverage showing simultaneous `app.freeze()` calls publish
+  one runtime and run setup domain registration once.
+- Added threaded post-freeze mutation coverage for freeze setup APIs.
+- Focused verification passed:
+  `tests/test_concurrency`, `tests/test_freeze_static.py`,
+  `tests/test_app/test_freeze.py`, and `ty check src/chirp/`.
 
 ## Phase 5: Diagnostics, Docs, And Fixtures
 
