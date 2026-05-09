@@ -62,11 +62,23 @@ def _route_to_dict(route: Any) -> dict[str, Any]:
         handler_sig = str(sig)
     except Exception:
         handler_sig = "(inspect failed)"
+    contract = getattr(route.handler, "_chirp_contract", None)
+    form_contract = getattr(contract, "form", None) if contract is not None else None
+    form_contract_dict: dict[str, Any] = {}
+    if form_contract is not None:
+        datacls = getattr(form_contract, "datacls", None)
+        form_contract_dict = {
+            "dataclass": getattr(datacls, "__name__", str(datacls)),
+            "template": getattr(form_contract, "template", ""),
+            "block": getattr(form_contract, "block", None),
+        }
     return {
         "url_path": route.url_path,
         "kind": getattr(route, "kind", "page"),
         "methods": list(getattr(route, "methods", [])),
         "template_name": route.template_name,
+        "has_contract": contract is not None,
+        "form_contract": form_contract_dict,
         "meta": meta_dict,
         "layout_count": len(layouts),
         "context_provider_count": len(providers),
@@ -98,12 +110,28 @@ def render_route_explorer(
         kind = rd["kind"]
         methods = ", ".join(rd["methods"])
         meta_str = json.dumps(rd["meta"]) if rd["meta"] else "{}"
+        contract_badge = '<span class="badge">contract</span>' if rd["has_contract"] else ""
+        form_contract = rd["form_contract"]
+        form_meta = ""
+        if form_contract:
+            form_meta = (
+                f'<div class="route-meta">form: {_esc(form_contract["dataclass"])}'
+                f' -> {_esc(form_contract["template"])}'
+                + (
+                    f'#{_esc(form_contract["block"])}'
+                    if form_contract.get("block") is not None
+                    else ""
+                )
+                + "</div>"
+            )
         rows_html.append(
             f'<div class="route-row" data-path="{_esc(path)}">'
             f'<span class="route-path">{_esc(path)}</span>'
             f'<span class="badge">{_esc(kind)}</span>'
             f'<span class="badge">{_esc(methods)}</span>'
+            f"{contract_badge}"
             f'<div class="route-meta">meta: {_esc(meta_str)}</div>'
+            f"{form_meta}"
             f'<div class="drill" style="display:none" data-detail="{_esc(json.dumps(rd))}">'
             f"<pre>{_esc(json.dumps(rd, indent=2))}</pre></div></div>"
         )

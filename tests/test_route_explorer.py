@@ -1,10 +1,13 @@
 """Tests for route explorer endpoint (/__chirp/routes)."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from chirp import App, AppConfig
+from chirp.contracts import FormContract, contract
+from chirp.server.route_explorer import render_route_explorer
 from chirp.testing import TestClient
 
 
@@ -24,8 +27,23 @@ META = RouteMeta(title="Home", section="main")
     )
     (pages / "page.py").write_text(
         """
+from dataclasses import dataclass
+
 from chirp import Page
+from chirp.contracts import FormContract, contract
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyForm:
+    body: str
+
+
 def get():
+    return Page("page.html", "content")
+
+
+@contract(form=FormContract(ReplyForm, "page.html", "content"))
+def post():
     return Page("page.html", "content")
 """
     )
@@ -68,6 +86,38 @@ async def test_route_explorer_200_when_debug_true(pages_tree: Path) -> None:
     assert "/" in body
     assert "/skills" in body
     assert "page" in body
+
+
+def test_render_route_explorer_shows_mounted_page_contracts() -> None:
+    """Mounted route contracts are visible in route explorer output."""
+
+    class ReplyForm:
+        body: str
+
+    @contract(form=FormContract(ReplyForm, "page.html", "content"))
+    def post() -> None:
+        return None
+
+    body = render_route_explorer(
+        [
+            SimpleNamespace(
+                actions=(),
+                context_providers=(),
+                handler=post,
+                kind="page",
+                layout_chain=SimpleNamespace(layouts=()),
+                meta=None,
+                methods=frozenset({"POST"}),
+                template_name="page.html",
+                url_path="/",
+                viewmodel_provider=None,
+            )
+        ]
+    )
+    assert '<span class="badge">contract</span>' in body
+    assert "ReplyForm" in body
+    assert "page.html#content" in body
+    assert "&quot;has_contract&quot;: true" in body
 
 
 @pytest.mark.asyncio
