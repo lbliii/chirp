@@ -23,6 +23,7 @@ EXPECTED_PUBLIC_API = [
     "ContractCheck",
     "ContractCheckSnapshot",
     "ContractIssue",
+    "DeferredCache",
     "DependencyIndex",
     "EventStream",
     "FormAction",

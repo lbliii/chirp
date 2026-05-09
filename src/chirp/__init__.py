@@ -119,6 +119,7 @@ _API_STATUS: dict[str, str] = {
     "ContractCheckSnapshot": "provisional",
     "ContractIssue": "provisional",
     "DependencyIndex": "provisional",
+    "DeferredCache": "provisional",
     "HtmxDetails": "provisional",
     "JSONResponse": "stable",
     "ReactiveBus": "provisional",
@@ -165,6 +166,7 @@ __all__ = [
     "ContractCheck",
     "ContractCheckSnapshot",
     "ContractIssue",
+    "DeferredCache",
     "DependencyIndex",
     "EventStream",
     "FormAction",
@@ -319,6 +321,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
     # Cache
+    "DeferredCache": ("chirp.cache", "DeferredCache"),
     "get_cache": ("chirp.cache", "get_cache"),
     "cache_view": ("chirp.cache", "cache_view"),
     # Plugin

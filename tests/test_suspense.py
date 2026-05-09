@@ -16,10 +16,12 @@ Covers:
 """
 
 import asyncio
+import inspect
 
 import pytest
 from kida import DictLoader, Environment
 
+from chirp.cache import DeferredCache
 from chirp.templating.returns import Suspense
 from chirp.templating.suspense import (
     CHIRP_DEFER_PENDING_KEY,
@@ -110,6 +112,28 @@ _SHARED_KEY_TEMPLATE = """\
 {% end %}
 </body></html>"""
 
+_TWO_CONSUMER_TEMPLATE = """\
+<html><body>
+<div id="hero">
+{% block hero %}
+  {% if hero is deferred %}
+    <span class="skeleton">Loading hero...</span>
+  {% else %}
+    <span>{{ hero }}</span>
+  {% end %}
+{% end %}
+</div>
+<div id="footer">
+{% block footer %}
+  {% if footer is deferred %}
+    <span class="skeleton">Loading footer...</span>
+  {% else %}
+    <span>{{ footer }}</span>
+  {% end %}
+{% end %}
+</div>
+</body></html>"""
+
 
 def _env() -> Environment:
     """Build a kida Environment with in-memory test templates."""
@@ -120,6 +144,7 @@ def _env() -> Environment:
                 "defer_pending.html": _DEFER_PENDING_TEMPLATE,
                 "simple.html": _SIMPLE_TEMPLATE,
                 "shared_key.html": _SHARED_KEY_TEMPLATE,
+                "two_consumer.html": _TWO_CONSUMER_TEMPLATE,
             }
         )
     )
@@ -145,6 +170,12 @@ async def _collect_chunks(
 async def _delayed_value(value: object, delay: float = 0.01) -> object:
     """Return *value* after a short delay (simulates async data fetch)."""
     await asyncio.sleep(delay)
+    return value
+
+
+async def _resolve_deferred(value: object) -> object:
+    if inspect.isawaitable(value):
+        return await value
     return value
 
 
@@ -1007,3 +1038,119 @@ class TestDeferPendingKey:
         oob = "".join(chunks[1:])
         assert "Loading stats..." not in oob
         assert "Loading feed..." not in oob
+
+
+# ---------------------------------------------------------------------------
+# DeferredCache integration
+# ---------------------------------------------------------------------------
+
+
+class TestDeferredCacheIntegration:
+    """DeferredCache keeps Suspense behavior on cold and warm paths."""
+
+    async def test_cold_miss_defers_then_warm_hit_renders_in_shell(self) -> None:
+        cache = DeferredCache(default_ttl=60)
+        calls = 0
+
+        async def factory() -> str:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.01)
+            return "42"
+
+        env = _env()
+        cold = Suspense(
+            "shared_key.html",
+            title="Home",
+            stars=cache.get_or_defer("gh:repo", factory),
+        )
+        cold_chunks = await _collect_chunks(env, cold, is_htmx=True)
+
+        assert "skeleton" in cold_chunks[0]
+        assert 'hx-swap-oob="true"' in "".join(cold_chunks[1:])
+        assert calls == 1
+
+        warm = Suspense(
+            "shared_key.html",
+            title="Home",
+            stars=cache.get_or_defer("gh:repo", factory),
+        )
+        warm_chunks = await _collect_chunks(env, warm, is_htmx=True)
+
+        assert len(warm_chunks) == 1
+        assert "42 stars" in warm_chunks[0]
+        assert "skeleton" not in warm_chunks[0]
+        assert "hx-swap-oob" not in warm_chunks[0]
+        assert calls == 1
+
+    async def test_two_cold_consumers_share_one_factory_call(self) -> None:
+        cache = DeferredCache(default_ttl=60)
+        calls = 0
+
+        async def factory() -> str:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.01)
+            return "shared value"
+
+        env = _env()
+        suspense = Suspense(
+            "two_consumer.html",
+            hero=cache.get_or_defer("shared", factory),
+            footer=cache.get_or_defer("shared", factory),
+        )
+        chunks = await _collect_chunks(env, suspense, is_htmx=True)
+
+        assert calls == 1
+        assert "Loading hero" in chunks[0]
+        assert "Loading footer" in chunks[0]
+        oob = "".join(chunks[1:])
+        assert oob.count("shared value") == 2
+
+    @pytest.mark.parametrize("value", [0, "", None, []])
+    async def test_cached_falsy_values_render_as_loaded(self, value: object) -> None:
+        cache = DeferredCache(default_ttl=60)
+
+        async def factory() -> object:
+            return value
+
+        env = _env()
+        assert await _resolve_deferred(cache.get_or_defer("falsy", factory)) == value
+
+        chunks = await _collect_chunks(
+            env,
+            Suspense("simple.html", data=cache.get_or_defer("falsy", factory)),
+            is_htmx=True,
+        )
+
+        assert len(chunks) == 1
+        assert "Loading..." not in chunks[0]
+
+    async def test_factory_failure_uses_suspense_fallback_and_does_not_cache(self) -> None:
+        cache = DeferredCache(default_ttl=60)
+        calls = 0
+
+        async def fail() -> str:
+            nonlocal calls
+            calls += 1
+            raise RuntimeError("upstream down")
+
+        env = _env()
+        chunks = await _collect_chunks(
+            env,
+            Suspense("simple.html", data=cache.get_or_defer("fragile", fail)),
+        )
+
+        assert calls == 1
+        combined = "".join(chunks)
+        assert "Loading..." in chunks[0]
+        assert "chirp-suspense-error" in combined
+
+        async def recover() -> str:
+            nonlocal calls
+            calls += 1
+            return "ok"
+
+        assert await _resolve_deferred(cache.get_or_defer("fragile", recover)) == "ok"
+        assert cache.get_or_defer("fragile", recover) == "ok"
+        assert calls == 2

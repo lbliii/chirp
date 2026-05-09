@@ -25,9 +25,17 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from typing import Any
 
+from chirp.cache.deferred import DeferredCache
 from chirp.cache.protocol import CacheBackend
 
-__all__ = ["CacheBackend", "cache_view", "create_backend", "get_cache", "set_cache"]
+__all__ = [
+    "CacheBackend",
+    "DeferredCache",
+    "cache_view",
+    "create_backend",
+    "get_cache",
+    "set_cache",
+]
 
 logger = logging.getLogger("chirp.cache")
 

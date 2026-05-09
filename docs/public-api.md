@@ -49,7 +49,7 @@ shape may still evolve before 1.0:
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
-| Cache | `get_cache`, `cache_view` |
+| Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Optional UI bridge | `use_chirp_ui` |
 
 ## 1.0 Audit Decisions
