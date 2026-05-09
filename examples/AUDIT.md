@@ -3,6 +3,28 @@
 Analysis of all examples for similar issues and outdated patterns (Feb 2025).
 Based on fixes applied to the hackernews example.
 
+## 2026 Reactive and Forum Pattern Audit
+
+Newer examples add production-shaped patterns that were not present in the
+original Feb 2025 audit:
+
+| Example | Canonical Pattern | Notes |
+|---------|-------------------|-------|
+| **reactive_tasks** | `ReactiveBus` + `DependencyIndex` + `reactive_stream()` | Shows `ConnectionInfo`, presence-aware streams, origin filtering, changed-path updates, and reactive contract metadata. Use this as the current reactive baseline. |
+| **chirpui/forum_shell** | Compact forum/PBP app shell | Demonstrates mounted pages, ChirpUI shell navigation, forum-style boards/threads/posts, mentions, OOB unread count, and app-shell-safe targets. It is a productization seed, not a full production forum. |
+| **returns_gallery** | Return-type reference | Covers `Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, `ValidationError`, `FormAction`, `Action`, `Stream`, and `Redirect`. Keep it aligned with the return-type architecture. |
+
+Current SSE guidance:
+
+- Untargeted yielded `Fragment` values emit unnamed SSE frames and are received
+  by htmx's default `sse-swap="message"` listener.
+- Use explicit `Fragment(..., target="name")` only for named channels.
+- Use `{% fragment %}` for swap-only payload blocks; keep Suspense shell slots
+  as `{% block %}` so skeletons render on first paint.
+- Put `sse-swap` on a child sink, not on the `sse-connect` element, and use
+  `hx-disinherit="hx-target hx-swap"` to isolate long-lived streams from broad
+  layout targets.
+
 ## Examples Expansion (Feb 2025)
 
 Documentation and new examples added:
