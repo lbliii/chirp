@@ -162,12 +162,12 @@ to demonstrate product-shaped contracts without becoming products.
 
 ## Implementation Sequence
 
-1. **Validation confidence gate**: fix broad-test blockers or keep them recorded
-   as explicit environment drift. Current blockers are a missing third-party
-   pytest plugin module during autoload and installed Kida lacking
-   `resolve_template_name`.
-2. **RFC 006 decision**: request URL scope RFC exists; next step is choosing
-   the public shape and proof matrix, not writing another RFC.
+1. **Validation confidence gate**: complete. Contract scanner compatibility now
+   covers installed Kida versions without `resolve_template_name`, and the
+   route explorer fixture is valid under current debug checks.
+2. **RFC 006 decision**: complete. RFC 006 accepts `RequestUrlScope`,
+   `request.with_url_scope(...)`, `request.scoped_url(path)`, and
+   `request.url_for(...)` while preserving app-root `app.url_for(...)`.
 3. **Request URL scope implementation**: keep `app.url_for(...)` deterministic;
    add request-scoped helpers without mutating frozen app state or rendered
    HTML.

@@ -1,14 +1,16 @@
 # RFC 006: Request URL Scope For Tenant And Base-Path Apps
 
-**Status:** Draft; steward-reviewed, awaiting API decision
+**Status:** Accepted for initial implementation; not shipped yet
 **Author:** (proposal)
 **Created:** 2026-05-09
 **Depends on:** RFC 003 (named routes), RFC 004 (`url_for`)
 
-**Next decision:** choose the first public shape. Steward convergence favors
-keeping `app.url_for(...)` app-root deterministic, then adding an immutable
-request URL scope plus explicit request-aware helpers such as
-`request.scoped_url(path)` and possibly `request.url_for(...)`.
+**Decision:** keep `app.url_for(...)` app-root deterministic. Add an
+immutable request URL scope on `Request`, plus explicit request-aware helpers:
+`request.with_url_scope(...)`, `request.scoped_url(path)`, and
+`request.url_for(name, **params)`. Template `url_for` becomes request-aware
+only for request renders and only when the app has not registered its own
+`url_for` global.
 
 ---
 
@@ -61,23 +63,18 @@ class RequestUrlScope:
     def apply(self, path: str) -> str: ...
 ```
 
-The exact storage API is still open, but it must not require consumers to write
-to `request._cache`. Candidate shapes:
+The accepted storage API is request-object based. Middleware creates a scoped
+request by copying the frozen request:
 
 ```python
 scoped_request = request.with_url_scope(RequestUrlScope(prefix="/c/acme"))
 request.url_scope
 ```
 
-or:
-
-```python
-with request_url_scope("/c/acme"):
-    ...
-```
-
-The request-object shape is preferred because it composes with explicit
-middleware and keeps scope visible in tests.
+`RequestUrlScope(prefix=...)` normalizes prefixes to one leading slash and no
+trailing slash, except the empty/root scope. It applies only to app-root paths;
+absolute URLs, protocol-relative URLs, anchors, and non-root relative paths are
+returned unchanged so products can keep external and local policy explicit.
 
 ### 3.2 Scoped URL Helpers
 
@@ -91,9 +88,14 @@ request.scoped_url(app.url_for("boards.detail", board_slug="ic"))
 # -> same result, useful for redirects and existing helpers
 ```
 
-Templates should receive a request-aware `url_for` only when rendering inside a
-request. This must keep `setdefault` semantics from RFC 004: user-defined
-template globals still win.
+`request.url_for(...)` requires the request to have an app reference. If a
+synthetic request was not created by Chirp's app/server path, it raises a clear
+runtime error naming the missing app binding.
+
+Templates receive a request-aware `url_for` only when rendering inside a
+request. This keeps RFC 004 `setdefault` semantics: user-defined template
+globals still win. Background renders and app-level renders without a request
+continue to use app-root `app.url_for(...)`.
 
 ### 3.3 Redirects
 
@@ -128,10 +130,10 @@ carry the public prefix:
 /_frag/c/acme/boards/ic?block=thread_list
 ```
 
-If that shape conflicts with the current fragment dispatcher, the RFC must
-settle it before implementation. An alternative is a query field that stores
-the scoped public path while the dispatcher still routes against the local app
-path.
+This keeps the current `/_frag{path}?_b={block}` shape. Product middleware that
+accepts tenant-prefixed full-page URLs must also strip the accepted request
+scope when a fragment request arrives under `/_frag/<scope>/...`. Chirp does
+not add a second query-encoded local-path protocol in the first implementation.
 
 ### 3.5 SSE Endpoints
 
@@ -241,7 +243,7 @@ Expected output:
 
 ---
 
-## 6. Required Proof Before Implementation
+## 6. Required Proof For Initial Implementation
 
 - `tests/test_url_for.py` keeps all existing app-root assertions.
 - New tests cover:
@@ -251,19 +253,37 @@ Expected output:
   - query-string `next` preservation;
   - SSE endpoint attribute generation;
   - no ambient prefix in background/template renders without a request.
+  - `fragment_url(request.url_for(...), block)` preserves the current
+    `/_frag<public-path>?_b=<block>` protocol.
 - Browser smoke for one shell example if the implementation changes htmx
   navigation behavior.
 - `app.check()` remains deterministic without a request scope.
 
 ---
 
-## 7. Open Questions
+## 7. Decision Matrix
 
-- Should the first public API be `request.url_for(...)`, `request.scoped_url(...)`,
-  both, or a standalone helper?
-- Should scoped fragment URLs route through the existing `/_frag/<path>` shape
-  or a query-encoded local path?
-- Should `Redirect.to_route(...)` exist, or is explicit `Redirect(request.url_for(...))`
-  clear enough?
-- Can template request-aware `url_for` be injected without making background
-  template renders surprising?
+| Question | Decision | Rationale |
+| --- | --- | --- |
+| First public API | Provide both `request.scoped_url(path)` and `request.url_for(name, **params)` | The first composes with existing helpers and redirects; the second keeps templates and handlers concise. |
+| Fragment URL shape | Keep `/_frag<public-path>?_b=<block>` | It preserves RFC 003/004 composition and avoids a second fragment protocol. |
+| Redirect convenience | Defer `Redirect.to_route(...)` | `Redirect(request.url_for(...))` is explicit and does not require changing redirect semantics. |
+| Template injection | Inject only during request renders and only under `setdefault` semantics | Background renders stay deterministic; user globals still win. |
+| Automatic HTML mutation | Reject for this RFC | URL scope must be generated at URL composition points, not by rewriting rendered documents. |
+
+## 8. Parity Matrix
+
+| Contract | API/CLI | Programmatic | Protocol | Schema/Types | Docs | Examples | Tests |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| App-root route reversal | `app.url_for` unchanged | Background renders unchanged | Existing route paths unchanged | No new route schema | RFC 004 remains valid | Existing examples unaffected | Existing `tests/test_url_for.py` assertions stay green |
+| Request URL scope | No CLI surface | `RequestUrlScope`, `request.with_url_scope`, `request.scoped_url`, `request.url_for` | Scope applies before public URL emission | Frozen/slotted request scope type | This RFC, routing docs after implementation | Tenant-like example only after API stabilizes | Full page, htmx, redirect, SSE, fragment, no-request tests |
+| Fragment composition | No CLI surface | `fragment_url(request.url_for(...), block)` | Current `/_frag{path}?_b={block}` protocol | No new fragment schema | RFC note only until implementation | Shell fixture may use it later | Fragment URL assertion with scoped path |
+
+## 9. Deferred
+
+- `Redirect.to_route(...)` convenience.
+- Absolute URL generation with scheme/host.
+- `AppConfig` base-path or tenant config.
+- Automatic URL rewriting in rendered HTML.
+- Product-owned tenant validation, durable tenant lookup, membership, roles, or
+  authorization policy.
