@@ -184,9 +184,9 @@ to demonstrate product-shaped contracts without becoming products.
 7. **SSE replay/reconnect proof**: complete. Reconnect tests prove
    `Last-Event-ID` can drive product-owned missed-event replay without adding
    a Chirp queue or durable store.
-8. **Shell/OOB/SSE browser proof**: add one deterministic browser smoke for
-   shell/OOB/SSE behavior. Tenant-like shell proof waits for request URL
-   scope.
+8. **Shell/OOB/SSE browser proof**: planned, not executed. The repo has no
+   browser-test harness yet, so `plan/drafted/shell-oob-sse-browser-smoke.md`
+   records the exact fixture, acceptance criteria, and future command shape.
 9. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
    smallest fixture or contract test needed for reusable framework gaps.
 
