@@ -104,7 +104,7 @@ No React. No npm. No virtual DOM diffing. Just the browser doing what browsers d
 | **Whole node tree wiped** on any SSE update | `sse-connect` inherits `hx-target="#main"` from parent; fragment gets swapped into `#main` instead of the sink | Add `hx-disinherit="hx-target hx-swap"` on `sse-connect` |
 | Whole page erased on score update | `view-transition-name` on `#main` caused View Transitions API to run on every OOB swap (a child of `#main`) | Scope `view-transition-name` to `.story-detail` only; list view has no transition so OOB updates don't trigger it |
 | List flickers, content disappears on score update | `transition:true` on `#main`'s `hx-swap` — htmx wraps swaps in View Transitions; OOB swaps to children trigger it | Remove `transition:true` from `#main`; put it only on nav links (story, back, comments) |
-| `ModuleNotFoundError: chirp` | Running `python` instead of `uv run python` — wrong venv | Use `uv run` from workspace root |
+| `ModuleNotFoundError: chirp` | Running `python` instead of `uv run python` — wrong venv | Use `uv run` from the Chirp repo root |
 | Outdated deps | chirp had `bengal-pounce>=0.1.0`, `patitas>=0.1.0` | Bumped to match bengal: `>=0.2.0`, `>=0.3.0` |
 
 These were mostly **our implementation choices** (initial fragment, view-transition scope) and **outdated docs** (run instructions, lifecycle hook names). The stack (chirp, kida, patitas, pounce, htmx) is solid; the integration patterns needed tuning.

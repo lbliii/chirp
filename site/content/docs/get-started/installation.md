@@ -38,6 +38,7 @@ pip install bengal-chirp
 git clone https://github.com/lbliii/chirp.git
 cd chirp
 uv sync --group dev
+uv run pytest -q --tb=short
 ```
 :::{/tab-item}
 :::{/tab-set}
@@ -81,6 +82,12 @@ python app.py
 ```
 
 Open `http://127.0.0.1:8000` in your browser.
+
+:::{note}
+When working on Chirp itself, run `uv` from the Chirp repository root. Chirp is
+now a standalone uv project and resolves its development dependencies the same
+way CI does.
+:::
 
 ## CLI Commands
 

@@ -39,7 +39,7 @@ install:
 		echo "Error: $(VENV_DIR) not found. Run 'make setup' first."; \
 		exit 1; \
 	fi
-	@bash -c 'source "$(VENV_DIR)/bin/activate" && uv sync --active --group dev --frozen'
+	@bash -c 'source "$(VENV_DIR)/bin/activate" && uv sync --active --group dev'
 
 test:
 	uv run pytest -q --tb=short
