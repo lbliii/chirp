@@ -126,33 +126,34 @@ Those surfaces must agree before deeper product-scale guidance is credible.
 docs if behavior or terminal wording changes, `forum_shell` README if example
 positioning changes.
 
-### 4. Downstream Product Success: Tenant/Base-Path URL RFC
+### 4. Downstream Product Success: Request URL Scope Decision
 
 **Why next**: ELBYSODIC currently scopes shared-host community URLs with request
-path rewriting and rendered HTML URL rewriting. Chirp should design a safer
-framework-level story before product apps normalize private request cache access
-and regex response mutation.
+path rewriting and rendered HTML URL rewriting. RFC 006 now exists; the next
+roadmap step is to settle its API shape and proof matrix before code.
 
 **Scope**:
-- Write an RFC for request-scoped URL prefixing or equivalent middleware-safe
-  URL generation hooks.
-- Cover `url_for`, redirects, htmx attributes, query-string return paths,
-  nested mounted pages, and SSE endpoints.
-- Preserve current app-root `url_for` semantics unless the RFC explicitly
-  changes that contract.
-- Do not implement the API until routing/server/templating stewards review the
-  shape.
+- Update RFC 006 from "design sketch" to an implementation-ready decision.
+- Preserve `app.url_for(...)` as app-root deterministic.
+- Decide whether the first public shape is `request.scoped_url(path)`,
+  `request.url_for(...)`, a middleware URL-scope provider, or a combination.
+- Define ordering for `mount_app()` plus scoped URLs: route reversal first,
+  request scope prefix second.
+- Reject automatic rendered-HTML rewriting as a core pattern.
 
 **Required proof before code**:
-- RFC examples for full page, boosted fragment, redirect, and SSE link cases.
-- Compatibility matrix for existing `url_for` users.
-- Risk section covering background renders and EventStream generators that do
-  not have an active request.
+- Existing `tests/test_url_for.py` stays unchanged.
+- Planned tests cover request-scoped template URL generation, redirects and
+  `next`, htmx attrs, SSE endpoint attrs, nested `mount_app()`, mounted pages,
+  concurrent requests with different prefixes, and no active request/background
+  render behavior.
+- Route explorer continues to show app-root paths; scoped URL behavior is
+  documented separately.
 
-**Collateral**: `docs/rfcs/`, routing docs, deployment docs for shared-host
-apps after implementation.
+**Collateral**: RFC 006, RFC 004 root-path note if superseded, routing docs,
+deployment docs for shared-host apps after implementation.
 
-### 5. Downstream Product Success: Production Form Ergonomics
+### 5. Downstream Product Success: Production Form Proof And CSRF Decision
 
 **Why next**: Real Chirp products have many server-rendered POST forms with
 repeated fields, multiple submit intents, safe redirects, CSRF, and validation.
@@ -160,25 +161,31 @@ ELBYSODIC’s product code proves the need without requiring Chirp to own the
 product workflows.
 
 **Scope**:
-- Update form guidance for CSRF helpers, `CSRFMiddleware`, `form_from`,
-  repeated list fields, `FormContract`, multi-intent POST handlers, and
-  htmx/non-htmx validation.
-- Consider a low-noise `app.check()` warning for likely missing CSRF fields
-  only after security/form stewards review false-positive risk.
+- Add or confirm integrated proof that `CSRFMiddleware`, `csrf_field()`,
+  mounted `FormContract`, `form_from()`, repeated fields, multi-intent forms,
+  and htmx/non-htmx validation work together.
+- Decide separately whether a narrow `csrf_form` `app.check()` rule is worth
+  adding. It should activate only when `CSRFMiddleware` is registered and start
+  conservative because false positives are likely.
+- Strengthen safe redirect examples and tests, coordinated with URL scope.
 - Keep automatic response mutation for CSRF injection out of core unless an RFC
   and security review prove it safe.
 
 **Required proof**:
-- Docs examples for login-style forms, multi-intent forms, and repeated list
-  fields.
-- Tests that combine mounted pages, `FormContract`, `form_from`, CSRF helpers,
-  and htmx fragment responses.
-- Middleware tests for any security-sensitive behavior.
+- `tests/test_csrf.py`
+- `tests/contracts/test_forms.py`
+- `tests/contracts/test_form_routes.py`
+- Focused mounted-page form contract visibility test.
+- `is_safe_url()` cases for tenant-prefixed paths, `//evil.com`, schemes,
+  empty strings, encoded paths, and login fallback behavior.
+- If `csrf_form` is accepted: tests for missing token, present `csrf_field()`,
+  present `_csrf_token`, dynamic/exempt forms skipped, and documented htmx
+  header patterns not over-enforced.
 
 **Collateral**: forms docs, production deployment checklist, hypermedia
 footguns if guidance changes.
 
-### 6. Downstream Product Success: App-Shell, OOB, And SSE Hardening
+### 6. Downstream Product Success: App-Shell, OOB, And SSE Proof
 
 **Why next**: Product shells combine boosted navigation, layout outlets, OOB
 theme/sidebar regions, and live updates. A bad contract here blanks visible
@@ -187,14 +194,21 @@ content or leaves stale shell state.
 **Scope**:
 - Continue hardening app-shell outlet selection and OOB registry checks.
 - Keep fragment/SSE contracts aligned with DevTools debugging guidance.
-- Define replay/event-id guidance before recommending product-critical SSE
-  streams.
-- Add tenant-like shell navigation proof only after the URL-prefix RFC settles.
+- Add explicit reconnect proof before promoting production-critical SSE
+  guidance: products own durable cursors; Chirp formats `SSEEvent(id=...)`.
+- Update stale SSE docs where they disagree with tested per-event error
+  behavior.
+- Keep EventStream guidance clear: post-load updates only, not first paint.
+- Add tenant-like shell navigation proof only after request URL scope lands.
 
 **Required proof**:
 - `uv run pytest tests/contracts/test_shell_outlet_boosted_navigation.py tests/contracts/test_oob_pipeline_e2e.py -q`
+- `uv run pytest tests/test_sse_integration.py tests/contracts/test_sse.py -q`
+- Multi-client/reconnect test using `Last-Event-ID`.
 - Browser smoke for at least one shell example when rendering behavior changes.
-- Multi-client/reconnect SSE tests before promoting replay semantics.
+- Browser smoke should prove stable `sse-connect`, boosted navigation across
+  two pages, OOB shell update, no full-document fragment response, and listener
+  survival after navigation.
 
 **Collateral**: htmx patterns, devtools docs, realtime docs, shell examples.
 

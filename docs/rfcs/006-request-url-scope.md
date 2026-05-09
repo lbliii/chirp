@@ -1,9 +1,14 @@
 # RFC 006: Request URL Scope For Tenant And Base-Path Apps
 
-**Status:** Draft
+**Status:** Draft; steward-reviewed, awaiting API decision
 **Author:** (proposal)
 **Created:** 2026-05-09
 **Depends on:** RFC 003 (named routes), RFC 004 (`url_for`)
+
+**Next decision:** choose the first public shape. Steward convergence favors
+keeping `app.url_for(...)` app-root deterministic, then adding an immutable
+request URL scope plus explicit request-aware helpers such as
+`request.scoped_url(path)` and possibly `request.url_for(...)`.
 
 ---
 

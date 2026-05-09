@@ -162,15 +162,105 @@ to demonstrate product-shaped contracts without becoming products.
 
 ## Implementation Sequence
 
-1. **Plan cleanup**: mark the old PBP forum plan as superseded by downstream
-   product research; keep useful framework observations.
-2. **Contract confidence pass**: audit mounted-page contract propagation,
-   route explorer output, terminal checks, and `forum_shell`.
-3. **Forms/docs pass**: update production form guidance around CSRF,
-   multi-intent forms, repeated fields, and mounted page contracts.
-4. **Tenant URL RFC**: design request-scoped URL prefix support before code.
-5. **Shell/realtime proof**: continue browser and contract proof for app-shell,
-   OOB, and SSE behavior.
+1. **Validation confidence gate**: fix broad-test blockers or keep them recorded
+   as explicit environment drift. Current blockers are a missing third-party
+   pytest plugin module during autoload and installed Kida lacking
+   `resolve_template_name`.
+2. **RFC 006 decision**: request URL scope RFC exists; next step is choosing
+   the public shape and proof matrix, not writing another RFC.
+3. **Request URL scope implementation**: keep `app.url_for(...)` deterministic;
+   add request-scoped helpers without mutating frozen app state or rendered
+   HTML.
+4. **Production form integration proof**: verify CSRF, typed binding,
+   `FormContract`, repeated fields, multi-intent forms, and htmx/non-htmx
+   validation together before adding new checks.
+5. **CSRF check decision**: either add a narrow `csrf_form` `app.check()` rule
+   gated on `CSRFMiddleware`, or explicitly defer it if scanner noise is too
+   high.
+6. **Shell/realtime proof**: add reconnect/replay tests and one deterministic
+   browser smoke for shell/OOB/SSE behavior. Tenant-like shell proof waits for
+   request URL scope.
+7. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
+   smallest fixture or contract test needed for reusable framework gaps.
+
+## Open-Item Steward Synthesis
+
+Consulted stewards: routing/app lifecycle, contracts/forms/security,
+realtime/rendering, and planning. A dedicated docs/examples/tests steward did
+not return before synthesis; planning reviewed those scoped files, and the
+missing dedicated signal is recorded as residual risk.
+
+### Convergence
+
+- `app.url_for(...)` stays app-root deterministic.
+- Request URL scope must be request-local, not frozen app state or ambient
+  global state.
+- Automatic rendered-HTML mutation for tenant URLs or CSRF is not a Chirp core
+  pattern.
+- `forum_shell` remains a fixture, not a product.
+- CSRF missing-field checks are useful only if narrow and low-noise.
+- SSE replay is product-owned durable cursor behavior; Chirp should prove
+  `Last-Event-ID` handling patterns without adding a queue/store.
+- Browser proof is required for shell/OOB/SSE behavior that can pass string
+  tests while failing in the live DOM.
+
+### Raw Steward Signals
+
+| Steward | Area | Severity | Accepted Finding | Required Proof | Confidence |
+| --- | --- | --- | --- | --- | --- |
+| Routing/App | Request URL scope | P1 | Preserve `app.url_for(...)`; add request-aware helper/scope instead | app-root URL tests unchanged; request-scoped template, redirect, htmx, SSE, mount, no-request, and concurrency tests | High |
+| Routing/App | Private URL rewriting | P1 | Replace private request/cache and regex HTML rewriting with public request URL scope | Tenant-like fixture with scoped URLs and no rendered HTML mutation | High |
+| Routing/App | Mount composition | P2 | Route reversal happens before request scope prefix; route explorer shows app-root paths | `test_mount_app.py` and `test_url_for.py` scoped mount cases | Medium-high |
+| Contracts/Forms/Security | CSRF form coverage | P1 | Add a narrow `csrf_form` check only after false-positive review | Missing/present token cases; dynamic/exempt skip cases; htmx header pattern docs | High |
+| Contracts/Forms/Security | Mounted `FormContract` | P2 | Keep wrapper/source contract visibility as regression contract | `forum_shell` plus focused mounted POST contract fixture | High |
+| Contracts/Forms/Security | Safe redirects | P1 | Strengthen examples/tests for `next=` and local URL safety | `is_safe_url()` tenant/local/evil/encoded cases and login behavior | High |
+| Realtime/Rendering | Browser shell proof | P1 | Add one deterministic browser smoke before broader shell claims | Stable SSE listener, boosted navigation, OOB update, no full-document fragment, listener survives navigation | High |
+| Realtime/Rendering | Replay/reconnect | P1 | Prove `Last-Event-ID` pattern; product owns durable cursor | Multi-client/reconnect test with missed-event ordering | High |
+| Realtime/Rendering | SSE docs drift | P2 | Update docs to match tested production error events | Existing SSE integration tests plus docs link check | High |
+| Planning | Roadmap state | P1 | Roadmap must say RFC 006 exists and next step is API decision | Docs link drift check | High |
+
+### Dependencies
+
+- Request URL scope blocks tenant-like shell navigation fixtures.
+- CSRF `app.check()` work depends on false-positive review and form integration
+  proof.
+- Safe redirect guidance depends on request URL scope for tenant-prefixed
+  `next` semantics.
+- SSE replay promotion depends on durable event-id/reconnect tests.
+- Broad examples/browser confidence depends on resolving or explicitly
+  documenting current validation environment drift.
+
+### Ranked Backlog
+
+1. Roadmap/RFC status cleanup for RFC 006.
+2. Request URL scope API decision.
+3. Request URL scope implementation and tests.
+4. Production form integration proof.
+5. CSRF missing-field `app.check()` RFC or explicit deferral.
+6. Safe redirect proof coordinated with URL scope.
+7. SSE replay/reconnect proof.
+8. Deterministic shell/OOB/SSE browser smoke.
+9. Diagnostics/category docs polish.
+10. Keep `forum_shell` current as a narrow fixture.
+
+### Minority Reports
+
+- ELBYSODIC can continue product-first work with explicit middleware while
+  Chirp designs request URL scope.
+- CSRF missing-field checks may remain docs-only if the scanner is too noisy.
+- `forum_shell` should not gain tenant behavior until request URL scope is
+  stable.
+
+### Not Now
+
+- Tenant router, tenant schema, membership model, or ELBYSODIC-specific policy.
+- Automatic rendered-HTML rewriting for tenant URLs or CSRF.
+- Ambient request-aware behavior in `app.url_for(...)`.
+- `AppConfig` base-path field for per-request tenant prefixes.
+- Static source-code analysis for arbitrary safe redirects.
+- Replay storage, queues, presence tracking, or forum-specific realtime
+  primitives in Chirp.
+- Broad app-shell browser suite before one deterministic smoke is stable.
 
 ## Open Questions
 
