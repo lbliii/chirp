@@ -1,0 +1,1 @@
+**Scoped auth redirects** — `@login_required` and `@requires` now preserve `RequestUrlScope` in generated `?next=` login redirects, so tenant/base-path middleware keeps users on the public URL after login.

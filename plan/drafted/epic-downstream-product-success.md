@@ -178,10 +178,13 @@ to demonstrate product-shaped contracts without becoming products.
 5. **CSRF check decision**: complete. Add a narrow WARNING-level `csrf_form`
    rule gated on active `CSRFMiddleware`; it only scans static mutating forms
    and accepts `csrf_field()`, `csrf_token()`, or an `_csrf_token` field.
-6. **Shell/realtime proof**: add reconnect/replay tests and one deterministic
+6. **Safe redirect proof**: complete. `is_safe_url()` now has tenant/local,
+   evil, and encoded-case tests, and auth login redirects preserve
+   request-scoped public `next` values.
+7. **Shell/realtime proof**: add reconnect/replay tests and one deterministic
    browser smoke for shell/OOB/SSE behavior. Tenant-like shell proof waits for
    request URL scope.
-7. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
+8. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
    smallest fixture or contract test needed for reusable framework gaps.
 
 ## Open-Item Steward Synthesis

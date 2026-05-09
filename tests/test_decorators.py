@@ -1,6 +1,6 @@
 """Tests for route protection decorators — @login_required and @requires."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from chirp import App
 from chirp.middleware.auth import AuthConfig, AuthMiddleware, get_user, login
@@ -124,6 +124,13 @@ def _make_app() -> App:
     return app
 
 
+async def _tenant_scope(request, next_handler):  # type: ignore[no-untyped-def]
+    if request.path == "/c/acme" or request.path.startswith("/c/acme/"):
+        local_path = request.path.removeprefix("/c/acme") or "/"
+        request = replace(request, path=local_path).with_url_scope("/c/acme")
+    return await next_handler(request)
+
+
 # ---------------------------------------------------------------------------
 # @login_required — browser behavior
 # ---------------------------------------------------------------------------
@@ -161,6 +168,16 @@ class TestLoginRequiredBrowser:
             location = _get_header(response, "location")
             assert location is not None
             assert "next=%2Fdashboard%3Ftab%3Dsettings" in location
+
+    async def test_redirect_preserves_request_url_scope(self) -> None:
+        app = _make_app()
+        app.add_middleware(_tenant_scope)
+        async with TestClient(app) as client:
+            response = await client.get("/c/acme/dashboard?tab=settings")
+            assert response.status == 302
+            location = _get_header(response, "location")
+            assert location is not None
+            assert "next=%2Fc%2Facme%2Fdashboard%3Ftab%3Dsettings" in location
 
 
 # ---------------------------------------------------------------------------
