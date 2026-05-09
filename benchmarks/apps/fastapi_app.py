@@ -1,4 +1,4 @@
-"""FastAPI benchmark app — JSON, CPU, and template workloads."""
+"""FastAPI benchmark app — JSON, CPU, DB, and template workloads."""
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -10,6 +10,7 @@ from benchmarks.apps.workloads import (
     TEMPLATE_ITEMS,
     TEMPLATE_TITLE,
     cpu_work,
+    fetch_db_rows,
 )
 
 app = FastAPI()
@@ -25,6 +26,11 @@ def json_handler():
 def cpu_handler():
     cpu_work()
     return {"message": "done", "result": 1}
+
+
+@app.get("/db")
+def db_handler():
+    return {"rows": fetch_db_rows()}
 
 
 @app.get("/template", response_class=HTMLResponse)

@@ -1,4 +1,4 @@
-"""Chirp benchmark app — JSON, CPU, and template workloads."""
+"""Chirp benchmark app — JSON, CPU, DB, and template workloads."""
 
 import os
 
@@ -10,6 +10,7 @@ from benchmarks.apps.workloads import (
     TEMPLATE_ITEMS,
     TEMPLATE_TITLE,
     cpu_work,
+    fetch_db_rows,
 )
 from chirp import App, AppConfig, Template
 
@@ -40,6 +41,11 @@ def json_handler() -> dict:
 def cpu_handler() -> dict:
     cpu_work()
     return {"message": "done", "result": 1}
+
+
+@app.route("/db")
+def db_handler() -> dict:
+    return {"rows": fetch_db_rows()}
 
 
 @app.route("/template")

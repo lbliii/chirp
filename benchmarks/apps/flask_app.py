@@ -1,4 +1,4 @@
-"""Flask benchmark app — JSON, CPU, and template workloads."""
+"""Flask benchmark app — JSON, CPU, DB, and template workloads."""
 
 from flask import Flask, jsonify
 
@@ -8,6 +8,7 @@ from benchmarks.apps.workloads import (
     TEMPLATE_ITEMS,
     TEMPLATE_TITLE,
     cpu_work,
+    fetch_db_rows,
 )
 
 app = Flask(__name__)
@@ -23,6 +24,11 @@ def json_handler():
 def cpu_handler():
     cpu_work()
     return jsonify({"message": "done", "result": 1})
+
+
+@app.route("/db")
+def db_handler():
+    return jsonify({"rows": fetch_db_rows()})
 
 
 @app.route("/template")
