@@ -46,6 +46,7 @@ EXPECTED_PUBLIC_API = [
     "RegionUpdate",
     "RenderPlan",
     "Request",
+    "RequestUrlScope",
     "Response",
     "SSEEvent",
     "Severity",

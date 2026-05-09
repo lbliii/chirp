@@ -77,7 +77,7 @@
           {% set col_tasks = board.get(col_id, []) %}
           {% call column(col_id, col_name, col_tasks | length, oob=false) %}
             {% unless col_tasks %}
-              {% call empty_state(icon="◇", title="No tasks") %}
+              {% call empty_state(icon="diamond", title="No tasks") %}
               <p>Nothing in {{ col_name | lower }} yet.</p>
               {% end %}
             {% end %}
@@ -203,7 +203,7 @@ document.body.addEventListener("click", function(event) {
   </div>
   <div class="kanban-column__body" data-status="{{ column_id }}">
   {% unless tasks %}
-    {% call empty_state(icon="◇", title="No tasks") %}
+    {% call empty_state(icon="diamond", title="No tasks") %}
     <p>Drop a task here.</p>
     {% end %}
   {% end %}
@@ -229,7 +229,7 @@ document.body.addEventListener("click", function(event) {
 {% if (column_id ?? none) %}
 {% call column(column_id, column_name, tasks | length, oob=true) %}
   {% unless tasks %}
-    {% call empty_state(icon="◇", title="No tasks") %}
+    {% call empty_state(icon="diamond", title="No tasks") %}
     <p>Drop a task here.</p>
     {% end %}
   {% end %}
