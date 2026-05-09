@@ -44,6 +44,13 @@ def _build_login_redirect(login_url: str, request_url: str) -> str:
     return f"{login_url}{separator}next={next_url}"
 
 
+def _next_url_for_request(request: Any) -> str:
+    scoped_url = getattr(request, "scoped_url", None)
+    if callable(scoped_url):
+        return scoped_url(request.url)
+    return request.url
+
+
 def _is_api_request(request: Any) -> bool:
     """Detect whether the request is from an API client (not a browser).
 
@@ -91,7 +98,7 @@ def login_required(handler: Callable) -> Callable:
             config = _active_config.get()
             login_url = config.login_url if config else "/login"
             if login_url:
-                redirect_url = _build_login_redirect(login_url, request.url)
+                redirect_url = _build_login_redirect(login_url, _next_url_for_request(request))
                 raise HTTPError(
                     status=302,
                     detail="Login required",
@@ -142,7 +149,7 @@ def requires(
                 config = _active_config.get()
                 login_url = config.login_url if config else "/login"
                 if login_url:
-                    redirect_url = _build_login_redirect(login_url, request.url)
+                    redirect_url = _build_login_redirect(login_url, _next_url_for_request(request))
                     raise HTTPError(
                         status=302,
                         detail="Login required",

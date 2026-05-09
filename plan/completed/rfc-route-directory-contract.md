@@ -4,7 +4,7 @@
 **Date**: 2026-03-11  
 **Scope**: `src/chirp/pages/`, `src/chirp/contracts/`, `src/chirp/app/`  
 **Related**: [Chirp Route Contract Vision](/.cursor/plans/chirp-route-contract-vision_2b982af5.plan.md), RFC: Contract Validation Extensions, RFC: Server-First App-Shell Stability  
-**Reference App**: Dori dashboard (`src/dori/dashboard/pages/`)
+**Reference App**: Reference dashboard (`src/app/dashboard/pages/`)
 
 ---
 
@@ -16,9 +16,9 @@ The consequences show up in every Chirp app that grows past a few routes:
 
 ### 1. Shell context is app-local glue
 
-Every Dori page handler takes `breadcrumb_prefix` and `route_tabs` from the cascade, then manually calls `build_page_context()` to assemble `current_path`, `sidebar_sections`, `breadcrumb_items`, `page_title`, and `tab_items`. This wrapper exists because the framework does not own shell context assembly.
+Every reference dashboard page handler takes `breadcrumb_prefix` and `route_tabs` from the cascade, then manually calls `build_page_context()` to assemble `current_path`, `sidebar_sections`, `breadcrumb_items`, `page_title`, and `tab_items`. This wrapper exists because the framework does not own shell context assembly.
 
-Evidence — Dori's `page_context.py`:
+Evidence — The reference dashboard's `page_context.py`:
 
 ```python
 def build_page_context(
@@ -45,11 +45,11 @@ def build_page_context(
     return context
 ```
 
-Every page handler in Dori calls this. The same pattern would repeat in any Chirp app with a persistent shell.
+Every page handler in the reference dashboard calls this. The same pattern would repeat in any Chirp app with a persistent shell.
 
 ### 2. Section identity is tribal knowledge
 
-Dori maintains a `DashboardSection` registry in `navigation.py` with `active_prefixes`, `active_exact_paths`, `tab_items`, and `breadcrumb_prefix`. Most `_context.py` files exist solely to call `section_context("discover")` or `section_context("settings")`:
+The reference dashboard maintains a `DashboardSection` registry in `navigation.py` with `active_prefixes`, `active_exact_paths`, `tab_items`, and `breadcrumb_prefix`. Most `_context.py` files exist solely to call `section_context("discover")` or `section_context("settings")`:
 
 ```python
 # skills/_context.py, workspace/_context.py, chains/_context.py, ...
@@ -127,7 +127,7 @@ Or as a function when metadata depends on path params or services:
 ```python
 from chirp.pages import RouteMeta
 
-def meta(name: str, orchestrator: DORIOrchestrator) -> RouteMeta:
+def meta(name: str, orchestrator: DashboardOrchestrator) -> RouteMeta:
     skill = orchestrator.get_skill(name)
     return RouteMeta(
         title=skill.display_name if skill else name,
@@ -165,12 +165,12 @@ Named mutation handlers for the route. Exports functions decorated with `@action
 from chirp.pages import action
 
 @action("delete")
-async def delete(request: Request, name: str, orchestrator: DORIOrchestrator) -> Redirect:
+async def delete(request: Request, name: str, orchestrator: DashboardOrchestrator) -> Redirect:
     orchestrator.delete_skill(name)
     return Redirect("/skills")
 
 @action("run")
-async def run(request: Request, name: str, orchestrator: DORIOrchestrator) -> Fragment:
+async def run(request: Request, name: str, orchestrator: DashboardOrchestrator) -> Fragment:
     result = await orchestrator.run_skill(name)
     return Fragment("skill/{name}/page.html", "run_result", context={"result": result})
 ```
@@ -198,7 +198,7 @@ from chirp.pages import RouteMeta
 
 def viewmodel(
     request: Request,
-    orchestrator: DORIOrchestrator,
+    orchestrator: DashboardOrchestrator,
     breadcrumb_prefix: list,
 ) -> dict:
     skills = orchestrator.list_skills()
@@ -299,7 +299,7 @@ If `_viewmodel.py` does not exist, behavior is unchanged from today.
 
 ## Section Registry
 
-Sections are groups of routes that share tab families, breadcrumb prefixes, and active-state logic. Today this is app-local (`navigation.py` in Dori). The route contract introduces a framework-level section concept.
+Sections are groups of routes that share tab families, breadcrumb prefixes, and active-state logic. Today this is app-local (`navigation.py` in the reference dashboard). The route contract introduces a framework-level section concept.
 
 ### Registration
 
@@ -520,9 +520,9 @@ Apps can adopt one new file at a time:
 3. **Add `_actions.py`** to extract mutations from `page.py`. Keep `page.py` display-focused.
 4. **Add `_viewmodel.py`** for complex context assembly. Simplify `page.py` to transport logic.
 
-### Dori Migration Example
+### Reference Dashboard Migration Example
 
-**Before** (current Dori pattern):
+**Before** (current reference dashboard pattern):
 
 ```python
 # skills/_context.py
@@ -555,7 +555,7 @@ META = RouteMeta(
 )
 
 # skills/page.py
-def get(orchestrator: DORIOrchestrator) -> dict:
+def get(orchestrator: DashboardOrchestrator) -> dict:
     skills = orchestrator.list_skills()
     return {
         "skills": skills,
@@ -625,7 +625,7 @@ No `_context.py` for section identity. No `build_page_context`. No `breadcrumb_p
 
 Fragment blocks live in `page.html` templates. Fragment response builders live in `page.py` (and in `_actions.py` for mutation-triggered fragments). `_fragments.py` is not introduced.
 
-The decision gate for `_fragments.py`: when a real app (Dori or another) shows three or more non-mutation, non-display fragment-builder functions accumulating in `page.py`, reconsider.
+The decision gate for `_fragments.py`: when a real app shows three or more non-mutation, non-display fragment-builder functions accumulating in `page.py`, reconsider.
 
 ---
 
@@ -659,7 +659,7 @@ The decision gate for `_fragments.py`: when a real app (Dori or another) shows t
 
 - A new route directory can be understood by reading its files without consulting app-level glue modules.
 - Section identity, tab families, and breadcrumb prefixes are declarative — not handler-level wiring.
-- Dori's `navigation.py` and `page_context.py` shrink or disappear when migrated to the contract.
+- The reference dashboard's `navigation.py` and `page_context.py` shrink or disappear when migrated to the contract.
 - Single-line `_context.py` shims (`return section_context("discover")`) are replaced by `_meta.py` declarations.
 - The contract checker catches route file inconsistencies at startup.
 - Existing Chirp apps work unchanged.
@@ -678,6 +678,6 @@ The decision gate for `_fragments.py`: when a real app (Dori or another) shows t
 - `src/chirp/contracts/rules_page_shell.py` — page shell block validation
 - `src/chirp/ext/chirp_ui.py` — ChirpUI page shell contract registration
 - `src/chirp/app/registry.py` — page handler wrapper and route registration
-- Dori `src/dori/dashboard/navigation.py` — section registry (pain point)
-- Dori `src/dori/dashboard/page_context.py` — shell context builder (pain point)
-- Dori `src/dori/dashboard/pages/*/` — route directory patterns (pain points)
+- Reference dashboard `src/app/dashboard/navigation.py` — section registry (pain point)
+- Reference dashboard `src/app/dashboard/page_context.py` — shell context builder (pain point)
+- Reference dashboard `src/app/dashboard/pages/*/` — route directory patterns (pain points)

@@ -104,20 +104,42 @@ The framework provides: `page_title`, `breadcrumb_items`, `tab_items`, `route_ta
 
 `app.check()` validates route contracts: section bindings, shell mode/block alignment, route file consistency, duplicate routes, section tab hrefs, and context provider signatures.
 
-Beyond route-level checks, `app.check()` also validates hypermedia surface contracts:
+Beyond route-level checks, `app.check()` also validates hypermedia surface
+contracts. The table below is a category reference for the checks users most
+often tune in CI:
 
 | Check | Severity | What it catches |
 |---|---|---|
 | `page_handlers` | ERROR / WARNING | `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler` fallback). Handler-shaped typos (`def handle`, `def GET`, `def index`) emit WARNING; an entirely missing handler emits ERROR — the file would register no routes and requests 404/500 at runtime. |
 | `route_names` | ERROR | Two routes at *different* paths claim the same name — `app.url_for(name)` would ambiguously resolve. Method variants of the same URL (e.g. GET from `page.py` + POST from `_actions.py`) are *not* flagged. Fix by renaming one of the pages or setting a module-level `name = "…"` override. |
 | `mount_app_merge` | INFO | `app.mount_app(prefix, sub_app)` dropped a sub-app template global, filter, provider, error handler, or severity override because the parent had already registered one. Parent-wins is intentional; promote via `override_contract_severity("mount_app_merge", Severity.WARNING)` if you want CI to flag them. |
+| `dead` | INFO | A template exists in the template directory but no route, include, import, or layout references it. Usually cleanup, not a deploy blocker. |
+| `component` | ERROR / WARNING | Component-call validation surfaced by Kida/chirp-ui metadata. The Chirp adapter is wired; full precision depends on typed component metadata from the template package. |
+| `unreachable_block` | WARNING | A filesystem page template defines a sibling block that layout composition will never render, such as `page_scripts` outside `page_content`. Move the content inside the rendered page block or make it a real fragment target. |
+| `composition_extends` | WARNING | A page template extends a registered layout instead of composing into it. Pages should render into the layout content block via `render_with_blocks`; they should not override sibling layout blocks. |
+| `fragment_target_orphan` | ERROR / WARNING | A required fragment target registry entry points at a block no template provides, or an optional entry cannot be resolved. Required entries are errors because htmx would otherwise swap nothing. |
+| `oob_registry` | ERROR / WARNING | A registered OOB region references a missing block or mismatched target. Required missing regions fail startup; optional regions can be warnings. |
 | `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |
 | `reactive_cycle` | WARNING | Derivation graph contains a cycle (`index.derive()` forms a loop) |
+| `reactive_paths` | WARNING | A declared `ChangeEvent.changed_paths` value is not registered in the `DependencyIndex`; the event will not update any block. |
+| `reactive_audience` | WARNING | A scope declares audience-filtered events but no connection-aware `reactive_stream(..., connection=ConnectionInfo(...))`. |
 | `oob_target` | WARNING | `hx-swap-oob` element references an `id` not found in any template |
 | `fragment_scope` | WARNING | A nested fragment block references an import or binding defined only inside an ancestor block; direct `render_block()` or block-fetch rendering skips that ancestor scope |
+| `sse_self_swap` | ERROR | `sse-connect` and `sse-swap` appear on the same element. Put `sse-swap` on a child sink so htmx can target the update correctly. |
+| `sse_scope` | ERROR | An SSE connection sits inside a broad inherited htmx target without `hx-disinherit` or another safe scope boundary. |
+| `sse_crossref` | ERROR / INFO | `sse-swap="name"` listens for an event no route declares or infers, or a route emits an event no template listens for. |
+| `defer_falsy` | WARNING | A Suspense template checks a deferred key with bare truthiness (`{% if key %}`), which keeps skeletons visible for empty lists, empty strings, or `0`. Use `is not none` or `__chirp_defer_pending__`. |
+| `alpine_cdn_url` | ERROR | A bare jsDelivr Alpine URL would load the package CommonJS entry instead of the browser CDN build. Use `/dist/cdn.min.js`. |
+| `form` | ERROR / WARNING | A route form contract and the template's actual `<input>`, `<select>`, or `<textarea>` names disagree. |
 | `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |
+| `csrf_form` | WARNING | `CSRFMiddleware` is active and a static mutating `<form>` has no `{{ csrf_field() }}`, `csrf_token()`, or `_csrf_token` field. |
+| `a11y_label`, `a11y_alt`, `a11y_heading`, `a11y_landmark` | WARNING | Accessibility checks for missing labels, missing image alt text, skipped heading levels, or missing landmarks. |
+| `csrf_session`, `secret_key`, `middleware_signature` | ERROR / WARNING | Production-safety checks for security middleware ordering, missing secret keys, and middleware call signatures. |
 
-These checks run automatically as part of `chirp check myapp:app`. Reactive checks are only active when the app uses `ReactiveBus` and `DependencyIndex`.
+These checks run automatically as part of `chirp check myapp:app`. Some
+categories only activate when the app provides the relevant metadata, such as a
+`DependencyIndex`, `FormContract`, OOB registry entries, or docs plugin
+collection.
 
 `app.check()` is not a style linter. It exists to catch wiring that can make
 the browser swap the wrong thing, silently skip an OOB update, or route a page

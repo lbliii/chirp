@@ -1,6 +1,7 @@
 # Epic: Harden bsite-discoveries — Land the Hierarchical Shell Swap PR
 
-**Status**: Draft
+**Status**: Implemented, historical hardening record
+**Updated**: 2026-05-09 - code/test audit found the planned guards and tests in place. Current `defer_blocks` behavior is fail-loud `ConfigurationError`, not the older warning-only proposal. Do not treat this as open roadmap without first finding a current failing case.
 **Created**: 2026-04-12
 **Target**: 0.4.0 (Unreleased)
 **Estimated Effort**: 6–10h

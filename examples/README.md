@@ -50,7 +50,7 @@ PYTHONPATH=src:../pounce/src python examples/standalone/ollama/app.py
 Some examples intentionally come in pairs so you can compare the baseline and app-shell lanes:
 
 - `examples/standalone/contacts` and `examples/chirpui/contacts_shell`
-- `examples/chirpui/forum_shell` for a compact forum/PBP shell with mounted pages, form contracts, OOB shell state, and JSON data islands
+- `examples/chirpui/forum_shell` for a compact product-shaped ChirpUI shell with mounted pages, form contracts, OOB shell state, and JSON data islands; it is a regression fixture, not a full forum product
 - `examples/standalone/kanban` and `examples/chirpui/kanban_shell`
 - `examples/standalone/islands` and `examples/chirpui/islands_shell`
 

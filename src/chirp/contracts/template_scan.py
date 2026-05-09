@@ -1,6 +1,7 @@
 """Template source scanners used by contracts checker."""
 
 import logging
+import posixpath
 import re
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -225,12 +226,24 @@ def resolve_template_reference(
         return reference
 
     from kida.exceptions import TemplateNotFoundError
-    from kida.utils.template_keys import resolve_template_name
 
     try:
-        return resolve_template_name(reference, caller=caller)
-    except TemplateNotFoundError:
+        from kida.utils.template_keys import resolve_template_name as kida_resolve_template_name
+    except ImportError:
+        pass
+    else:
+        try:
+            return kida_resolve_template_name(reference, caller=caller)
+        except TemplateNotFoundError:
+            return reference
+
+    if not reference.startswith("."):
         return reference
+    caller_dir = caller.rsplit("/", 1)[0] if "/" in caller else ""
+    resolved = posixpath.normpath(posixpath.join(caller_dir, reference))
+    if resolved.startswith("../"):
+        return reference
+    return resolved
 
 
 def extract_fragment_island_ids(source: str) -> set[str]:

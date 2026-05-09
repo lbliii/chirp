@@ -4,8 +4,8 @@ Frozen metadata with async body access. The request is honest about
 what it is: received data that doesn't change.
 """
 
-from collections.abc import AsyncGenerator, Iterator, Mapping
-from dataclasses import dataclass, field
+from collections.abc import AsyncGenerator, Callable, Iterator, Mapping
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, overload
 from urllib.parse import unquote, urlparse
 
@@ -16,6 +16,46 @@ from chirp.http.query import QueryParams
 
 if TYPE_CHECKING:
     from chirp.http.forms import FormData
+
+
+@dataclass(frozen=True, slots=True)
+class RequestUrlScope:
+    """Request-local public URL prefix.
+
+    Middleware can attach this to a copied ``Request`` when the app routes a
+    local path through a tenant or base-path public URL. It applies only to
+    app-root paths, leaving external URLs, anchors, and relative paths alone.
+    """
+
+    prefix: str = ""
+
+    def __post_init__(self) -> None:
+        prefix = self.prefix.strip()
+        if not prefix or prefix == "/":
+            object.__setattr__(self, "prefix", "")
+            return
+        if prefix.startswith(("//", "#", "?")) or "://" in prefix:
+            msg = "RequestUrlScope.prefix must be an app-root path prefix"
+            raise ValueError(msg)
+        if not prefix.startswith("/"):
+            prefix = f"/{prefix}"
+        object.__setattr__(self, "prefix", prefix.rstrip("/"))
+
+    def apply(self, path: str) -> str:
+        """Return ``path`` under this request scope when it is app-rooted."""
+        if not self.prefix:
+            return path
+        if not path.startswith("/") or path.startswith(("//", "#", "?")):
+            return path
+        if path == self.prefix or path.startswith(f"{self.prefix}/"):
+            return path
+        if path.startswith((f"{self.prefix}?", f"{self.prefix}#")):
+            return path
+        if path == "/":
+            return self.prefix
+        if path.startswith(("/?", "/#")):
+            return f"{self.prefix}{path[1:]}"
+        return f"{self.prefix}{path}"
 
 
 class HtmxDetails:
@@ -252,6 +292,11 @@ class Request:
     # Private: ASGI receive callable for body streaming
     _receive: Receive
 
+    url_scope: RequestUrlScope | None = None
+
+    # Private: request-bound route reversal; set by the app/server layer
+    _url_for: Callable[..., str] | None = field(default=None, repr=False, compare=False)
+
     # Private: mutable cache for body and parsed form data
     # (dict contents are mutable even though the field reference is frozen)
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
@@ -270,6 +315,29 @@ class Request:
         if "_htmx" not in self._cache:
             self._cache["_htmx"] = HtmxDetails(self.headers, self.server)
         return self._cache["_htmx"]
+
+    def with_url_scope(self, scope: RequestUrlScope | str | None) -> Request:
+        """Return a copy of this request with a public URL scope attached."""
+        if scope is None:
+            url_scope = None
+        elif isinstance(scope, RequestUrlScope):
+            url_scope = scope
+        else:
+            url_scope = RequestUrlScope(scope)
+        return replace(self, url_scope=url_scope)
+
+    def scoped_url(self, path: str) -> str:
+        """Apply the request URL scope to an app-root path."""
+        if self.url_scope is None:
+            return path
+        return self.url_scope.apply(path)
+
+    def url_for(self, name: str, /, **params: Any) -> str:
+        """Reverse a named route and apply this request's URL scope."""
+        if self._url_for is None:
+            msg = "request.url_for() requires a Chirp request created by the app/server pipeline"
+            raise RuntimeError(msg)
+        return self.scoped_url(self._url_for(name, **params))
 
     # -- Convenience aliases (delegate to request.htmx) --
 
@@ -460,6 +528,8 @@ class Request:
         scope: Scope,
         receive: Receive,
         path_params: dict[str, str] | None = None,
+        *,
+        url_for: Callable[..., str] | None = None,
     ) -> Request:
         """Create a Request from an ASGI scope and receive callable.
 
@@ -489,4 +559,5 @@ class Request:
             cookies=_LazyCookies(cookie_header),
             request_id=request_id,
             _receive=receive,
+            _url_for=url_for,
         )

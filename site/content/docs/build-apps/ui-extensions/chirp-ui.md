@@ -219,7 +219,7 @@ For dashboard and settings pages, use these patterns for consistent structure:
 ```html
 {% from "chirpui/settings_row.html" import settings_row_list, settings_row %}
 {% call settings_row_list() %}
-{{ settings_row("Cursor IDE", status="Configured", detail="dori setup cursor") }}
+{{ settings_row("Cursor IDE", status="Configured", detail="setup cursor") }}
 {{ settings_row("Skills directory", status="ok", detail="/path/to/skills") }}
 {% end %}
 ```

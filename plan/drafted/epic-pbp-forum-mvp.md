@@ -1,6 +1,7 @@
 # Epic: Play-by-Post Forum — MVP on Chirp
 
-**Status**: Draft
+**Status**: Superseded as a Chirp roadmap item; preserve as historical product-research context
+**Updated**: 2026-05-09 - ELBYSODIC is the downstream forum/product. Do not use this plan as an instruction to build a full forum inside Chirp. Framework follow-up moved to `plan/drafted/epic-downstream-product-success.md`.
 **Created**: 2026-04-12
 **Target**: Standalone product (first production app on Chirp)
 **Estimated Effort**: 80–120h (MVP through Sprint 4)
@@ -9,12 +10,25 @@
 
 ---
 
-## Why This Matters
+## Current Disposition
 
-Chirp has no production-grade downstream product. Every framework feature was validated by
-examples (49 total), but examples are synthetic — they test the API, not the architecture
-under real-world stress. A play-by-post forum is the ideal first product because it
-exercises every Chirp strength simultaneously:
+This draft described an earlier product idea. It is no longer the active Chirp
+roadmap because the product now lives downstream in ELBYSODIC. Keep this file
+only as historical evidence of framework pressure points: mounted pages,
+forms, app shells, OOB, SSE, sessions, markdown, and deployment concerns.
+
+Active Chirp planning should use
+`plan/drafted/epic-downstream-product-success.md`, which turns the downstream
+research into framework investments without rebuilding the product here.
+
+## Why This Mattered At Draft Time
+
+The remainder of this file is historical and may contain stale product
+assumptions. At the time this draft was written, Chirp did not yet have a
+serious downstream product exercising the architecture under real-world stress.
+ELBYSODIC now fills that role outside this repository, so active Chirp work
+should extract reusable framework needs instead of implementing the product
+described below.
 
 1. **Fragment rendering** — thread lists, post lists, and reply forms are natural fragment
    targets; htmx navigation between boards/threads/posts is the core UX loop

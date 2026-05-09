@@ -45,11 +45,12 @@ shape may still evolve before 1.0:
 |------|-------|
 | Contracts | `CheckResult`, `ContractCheck`, `ContractCheckSnapshot`, `ContractIssue`, `Severity`, `ChirpPlugin`, `CHIRP_CAPABILITIES` |
 | Suspense internals exposed for templates/checks | `CHIRP_DEFER_PENDING_KEY`, `DEFERRED` |
+| HTTP/request helpers | `RequestUrlScope` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
-| Cache | `get_cache`, `cache_view` |
+| Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Optional UI bridge | `use_chirp_ui` |
 
 ## 1.0 Audit Decisions

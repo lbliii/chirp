@@ -3,7 +3,7 @@
 **Status**: Implemented
 **Date**: 2026-03-11
 **Scope**: `PageComposition`, `FragmentTargetRegistry`, `render_plan`, `upgrade_result`
-**Related**: OOB Registry (oob-registry branch), dori dashboard route tabs, chirp-ui app shell
+**Related**: OOB Registry (oob-registry branch), dashboard route tabs, chirp-ui app shell
 
 ## Implementation Notes (2026-03-11)
 
@@ -19,7 +19,7 @@
 
 Every page handler that returns `PageComposition` must specify a `fragment_block` — the template block rendered for non-boosted HTMX fragment requests (tab clicks, inline updates). This value is determined by the page's template structure, not by the page's domain logic, yet it lives in the handler.
 
-This is a proven footgun. In the dori dashboard, 11 out of 22 tabbed pages had `fragment_block="page_content"` when they needed `"page_root_inner"`. The result: clicking a tab wiped out the tab navigation bar, because the rendered fragment was too narrow to include the tabs.
+This is a proven footgun. In the reference dashboard, 11 out of 22 tabbed pages had `fragment_block="page_content"` when they needed `"page_root_inner"`. The result: clicking a tab wiped out the tab navigation bar, because the rendered fragment was too narrow to include the tabs.
 
 The pages that worked (Discover section) had:
 
@@ -348,14 +348,14 @@ def get():
 - `src/chirp/app/registry.py`
 - `src/chirp/pages/resolve.py`
 
-### Phase 3: Migrate dori dashboard (validation)
+### Phase 3: Migrate reference dashboard (validation)
 
 1. Remove explicit `fragment_block` and `page_block` from all 22+ page handlers.
 2. Move repeated context (route_tabs, breadcrumb_prefix) into `_context.py` per section.
 3. Convert handlers to return dicts.
 4. Verify all dashboard tests pass.
 
-**Files changed:** `src/dori/dashboard/pages/*/page.py`, `src/dori/dashboard/pages/*/_context.py`
+**Files changed:** `src/app/dashboard/pages/*/page.py`, `src/app/dashboard/pages/*/_context.py`
 
 ---
 
@@ -409,7 +409,7 @@ Success looks like:
 
 - `fragment_block` on `PageComposition` defaults to `None` with no test regressions.
 - The `FragmentTargetRegistry` resolves the correct block for tab clicks (local fragments), not just boosted navigation.
-- Dori dashboard page handlers are 3-5 line functions returning dicts, with no `fragment_block` or `page_block`.
+- Reference dashboard page handlers are 3-5 line functions returning dicts, with no `fragment_block` or `page_block`.
 - The 11-file footgun class is eliminated — new pages cannot get the wrong fragment block unless they explicitly override.
 - Existing apps that set `fragment_block` explicitly continue to work unchanged.
 - Navigation shapes (tabs, steppers, filters) remain template context — the framework has no opinion on the shape.
@@ -425,4 +425,4 @@ Success looks like:
 - `src/chirp/pages/resolve.py` — `upgrade_result()`
 - `src/chirp/pages/discovery.py` — `_walk_directory()`, `_load_context_provider()`
 - `src/chirp/app/registry.py` — `register_page_handler()`, `page_wrapper`
-- dori `src/dori/dashboard/pages/workspace/*/page.py` — the 11 pages with wrong `fragment_block`
+- reference dashboard `src/app/dashboard/pages/workspace/*/page.py` — the 11 pages with wrong `fragment_block`

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run python
 """Deep dive: prefer-regions vs combine for _oob_block_names.
 
-Reproduces the dori layout regression. Run from chirp repo root:
+Reproduces the nested layout regression. Run from chirp repo root:
   uv run python scripts/oob_deep_dive.py
 
 Compares:

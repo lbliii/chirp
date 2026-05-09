@@ -226,6 +226,37 @@ For htmx navigations: OOB swaps via `hx-swap-oob`. For initial page loads: `<tem
 
 No client-side framework needed. The browser renders the shell, and blocks fill in as data arrives.
 
+### Reuse deferred values with `DeferredCache`
+
+Use `DeferredCache` when the same deferred value is needed by multiple blocks
+or nearby page navigations and the value can be reused for a short TTL window.
+The cache is explicit app or route state: there is no process-wide default.
+
+```python
+from chirp import DeferredCache, Suspense
+
+stars_cache = DeferredCache(default_ttl=300)
+
+@app.route("/")
+def home():
+    return Suspense(
+        "home.html",
+        stars=stars_cache.get_or_defer(
+            "gh:lbliii/chirp",
+            lambda: fetch_github_stars_label("lbliii", "chirp"),
+        ),
+    )
+```
+
+On a cache miss, `get_or_defer()` returns an awaitable, so `Suspense` renders
+the skeleton and streams the resolved block later. On a warm hit, it returns the
+cached value directly, so the value renders in the initial shell and no OOB
+chunk is needed. Only successful results are cached; exceptions continue
+through Suspense's existing error fallback path. The factory must return an
+awaitable, not a pre-created coroutine, so warm cache hits do not allocate
+unused coroutine objects. `DeferredCache` does not create a browser-side store
+and does not push real-time updates.
+
 When using `mount_pages`, `Suspense` receives the layout chain automatically. The first chunk is wrapped in your `_layout.html` shell (head, CSS, sidebar), and OOB swaps target block IDs inside the page. Fragment-only requests skip the layout (same as `Page`).
 
 **Alpine.js:** Streaming responses are still HTML documents. When `AppConfig(alpine=True)`, `AlpineInject` rewrites the chunk stream so the Alpine bundle is inserted before `</body>` in the final output—same deduplication rules as buffered pages—so shell-first routes (Suspense, skeletons) keep interactive components working without inlining scripts in layouts. If `use_chirp_ui(app)` is active, the shared `chirpui-alpine.js` runtime is also injected on full-page streaming HTML, so named chirp-ui controllers remain available there too.

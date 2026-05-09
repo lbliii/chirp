@@ -187,7 +187,7 @@ class TestFullPageOobLayoutComposition:
     """Regression: full-page composition with layout that has regions must preserve structure.
 
     _oob_block_names uses 'prefer regions, fallback to blocks'. Combining regions U blocks
-    caused dori layouts to break (fragmented HTML, card headers outside articles).
+    caused nested app-shell layouts to break (fragmented HTML, card headers outside articles).
     """
 
     def test_oob_layout_preserves_page_content_structure(self, kida_env: Environment) -> None:
@@ -277,7 +277,7 @@ class TestFullPageOobLayoutComposition:
 
 
 class TestMultiLevelLayoutChain:
-    """Dori-style: root_layout wraps page that extends page_layout; OOB suppressed on full-page."""
+    """Nested app-shell: root_layout wraps page that extends page_layout; OOB suppressed on full-page."""
 
     def test_root_layout_wraps_page_that_extends_inner_layout(self, kida_env: Environment) -> None:
         """Full-page with root_layout; page extends _page_layout. Structure and OOB correct."""

@@ -358,7 +358,21 @@ class AppCompiler:
         from chirp.server.fragment_dispatch import fragment_url as _fragment_url
 
         self._mutable.template_globals.setdefault("fragment_url", _fragment_url)
-        self._mutable.template_globals.setdefault("url_for", cast("App", app).url_for)
+
+        def _request_aware_url_for(name: str, /, **params: Any) -> str:
+            app_ref = cast("App", app)
+            try:
+                from chirp.context import get_request
+
+                request = get_request()
+            except LookupError:
+                return app_ref.url_for(name, **params)
+            try:
+                return request.url_for(name, **params)
+            except RuntimeError:
+                return app_ref.url_for(name, **params)
+
+        self._mutable.template_globals.setdefault("url_for", _request_aware_url_for)
 
         if self._mutable.custom_kida_env is not None:
             self._runtime.kida_env = self._mutable.custom_kida_env
@@ -410,7 +424,7 @@ class AppCompiler:
                 # CLDR plural categories requires a catalog format upgrade.
                 return singular if n == 1 else plural
 
-            self._runtime.kida_env.install_gettext_callables(_gettext, _ngettext)
+            cast(Any, self._runtime.kida_env).install_gettext_callables(_gettext, _ngettext)
 
         self._runtime.tool_registry = compile_tools(
             [(t.name, t.description, t.handler) for t in self._mutable.pending_tools],

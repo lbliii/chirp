@@ -17,6 +17,12 @@ class TestIsSafeUrl:
     def test_path_with_query(self) -> None:
         assert is_safe_url("/login?next=/home") is True
 
+    def test_tenant_prefixed_path(self) -> None:
+        assert is_safe_url("/c/acme/boards/ic?tab=cast") is True
+
+    def test_tenant_prefixed_next_value(self) -> None:
+        assert is_safe_url("/login?next=/c/acme/boards/ic") is True
+
     def test_nested_path(self) -> None:
         assert is_safe_url("/a/b/c") is True
 
@@ -58,3 +64,9 @@ class TestIsSafeUrl:
 
     def test_data_scheme(self) -> None:
         assert is_safe_url("data://text/html,<h1>hi</h1>") is False
+
+    def test_encoded_absolute_url_without_leading_slash(self) -> None:
+        assert is_safe_url("https%3A%2F%2Fevil.com") is False
+
+    def test_absolute_url_hidden_in_query_is_rejected(self) -> None:
+        assert is_safe_url("/login?next=https://evil.com") is False

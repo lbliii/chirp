@@ -60,6 +60,9 @@ With one web replica, in-process event dispatch is acceptable for early launch.
 With multiple replicas, use shared fanout; otherwise a browser connected to
 replica A will miss an event produced on replica B.
 
+For shell placement, OOB targets, replayable event ids, and reconnect testing,
+see [Realtime Product Patterns](../realtime-production.md).
+
 ## Rendering
 
 Prefer returning the narrowest correct Chirp return type:

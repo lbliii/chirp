@@ -173,7 +173,7 @@
       {% unless contacts %}
       <tr class="chirpui-table__row">
         <td class="chirpui-table__td" colspan="6">
-          {% call empty_state(icon="⌕", title="No contacts found") %}
+          {% call empty_state(icon="search", title="No contacts found") %}
           <p>{% if query %}No contacts match "{{ query }}"{% elif active_group %}No contacts in {{ active_group }}{% else %}Add your first contact{% end %}.</p>
           {% end %}
         </td>

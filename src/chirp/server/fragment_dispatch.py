@@ -29,6 +29,7 @@ freeze-time rewriting that turns a regular block into a true live block.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from chirp._internal.invoke import invoke
@@ -144,18 +145,11 @@ async def _dispatch_fragment(app: App, request: Request) -> Fragment:
     # the same query, headers, cookies, and body callables so handlers that
     # read query parameters (including `_b`) still work; `_b` is just noise
     # to them.
-    target_request = Request(
+    target_request = replace(
+        request,
         method="GET",
         path=target_path,
-        headers=request.headers,
-        query=request.query,
         path_params=match.path_params,
-        http_version=request.http_version,
-        server=request.server,
-        client=request.client,
-        cookies=request.cookies,
-        request_id=request.request_id,
-        _receive=request._receive,
     )
 
     # Stash the block on `g` so handler code / middleware can introspect

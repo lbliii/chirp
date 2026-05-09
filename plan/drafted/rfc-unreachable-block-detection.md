@@ -1,6 +1,7 @@
 # RFC: Unreachable Block Detection in Page Templates
 
-**Status**: Draft  
+**Status**: Implemented  
+**Updated**: 2026-05-09 - `rules_unreachable_blocks.py`, checker wiring, contract tests, and fragment-block regression coverage exist. Remaining follow-up is app.check integration proof through real page/layout discovery plus a documented empty-block noise policy.  
 **Date**: 2026-04-11  
 **Scope**: `src/chirp/contracts/rules_unreachable_blocks.py`, `src/chirp/contracts/checker.py`  
 **Related**: RFC: Contract Validation Extensions (`plan/drafted/rfc-contract-extensions.md`), RFC: Hierarchical Shell Swap Scopes

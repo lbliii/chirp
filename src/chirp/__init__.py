@@ -119,9 +119,11 @@ _API_STATUS: dict[str, str] = {
     "ContractCheckSnapshot": "provisional",
     "ContractIssue": "provisional",
     "DependencyIndex": "provisional",
+    "DeferredCache": "provisional",
     "HtmxDetails": "provisional",
     "JSONResponse": "stable",
     "ReactiveBus": "provisional",
+    "RequestUrlScope": "provisional",
     "Severity": "provisional",
     "ShellAction": "provisional",
     "ShellActionZone": "provisional",
@@ -165,6 +167,7 @@ __all__ = [
     "ContractCheck",
     "ContractCheckSnapshot",
     "ContractIssue",
+    "DeferredCache",
     "DependencyIndex",
     "EventStream",
     "FormAction",
@@ -187,6 +190,7 @@ __all__ = [
     "RegionUpdate",
     "RenderPlan",
     "Request",
+    "RequestUrlScope",
     "Response",
     "SSEEvent",
     "Severity",
@@ -245,6 +249,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # HTTP
     "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),
+    "RequestUrlScope": ("chirp.http.request", "RequestUrlScope"),
     "Response": ("chirp.http.response", "Response"),
     "JSONResponse": ("chirp.http.response", "JSONResponse"),
     "Redirect": ("chirp.http.response", "Redirect"),
@@ -319,6 +324,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
     # Cache
+    "DeferredCache": ("chirp.cache", "DeferredCache"),
     "get_cache": ("chirp.cache", "get_cache"),
     "cache_view": ("chirp.cache", "cache_view"),
     # Plugin

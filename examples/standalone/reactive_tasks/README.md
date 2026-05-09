@@ -8,7 +8,11 @@ Live-updating task board using Chirp's reactive system.
 - **DependencyIndex**: maps context paths to template blocks
 - **reactive_stream()**: auto-pushes re-rendered blocks via SSE
 - **ConnectionInfo**: tracks connected viewers for presence-aware streams
+- **Audience-ready streams**: the same connection metadata supports
+  `ChangeEvent(audience=...)` when updates should go only to selected users
 - **Origin filtering**: your own mutations don't echo back
+- **Changed-path context builders**: `reactive_stream()` can pass
+  `changed_paths` into the context builder for selective data loading
 - **Contract metadata**: exposes the reactive index and emitted paths to `app.check()`
 
 Four blocks update in real time: the task list, the count badge,
@@ -30,3 +34,13 @@ delete tasks in one tab — the other tab updates within a second.
 3. The presence counter changes as tabs connect and disconnect
 4. The timestamp shows when the last change happened
 5. All updates are server-pushed via SSE — no polling
+
+## Contract checks
+
+This example sets reactive metadata so `app.check()` can validate the stream:
+
+- `reactive_emitted_paths`: the store paths this app emits
+- `reactive_connection_scopes`: scopes that pass `ConnectionInfo`
+
+If an example starts emitting audience-filtered events, add the matching scope
+to `reactive_audience_scopes` as well.

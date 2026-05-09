@@ -1,4 +1,4 @@
-"""OOB Layout Chain — dori-style root layout wrapping page that extends inner layout.
+"""OOB Layout Chain — nested app-shell root layout wrapping page that extends inner layout.
 
 Demonstrates full-page composition with layout chain: root_layout wraps a page
 that extends _page_layout. OOB regions (sidebar_oob) are suppressed on full-page

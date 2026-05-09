@@ -48,13 +48,25 @@ def compile_middleware_chain(
     dispatch: Callable[[Request], Any],
 ) -> Callable[[Request], Any]:
     """Build middleware chain once. Returns async handler(req) -> Response."""
-    chain = dispatch
+
+    async def dispatch_with_context(req: Request) -> AnyResponse:
+        token: Token[Request] = request_var.set(req)
+        try:
+            return await dispatch(req)
+        finally:
+            request_var.reset(token)
+
+    chain = dispatch_with_context
     for mw in reversed(middleware):
         inner = chain
         mw_ref = mw
 
         async def layer(req: Request, _mw: Any = mw_ref, _next: Next = inner) -> AnyResponse:
-            return await _mw(req, _next)
+            token: Token[Request] = request_var.set(req)
+            try:
+                return await _mw(req, _next)
+            finally:
+                request_var.reset(token)
 
         chain = layer
     return chain
@@ -247,13 +259,14 @@ async def handle_request(
     compiled_handler: Callable[[Request], Any] | None = None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    url_for: Callable[..., str] | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
         return
 
     # Build Request from ASGI scope
-    request = Request.from_asgi(scope, receive)
+    request = Request.from_asgi(scope, receive, url_for=url_for)
 
     # Pounce sync workers set this so sync handlers run directly on the
     # worker thread instead of being dispatched through asyncio.to_thread().
@@ -344,20 +357,7 @@ async def _invoke_handler(
 
     # Inject path_params into Request; skip clone when already identical
     if request.path_params != match.path_params:
-        request = Request(
-            method=request.method,
-            path=request.path,
-            headers=request.headers,
-            query=request.query,
-            path_params=match.path_params,
-            http_version=request.http_version,
-            server=request.server,
-            client=request.client,
-            cookies=request.cookies,
-            request_id=request.request_id,
-            _receive=request._receive,
-            _cache=request._cache,
-        )
+        request = replace(request, path_params=match.path_params)
 
     cross_shell_redirect = _cross_shell_boost_redirect(
         request,

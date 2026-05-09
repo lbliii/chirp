@@ -1,5 +1,7 @@
 """Tests for the forum_shell ChirpUI example."""
 
+from pathlib import Path
+
 from chirp.contracts import check_hypermedia_surface
 from chirp.testing import (
     TestClient,
@@ -11,6 +13,13 @@ from chirp.testing import (
 
 
 class TestForumShell:
+    def test_readme_keeps_fixture_boundary_explicit(self) -> None:
+        readme = Path(__file__).with_name("README.md").read_text()
+
+        assert "not a full forum product" in readme
+        assert "regression fixture" in readme
+        assert "general-purpose forum scaffold" in readme
+
     async def test_boards_page_renders_full_shell(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/boards")

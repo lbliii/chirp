@@ -16,7 +16,7 @@ from chirp.templating.returns import LayoutPage, LayoutSuspense, Suspense, Templ
 class TestLayoutPageSlotContext:
     """Integration test: page vars in nested macro slots via LayoutPage negotiation.
 
-    Mirrors Dori skills page: container → stack → form from chirpui-style
+    Mirrors a skills page pattern: container → stack → form from chirpui-style
     templates. If selected_tags/all_tags are undefined in the form slot,
     negotiation would raise UndefinedError. This test ensures the full
     Chirp negotiation path (LayoutPage, render_block, FileSystemLoader)

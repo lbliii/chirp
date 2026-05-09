@@ -66,6 +66,21 @@ bus.subscriber_count   # active subscribers across all scopes
 
 All counters are `int`s maintained by the bus for observability.
 
+## ConnectionInfo
+
+Subscriber identity is optional, but it unlocks audience filtering and
+presence:
+
+```python
+from chirp.pages.reactive import ConnectionInfo
+
+connection = ConnectionInfo(session_id=session_id, user_id=current_user.id)
+```
+
+`session_id` is required. `user_id` can be `None` for anonymous viewers.
+`connected_at` is captured with `time.monotonic()` when the dataclass is
+created.
+
 ## ChangeEvent
 
 A frozen dataclass emitted after a data mutation:
@@ -76,11 +91,14 @@ class ChangeEvent:
     scope: str                       # e.g., a document ID
     changed_paths: frozenset[str]    # e.g., {"doc.content", "doc.version"}
     origin: str | None = None        # who caused this change
+    audience: frozenset[str] | None = None
 ```
 
 - **scope** scopes delivery — subscribers only receive events for their scope.
 - **changed_paths** tells the `DependencyIndex` which blocks need re-rendering.
 - **origin** enables self-suppression: `reactive_stream()` skips events whose origin matches the current connection, so the client that caused the change isn't notified of it.
+- **audience** narrows delivery to subscribers whose `ConnectionInfo.user_id`
+  is present in the set. `None` broadcasts to every subscriber in the scope.
 
 ## DependencyIndex
 
@@ -129,6 +147,9 @@ The store emits only what actually mutated. Display blocks that depend on comput
 ```python
 blocks = index.affected_blocks(frozenset({"doc.content"}))
 # Returns: [BlockRef(template_name="page.html", block_name="content"), ...]
+
+deps = index.block_dependencies("page.html", "content")
+# Returns the context paths that can cause that block to re-render.
 ```
 
 Prefix matching is built in — changing `"doc"` affects blocks that depend on `"doc.version"`, and vice versa.
@@ -150,7 +171,7 @@ index.explain_affected(frozenset({"doc.content"}))
 The one-liner that ties everything together:
 
 ```python
-from chirp.pages.reactive import reactive_stream
+from chirp.pages.reactive import ConnectionInfo, reactive_stream
 
 @app.route("/doc/{doc_id}/live")
 def live(doc_id: str) -> EventStream:
@@ -158,19 +179,51 @@ def live(doc_id: str) -> EventStream:
         bus,
         scope=doc_id,
         index=dep_index,
-        context_builder=lambda: {"doc": store.get(doc_id)},
+        context_builder=lambda paths: build_doc_context(doc_id, paths),
         origin=session_id,
+        connection=ConnectionInfo(session_id=session_id, user_id=current_user.id),
+        on_disconnect=lambda scope, connection: audit_disconnect(scope, connection),
     )
 ```
 
 What happens on each `ChangeEvent`:
 
 1. Skip if `origin` matches (self-suppression)
-2. Look up affected blocks via `DependencyIndex`
-3. Call `context_builder()` for fresh data
-4. Yield a `Fragment` per affected block
+2. Deliver only to matching `connection.user_id` when `audience` is set
+3. Look up affected blocks via `DependencyIndex`
+4. Call `context_builder(changed_paths)` for fresh data when the builder
+   accepts one argument; zero-argument builders still work for older apps
+5. Yield a `Fragment` per affected block
 
 Error boundary: if `context_builder()` raises, the event is skipped and the stream continues. The next change event retries with fresh data.
+
+### Presence
+
+Connection-aware streams are visible through the bus:
+
+```python
+viewers = bus.presence("doc-42")
+viewer_count = len(viewers)
+```
+
+Presence only includes subscribers that passed `ConnectionInfo`. Use
+`on_disconnect` for cleanup or to emit a presence-only change event after a tab
+closes.
+
+### Audience Filtering
+
+Use `audience` when a change is relevant to only some connected users:
+
+```python
+bus.emit_sync(ChangeEvent(
+    scope="doc-42",
+    changed_paths=frozenset({"notifications"}),
+    audience=frozenset({"alice", "bob"}),
+))
+```
+
+Subscribers without `ConnectionInfo`, or with a `user_id` outside the audience,
+do not receive that event. Broadcast events keep `audience=None`.
 
 ## Contract Validation
 
@@ -180,8 +233,17 @@ Error boundary: if `context_builder()` raises, the event is skipped and the stre
 |---|---|---|
 | `reactive_block` | ERROR | `BlockRef` references a non-existent template block (typo or renamed block) |
 | `reactive_cycle` | WARNING | Derivation graph contains a cycle |
+| `reactive_paths` | WARNING | Declared emitted paths are not registered in the dependency index |
+| `reactive_audience` | WARNING | Audience-filtered scopes have no connection-aware streams |
 
-These checks are only active when the app uses `DependencyIndex`.
+These checks are only active when the app uses `DependencyIndex` or declares
+reactive metadata:
+
+```python
+app.set_contract_check_data("reactive_emitted_paths", {"tasks", "presence"})
+app.set_contract_check_data("reactive_audience_scopes", {"thread:42"})
+app.set_contract_check_data("reactive_connection_scopes", {"thread:42"})
+```
 
 ## Thread Safety
 

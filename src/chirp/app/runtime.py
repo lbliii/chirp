@@ -71,6 +71,12 @@ class ASGIRuntime:
 
         self._ensure_frozen()
         assert self._runtime.router is not None
+        routes_by_name = self._runtime.routes_by_name or {}
+
+        def url_for(name: str, /, **params: object) -> str:
+            from chirp.app.url_for import resolve_url
+
+            return resolve_url(routes_by_name, name, **params)
 
         await handle_request(
             scope,
@@ -90,4 +96,5 @@ class ASGIRuntime:
             compiled_handler=self._get_compiled_handler(),
             oob_registry=self._runtime.oob_registry,
             fragment_target_registry=self._runtime.fragment_target_registry,
+            url_for=url_for,
         )

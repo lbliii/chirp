@@ -210,7 +210,10 @@ Content-negotiated responses: browser requests redirect to `login_url`, API requ
 
 ### Safe Redirects
 
-When `@login_required` redirects to `login_url`, it appends a URL-encoded `?next=` parameter. To safely honour this after login, use `is_safe_url()`:
+When `@login_required` redirects to `login_url`, it appends a URL-encoded
+`?next=` parameter. If middleware attached a request URL scope, that public
+scope is preserved in `next`. To safely honour this after login, use
+`is_safe_url()`:
 
 ```python
 from chirp import is_safe_url, Redirect
