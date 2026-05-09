@@ -363,8 +363,13 @@ window.ChirpHtmxDebug.exportRecordsJson()
 git clone https://github.com/lbliii/chirp.git
 cd chirp
 uv sync --group dev
-pytest
+uv run pytest -q --tb=short
 ```
+
+Run uv commands from the Chirp repository root. Chirp is developed as a
+standalone project and resolves development dependencies the same way CI does.
+If an ancestor directory still has old multi-repo dependency overrides, clone
+or move Chirp outside that parent before running `uv sync`.
 
 ---
 
