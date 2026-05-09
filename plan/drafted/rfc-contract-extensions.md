@@ -1,8 +1,8 @@
 # RFC: Contract Validation Extensions
 
-**Status**: Phases 1-3 complete (shipped 0.4.0). Phase 4 blocked on Kida typed `{% def %}`
+**Status**: Mostly complete. Phase 4 remains blocked on typed component metadata.
 **Date**: 2026-02-10  
-**Updated**: 2026-04-12 — confirmed Phases 1-3 shipped; remaining work is Phase 4 only  
+**Updated**: 2026-05-09 - code/test audit shows dead-template, form, SSE, and component-call adapter coverage in place. True typed component-call validation remains dependency-blocked until stable Kida/chirp-ui metadata exists; do not mark that portion fully shipped based only on mocked adapter tests.  
 **Scope**: `src/chirp/contracts/`  
 **Related**: Gap Analysis — Kida/Chirp Strategic Plan  
 **Depends on**: Gap 1 RFC (Typed `{% def %}` in Kida) — Phase 4 only

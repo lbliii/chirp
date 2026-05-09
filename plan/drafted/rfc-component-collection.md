@@ -1,6 +1,7 @@
 # RFC: First-Party Component Collection
 
-**Status**: Not started — separate chirp-ui package, blocked on Kida typed `{% def %}`
+**Status**: Not now - separate chirp-ui package, blocked on stable typed component metadata
+**Updated**: 2026-05-09 - keep this outside Chirp core. Revisit after Kida typed `{% def %}` or an equivalent chirp-ui manifest can support component-call validation.
 **Date**: 2026-02-10  
 **Scope**: Separate package — `chirp-ui` or ecosystem-named equivalent  
 **Related**: Gap Analysis — Kida/Chirp Strategic Plan  

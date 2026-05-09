@@ -6,7 +6,8 @@ type: epic
 
 # Epic: Agent Vibe DX — Make Chirp the Default Hypermedia Framework for AI Agents
 
-**Status**: In Progress (Sprints 0–5 implemented; awaiting maintainer review and commit)
+**Status**: Implemented, historical review record
+**Updated**: 2026-05-09 - code/docs/tests for Sprints 0-5 are present. Do not treat this as open roadmap unless a new agent-DX audit finds fresh gaps.
 **Created**: 2026-04-20
 **Target**: 0.5.0
 **Estimated Effort**: 13–19h (Sprints 4 + 5 added 2026-04-20, +5–7h)

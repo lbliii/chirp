@@ -1,6 +1,7 @@
 # RFC: Shared Store for Multi-Consumer Deferred Data
 
-**Status**: Draft  
+**Status**: Open - Phase 1 server-side deferred cache is the next actionable slice  
+**Updated**: 2026-05-09 - no `chirp.stores` or `cached_deferred` implementation exists; keep Alpine store and SSE broadcast phases deferred until server-side cache semantics are proven.  
 **Date**: 2026-04-11  
 **Scope**: `src/chirp/templating/suspense.py`, new `src/chirp/stores/` module (proposed)  
 **Related**: Suspense renderer, `defer_blocks` parameter, Alpine.js injection

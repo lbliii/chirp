@@ -1,6 +1,7 @@
 # Epic: Reactive System Phase 2 — Scoped Streams & Connection Awareness
 
-**Status**: Draft
+**Status**: Implemented, awaiting product-scale validation
+**Updated**: 2026-05-09 - `ConnectionInfo`, audience filtering, presence, inverse dependency lookup, reactive contract checks, and the `reactive_tasks` example are present. Remaining roadmap work is docs/example parity and validation in a real app, not the original framework build.
 **Created**: 2026-04-12
 **Target**: 0.5.0
 **Estimated Effort**: 30–45h (Sprints 0–4)

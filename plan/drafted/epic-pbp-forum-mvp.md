@@ -1,6 +1,7 @@
 # Epic: Play-by-Post Forum — MVP on Chirp
 
-**Status**: Draft
+**Status**: Open product proof; refresh Sprint 0 before implementation
+**Updated**: 2026-05-09 - framework blockers called out in this plan have largely shipped, including pagination, reactive presence/audience filtering, and contract extensions. Rebase this plan around `examples/chirpui/forum_shell` and current shipped APIs. The next step is product design refresh plus Sprint 1-2 implementation; Sprint 3 realtime must define replayable event ids, `Last-Event-ID` behavior, and presence/heartbeat semantics before UI polish.
 **Created**: 2026-04-12
 **Target**: Standalone product (first production app on Chirp)
 **Estimated Effort**: 80–120h (MVP through Sprint 4)
