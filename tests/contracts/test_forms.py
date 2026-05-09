@@ -6,6 +6,8 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import FormContract, check_hypermedia_surface, contract
 from chirp.contracts.rules_forms import extract_form_field_names, extract_template_block_source
+from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 
 class TestExtractFormFieldNames:
@@ -223,3 +225,73 @@ class TestFormFieldValidation:
         result = check_hypermedia_surface(app)
         form_errors = [i for i in result.errors if i.category == "form"]
         assert len(form_errors) == 0
+
+
+class TestCSRFFormTokenChecks:
+    def test_mutating_form_without_token_warns_when_csrf_middleware_active(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method="post" action="/save"><input name="title"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware())
+
+        @app.route("/save", methods=["POST"])
+        async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert len(csrf_warnings) == 1
+        assert "csrf_field()" in csrf_warnings[0].message
+        assert csrf_warnings[0].template == "page.html"
+
+    def test_csrf_field_marker_satisfies_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method="post" action="/save">{{ csrf_field() }}<input name="title"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware())
+
+        @app.route("/save", methods=["POST"])
+        async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
+    def test_hidden_token_marker_satisfies_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form hx-post="/save"><input type="hidden" name="_csrf_token"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware())
+
+        @app.route("/save", methods=["POST"])
+        async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
+    def test_csrf_form_check_inactive_without_csrf_middleware(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method="post" action="/save"><input name="title"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/save", methods=["POST"])
+        async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []

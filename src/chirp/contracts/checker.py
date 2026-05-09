@@ -29,6 +29,7 @@ from .rules_chirpui_runtime import check_chirpui_runtime_registration
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_composition import check_page_extends_layout
 from .rules_context_cascade import check_context_cascade
+from .rules_csrf_forms import check_csrf_form_tokens
 from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
@@ -295,6 +296,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     router = snapshot.router
     kida_env = snapshot.kida_env
     result.coverage = _build_coverage(snapshot)
+    middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
 
     route_paths = collect_route_paths(router)
     result.routes_checked = len(route_paths)
@@ -407,6 +409,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(hx_target_issues)
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
         result.issues.extend(check_selector_syntax(template_sources))
+        result.issues.extend(check_csrf_form_tokens(template_sources, middleware_list))
         result.issues.extend(check_hx_boost(template_sources))
         commandfor_issues, commandfor_validated = check_commandfor_targets(
             template_sources, all_ids
@@ -686,7 +689,6 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     )
 
     result.issues.extend(check_sse_speculation(router))
-    middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
     result.issues.extend(check_csrf_session_order(middleware_list))
     result.issues.extend(check_middleware_signatures(middleware_list))
     result.issues.extend(check_secret_key(app.config))

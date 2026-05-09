@@ -132,6 +132,7 @@ often tune in CI:
 | `alpine_cdn_url` | ERROR | A bare jsDelivr Alpine URL would load the package CommonJS entry instead of the browser CDN build. Use `/dist/cdn.min.js`. |
 | `form` | ERROR / WARNING | A route form contract and the template's actual `<input>`, `<select>`, or `<textarea>` names disagree. |
 | `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |
+| `csrf_form` | WARNING | `CSRFMiddleware` is active and a static mutating `<form>` has no `{{ csrf_field() }}`, `csrf_token()`, or `_csrf_token` field. |
 | `a11y_label`, `a11y_alt`, `a11y_heading`, `a11y_landmark` | WARNING | Accessibility checks for missing labels, missing image alt text, skipped heading levels, or missing landmarks. |
 | `csrf_session`, `secret_key`, `middleware_signature` | ERROR / WARNING | Production-safety checks for security middleware ordering, missing secret keys, and middleware call signatures. |
 

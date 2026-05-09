@@ -175,9 +175,9 @@ to demonstrate product-shaped contracts without becoming products.
    verifies CSRF, typed binding, `FormContract`, repeated fields,
    multi-intent submit handling, and htmx/non-htmx validation together before
    adding new checks.
-5. **CSRF check decision**: either add a narrow `csrf_form` `app.check()` rule
-   gated on `CSRFMiddleware`, or explicitly defer it if scanner noise is too
-   high.
+5. **CSRF check decision**: complete. Add a narrow WARNING-level `csrf_form`
+   rule gated on active `CSRFMiddleware`; it only scans static mutating forms
+   and accepts `csrf_field()`, `csrf_token()`, or an `_csrf_token` field.
 6. **Shell/realtime proof**: add reconnect/replay tests and one deterministic
    browser smoke for shell/OOB/SSE behavior. Tenant-like shell proof waits for
    request URL scope.

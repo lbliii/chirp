@@ -21,6 +21,8 @@ app.add_middleware(CSRFMiddleware())
 
 `CSRFMiddleware` requires session state. Add `SessionMiddleware` before
 `CSRFMiddleware`; `app.check()` reports `csrf_session` when the order is wrong
+and `csrf_form` when a static mutating form is missing a rendered CSRF field
+while CSRF middleware is active.
 or session middleware is missing.
 
 In templates, render the field inside every mutating form:
