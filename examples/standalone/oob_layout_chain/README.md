@@ -1,6 +1,6 @@
 # OOB Layout Chain
 
-Dori-style layout chain: root layout wraps a page that extends an inner layout.
+Nested app-shell layout chain: root layout wraps a page that extends an inner layout.
 OOB regions (`{% region sidebar_oob %}`) are suppressed on full-page to avoid
 orphaned fragments; they appear in fragment responses for HTMX swaps.
 

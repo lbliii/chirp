@@ -3,7 +3,7 @@
 **Status**: Draft  
 **Date**: 2026-03-06  
 **Scope**: Chirp negotiation, htmx app-shell behavior, `kanban_shell` example  
-**Related**: `kanban_shell`, dori app shell, `chirp-ui` fragment patterns
+**Related**: `kanban_shell`, reference app shell, `chirp-ui` fragment patterns
 
 ---
 

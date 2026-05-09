@@ -1,4 +1,4 @@
-"""Integration test: Dori-style app (mount_pages + GET form + POST+htmx + SSE) passes app.check()."""
+"""Integration test: app-shell patterns (mount_pages + GET form + POST+htmx + SSE) pass app.check()."""
 
 import importlib.util
 from pathlib import Path
@@ -8,18 +8,18 @@ import pytest
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent
 
 
-def _create_dori_pattern_app(tmp_path: Path) -> App:
-    """Create minimal Chirp app mirroring Dori dashboard patterns."""
+def _create_app_shell_pattern_app(tmp_path: Path) -> App:
+    """Create a minimal Chirp app mirroring app-shell dashboard patterns."""
     pages_dir = tmp_path / "pages"
     pages_dir.mkdir()
     (pages_dir / "skills").mkdir()
 
-    # Layout with block page_content (Dori-style)
+    # Layout with block page_content (app shell)
     (pages_dir / "_layout.html").write_text(
         '<html><body id="main">{% block page_content %}{% end %}</body></html>'
     )
 
-    # /skills page with plain GET form (Dori skills search)
+    # /skills page with plain GET form (skills search)
     (pages_dir / "skills" / "page.py").write_text(
         """
 from chirp import Template
@@ -79,12 +79,12 @@ async def handler():
     return app
 
 
-class TestDoriPatterns:
-    """Dori-style app patterns pass contract validation."""
+class TestAppShellPatterns:
+    """App-shell app patterns pass contract validation."""
 
-    def test_dori_pattern_app_passes_check(self, tmp_path: Path) -> None:
+    def test_app_shell_pattern_app_passes_check(self, tmp_path: Path) -> None:
         """mount_pages + GET form + POST+htmx + SSE passes app.check()."""
-        app = _create_dori_pattern_app(tmp_path)
+        app = _create_app_shell_pattern_app(tmp_path)
         app.check()
 
     def test_form_get_example_passes_check(self) -> None:
