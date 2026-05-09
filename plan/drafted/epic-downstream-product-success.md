@@ -181,10 +181,13 @@ to demonstrate product-shaped contracts without becoming products.
 6. **Safe redirect proof**: complete. `is_safe_url()` now has tenant/local,
    evil, and encoded-case tests, and auth login redirects preserve
    request-scoped public `next` values.
-7. **Shell/realtime proof**: add reconnect/replay tests and one deterministic
-   browser smoke for shell/OOB/SSE behavior. Tenant-like shell proof waits for
-   request URL scope.
-8. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
+7. **SSE replay/reconnect proof**: complete. Reconnect tests prove
+   `Last-Event-ID` can drive product-owned missed-event replay without adding
+   a Chirp queue or durable store.
+8. **Shell/OOB/SSE browser proof**: add one deterministic browser smoke for
+   shell/OOB/SSE behavior. Tenant-like shell proof waits for request URL
+   scope.
+9. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
    smallest fixture or contract test needed for reusable framework gaps.
 
 ## Open-Item Steward Synthesis

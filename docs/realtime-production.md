@@ -75,6 +75,9 @@ async def stream(request):
     return EventStream(events())
 ```
 
+Chirp's integration suite covers this pattern with reconnect and fresh-tab
+cases; durable cursor storage remains product-owned.
+
 If missed events cannot be replayed, document the degradation. Common fallback:
 send an event that tells the client to refresh the affected fragment or page.
 

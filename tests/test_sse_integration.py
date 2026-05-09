@@ -194,6 +194,42 @@ class TestSSEEventPassthrough:
         assert result.events[0].data == "line1\nline2\nline3"
 
 
+class TestSSEReconnectReplay:
+    async def test_last_event_id_replays_only_missed_product_events(self) -> None:
+        app = App()
+        stored_events = (
+            SSEEvent(data="post-1", event="post", id="1"),
+            SSEEvent(data="post-2", event="post", id="2"),
+            SSEEvent(data="post-3", event="post", id="3"),
+            SSEEvent(data="post-4", event="post", id="4"),
+        )
+
+        @app.route("/events")
+        def events(request):
+            last_id = request.headers.get("last-event-id")
+            last_seen = int(last_id) if last_id is not None else 0
+
+            async def gen():
+                for event in stored_events:
+                    if int(event.id or "0") > last_seen:
+                        yield event
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            first = await client.sse("/events", max_events=2)
+            reconnect = await client.sse(
+                "/events",
+                headers={"Last-Event-ID": first.events[-1].id or ""},
+                max_events=10,
+            )
+            fresh_tab = await client.sse("/events", max_events=4)
+
+        assert [event.id for event in first.events] == ["1", "2"]
+        assert [event.id for event in reconnect.events] == ["3", "4"]
+        assert [event.id for event in fresh_tab.events] == ["1", "2", "3", "4"]
+
+
 # ---------------------------------------------------------------------------
 # Dict / JSON events
 # ---------------------------------------------------------------------------
