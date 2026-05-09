@@ -101,6 +101,8 @@ and product dashboards need clear ownership boundaries for durable replay.
 
 ## Phase 3: Mounted Apps, URL Scope, And Route Contracts
 
+**Status**: Complete on `codex/production-contract-quality-bar`.
+
 **Why**: Downstream products use mounted filesystems, tenant/base-path URLs,
 and generated wrappers. Route reversal, request URL scope, route explorer, and
 `app.check()` must agree.
@@ -126,6 +128,19 @@ and generated wrappers. Route reversal, request URL scope, route explorer, and
 
 - Tenant-like URL generation and mounted-page contract reporting are explicit,
   request-local, and proven without rendered-HTML URL rewriting.
+
+**Completed proof**:
+
+- Added mounted child-app coverage showing request-local `url_for(...)` scopes
+  both regular links and htmx URLs while app-root `app.url_for(...)` stays
+  deterministic.
+- Confirmed the debug route explorer endpoint exposes real mounted page form
+  contracts, including the form type, target block, and serialized contract
+  marker.
+- Focused verification passed:
+  `tests/test_url_for.py tests/test_request.py tests/test_decorators.py`,
+  `tests/test_route_explorer.py tests/contracts/test_forms.py`, and
+  `examples/chirpui/forum_shell`.
 
 ## Phase 4: Free-Threaded Shared State
 

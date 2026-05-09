@@ -89,6 +89,10 @@ async def test_route_explorer_200_when_debug_true(pages_tree: Path) -> None:
     assert "/" in body
     assert "/skills" in body
     assert "page" in body
+    assert '<span class="badge">contract</span>' in body
+    assert "ReplyForm" in body
+    assert "page.html#content" in body
+    assert "&quot;has_contract&quot;: true" in body
 
 
 def test_render_route_explorer_shows_mounted_page_contracts() -> None:
