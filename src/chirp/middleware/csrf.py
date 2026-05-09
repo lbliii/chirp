@@ -34,6 +34,7 @@ calling ``csrf_token()`` during stream rendering.
 import secrets
 from contextvars import ContextVar
 from dataclasses import dataclass
+from html import escape
 from typing import Any, ClassVar
 
 from chirp.errors import ConfigurationError, HTTPError
@@ -44,6 +45,10 @@ from chirp.security.audit import emit_security_event
 # -- CSRF token ContextVar (accessible from template globals) --
 
 _csrf_token_var: ContextVar[str | None] = ContextVar("chirp_csrf_token", default=None)
+_csrf_field_name_var: ContextVar[str] = ContextVar(
+    "chirp_csrf_field_name",
+    default="_csrf_token",
+)
 
 # Methods that mutate state and need CSRF protection
 _UNSAFE_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -84,7 +89,12 @@ def csrf_field() -> str:
     from kida.utils.html import Markup
 
     token = get_csrf_token()
-    return Markup(f'<input type="hidden" name="_csrf_token" value="{token}">')
+    field_name = _csrf_field_name_var.get()
+    return Markup(
+        '<input type="hidden" '
+        f'name="{escape(field_name, quote=True)}" '
+        f'value="{escape(token, quote=True)}">'
+    )
 
 
 def csrf_token() -> str:
@@ -173,6 +183,7 @@ class CSRFMiddleware:
 
         # Make token available via ContextVar
         cv_token = _csrf_token_var.set(token)
+        cv_field_name = _csrf_field_name_var.set(cfg.field_name)
 
         try:
             # Validate on unsafe methods
@@ -181,6 +192,7 @@ class CSRFMiddleware:
 
             return await next(request)
         finally:
+            _csrf_field_name_var.reset(cv_field_name)
             _csrf_token_var.reset(cv_token)
 
 

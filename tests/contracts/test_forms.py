@@ -6,7 +6,7 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import FormContract, check_hypermedia_surface, contract
 from chirp.contracts.rules_forms import extract_form_field_names, extract_template_block_source
-from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 
@@ -274,6 +274,40 @@ class TestCSRFFormTokenChecks:
 
         @app.route("/save", methods=["POST"])
         async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
+    def test_configured_token_field_satisfies_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method="post" action="/save"><input type="hidden" name="csrf"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig(field_name="csrf")))
+
+        @app.route("/save", methods=["POST"])
+        async def save():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
+    def test_exempt_form_target_skips_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method="post" action="/webhook"><input name="payload"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig(exempt_paths=frozenset({"/webhook"}))))
+
+        @app.route("/webhook", methods=["POST"])
+        async def webhook():
             return "ok"
 
         result = check_hypermedia_surface(app)

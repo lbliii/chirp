@@ -33,6 +33,11 @@ In templates, render the field inside every mutating form:
 </form>
 ```
 
+If you configure `CSRFConfig(field_name="csrf")`, `csrf_field()` renders that
+configured field name for the active request and `app.check()` accepts the
+same field in static form scans. Routes listed in `CSRFConfig.exempt_paths`
+are also skipped by the `csrf_form` check.
+
 Do not solve missing CSRF fields by rewriting arbitrary rendered HTML. Keep the
 field visible in the template that owns the form so review, tests, and
 `app.check()` can reason about it.

@@ -18,6 +18,8 @@ keep changes traceable to one phase below.
 
 ## Phase 1: Production Forms And CSRF Confidence
 
+**Status**: Complete on `codex/production-contract-quality-bar`.
+
 **Why**: Forms are the easiest place for app authors to accidentally split
 browser fallback, htmx fragments, validation, CSRF, and mounted route contracts.
 
@@ -42,6 +44,17 @@ browser fallback, htmx fragments, validation, CSRF, and mounted route contracts.
 
 - A product-shaped POST flow can be explained from docs and proven by tests
   without relying on private helpers or response rewriting.
+
+**Completed proof**:
+
+- `csrf_field()` now renders the active `CSRFConfig.field_name` instead of
+  always rendering `_csrf_token`.
+- `csrf_form` scans accept the configured field name and skip static form
+  targets covered by `CSRFConfig.exempt_paths`.
+- Focused and full verification passed:
+  `tests/test_form_integration.py tests/contracts/test_forms.py tests/contracts/test_form_routes.py`,
+  `tests/test_csrf.py tests/test_safe_url.py`, `tests/docs`, `ruff`, `ty`, and
+  the full non-slow pytest suite.
 
 ## Phase 2: Streaming, Suspense, And SSE Reliability
 
@@ -175,4 +188,3 @@ uv run pytest -q --tb=short --timeout=60 -m "not slow"
 - Core dependency on `chirp-ui`.
 - Contract severity promotions without a focused maintainer review.
 - Browser harness expansion beyond one deterministic shell/OOB/SSE smoke.
-
