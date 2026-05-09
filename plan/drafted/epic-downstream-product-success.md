@@ -171,9 +171,10 @@ to demonstrate product-shaped contracts without becoming products.
 3. **Request URL scope implementation**: complete for the initial API.
    `app.url_for(...)` remains deterministic; request-scoped helpers compose
    tenant/base-path URLs without mutating frozen app state or rendered HTML.
-4. **Production form integration proof**: verify CSRF, typed binding,
-   `FormContract`, repeated fields, multi-intent forms, and htmx/non-htmx
-   validation together before adding new checks.
+4. **Production form integration proof**: complete. Mounted-page coverage now
+   verifies CSRF, typed binding, `FormContract`, repeated fields,
+   multi-intent submit handling, and htmx/non-htmx validation together before
+   adding new checks.
 5. **CSRF check decision**: either add a narrow `csrf_form` `app.check()` rule
    gated on `CSRFMiddleware`, or explicitly defer it if scanner noise is too
    high.
