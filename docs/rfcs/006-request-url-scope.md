@@ -1,6 +1,6 @@
 # RFC 006: Request URL Scope For Tenant And Base-Path Apps
 
-**Status:** Accepted for initial implementation; not shipped yet
+**Status:** Initial API implemented
 **Author:** (proposal)
 **Created:** 2026-05-09
 **Depends on:** RFC 003 (named routes), RFC 004 (`url_for`)
@@ -11,6 +11,8 @@ immutable request URL scope on `Request`, plus explicit request-aware helpers:
 `request.url_for(name, **params)`. Template `url_for` becomes request-aware
 only for request renders and only when the app has not registered its own
 `url_for` global.
+
+**Implemented:** 2026-05-09. `RequestUrlScope` is provisional public API.
 
 ---
 

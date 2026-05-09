@@ -168,9 +168,9 @@ to demonstrate product-shaped contracts without becoming products.
 2. **RFC 006 decision**: complete. RFC 006 accepts `RequestUrlScope`,
    `request.with_url_scope(...)`, `request.scoped_url(path)`, and
    `request.url_for(...)` while preserving app-root `app.url_for(...)`.
-3. **Request URL scope implementation**: keep `app.url_for(...)` deterministic;
-   add request-scoped helpers without mutating frozen app state or rendered
-   HTML.
+3. **Request URL scope implementation**: complete for the initial API.
+   `app.url_for(...)` remains deterministic; request-scoped helpers compose
+   tenant/base-path URLs without mutating frozen app state or rendered HTML.
 4. **Production form integration proof**: verify CSRF, typed binding,
    `FormContract`, repeated fields, multi-intent forms, and htmx/non-htmx
    validation together before adding new checks.

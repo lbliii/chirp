@@ -123,6 +123,7 @@ _API_STATUS: dict[str, str] = {
     "HtmxDetails": "provisional",
     "JSONResponse": "stable",
     "ReactiveBus": "provisional",
+    "RequestUrlScope": "provisional",
     "Severity": "provisional",
     "ShellAction": "provisional",
     "ShellActionZone": "provisional",
@@ -189,6 +190,7 @@ __all__ = [
     "RegionUpdate",
     "RenderPlan",
     "Request",
+    "RequestUrlScope",
     "Response",
     "SSEEvent",
     "Severity",
@@ -247,6 +249,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # HTTP
     "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),
+    "RequestUrlScope": ("chirp.http.request", "RequestUrlScope"),
     "Response": ("chirp.http.response", "Response"),
     "JSONResponse": ("chirp.http.response", "JSONResponse"),
     "Redirect": ("chirp.http.response", "Redirect"),

@@ -1,12 +1,14 @@
 """Tests for app.url_for and the url_for template global."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from chirp import App, AppConfig
+from chirp import App, AppConfig, Redirect, Template
 from chirp.contracts import check_hypermedia_surface
 from chirp.contracts.types import Severity
+from chirp.testing import TestClient
 
 
 def _write_page(dir_: Path, body: str = "def get(): return {}") -> None:
@@ -204,3 +206,99 @@ def test_url_for_template_global_is_setdefault(tmp_path: Path) -> None:
     (pages_dir / "probe.html").write_text("{{ url_for('contacts') }}")
     rendered = app._kida_env.get_template("probe.html").render({})
     assert rendered == "OVERRIDE"
+
+
+async def _tenant_scope_middleware(request, next_handler):  # type: ignore[no-untyped-def]
+    if request.path == "/c/acme" or request.path.startswith("/c/acme/"):
+        local_path = request.path.removeprefix("/c/acme") or "/"
+        request = replace(request, path=local_path).with_url_scope("/c/acme")
+    return await next_handler(request)
+
+
+@pytest.mark.asyncio
+async def test_request_url_for_scopes_template_links_htmx_fragments_and_sse(
+    tmp_path: Path,
+) -> None:
+    tpl_dir = tmp_path / "templates"
+    tpl_dir.mkdir()
+    (tpl_dir / "links.html").write_text(
+        """
+<a id="board-link" href="{{ url_for('boards.detail', board_id='ic', tab='cast') }}">board</a>
+<a id="boosted" hx-get="{{ url_for('boards.detail', board_id='ic') }}">boost</a>
+<a id="fragment" hx-get="{{ fragment_url(url_for('boards.detail', board_id='ic'), 'content') }}">fragment</a>
+<section id="events" sse-connect="{{ url_for('threads.events', thread_id=42) }}"></section>
+"""
+    )
+    app = App(AppConfig(template_dir=str(tpl_dir), debug=False))
+    app.add_middleware(_tenant_scope_middleware)
+
+    @app.route("/", name="home")
+    def home():
+        return Template("links.html")
+
+    @app.route("/boards/{board_id}", name="boards.detail")
+    def board(board_id: str):
+        return f"board {board_id}"
+
+    @app.route("/threads/{thread_id}/events", name="threads.events")
+    def events(thread_id: str):
+        return f"events {thread_id}"
+
+    async with TestClient(app) as client:
+        response = await client.get("/c/acme/")
+
+    assert response.status == 200
+    body = response.body.decode("utf-8")
+    assert 'href="/c/acme/boards/ic?tab=cast"' in body
+    assert 'hx-get="/c/acme/boards/ic"' in body
+    assert 'hx-get="/_frag/c/acme/boards/ic?_b=content"' in body
+    assert 'sse-connect="/c/acme/threads/42/events"' in body
+    assert app.url_for("boards.detail", board_id="ic") == "/boards/ic"
+
+
+@pytest.mark.asyncio
+async def test_request_scoped_url_supports_redirects(tmp_path: Path) -> None:
+    tpl_dir = tmp_path / "templates"
+    tpl_dir.mkdir()
+    app = App(AppConfig(template_dir=str(tpl_dir), debug=False))
+    app.add_middleware(_tenant_scope_middleware)
+
+    @app.route("/jump", name="jump")
+    def jump(request):
+        return Redirect(request.url_for("boards.detail", board_id="ic", next="/boards/ooc"))
+
+    @app.route("/boards/{board_id}", name="boards.detail")
+    def board(board_id: str):
+        return f"board {board_id}"
+
+    async with TestClient(app) as client:
+        response = await client.get("/c/acme/jump")
+
+    assert response.status == 302
+    assert ("location", "/c/acme/boards/ic?next=%2Fboards%2Fooc") in response.headers
+
+
+@pytest.mark.asyncio
+async def test_custom_url_for_template_global_still_wins(tmp_path: Path) -> None:
+    tpl_dir = tmp_path / "templates"
+    tpl_dir.mkdir()
+    (tpl_dir / "links.html").write_text("{{ url_for('boards.detail', board_id='ic') }}")
+    app = App(AppConfig(template_dir=str(tpl_dir), debug=False))
+    app.add_middleware(_tenant_scope_middleware)
+
+    @app.template_global("url_for")
+    def custom_url_for(*args, **kwargs):  # type: ignore[no-untyped-def]
+        return "OVERRIDE"
+
+    @app.route("/", name="home")
+    def home():
+        return Template("links.html")
+
+    @app.route("/boards/{board_id}", name="boards.detail")
+    def board(board_id: str):
+        return f"board {board_id}"
+
+    async with TestClient(app) as client:
+        response = await client.get("/c/acme/")
+
+    assert response.body.decode("utf-8") == "OVERRIDE"

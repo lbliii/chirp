@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from chirp.http.request import HtmxDetails, Request
+from chirp.http.request import HtmxDetails, Request, RequestUrlScope
 
 
 def _make_scope(**overrides: object) -> dict[str, object]:
@@ -110,6 +110,60 @@ class TestRequestFromASGI:
 
         assert req.server is None
         assert req.client is None
+
+
+class TestRequestUrlScope:
+    def test_normalizes_prefix(self) -> None:
+        scope = RequestUrlScope("c/acme/")
+
+        assert scope.prefix == "/c/acme"
+
+    def test_rejects_non_path_prefix(self) -> None:
+        with pytest.raises(ValueError, match="app-root path prefix"):
+            RequestUrlScope("https://example.com/c/acme")
+
+    def test_apply_scopes_app_root_urls(self) -> None:
+        scope = RequestUrlScope("/c/acme")
+
+        assert scope.apply("/boards/ic?page=2") == "/c/acme/boards/ic?page=2"
+        assert scope.apply("/?page=2") == "/c/acme?page=2"
+
+    def test_apply_leaves_non_app_root_urls_alone(self) -> None:
+        scope = RequestUrlScope("/c/acme")
+
+        assert scope.apply("boards/ic") == "boards/ic"
+        assert scope.apply("#reply") == "#reply"
+        assert scope.apply("//cdn.example/app.css") == "//cdn.example/app.css"
+        assert scope.apply("https://example.com/boards/ic") == "https://example.com/boards/ic"
+
+    def test_apply_does_not_double_scope(self) -> None:
+        scope = RequestUrlScope("/c/acme")
+
+        assert scope.apply("/c/acme/boards/ic") == "/c/acme/boards/ic"
+
+    def test_request_scoped_url_uses_attached_scope(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive()).with_url_scope("/c/acme")
+
+        assert req.scoped_url("/boards/ic") == "/c/acme/boards/ic"
+
+    def test_request_url_for_requires_bound_resolver(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive()).with_url_scope("/c/acme")
+
+        with pytest.raises(RuntimeError, match="app/server pipeline"):
+            req.url_for("boards.detail")
+
+    def test_request_url_for_applies_scope_to_bound_resolver(self) -> None:
+        def resolver(name: str, /, **params: object) -> str:
+            assert name == "boards.detail"
+            return f"/boards/{params['board_id']}"
+
+        req = Request.from_asgi(
+            _make_scope(),
+            _make_receive(),
+            url_for=resolver,
+        ).with_url_scope("/c/acme")
+
+        assert req.url_for("boards.detail", board_id="ic") == "/c/acme/boards/ic"
 
 
 class TestRequestCookies:
