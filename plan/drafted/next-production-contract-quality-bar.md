@@ -58,6 +58,8 @@ browser fallback, htmx fragments, validation, CSRF, and mounted route contracts.
 
 ## Phase 2: Streaming, Suspense, And SSE Reliability
 
+**Status**: Complete on `codex/production-contract-quality-bar`.
+
 **Why**: Streaming bugs are often visible only after navigation or reconnect,
 and product dashboards need clear ownership boundaries for durable replay.
 
@@ -83,6 +85,19 @@ and product dashboards need clear ownership boundaries for durable replay.
 - Reconnect, per-event failure, Suspense cache reuse, and close semantics are
   documented or tested with no ambiguous ownership between Chirp and product
   code.
+
+**Completed proof**:
+
+- Confirmed `DeferredCache.close()` behavior is already covered by the
+  no-poisoning regression and contention tests.
+- Published SSE docs now describe `Last-Event-ID`, `SSEEvent(id=...)`, and the
+  product-owned durable cursor boundary.
+- Added docs guard coverage so source and site docs keep naming reconnect
+  ownership explicitly.
+- Focused verification passed:
+  `tests/test_cache.py tests/test_concurrency/test_deferred_cache_contention.py`,
+  `tests/test_suspense.py tests/test_sse_integration.py tests/contracts/test_sse.py`,
+  and `tests/docs`.
 
 ## Phase 3: Mounted Apps, URL Scope, And Route Contracts
 

@@ -74,6 +74,38 @@ async def stream():
     )
 ```
 
+## Reconnect And Replay
+
+Browsers automatically reconnect SSE streams and send the last received event
+id in the `Last-Event-ID` request header when your stream yields events with
+`id:`. Chirp preserves `SSEEvent(id=...)` on the wire, but it does not store or
+replay missed events for you.
+
+Production-critical streams need a product-owned durable cursor: a database
+sequence, notification id, post id, queue offset, or another value that can be
+queried after reconnect.
+
+```python
+from chirp import EventStream, SSEEvent
+
+
+@app.route("/notifications/stream")
+async def notifications(request):
+    last_id = request.headers.get("last-event-id")
+
+    async def stream():
+        async for item in missed_notifications_after(last_id):
+            yield SSEEvent(event="notification", id=str(item.id), data=item.html)
+        async for item in live_notifications():
+            yield SSEEvent(event="notification", id=str(item.id), data=item.html)
+
+    return EventStream(stream())
+```
+
+If the product cannot replay missed events, make that degradation explicit:
+send a refresh event for the affected fragment or document that reconnecting
+clients may need to reload the page.
+
 ## Real-Time HTML with htmx
 
 The killer pattern: combine SSE with htmx to push rendered HTML fragments in real-time.
