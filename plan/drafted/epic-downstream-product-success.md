@@ -187,8 +187,9 @@ to demonstrate product-shaped contracts without becoming products.
 8. **Shell/OOB/SSE browser proof**: planned, not executed. The repo has no
    browser-test harness yet, so `plan/drafted/shell-oob-sse-browser-smoke.md`
    records the exact fixture, acceptance criteria, and future command shape.
-9. **Diagnostics and fixtures**: keep `forum_shell` narrow and add only the
-   smallest fixture or contract test needed for reusable framework gaps.
+9. **Diagnostics and fixtures**: complete for this pass. `forum_shell` remains
+   narrow, and its tests now pin the README language that says it is a
+   regression fixture rather than a product scaffold.
 
 ## Open-Item Steward Synthesis
 

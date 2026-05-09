@@ -2,9 +2,9 @@
 
 A compact ChirpUI shell fixture inspired by richer play-by-post apps.
 
-This is not a full forum product. It exists to keep product-shaped Chirp
-contracts executable: mounted pages, typed forms, app-shell navigation, OOB
-shell state, and a narrow JSON data island.
+This is not a full forum product. It is a regression fixture that keeps
+product-shaped Chirp contracts executable: mounted pages, typed forms,
+app-shell navigation, OOB shell state, and a narrow JSON data island.
 
 It demonstrates:
 
