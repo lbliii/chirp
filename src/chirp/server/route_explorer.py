@@ -116,9 +116,9 @@ def render_route_explorer(
         if form_contract:
             form_meta = (
                 f'<div class="route-meta">form: {_esc(form_contract["dataclass"])}'
-                f' -> {_esc(form_contract["template"])}'
+                f" -> {_esc(form_contract['template'])}"
                 + (
-                    f'#{_esc(form_contract["block"])}'
+                    f"#{_esc(form_contract['block'])}"
                     if form_contract.get("block") is not None
                     else ""
                 )

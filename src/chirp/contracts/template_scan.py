@@ -228,13 +228,12 @@ def resolve_template_reference(
     from kida.exceptions import TemplateNotFoundError
 
     try:
-        from kida.utils.template_keys import resolve_template_name
+        from kida.utils.template_keys import resolve_template_name as kida_resolve_template_name
     except ImportError:
-        resolve_template_name = None
-
-    if resolve_template_name is not None:
+        pass
+    else:
         try:
-            return resolve_template_name(reference, caller=caller)
+            return kida_resolve_template_name(reference, caller=caller)
         except TemplateNotFoundError:
             return reference
 
