@@ -125,6 +125,9 @@ single attribute.
 on the container — it causes flicker when OOB swaps arrive. Put
 `hx-swap="innerHTML transition:true"` on each nav link instead. See
 [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full pattern.
+Keep long-lived `sse-connect` listeners in stable shell/layout regions, not
+inside the boosted content that navigation replaces; see
+[Realtime Product Patterns](realtime-production.md).
 
 **Behavior:**
 - **Links:** AJAX GET, push URL to history, target body, innerHTML swap
