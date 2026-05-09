@@ -283,23 +283,30 @@ def test_deferred_cache_rejects_empty_key():
 
 
 @pytest.mark.asyncio
-async def test_deferred_cache_closed_awaitable_releases_inflight():
+async def test_deferred_cache_closed_awaitable_releases_inflight_without_poisoning_holders():
     cache = DeferredCache(default_ttl=60)
     calls = 0
 
     async def factory():
         nonlocal calls
         calls += 1
-        return "value"
+        value = f"value-{calls}"
+        await asyncio.sleep(0)
+        return value
 
     pending = cache.get_or_defer("cancelled", factory)
+    same_pending = cache.get_or_defer("cancelled", factory)
+    assert same_pending is pending
+
     pending.close()
 
-    with pytest.raises(RuntimeError, match="closed before it ran"):
-        await pending
+    replacement = cache.get_or_defer("cancelled", factory)
+    assert replacement is not pending
 
-    assert await _resolve(cache.get_or_defer("cancelled", factory)) == "value"
-    assert calls == 1
+    results = await asyncio.gather(_resolve(pending), _resolve(replacement))
+    assert results == ["value-1", "value-2"]
+    assert cache.get_or_defer("cancelled", factory) == "value-2"
+    assert calls == 2
 
 
 @pytest.mark.asyncio

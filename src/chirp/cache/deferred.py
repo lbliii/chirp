@@ -62,14 +62,12 @@ class _SharedDeferred[T]:
 
         Suspense calls ``close()`` on awaitables when validation fails before
         scheduling them. Removing the in-flight entry keeps a rejected render
-        from pinning the key forever.
+        from pinning the key forever without poisoning other consumers that
+        already received the same shared awaitable.
         """
         with self._condition:
             if self._started or self._done:
                 return
-            self._exception = RuntimeError("DeferredCache awaitable was closed before it ran.")
-            self._done = True
-            self._condition.notify_all()
         self._cache._discard_inflight(self._key, self)
 
     async def _await(self) -> T:

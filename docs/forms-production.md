@@ -12,10 +12,10 @@ For POST, PUT, PATCH, or DELETE forms in production:
 ```python
 from chirp import App, AppConfig
 from chirp.middleware.csrf import CSRFMiddleware
-from chirp.middleware.sessions import SessionMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 app = App(AppConfig(secret_key=SECRET_KEY, debug=False))
-app.add_middleware(SessionMiddleware())
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=SECRET_KEY)))
 app.add_middleware(CSRFMiddleware())
 ```
 
@@ -23,7 +23,6 @@ app.add_middleware(CSRFMiddleware())
 `CSRFMiddleware`; `app.check()` reports `csrf_session` when the order is wrong
 and `csrf_form` when a static mutating form is missing a rendered CSRF field
 while CSRF middleware is active.
-or session middleware is missing.
 
 In templates, render the field inside every mutating form:
 
