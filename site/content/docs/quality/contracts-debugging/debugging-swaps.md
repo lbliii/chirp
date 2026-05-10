@@ -28,7 +28,8 @@ chirp check app:app --warnings-as-errors
 `chirp check` catches the failures that most often turn into blank or wrong DOM:
 missing template blocks, route-name collisions, OOB registrations that no
 layout satisfies, route-directory metadata mismatches, reactive block typos,
-form-contract gaps, and known htmx footguns.
+form-contract gaps, local Kida component-call mistakes, trusted-markup review
+points, sensitive-looking template output, and known htmx footguns.
 
 ## Then Enable Debug Mode
 
@@ -77,6 +78,30 @@ precise.
 | SSE stream stops after one bad event | Error boundary widened beyond one event | Check `EventStream` generator and fragment render errors |
 | Boosted link reloads the page | Link crosses shell boundaries or boost is disabled | Check `HX-Redirect`, shell layout domains, and `hx-boost` inheritance |
 | Duplicate shell actions or badges appear | OOB region rendered inline and out-of-band | Register the region and keep the DOM id in one owner |
+
+Kida-powered template diagnostics use their own categories:
+
+| Category | Meaning | Typical fix |
+| --- | --- | --- |
+| `component` | A local `{% def %}` call has unknown, missing, duplicate, or literal type-mismatched arguments | Fix the call site or the component signature |
+| `template_context` | An opt-in dotted context contract does not cover what the template reads | Add the missing path to `provided`, move it to `optional`, or stop reading it |
+| `template_escape` | A template deliberately trusts markup, such as `| safe`, and should document the trust boundary | Add `safe(reason="...")` or remove the trust override |
+| `template_privacy` | A template reads sensitive-looking data such as tokens, secrets, or password paths | Confirm the value belongs in rendered output or remove it |
+
+For dotted context checks, register template contracts through the existing
+check-data channel:
+
+```python
+app.set_contract_check_data(
+    "template_context_contracts",
+    {
+        "page.html": {
+            "provided": {"page.title", "user.name"},
+            "optional": {"flash.message"},
+        }
+    },
+)
+```
 
 ## Read The Headers
 

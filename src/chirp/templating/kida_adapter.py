@@ -3,6 +3,7 @@
 from typing import Any
 
 from kida import Environment
+from kida.exceptions import TemplateRuntimeError
 
 
 class KidaAdapter:
@@ -19,7 +20,13 @@ class KidaAdapter:
     def render_block(self, template: str, block: str, context: dict[str, Any]) -> str:
         """Render a named block from a template."""
         tmpl = self._env.get_template(template)
-        return tmpl.render_block(block, context)
+        try:
+            return tmpl.render_block(block, context)
+        except TemplateRuntimeError as exc:
+            message = getattr(exc, "message", str(exc))
+            if f"Block {block!r} not found" in message:
+                raise KeyError(message) from exc
+            raise
 
     def compose_layout(
         self,
