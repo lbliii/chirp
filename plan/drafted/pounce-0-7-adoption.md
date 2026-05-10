@@ -256,6 +256,8 @@ config path actually runs.
 
 ### 4. Security-Facing Pounce Config Decisions
 
+**Status**: Deferred. No public `AppConfig` fields were added in this PR.
+
 **Why**: Trusted proxy authority, compression, and introspection affect security
 and operator behavior. They need an explicit API decision before code changes.
 
@@ -293,6 +295,8 @@ and operator behavior. They need an explicit API decision before code changes.
 
 ### 5. Pounce 0.7 Introspection Guidance
 
+**Status**: Done in `docs: close pounce adoption follow-ups`.
+
 **Why**: `/_pounce/info` is useful operationally, but easy to expose
 incorrectly.
 
@@ -311,7 +315,14 @@ incorrectly.
 - If code/config is added: production server E2E proving disabled-by-default,
   redacted response shape, and public-bind warning.
 
+**Completed proof**:
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs/test_site_link_drift.py tests/test_freeze_site.py -q`
+
 ### 6. Benchmark Fixture Adoption
+
+**Status**: Done in `docs: close pounce adoption follow-ups`.
 
 **Why**: Pounce 0.7 includes Bengal and Chirp workload fixtures. Chirp should
 use them to calibrate claims, not copy numbers into marketing.
@@ -331,6 +342,21 @@ use them to calibrate claims, not copy numbers into marketing.
 - Benchmark artifact with command, environment, Pounce/Chirp/Kida versions, and
   caveats if publishing numbers.
 
+**Completed decision**:
+
+- The installed Pounce 0.7 `pounce bench` command provides generic ASGI
+  workloads (`/hello`, `/json`, `/body`), useful as a Pounce server smoke.
+- Chirp benchmark claims should stay on Chirp's repo harness because it covers
+  return values, Kida rendering, SSE fanout, route dispatch, and fused sync
+  behavior.
+- No benchmark numbers were published.
+
+**Completed proof**:
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_benchmarks_core.py -q`
+- `.venv/bin/python -m benchmarks.core --iterations 5 --route-count 5 --output /private/tmp/chirp-core-pounce-0-7-smoke.json`
+- `.venv/bin/pounce bench --workers 1 --duration 1 --connections 1`
+
 **Collateral**:
 
 - `benchmarks/README.md`
@@ -338,6 +364,9 @@ use them to calibrate claims, not copy numbers into marketing.
 - `docs/benchmark-deep-dive.md`
 
 ### 7. Release Collateral
+
+**Status**: Done in `docs: clarify pounce operator config boundary` and
+`docs: close pounce adoption follow-ups`.
 
 **Why**: Pounce 0.7 is now Chirp's dependency floor and has user-visible
 operator implications.

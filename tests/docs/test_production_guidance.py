@@ -45,3 +45,13 @@ def test_production_docs_do_not_claim_sse_compression() -> None:
         text = path.read_text()
         assert "text/event-stream" in text
         assert "avoids compressing" in text
+
+
+def test_production_docs_warn_introspection_bypasses_chirp_middleware() -> None:
+    for path in _PRODUCTION_DOCS:
+        text = path.read_text()
+        compact = " ".join(text.split())
+        assert "/_pounce/info" in text
+        assert "disabled by default" in text
+        assert "before Chirp middleware" in text
+        assert "Do not expose it on a public internet interface" in compact

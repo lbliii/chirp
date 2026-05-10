@@ -143,6 +143,21 @@ SSE is Chirp's realtime contract. Pounce intentionally avoids compressing
 compression windows. Use `worker_mode="async"` for apps with long-lived SSE
 connections.
 
+## Pounce Introspection
+
+Pounce 0.7 includes a server-level introspection endpoint at `/_pounce/info`,
+but it is disabled by default and remains Pounce-native in Chirp today. Chirp
+does not expose `AppConfig` fields for Pounce introspection yet.
+
+If you enable Pounce introspection through `pounce.toml` or `pounce serve`
+flags, treat it as an operations endpoint. Pounce handles it before the Chirp
+app and before Chirp middleware, so do not rely on Chirp auth, CSRF, sessions,
+or allowed-host middleware to protect it.
+
+Bind introspection to loopback or a private admin network, and access it
+through a VPN, SSH tunnel, or port-forward. Do not expose it on a public
+internet interface.
+
 ## Custom Port Checks
 
 If your CLI checks whether a port is free before calling `app.run()` (e.g. to avoid split-brain or show a clearer error), use `SO_REUSEADDR` in that check. Otherwise you'll block restarts when the port is in **TIME_WAIT** (30–120 seconds after shutdown). The server already uses `SO_REUSEADDR`; your check should match.
@@ -189,6 +204,10 @@ CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
 Do not assume Pounce environment variable names are read by Chirp. If your
 platform provides deployment variables, read them in your app code and build an
 `AppConfig`, or start through `pounce serve --config pounce.toml`.
+
+Chirp intentionally does not expose Pounce trusted proxy, compression, or
+introspection settings through `AppConfig` yet. Those fields are
+security-facing and need a separate public API decision before adoption.
 
 ## Full Guide
 

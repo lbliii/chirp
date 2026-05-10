@@ -127,6 +127,21 @@ Pounce can still compress ordinary HTTP responses and WebSocket messages where
 that is appropriate. For long-lived Chirp realtime views, tune worker mode and
 connection limits before assuming compression is the right lever.
 
+## Pounce Introspection
+
+Pounce 0.7 includes a server-level introspection endpoint at `/_pounce/info`,
+but it is disabled by default and remains Pounce-native in Chirp today. Chirp
+does not expose `AppConfig` fields for Pounce introspection yet.
+
+If you enable Pounce introspection through `pounce.toml` or `pounce serve`
+flags, treat it as an operations endpoint. Pounce handles it before the Chirp
+app and before Chirp middleware, so do not rely on Chirp auth, CSRF, sessions,
+or allowed-host middleware to protect it.
+
+Bind introspection to loopback or a private admin network, and access it
+through a VPN, SSH tunnel, or port-forward. Do not expose it on a public
+internet interface.
+
 ## Configuration
 
 | Path | Reads | Use For |
@@ -139,6 +154,10 @@ connection limits before assuming compression is the right lever.
 Do not assume Pounce environment variable names are read by Chirp. If your
 platform provides deployment variables, read them in your app code and build an
 `AppConfig`, or start through `pounce serve --config pounce.toml`.
+
+Chirp intentionally does not expose Pounce trusted proxy, compression, or
+introspection settings through `AppConfig` yet. Those fields are
+security-facing and need a separate public API decision before adoption.
 
 ## Security Checklist
 

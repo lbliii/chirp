@@ -7,6 +7,11 @@ This directory has two benchmark families:
 - `benchmarks.run`: networked framework comparison, useful for Chirp vs FastAPI vs Flask vs Starlette vs Litestar.
 - `benchmarks.core`: in-process Chirp regression workloads, useful for release gates and hot-path tracking.
 
+Pounce 0.7 also ships `pounce bench`, a server-level smoke/comparison command
+with generic ASGI workloads (`/hello`, `/json`, `/body`). Treat it as a Pounce
+server benchmark, not as a replacement for Chirp's framework-specific JSON,
+CPU, DB, template, SSE, and core regression workloads.
+
 ## Quick Start
 
 ```bash
@@ -21,6 +26,9 @@ uv run poe benchmark
 # Run Chirp core regression workloads and write a JSON artifact
 uv run poe benchmark-core
 # or: python -m benchmarks.core --output .benchmarks/core-latest.json
+
+# Run the smallest Pounce 0.7 server smoke benchmark
+pounce bench --workers 1 --duration 1 --connections 1
 
 # Run a single framework
 python -m benchmarks.run chirp
@@ -84,6 +92,11 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 > **Latency includes failed attempts.** Percentiles are calculated across all requests, not only 200 responses, so overload and instability remain visible in the output.
 
 > **Python 3.14t recommended.** Chirp and Pounce are designed for free-threaded Python. Run both `uv run --python 3.14 python -m benchmarks.run all` and `uv run --python 3.14t python -m benchmarks.run all` when making GIL vs free-threaded claims. The report header records Python version, cache tag, and whether the GIL is enabled.
+
+> **Pounce benchmark scope.** `pounce bench` is useful for checking Pounce's
+> server behavior with generic ASGI apps. Chirp release claims should continue
+> to use this repository's benchmark harness because it exercises Chirp's
+> return values, Kida rendering, SSE fanout, and fused sync path.
 
 ## Core Regression Workloads
 
