@@ -2,7 +2,7 @@
 
 **Status**: Implemented  
 **Scope**: Chirp (chirp package)  
-**Related**: dori collections page, mount_pages
+**Related**: collections page, mount_pages
 
 ---
 
@@ -318,7 +318,7 @@ When there are no awaitables, `render_suspense` yields one chunk. That chunk sho
 - Add `test_layout_suspense_fragment_request_skips_layouts` — when `request.is_fragment` and no target, first chunk has no layout.
 - Add `test_layout_suspense_oob_targets_unchanged` — OOB chunks still target correct IDs.
 
-### Integration (dori)
+### Integration
 
 - Revert collections page to `Suspense` (from current `Page` workaround).
 - Verify `/collections` renders with full shell, CSS, sidebar.
