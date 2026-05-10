@@ -100,3 +100,5 @@ app.add_middleware(
     )
 )
 ```
+
+`AuthRateLimitMiddleware` uses the socket client address by default. When deploying behind a trusted proxy that rewrites forwarded headers, pass `key_header="x-forwarded-for"` explicitly.

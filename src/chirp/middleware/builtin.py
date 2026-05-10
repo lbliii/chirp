@@ -6,6 +6,7 @@ preflight requests and adds appropriate headers to all responses.
 
 from dataclasses import dataclass
 
+from chirp.errors import ConfigurationError
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.middleware.protocol import AnyResponse, Next
@@ -30,6 +31,14 @@ class CORSConfig:
     expose_headers: tuple[str, ...] = ()
     allow_credentials: bool = False
     max_age: int = 600  # 10 minutes
+
+    def __post_init__(self) -> None:
+        if self.allow_credentials and "*" in self.allow_origins:
+            msg = (
+                "CORS allow_credentials=True requires explicit allow_origins; "
+                "wildcard '*' would allow credentialed requests from any origin."
+            )
+            raise ConfigurationError(msg)
 
 
 class CORSMiddleware:

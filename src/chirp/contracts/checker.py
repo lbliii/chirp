@@ -682,6 +682,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
 
     # Safety checks: catch silent failure modes
     from chirp.contracts.rules_safety import (
+        check_allowed_hosts,
         check_csrf_session_order,
         check_middleware_signatures,
         check_secret_key,
@@ -692,6 +693,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_csrf_session_order(middleware_list))
     result.issues.extend(check_middleware_signatures(middleware_list))
     result.issues.extend(check_secret_key(app.config))
+    result.issues.extend(check_allowed_hosts(app.config))
 
     live_blocks = getattr(app._mutable_state, "live_blocks", {})
     result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))

@@ -30,6 +30,10 @@ app.add_middleware(cors)
 
 Handles preflight `OPTIONS` requests automatically. Supports multiple origins, exposed headers, and credentials.
 
+:::{note}
+Credentialed CORS requires explicit origins. `CORSConfig(allow_credentials=True)` raises `ConfigurationError` when `allow_origins` includes `"*"`.
+:::
+
 ## StaticFiles
 
 Serve static assets (CSS, JS, images) from a directory:
@@ -315,6 +319,8 @@ app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
 ```
 
 Returns `429 Too Many Requests` with `Retry-After` when the threshold is exceeded.
+
+By default the limiter keys requests by the socket client address. If the app is behind a trusted proxy and the proxy strips or rewrites forwarded headers, pass `key_header="x-forwarded-for"` explicitly.
 
 ## SecurityHeadersMiddleware
 

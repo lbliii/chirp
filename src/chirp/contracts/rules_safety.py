@@ -261,3 +261,26 @@ def check_secret_key(
         )
 
     return issues
+
+
+def check_allowed_hosts(
+    config: Any,
+) -> list[ContractIssue]:
+    """Warn/error when host validation is permissive outside development."""
+    env = getattr(config, "env", "development")
+    allowed_hosts = tuple(getattr(config, "allowed_hosts", ("*",)))
+    if "*" not in allowed_hosts or env == "development":
+        return []
+
+    severity = Severity.ERROR if env == "production" else Severity.WARNING
+    return [
+        ContractIssue(
+            severity=severity,
+            category="allowed_hosts",
+            message=(
+                "allowed_hosts contains '*' while env is "
+                f"'{env}'. Configure explicit hostnames before deploying so "
+                "Host header validation is active."
+            ),
+        )
+    ]

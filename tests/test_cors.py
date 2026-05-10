@@ -1,6 +1,9 @@
 """Tests for CORS middleware."""
 
+import pytest
+
 from chirp import App
+from chirp.errors import ConfigurationError
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.testing import TestClient
 
@@ -148,6 +151,10 @@ class TestCORSCredentials:
             assert ("access-control-allow-origin", "https://example.com") in response.headers
             # Should include Vary since it's not wildcard
             assert ("vary", "Origin") in response.headers
+
+    def test_credentials_reject_wildcard_origin(self) -> None:
+        with pytest.raises(ConfigurationError, match="requires explicit allow_origins"):
+            CORSConfig(allow_origins=("*",), allow_credentials=True)
 
 
 class TestCORSExposeHeaders:

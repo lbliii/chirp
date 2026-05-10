@@ -1,6 +1,7 @@
 """Tests for safety contract checks — sse_speculation, csrf_session, middleware_signature, secret_key."""
 
 from chirp.contracts.rules_safety import (
+    check_allowed_hosts,
     check_csrf_session_order,
     check_middleware_signatures,
     check_secret_key,
@@ -184,9 +185,15 @@ class TestMiddlewareSignatures:
 
 
 class _FakeConfig:
-    def __init__(self, secret_key: str = "", env: str = "development") -> None:
+    def __init__(
+        self,
+        secret_key: str = "",
+        env: str = "development",
+        allowed_hosts: tuple[str, ...] = ("*",),
+    ) -> None:
         self.secret_key = secret_key
         self.env = env
+        self.allowed_hosts = allowed_hosts
 
 
 class TestSecretKey:
@@ -214,3 +221,31 @@ class TestSecretKey:
         issues = check_secret_key(_FakeConfig(secret_key="", env="staging"))
         assert len(issues) == 1
         assert issues[0].severity == Severity.ERROR
+
+
+# ---------------------------------------------------------------------------
+# Allowed host checks
+# ---------------------------------------------------------------------------
+
+
+class TestAllowedHosts:
+    def test_wildcard_in_production_errors(self) -> None:
+        issues = check_allowed_hosts(_FakeConfig(env="production", allowed_hosts=("*",)))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert issues[0].category == "allowed_hosts"
+
+    def test_wildcard_in_staging_warns(self) -> None:
+        issues = check_allowed_hosts(_FakeConfig(env="staging", allowed_hosts=("*",)))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+
+    def test_wildcard_in_development_ok(self) -> None:
+        issues = check_allowed_hosts(_FakeConfig(env="development", allowed_hosts=("*",)))
+        assert issues == []
+
+    def test_explicit_hosts_ok(self) -> None:
+        issues = check_allowed_hosts(
+            _FakeConfig(env="production", allowed_hosts=("example.com", ".example.com"))
+        )
+        assert issues == []
