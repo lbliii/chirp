@@ -2,6 +2,7 @@
 
 Opt-in via ``cache_middleware_enabled = True`` in config.
 Only caches GET requests that return 200 with no Set-Cookie header.
+Requests carrying Cookie or Authorization bypass the cache entirely.
 """
 
 import logging
@@ -20,6 +21,7 @@ class CacheMiddleware:
 
     Skips caching for:
     - Non-GET requests
+    - Requests with Cookie or Authorization headers
     - Non-200 responses
     - Responses with Set-Cookie header
     - Streaming/SSE responses
@@ -34,6 +36,8 @@ class CacheMiddleware:
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         if request.method != "GET":
+            return await next(request)
+        if _has_private_request_headers(request):
             return await next(request)
 
         key = self._key_func(request)
@@ -75,3 +79,8 @@ class CacheMiddleware:
                 logger.warning("Cache set error for %s", key, exc_info=True)
 
         return response
+
+
+def _has_private_request_headers(request: Request) -> bool:
+    """Return True for request headers that commonly vary per user."""
+    return bool(request.headers.get("cookie") or request.headers.get("authorization"))

@@ -199,6 +199,47 @@ class TestSetCookieSkip:
         assert counter["calls"] == 2
 
 
+class TestPrivateRequestBypass:
+    """User-specific request headers bypass cache reads and writes."""
+
+    async def test_cookie_request_not_cached(self) -> None:
+        app = _app()
+        _wire_cache(app)
+        counter = {"calls": 0}
+
+        @app.route("/profile")
+        def profile(request):
+            counter["calls"] += 1
+            return f"<p>{request.headers.get('cookie')}:{counter['calls']}</p>"
+
+        async with TestClient(app) as client:
+            first = await client.get("/profile", headers={"Cookie": "session=a"})
+            second = await client.get("/profile", headers={"Cookie": "session=a"})
+            anonymous = await client.get("/profile")
+            anonymous_again = await client.get("/profile")
+
+        assert counter["calls"] == 3
+        assert first.text != second.text
+        assert anonymous.text == anonymous_again.text
+
+    async def test_authorization_request_not_cached(self) -> None:
+        app = _app()
+        _wire_cache(app)
+        counter = {"calls": 0}
+
+        @app.route("/account")
+        def account(request):
+            counter["calls"] += 1
+            return f"<p>{request.headers.get('authorization')}:{counter['calls']}</p>"
+
+        async with TestClient(app) as client:
+            first = await client.get("/account", headers={"Authorization": "Bearer a"})
+            second = await client.get("/account", headers={"Authorization": "Bearer a"})
+
+        assert counter["calls"] == 2
+        assert first.text != second.text
+
+
 # ---------------------------------------------------------------------------
 # 4.4 — Non-200 skip
 # ---------------------------------------------------------------------------

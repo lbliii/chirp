@@ -1,0 +1,1 @@
+`CacheMiddleware` now bypasses cache reads and writes for GET requests carrying `Cookie` or `Authorization` headers, preventing default site-wide caching from replaying authenticated or session-specific HTML.
