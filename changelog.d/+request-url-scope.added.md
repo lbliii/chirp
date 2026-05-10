@@ -1,1 +1,0 @@
-**Request URL scope** — `RequestUrlScope`, `request.with_url_scope(...)`, `request.scoped_url(path)`, and `request.url_for(...)` let middleware generate tenant/base-path public URLs without changing `app.url_for(...)` or rewriting rendered HTML.

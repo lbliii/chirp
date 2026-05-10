@@ -1,1 +1,0 @@
-Added drift guards that keep `docs/public-api.md` aligned with `_API_STATUS`, require every `AppConfig` field to appear in the configuration guide, and require changelog fragments for branch changes to the top-level public API registry.

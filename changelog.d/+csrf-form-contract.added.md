@@ -1,1 +1,0 @@
-**`csrf_form` contract check** — when `CSRFMiddleware` is active, `app.check()` now warns on static mutating forms that do not render `csrf_field()`, call `csrf_token()`, or include an `_csrf_token` field.

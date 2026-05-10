@@ -1,1 +1,0 @@
-Require `kida-templates>=0.9.0`, preserve Chirp's missing-block `KeyError` behavior when Kida reports missing blocks with its typed runtime error, and surface Kida 0.9 component-call, dotted context-contract, literal-attribute, escape-audit, and privacy-lint diagnostics through `app.check()`.

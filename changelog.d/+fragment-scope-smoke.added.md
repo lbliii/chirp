@@ -1,1 +1,0 @@
-**Fragment safety** — `app.check()` now warns when a fragment block depends on imports or bindings declared only inside an ancestor block, and `chirp.testing` adds `RouteSmokeCase` / `assert_route_smoke` for full-page and fragment route smoke checks.

@@ -1,1 +1,0 @@
-SQLite migrations now wrap the migration SQL and tracking-table insert in one explicit transaction, so a failed multi-statement migration does not leave partially-created tables or a stale migration record.

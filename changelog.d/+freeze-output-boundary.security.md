@@ -1,1 +1,0 @@
-`chirp freeze` now rejects expanded URLs containing `.` or `..` path segments before mapping them to output files. Unsafe `freeze_params` values are reported in `FreezeResult.errors` and are not written outside the target output directory.
