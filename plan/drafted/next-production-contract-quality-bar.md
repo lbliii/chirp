@@ -184,6 +184,8 @@ boundaries.
 
 ## Phase 5: Diagnostics, Docs, And Fixtures
 
+**Status**: Complete on `codex/production-contract-quality-bar`.
+
 **Why**: Production dependability needs failure messages and examples that
 teach the safe path before users inspect internals.
 
@@ -207,6 +209,19 @@ teach the safe path before users inspect internals.
 
 - A future agent can read docs, run a targeted command, and understand whether
   behavior is shipped, planned, or intentionally not now.
+
+**Completed proof**:
+
+- Mapped recently added public contract categories to specific terminal concern
+  groups instead of the generic `Other` bucket.
+- Updated public contract debugging guidance to describe concrete fix targets:
+  route, template, block, selector, middleware, config flag, import string, or
+  registration.
+- Added docs guards so the contract guidance keeps naming those fix targets and
+  recent categories.
+- Focused verification passed:
+  `tests/test_terminal_checks.py`, `tests/docs`, and
+  `tests/docs/test_site_link_drift.py`.
 
 ## Suggested Next-Session Order
 

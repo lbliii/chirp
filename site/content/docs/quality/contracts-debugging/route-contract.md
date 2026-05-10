@@ -108,6 +108,12 @@ Beyond route-level checks, `app.check()` also validates hypermedia surface
 contracts. The table below is a category reference for the checks users most
 often tune in CI:
 
+Read each issue as a pointer to one concrete fix target. A useful diagnostic
+names the route, template, block, selector, middleware, config flag, import string,
+or registration that must change. Terminal output groups categories by concern
+(`Routing`, `HTMX`, `Forms`, `OOB / Suspense / SSE`, and so on) so the first
+header tells you which surface to inspect before you open the file.
+
 | Check | Severity | What it catches |
 |---|---|---|
 | `page_handlers` | ERROR / WARNING | `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler` fallback). Handler-shaped typos (`def handle`, `def GET`, `def index`) emit WARNING; an entirely missing handler emits ERROR — the file would register no routes and requests 404/500 at runtime. |
@@ -117,6 +123,7 @@ often tune in CI:
 | `component` | ERROR / WARNING | Component-call validation surfaced by Kida/chirp-ui metadata. The Chirp adapter is wired; full precision depends on typed component metadata from the template package. |
 | `unreachable_block` | WARNING | A filesystem page template defines a sibling block that layout composition will never render, such as `page_scripts` outside `page_content`. Move the content inside the rendered page block or make it a real fragment target. |
 | `composition_extends` | WARNING | A page template extends a registered layout instead of composing into it. Pages should render into the layout content block via `render_with_blocks`; they should not override sibling layout blocks. |
+| `hx-target`, `hx-indicator`, `hx-boost` | ERROR / WARNING | htmx attributes reference missing selectors, invalid boosted links, or unsafe targets. Fix the selector or target element named in the issue. |
 | `fragment_target_orphan` | ERROR / WARNING | A required fragment target registry entry points at a block no template provides, or an optional entry cannot be resolved. Required entries are errors because htmx would otherwise swap nothing. |
 | `oob_registry` | ERROR / WARNING | A registered OOB region references a missing block or mismatched target. Required missing regions fail startup; optional regions can be warnings. |
 | `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |

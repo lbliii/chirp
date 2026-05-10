@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from chirp.contracts import CheckResult, ContractIssue, Severity
-from chirp.server.terminal_checks import format_check_result
+from chirp.server.terminal_checks import _concern_for_category, format_check_result
 from chirp.templating.fragment_target_registry import (
     FragmentTargetRegistry,
     PageShellContract,
@@ -151,6 +153,23 @@ class TestFormatterVerboseDump:
 
 
 class TestFormatterConcernGroups:
+    @pytest.mark.parametrize(
+        ("category", "concern"),
+        [
+            ("page_handlers", "Routing"),
+            ("route_names", "Routing"),
+            ("hx-target", "HTMX"),
+            ("hx-indicator", "HTMX"),
+            ("hx-boost", "HTMX"),
+            ("csrf_form", "Forms"),
+            ("mount_app_merge", "Setup"),
+        ],
+    )
+    def test_public_contract_categories_have_specific_groups(
+        self, category: str, concern: str
+    ) -> None:
+        assert _concern_for_category(category) == concern
+
     def test_groups_issues_by_contract_concern(self) -> None:
         result = CheckResult(
             issues=[
