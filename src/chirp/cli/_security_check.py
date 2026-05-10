@@ -36,10 +36,11 @@ def run_security_check(args) -> None:
 
     # 2. ALLOWED_HOSTS
     allowed = getattr(config, "allowed_hosts", ("*",))
+    wildcard_hosts_ok = "*" not in allowed or config.env == "development"
     check(
-        "*" not in allowed,
+        wildcard_hosts_ok,
         f"allowed_hosts configured ({', '.join(allowed)})",
-        'allowed_hosts is "*" \u2014 all hosts accepted',
+        f'allowed_hosts is "*" in {config.env} \u2014 configure explicit hosts before deploying',
     )
 
     # 3. Debug mode in production

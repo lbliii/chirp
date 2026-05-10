@@ -193,6 +193,18 @@ class TestSSEEventPassthrough:
         assert len(result.events) == 1
         assert result.events[0].data == "line1\nline2\nline3"
 
+    def test_event_name_rejects_line_injection(self) -> None:
+        with pytest.raises(ValueError, match="event must not contain"):
+            SSEEvent(data="payload", event="update\nid: injected")
+
+    def test_id_rejects_line_injection(self) -> None:
+        with pytest.raises(ValueError, match="id must not contain"):
+            SSEEvent(data="payload", id="1\nevent: injected")
+
+    def test_retry_rejects_negative_values(self) -> None:
+        with pytest.raises(ValueError, match="non-negative"):
+            SSEEvent(data="payload", retry=-1)
+
 
 class TestSSEReconnectReplay:
     async def test_last_event_id_replays_only_missed_product_events(self) -> None:

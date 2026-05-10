@@ -30,6 +30,13 @@ from chirp.server.devtools import (
     handle_highlight_request,
 )
 from chirp.server.errors import handle_http_error, handle_internal_error
+from chirp.server.fragment_dispatch import (
+    FRAGMENT_DISPATCH_CACHE_KEY,
+    FragmentDispatchTarget,
+    _coerce_to_fragment,
+    is_fragment_dispatch_request,
+    resolve_fragment_dispatch_target,
+)
 from chirp.server.fragment_targets_debug import (
     FRAGMENT_TARGETS_DEBUG_PATH,
     render_fragment_targets_debug,
@@ -220,7 +227,13 @@ def create_request_handler(
             from chirp.tools.handler import handle_mcp_request
 
             return await handle_mcp_request(req, tool_registry)
-        match = router.match(req.method, req.path)
+        fragment_target = req._cache.get(FRAGMENT_DISPATCH_CACHE_KEY)
+        if isinstance(fragment_target, FragmentDispatchTarget):
+            match = fragment_target.match
+            fragment_block = fragment_target.block_name
+        else:
+            match = router.match(req.method, req.path)
+            fragment_block = None
         return await _invoke_handler(
             match,
             req,
@@ -235,9 +248,20 @@ def create_request_handler(
             swap_scope_map=swap_scope_map,
             suspense_error_template=suspense_error_template,
             suspense_error_block=suspense_error_block,
+            fragment_block=fragment_block,
         )
 
-    return compile_middleware_chain(middleware, dispatch)
+    chain = compile_middleware_chain(middleware, dispatch)
+
+    async def dispatch_with_fragment_resolution(req: Request) -> AnyResponse:
+        if not is_fragment_dispatch_request(req):
+            return await chain(req)
+        target = resolve_fragment_dispatch_target(router, req)
+        target.request._cache[FRAGMENT_DISPATCH_CACHE_KEY] = target
+        g.chirp_fragment_block = target.block_name
+        return await chain(target.request)
+
+    return dispatch_with_fragment_resolution
 
 
 async def handle_request(
@@ -351,6 +375,7 @@ async def _invoke_handler(
     swap_scope_map: Mapping[str, str] | None = None,
     suspense_error_template: str | None = None,
     suspense_error_block: str = "fallback",
+    fragment_block: str | None = None,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -398,6 +423,8 @@ async def _invoke_handler(
     elif force_inline_sync:
         invoke_kw["inline_sync"] = True
     result = await invoke(handler, **invoke_kw, **kwargs)
+    if fragment_block is not None:
+        result = _coerce_to_fragment(result, fragment_block)
 
     return negotiate(
         result,

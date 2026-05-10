@@ -51,7 +51,7 @@
 {% end %}
 
 {% block response %}
-<div class="chirpui-prose">{{ (text ?? "") | markdown | safe }}</div>
+<div class="chirpui-prose">{{ (text ?? "") | markdown }}</div>
 {% end %}
 
 {% block empty %}

@@ -11,6 +11,7 @@ _SITE_CONTENT = _ROOT / "site" / "content"
 
 _INDEX_STEMS = frozenset({"index", "_index", "README"})
 _CHIRP_DOC_LINK_RE = re.compile(r"(?:https://lbliii\.github\.io)?/chirp/docs/[^\s\])\"'<>]+")
+_MARKDOWN_SAFE_PIPE_RE = re.compile(r"\|\s*markdown\s*\|\s*safe\b")
 
 
 def _site_markdown_files() -> tuple[Path, ...]:
@@ -78,3 +79,18 @@ def test_public_chirp_docs_links_resolve_to_source_pages() -> None:
                 offenders.append(f"{rel_path}:{match.start()}: {url}")
 
     assert not offenders, f"Broken /chirp/docs links: {offenders}"
+
+
+def test_public_docs_do_not_mark_markdown_filter_safe() -> None:
+    """Markdown output is sanitized and marked safe by Chirp's filter."""
+    offenders: list[str] = []
+    for rel_path in _public_markdown_files():
+        path = _ROOT / rel_path
+        text = path.read_text()
+        if _MARKDOWN_SAFE_PIPE_RE.search(text):
+            offenders.append(str(rel_path))
+
+    assert not offenders, (
+        "Use `{{ content | markdown }}` in docs. `| safe` after markdown hides "
+        f"the sanitizer contract: {offenders}"
+    )

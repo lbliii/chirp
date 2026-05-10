@@ -54,6 +54,48 @@ class TestMarkdownRenderer:
         assert "<li>" in html
         assert "one" in html
 
+    def test_sanitizes_raw_script_by_default(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer()
+        html = md.render("<script>alert(1)</script>\n\nHello")
+        assert "<script" not in html
+        assert "alert(1)" not in html
+        assert "Hello" in html
+
+    def test_sanitizes_event_handlers_by_default(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer()
+        html = md.render('<img src="/ok.png" onerror="alert(1)" alt="ok">')
+        assert 'src="/ok.png"' in html
+        assert 'alt="ok"' in html
+        assert "onerror" not in html
+
+    def test_sanitizes_unsafe_markdown_urls_by_default(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer()
+        html = md.render("[x](javascript:alert(1))")
+        assert "javascript:" not in html
+        assert "<a" in html
+        assert "href=" not in html
+
+    def test_merges_rel_tokens_for_blank_target_links(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer()
+        html = md.render('<a href="/docs" target="_blank" rel="nofollow">docs</a>')
+        assert 'rel="nofollow noopener noreferrer"' in html
+        assert html.count("rel=") == 1
+
+    def test_sanitize_false_preserves_trusted_html(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer(sanitize=False)
+        html = md.render('<span onclick="trusted()">ok</span>')
+        assert 'onclick="trusted()"' in html
+
 
 # ── Plugins ──────────────────────────────────────────────────────────────
 
@@ -161,6 +203,16 @@ class TestFilterRegistration:
         assert isinstance(renderer, MarkdownRenderer)
         html = renderer.render("**bold**")
         assert "<strong>" in html
+
+    def test_filter_forwards_sanitize_option(self) -> None:
+        from chirp import App
+        from chirp.markdown import register_markdown_filter
+
+        app = App()
+        register_markdown_filter(app, sanitize=False)
+
+        html = app._template_filters["markdown"]('<span onclick="trusted()">ok</span>')
+        assert 'onclick="trusted()"' in html
 
 
 # ── Lazy Import ──────────────────────────────────────────────────────────

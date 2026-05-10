@@ -61,7 +61,13 @@ async def test_limit_is_per_identity_key() -> None:
     app = App()
     app.add_middleware(
         AuthRateLimitMiddleware(
-            AuthRateLimitConfig(requests=1, window_seconds=60, block_seconds=120, paths=("/login",))
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=("/login",),
+                key_header="x-forwarded-for",
+            )
         )
     )
 
@@ -91,3 +97,34 @@ async def test_limit_is_per_identity_key() -> None:
     assert first_ip_1.status == 200
     assert second_ip_1.status == 429
     assert first_ip_2.status == 200
+
+
+@pytest.mark.anyio
+async def test_forwarded_for_is_ignored_by_default() -> None:
+    app = App()
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(requests=1, window_seconds=60, block_seconds=120, paths=("/login",))
+        )
+    )
+
+    @app.route("/login", methods=["POST"])
+    async def login_route(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        common_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        first = await client.post(
+            "/login",
+            body=b"a=1",
+            headers={**common_headers, "x-forwarded-for": "10.0.0.1"},
+        )
+        second = await client.post(
+            "/login",
+            body=b"a=1",
+            headers={**common_headers, "x-forwarded-for": "10.0.0.2"},
+        )
+
+    assert first.status == 200
+    assert second.status == 429

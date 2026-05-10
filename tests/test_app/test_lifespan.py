@@ -1,7 +1,7 @@
 """Tests for chirp.app — App lifecycle, registration, and ASGI entry."""
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -168,6 +168,35 @@ class TestLifespanProtocol:
         failed = [m for m in sent if m["type"] == "lifespan.startup.failed"]
         assert len(failed) == 1
         assert "Database connection refused" in failed[0]["message"]
+
+    async def test_startup_failure_disconnects_connected_database(self) -> None:
+        app = App()
+        events: list[str] = []
+
+        class FakeDatabase:
+            async def connect(self) -> None:
+                events.append("connect")
+
+            async def disconnect(self) -> None:
+                events.append("disconnect")
+
+        app._mutable_state.db = cast(Any, FakeDatabase())
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        @app.on_startup
+        async def bad_setup():
+            events.append("hook")
+            msg = "startup hook failed"
+            raise RuntimeError(msg)
+
+        sent, ok = await _lifespan_exchange(app)
+
+        assert ok is False
+        assert events == ["connect", "hook", "disconnect"]
+        assert sent[-1]["type"] == "lifespan.startup.failed"
 
     async def test_no_hooks(self) -> None:
         """Lifespan responds correctly even with no hooks registered."""

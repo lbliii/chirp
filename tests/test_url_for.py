@@ -129,6 +129,30 @@ def test_url_for_list_path_param_raises_type_error(tmp_path: Path) -> None:
         app.url_for("contacts.contact_id", contact_id=[1, 2])
 
 
+def test_url_for_rejects_value_that_does_not_match_converter(tmp_path: Path) -> None:
+    pages_dir = tmp_path / "pages"
+    _write_page(
+        pages_dir / "contacts" / "{contact_id:int}",
+        body="def get(contact_id: int): return {}",
+    )
+    app = _app_with_pages(pages_dir)
+
+    with pytest.raises(ValueError, match="does not match converter 'int'"):
+        app.url_for("contacts.contact_id", contact_id="alice")
+
+
+def test_url_for_path_converter_requires_non_empty_value(tmp_path: Path) -> None:
+    pages_dir = tmp_path / "pages"
+    _write_page(
+        pages_dir / "files" / "{filepath:path}",
+        body="def get(filepath: str): return {}",
+    )
+    app = _app_with_pages(pages_dir)
+
+    with pytest.raises(ValueError, match="does not match converter 'path'"):
+        app.url_for("files.filepath", filepath="")
+
+
 def test_same_path_different_methods_is_not_a_collision(tmp_path: Path) -> None:
     """A page with both GET (page.py) and POST (_actions.py) at the same URL
     must not be flagged as a duplicate — they're method variants of one name.

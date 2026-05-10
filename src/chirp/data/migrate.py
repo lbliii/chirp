@@ -24,6 +24,7 @@ Or integrated with the app::
     app = App(db="sqlite:///app.db", migrations="migrations/")
 """
 
+import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -128,18 +129,43 @@ async def _get_applied_versions(db: Database) -> set[int]:
 async def _apply_migration(db: Database, migration: Migration) -> None:
     """Apply a single migration.
 
-    Uses ``execute_script`` for SQLite to support multi-statement migration
-    files (e.g. CREATE TABLE + CREATE INDEX in one file). The tracking
-    record is inserted separately after the migration succeeds.
+    Uses ``execute_script`` for multi-statement migration files (e.g.
+    CREATE TABLE + CREATE INDEX in one file). SQLite gets an explicit
+    BEGIN/COMMIT wrapper because ``sqlite3.executescript`` does not honor
+    the connection's surrounding transaction mode.
     """
     now = datetime.now(UTC).isoformat()
-    await db.execute_script(migration.sql)
-    await db.execute(
-        f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) VALUES (?, ?, ?)",
-        migration.version,
-        migration.name,
-        now,
-    )
+    if getattr(db, "_driver", None) == "sqlite":
+        migration_sql = migration.sql.rstrip()
+        if not migration_sql.endswith(";"):
+            migration_sql += ";"
+        script = (
+            "BEGIN;\n"
+            f"{migration_sql}\n"
+            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) "
+            f"VALUES ({migration.version}, {_sql_literal(migration.name)}, {_sql_literal(now)});\n"
+            "COMMIT;"
+        )
+        try:
+            await db.execute_script(script)
+        except Exception:
+            with contextlib.suppress(Exception):
+                await db.execute("ROLLBACK")
+            raise
+        return
+
+    async with db.transaction():
+        await db.execute_script(migration.sql)
+        await db.execute(
+            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) VALUES (?, ?, ?)",
+            migration.version,
+            migration.name,
+            now,
+        )
+
+
+def _sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 async def migrate(db: Database, directory: str | Path) -> MigrationResult:

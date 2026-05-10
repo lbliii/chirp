@@ -40,7 +40,7 @@ class AuthRateLimitConfig:
     block_seconds: int = 300
     methods: tuple[str, ...] = ("POST",)
     paths: tuple[str, ...] = ("/login", "/signup", "/register", "/password-reset")
-    key_header: str | None = "x-forwarded-for"
+    key_header: str | None = None
     backend: RateLimitBackend | None = None  # None = in-memory
 
 

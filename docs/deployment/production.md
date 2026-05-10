@@ -165,12 +165,16 @@ security-facing and need a separate public API decision before adoption.
 - Use a strong `secret_key` generated with `secrets.token_urlsafe()`.
 - Run `chirp check myapp:app --warnings-as-errors`.
 - Run `pounce check --app myapp:app` with your production server config.
+- Set explicit `allowed_hosts`; wildcard hosts are reported by `app.check()`
+  outside development.
 - Add `SecurityHeadersMiddleware` or equivalent headers through custom
   middleware.
 - Add `CSRFMiddleware` for apps with POST, PUT, PATCH, or DELETE forms.
 - Never use `| safe` on user input without sanitization.
 - Enable TLS with valid certificates.
-- Enable rate limiting where public traffic can reach the app.
+- Enable rate limiting where public traffic can reach the app, and only trust
+  `X-Forwarded-For` behind a proxy that rewrites it.
+- Set appropriate CORS policies; credentialed CORS requires explicit origins.
 - Monitor metrics and health checks.
 - Configure graceful shutdown timeouts for your deployment platform.
 

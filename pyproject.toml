@@ -222,7 +222,14 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = ["-ra", "-q", "--strict-markers", "--import-mode=importlib"]
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--import-mode=importlib",
+    "-p",
+    "no:dori_snapshots",
+]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: integration tests requiring full app setup",

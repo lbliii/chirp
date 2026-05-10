@@ -43,9 +43,10 @@ rendered HTML.
 
 Chirp's default cache key includes the path, query string, and htmx shape, so
 `/threads?page=1`, `/threads?page=2`, full-page responses, and htmx fragments do
-not collide. It still does not know about user identity, permissions, locale, or
-custom feature flags. Include those in a custom key for authenticated pages, or
-leave those pages uncached.
+not collide. `CacheMiddleware` also bypasses requests carrying `Cookie` or
+`Authorization` headers. It still does not know about locale, tenant, custom
+feature flags, or other app-specific variants. Include those in a custom key for
+scoped pages, or leave those pages uncached.
 
 ## SSE
 

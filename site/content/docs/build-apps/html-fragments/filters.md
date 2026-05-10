@@ -129,12 +129,14 @@ Chirp uses Kida's template engine, which provides escape and safe filters. These
 
 **`e` / `escape`** — HTML-escape a value. When `AppConfig(autoescape=True)` (the default), `{{ x }}` is escaped automatically. Use `| e` explicitly when chaining filters that might strip escaping (e.g. `{{ user_input | upper | e }}`).
 
-**`safe(reason="...")`** — Mark output as trusted HTML so it is not escaped. **Only use for content that is sanitized or from trusted sources** (e.g. Patitas markdown output, CMS blocks, server-generated HTML). Never use on raw user input — that enables XSS.
+**`safe(reason="...")`** — Mark output as trusted HTML so it is not escaped. **Only use for content that is sanitized or from trusted sources** (e.g. sanitized markdown output, CMS blocks, server-generated HTML). Never use on raw user input — that enables XSS.
 
 ```html
-{{ content | markdown | safe(reason="patitas output") }}
+{{ content | markdown }}
 {{ cms_block | safe(reason="admin-only CMS") }}
 ```
+
+Chirp's markdown filter sanitizes unsafe HTML and URLs by default and returns template-safe markup. Pass `sanitize=False` to `register_markdown_filter()` only for trusted markdown where raw HTML is intentional.
 
 The `reason` argument is for code review and audit; it is not used at runtime.
 

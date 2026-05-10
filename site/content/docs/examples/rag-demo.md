@@ -77,7 +77,7 @@ For the standard answer structure (body + prose + copy button), use the ``sse_an
 
 ```html
 {% from "chirp/sse_answer.html" import sse_answer %}
-{{ sse_answer(text, text | markdown | cite(sources) | safe(reason="patitas")) }}
+{{ sse_answer(text, text | markdown | cite(sources)) }}
 ```
 
 The RAG demo uses custom logic for streaming states; the macro suits the final "done" state.

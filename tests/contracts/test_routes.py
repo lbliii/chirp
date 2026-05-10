@@ -55,6 +55,15 @@ class TestPathMatchesRoute:
     def test_typed_param_match(self):
         assert path_matches_route("/api/items/42", "/api/items/{id:int}")
 
+    def test_typed_param_rejects_wrong_shape(self):
+        assert not path_matches_route("/api/items/alice", "/api/items/{id:int}")
+
+    def test_float_param_rejects_wrong_shape(self):
+        assert not path_matches_route("/price/free", "/price/{amount:float}")
+
+    def test_percent_encoded_typed_param_match(self):
+        assert path_matches_route("/api/items/%34%32", "/api/items/{id:int}")
+
     def test_multiple_params(self):
         assert path_matches_route("/users/1/posts/5", "/users/{uid}/posts/{pid}")
 
@@ -74,6 +83,10 @@ class TestPathMatchesRoute:
     def test_query_string_with_param_route(self):
         """Query string stripped before matching param routes."""
         assert path_matches_route("/api/items/42?expand=details", "/api/items/{id}")
+
+    def test_path_converter_requires_remaining_segment(self):
+        assert path_matches_route("/files/docs/readme.md", "/files/{filepath:path}")
+        assert not path_matches_route("/files", "/files/{filepath:path}")
 
 
 class TestContractDecorator:

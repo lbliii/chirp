@@ -29,7 +29,7 @@ freeze-time rewriting that turns a regular block into a true live block.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from chirp._internal.invoke import invoke
@@ -37,6 +37,8 @@ from chirp.app.state import PendingRoute
 from chirp.context import g
 from chirp.errors import HTTPError, NotFound
 from chirp.http.request import Request
+from chirp.routing.route import RouteMatch
+from chirp.routing.router import Router
 from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.templating.returns import Fragment, LayoutPage, Page, Template
 
@@ -51,6 +53,18 @@ FRAGMENT_ROUTE_PATH = "/_frag/{path:path}"
 
 FRAGMENT_QUERY_PARAM = "_b"
 """Query param carrying the block name. Short to keep URLs cache-key-friendly."""
+
+FRAGMENT_DISPATCH_CACHE_KEY = "__chirp_fragment_dispatch__"
+"""Request cache key used after resolving a block-fetch request before middleware."""
+
+
+@dataclass(frozen=True, slots=True)
+class FragmentDispatchTarget:
+    """Resolved target route for a ``/_frag`` request."""
+
+    match: RouteMatch
+    request: Request
+    block_name: str
 
 
 def fragment_url(route_path: str, block_name: str) -> str:
@@ -92,30 +106,25 @@ def _normalize_target_path(encoded: str) -> str:
     return "/" + encoded.lstrip("/")
 
 
-def _coerce_to_fragment(result: Any, block_name: str) -> Fragment:
-    """Convert a handler's return value into a ``Fragment`` for *block_name*.
-
-    Raises ``_BadFragmentRequest`` for streaming / mutation / redirect results
-    — those have no single block to extract.
-    """
-    if isinstance(result, Fragment):
-        return result
-    if isinstance(result, (Template, Page, LayoutPage)):
-        return Fragment(result.template_name, block_name, **result.context)
-    raise _BadFragmentRequest(
-        f"cannot extract block from {type(result).__name__}; "
-        "block-fetch requires Template/Page/LayoutPage/Fragment"
-    )
+def _encoded_path_from_fragment_request(path: str) -> str | None:
+    """Return the encoded target path segment for a fragment-dispatch URL."""
+    prefix = f"{FRAGMENT_ROUTE_PREFIX}/"
+    if path.startswith(prefix):
+        return path[len(FRAGMENT_ROUTE_PREFIX) :]
+    return None
 
 
-async def _dispatch_fragment(app: App, request: Request) -> Fragment:
-    """Match the underlying route, invoke its handler, re-pack as a Fragment."""
-    runtime = app._runtime_state
-    router = runtime.router
-    if router is None:
-        raise _BadFragmentRequest("router not compiled")
+def is_fragment_dispatch_request(request: Request) -> bool:
+    """Whether *request* addresses the block-fetch endpoint."""
+    return _encoded_path_from_fragment_request(request.path) is not None
 
-    encoded = request.path_params.get("path", "")
+
+def resolve_fragment_dispatch_target(router: Router, request: Request) -> FragmentDispatchTarget:
+    """Resolve ``/_frag{path}?_b=...`` before middleware policy runs."""
+    encoded = _encoded_path_from_fragment_request(request.path)
+    if encoded is None:
+        raise _BadFragmentRequest("not a fragment-dispatch request")
+
     block = request.query.get(FRAGMENT_QUERY_PARAM)
     if not block:
         raise _BadFragmentRequest(f"missing {FRAGMENT_QUERY_PARAM!r} query param")
@@ -151,16 +160,43 @@ async def _dispatch_fragment(app: App, request: Request) -> Fragment:
         path=target_path,
         path_params=match.path_params,
     )
+    return FragmentDispatchTarget(match=match, request=target_request, block_name=block)
+
+
+def _coerce_to_fragment(result: Any, block_name: str) -> Fragment:
+    """Convert a handler's return value into a ``Fragment`` for *block_name*.
+
+    Raises ``_BadFragmentRequest`` for streaming / mutation / redirect results
+    — those have no single block to extract.
+    """
+    if isinstance(result, Fragment):
+        return result
+    if isinstance(result, (Template, Page, LayoutPage)):
+        return Fragment(result.template_name, block_name, **result.context)
+    raise _BadFragmentRequest(
+        f"cannot extract block from {type(result).__name__}; "
+        "block-fetch requires Template/Page/LayoutPage/Fragment"
+    )
+
+
+async def _dispatch_fragment(app: App, request: Request) -> Fragment:
+    """Match the underlying route, invoke its handler, re-pack as a Fragment."""
+    runtime = app._runtime_state
+    router = runtime.router
+    if router is None:
+        raise _BadFragmentRequest("router not compiled")
+
+    target = resolve_fragment_dispatch_target(router, request)
 
     # Stash the block on `g` so handler code / middleware can introspect
     # "is this a block-fetch?" without plumbing a new arg.
-    g.chirp_fragment_block = block
+    g.chirp_fragment_block = target.block_name
 
-    plan = match.route.invoke_plan
+    plan = target.match.route.invoke_plan
     kwargs = build_handler_kwargs(
-        match.route.handler,
-        target_request,
-        match.path_params,
+        target.match.route.handler,
+        target.request,
+        target.match.path_params,
         app._mutable_state.providers,
         body_data=None,
         invoke_plan=plan,
@@ -171,8 +207,8 @@ async def _dispatch_fragment(app: App, request: Request) -> Fragment:
         invoke_kw["is_async"] = plan.is_async
         invoke_kw["inline_sync"] = plan.inline_sync
 
-    result = await invoke(match.route.handler, **invoke_kw, **kwargs)
-    return _coerce_to_fragment(result, block)
+    result = await invoke(target.match.route.handler, **invoke_kw, **kwargs)
+    return _coerce_to_fragment(result, target.block_name)
 
 
 def make_fragment_dispatch_pending_route(app: App) -> PendingRoute:

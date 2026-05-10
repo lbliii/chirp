@@ -84,6 +84,10 @@ Supported types:
 | `float` | digits with optional decimal | `/price/{amount:float}` |
 | `path` | any chars including `/` | `/files/{filepath:path}` |
 
+Parameter names must be valid Python identifiers, converters must be one of the supported names above, and routes use Chirp's `{param}` syntax rather than Flask-style `<param>`. Routes that differ only by parameter name, such as `/users/{id}` and `/users/{name}`, are duplicate route shapes and are rejected.
+
+`url_for()` validates supplied path values against the same converter rules, so `url_for("users.detail", id="alice")` fails for `/users/{id:int}` instead of generating a URL the router cannot match.
+
 ### Catch-All Routes
 
 Use `{name:path}` to match the rest of the URL:
@@ -93,6 +97,8 @@ Use `{name:path}` to match the rest of the URL:
 def serve_file(filepath: str):
     return send_file(filepath)  # filepath can contain slashes
 ```
+
+`path` converters must be the final segment because they consume the rest of the URL.
 
 ## Handler Signature Introspection
 
@@ -190,9 +196,11 @@ The compiled route table is immutable. Under free-threading, all worker threads 
 When `chirp check <app>` validates templates, it extracts `hx-get`, `hx-post`,
 `hx-put`, `hx-delete`, `hx-patch`, `action`, and route-bearing macro arguments
 such as `confirm_url`, then verifies method + path against the route table.
-Dynamic URLs (built with Kida's `~` or `{{ }}`) are skipped; only literal URLs
-are validated. Use `~` or `{{ var }}` for path parameters; both work at render
-time and are correctly treated as dynamic by the checker.
+Literal URLs are checked against route converter rules, so `/users/alice` does
+not satisfy `/users/{id:int}`. Dynamic URLs (built with Kida's `~` or `{{ }}`)
+are skipped; only literal URLs are validated. Use `~` or `{{ var }}` for path
+parameters; both work at render time and are correctly treated as dynamic by
+the checker.
 
 `confirm_url` defaults to `POST` unless a companion `confirm_method` is present,
 which lets dialog-style component APIs participate in the same route validation
