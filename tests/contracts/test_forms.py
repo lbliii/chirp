@@ -315,6 +315,38 @@ class TestCSRFFormTokenChecks:
 
         assert csrf_warnings == []
 
+    def test_unquoted_exempt_form_action_skips_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text(
+            '<form method=post action=/webhook><input name="payload"></form>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig(exempt_paths=frozenset({"/webhook"}))))
+
+        @app.route("/webhook", methods=["POST"])
+        async def webhook():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
+    def test_unquoted_exempt_hx_target_skips_mutating_form_check(self, tmp_path):
+        (tmp_path / "page.html").write_text('<form hx-post=/webhook><input name="payload"></form>')
+        app = App(AppConfig(template_dir=str(tmp_path)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig(exempt_paths=frozenset({"/webhook"}))))
+
+        @app.route("/webhook", methods=["POST"])
+        async def webhook():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
+
+        assert csrf_warnings == []
+
     def test_csrf_form_check_inactive_without_csrf_middleware(self, tmp_path):
         (tmp_path / "page.html").write_text(
             '<form method="post" action="/save"><input name="title"></form>'

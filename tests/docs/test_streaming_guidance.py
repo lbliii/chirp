@@ -11,9 +11,10 @@ def _read(path: str) -> str:
 
 def test_realtime_source_docs_name_product_owned_replay() -> None:
     text = _read("docs/realtime-production.md")
+    compact = " ".join(text.split())
 
     assert "Last-Event-ID" in text
-    assert "Chirp\nsupports `SSEEvent(id=...)`" in text
+    assert "Chirp supports `SSEEvent(id=...)`" in compact
     assert "the product owns the cursor" in text
     assert "durable cursor storage remains product-owned" in text
 

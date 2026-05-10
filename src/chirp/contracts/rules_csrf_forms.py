@@ -15,7 +15,7 @@ _UNSAFE_METHOD_PATTERN = re.compile(
 )
 _UNSAFE_HTMX_PATTERN = re.compile(r"\bhx-(?:post|put|patch|delete)\s*=", re.IGNORECASE)
 _ATTR_PATTERN = re.compile(
-    r"""\b(?P<name>[A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*(?P<quote>["'])(?P<value>.*?)(?P=quote)""",
+    r"""\b(?P<name>[A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*(?:(?P<quote>["'])(?P<quoted>.*?)(?P=quote)|(?P<unquoted>[^\s"'=<>`]+))""",
     re.DOTALL,
 )
 
@@ -44,10 +44,13 @@ def _configured_exempt_paths(config: Any | None) -> frozenset[str]:
 
 
 def _attrs_map(attrs: str) -> dict[str, str]:
-    return {
-        match.group("name").lower(): match.group("value").strip()
-        for match in _ATTR_PATTERN.finditer(attrs)
-    }
+    attrs_by_name: dict[str, str] = {}
+    for match in _ATTR_PATTERN.finditer(attrs):
+        value = match.group("quoted")
+        if value is None:
+            value = match.group("unquoted") or ""
+        attrs_by_name[match.group("name").lower()] = value.strip()
+    return attrs_by_name
 
 
 def _is_mutating_form(attrs: str) -> bool:
@@ -80,7 +83,7 @@ def _has_csrf_marker(form_source: str, field_name: str) -> bool:
     if "csrf_field(" in form_source or "csrf_token(" in form_source:
         return True
     field_pattern = re.compile(
-        rf"""\bname\s*=\s*(?P<quote>["']){re.escape(field_name)}(?P=quote)""",
+        rf"""\bname\s*=\s*(?:(?P<quote>["']){re.escape(field_name)}(?P=quote)|{re.escape(field_name)}(?=\s|>|/))""",
         re.IGNORECASE,
     )
     return field_pattern.search(form_source) is not None

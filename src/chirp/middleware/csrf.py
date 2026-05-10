@@ -84,7 +84,8 @@ def csrf_field() -> str:
             ...
         </form>
 
-    Renders: ``<input type="hidden" name="_csrf_token" value="...">``
+    Renders a hidden ``<input>`` using the active ``CSRFConfig.field_name``
+    and the current request token.
     """
     from kida.utils.html import Markup
 
