@@ -137,7 +137,7 @@ class TestRenderPlanBlockValidation:
         assert "a" in rendered.main_html
 
     def test_validate_blocks_default_off_raises_at_render(self, kida_env: Environment) -> None:
-        """Without validate_blocks, missing block raises at render time (Kida KeyError)."""
+        """Without validate_blocks, missing block raises at render time."""
         adapter = KidaAdapter(kida_env)
         comp = PageComposition(
             template="search.html",

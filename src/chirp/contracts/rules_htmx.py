@@ -28,6 +28,8 @@ _SELECTOR_DIRECT_LEADING = frozenset({">", "+", "~"})
 def check_hx_target_selectors(
     template_sources: dict[str, str],
     all_ids: set[str],
+    *,
+    literal_selectors: dict[str, list[str]] | None = None,
 ) -> tuple[list[ContractIssue], int]:
     """Validate #id hx-target selectors against known static ids."""
     issues: list[ContractIssue] = []
@@ -36,6 +38,10 @@ def check_hx_target_selectors(
         if template_name.startswith(("chirp/", "chirpui/")):
             continue
         selectors = extract_hx_target_selectors(source)
+        if literal_selectors:
+            for selector in literal_selectors.get(template_name, ()):
+                if selector not in selectors:
+                    selectors.append(selector)
         for selector in selectors:
             first_word = selector.split()[0] if selector else ""
             if first_word.lower() in _HTMX_SPECIAL_TARGETS:

@@ -1,6 +1,4 @@
-"""Tests for component call validation via kida_env.validate_calls()."""
-
-from types import SimpleNamespace
+"""Tests for Kida component call validation."""
 
 from chirp import App
 from chirp.config import AppConfig
@@ -8,67 +6,63 @@ from chirp.contracts import Severity, check_hypermedia_surface
 
 
 class TestComponentCallValidation:
-    """Component call validation via kida_env.validate_calls()."""
+    """Component call validation via Kida 0.9 static analysis."""
 
-    def test_issues_surface_from_validate_calls(self, tmp_path):
-        """When kida exposes validate_calls(), issues are forwarded."""
+    def test_unknown_and_missing_params_surface_as_component_errors(self, tmp_path):
+        """Bad Kida component call parameters fail app.check()."""
+        (tmp_path / "board.html").write_text(
+            """
+            {% def card(title: str, url: str) %}<a href="{{ url }}">{{ title }}</a>{% end %}
+            {{ card(titl="Save") }}
+            """
+        )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
         async def home():
             return "ok"
 
-        # Prepare mock issues from kida
-        mock_issue = SimpleNamespace(
-            is_error=True,
-            message="card(titl='x') has no parameter 'titl'. Did you mean 'title'?",
-            template="board.html",
-        )
-
-        app._ensure_frozen()
-        kida_env = app._kida_env
-        # Temporarily add validate_calls to the environment
-        kida_env.validate_calls = lambda: [mock_issue]
-        try:
-            result = check_hypermedia_surface(app)
-        finally:
-            del kida_env.validate_calls
+        result = check_hypermedia_surface(app)
 
         comp_issues = [i for i in result.issues if i.category == "component"]
         assert len(comp_issues) == 1
         assert comp_issues[0].severity == Severity.ERROR
         assert "titl" in comp_issues[0].message
+        assert "url" in comp_issues[0].message
         assert comp_issues[0].template == "board.html"
+        assert "line" in (comp_issues[0].details or "")
         assert result.component_calls_validated == 1
 
-    def test_warning_severity_forwarded(self, tmp_path):
-        """Non-error issues from validate_calls come through as WARNING."""
+    def test_literal_type_mismatch_surfaces_as_component_error(self, tmp_path):
+        """Kida type annotations catch literal component argument mismatches."""
+        (tmp_path / "board.html").write_text(
+            """
+            {% def badge(count: int) %}<span>{{ count }}</span>{% end %}
+            {{ badge(count="5") }}
+            """
+        )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")
         async def home():
             return "ok"
 
-        mock_issue = SimpleNamespace(
-            is_error=False,
-            message="card() missing optional parameter 'footer'.",
-            template="board.html",
-        )
-
-        app._ensure_frozen()
-        kida_env = app._kida_env
-        kida_env.validate_calls = lambda: [mock_issue]
-        try:
-            result = check_hypermedia_surface(app)
-        finally:
-            del kida_env.validate_calls
+        result = check_hypermedia_surface(app)
 
         comp_issues = [i for i in result.issues if i.category == "component"]
         assert len(comp_issues) == 1
-        assert comp_issues[0].severity == Severity.WARNING
+        assert comp_issues[0].severity == Severity.ERROR
+        assert "passes str" in comp_issues[0].message
+        assert "expects int" in comp_issues[0].message
 
-    def test_graceful_noop_without_validate_calls(self, tmp_path):
-        """When kida doesn't have validate_calls, no component issues."""
+    def test_valid_component_calls_do_not_emit_component_issues(self, tmp_path):
+        """Valid Kida component calls stay quiet."""
+        (tmp_path / "board.html").write_text(
+            """
+            {% def card(title: str, url: str) %}<a href="{{ url }}">{{ title }}</a>{% end %}
+            {{ card(title="Save", url="/save") }}
+            """
+        )
         app = App(AppConfig(template_dir=str(tmp_path)))
 
         @app.route("/")

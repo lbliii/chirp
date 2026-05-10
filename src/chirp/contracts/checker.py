@@ -43,6 +43,18 @@ from .rules_htmx import (
 )
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
+from .rules_kida_analysis import (
+    check_component_calls,
+    check_template_context_contracts,
+    check_template_escape_audit,
+    check_template_privacy,
+    collect_literal_attributes,
+    literal_href_references,
+    literal_htmx_partial_sources,
+    literal_hx_target_selectors,
+    literal_route_targets,
+    literal_static_ids,
+)
 from .rules_layout import check_layout_chains
 from .rules_live_blocks import check_live_blocks
 from .rules_mount_app import check_mount_app_merge
@@ -321,6 +333,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         template_aliases = getattr(kida_env, "template_aliases", None)
         referenced_paths: set[str] = set()
         static_routes, parametric_routes = build_route_index(route_paths)
+        literal_attrs_by_template = collect_literal_attributes(kida_env, template_sources)
 
         all_ids: set[str] = set()
         static_ids: set[str] = set()
@@ -330,6 +343,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         for template_name, source in template_sources.items():
             if template_name.startswith("chirpui/"):
                 continue
+            literal_attrs = literal_attrs_by_template.get(template_name, ())
             for legacy_action in sorted(extract_legacy_action_contracts(source)):
                 result.issues.append(
                     ContractIssue(
@@ -344,6 +358,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     )
                 )
             targets = extract_targets_from_source(source)
+            for target in literal_route_targets(literal_attrs):
+                if target not in targets:
+                    targets.append(target)
             result.targets_found += len(targets)
             for attr_name, url, method_override in targets:
                 if attr_name == "action" and not url.startswith("/"):
@@ -376,7 +393,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                             template=template_name,
                         )
                     )
-            s = extract_static_ids(source)
+            s = extract_static_ids(source) | literal_static_ids(literal_attrs)
             static_ids.update(s)
             all_ids.update(s)
             all_ids.update(extract_fragment_island_ids(source))
@@ -386,11 +403,17 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                 resolve_template_reference(ref, template_name, template_aliases)
                 for ref in extract_template_references(source)
             )
-            for href_url in extract_href_references(source):
+            for href_url in extract_href_references(source) | literal_href_references(
+                literal_attrs
+            ):
                 href_match = find_matching_route(href_url, static_routes, parametric_routes)
                 if href_match is not None:
                     referenced_paths.add(href_match[0])
-            for partial_url in extract_htmx_partial_sources(source):
+            partial_urls = list(extract_htmx_partial_sources(source))
+            for partial_url in literal_htmx_partial_sources(literal_attrs):
+                if partial_url not in partial_urls:
+                    partial_urls.append(partial_url)
+            for partial_url in partial_urls:
                 partial_match = find_matching_route(partial_url, static_routes, parametric_routes)
                 if partial_match is not None:
                     referenced_paths.add(partial_match[0])
@@ -404,7 +427,15 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                         )
                     )
 
-        hx_target_issues, hx_validated = check_hx_target_selectors(template_sources, all_ids)
+        literal_hx_targets = {
+            template_name: literal_hx_target_selectors(attrs)
+            for template_name, attrs in literal_attrs_by_template.items()
+        }
+        hx_target_issues, hx_validated = check_hx_target_selectors(
+            template_sources,
+            all_ids,
+            literal_selectors=literal_hx_targets,
+        )
         result.hx_targets_validated = hx_validated
         result.issues.extend(hx_target_issues)
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
@@ -557,6 +588,14 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_alpine_cdn_urls(template_sources))
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
         result.issues.extend(check_fragment_block_scope(template_sources, kida_env))
+        result.issues.extend(
+            check_template_context_contracts(kida_env, template_sources, snapshot.extras)
+        )
+        component_issues, component_count = check_component_calls(kida_env, template_sources)
+        result.component_calls_validated += component_count
+        result.issues.extend(component_issues)
+        result.issues.extend(check_template_escape_audit(kida_env, template_sources))
+        result.issues.extend(check_template_privacy(kida_env, template_sources))
 
         # Reactive bus contract checks (if a DependencyIndex is registered)
         reactive_index = getattr(app, "_reactive_index", None) or snapshot.extras.get(
@@ -664,20 +703,6 @@ def check_hypermedia_surface(app: App) -> CheckResult:
                     "Fragment context check failed for route %s",
                     route.path,
                     exc_info=True,
-                )
-
-    if kida_env is not None:
-        validate_fn = getattr(kida_env, "validate_calls", None)
-        if callable(validate_fn):
-            for issue in validate_fn():
-                result.component_calls_validated += 1
-                result.issues.append(
-                    ContractIssue(
-                        severity=Severity.ERROR if issue.is_error else Severity.WARNING,
-                        category="component",
-                        message=issue.message,
-                        template=getattr(issue, "template", None),
-                    )
                 )
 
     # Safety checks: catch silent failure modes
