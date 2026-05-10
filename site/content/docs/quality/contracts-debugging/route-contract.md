@@ -125,6 +125,7 @@ header tells you which surface to inspect before you open the file.
 | `composition_extends` | WARNING | A page template extends a registered layout instead of composing into it. Pages should render into the layout content block via `render_with_blocks`; they should not override sibling layout blocks. |
 | `hx-target`, `hx-indicator`, `hx-boost` | ERROR / WARNING | htmx attributes reference missing selectors, invalid boosted links, or unsafe targets. Fix the selector or target element named in the issue. |
 | `fragment_target_orphan` | ERROR / WARNING | A required fragment target registry entry points at a block no template provides, or an optional entry cannot be resolved. Required entries are errors because htmx would otherwise swap nothing. |
+| `fragment_target_scan` | ERROR | Chirp could not inspect a page template while checking fragment target registrations. Fix the named template parse/load error first; otherwise orphaned target checks may be incomplete. |
 | `oob_registry` | ERROR / WARNING | A registered OOB region references a missing block or mismatched target. Required missing regions fail startup; optional regions can be warnings. |
 | `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |
 | `reactive_cycle` | WARNING | Derivation graph contains a cycle (`index.derive()` forms a loop) |

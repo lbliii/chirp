@@ -47,16 +47,27 @@ def check_fragment_target_orphans(
         return []
 
     defined_blocks: set[str] = set()
+    issues: list[ContractIssue] = []
     for template_name in page_templates:
         try:
             template = kida_env.get_template(template_name)
             blocks = template.block_metadata()
-        except Exception:
+        except Exception as exc:
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="fragment_target_scan",
+                    message=(
+                        f"Could not inspect template '{template_name}' while checking "
+                        f"fragment target registrations: {type(exc).__name__}: {exc}"
+                    ),
+                    template=template_name,
+                )
+            )
             continue
         if blocks is not None:
             defined_blocks.update(blocks)
 
-    issues: list[ContractIssue] = []
     for target_id in sorted(registered):
         config = fragment_target_registry.get(target_id)
         if config is None:

@@ -31,6 +31,10 @@ def _orphans(result) -> list:
     return [i for i in result.issues if i.category == "fragment_target_orphan"]
 
 
+def _scan_errors(result) -> list:
+    return [i for i in result.issues if i.category == "fragment_target_scan"]
+
+
 class TestRequiredTargetOrphans:
     def test_required_target_missing_block_is_error(self, tmp_path):
         app = _page_app(tmp_path)
@@ -91,6 +95,31 @@ class TestNoOrphanWhenBlockExists:
 
         result = check_hypermedia_surface(app)
         assert _orphans(result) == []
+
+    def test_template_inspection_error_is_reported(self, tmp_path):
+        write_layout_page(
+            tmp_path,
+            "<html><body>{% block content %}{% endblock %}</body></html>",
+            '{% extends "_layout.html" %}{% block content %}{% if %}{% endblock %}',
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        app._mutable_state.page_leaf_templates.add("page.html")
+        app._mutable_state.page_templates.add("page.html")
+        app._mutable_state.fragment_target_registry.register(
+            "page-root", fragment_block="foo", required=True
+        )
+
+        result = check_hypermedia_surface(app)
+        errors = _scan_errors(result)
+        assert len(errors) == 1
+        assert errors[0].severity.name == "ERROR"
+        assert errors[0].template == "page.html"
+        assert "Could not inspect template" in errors[0].message
 
 
 class TestSeverityOverride:
