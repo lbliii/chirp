@@ -38,6 +38,10 @@ def _wire_cache(app, backend=None, ttl: int = 300):
     return backend
 
 
+def _headers(response) -> dict[str, str]:
+    return {name.lower(): value for name, value in response.headers}
+
+
 # ---------------------------------------------------------------------------
 # 4.1 — Cache miss then hit
 # ---------------------------------------------------------------------------
@@ -108,6 +112,28 @@ class TestCacheMissThenHit:
         assert "fragment call 2" in fragment.text
         assert full_again.text == full.text
         assert counter["calls"] == 2
+
+    async def test_cached_hit_preserves_response_headers_and_content_type(self) -> None:
+        app = _app()
+        _wire_cache(app)
+        counter = {"calls": 0}
+
+        @app.route("/metadata")
+        def metadata():
+            counter["calls"] += 1
+            return Response(
+                body="<p>cached</p>", content_type="text/html; charset=iso-8859-1"
+            ).with_header("X-Trace", "abc123")
+
+        async with TestClient(app) as client:
+            first = await client.get("/metadata")
+            second = await client.get("/metadata")
+
+        assert counter["calls"] == 1
+        second_headers = _headers(second)
+        assert first.content_type == "text/html; charset=iso-8859-1"
+        assert second.content_type == "text/html; charset=iso-8859-1"
+        assert second_headers["x-trace"] == "abc123"
 
 
 # ---------------------------------------------------------------------------
