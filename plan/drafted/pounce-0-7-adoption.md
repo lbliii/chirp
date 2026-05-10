@@ -137,6 +137,8 @@ The stewards converged on five points:
 
 ### 1. CLI And Production Launch Parity
 
+**Status**: Done in `fix: align pounce production launch config`.
+
 **Why**: `chirp run --production` must not ignore production settings that
 `app.run()` honors.
 
@@ -150,6 +152,12 @@ The stewards converged on five points:
   unless the launch path can provide a Pounce app import path.
 
 **Required proof**:
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_cli.py tests/test_cli_run.py tests/test_app/test_worker_lifecycle.py -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_startup_errors.py tests/test_sync_handler.py tests/test_sync_request.py -q`
+- `.venv/bin/ty check src/chirp/`
+
+**Completed proof**:
 
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_cli.py tests/test_cli_run.py tests/test_app/test_worker_lifecycle.py -q`
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_startup_errors.py tests/test_sync_handler.py tests/test_sync_request.py -q`
@@ -350,4 +358,3 @@ operator implications.
 - Chirp WebSocket return types.
 - Pounce HTTP/2/HTTP/3 parser regression tests in Chirp.
 - Automatic `pounce.toml` loading by `chirp run` without a design review.
-
