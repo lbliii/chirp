@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from chirp import App, AppConfig
+from chirp.http.response import Response
 from chirp.realtime.events import EventStream
 from chirp.templating.returns import Fragment, Template
 from chirp.testing import TestClient
@@ -83,6 +84,33 @@ class TestFragmentDispatch:
         async with TestClient(app_with_blocks) as client:
             response = await client.get("/_frag/_frag/hello/alice?_b=main")
             assert response.status == 400
+
+    async def test_target_route_policy_middleware_sees_target_path(self, tmp_path: Path) -> None:
+        tmpl_dir = tmp_path / "templates"
+        tmpl_dir.mkdir()
+        (tmpl_dir / "page.html").write_text("{% block main %}<p>secret</p>{% end %}")
+        app = App(config=AppConfig(template_dir=str(tmpl_dir), debug=False))
+        seen_paths: list[str] = []
+
+        async def deny_admin(request, call_next):
+            seen_paths.append(request.path)
+            if request.path.startswith("/admin"):
+                return Response("denied", status=403)
+            return await call_next(request)
+
+        app.add_middleware(deny_admin)
+
+        @app.route("/admin")
+        def admin():
+            return Template("page.html")
+
+        async with TestClient(app) as client:
+            route_response = await client.get("/admin")
+            fragment_response = await client.get("/_frag/admin?_b=main")
+
+        assert route_response.status == 403
+        assert fragment_response.status == 403
+        assert seen_paths == ["/admin", "/admin"]
 
 
 class TestReservedPrefixCollision:
