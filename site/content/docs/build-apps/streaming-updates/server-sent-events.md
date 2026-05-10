@@ -74,6 +74,10 @@ async def stream():
     )
 ```
 
+`event` and `id` must be single-line values, and `retry` must be
+non-negative. Chirp rejects CR/LF/NUL characters in SSE metadata fields so
+event payloads cannot inject extra wire-protocol lines.
+
 ## Reconnect And Replay
 
 Browsers automatically reconnect SSE streams and send the last received event

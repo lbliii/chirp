@@ -17,6 +17,7 @@ def register_markdown_filter(
     *,
     plugins: list[str] | None = None,
     highlight: bool = True,
+    sanitize: bool = True,
     filter_name: str = "markdown",
 ) -> MarkdownRenderer:
     """Register a ``markdown`` template filter on the app.
@@ -39,11 +40,12 @@ def register_markdown_filter(
         app: The chirp application to register the filter on.
         plugins: Patitas plugins to enable (default: all).
         highlight: Enable syntax highlighting for fenced code blocks (default: True).
+        sanitize: Remove unsafe HTML and URL attributes (default: True).
         filter_name: Template filter name (default: ``"markdown"``).
 
     Returns:
         The ``MarkdownRenderer`` instance backing the filter.
     """
-    renderer = MarkdownRenderer(plugins=plugins, highlight=highlight)
+    renderer = MarkdownRenderer(plugins=plugins, highlight=highlight, sanitize=sanitize)
     app.template_filter(filter_name)(renderer.render)
     return renderer

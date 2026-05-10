@@ -14,6 +14,9 @@ Then in templates::
 
     {{ content | markdown }}
 
+Rendered markdown is sanitized by default. Use ``sanitize=False`` only for
+trusted markdown or controlled CMS content where raw HTML is intentional.
+
 Requires ``patitas`` (includes rosettes for syntax highlighting)::
 
     pip install chirp[markdown]
