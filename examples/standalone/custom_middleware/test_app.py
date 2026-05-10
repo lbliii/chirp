@@ -46,3 +46,19 @@ class TestCustomMiddleware:
             response = await client.get("/")
             assert response.status == 429
             assert "Too Many" in response.text
+
+    async def test_rate_limit_ignores_spoofed_forwarded_for(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            for index in range(5):
+                response = await client.get(
+                    "/",
+                    headers={"X-Forwarded-For": f"203.0.113.{index}"},
+                )
+                assert response.status == 200
+
+            response = await client.get(
+                "/",
+                headers={"X-Forwarded-For": "203.0.113.250"},
+            )
+
+        assert response.status == 429

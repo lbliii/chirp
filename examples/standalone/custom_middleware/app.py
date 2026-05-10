@@ -50,10 +50,9 @@ class RateLimiter:
         self._lock = threading.Lock()
 
     async def __call__(self, request: Request, next: Next) -> Any:
-        # Use X-Forwarded-For if behind a proxy; else a simple client identifier
-        client_ip = request.headers.get("x-forwarded-for", "127.0.0.1")
-        if "," in client_ip:
-            client_ip = client_ip.split(",")[0].strip()
+        # Use the ASGI client address. Apps behind a proxy should install an
+        # explicit trusted-proxy boundary before using forwarded headers.
+        client_ip = request.client[0] if request.client else "127.0.0.1"
 
         with self._lock:
             now = time.monotonic()
