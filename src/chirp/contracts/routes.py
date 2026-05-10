@@ -1,6 +1,10 @@
 """Route helpers for contracts checker."""
 
-from chirp.routing.router import Router
+import re
+from urllib.parse import unquote
+
+from chirp.routing.params import CONVERTERS
+from chirp.routing.router import Router, parse_path
 
 
 def _normalize_path(path: str) -> str:
@@ -30,16 +34,33 @@ def collect_route_paths(router: Router) -> dict[str, frozenset[str]]:
 def path_matches_route(url: str, route_path: str) -> bool:
     """Check if URL could match a route pattern."""
     path_only = url.split("?")[0] if "?" in url else url
-    url_parts = path_only.strip("/").split("/")
-    route_parts = route_path.strip("/").split("/")
-    if len(url_parts) != len(route_parts):
-        if route_parts and route_parts[-1].startswith("{") and ":path" in route_parts[-1]:
-            return len(url_parts) >= len(route_parts) - 1
+    url_parts = [part for part in path_only.strip("/").split("/") if part]
+    route_segments = parse_path(route_path)
+
+    if not route_segments:
+        return not url_parts
+
+    has_path_converter = route_segments[-1].is_param and route_segments[-1].param_type == "path"
+    if has_path_converter:
+        if len(url_parts) < len(route_segments):
+            return False
+    elif len(url_parts) != len(route_segments):
         return False
-    for url_seg, route_seg in zip(url_parts, route_parts, strict=True):
-        if route_seg.startswith("{") and route_seg.endswith("}"):
+
+    for index, route_seg in enumerate(route_segments):
+        if route_seg.is_param and route_seg.param_type == "path":
+            remaining = "/".join(url_parts[index:])
+            pattern, _ = CONVERTERS["path"]
+            return re.fullmatch(pattern, unquote(remaining)) is not None
+
+        url_seg = url_parts[index]
+        if route_seg.is_param:
+            pattern, _ = CONVERTERS[route_seg.param_type]
+            value = unquote(url_seg) if route_seg.param_type != "str" else url_seg
+            if re.fullmatch(pattern, value) is None:
+                return False
             continue
-        if url_seg != route_seg:
+        if url_seg != route_seg.value:
             return False
     return True
 

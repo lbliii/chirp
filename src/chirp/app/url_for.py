@@ -9,10 +9,12 @@ Design notes live in ``docs/rfcs/004-url-for.md``.
 
 from __future__ import annotations
 
+import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlencode
 
+from chirp.routing.params import CONVERTERS
 from chirp.routing.router import parse_path
 
 if TYPE_CHECKING:
@@ -94,10 +96,22 @@ def resolve_url(
                     f"must be scalar. Route: {name!r} (path={route.path!r})"
                 )
                 raise TypeError(msg)
-            if seg.param_type == "path":
-                rendered.append(quote(str(value), safe="/"))
-            else:
-                rendered.append(quote(str(value), safe=""))
+            string_value = str(value)
+            encoded_value = (
+                quote(string_value, safe="/")
+                if seg.param_type == "path"
+                else quote(string_value, safe="")
+            )
+            value_to_validate = encoded_value if seg.param_type == "str" else string_value
+            pattern, _ = CONVERTERS[seg.param_type]
+            if not re.fullmatch(pattern, value_to_validate):
+                msg = (
+                    f"Path parameter {param_name!r}={string_value!r} does not "
+                    f"match converter '{seg.param_type}' for route {name!r} "
+                    f"(path={route.path!r})."
+                )
+                raise ValueError(msg)
+            rendered.append(encoded_value)
             used.add(param_name)
         else:
             rendered.append(seg.value)
