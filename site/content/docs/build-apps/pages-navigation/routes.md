@@ -84,6 +84,8 @@ Supported types:
 | `float` | digits with optional decimal | `/price/{amount:float}` |
 | `path` | any chars including `/` | `/files/{filepath:path}` |
 
+Parameter names must be valid Python identifiers, converters must be one of the supported names above, and routes use Chirp's `{param}` syntax rather than Flask-style `<param>`. Routes that differ only by parameter name, such as `/users/{id}` and `/users/{name}`, are duplicate route shapes and are rejected.
+
 ### Catch-All Routes
 
 Use `{name:path}` to match the rest of the URL:
@@ -93,6 +95,8 @@ Use `{name:path}` to match the rest of the URL:
 def serve_file(filepath: str):
     return send_file(filepath)  # filepath can contain slashes
 ```
+
+`path` converters must be the final segment because they consume the rest of the URL.
 
 ## Handler Signature Introspection
 

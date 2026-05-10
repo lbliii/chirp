@@ -1,0 +1,1 @@
+Fixed router parameter matching so typed and string parameter routes at the same path depth no longer shadow each other or reuse the wrong parameter name. Route parsing now rejects malformed parameter segments, unknown converters, non-final `{name:path}` converters, and duplicate route shapes that differ only by parameter name.

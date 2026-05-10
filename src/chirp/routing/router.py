@@ -12,6 +12,12 @@ from chirp.errors import ConfigurationError, MethodNotAllowed, NotFound
 from chirp.routing.params import CONVERTERS
 from chirp.routing.route import PathSegment, Route, RouteMatch
 
+_PARAM_TYPE_PRIORITY = {
+    "int": 0,
+    "float": 1,
+    "str": 2,
+}
+
 
 def _route_path_has_flask_syntax(path: str) -> bool:
     """Return True if path uses ``<param>`` instead of ``{param}``."""
@@ -44,7 +50,8 @@ def parse_path(path: str) -> list[PathSegment]:
     """
     validate_route_path(path)
     segments: list[PathSegment] = []
-    for part in path.strip("/").split("/"):
+    parts = [part for part in path.strip("/").split("/") if part]
+    for index, part in enumerate(parts):
         if not part:
             continue
         if part.startswith("{") and part.endswith("}"):
@@ -54,6 +61,8 @@ def parse_path(path: str) -> list[PathSegment]:
             else:
                 param_name = inner
                 param_type = "str"
+            if not param_name:
+                raise ConfigurationError(f"Path parameter name cannot be empty. Route: {path!r}")
             if not param_name.isidentifier():
                 suggestion = param_name.replace("-", "_")
                 hint = (
@@ -71,6 +80,17 @@ def parse_path(path: str) -> list[PathSegment]:
                     f"and cannot be used as a parameter name. "
                     f"Route: {path!r}"
                 )
+            if param_type not in CONVERTERS:
+                allowed = ", ".join(sorted(CONVERTERS))
+                raise ConfigurationError(
+                    f"Unknown path parameter converter '{param_type}' in route "
+                    f"{path!r}. Supported converters: {allowed}."
+                )
+            if param_type == "path" and index != len(parts) - 1:
+                raise ConfigurationError(
+                    f"Path converter '{{{param_name}:path}}' must be the final "
+                    f"segment in route {path!r}."
+                )
             segments.append(
                 PathSegment(
                     value=part,
@@ -80,6 +100,11 @@ def parse_path(path: str) -> list[PathSegment]:
                 )
             )
         else:
+            if "{" in part or "}" in part:
+                raise ConfigurationError(
+                    f"Malformed path parameter segment {part!r} in route {path!r}. "
+                    "Use '{name}' or '{name:type}'."
+                )
             segments.append(PathSegment(value=part))
     return segments
 
@@ -87,13 +112,13 @@ def parse_path(path: str) -> list[PathSegment]:
 class _TrieNode:
     """A node in the route trie. Mutable during compilation only."""
 
-    __slots__ = ("catch_all_route", "children", "param_child", "routes_by_method")
+    __slots__ = ("catch_all_route", "children", "param_edges", "routes_by_method")
 
     def __init__(self) -> None:
         # Static segment children: "users" -> node
         self.children: dict[str, _TrieNode] = {}
-        # Single parameter child (only one param pattern per level)
-        self.param_child: _ParamEdge | None = None
+        # Parameter children. Multiple typed/name variants can share a level.
+        self.param_edges: list[_ParamEdge] = []
         # Catch-all route (path converter)
         self.catch_all_route: _CatchAllEdge | None = None
         # Routes at this node, keyed by HTTP method
@@ -130,10 +155,11 @@ class Router:
         match = router.match("GET", "/users/42")
     """
 
-    __slots__ = ("_compiled", "_root")
+    __slots__ = ("_compiled", "_root", "_route_shapes")
 
     def __init__(self) -> None:
         self._root = _TrieNode()
+        self._route_shapes: dict[tuple[tuple[str, str], ...], dict[str, Route]] = {}
         self._compiled = False
 
     def add(self, route: Route) -> None:
@@ -143,9 +169,10 @@ class Router:
             raise RuntimeError(msg)
 
         segments = parse_path(route.path)
+        self._register_shape(route, segments)
         node = self._root
 
-        for _i, seg in enumerate(segments):
+        for seg in segments:
             if seg.is_param and seg.param_type == "path":
                 # Catch-all: consumes rest of path, must be last segment
                 if node.catch_all_route is None:
@@ -159,15 +186,8 @@ class Router:
 
             if seg.is_param:
                 # Parameter segment
-                if node.param_child is None:
-                    pattern, _ = CONVERTERS[seg.param_type]
-                    node.param_child = _ParamEdge(
-                        param_name=seg.param_name or "",
-                        param_type=seg.param_type,
-                        regex=re.compile(f"^{pattern}$"),
-                        node=_TrieNode(),
-                    )
-                node = node.param_child.node
+                edge = self._get_or_create_param_edge(node, seg)
+                node = edge.node
             else:
                 # Static segment
                 if seg.value not in node.children:
@@ -177,7 +197,7 @@ class Router:
         # Register methods at the terminal node
         for method in route.methods:
             existing = node.routes_by_method.get(method)
-            if existing is not None and existing.handler is not route.handler:
+            if existing is not None:
                 msg = (
                     f"Duplicate route: {method} {route.path} is already "
                     f"registered to {existing.handler!r}. "
@@ -185,6 +205,42 @@ class Router:
                 )
                 raise ConfigurationError(msg)
             node.routes_by_method[method] = route
+
+    def _register_shape(self, route: Route, segments: list[PathSegment]) -> None:
+        """Reject duplicate path shapes that differ only by parameter names."""
+        shape = tuple(
+            ("param", segment.param_type) if segment.is_param else ("static", segment.value)
+            for segment in segments
+        )
+        routes_by_method = self._route_shapes.setdefault(shape, {})
+        for method in route.methods:
+            existing = routes_by_method.get(method)
+            if existing is not None:
+                msg = (
+                    f"Duplicate route shape: {method} {route.path} conflicts "
+                    f"with already registered route {existing.path}. "
+                    "Parameter names do not disambiguate routes."
+                )
+                raise ConfigurationError(msg)
+            routes_by_method[method] = route
+
+    def _get_or_create_param_edge(self, node: _TrieNode, segment: PathSegment) -> _ParamEdge:
+        param_name = segment.param_name or ""
+        param_type = segment.param_type
+        for edge in node.param_edges:
+            if edge.param_name == param_name and edge.param_type == param_type:
+                return edge
+
+        pattern, _ = CONVERTERS[param_type]
+        edge = _ParamEdge(
+            param_name=param_name,
+            param_type=param_type,
+            regex=re.compile(f"^{pattern}$"),
+            node=_TrieNode(),
+        )
+        node.param_edges.append(edge)
+        node.param_edges.sort(key=lambda item: _PARAM_TYPE_PRIORITY.get(item.param_type, 100))
+        return edge
 
     @property
     def routes(self) -> list[Route]:
@@ -215,8 +271,8 @@ class Router:
         for child in node.children.values():
             self._collect_routes(child, seen, result)
 
-        if node.param_child is not None:
-            self._collect_routes(node.param_child.node, seen, result)
+        for edge in node.param_edges:
+            self._collect_routes(edge.node, seen, result)
 
         if node.catch_all_route is not None:
             for route in node.catch_all_route.route_by_method.values():
@@ -284,9 +340,8 @@ class Router:
             if result is not None:
                 return result
 
-        # 2. Try parameter child
-        if node.param_child is not None:
-            edge = node.param_child
+        # 2. Try parameter children in specificity order
+        for edge in node.param_edges:
             if edge.regex.match(part):
                 new_params = {**params, edge.param_name: part}
                 result = self._match_node(edge.node, parts, index + 1, new_params)

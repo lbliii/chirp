@@ -43,6 +43,22 @@ class TestParsePath:
         assert segments[1].param_type == "path"
         assert segments[1].param_name == "filepath"
 
+    def test_rejects_unknown_converter(self) -> None:
+        with pytest.raises(ConfigurationError, match="Unknown path parameter converter 'uuid'"):
+            parse_path("/users/{id:uuid}")
+
+    def test_rejects_empty_param_name(self) -> None:
+        with pytest.raises(ConfigurationError, match="cannot be empty"):
+            parse_path("/users/{}")
+
+    def test_rejects_malformed_param_segment(self) -> None:
+        with pytest.raises(ConfigurationError, match="Malformed path parameter segment"):
+            parse_path("/users/{id")
+
+    def test_rejects_path_converter_before_final_segment(self) -> None:
+        with pytest.raises(ConfigurationError, match="must be the final segment"):
+            parse_path("/files/{filepath:path}/edit")
+
     def test_root(self) -> None:
         segments = parse_path("/")
         assert segments == []
@@ -191,6 +207,50 @@ class TestRouterParams:
 
         match2 = r.match("GET", "/users/42")
         assert match2.route.path == "/users/{id}"
+
+    def test_typed_param_edges_do_not_shadow_string_param(self) -> None:
+        r = Router()
+        r.add(_route("/items/{id:int}"))
+        r.add(_route("/items/{slug}"))
+        r.compile()
+
+        int_match = r.match("GET", "/items/42")
+        slug_match = r.match("GET", "/items/readme")
+
+        assert int_match.route.path == "/items/{id:int}"
+        assert int_match.path_params == {"id": "42"}
+        assert slug_match.route.path == "/items/{slug}"
+        assert slug_match.path_params == {"slug": "readme"}
+
+    def test_param_edges_keep_route_specific_param_names(self) -> None:
+        r = Router()
+        r.add(_route("/files/{bucket}/objects"))
+        r.add(_route("/files/{key}/metadata"))
+        r.compile()
+
+        objects = r.match("GET", "/files/media/objects")
+        metadata = r.match("GET", "/files/readme/metadata")
+
+        assert objects.path_params == {"bucket": "media"}
+        assert metadata.path_params == {"key": "readme"}
+
+    def test_more_specific_param_converter_wins_independent_of_registration_order(self) -> None:
+        r = Router()
+        r.add(_route("/items/{slug}"))
+        r.add(_route("/items/{id:int}"))
+        r.compile()
+
+        match = r.match("GET", "/items/42")
+
+        assert match.route.path == "/items/{id:int}"
+        assert match.path_params == {"id": "42"}
+
+    def test_duplicate_param_shape_rejected(self) -> None:
+        r = Router()
+        r.add(_route("/users/{id}"))
+
+        with pytest.raises(ConfigurationError, match="Duplicate route shape"):
+            r.add(_route("/users/{name}"))
 
 
 class TestRouterMethods:
