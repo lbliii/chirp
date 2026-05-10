@@ -110,9 +110,17 @@ def _url_to_file_path(url: str, output_dir: Path) -> Path:
     ``/`` → ``output_dir/index.html``
     """
     stripped = url.strip("/")
-    if stripped:
-        return output_dir / stripped / "index.html"
-    return output_dir / "index.html"
+    parts = [part for part in stripped.split("/") if part]
+    if any(part in {".", ".."} for part in parts):
+        msg = f"Freeze URL {url!r} contains '.' or '..' path segments."
+        raise ValueError(msg)
+    candidate = output_dir.joinpath(*parts, "index.html") if parts else output_dir / "index.html"
+    output_root = output_dir.resolve()
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(output_root):
+        msg = f"Freeze URL {url!r} maps outside output directory {output_dir}."
+        raise ValueError(msg)
+    return candidate
 
 
 def _expand_params(route_path: str, params: dict[str, str]) -> str:
@@ -702,7 +710,12 @@ async def freeze(
         depth = _page_depth(url)
         index_rel = "../" * depth + "_search-index.js"
         html = _inject_static_search(html, depth, index_rel)
-        out_path = _url_to_file_path(url, output_dir)
+        try:
+            out_path = _url_to_file_path(url, output_dir)
+        except ValueError as exc:
+            errors.append(f"ERROR {url}: {exc}")
+            _logger.warning("Skipping unsafe freeze output path for %s: %s", url, exc)
+            continue
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(html)
         written_urls.append(url)

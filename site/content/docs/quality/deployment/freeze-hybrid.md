@@ -108,3 +108,6 @@ guarantee**: frozen pages never become unusable because the origin is down.
   that can only be iterated once) is not supported.
 - The block-fetch URL scheme is reserved: user routes starting with `/_frag/`
   raise `ConfigurationError` at freeze time.
+- `freeze_params` values must expand to normal URL path segments. Values that
+  introduce `.` or `..` path segments are reported as freeze errors and are not
+  written to disk.

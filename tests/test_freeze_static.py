@@ -117,6 +117,12 @@ class TestFreezeRelativeUrls:
         assert _make_relative("/about", "/articles/foo") == "../articles/foo/index.html"
         assert _make_relative("/", "/") == "index.html"
 
+    async def test_url_to_file_path_rejects_parent_segments(self, tmp_path: Path) -> None:
+        from chirp.freeze import _url_to_file_path
+
+        with pytest.raises(ValueError, match="contains"):
+            _url_to_file_path("/docs/../../escape", tmp_path / "dist")
+
     async def test_fragments_and_queries_preserved(self, tmp_path: Path) -> None:
         """URL rewriting must preserve #fragment and ?query suffixes."""
         from chirp.freeze import _relativize_html
@@ -196,6 +202,24 @@ class TestFreezeEdgeCases:
         # Parameterized route without provider should be skipped, not crash
         assert result.pages_written == 0
         assert result.pages_skipped > 0
+
+    async def test_unsafe_freeze_param_does_not_write_outside_output(self, tmp_path: Path) -> None:
+        app = App()
+
+        @app.route("/files/{filepath:path}")
+        def file_page(filepath: str):
+            return f"<html>file {filepath}</html>"
+
+        @app.freeze_params("/files/{filepath:path}")
+        def file_params():
+            return [{"filepath": "../../escape"}]
+
+        output = tmp_path / "dist"
+        result = await freeze(app, output)
+
+        assert result.pages_written == 0
+        assert any("contains '.' or '..'" in err for err in result.errors)
+        assert not (tmp_path / "escape" / "index.html").exists()
 
     async def test_exclude_patterns(self, docs_app: App, tmp_path: Path) -> None:
         output = tmp_path / "dist"
