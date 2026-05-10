@@ -368,7 +368,7 @@ migrations/
 app = App(db="sqlite:///app.db", migrations="migrations/")
 ```
 
-Pending migrations run automatically at startup. Each migration runs in its own transaction -- if one fails, it rolls back without affecting previously applied migrations.
+Pending migrations run automatically at startup. Each migration runs in its own transaction -- if one fails, it rolls back without affecting previously applied migrations. Do not include manual `BEGIN`, `COMMIT`, or `ROLLBACK` statements in migration files; Chirp owns the transaction boundary.
 
 ### Standalone
 

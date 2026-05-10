@@ -564,6 +564,32 @@ class TestMigrations:
 
         await db.disconnect()
 
+    async def test_migrate_failed_multi_statement_does_not_leave_partial_table(
+        self, tmp_path
+    ) -> None:
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        (migrations_dir / "001_partial.sql").write_text(
+            "CREATE TABLE leaked (id INTEGER PRIMARY KEY);\n"
+            "ALTER TABLE missing_table ADD COLUMN x TEXT;"
+        )
+
+        db_path = tmp_path / "partial.db"
+        db = Database(f"sqlite:///{db_path}")
+        await db.connect()
+
+        with pytest.raises(MigrationError, match="001_partial"):
+            await migrate(db, migrations_dir)
+
+        table_count = await db.fetch_val(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='leaked'"
+        )
+        applied_count = await db.fetch_val("SELECT COUNT(*) FROM _chirp_migrations")
+        assert table_count == 0
+        assert applied_count == 0
+
+        await db.disconnect()
+
     async def test_migrate_bad_filename_raises(self, tmp_path) -> None:
         migrations_dir = tmp_path / "migrations"
         migrations_dir.mkdir()
