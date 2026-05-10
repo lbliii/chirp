@@ -53,6 +53,10 @@ chirp run myapp:app
 
 # Production (multi-worker, all features)
 chirp run myapp:app --production --workers 4 --metrics --rate-limit
+
+# Production preflight
+chirp check myapp:app --warnings-as-errors
+pounce check --app myapp:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 Or from Python:
@@ -66,3 +70,7 @@ app = App(config=config)
 # app.run() uses production server when debug=False
 app.run()
 ```
+
+`pounce.toml` is Pounce-native today. Use it with `pounce serve --app
+myapp:app --config pounce.toml`; `app.run()` and `chirp run` use `AppConfig`
+and Chirp CLI flags.

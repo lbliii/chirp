@@ -154,7 +154,7 @@ See [`benchmarks/README.md`](benchmarks/README.md) for how the benchmarks work, 
 
 ## Production Deployment
 
-Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/) for details.
+Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. Use `chirp check myapp:app --warnings-as-errors` for Chirp hypermedia contracts and `pounce check --app myapp:app` for server preflight. `pounce.toml` is Pounce-native today; `app.run()` and `chirp run` use `AppConfig` plus CLI flags. See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/) for details.
 
 ---
 

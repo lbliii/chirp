@@ -215,6 +215,8 @@ best-effort.
 
 ### 3. Operator Docs And Config Boundary
 
+**Status**: Done in `docs: clarify pounce operator config boundary`.
+
 **Why**: Pounce 0.7 adds useful operator commands, but Chirp must explain which
 config path actually runs.
 
@@ -240,6 +242,12 @@ config path actually runs.
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs -q`
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs/test_site_link_drift.py tests/test_freeze_site.py -q`
 - Add docs guards for unsupported env var claims if possible.
+
+**Completed proof**:
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs/test_site_link_drift.py tests/test_freeze_site.py -q`
+- `make changelog-draft`
 
 **Collateral**:
 

@@ -16,7 +16,7 @@ Chirp apps run on [Pounce](https://github.com/lbliii/pounce), a production-grade
 
 ### Phase 5 (Automatic)
 
-- **WebSocket compression** — 60% bandwidth reduction
+- **HTTP response and WebSocket compression** — ordinary responses and WebSocket messages can be compressed; Pounce intentionally avoids compressing `text/event-stream`
 - **HTTP/2 support** — Multiplexed streams, server push
 - **Graceful shutdown** — Finishes active requests on SIGTERM
 - **Zero-downtime reload** — `kill -SIGUSR1` for hot code updates
@@ -74,6 +74,44 @@ app.run()  # Multi-worker, Phase 5 & 6 features
 chirp run myapp:app --production --workers 4 --metrics --rate-limit
 ```
 
+## Operator Preflight
+
+Run Chirp and Pounce checks before deployment because they validate different
+contracts:
+
+```bash
+chirp check myapp:app --warnings-as-errors
+pounce check --app myapp:app --config pounce.toml
+```
+
+`chirp check` validates Chirp's hypermedia contracts: routes, templates,
+blocks, OOB targets, forms, SSE wiring, and app-level checks.
+
+`pounce check` validates Pounce's server-facing inputs: import path, config
+file, bind address, TLS files, worker settings, and related server options. If
+you do not use `pounce.toml`, pass the same server flags you use at runtime:
+
+```bash
+pounce check --app myapp:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+## Pounce-Native Config
+
+`pounce.toml` is Pounce-native today. It is read by `pounce serve` and
+`pounce check`; it is not read by `app.run()` or `chirp run`, which use
+`AppConfig` plus Chirp CLI flags.
+
+```bash
+pounce config schema --output-format toml-template
+pounce config schema --output-format json
+pounce config show --config pounce.toml --output-format toml
+pounce serve --app myapp:app --config pounce.toml
+```
+
+Use `toml-template` to generate a starting `pounce.toml`, `json` for tooling,
+and `config show` to inspect the resolved Pounce config after file and CLI
+overrides are merged.
+
 ## Worker Lifecycle Hooks
 
 Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that
@@ -97,6 +135,13 @@ logs the exception and continues serving. Put must-succeed application-wide
 checks in `@app.on_startup`, and use a health check for dependencies that can
 fail after startup. Fail-loud worker startup is tracked upstream in
 [pounce#65](https://github.com/lbliii/pounce/issues/65).
+
+## Realtime And Compression
+
+SSE is Chirp's realtime contract. Pounce intentionally avoids compressing
+`text/event-stream` responses so event delivery is not buffered behind
+compression windows. Use `worker_mode="async"` for apps with long-lived SSE
+connections.
 
 ## Custom Port Checks
 
@@ -140,6 +185,10 @@ CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
 | `sentry_dsn` | `None` | Sentry error tracking |
 | `ssl_certfile` | `None` | TLS certificate (enables HTTP/2) |
 | `ssl_keyfile` | `None` | TLS private key |
+
+Do not assume Pounce environment variable names are read by Chirp. If your
+platform provides deployment variables, read them in your app code and build an
+`AppConfig`, or start through `pounce serve --config pounce.toml`.
 
 ## Full Guide
 
