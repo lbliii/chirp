@@ -23,7 +23,7 @@ import asyncio
 import pytest
 
 from chirp.cache.backends.memory import MemoryCacheBackend
-from chirp.cache.middleware import CacheMiddleware
+from chirp.cache.middleware import CacheMiddleware, _decode_cached_response
 from chirp.http.response import Response
 from chirp.realtime.events import EventStream
 from chirp.testing import TestClient
@@ -134,6 +134,34 @@ class TestCacheMissThenHit:
         assert first.content_type == "text/html; charset=iso-8859-1"
         assert second.content_type == "text/html; charset=iso-8859-1"
         assert second_headers["x-trace"] == "abc123"
+
+    async def test_cache_entry_strips_sender_computed_and_hop_by_hop_headers(self) -> None:
+        app = _app()
+        backend = _wire_cache(app)
+
+        @app.route("/computed-headers")
+        def computed_headers():
+            return (
+                Response(body="<p>cached</p>")
+                .with_header("Content-Length", "999")
+                .with_header("Transfer-Encoding", "chunked")
+                .with_header("Connection", "X-Internal")
+                .with_header("X-Internal", "drop-me")
+                .with_header("X-Trace", "keep-me")
+            )
+
+        async with TestClient(app) as client:
+            await client.get("/computed-headers")
+
+        assert len(backend._store) == 1
+        raw_cached = next(iter(backend._store.values()))[0]
+        cached_response = _decode_cached_response(raw_cached)
+        cached_headers = _headers(cached_response)
+        assert "content-length" not in cached_headers
+        assert "transfer-encoding" not in cached_headers
+        assert "connection" not in cached_headers
+        assert "x-internal" not in cached_headers
+        assert cached_headers["x-trace"] == "keep-me"
 
 
 # ---------------------------------------------------------------------------

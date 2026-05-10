@@ -185,7 +185,9 @@ class _MarkdownHTMLSanitizer(HTMLParser):
             self._parts.append(f"&#{name};")
 
     def _render_attrs(self, tag: str, attrs: list[tuple[str, str | None]]) -> str:
-        rendered: list[str] = []
+        rendered: list[tuple[str, str | None]] = []
+        rel_index: int | None = None
+        target_blank = False
         for name, value in attrs:
             name = name.lower()
             if not _is_allowed_attr(name):
@@ -193,16 +195,33 @@ class _MarkdownHTMLSanitizer(HTMLParser):
             if tag == "input" and name not in {"type", "checked", "disabled"}:
                 continue
             if value is None:
-                rendered.append(name)
+                rendered.append((name, None))
                 continue
             if name in _URL_ATTRS and not _is_safe_url(value):
                 continue
-            rendered.append(f'{name}="{escape(value, quote=True)}"')
-        if tag == "a" and any(attr.startswith('target="_blank"') for attr in rendered):
-            rendered.append('rel="noopener noreferrer"')
+            if tag == "a" and name == "target" and value == "_blank":
+                target_blank = True
+            if tag == "a" and name == "rel":
+                rel_index = len(rendered)
+            rendered.append((name, value))
+        if tag == "a" and target_blank:
+            rel_value = "noopener noreferrer"
+            if rel_index is None:
+                rendered.append(("rel", rel_value))
+            else:
+                existing = rendered[rel_index][1] or ""
+                rel_tokens = [token for token in existing.split() if token]
+                seen = {token.lower() for token in rel_tokens}
+                rel_tokens.extend(
+                    token for token in ("noopener", "noreferrer") if token not in seen
+                )
+                rendered[rel_index] = ("rel", " ".join(rel_tokens))
         if not rendered:
             return ""
-        return " " + " ".join(rendered)
+        return " " + " ".join(
+            name if value is None else f'{name}="{escape(value, quote=True)}"'
+            for name, value in rendered
+        )
 
 
 def _is_allowed_attr(name: str) -> bool:

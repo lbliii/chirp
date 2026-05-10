@@ -18,6 +18,19 @@ from .key import default_cache_key
 
 logger = logging.getLogger("chirp.cache")
 _CACHE_ENTRY_PREFIX = b"chirp-cache-v1\n"
+_UNCACHEABLE_RESPONSE_HEADERS = frozenset(
+    {
+        "connection",
+        "content-length",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,7 +106,7 @@ class CacheMiddleware:
                 cached_response = _CachedResponse(
                     body=body,
                     content_type=response.content_type,
-                    headers=response.headers,
+                    headers=_cacheable_response_headers(response.headers),
                 )
                 await self._backend.set(key, _encode_cached_response(cached_response), self._ttl)
             except Exception:
@@ -105,6 +118,20 @@ class CacheMiddleware:
 def _has_private_request_headers(request: Request) -> bool:
     """Return True for request headers that commonly vary per user."""
     return bool(request.headers.get("cookie") or request.headers.get("authorization"))
+
+
+def _cacheable_response_headers(
+    headers: tuple[tuple[str, str], ...],
+) -> tuple[tuple[str, str], ...]:
+    """Strip headers that the sender computes or that are hop-by-hop."""
+    connection_tokens: set[str] = set()
+    for name, value in headers:
+        if name.lower() == "connection":
+            connection_tokens.update(
+                token.strip().lower() for token in value.split(",") if token.strip()
+            )
+    blocked = _UNCACHEABLE_RESPONSE_HEADERS | connection_tokens
+    return tuple((name, value) for name, value in headers if name.lower() not in blocked)
 
 
 def _encode_cached_response(response: _CachedResponse) -> bytes:
@@ -127,5 +154,7 @@ def _decode_cached_response(value: bytes) -> _CachedResponse:
     return _CachedResponse(
         body=base64.b64decode(payload["body"]),
         content_type=str(payload.get("content_type") or "text/html; charset=utf-8"),
-        headers=tuple((str(name), str(header_value)) for name, header_value in payload["headers"]),
+        headers=_cacheable_response_headers(
+            tuple((str(name), str(header_value)) for name, header_value in payload["headers"])
+        ),
     )

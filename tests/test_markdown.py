@@ -81,6 +81,14 @@ class TestMarkdownRenderer:
         assert "<a" in html
         assert "href=" not in html
 
+    def test_merges_rel_tokens_for_blank_target_links(self) -> None:
+        from chirp.markdown import MarkdownRenderer
+
+        md = MarkdownRenderer()
+        html = md.render('<a href="/docs" target="_blank" rel="nofollow">docs</a>')
+        assert 'rel="nofollow noopener noreferrer"' in html
+        assert html.count("rel=") == 1
+
     def test_sanitize_false_preserves_trusted_html(self) -> None:
         from chirp.markdown import MarkdownRenderer
 
