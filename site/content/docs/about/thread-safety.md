@@ -146,6 +146,12 @@ g.user = current_user
 g.start_time = time.monotonic()
 ```
 
+For resources that are bound to a specific worker thread or event loop, use
+`@app.on_worker_startup` and `@app.on_worker_shutdown`, and run production with
+`worker_mode="async"`. Pounce 0.7 sync workers do not emit worker lifecycle
+scopes; Chirp fails production startup when worker hooks are registered and the
+effective worker mode is sync.
+
 ## Stress-Tested Under Contention
 
 Every Lock-protected module has concurrency stress tests in `tests/test_concurrency/`. These use synchronized starts (for example, `threading.Barrier` where applicable), bounded iteration counts, and explicit timeouts to reduce flakiness under contention. Some async stress tests also use short `asyncio.sleep(...)` calls to allow subscriber registration or processing before assertions.

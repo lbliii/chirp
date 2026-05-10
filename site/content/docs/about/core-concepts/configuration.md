@@ -114,7 +114,7 @@ provisional until those subsystems are stabilized.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `workers` | `int` | `0` | Pounce worker count; `0` lets pounce auto-detect |
-| `worker_mode` | `str` | `"auto"` | Pounce worker execution mode |
+| `worker_mode` | `str` | `"auto"` | Pounce worker execution mode; use `"async"` when registering worker lifecycle hooks |
 | `metrics_enabled` | `bool` | `False` | Enable Prometheus metrics |
 | `metrics_path` | `str` | `"/metrics"` | Metrics endpoint path |
 | `rate_limit_enabled` | `bool` | `False` | Enable rate limiting |

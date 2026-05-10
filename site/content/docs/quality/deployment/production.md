@@ -74,6 +74,30 @@ app.run()  # Multi-worker, Phase 5 & 6 features
 chirp run myapp:app --production --workers 4 --metrics --rate-limit
 ```
 
+## Worker Lifecycle Hooks
+
+Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that
+must be created inside each production worker, such as async HTTP clients or
+event-loop-bound database pools.
+
+Worker lifecycle hooks require async workers in production:
+
+```python
+config = AppConfig(debug=False, workers=4, worker_mode="async")
+```
+
+Pounce 0.7 sync workers do not emit worker lifecycle scopes. On free-threaded
+Python, Pounce resolves `worker_mode="auto"` to sync workers, so Chirp rejects
+production launch when worker hooks are registered and the effective worker
+mode is sync. If you do not register worker hooks, `worker_mode="auto"` remains
+valid.
+
+Worker startup failures are best-effort in Pounce 0.7 async workers: Pounce
+logs the exception and continues serving. Put must-succeed application-wide
+checks in `@app.on_startup`, and use a health check for dependencies that can
+fail after startup. Fail-loud worker startup is tracked upstream in
+[pounce#65](https://github.com/lbliii/pounce/issues/65).
+
 ## Custom Port Checks
 
 If your CLI checks whether a port is free before calling `app.run()` (e.g. to avoid split-brain or show a clearer error), use `SO_REUSEADDR` in that check. Otherwise you'll block restarts when the port is in **TIME_WAIT** (30–120 seconds after shutdown). The server already uses `SO_REUSEADDR`; your check should match.
@@ -109,6 +133,7 @@ CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
 | Config | Default | Description |
 |--------|---------|-------------|
 | `workers` | `0` (auto) | Worker count (0 = CPU count) |
+| `worker_mode` | `"auto"` | Pounce worker execution mode; use `"async"` when registering worker lifecycle hooks |
 | `metrics_enabled` | `False` | Prometheus `/metrics` endpoint |
 | `rate_limit_enabled` | `False` | Per-IP rate limiting |
 | `request_queue_enabled` | `False` | Request queueing and load shedding |

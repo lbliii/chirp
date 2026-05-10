@@ -169,6 +169,8 @@ The stewards converged on five points:
 
 ### 2. Worker Lifecycle Semantics
 
+**Status**: Done in `fix: gate worker hooks to async pounce workers`.
+
 **Why**: Worker hooks are a production contract. If Pounce sync workers do not
 emit worker scopes, Chirp must either gate the combination or document it as
 best-effort.
@@ -187,6 +189,24 @@ best-effort.
 - Existing worker lifecycle tests plus a Pounce-backed smoke test if feasible.
 - Startup-failure test showing whether a failed hook prevents serving or is
   reported as best-effort.
+
+**Completed decision**:
+
+- Chirp fails production startup when worker hooks are registered and Pounce
+  resolves the effective worker mode to sync.
+- Worker hook users must set `worker_mode="async"` explicitly.
+- Pounce 0.7 async worker startup hook failures are documented as best-effort:
+  Pounce logs and continues serving. Fail-loud worker startup needs an upstream
+  Pounce change, tracked in
+  [pounce#65](https://github.com/lbliii/pounce/issues/65).
+
+**Completed proof**:
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_app/test_worker_lifecycle.py -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_startup_errors.py tests/test_sync_handler.py tests/test_sync_request.py -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/docs -q`
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/pytest -p pytest_asyncio.plugin -p pytest_timeout tests/test_freeze_site.py tests/test_search_index_v2.py tests/docs/test_site_link_drift.py -q`
+- `.venv/bin/ty check src/chirp/`
 
 **Collateral**:
 
