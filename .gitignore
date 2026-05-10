@@ -81,7 +81,3 @@ Thumbs.db
 
 # uv
 uv.lock
-
-# DORI (local/ephemeral)
-.dori/local/
-.dori/events/

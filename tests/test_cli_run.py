@@ -30,6 +30,25 @@ def fake_app_debug_off(monkeypatch: pytest.MonkeyPatch) -> App:
     return app
 
 
+@pytest.fixture
+def fake_prod_app(monkeypatch: pytest.MonkeyPatch) -> App:
+    """Register a production-configured app for ``chirp run --production`` tests."""
+    app = App(
+        config=AppConfig(
+            host="127.0.0.1",
+            port=8000,
+            debug=False,
+            worker_mode="async",
+            metrics_enabled=True,
+            metrics_path="/internal/metrics",
+        )
+    )
+    mod = types.ModuleType("_run_test_app")
+    mod.app = app  # type: ignore[attr-defined]
+    monkeypatch.setitem(__import__("sys").modules, "_run_test_app", mod)
+    return app
+
+
 class TestChirpRun:
     @patch("chirp.server.dev.run_dev_server")
     def test_default_host_and_port(self, mock_server: MagicMock, fake_app: App) -> None:
@@ -87,6 +106,21 @@ class TestChirpRun:
         app_arg = mock_server.call_args[0][0]
         assert app_arg.config.debug is True
         assert app_arg.config.dev_browser_reload is True
+
+    @patch("chirp.server.production.run_production_server")
+    def test_production_forwards_worker_mode_and_metrics_path(
+        self,
+        mock_server: MagicMock,
+        fake_prod_app: App,
+    ) -> None:
+        """Production CLI launch preserves AppConfig worker and metrics path settings."""
+        main(["run", "_run_test_app:app"])
+
+        mock_server.assert_called_once()
+        kwargs = mock_server.call_args.kwargs
+        assert kwargs["worker_mode"] == "async"
+        assert kwargs["metrics_enabled"] is True
+        assert kwargs["metrics_path"] == "/internal/metrics"
 
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """run exits 1 with error message for bad import string."""

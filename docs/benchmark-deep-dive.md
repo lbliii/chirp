@@ -83,3 +83,8 @@ Both frameworks now offload sync handlers to a thread pool. Benchmarks use per-r
 | Client setup churn | Per-request httpx.Client creation | 4.3 — shared pooled client with explicit limits |
 
 **Measurement methodology:** The harness uses a shared pooled `httpx.Client`, warms each endpoint before timing, runs multiple rounds, and reports median results. Latency percentiles include failed attempts so overload still shows up in the reported numbers.
+
+**Pounce 0.7 note:** `pounce bench` is a useful server-level smoke benchmark
+for generic ASGI workloads. Keep using `benchmarks.run` and `benchmarks.core`
+for Chirp evidence because they cover Chirp-specific return values, templates,
+SSE, route dispatch, and fused sync behavior.

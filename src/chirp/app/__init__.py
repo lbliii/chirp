@@ -431,6 +431,7 @@ class App:
         """
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            self._check_not_frozen()
             self._mutable_state.freeze_param_providers[path] = fn
             return fn
 
@@ -444,6 +445,7 @@ class App:
 
             app.freeze_exclude("/docs/search")
         """
+        self._check_not_frozen()
         self._mutable_state.freeze_exclude.add(path)
 
     def live_block(

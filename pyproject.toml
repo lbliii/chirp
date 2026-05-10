@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "kida-templates>=0.8.0", # Template engine (same ecosystem, same author)
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.6.0",  # ASGI server (public PounceError et al. from pounce)
+    "bengal-pounce>=0.7.0",  # ASGI server (public PounceError et al. from pounce)
 ]
 
 [project.optional-dependencies]

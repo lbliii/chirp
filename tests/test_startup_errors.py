@@ -188,6 +188,60 @@ class TestServerLauncherErrorHandling:
         captured = capsys.readouterr()
         assert captured.err == ""
 
+    @patch("chirp.server.production.run_production_server")
+    def test_production_forwards_lifecycle_collector_and_worker_settings(
+        self,
+        mock_production: MagicMock,
+    ) -> None:
+        from chirp.app.server import ServerLauncher
+        from chirp.app.state import MutableAppState
+        from chirp.config import AppConfig
+
+        collector = MagicMock()
+        config = AppConfig(
+            host="127.0.0.1",
+            port=8000,
+            debug=False,
+            worker_mode="async",
+            metrics_path="/internal/metrics",
+        )
+        launcher = ServerLauncher(config, MutableAppState())
+
+        launcher.run(MagicMock(), host=None, port=None, lifecycle_collector=collector)
+
+        kwargs = mock_production.call_args.kwargs
+        assert kwargs["lifecycle_collector"] is collector
+        assert kwargs["worker_mode"] == "async"
+        assert kwargs["metrics_path"] == "/internal/metrics"
+
+
+class TestProductionServerLaunch:
+    @patch("pounce.server.Server")
+    def test_lifecycle_collector_reaches_pounce_server(self, mock_server: MagicMock) -> None:
+        from chirp import App
+        from chirp.config import AppConfig
+        from chirp.server.production import run_production_server
+
+        app = App(config=AppConfig(debug=False))
+        collector = MagicMock()
+
+        run_production_server(app, worker_mode="async", lifecycle_collector=collector)
+
+        kwargs = mock_server.call_args.kwargs
+        assert kwargs["lifecycle_collector"] is collector
+        mock_server.return_value.run.assert_called_once()
+
+    def test_subinterpreter_worker_mode_requires_import_path(self) -> None:
+        from chirp import App
+        from chirp.config import AppConfig
+        from chirp.errors import ConfigurationError
+        from chirp.server.production import run_production_server
+
+        app = App(config=AppConfig(debug=False))
+
+        with pytest.raises(ConfigurationError, match="requires a Pounce app import path"):
+            run_production_server(app, worker_mode="subinterpreter")
+
 
 # ---------------------------------------------------------------------------
 # Integration: chirp run CLI wiring

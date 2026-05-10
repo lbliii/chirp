@@ -287,6 +287,34 @@ Key rules:
 
 See [[docs/examples/rag-demo|RAG demo]] for the full implementation.
 
+## Reconnect And Replay
+
+SSE gives the browser reconnect mechanics, not durable product semantics. When
+you yield `SSEEvent(id=...)`, the browser sends the latest id back as
+`Last-Event-ID` after reconnect. Chirp exposes that header on the request and
+formats the `id:` line, but the product owns the durable cursor and missed-event
+query.
+
+Use domain cursors that can be queried later: notification ids, post ids,
+database sequence numbers, or queue offsets. Avoid process-local counters or
+random ids for product-critical streams.
+
+```python
+async def stream(request):
+    last_id = request.headers.get("last-event-id")
+
+    async def events():
+        async for item in missed_items_after(last_id):
+            yield SSEEvent(event="item", id=str(item.id), data=item.html)
+        async for item in live_items():
+            yield SSEEvent(event="item", id=str(item.id), data=item.html)
+
+    return EventStream(events())
+```
+
+When replay is impossible, send a refresh event for the affected fragment or
+document that reconnecting clients should reload.
+
 ## Monitoring the Bus
 
 `ReactiveBus` exposes lightweight observability counters -- useful for dashboards, health checks, and debugging back-pressure:

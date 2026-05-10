@@ -118,6 +118,14 @@ chirp/
 - [ ] Link from Chirp docs comparison page
 - [ ] Optional: CI job to run benchmarks on release
 
+### Pounce 0.7 Benchmark Note
+
+Pounce 0.7's packaged `pounce bench` command is useful as a Pounce server
+smoke/comparison run with generic ASGI workloads (`/hello`, `/json`, `/body`).
+It does not replace Chirp's benchmark harness for release evidence because it
+does not exercise Chirp return values, Kida rendering, SSE fanout, filesystem
+routes, or the fused sync path.
+
 ---
 
 ## 8. Caveats (README Copy)

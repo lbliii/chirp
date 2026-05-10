@@ -3,7 +3,7 @@
 import pytest
 
 from chirp import App
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware, get_csrf_token
+from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware, csrf_field, get_csrf_token
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.testing import TestClient
 from tests.helpers.auth import extract_session_cookie
@@ -165,6 +165,39 @@ class TestCSRFValidation:
                 },
             )
             assert r2.status == 403
+
+    async def test_custom_field_name_used_by_helper_and_validation(self) -> None:
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(CSRFMiddleware(CSRFConfig(field_name="csrf")))
+
+        @app.route("/form")
+        def form_page():
+            return csrf_field()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request):
+            form = await request.form()
+            return f"ok={form.get('data', '')}"
+
+        async with TestClient(app) as client:
+            r1 = await client.get("/form")
+            cookie = extract_session_cookie(r1, "chirp_session")
+            assert 'name="csrf"' in r1.text
+            assert 'name="_csrf_token"' not in r1.text
+            token = r1.text.split('value="', 1)[1].split('"', 1)[0]
+
+            r2 = await client.post(
+                "/submit",
+                body=f"csrf={token}&data=hello".encode(),
+                headers={
+                    "Cookie": f"chirp_session={cookie}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
+
+        assert r2.status == 200
+        assert r2.text == "ok=hello"
 
     async def test_get_request_not_checked(self) -> None:
         """GET requests should not require CSRF tokens."""

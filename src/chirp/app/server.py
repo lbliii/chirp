@@ -103,4 +103,5 @@ class ServerLauncher:
             request_timeout=self._config.request_timeout,
             ssl_certfile=self._config.ssl_certfile,
             ssl_keyfile=self._config.ssl_keyfile,
+            lifecycle_collector=lifecycle_collector,
         )

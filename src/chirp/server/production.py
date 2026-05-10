@@ -4,13 +4,42 @@ Starts a pounce production server with multi-worker, metrics, rate limiting,
 request queueing, error tracking, and zero-downtime hot reload.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, cast
 
 from pounce import ASGIApp
 from pounce.sync_protocol import SyncApp
 
 if TYPE_CHECKING:
+    from pounce.server import LifecycleCollector
+
     from chirp.app import App
+
+
+def _effective_worker_mode(worker_mode: str) -> str:
+    from pounce._runtime import resolve_worker_execution_mode
+
+    return str(resolve_worker_execution_mode(worker_mode))
+
+
+def _validate_worker_lifecycle_mode(app: App, worker_mode: str) -> None:
+    if not (app._worker_startup_hooks or app._worker_shutdown_hooks):
+        return
+    if _effective_worker_mode(worker_mode) != "sync":
+        return
+
+    from chirp.errors import ConfigurationError
+
+    msg = (
+        "worker lifecycle hooks require worker_mode='async' in production. "
+        f"Pounce resolved worker_mode={worker_mode!r} to sync workers on this "
+        "Python build, and Pounce 0.7 sync workers do not emit "
+        "pounce.worker.startup or pounce.worker.shutdown scopes. Set "
+        "AppConfig(worker_mode='async') or remove @app.on_worker_startup/"
+        "@app.on_worker_shutdown hooks."
+    )
+    raise ConfigurationError(msg)
 
 
 def run_production_server(
@@ -54,6 +83,7 @@ def run_production_server(
     # TLS (optional)
     ssl_certfile: str | None = None,
     ssl_keyfile: str | None = None,
+    lifecycle_collector: LifecycleCollector | None = None,
 ) -> None:
     """Run chirp app in production mode with pounce Phase 5 & 6 features.
 
@@ -98,6 +128,8 @@ def run_production_server(
 
         ssl_certfile: Path to TLS certificate file (enables HTTPS/HTTP2).
         ssl_keyfile: Path to TLS private key file.
+        lifecycle_collector: Optional Pounce lifecycle collector for
+            startup/shutdown/worker hook event capture.
 
     Example:
         >>> from myapp import app
@@ -120,6 +152,18 @@ def run_production_server(
         - OTEL_ENDPOINT: OpenTelemetry endpoint
 
     """
+    if worker_mode == "subinterpreter":
+        from chirp.errors import ConfigurationError
+
+        msg = (
+            "worker_mode='subinterpreter' requires a Pounce app import path, "
+            "but Chirp production launch currently passes a live App object. "
+            "Use worker_mode='sync', 'async', or 'auto' until Chirp supports "
+            "import-string production launch."
+        )
+        raise ConfigurationError(msg)
+    _validate_worker_lifecycle_mode(app, worker_mode)
+
     from pounce.config import ServerConfig
     from pounce.server import Server
 
@@ -168,5 +212,10 @@ def run_production_server(
     )
 
     # Create and run server — pass app as sync_app for fused sync path
-    server = Server(config, cast(ASGIApp, app), sync_app=cast(SyncApp, app))
+    server = Server(
+        config,
+        cast(ASGIApp, app),
+        sync_app=cast(SyncApp, app),
+        lifecycle_collector=lifecycle_collector,
+    )
     server.run()

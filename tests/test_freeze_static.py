@@ -219,6 +219,31 @@ class TestFreezeParams:
 
         assert "/items/{id}" in app._mutable_state.freeze_param_providers
 
+    def test_freeze_params_rejects_registration_after_freeze(self) -> None:
+        app = App()
+        app.freeze()
+
+        with pytest.raises(RuntimeError, match="Cannot modify the app"):
+
+            @app.freeze_params("/items/{id}")
+            def item_params():
+                return [{"id": "1"}]
+
+        assert "/items/{id}" not in app._mutable_state.freeze_param_providers
+
+    def test_freeze_params_decorator_rejects_late_application(self) -> None:
+        app = App()
+        decorator = app.freeze_params("/items/{id}")
+        app.freeze()
+
+        def item_params():
+            return [{"id": "1"}]
+
+        with pytest.raises(RuntimeError, match="Cannot modify the app"):
+            decorator(item_params)
+
+        assert "/items/{id}" not in app._mutable_state.freeze_param_providers
+
     async def test_freeze_params_expand(self, tmp_path: Path) -> None:
         app = App()
 
@@ -244,6 +269,17 @@ class TestFreezeParams:
         """DocsPlugin should auto-register freeze_params for the slug route."""
         providers = docs_app._mutable_state.freeze_param_providers
         assert any("slug" in path for path in providers)
+
+
+class TestFreezeExclude:
+    def test_freeze_exclude_rejects_registration_after_freeze(self) -> None:
+        app = App()
+        app.freeze()
+
+        with pytest.raises(RuntimeError, match="Cannot modify the app"):
+            app.freeze_exclude("/docs/search")
+
+        assert "/docs/search" not in app._mutable_state.freeze_exclude
 
 
 # ── Static search ──────────────────────────────────────────────────────

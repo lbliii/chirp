@@ -95,6 +95,28 @@ async def cleanup_worker():
     pass
 ```
 
+Worker hooks are a production worker contract, not a general app startup
+replacement. Use them for resources that must live on the worker's event loop
+or worker thread, such as async HTTP clients, async database pools, or
+per-worker caches.
+
+In production, worker hooks require `worker_mode="async"`:
+
+```python
+app = App(AppConfig(debug=False, worker_mode="async"))
+```
+
+Pounce 0.7 sync workers do not emit `pounce.worker.startup` or
+`pounce.worker.shutdown` scopes. On free-threaded Python, Pounce resolves
+`worker_mode="auto"` to sync workers, so Chirp rejects production launch when
+worker hooks are registered and the effective worker mode is sync. If you need
+worker hooks, set `worker_mode="async"` explicitly.
+
+If a worker startup hook raises under Pounce 0.7 async workers, Pounce logs the
+failure and continues serving. Put must-succeed global checks in
+`@app.on_startup` or expose a health check until fail-loud worker startup is
+available upstream ([pounce#65](https://github.com/lbliii/pounce/issues/65)).
+
 ## Thread-Safe Freeze
 
 The freeze operation uses double-check locking to be safe under free-threading:

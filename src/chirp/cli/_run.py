@@ -73,6 +73,7 @@ def _run_production(app: App, args: argparse.Namespace, host: str, port: int) ->
         workers=args.workers if args.workers is not None else app.config.workers,
         # CLI flags override config
         metrics_enabled=args.metrics or app.config.metrics_enabled,
+        metrics_path=app.config.metrics_path,
         rate_limit_enabled=args.rate_limit or app.config.rate_limit_enabled,
         request_queue_enabled=args.queue or app.config.request_queue_enabled,
         sentry_dsn=args.sentry_dsn or app.config.sentry_dsn,
@@ -91,6 +92,7 @@ def _run_production(app: App, args: argparse.Namespace, host: str, port: int) ->
         lifecycle_logging=app.config.lifecycle_logging,
         log_format=app.config.log_format,
         log_level=app.config.log_level,
+        worker_mode=app.config.worker_mode,
         max_connections=app.config.max_connections,
         backlog=app.config.backlog,
         keep_alive_timeout=app.config.keep_alive_timeout,

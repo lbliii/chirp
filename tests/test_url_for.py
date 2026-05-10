@@ -257,6 +257,36 @@ async def test_request_url_for_scopes_template_links_htmx_fragments_and_sse(
 
 
 @pytest.mark.asyncio
+async def test_request_url_for_scopes_mounted_app_routes(tmp_path: Path) -> None:
+    tpl_dir = tmp_path / "templates"
+    tpl_dir.mkdir()
+    (tpl_dir / "console.html").write_text(
+        """
+<a href="{{ url_for('console.user', user_id=42) }}">user</a>
+<button hx-get="{{ url_for('console.user', user_id=43) }}">next</button>
+"""
+    )
+    parent = App(AppConfig(template_dir=str(tpl_dir), debug=False))
+    parent.add_middleware(_tenant_scope_middleware)
+    console = App(AppConfig(debug=False, skip_contract_checks=True))
+
+    @console.route("/users/{user_id}", name="console.user")
+    def user(user_id: str):
+        return Template("console.html")
+
+    parent.mount_app("/console", console)
+
+    async with TestClient(parent) as client:
+        response = await client.get("/c/acme/console/users/42")
+
+    assert response.status == 200
+    body = response.body.decode("utf-8")
+    assert 'href="/c/acme/console/users/42"' in body
+    assert 'hx-get="/c/acme/console/users/43"' in body
+    assert parent.url_for("console.user", user_id=42) == "/console/users/42"
+
+
+@pytest.mark.asyncio
 async def test_request_scoped_url_supports_redirects(tmp_path: Path) -> None:
     tpl_dir = tmp_path / "templates"
     tpl_dir.mkdir()
