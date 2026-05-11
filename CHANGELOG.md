@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Pounce 0.7 operator guidance** — documented the `bengal-pounce>=0.7.0` production boundary, paired `chirp check` with `pounce check`, described Pounce config inspection commands, clarified that `pounce.toml` is Pounce-native today while `app.run()` and `chirp run` use `AppConfig`, and deferred trusted proxy, compression, and introspection `AppConfig` fields pending a separate security-facing API decision.
 - **Scoped auth redirects** — `@login_required` and `@requires` now preserve `RequestUrlScope` in generated `?next=` login redirects, so tenant/base-path middleware keeps users on the public URL after login.
+- Raised Chirp's optional `ui` extra, development example dependency, and new scaffolded project floor to `chirp-ui>=0.8.0`.
 - Require `kida-templates>=0.9.0`, preserve Chirp's missing-block `KeyError` behavior when Kida reports missing blocks with its typed runtime error, and surface Kida 0.9 component-call, dotted context-contract, literal-attribute, escape-audit, and privacy-lint diagnostics through `app.check()`.
 - `EventStream` now matches the documented htmx SSE default for yielded `Fragment` values: fragments without an explicit target emit on the `message` channel, while targeted fragments still use their target as the event name. The `sse_scope()` macro and bundled examples now listen on `message` by default, and the SSE cross-reference contract can infer literal `SSEEvent(event=...)` and `Fragment(target=...)` yields from route source.
 
