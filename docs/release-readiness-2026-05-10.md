@@ -37,6 +37,8 @@ Environment: CPython 3.14.2, free-threaded, Darwin arm64.
 ## Release Artifacts
 
 - Package version bumped to `0.7.0`.
+- Optional `chirp-ui` dependency floor bumped to `>=0.8.0` after verifying
+  GitHub release `lbliii/chirp-ui@v0.8.0`.
 - `CHANGELOG.md` includes the compiled `0.7.0` release entry.
 - `site/content/releases/0.7.0.md` is present for the GitHub release target.
 - `dist/bengal_chirp-0.7.0.tar.gz` and
