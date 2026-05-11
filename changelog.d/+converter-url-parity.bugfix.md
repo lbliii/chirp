@@ -1,1 +1,0 @@
-Aligned `url_for()` and contract route matching with typed route converters. `url_for()` now rejects path values that do not match the route converter, and `app.check()` no longer treats literal URLs like `/users/alice` as valid matches for `/users/{id:int}`.

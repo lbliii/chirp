@@ -1,1 +1,0 @@
-`app.check()` now reports `fragment_target_scan` errors when a page template cannot be inspected during fragment target orphan checks, instead of silently skipping that template and potentially hiding stale or misspelled target registrations.

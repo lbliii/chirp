@@ -5,6 +5,48 @@ All notable changes to chirp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-05-10
+
+### Added
+
+- **Benchmarks** — added a networked template-rendering workload to the Chirp, FastAPI, and Flask comparison runner.
+- **Fragment safety** — `app.check()` now warns when a fragment block depends on imports or bindings declared only inside an ancestor block, and `chirp.testing` adds `RouteSmokeCase` / `assert_route_smoke` for full-page and fragment route smoke checks.
+- **Request URL scope** — `RequestUrlScope`, `request.with_url_scope(...)`, `request.scoped_url(path)`, and `request.url_for(...)` let middleware generate tenant/base-path public URLs without changing `app.url_for(...)` or rewriting rendered HTML.
+- **`csrf_form` contract check** — when `CSRFMiddleware` is active, `app.check()` now warns on static mutating forms that do not render `csrf_field()`, call `csrf_token()`, or include an `_csrf_token` field.
+- Added drift guards that keep `docs/public-api.md` aligned with `_API_STATUS`, require every `AppConfig` field to appear in the configuration guide, and require changelog fragments for branch changes to the top-level public API registry.
+- Added provisional `DeferredCache` for explicit server-side reuse of Suspense deferred values, including TTL expiry and same-key in-flight deduplication.
+- Benchmark comparison runner now covers SQLite DB workloads and Starlette/Litestar targets, with report headers that record Python version and GIL/free-threaded mode for 3.14 vs 3.14t comparisons.
+- Document the 2026-05-03 release-readiness gate run, mark completed/stale planning docs with current status, complete the initial 1.0 public surface, `AppConfig`, and stable error-message audits, correct the configuration guide, promote `JSONResponse` to stable, and make selected routing/forms/session errors more actionable.
+- Reactive apps can now expose `reactive_index`, `reactive_emitted_paths`, `reactive_audience_scopes`, and `reactive_connection_scopes` through `app.set_contract_check_data()` so `app.check()` can warn about emitted paths missing from the `DependencyIndex` and audience-filtered scopes that lack `ConnectionInfo` subscribers.
+
+### Changed
+
+- **Pounce 0.7 operator guidance** — documented the `bengal-pounce>=0.7.0` production boundary, paired `chirp check` with `pounce check`, described Pounce config inspection commands, clarified that `pounce.toml` is Pounce-native today while `app.run()` and `chirp run` use `AppConfig`, and deferred trusted proxy, compression, and introspection `AppConfig` fields pending a separate security-facing API decision.
+- **Scoped auth redirects** — `@login_required` and `@requires` now preserve `RequestUrlScope` in generated `?next=` login redirects, so tenant/base-path middleware keeps users on the public URL after login.
+- Require `kida-templates>=0.9.0`, preserve Chirp's missing-block `KeyError` behavior when Kida reports missing blocks with its typed runtime error, and surface Kida 0.9 component-call, dotted context-contract, literal-attribute, escape-audit, and privacy-lint diagnostics through `app.check()`.
+- `EventStream` now matches the documented htmx SSE default for yielded `Fragment` values: fragments without an explicit target emit on the `message` channel, while targeted fragments still use their target as the event name. The `sse_scope()` macro and bundled examples now listen on `message` by default, and the SSE cross-reference contract can infer literal `SSEEvent(event=...)` and `Fragment(target=...)` yields from route source.
+
+### Fixed
+
+- Aligned `url_for()` and contract route matching with typed route converters. `url_for()` now rejects path values that do not match the route converter, and `app.check()` no longer treats literal URLs like `/users/alice` as valid matches for `/users/{id:int}`.
+- Fixed lifespan startup cleanup so a database connection opened during startup is disconnected when a later startup hook or migration step fails before `lifespan.startup.complete`.
+- Fixed router parameter matching so typed and string parameter routes at the same path depth no longer shadow each other or reuse the wrong parameter name. Route parsing now rejects malformed parameter segments, unknown converters, non-final `{name:path}` converters, and duplicate route shapes that differ only by parameter name.
+- SQLite migrations now wrap the migration SQL and tracking-table insert in one explicit transaction, so a failed multi-statement migration does not leave partially-created tables or a stale migration record.
+- `CacheMiddleware` now preserves cached response headers and content type on cache hits instead of reconstructing every cached response as bare `text/html`.
+- `app.check()` now reports `fragment_target_scan` errors when a page template cannot be inspected during fragment target orphan checks, instead of silently skipping that template and potentially hiding stale or misspelled target registrations.
+- `chirp security-check` now matches `app.check()` host validation by allowing wildcard `allowed_hosts` in development while still failing wildcard hosts outside development.
+
+### Security
+
+- **Middleware security defaults** — auth rate limiting now uses the socket client address by default instead of trusting `X-Forwarded-For`, credentialed wildcard CORS is rejected, and `app.check()` flags wildcard `allowed_hosts` outside development.
+
+    **Migration** — Apps behind a trusted proxy that intentionally key auth rate limits by `X-Forwarded-For` must pass `AuthRateLimitConfig(key_header="x-forwarded-for")`; credentialed CORS must list explicit origins.
+- **SSE and markdown trust boundaries** — `SSEEvent` now rejects event names and IDs containing CR, LF, or NUL characters, rejects negative retry values, and normalizes carriage returns in data frames. `MarkdownRenderer` and `register_markdown_filter()` now sanitize unsafe HTML, event attributes, and unsafe link/image URLs by default.
+
+    **Migration** — Trusted markdown that intentionally preserves raw HTML can pass `sanitize=False`. Apps constructing `SSEEvent(event=...)` or `SSEEvent(id=...)` must pass single-line field values.
+- `CacheMiddleware` now bypasses cache reads and writes for GET requests carrying `Cookie` or `Authorization` headers, preventing default site-wide caching from replaying authenticated or session-specific HTML.
+- `chirp freeze` now rejects expanded URLs containing `.` or `..` path segments before mapping them to output files. Unsafe `freeze_params` values are reported in `FreezeResult.errors` and are not written outside the target output directory.
+
 ## [0.6.0] — 2026-05-02
 
 ### Added
