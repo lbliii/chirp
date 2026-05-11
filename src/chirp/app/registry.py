@@ -277,6 +277,7 @@ class AppRegistry:
                                 full_ctx,
                                 _service_providers,
                                 form_data,
+                                request=request,
                             )
                             return upgrade_result(
                                 action_result,

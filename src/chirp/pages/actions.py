@@ -7,6 +7,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
+from chirp.http.request import Request
 from chirp.pages.types import ActionInfo
 
 
@@ -45,6 +46,8 @@ async def dispatch_action(
     cascade_ctx: dict[str, Any],
     service_providers: dict[type, Any],
     form_data: dict[str, Any] | None = None,
+    *,
+    request: Request | None = None,
 ) -> Any:
     """Invoke an action with path params, context, and services.
 
@@ -53,7 +56,12 @@ async def dispatch_action(
     """
     form_data = form_data or {}
     kwargs = _resolve_action_kwargs(
-        action_info.func, path_params, cascade_ctx, service_providers, form_data
+        action_info.func,
+        path_params,
+        cascade_ctx,
+        service_providers,
+        form_data,
+        request=request,
     )
     result = action_info.func(**kwargs)
     if inspect.isawaitable(result):
@@ -67,13 +75,19 @@ def _resolve_action_kwargs(
     cascade_ctx: dict[str, Any],
     service_providers: dict[type, Any],
     form_data: dict[str, Any],
+    *,
+    request: Request | None = None,
 ) -> dict[str, Any]:
     """Resolve kwargs for action function (same pattern as _call_provider)."""
+    from chirp.pages.resolve import _invoke_provider_factory
+
     sig = inspect.signature(func, eval_str=True)
     kwargs: dict[str, Any] = {}
 
     for name, param in sig.parameters.items():
-        if name in path_params:
+        if request is not None and (name == "request" or param.annotation is Request):
+            kwargs[name] = request
+        elif name in path_params:
             value = path_params[name]
             if param.annotation is not inspect.Parameter.empty:
                 try:
@@ -95,6 +109,10 @@ def _resolve_action_kwargs(
             param.annotation is not inspect.Parameter.empty
             and param.annotation in service_providers
         ):
-            kwargs[name] = service_providers[param.annotation]()
+            factory = service_providers[param.annotation]
+            if request is None:
+                kwargs[name] = factory()
+            else:
+                kwargs[name] = _invoke_provider_factory(factory, request, cascade_ctx)
 
     return kwargs

@@ -142,6 +142,70 @@ def post(name: str):
 
 
 @pytest.mark.asyncio
+async def test_action_receives_request_and_request_aware_services(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Action dispatch preserves request scope when resolving service providers."""
+    pages_dir = tmp_path / "pages"
+    pages_dir.mkdir()
+    monkeypatch.syspath_prepend(str(tmp_path))
+    (tmp_path / "services.py").write_text(
+        """
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class AppServices:
+    tenant: str
+"""
+    )
+    (pages_dir / "_layout.html").write_text(
+        '<html><body id="body">{% block page_root %}{% block content %}{% end %}{% end %}</body></html>'
+    )
+    (pages_dir / "_actions.py").write_text(
+        """
+from chirp import Request
+from chirp.pages.actions import action
+from services import AppServices
+
+@action("scoped")
+def scoped(request: Request, services: AppServices):
+    return {"msg": f"{request.method}:{services.tenant}"}
+"""
+    )
+    (pages_dir / "page.py").write_text(
+        """
+from chirp import Page
+
+def get():
+    return Page("page.html", "content", page_block_name="content", msg="get")
+def post():
+    return Page("page.html", "content", page_block_name="content", msg="post")
+"""
+    )
+    (pages_dir / "page.html").write_text(
+        "{% block page_root %}{% block content %}{{ msg }}{% end %}{% end %}"
+    )
+
+    from services import AppServices
+
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    app.provide(
+        AppServices,
+        lambda request: AppServices(request.headers.get("x-tenant", "missing")),
+    )
+    app.mount_pages(str(pages_dir))
+
+    async with TestClient(app) as client:
+        response = await client.post(
+            "/",
+            data={"_action": "scoped"},
+            headers={"X-Tenant": "acme"},
+        )
+        assert response.status == 200
+        assert "POST:acme" in response.body.decode("utf-8")
+
+
+@pytest.mark.asyncio
 async def test_page_post_coexists_with_actions(tmp_path: Path) -> None:
     """page.py post() + _actions.py actions coexist."""
     pages_dir = tmp_path / "pages"
