@@ -83,10 +83,11 @@ class TestChirpRun:
 
     @patch("chirp.server.dev.run_dev_server")
     def test_reload_from_config(self, mock_server: MagicMock, fake_app: App) -> None:
-        """reload flag comes from app.config.debug."""
+        """Dev server process reload excludes browser asset reload suffixes."""
         main(["run", "_run_test_app:app"])
         kwargs = mock_server.call_args[1]
         assert kwargs["reload"] is True  # debug=True in fixture
+        assert kwargs["reload_include"] == ()
 
     @patch("chirp.server.dev.run_dev_server")
     def test_dev_sets_browser_reload_config(self, mock_server: MagicMock, fake_app: App) -> None:

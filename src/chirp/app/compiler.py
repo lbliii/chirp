@@ -171,11 +171,19 @@ def _collect_builtin_middleware(
 
             middleware_list.append(ViewTransitionCssDebugWarning())
         if config.dev_browser_reload:
-            from chirp.server.dev_browser_reload import DEV_BROWSER_RELOAD_SNIPPET
-
-            middleware_list.append(
-                HTMLInject(DEV_BROWSER_RELOAD_SNIPPET, full_page_only=True),
+            from chirp.server.dev_browser_reload import (
+                DEV_BROWSER_RELOAD_SNIPPET,
+                is_dev_browser_reload_enabled,
             )
+
+            if is_dev_browser_reload_enabled(config):
+                middleware_list.append(
+                    HTMLInject(
+                        DEV_BROWSER_RELOAD_SNIPPET,
+                        full_page_only=True,
+                        skip_htmx=True,
+                    ),
+                )
         if config.debug_fragment_validator and oob_registry is not None:
             from chirp.middleware.debug_fragment_validator import DebugFragmentValidator
 
@@ -297,9 +305,13 @@ class AppCompiler:
             self._mutable.lazy_pages_dir = None
 
         if self._config.debug and self._config.dev_browser_reload:
-            from chirp.server.dev_browser_reload import make_dev_reload_pending_route
+            from chirp.server.dev_browser_reload import (
+                is_dev_browser_reload_enabled,
+                make_dev_reload_pending_route,
+            )
 
-            self._mutable.pending_routes.append(make_dev_reload_pending_route(self._config))
+            if is_dev_browser_reload_enabled(self._config):
+                self._mutable.pending_routes.append(make_dev_reload_pending_route(self._config))
 
         from chirp.server.fragment_dispatch import (
             FRAGMENT_ROUTE_PREFIX,

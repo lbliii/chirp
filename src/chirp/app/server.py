@@ -64,7 +64,7 @@ class ServerLauncher:
                 host,
                 port,
                 reload=self._config.debug,
-                reload_include=self._config.reload_include,
+                reload_include=(),
                 reload_dirs=reload_dirs,
                 lifecycle_collector=lifecycle_collector,
             )

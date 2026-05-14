@@ -5,6 +5,8 @@ events. Works alongside Pounce's Python ``--reload`` so .py changes restart
 the process while .html/.css edits trigger an in-browser refresh.
 """
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -22,7 +24,13 @@ DEV_RELOAD_SSE_PATH = "/__chirp__/dev-reload"
 DEV_BROWSER_RELOAD_SNIPPET = f"""\
 <script>
 (function() {{
+  if (window.__chirpDevReloadBooted) return;
+  window.__chirpDevReloadBooted = true;
+  if (window.__chirpDevReloadSource && window.__chirpDevReloadSource.close) {{
+    try {{ window.__chirpDevReloadSource.close(); }} catch (e) {{}}
+  }}
   var es = new EventSource("{DEV_RELOAD_SSE_PATH}");
+  window.__chirpDevReloadSource = es;
   es.addEventListener("reload", function() {{ location.reload(); }});
   es.addEventListener("css", function() {{
     var t = Date.now();
@@ -34,6 +42,11 @@ DEV_BROWSER_RELOAD_SNIPPET = f"""\
   es.onerror = function() {{ setTimeout(function() {{ location.reload(); }}, 2000); }};
 }})();
 </script>"""
+
+
+def is_dev_browser_reload_enabled(config: AppConfig) -> bool:
+    """Return whether dev browser reload should register browser-visible wiring."""
+    return bool(config.dev_browser_reload and config.reload_include)
 
 
 def _watch_roots(config: AppConfig) -> list[Path]:

@@ -51,7 +51,7 @@ provisional until those subsystems are stabilized.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `reload_include` | `tuple[str, ...]` | `(".html", ".css", ".md")` | File suffixes watched by development reload |
+| `reload_include` | `tuple[str, ...]` | `(".html", ".css", ".md")` | File suffixes watched by browser reload; use `()` to disable browser reload |
 | `reload_dirs` | `tuple[str, ...]` | `()` | Extra directories watched alongside the current working directory |
 | `dev_browser_reload` | `bool \| None` | `None` | Browser refresh injection; `None` follows `debug` |
 | `reload_timeout` | `float` | `30.0` | Pounce hot-reload drain timeout |
