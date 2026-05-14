@@ -45,13 +45,15 @@ _CHIRP_UI_FILTER_NAMES = (
     "resolve_status_variant",
     "sanitize_color",
     "shell_action_btn_variant",
+    "validate_appearance_block",
     "validate_size",
+    "validate_tone_block",
     "validate_variant",
     "validate_variant_block",
     "value_type",
 )
 
-_CHIRP_UI_GLOBAL_NAMES = ("build_hx_attrs", "check_required_id")
+_CHIRP_UI_GLOBAL_NAMES = ("build_hx_attrs", "check_required_id", "chirpui_asset_path")
 
 
 def _ensure_chirp_ui_filters(env: Environment) -> None:

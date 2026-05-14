@@ -184,6 +184,9 @@ class TestCreateEnvironmentChirpUIFallback:
         assert "bem" in env.filters
         assert "field_errors" in env.filters
         assert "validate_variant" in env.filters
+        assert "validate_appearance_block" in env.filters
+        assert "validate_tone_block" in env.filters
+        assert "chirpui_asset_path" in env.globals
 
     def test_user_filter_overrides_chirp_ui_fallback(self, tmp_path: Path) -> None:
         """User-registered filters take precedence over chirp-ui fallback."""
