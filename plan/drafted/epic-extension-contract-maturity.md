@@ -94,7 +94,8 @@ across package names and extras.
 - Keep SQLite guidance clear: stdlib `sqlite3` plus `anyio`, no `data` extra.
 
 **Required proof**:
-- `uv run pytest tests/test_optional_extras.py -q`
+- Add a focused optional-extra guardrail test, then run that test. Suggested
+  path: `tests/test_optional_extras.py`.
 - Targeted docs search for stale install commands outside historical paths.
 - Scaffold tests when scaffold install guidance changes.
 

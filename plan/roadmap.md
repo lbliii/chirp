@@ -256,7 +256,7 @@ extras.
 **Required proof**:
 - `uv run pytest tests/test_chirpui_boundary.py tests/test_templating_filters.py -q`
 - `uv run pytest tests/contracts/test_custom_checks_integration.py -q -k chirpui`
-- `uv run pytest tests/test_optional_extras.py -q`
+- Add and run a focused optional-extra guardrail test.
 - `uv run pytest tests/docs -q`
 - No new mandatory dependency in `pyproject.toml`.
 
