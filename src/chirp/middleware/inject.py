@@ -38,7 +38,7 @@ class HTMLInject:
         ))
     """
 
-    __slots__ = ("_full_page_only", "_snippet", "_target")
+    __slots__ = ("_full_page_only", "_skip_htmx", "_snippet", "_target")
 
     def __init__(
         self,
@@ -46,10 +46,12 @@ class HTMLInject:
         *,
         before: str = "</body>",
         full_page_only: bool = False,
+        skip_htmx: bool = False,
     ) -> None:
         self._snippet = snippet
         self._target = before
         self._full_page_only = full_page_only
+        self._skip_htmx = skip_htmx
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Inject the snippet into HTML responses."""
@@ -59,6 +61,8 @@ class HTMLInject:
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
+            return response
+        if self._skip_htmx and request.is_htmx:
             return response
         # Prefer explicit render intent when available. Fall back to
         # request heuristics for unknown/legacy responses.
@@ -93,8 +97,14 @@ class StreamingHTMLInject(HTMLInject):
         before: str = "</body>",
         full_page_only: bool = False,
         dedup_marker: str | None = None,
+        skip_htmx: bool = False,
     ) -> None:
-        super().__init__(snippet, before=before, full_page_only=full_page_only)
+        super().__init__(
+            snippet,
+            before=before,
+            full_page_only=full_page_only,
+            skip_htmx=skip_htmx,
+        )
         self._dedup_marker = dedup_marker
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
@@ -104,6 +114,8 @@ class StreamingHTMLInject(HTMLInject):
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
+            return response
+        if self._skip_htmx and request.is_htmx:
             return response
         if response.render_intent == "fragment":
             return response
@@ -124,6 +136,8 @@ class StreamingHTMLInject(HTMLInject):
 
     def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
         if "text/html" not in response.content_type:
+            return response
+        if self._skip_htmx and request.is_htmx:
             return response
         if response.render_intent == "fragment":
             return response

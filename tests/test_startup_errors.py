@@ -151,6 +151,18 @@ class TestServerLauncherErrorHandling:
         assert "app.run(port=8001)" in captured.err
 
     @patch("chirp.server.dev.run_dev_server")
+    def test_dev_launcher_excludes_browser_reload_suffixes_from_pounce(
+        self, mock_dev: MagicMock
+    ) -> None:
+        launcher = self._make_launcher()
+
+        launcher.run(MagicMock(), host=None, port=None, lifecycle_collector=None)
+
+        kwargs = mock_dev.call_args.kwargs
+        assert kwargs["reload"] is True
+        assert kwargs["reload_include"] == ()
+
+    @patch("chirp.server.dev.run_dev_server")
     def test_unknown_error_re_raises(self, mock_dev: MagicMock) -> None:
         mock_dev.side_effect = RuntimeError("boom")
         launcher = self._make_launcher()

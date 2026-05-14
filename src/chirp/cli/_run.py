@@ -110,7 +110,7 @@ def _run_dev(app: App, args: argparse.Namespace, host: str, port: int) -> None:
         host,
         port,
         reload=app.config.debug,
-        reload_include=app.config.reload_include,
+        reload_include=(),
         reload_dirs=app.config.reload_dirs,
         app_path=args.app,
     )
