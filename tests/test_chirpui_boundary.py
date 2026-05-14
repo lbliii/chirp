@@ -238,6 +238,17 @@ class TestChirpUIIntegration:
                 f"ChirpUI middleware broke ContextVar: {data}"
             )
 
+    async def test_use_chirp_ui_preserves_user_route_link_attrs_global(self, tmp_path: Path):
+        app = App(AppConfig(template_dir=tmp_path))
+
+        def custom_route_link_attrs(href: str) -> dict[str, str]:
+            return {"data-custom-route": href}
+
+        app.template_global("route_link_attrs")(custom_route_link_attrs)
+        use_chirp_ui(app)
+
+        assert app._mutable_state.template_globals["route_link_attrs"] is custom_route_link_attrs
+
     async def test_post_through_chirpui_middleware(self):
         """POST request works through ChirpUI middleware stack."""
         app = _make_chirpui_app()

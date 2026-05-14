@@ -4,11 +4,13 @@ from pathlib import Path
 
 import pytest
 from kida import Environment, FileSystemLoader
+from kida.environment.exceptions import TemplateNotFoundError
 
 from chirp.config import AppConfig
 from chirp.http.request import Request
 from chirp.pages.shell_actions import ShellAction, ShellActions, ShellActionZone
 from chirp.server.negotiation import negotiate
+from chirp.server.negotiation_oob import render_shell_actions_oob
 from chirp.templating.integration import create_environment
 from chirp.templating.returns import LayoutPage, LayoutSuspense, Suspense, Template
 
@@ -127,6 +129,19 @@ class TestLayoutPageSlotContext:
 
         assert 'id="chirp-shell-actions"' in result.text
         assert 'hx-swap-oob="innerHTML"></div>' in result.text
+
+    def test_shell_actions_oob_missing_template_fails_loud(self, tmp_path: Path) -> None:
+        env = Environment(loader=FileSystemLoader(str(tmp_path)))
+        context = {
+            "shell_actions": ShellActions(
+                primary=ShellActionZone(
+                    items=(ShellAction(id="deploy", label="Deploy", href="/deploy"),)
+                )
+            )
+        }
+
+        with pytest.raises(TemplateNotFoundError):
+            render_shell_actions_oob(context, env)
 
     def test_template_extending_chirpui_app_shell_layout_renders(
         self,

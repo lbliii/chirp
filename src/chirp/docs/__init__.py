@@ -10,7 +10,7 @@ Basic usage::
 
     app.mount("/docs", DocsPlugin(content_dir="./content/docs"))
 
-Requires ``patitas`` (``pip install chirp[markdown]``).
+Requires ``patitas`` (``pip install bengal-chirp[markdown]``).
 """
 
 from chirp.docs.collection import DocsCollection

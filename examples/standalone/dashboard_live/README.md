@@ -7,7 +7,7 @@ the kind of polling-or-push workflow you would use for production dashboards.
 ## Run
 
 ```bash
-pip install chirp[data]
+pip install bengal-chirp
 PYTHONPATH=src python examples/standalone/dashboard_live/app.py
 ```
 

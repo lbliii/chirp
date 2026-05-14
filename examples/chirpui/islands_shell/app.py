@@ -11,7 +11,7 @@ Demonstrates:
 - StaticFiles for island adapter (counter.js)
 
 Run:
-    pip install chirp[ui]
+    pip install "bengal-chirp[ui]"
     python app.py
 """
 

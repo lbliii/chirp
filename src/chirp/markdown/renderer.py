@@ -249,7 +249,7 @@ def _get_markdown(
     except ImportError:
         msg = (
             "chirp.markdown requires 'patitas' for Markdown rendering. "
-            "Install with: pip install chirp[markdown]"
+            "Install with: pip install bengal-chirp[markdown]"
         )
         raise MarkdownNotInstalledError(msg) from None
 

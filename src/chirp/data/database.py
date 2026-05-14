@@ -453,7 +453,7 @@ class Database:
         except ImportError:
             msg = (
                 "chirp.data requires 'asyncpg' for PostgreSQL LISTEN/NOTIFY. "
-                "Install it with: pip install chirp[data-pg]"
+                "Install it with: pip install bengal-chirp[data-pg]"
             )
             raise DriverNotInstalledError(msg) from None
 

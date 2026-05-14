@@ -19,7 +19,7 @@ Basic usage::
 
 SQLite works out of the box. For PostgreSQL, install the driver::
 
-    pip install chirp[data-pg]    # PostgreSQL
+    pip install bengal-chirp[data-pg]    # PostgreSQL
 """
 
 from chirp.data.database import Database, Notification, get_db

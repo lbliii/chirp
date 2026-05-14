@@ -11,7 +11,7 @@ Demonstrates:
 - Template, Redirect, request.form()
 
 Run:
-    pip install chirp[sessions]
+    pip install bengal-chirp[sessions]
     PYTHONPATH=src python examples/standalone/production/app.py
 """
 

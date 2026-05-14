@@ -2,7 +2,7 @@
 
 Hashes passwords using the best available algorithm:
 
-1. **argon2id** via ``argon2-cffi`` (preferred, ``pip install chirp[auth]``)
+1. **argon2id** via ``argon2-cffi`` (preferred, ``pip install bengal-chirp[auth]``)
 2. **scrypt** via stdlib ``hashlib`` (fallback, always available)
 
 Both produce PHC-format strings. ``verify_password`` auto-detects the
@@ -140,7 +140,7 @@ def _verify_argon2(password: str, phc_hash: str) -> bool:
 def hash_password(password: str) -> str:
     """Hash a password using the best available algorithm.
 
-    Uses argon2id if ``argon2-cffi`` is installed (``pip install chirp[auth]``),
+    Uses argon2id if ``argon2-cffi`` is installed (``pip install bengal-chirp[auth]``),
     otherwise falls back to scrypt (stdlib).
 
     Returns a PHC-format string safe for database storage.
@@ -181,7 +181,7 @@ def verify_password(password: str, phc_hash: str) -> bool:
         if not _has_argon2():
             msg = (
                 "Hash was created with argon2 but argon2-cffi is not installed. "
-                "Install it with: pip install chirp[auth]"
+                "Install it with: pip install bengal-chirp[auth]"
             )
             raise RuntimeError(msg)
         return _verify_argon2(password, phc_hash)

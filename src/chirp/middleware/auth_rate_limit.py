@@ -47,7 +47,10 @@ class AuthRateLimitConfig:
 def redis_rate_limit_backend(
     redis_url: str, key_prefix: str = "chirp:ratelimit:"
 ) -> RateLimitBackend:
-    """Create a Redis-backed rate limit backend. Requires ``pip install chirp[redis]``."""
+    """Create a Redis-backed rate limit backend.
+
+    Requires ``pip install bengal-chirp[redis]``.
+    """
     from chirp.middleware._redis_rate_limit import RedisRateLimitBackend
 
     return RedisRateLimitBackend(redis_url, key_prefix)

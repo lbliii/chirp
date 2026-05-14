@@ -7,7 +7,7 @@ uploads to disk, reading file metadata, and serving uploaded assets back through
 ## Run
 
 ```bash
-pip install chirp[forms]
+pip install bengal-chirp[forms]
 PYTHONPATH=src python examples/standalone/upload/app.py
 ```
 

@@ -99,8 +99,6 @@ def compute_shell_region_updates(
 
 def render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
     """Render shell action OOB markup for boosted layout navigations."""
-    from kida.environment.exceptions import TemplateNotFoundError
-
     actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
     fragment = shell_actions_fragment(actions)
     if fragment is None or actions is None:
@@ -108,13 +106,10 @@ def render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> 
         html = ""
     else:
         template_name, block_name, target = fragment
-        try:
-            html = render_fragment(
-                kida_env,
-                Fragment(template_name, block_name, shell_actions=actions),
-            )
-        except TemplateNotFoundError:
-            html = ""
+        html = render_fragment(
+            kida_env,
+            Fragment(template_name, block_name, shell_actions=actions),
+        )
     return f'<div id="{target}" hx-swap-oob="innerHTML">{html}</div>'
 
 

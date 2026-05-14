@@ -27,7 +27,7 @@ The RAG (Retrieval Augmented Generation) demo is Chirp's most comprehensive exam
 | **chirp.data** | SQLite with typed frozen dataclasses for document storage |
 | **chirp.ai** | Streaming LLM via Ollama (default) or Anthropic |
 | **referenced routes** | `/share/{slug}` and `/ask/stream` use `referenced=True` so `chirp check` does not flag them as orphan |
-| **chirp-ui** | Layout macros, cards, badges, alert; `use_chirp_ui(app)` + `chirp_ui.register_filters(app)` |
+| **chirp-ui** | Layout macros, cards, badges, alert; `use_chirp_ui(app)` |
 
 ## Key Patterns
 
@@ -64,7 +64,7 @@ A `role="switch"` button toggles `aria-checked` and enables/disables the second 
 ## Run
 
 ```bash
-pip install bengal-chirp[ai,data]
+pip install bengal-chirp[ai]
 ollama serve   # Start Ollama first
 PYTHONPATH=src python examples/chirpui/rag_demo/app.py
 ```

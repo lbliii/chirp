@@ -22,7 +22,7 @@ chirp serving both interfaces from the same app.
 ## Run
 
 ```bash
-pip install chirp[data]
+pip install bengal-chirp
 PYTHONPATH=src python examples/standalone/pokedex/app.py
 ```
 

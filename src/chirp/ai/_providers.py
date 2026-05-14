@@ -111,7 +111,10 @@ def _get_httpx() -> Any:
 
         return httpx
     except ImportError:
-        msg = "chirp.ai requires 'httpx' for LLM API calls. Install it with: pip install chirp[ai]"
+        msg = (
+            "chirp.ai requires 'httpx' for LLM API calls. "
+            "Install it with: pip install bengal-chirp[ai]"
+        )
         raise ProviderNotInstalledError(msg) from None
 
 

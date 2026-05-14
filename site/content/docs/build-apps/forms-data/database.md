@@ -15,7 +15,7 @@ category: guide
 Chirp's `data` module provides typed async database access. SQL in, frozen dataclasses out. It is not an ORM -- you write SQL, and chirp maps the results to typed Python objects.
 
 :::{note}
-Requires optional extras: `pip install bengal-chirp[data]` for SQLite or `pip install bengal-chirp[data-pg]` for PostgreSQL.
+SQLite support uses Python's stdlib `sqlite3` plus `anyio`, so it needs no extra. PostgreSQL requires `pip install bengal-chirp[data-pg]`.
 :::
 
 ## Setup

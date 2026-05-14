@@ -177,7 +177,7 @@ chirp[forms]      → python-multipart  (form/multipart parsing)
 chirp[sessions]   → itsdangerous      (signed session cookies)
 chirp[auth]       → argon2-cffi       (password hashing)
 chirp[testing]    → httpx             (test client)
-chirp[data]       → aiosqlite        (SQLite)
+bengal-chirp      → sqlite3 + anyio  (SQLite)
 chirp[data-pg]    → asyncpg          (PostgreSQL)
 chirp[ai]         → httpx            (LLM streaming)
 ```

@@ -1,6 +1,6 @@
 """Redis cache backend.
 
-Requires ``redis`` (``pip install chirp[redis]``).
+Requires ``redis`` (``pip install bengal-chirp[redis]``).
 """
 
 from typing import Any

@@ -9,7 +9,7 @@ a populated instance. No magic validation — just binding with type
 coercion for ``str``, ``int``, ``float``, ``bool``, and ``list[T]``
 for repeated fields such as checkbox groups and multi-selects.
 
-``python-multipart`` is an optional dependency (``pip install chirp[forms]``).
+``python-multipart`` is an optional dependency (``pip install bengal-chirp[forms]``).
 URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 """
 
@@ -391,7 +391,7 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
     except ImportError:
         msg = (
             "Multipart form parsing requires the 'python-multipart' package. "
-            "Install it with: pip install chirp[forms]"
+            "Install it with: pip install bengal-chirp[forms]"
         )
         raise ConfigurationError(msg) from None
 

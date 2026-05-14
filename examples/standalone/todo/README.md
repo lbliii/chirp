@@ -7,7 +7,7 @@ work with partial page updates and inline validation.
 ## Run
 
 ```bash
-pip install chirp[data]
+pip install bengal-chirp
 PYTHONPATH=src python examples/standalone/todo/app.py
 ```
 

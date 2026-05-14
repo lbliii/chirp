@@ -4,7 +4,7 @@ Demonstrates native HTML5 drag-and-drop with chirp-ui sortable_list,
 structured recipe steps, and split layout with live preview.
 
 Run:
-    pip install chirp[ui]
+    pip install "bengal-chirp[ui]"
     python app.py
 """
 

@@ -6,7 +6,7 @@ AI-generated answers with cited sources. The entire application is
 
 Run::
 
-    pip install chirp[ai,data,sessions]
+    pip install "bengal-chirp[ai,sessions,ui]"
     ollama pull llama3.2    # if using Ollama (default)
     ollama serve            # in another terminal
     PYTHONPATH=src python examples/chirpui/rag_demo/app.py
@@ -43,7 +43,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-import chirp_ui
 import httpx
 
 # Allow importing sync when run as script (python app.py)
@@ -159,7 +158,6 @@ RAG_STATIC = Path(__file__).parent / "static"
 app = App(AppConfig(template_dir=TEMPLATES_DIR, debug=True, delegation=True))
 app.add_middleware(StaticFiles(directory=str(RAG_STATIC), prefix="/static/rag"))
 use_chirp_ui(app)
-chirp_ui.register_filters(app)
 # app_shell_layout.html expects shell_actions (normally injected by mount_pages).
 # Manual-route apps must provide a default so the template guard works.
 app._mutable_state.template_globals["shell_actions"] = None

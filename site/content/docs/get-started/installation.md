@@ -53,13 +53,13 @@ Chirp ships with two core dependencies: `kida` (template engine) and `anyio` (as
 | `sessions` | Signed cookie sessions via itsdangerous | `pip install bengal-chirp[sessions]` |
 | `auth` | Password hashing via argon2 | `pip install bengal-chirp[auth]` |
 | `testing` | Test client via httpx | `pip install bengal-chirp[testing]` |
-| `data` | SQLite access via aiosqlite | `pip install bengal-chirp[data]` |
+| SQLite data | Built in via stdlib sqlite3 + anyio | `pip install bengal-chirp` |
 | `data-pg` | PostgreSQL access via asyncpg | `pip install bengal-chirp[data-pg]` |
 | `ai` | LLM streaming via httpx | `pip install bengal-chirp[ai]` |
 | `ui` | chirp-ui component library (CSS, themes, macros) | `pip install bengal-chirp[ui]` |
 | `redis` | Redis-backed cache and sessions | `pip install bengal-chirp[redis]` |
 | `config` | Load config from `.env` files | `pip install bengal-chirp[config]` |
-| `all` | Everything above | `pip install bengal-chirp[all]` |
+| `all` | All installable optional features above | `pip install bengal-chirp[all]` |
 
 ```bash
 # Install with common extras for a full-stack app

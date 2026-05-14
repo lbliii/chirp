@@ -1,1 +1,1 @@
-Raised Chirp's optional `ui` extra, development example dependency, and new scaffolded project floor to `chirp-ui>=0.9.0`.
+Raised Chirp's optional `ui` extra, development example dependency, and new scaffolded project floor to `chirp-ui>=0.9.0`. The ChirpUI integration check now treats missing `use_chirp_ui(app)` runtime wiring as a warning, detects `extends`/`include`/`import` references, and reports optional integration discovery/manifest failures explicitly. Direct imports of `chirp.server.handler` are no longer sensitive to app-runtime import order.

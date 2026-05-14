@@ -20,7 +20,7 @@ Basic usage::
 
 Requires ``httpx``::
 
-    pip install chirp[ai]
+    pip install bengal-chirp[ai]
 """
 
 from chirp.ai.errors import AIError, ProviderError, ProviderNotInstalledError

@@ -8,7 +8,7 @@ Islands inside ChirpUI shells with htmx-boosted navigation. Demonstrates:
 ## Run
 
 ```bash
-pip install chirp[ui]
+pip install "bengal-chirp[ui]"
 PYTHONPATH=src python examples/chirpui/islands_shell/app.py
 ```
 

@@ -6,7 +6,7 @@ stream live to an activity panel via SSE. The assistant's response
 streams token-by-token for a real-time typing effect.
 
 Requires:
-    pip install httpx   # (or pip install chirp[all])
+    pip install httpx   # (or pip install bengal-chirp[all])
     ollama pull llama3.2
 
 Run:

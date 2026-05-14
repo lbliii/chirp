@@ -19,7 +19,6 @@ from .compiler import AppCompiler
 from .diagnostics import ContractCheckRunner
 from .lifecycle import LifecycleCoordinator
 from .registry import AppRegistry
-from .runtime import ASGIRuntime
 from .server import ServerLauncher
 from .state import (
     ContractCheckSnapshot,
@@ -119,6 +118,8 @@ class App:
         self._lifecycle = LifecycleCoordinator(
             self.config, self._mutable_state, self._ensure_frozen
         )
+        from .runtime import ASGIRuntime
+
         self._runtime = ASGIRuntime(
             self.config,
             self._mutable_state,

@@ -11,7 +11,7 @@ async def create_pool(config: DatabaseConfig) -> object:
     except ImportError:
         msg = (
             "chirp.data requires 'asyncpg' for PostgreSQL databases. "
-            "Install it with: pip install chirp[data-pg]"
+            "Install it with: pip install bengal-chirp[data-pg]"
         )
         raise DriverNotInstalledError(msg) from None
 

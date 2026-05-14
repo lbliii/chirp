@@ -16,6 +16,7 @@ import importlib
 import re
 from collections.abc import Callable
 from dataclasses import replace
+from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -42,6 +43,9 @@ CHIRPUI_DOCUMENT_TITLE_TARGET = "chirpui-document-title"
 BREADCRUMBS_OOB_BLOCK = "breadcrumbs_oob"
 SIDEBAR_OOB_BLOCK = "sidebar_oob"
 TITLE_OOB_BLOCK = "title_oob"
+_MIN_CHIRPUI_VERSION = "0.9.0"
+_REQUIRED_CHIRPUI_ATTRIBUTES = ("register_filters", "set_strict", "static_path")
+_REQUIRED_CHIRPUI_FILTER_ATTRIBUTES = ("make_route_link_attrs",)
 
 CHIRPUI_PAGE_SHELL_CONTRACT = PageShellContract(
     name="chirpui-app-shell",
@@ -94,6 +98,49 @@ def _chirpui_app_theme_snippet(prefix: str) -> str:
 
 def _chirpui_empty_csrf_token() -> str:
     return ""
+
+
+def _is_chirpui_callable(value: object) -> bool:
+    return getattr(value, "__module__", "").startswith("chirp_ui")
+
+
+def _chirpui_installed_version() -> str:
+    try:
+        return metadata.version("chirp-ui")
+    except metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _require_chirpui_capabilities(chirp_ui_module: Any) -> None:
+    missing = [
+        f"chirp_ui.{name}"
+        for name in _REQUIRED_CHIRPUI_ATTRIBUTES
+        if not callable(getattr(chirp_ui_module, name, None))
+    ]
+    try:
+        filters_module = importlib.import_module("chirp_ui.filters")
+    except ImportError as exc:
+        missing.append("chirp_ui.filters")
+        filters_module = None
+        import_error = exc
+    else:
+        import_error = None
+    if filters_module is not None:
+        missing.extend(
+            f"chirp_ui.filters.{name}"
+            for name in _REQUIRED_CHIRPUI_FILTER_ATTRIBUTES
+            if not callable(getattr(filters_module, name, None))
+        )
+    if missing:
+        found = _chirpui_installed_version()
+        msg = (
+            f"use_chirp_ui(app) requires chirp-ui>={_MIN_CHIRPUI_VERSION}; "
+            f"found chirp-ui {found} missing {', '.join(missing)}. "
+            'Install with: pip install "bengal-chirp[ui]"'
+        )
+        if import_error is not None:
+            raise ImportError(msg) from import_error
+        raise ImportError(msg)
 
 
 class _ChirpUIAppThemeInject:
@@ -186,16 +233,20 @@ def use_chirp_ui(
 
     from chirp.middleware.static import StaticFiles
 
+    _require_chirpui_capabilities(chirp_ui)
+
     if not app.config.alpine:
         app.bind_config(replace(app.config, alpine=True))
 
+    template_globals = getattr(getattr(app, "_mutable_state", None), "template_globals", {})
+    existing_csrf_token = template_globals.get("csrf_token")
+    existing_route_link_attrs = template_globals.get("route_link_attrs")
+
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):
-        template_globals = getattr(getattr(app, "_mutable_state", None), "template_globals", {})
-        current_csrf_token = template_globals.get("csrf_token")
-        if current_csrf_token is None or getattr(current_csrf_token, "__module__", "").startswith(
-            "chirp_ui"
-        ):
+        if existing_csrf_token is not None and not _is_chirpui_callable(existing_csrf_token):
+            app.template_global("csrf_token")(existing_csrf_token)
+        elif existing_csrf_token is None or _is_chirpui_callable(existing_csrf_token):
             app.template_global("csrf_token")(_chirpui_empty_csrf_token)
 
         # importlib + getattr: optional peer dep; static import fails ty when chirp-ui
@@ -207,7 +258,11 @@ def use_chirp_ui(
         except ImportError:
             pass
 
-        if make_route_link_attrs_fn is not None:
+        should_register_route_link_attrs = (
+            existing_route_link_attrs is None or _is_chirpui_callable(existing_route_link_attrs)
+        )
+
+        if make_route_link_attrs_fn is not None and should_register_route_link_attrs:
             from chirp.templating.navigation_swap import make_swap_attrs
 
             swap_helper_cache: dict[str, Any] = {}
@@ -232,6 +287,8 @@ def use_chirp_ui(
             app.template_global("route_link_attrs")(
                 make_route_link_attrs_fn(swap_resolver=_swap_resolver)
             )
+        elif existing_route_link_attrs is not None:
+            app.template_global("route_link_attrs")(existing_route_link_attrs)
     app.add_middleware(StaticFiles(directory=str(chirp_ui.static_path()), prefix=prefix))
     app.add_middleware(_ChirpUIAppThemeInject(prefix))
     app.add_middleware(
@@ -291,19 +348,23 @@ def use_chirp_ui(
 
     # Register chirp-ui contract checks so app.check() validates component imports
     # and reports design system surface.
+    app.set_contract_check_data("chirpui_runtime_registered", True)
     _available = _discover_chirpui_components()
-    if _available is not None:
+    if _available is None:
+        app.set_contract_check_data("chirpui_components_unavailable", True)
+    else:
         app.set_contract_check_data("chirpui_components", _available)
-        app.register_contract_check(check_chirpui_imports)
-        app.register_contract_check(check_design_system_surface)
+    app.register_contract_check(check_chirpui_integration)
+    app.register_contract_check(check_chirpui_imports)
+    app.register_contract_check(check_design_system_surface)
 
 
 # ---------------------------------------------------------------------------
 # Contract check: validate chirp-ui component imports
 # ---------------------------------------------------------------------------
 
-_CHIRPUI_IMPORT_RE = re.compile(
-    r"""\{%[-\s]+from\s+["']chirpui/([^"']+)["']""",
+_CHIRPUI_TEMPLATE_REF_RE = re.compile(
+    r"""\{%[-\s]+(?:from|extends|include|import)\s+["']chirpui/([^"']+)["']""",
 )
 
 
@@ -328,7 +389,7 @@ def check_chirpui_imports(
     snapshot: ContractCheckSnapshot,
     result: CheckResult,
 ) -> None:
-    """Verify that ``{% from "chirpui/..." %}`` imports reference real components.
+    """Verify that ``chirpui/...`` template references point at real files.
 
     Catches typos like ``{% from "chirpui/cardd.html" import card %}`` at
     startup instead of letting them surface as runtime ``TemplateNotFound``
@@ -339,7 +400,7 @@ def check_chirpui_imports(
         return
 
     for template_name, source in snapshot.template_sources.items():
-        for match in _CHIRPUI_IMPORT_RE.finditer(source):
+        for match in _CHIRPUI_TEMPLATE_REF_RE.finditer(source):
             component_file = match.group(1)
             if component_file not in available:
                 result.issues.append(
@@ -356,6 +417,29 @@ def check_chirpui_imports(
                         ),
                     )
                 )
+
+
+def check_chirpui_integration(
+    snapshot: ContractCheckSnapshot,
+    result: CheckResult,
+) -> None:
+    """Report broken ChirpUI discovery after runtime registration."""
+    if snapshot.extras.get("chirpui_runtime_registered") is not True:
+        return
+    if snapshot.extras.get("chirpui_components_unavailable") is not True:
+        return
+    result.issues.append(
+        ContractIssue(
+            severity=Severity.WARNING,
+            category="chirpui_components_unavailable",
+            message=(
+                "ChirpUI runtime is registered, but component templates could not be "
+                "discovered. Check the chirp-ui installation and reinstall with: "
+                'pip install "bengal-chirp[ui]"'
+            ),
+            details="Expected package templates under chirp_ui/templates/chirpui.",
+        )
+    )
 
 
 def check_design_system_surface(
@@ -386,7 +470,14 @@ def check_design_system_surface(
     if callable(load_manifest):
         try:
             manifest = load_manifest()
-        except Exception:
+        except Exception as exc:
+            result.issues.append(
+                ContractIssue(
+                    severity=Severity.WARNING,
+                    category="design_system_manifest",
+                    message=(f"ChirpUI manifest could not be loaded: {type(exc).__name__}: {exc}"),
+                )
+            )
             manifest = {}
     stats = manifest.get("stats") or report.get("stats", {})
     schema = manifest.get("schema")
@@ -402,7 +493,7 @@ def check_design_system_surface(
     result.issues.append(
         ContractIssue(
             severity=Severity.INFO,
-            category="design_system",
+            category="design_system_summary",
             message=(
                 f"chirp-ui design system{manifest_label}: "
                 f"{stats.get('total_components', 0)} components, "
@@ -417,7 +508,7 @@ def check_design_system_surface(
             result.issues.append(
                 ContractIssue(
                     severity=Severity.ERROR,
-                    category="design_system",
+                    category="design_system_descriptor",
                     message=(
                         f'Component "{name}" declares template "{desc.template}" '
                         f"but the file does not exist in chirp-ui templates"
@@ -431,7 +522,7 @@ def check_design_system_surface(
         result.issues.append(
             ContractIssue(
                 severity=Severity.INFO,
-                category="design_system",
+                category="design_system_summary",
                 message=(
                     f"{len(undescribed)} chirp-ui templates without descriptors: "
                     + ", ".join(undescribed[:10])

@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from chirp import App, AppConfig
 from chirp.app.state import ContractCheckSnapshot
 from chirp.contracts import CheckResult, ContractIssue, Severity, check_hypermedia_surface
@@ -124,8 +126,53 @@ class TestChirpUIContractCheck:
         result = check_hypermedia_surface(app)
         runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
         assert len(runtime_issues) == 1
-        assert runtime_issues[0].severity == Severity.INFO
+        assert runtime_issues[0].severity == Severity.WARNING
         assert "use_chirp_ui(app)" in runtime_issues[0].message
+
+    def test_chirpui_extends_without_use_chirp_ui_gets_runtime_hint(self, tmp_path: Path) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% extends "chirpui/app_shell_layout.html" %}'
+            "{% block content %}<p>Hello</p>{% endblock %}"
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
+        assert len(runtime_issues) == 1
+        assert runtime_issues[0].severity == Severity.WARNING
+        assert runtime_issues[0].template == "page.html"
+
+    def test_chirpui_import_tag_without_use_chirp_ui_gets_runtime_hint(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% import "chirpui/layout.html" as layout %}<html></html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
+        assert len(runtime_issues) == 1
+
+    def test_chirpui_include_without_use_chirp_ui_gets_runtime_hint(self, tmp_path: Path) -> None:
+        (tmp_path / "page.html").write_text('{% include "chirpui/alert.html" %}')
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
+        assert len(runtime_issues) == 1
 
     def test_use_chirp_ui_reports_manifest_stats(self, tmp_path: Path) -> None:
         (tmp_path / "page.html").write_text(
@@ -141,9 +188,59 @@ class TestChirpUIContractCheck:
 
         use_chirp_ui(app)
         result = check_hypermedia_surface(app)
-        messages = [i.message for i in result.issues if i.category == "design_system"]
+        messages = [i.message for i in result.issues if i.category == "design_system_summary"]
         assert any("chirpui-manifest@" in msg for msg in messages)
         assert any("requirements:" in msg for msg in messages)
+
+    def test_use_chirp_ui_tracks_runtime_even_when_components_unavailable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        import chirp.ext.chirp_ui as chirpui_ext
+
+        monkeypatch.setattr(chirpui_ext, "_discover_chirpui_components", lambda: None)
+        chirpui_ext.use_chirp_ui(app)
+        result = check_hypermedia_surface(app)
+
+        runtime_issues = [i for i in result.issues if i.category == "chirpui_runtime"]
+        unavailable = [i for i in result.issues if i.category == "chirpui_components_unavailable"]
+        assert runtime_issues == []
+        assert len(unavailable) == 1
+        assert unavailable[0].severity == Severity.WARNING
+
+    def test_use_chirp_ui_reports_manifest_load_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        import chirp_ui
+
+        from chirp.ext.chirp_ui import use_chirp_ui
+
+        def broken_manifest() -> dict:
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(chirp_ui, "load_manifest", broken_manifest)
+        use_chirp_ui(app)
+        result = check_hypermedia_surface(app)
+        manifest_issues = [i for i in result.issues if i.category == "design_system_manifest"]
+        assert len(manifest_issues) == 1
+        assert "RuntimeError: boom" in manifest_issues[0].message
 
     def test_valid_import_no_issues(self, tmp_path: Path) -> None:
         (tmp_path / "page.html").write_text(

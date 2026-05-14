@@ -13,7 +13,8 @@ class RedisRateLimitBackend:
 
         if importlib.util.find_spec("redis.asyncio") is None:
             raise ConfigurationError(
-                "RedisRateLimitBackend requires 'redis'. Install with: pip install chirp[redis]"
+                "RedisRateLimitBackend requires 'redis'. "
+                "Install with: pip install bengal-chirp[redis]"
             ) from None
         self._redis_url = redis_url
         self._prefix = key_prefix

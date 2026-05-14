@@ -19,7 +19,7 @@ kanban and kanban_shell on the same host/port without session collision.
 ## Run
 
 ```bash
-pip install chirp[ui]  # or: uv add chirp[ui]
+pip install "bengal-chirp[ui]"  # or: uv add "bengal-chirp[ui]"
 PYTHONPATH=src python examples/chirpui/kanban_shell/app.py
 ```
 

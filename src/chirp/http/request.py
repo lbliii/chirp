@@ -496,7 +496,7 @@ class Request:
         the same ``FormData`` is returned on subsequent calls.
 
         Supports ``application/x-www-form-urlencoded`` (stdlib) and
-        ``multipart/form-data`` (requires ``pip install chirp[forms]``).
+        ``multipart/form-data`` (requires ``pip install bengal-chirp[forms]``).
 
         Returns:
             Parsed ``FormData`` implementing ``MultiValueMapping``.

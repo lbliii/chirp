@@ -58,9 +58,9 @@ app = App(AppConfig(template_dir="templates"))
 use_chirp_ui(app)
 ```
 
-**Import:** `use_chirp_ui` is provided by Chirp. Use `from chirp import use_chirp_ui` when the `chirp[ui]` extra is installed. If that fails (e.g. older Chirp), use `from chirp.ext.chirp_ui import use_chirp_ui`.
+**Import:** `use_chirp_ui` is provided by Chirp. Use `from chirp import use_chirp_ui` when the `bengal-chirp[ui]` extra is installed. If that fails (e.g. older Chirp), use `from chirp.ext.chirp_ui import use_chirp_ui`.
 
-`use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory (default `/static`) and registers filters (`bem`, `field_errors`, `html_attrs`, `validate_variant`) so chirp-ui components render correctly.
+`use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory (default `/static`), serves ChirpUI CSS/theme/runtime assets, enables Alpine, registers ChirpUI filters and route-aware globals, wires page-shell/OOB regions, and adds ChirpUI contract checks.
 
 ### 2. Include CSS in your base template
 
@@ -76,7 +76,9 @@ For View Transitions support, add:
 
 ## Auto-detection
 
-When chirp-ui is installed, Chirp's template loader adds the chirp-ui package automatically. No configuration needed for `{% from "chirpui/..." %}` imports. Templates resolve `chirpui/layout.html`, `chirpui/card.html`, etc. from the package.
+When chirp-ui is installed, Chirp's template loader adds the chirp-ui package automatically. Templates resolve `chirpui/layout.html`, `chirpui/card.html`, etc. from the package.
+
+Auto-detection only makes templates importable. Call `use_chirp_ui(app)` for the runtime side of the contract: static assets, Alpine controllers, page-shell targets, OOB regions, route-aware link attributes, and ChirpUI-specific `app.check()` diagnostics. If templates reference `chirpui/*` without runtime registration, `app.check()` emits a `chirpui_runtime` warning.
 
 ## Quick example
 

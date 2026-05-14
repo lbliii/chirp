@@ -4,7 +4,7 @@ Demonstrates chirp's multipart form handling: ``UploadFile``, ``form.files``,
 ``file.save()``, validation of text fields alongside file uploads, and serving
 uploaded files via ``StaticFiles`` middleware.
 
-Requires: ``pip install chirp[forms]`` (python-multipart).
+Requires: ``pip install bengal-chirp[forms]`` (python-multipart).
 
 Demonstrates:
 - ``request.form()`` with ``multipart/form-data``
@@ -16,7 +16,7 @@ Demonstrates:
 - ``StaticFiles`` middleware to serve uploaded images
 
 Run:
-    pip install chirp[forms]
+    pip install bengal-chirp[forms]
     python app.py
 """
 

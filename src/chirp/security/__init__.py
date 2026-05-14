@@ -14,7 +14,7 @@ Route protection decorators::
     def admin_panel():
         ...
 
-Password hashing (``pip install chirp[auth]``)::
+Password hashing (``pip install bengal-chirp[auth]``)::
 
     from chirp.security import hash_password, verify_password
 

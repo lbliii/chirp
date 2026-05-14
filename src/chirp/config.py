@@ -317,7 +317,7 @@ class AppConfig:
         Reads env vars with the given prefix (default ``CHIRP_``).
         Unset vars use AppConfig defaults.
 
-        If ``python-dotenv`` is installed (``pip install chirp[config]``),
+        If ``python-dotenv`` is installed (``pip install bengal-chirp[config]``),
         loads ``.env`` from the current directory before reading env.
 
         Env vars (with CHIRP_ prefix):

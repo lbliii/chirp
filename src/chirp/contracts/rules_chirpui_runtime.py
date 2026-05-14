@@ -4,7 +4,9 @@ import re
 
 from .types import ContractIssue, Severity
 
-_CHIRPUI_IMPORT_RE = re.compile(r"""\{%[-\s]+from\s+["']chirpui/([^"']+)["']""")
+_CHIRPUI_TEMPLATE_REF_RE = re.compile(
+    r"""\{%[-\s]+(?:from|extends|include|import)\s+["']chirpui/([^"']+)["']"""
+)
 
 
 def check_chirpui_runtime_registration(
@@ -17,13 +19,13 @@ def check_chirpui_runtime_registration(
     forgot ``use_chirp_ui(app)``. That is useful for filters, but it does not
     serve ``chirpui.css`` / ``chirpui-alpine.js`` or register ChirpUI checks.
     """
-    if extras.get("chirpui_components") is not None:
+    if extras.get("chirpui_runtime_registered") is True:
         return []
 
     templates = sorted(
         name
         for name, source in template_sources.items()
-        if not name.startswith(("chirp/", "chirpui/")) and _CHIRPUI_IMPORT_RE.search(source)
+        if not name.startswith(("chirp/", "chirpui/")) and _CHIRPUI_TEMPLATE_REF_RE.search(source)
     )
     if not templates:
         return []
@@ -32,7 +34,7 @@ def check_chirpui_runtime_registration(
     more = f" (+{len(templates) - 5} more)" if len(templates) > 5 else ""
     return [
         ContractIssue(
-            severity=Severity.INFO,
+            severity=Severity.WARNING,
             category="chirpui_runtime",
             message=(
                 "Template imports ChirpUI components, but ChirpUI runtime registration "

@@ -8,7 +8,7 @@ The session object is stored in a ContextVar, accessible via
 ``get_session()`` from any handler or middleware.
 
 ``itsdangerous`` is required for cookie store. ``redis`` is required
-for RedisSessionStore (``pip install chirp[redis]``).
+for RedisSessionStore (``pip install bengal-chirp[redis]``).
 """
 
 import logging
@@ -227,7 +227,7 @@ class RedisSessionStore:
 
         if importlib.util.find_spec("redis.asyncio") is None:
             raise ConfigurationError(
-                "RedisSessionStore requires 'redis'. Install with: pip install chirp[redis]"
+                "RedisSessionStore requires 'redis'. Install with: pip install bengal-chirp[redis]"
             ) from None
         if not config.secret_key:
             msg = "SessionConfig.secret_key must not be empty."
@@ -352,7 +352,7 @@ class SessionMiddleware:
             secret_key="my-secret-key",
         )))
 
-        # Redis-backed (pip install chirp[redis]):
+        # Redis-backed (pip install bengal-chirp[redis]):
         from chirp.middleware.sessions import RedisSessionStore, SessionConfig
 
         app.add_middleware(SessionMiddleware(SessionConfig(
