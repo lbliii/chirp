@@ -25,6 +25,7 @@ true open work is narrower:
 | `rfc-component-collection.md` | Not now | Separate `chirp-ui` package scope; still blocked on mature typed component contracts |
 | `epic-pbp-forum-mvp.md` | Superseded historical product draft | ELBYSODIC is the downstream forum/product; do not rebuild it in Chirp |
 | `epic-downstream-product-success.md` | Active product-research roadmap | ELBYSODIC shows reusable framework needs: mounted contracts, tenant URL support, forms/CSRF, shell/OOB/SSE hardening, and diagnostics |
+| `epic-extension-contract-maturity.md` | Draft follow-up from ChirpUI 0.9 steward review | Optional extensions need explicit installed/configured/runtime-ready contracts without becoming core dependencies |
 
 ## Ranked Roadmap
 
@@ -235,7 +236,34 @@ full applications.
 
 **Collateral**: examples audit notes, contract docs, roadmap updates.
 
-### 8. Component Collection And Component-Call Contracts
+### 8. Extension Contract Maturity
+
+**Why later**: The ChirpUI 0.9 review found a reusable optional-extension
+pattern: installed packages, importable templates, configured adapters, and
+runtime-ready behavior are distinct states. That boundary should mature before
+Chirp repeats the same ambiguity across markdown, AI, Redis/session, or data-pg
+extras.
+
+**Scope**:
+- Keep `plan/drafted/epic-extension-contract-maturity.md` as the source plan.
+- Finish the ChirpUI adapter contract with explicit capability/version tests.
+- Document optional-extension contract categories and severity guidance.
+- Add install-guidance guardrails for current docs/examples/scaffolds while
+  leaving historical release/RFC text historical.
+- Inventory optional extras before adding new checks so `app.check()` stays
+  low-noise.
+
+**Required proof**:
+- `uv run pytest tests/test_chirpui_boundary.py tests/test_templating_filters.py -q`
+- `uv run pytest tests/contracts/test_custom_checks_integration.py -q -k chirpui`
+- `uv run pytest tests/test_optional_extras.py -q`
+- `uv run pytest tests/docs -q`
+- No new mandatory dependency in `pyproject.toml`.
+
+**Collateral**: ChirpUI docs, contract-debugging docs, installation docs,
+examples, source import errors, and changelog for user-facing behavior.
+
+### 9. Component Collection And Component-Call Contracts
 
 **Why later**: This remains ecosystem work, not core framework work. It is also
 coupled to typed component metadata in Kida and the separate `chirp-ui`
