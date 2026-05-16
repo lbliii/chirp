@@ -18,6 +18,8 @@ or content negotiation, activate debug mode before guessing from screenshots:
   `AppConfig.from_env()`, `CHIRP_DEBUG=1` also works.
 - Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools.
 - Press `Ctrl+Shift+K` to inspect inherited/direct/blocked `hx-*` settings.
+- Use the SSE tab for native Chirp `EventStream` traces; framework reload
+  streams are hidden by default.
 - For agent-readable diagnostics, evaluate
   `window.ChirpHtmxDebug.help()` and
   `window.ChirpHtmxDebug.exportRecordsJson()` in the browser context.

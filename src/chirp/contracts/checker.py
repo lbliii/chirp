@@ -30,6 +30,7 @@ from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_composition import check_page_extends_layout
 from .rules_context_cascade import check_context_cascade
 from .rules_csrf_forms import check_csrf_form_tokens
+from .rules_debug_wiring import check_debug_wiring
 from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
@@ -318,6 +319,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_page_handlers(snapshot.page_handler_findings))
     result.issues.extend(check_route_names(snapshot.route_name_collisions))
     result.issues.extend(check_mount_app_merge(snapshot.mount_app_skips))
+    result.issues.extend(check_debug_wiring(snapshot.debug_wiring))
 
     referenced_templates_from_routes, referenced_route_paths = _route_prepass(
         router, kida_env, result

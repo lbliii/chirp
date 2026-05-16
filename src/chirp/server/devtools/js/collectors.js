@@ -7,82 +7,82 @@ function pushSseEvent(connId, type, url, data) {
   refreshSsePanel();
 }
 
-// --- SSE Monitor (monkey-patch EventSource) ---
-var OriginalEventSource = window.EventSource;
-if (OriginalEventSource) {
-  window.EventSource = function ChirpTrackedEventSource(url, opts) {
-    var es = new OriginalEventSource(url, opts);
-    var conn = {
-      id: "sse-" + Date.now() + "-" + Math.random().toString(36).slice(2),
-      url: url,
-      openedAt: null,
-      closedAt: null,
-      readyState: es.readyState,
-      eventCount: 0,
-      errorCount: 0,
-      lastEventAt: null,
-    };
-    state.sseConnections.unshift(conn);
-    if (state.sseConnections.length > 20) state.sseConnections.pop();
-
-    es.addEventListener("open", function() {
-      conn.openedAt = Date.now();
-      conn.readyState = es.readyState;
-      pushSseEvent(conn.id, "open", url, null);
-    });
-
-    es.addEventListener("error", function() {
-      conn.errorCount++;
-      conn.readyState = es.readyState;
-      pushSseEvent(conn.id, "error", url, "readyState=" + es.readyState);
-    });
-
-    var origAddListener = es.addEventListener.bind(es);
-    es.addEventListener = function(type, fn, opts2) {
-      if (type !== "open" && type !== "error") {
-        var wrapped = function(evt) {
-          conn.eventCount++;
-          conn.lastEventAt = Date.now();
-          conn.readyState = es.readyState;
-          var preview = evt.data ? String(evt.data).slice(0, 200) : "";
-          pushSseEvent(conn.id, type, url, preview);
-          return fn.call(es, evt);
-        };
-        return origAddListener(type, wrapped, opts2);
-      }
-      return origAddListener(type, fn, opts2);
-    };
-
-    var origOnMessage = null;
-    Object.defineProperty(es, "onmessage", {
-      get: function() { return origOnMessage; },
-      set: function(fn) {
-        origOnMessage = fn;
-        origAddListener("message", function(evt) {
-          conn.eventCount++;
-          conn.lastEventAt = Date.now();
-          conn.readyState = es.readyState;
-          var preview = evt.data ? String(evt.data).slice(0, 200) : "";
-          pushSseEvent(conn.id, "message", url, preview);
-          if (fn) fn.call(es, evt);
-        });
-      },
-    });
-
-    var origClose = es.close.bind(es);
-    es.close = function() {
-      conn.closedAt = Date.now();
-      conn.readyState = 2;
-      pushSseEvent(conn.id, "close", url, null);
-      return origClose();
-    };
-
-    return es;
-  };
-  window.EventSource.CONNECTING = 0;
-  window.EventSource.OPEN = 1;
-  window.EventSource.CLOSED = 2;
+// --- SSE Monitor (native Chirp EventStream traces) ---
+function findSseConnection(id) {
+  for (var i = 0; i < state.sseConnections.length; i++) {
+    if (state.sseConnections[i].id === id) return state.sseConnections[i];
+  }
+  return null;
 }
+
+function ensureNativeSseConnection(rec) {
+  var id = "sse-" + rec.request_id;
+  var conn = findSseConnection(id);
+  if (conn) return conn;
+  conn = {
+    id: id,
+    url: rec.path,
+    openedAt: null,
+    closedAt: null,
+    readyState: 0,
+    eventCount: 0,
+    errorCount: 0,
+    lastEventAt: null,
+    native: true,
+    owner: rec.owner || "app",
+  };
+  state.sseConnections.unshift(conn);
+  if (state.sseConnections.length > 20) state.sseConnections.pop();
+  return conn;
+}
+
+function ingestNativeSseTrace(rec) {
+  if (!rec || rec.channel !== "sse") return;
+  var key = rec.channel + ":" + rec.request_id + ":" + rec.phase + ":" + rec.ts_ms;
+  if (state.nativeTraceKeys[key]) return;
+  state.nativeTraceKeys[key] = true;
+  var conn = ensureNativeSseConnection(rec);
+  if (rec.phase === "start") {
+    conn.openedAt = rec.ts_ms;
+    conn.readyState = 1;
+  } else if (rec.phase === "closed" || rec.phase === "disconnect" || rec.phase === "cancelled") {
+    conn.closedAt = rec.ts_ms;
+    conn.readyState = 2;
+  } else if (rec.phase === "event" || rec.phase === "retry" || rec.phase === "heartbeat") {
+    conn.eventCount++;
+    conn.readyState = 1;
+    conn.lastEventAt = rec.ts_ms;
+  } else if (rec.phase === "render_error" || rec.phase === "generator_error" || rec.phase === "send_failed") {
+    conn.errorCount++;
+    conn.lastEventAt = rec.ts_ms;
+  }
+  var data = rec.data ? JSON.stringify(rec.data).slice(0, 200) : "";
+  state.sseEvents.unshift({
+    connId: conn.id,
+    type: rec.phase,
+    url: rec.path,
+    ts: rec.ts_ms || Date.now(),
+    data: data,
+  });
+  if (state.sseEvents.length > BUFFER_SIZE) state.sseEvents.pop();
+  refreshSsePanel();
+}
+
+function refreshNativeSseTraces(includeInternal) {
+  if (!window.fetch) return;
+  var url = DEBUG_TRACES_PATH + (includeInternal ? "?internal=1" : "");
+  fetch(url, { credentials: "same-origin", cache: "no-store" })
+    .then(function(res) { return res.ok ? res.json() : null; })
+    .then(function(payload) {
+      if (!payload || !payload.records) return;
+      payload.records.forEach(ingestNativeSseTrace);
+    })
+    .catch(function() {});
+}
+
+setInterval(function() {
+  if (state.open || state.tab === "sse") refreshNativeSseTraces(false);
+}, 2000);
 
 // --- View Transition tracking ---
 if (document.startViewTransition) {
@@ -178,6 +178,7 @@ function createRecord() {
     bodyPreview: "",
     contentType: "",
     renderPlan: null,
+    returnTrace: null,
     effectiveConfigDetails: null,
     select: "",
     selectMatched: null,
@@ -273,6 +274,10 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     var rpHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Render-Plan");
     if (rpHeader) {
       r.renderPlan = decodeRenderPlan(rpHeader);
+    }
+    var rtHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Return-Trace");
+    if (rtHeader) {
+      r.returnTrace = decodeRenderPlan(rtHeader);
     }
 
     // Extract HX-Trigger events for devtools display

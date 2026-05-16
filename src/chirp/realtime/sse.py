@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import json as json_module
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from kida import Environment
@@ -29,6 +30,8 @@ async def handle_sse(
     debug: bool = False,
     retry_ms: int | None = None,
     close_event: str | None = None,
+    trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
 ) -> None:
     """Stream Server-Sent Events over an ASGI connection.
 
@@ -51,9 +54,12 @@ async def handle_sse(
                 (b"connection", b"keep-alive"),
                 (b"x-accel-buffering", b"no"),
                 (b"access-control-allow-origin", b"*"),
+                *extra_headers,
             ],
         }
     )
+    if trace_sink is not None:
+        trace_sink("start", {"heartbeat_interval": event_stream.heartbeat_interval})
 
     if retry_ms is not None:
         retry_event = SSEEvent(data="sse-retry", event="chirp:sse:meta", retry=retry_ms)
@@ -64,6 +70,8 @@ async def handle_sse(
                 "more_body": True,
             }
         )
+        if trace_sink is not None:
+            trace_sink("retry", {"retry_ms": retry_ms})
 
     # Track disconnect
     disconnected = asyncio.Event()
@@ -124,7 +132,11 @@ async def handle_sse(
                                 "more_body": True,
                             }
                         )
+                        if trace_sink is not None:
+                            trace_sink("heartbeat", {})
                     except RuntimeError:
+                        if trace_sink is not None:
+                            trace_sink("send_failed", {"during": "heartbeat"})
                         break  # Response already closed (client disconnected)
                     continue
 
@@ -143,10 +155,21 @@ async def handle_sse(
                         default_event=event_stream.event_type,
                         kida_env=kida_env,
                     )
+                    if trace_sink is not None:
+                        trace_sink("event", _trace_event_payload(value, sse_text))
                 except Exception as render_exc:
                     from chirp.server.terminal_errors import log_error
 
                     log_error(render_exc)
+                    if trace_sink is not None:
+                        trace_sink(
+                            "render_error",
+                            {
+                                "value_type": type(value).__name__,
+                                "error_type": type(render_exc).__name__,
+                                "message": str(render_exc),
+                            },
+                        )
                     # Always send an error event so clients know an event
                     # was lost.  In debug mode, include targeted block info;
                     # in production, send a generic error event.
@@ -168,14 +191,25 @@ async def handle_sse(
                             }
                         )
                     except RuntimeError:
+                        if trace_sink is not None:
+                            trace_sink("send_failed", {"during": "event"})
                         break  # Response already closed (client disconnected)
         except asyncio.CancelledError:
-            pass
+            if trace_sink is not None:
+                trace_sink("cancelled", {})
         except Exception as exc:
             # Log with structured formatting for kida errors
             from chirp.server.terminal_errors import _is_kida_error, _plain_error_message, log_error
 
             log_error(exc)
+            if trace_sink is not None:
+                trace_sink(
+                    "generator_error",
+                    {
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    },
+                )
 
             # Send an error event so the client can react
             if debug:
@@ -222,6 +256,8 @@ async def handle_sse(
             {producer_task, monitor_task},
             return_when=asyncio.FIRST_COMPLETED,
         )
+        if trace_sink is not None and monitor_task.done() and not producer_task.done():
+            trace_sink("disconnect", {})
         for task in pending:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -237,6 +273,8 @@ async def handle_sse(
                         "more_body": True,
                     }
                 )
+                if trace_sink is not None:
+                    trace_sink("close_event", {"event": close_event})
         # Close the stream
         await send(
             {
@@ -245,6 +283,8 @@ async def handle_sse(
                 "more_body": False,
             }
         )
+        if trace_sink is not None:
+            trace_sink("closed", {})
 
 
 def _format_event(
@@ -291,6 +331,30 @@ def _format_event(
     # Unknown type: convert to string
     event = SSEEvent(data=str(value), event=default_event)
     return event.encode()
+
+
+def _trace_event_payload(value: Any, sse_text: str) -> dict[str, Any]:
+    """Return bounded metadata about a formatted SSE event."""
+    event_name = None
+    event_id = None
+    retry = None
+    data_lines = 0
+    for line in sse_text.splitlines():
+        if line.startswith("event: "):
+            event_name = line[7:]
+        elif line.startswith("id: "):
+            event_id = line[4:]
+        elif line.startswith("retry: "):
+            retry = line[7:]
+        elif line.startswith("data: "):
+            data_lines += 1
+    return {
+        "value_type": type(value).__name__,
+        "event": event_name,
+        "id": event_id,
+        "retry": retry,
+        "data_lines": data_lines,
+    }
 
 
 def _format_error_event(value: Any, exc: Exception) -> str:

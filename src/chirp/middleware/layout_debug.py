@@ -17,6 +17,7 @@ from chirp.server.debug.render_plan_snapshot import (
     RENDER_DEBUG_CACHE_KEY,
     get_render_plan,
 )
+from chirp.templating.trace import encode_return_trace, get_return_trace
 
 _CACHE_KEY = "_layout_debug"
 _ROUTE_CACHE_KEY = "_route_debug"
@@ -135,6 +136,19 @@ class LayoutDebugMiddleware:
         except Exception:
             logging.getLogger("chirp.debug").debug(
                 "Render plan encoding failed",
+                exc_info=True,
+            )
+
+        try:
+            return_trace = get_return_trace(request)
+            if return_trace is not None:
+                response = response.with_header(
+                    "X-Chirp-Return-Trace",
+                    encode_return_trace(return_trace),
+                )
+        except Exception:
+            logging.getLogger("chirp.debug").debug(
+                "Return trace encoding failed",
                 exc_info=True,
             )
 

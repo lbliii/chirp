@@ -15,6 +15,7 @@ from kida import Environment
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.invoke import invoke
 from chirp._internal.invoke_plan import InvokePlan
+from chirp.app.state import RuntimeDebugWiring
 from chirp.context import force_inline_sync_var, g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
@@ -23,6 +24,12 @@ from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
+from chirp.server.debug_runtime import (
+    DEBUG_MANIFEST_PATH,
+    DEBUG_TRACES_PATH,
+    render_debug_manifest_json,
+    render_debug_traces_json,
+)
 from chirp.server.devtools import (
     DEVTOOLS_BOOT_JS,
     DEVTOOLS_BOOT_PATH,
@@ -47,6 +54,7 @@ from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explor
 from chirp.server.sender import send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
+from chirp.templating.trace import encode_return_trace, get_return_trace
 from chirp.tools.registry import ToolRegistry
 
 
@@ -185,40 +193,86 @@ def create_request_handler(
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     discovered_routes: list[Any] | None = None,
+    debug_wiring: RuntimeDebugWiring | None = None,
     suspense_error_template: str | None = None,
     suspense_error_block: str = "fallback",
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request."""
     routes = discovered_routes or []
 
+    def _internal_response(req: Request, response: Response) -> Response:
+        if debug_wiring is None:
+            return response
+        spec = debug_wiring.internal_route_for_path(req.path)
+        if spec is None:
+            return response
+        return response.with_header("X-Chirp-Internal", "true").with_header(
+            "X-Chirp-Internal-Owner",
+            spec.owner,
+        )
+
     async def dispatch(req: Request) -> AnyResponse:
         if debug and req.path == DEVTOOLS_BOOT_PATH:
-            return Response(
-                body=DEVTOOLS_BOOT_JS,
-                content_type="application/javascript; charset=utf-8",
-                render_intent="full_page",
+            return _internal_response(
+                req,
+                Response(
+                    body=DEVTOOLS_BOOT_JS,
+                    content_type="application/javascript; charset=utf-8",
+                    render_intent="full_page",
+                ),
             )
         if debug and req.path == HIGHLIGHT_PATH:
             body = handle_highlight_request(req.query)
-            return Response(
-                body=body,
-                content_type="application/json; charset=utf-8",
-                render_intent="full_page",
+            return _internal_response(
+                req,
+                Response(
+                    body=body,
+                    content_type="application/json; charset=utf-8",
+                    render_intent="full_page",
+                ),
             )
         if debug and req.path == FRAGMENT_TARGETS_DEBUG_PATH:
-            return Response(
-                body=render_fragment_targets_debug(fragment_target_registry),
-                content_type="application/json; charset=utf-8",
-                render_intent="full_page",
+            return _internal_response(
+                req,
+                Response(
+                    body=render_fragment_targets_debug(fragment_target_registry),
+                    content_type="application/json; charset=utf-8",
+                    render_intent="full_page",
+                ),
+            )
+        if debug and req.path == DEBUG_MANIFEST_PATH and debug_wiring is not None:
+            return _internal_response(
+                req,
+                Response(
+                    body=render_debug_manifest_json(debug_wiring),
+                    content_type="application/json; charset=utf-8",
+                    render_intent="full_page",
+                ),
+            )
+        if debug and req.path == DEBUG_TRACES_PATH and debug_wiring is not None:
+            include_internal = req.query.get("internal") in {"1", "true", "yes"}
+            return _internal_response(
+                req,
+                Response(
+                    body=render_debug_traces_json(
+                        debug_wiring,
+                        include_internal=include_internal,
+                    ),
+                    content_type="application/json; charset=utf-8",
+                    render_intent="full_page",
+                ),
             )
         if req.path == ROUTE_EXPLORER_PATH:
             if debug:
                 path_filter = req.query.get("path", "")
                 html_body = render_route_explorer(routes, path_filter=path_filter or None)
-                return Response(
-                    body=html_body,
-                    content_type="text/html; charset=utf-8",
-                    render_intent="full_page",
+                return _internal_response(
+                    req,
+                    Response(
+                        body=html_body,
+                        content_type="text/html; charset=utf-8",
+                        render_intent="full_page",
+                    ),
                 )
             from chirp.errors import NotFound
 
@@ -284,6 +338,7 @@ async def handle_request(
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
     url_for: Callable[..., str] | None = None,
+    debug_wiring: RuntimeDebugWiring | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -344,6 +399,29 @@ async def handle_request(
             stream = response.event_stream
             if stream.heartbeat_interval == 15.0:
                 stream = replace(stream, heartbeat_interval=sse_heartbeat_interval)
+            trace_sink = None
+            extra_headers: tuple[tuple[bytes, bytes], ...] = ()
+            return_trace = get_return_trace(request)
+            if debug and return_trace is not None:
+                extra_headers = (
+                    (b"x-chirp-return-trace", encode_return_trace(return_trace).encode("ascii")),
+                )
+            if debug and debug_wiring is not None and debug_wiring.trace_store is not None:
+                spec = debug_wiring.internal_route_for_path(request.path)
+                internal = spec is not None and spec.visibility != "user"
+                owner = spec.owner if spec is not None else "app"
+
+                def _trace_sink(phase: str, data: dict[str, Any]) -> None:
+                    debug_wiring.trace_store.record_sse(
+                        phase=phase,
+                        path=request.path,
+                        request_id=request.request_id,
+                        internal=internal,
+                        owner=owner,
+                        data=data,
+                    )
+
+                trace_sink = _trace_sink
 
             await handle_sse(
                 stream,
@@ -353,6 +431,8 @@ async def handle_request(
                 debug=debug,
                 retry_ms=sse_retry_ms,
                 close_event=sse_close_event,
+                trace_sink=trace_sink,
+                extra_headers=extra_headers,
             )
         case StreamingResponse():
             await send_streaming_response(response, send, debug=debug, request_id=rid)

@@ -56,6 +56,7 @@ from chirp.templating.returns import (
 )
 from chirp.templating.streaming import has_async_context, render_stream_async
 from chirp.templating.suspense import render_suspense
+from chirp.templating.trace import ReturnTrace, stash_return_trace_for_request
 
 _logger = logging.getLogger(__name__)
 
@@ -95,6 +96,50 @@ def _require_kida_env(kida_env: Environment | None, return_type: str) -> Environ
         )
         raise ConfigurationError(msg)
     return kida_env
+
+
+def _context_keys(ctx: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(str(key) for key in ctx)
+
+
+def _is_htmx(request: Request | None) -> bool:
+    return bool(request and request.is_htmx)
+
+
+def _trace_return(
+    request: Request | None,
+    *,
+    return_type: str,
+    category: str,
+    render_intent: str = "unknown",
+    status: int | None = None,
+    template: str | None = None,
+    block: str | None = None,
+    target: str | None = None,
+    swap: str | None = None,
+    context_keys: tuple[str, ...] = (),
+    streaming: bool = False,
+    sse: bool = False,
+    notes: tuple[str, ...] = (),
+) -> None:
+    stash_return_trace_for_request(
+        ReturnTrace(
+            return_type=return_type,
+            category=category,
+            is_htmx=_is_htmx(request),
+            render_intent=render_intent,
+            status=status,
+            template=template,
+            block=block,
+            target=target,
+            swap=swap,
+            context_keys=context_keys,
+            streaming=streaming,
+            sse=sse,
+            notes=notes,
+        ),
+        request,
+    )
 
 
 @overload
@@ -175,6 +220,17 @@ def _render_composition(
     )
     html = serialize_rendered_plan(rendered, oob_registry=oob_registry)
     intent = "fragment" if plan.intent != "full_page" else "full_page"
+    _trace_return(
+        request,
+        return_type="PageComposition",
+        category="page",
+        render_intent=intent,
+        status=200,
+        template=plan.main_view.template,
+        block=plan.main_view.block,
+        context_keys=_context_keys(plan.main_view.context),
+        notes=(f"plan_intent={plan.intent}",),
+    )
     return _html_response(html, intent=intent).with_vary("HX-Request")
 
 
@@ -236,8 +292,22 @@ def negotiate(
     """
     match value:
         case Response():
+            _trace_return(
+                request,
+                return_type=type(value).__name__,
+                category="response",
+                render_intent=value.render_intent,
+                status=value.status,
+            )
             return value
         case Redirect():
+            _trace_return(
+                request,
+                return_type="Redirect",
+                category="redirect",
+                status=value.status,
+                target=value.url,
+            )
             return (
                 Response(body="")
                 .with_status(value.status)
@@ -247,6 +317,19 @@ def negotiate(
         case MutationResult():
             if request is not None and request.is_htmx:
                 if value.fragments:
+                    first = value.fragments[0]
+                    _trace_return(
+                        request,
+                        return_type="MutationResult",
+                        category="mutation",
+                        render_intent="fragment",
+                        status=200,
+                        template=first.template_name,
+                        block=first.block_name,
+                        target=first.target,
+                        context_keys=_context_keys(first.context),
+                        notes=(f"fragments={len(value.fragments)}",),
+                    )
                     kida_env = _require_kida_env(kida_env, "MutationResult")
                     parts: list[str] = []
                     for i, frag in enumerate(value.fragments):
@@ -276,23 +359,66 @@ def negotiate(
                         response = response.with_hx_trigger(value.trigger)
                     return response
                 else:
+                    _trace_return(
+                        request,
+                        return_type="MutationResult",
+                        category="mutation_redirect",
+                        status=200,
+                        target=value.redirect,
+                    )
                     return Response(body="").with_hx_redirect(value.redirect)
             else:
+                _trace_return(
+                    request,
+                    return_type="MutationResult",
+                    category="mutation_redirect",
+                    status=value.status,
+                    target=value.redirect,
+                )
                 return (
                     Response(body="")
                     .with_status(value.status)
                     .with_header("Location", value.redirect)
                 )
         case Template():
+            _trace_return(
+                request,
+                return_type="Template",
+                category="template",
+                render_intent="full_page",
+                status=200,
+                template=value.template_name,
+                context_keys=_context_keys(value.context),
+            )
             kida_env = _require_kida_env(kida_env, "Template")
             html = render_template(kida_env, _with_current_path_in_context(value, request))
             return _html_response(html, intent="full_page")
         case InlineTemplate():
+            _trace_return(
+                request,
+                return_type="InlineTemplate",
+                category="template",
+                render_intent="full_page",
+                status=200,
+                context_keys=_context_keys(value.context),
+            )
             env = kida_env or _minimal_kida_env()
             tmpl = env.from_string(value.source)
             html = tmpl.render(value.context)
             return _html_response(html, intent="full_page")
         case Fragment():
+            _trace_return(
+                request,
+                return_type="Fragment",
+                category="fragment",
+                render_intent="fragment",
+                status=200,
+                template=value.template_name,
+                block=value.block_name,
+                target=value.target,
+                swap=value.swap,
+                context_keys=_context_keys(value.context),
+            )
             kida_env = _require_kida_env(kida_env, "Fragment")
             html = render_fragment(kida_env, value)
             return _fragment_response(html)
@@ -322,6 +448,13 @@ def negotiate(
                 oob_registry,
             )
         case Action():
+            _trace_return(
+                request,
+                return_type="Action",
+                category="action",
+                status=value.status,
+                notes=(f"refresh={value.refresh}",),
+            )
             response = Response(body="").with_status(value.status)
             if value.trigger is not None:
                 response = response.with_hx_trigger(value.trigger)
@@ -329,6 +462,17 @@ def negotiate(
                 response = response.with_hx_refresh()
             return response
         case ValidationError():
+            _trace_return(
+                request,
+                return_type="ValidationError",
+                category="validation",
+                render_intent="fragment",
+                status=422,
+                template=value.template_name,
+                block=value.block_name,
+                target=value.retarget,
+                context_keys=_context_keys(value.context),
+            )
             kida_env = _require_kida_env(kida_env, "ValidationError")
             frag = Fragment(value.template_name, value.block_name, **value.context)
             html = render_fragment(kida_env, frag)
@@ -337,6 +481,14 @@ def negotiate(
                 response = response.with_hx_retarget(value.retarget)
             return response
         case OOB():
+            _trace_return(
+                request,
+                return_type="OOB",
+                category="oob",
+                render_intent="fragment",
+                status=200,
+                notes=(f"oob_fragments={len(value.oob_fragments)}",),
+            )
             kida_env = _require_kida_env(kida_env, "OOB")
             main_response = negotiate(
                 value.main,
@@ -372,10 +524,29 @@ def negotiate(
                 else:
                     parts.append(html)
             body = "\n".join(parts)
+            _trace_return(
+                request,
+                return_type="OOB",
+                category="oob",
+                render_intent="fragment",
+                status=200,
+                notes=(f"oob_fragments={len(value.oob_fragments)}",),
+            )
             return _fragment_response(body)
         case Stream():
+            async_context = has_async_context(value.context)
+            _trace_return(
+                request,
+                return_type="Stream",
+                category="stream",
+                status=200,
+                template=value.template_name,
+                context_keys=_context_keys(value.context),
+                streaming=True,
+                notes=("async_context" if async_context else "sync_context",),
+            )
             kida_env = _require_kida_env(kida_env, "Stream")
-            if has_async_context(value.context):
+            if async_context:
                 # Async sources detected — resolve concurrently, then stream
                 chunks = render_stream_async(kida_env, value)
                 return StreamingResponse(
@@ -392,6 +563,15 @@ def negotiate(
                 request_context=request,
             )
         case TemplateStream():
+            _trace_return(
+                request,
+                return_type="TemplateStream",
+                category="stream",
+                status=200,
+                template=value.template_name,
+                context_keys=_context_keys(value.context),
+                streaming=True,
+            )
             kida_env = _require_kida_env(kida_env, "TemplateStream")
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream_async(**value.context)
@@ -401,8 +581,22 @@ def negotiate(
                 request_context=request,
             )
         case LayoutSuspense():
-            kida_env = _require_kida_env(kida_env, "LayoutSuspense")
             req = value.request if value.request is not None else request
+            _trace_return(
+                req,
+                return_type="LayoutSuspense",
+                category="suspense",
+                status=200,
+                template=value.suspense.template_name,
+                context_keys=_context_keys(value.suspense.context),
+                streaming=True,
+                notes=(
+                    f"defer_map={len(value.suspense.defer_map)}",
+                    f"defer_blocks={len(value.suspense.defer_blocks or ())}",
+                    "layout=true",
+                ),
+            )
+            kida_env = _require_kida_env(kida_env, "LayoutSuspense")
             is_htmx = bool(req and req.is_htmx)
             chunks = render_suspense(
                 kida_env,
@@ -428,6 +622,19 @@ def negotiate(
                 request_context=req,
             )
         case Suspense():
+            _trace_return(
+                request,
+                return_type="Suspense",
+                category="suspense",
+                status=200,
+                template=value.template_name,
+                context_keys=_context_keys(value.context),
+                streaming=True,
+                notes=(
+                    f"defer_map={len(value.defer_map)}",
+                    f"defer_blocks={len(value.defer_blocks or ())}",
+                ),
+            )
             kida_env = _require_kida_env(kida_env, "Suspense")
             is_htmx = request is not None and request.is_htmx
             chunks = render_suspense(
@@ -444,15 +651,42 @@ def negotiate(
                 request_context=request,
             )
         case EventStream():
+            _trace_return(
+                request,
+                return_type="EventStream",
+                category="eventstream",
+                status=200,
+                streaming=True,
+                sse=True,
+            )
             return SSEResponse(
                 event_stream=value,
                 kida_env=kida_env,
             )
         case str():
+            _trace_return(
+                request,
+                return_type="str",
+                category="primitive",
+                render_intent="unknown",
+                status=200,
+            )
             return _html_response(value, intent="unknown")
         case bytes():
+            _trace_return(
+                request,
+                return_type="bytes",
+                category="primitive",
+                status=200,
+            )
             return Response(body=value, content_type="application/octet-stream")
         case dict() | list():
+            _trace_return(
+                request,
+                return_type=type(value).__name__,
+                category="primitive",
+                status=200,
+            )
             return JSONResponse.from_value(value)
         case (inner, int() as status):
             response = negotiate(

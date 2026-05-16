@@ -162,6 +162,19 @@ class TestAppE2E:
             assert "application/javascript" in asset.content_type
             assert "__chirpHtmxDebugBooted" in asset.text
 
+    async def test_debug_bootstrap_skips_htmx_responses(self) -> None:
+        app = App(config=AppConfig(debug=True))
+
+        @app.route("/")
+        def index():
+            return Response("<html><body>ok</body></html>").with_render_intent("full_page")
+
+        async with TestClient(app) as client:
+            response = await client.get("/", headers={"HX-Request": "true"})
+
+        assert response.status == 200
+        assert "/__chirp/debug/htmx.js" not in response.text
+
     async def test_response_chaining(self) -> None:
         app = App()
 

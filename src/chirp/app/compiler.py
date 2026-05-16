@@ -13,7 +13,7 @@ from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.registry import compile_tools
 
 from .registry import AppRegistry
-from .state import MutableAppState, RuntimeAppState
+from .state import MutableAppState, RuntimeAppState, RuntimeDebugWiring
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -25,6 +25,7 @@ def _collect_builtin_middleware(
     *,
     router: object | None = None,
     oob_registry: OOBRegistry | None = None,
+    debug_wiring: RuntimeDebugWiring | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first
@@ -162,28 +163,27 @@ def _collect_builtin_middleware(
     if config.debug:
         from chirp.middleware.inject import HTMLInject
         from chirp.middleware.layout_debug import LayoutDebugMiddleware
-        from chirp.server.devtools import DEVTOOLS_BOOT_SNIPPET
 
         middleware_list.append(LayoutDebugMiddleware())
-        middleware_list.append(HTMLInject(DEVTOOLS_BOOT_SNIPPET))
+        if debug_wiring is not None:
+            for feature in debug_wiring.features:
+                if not feature.enabled:
+                    continue
+                middleware_list.extend(
+                    [
+                        HTMLInject(
+                            injection.snippet,
+                            before=injection.before,
+                            full_page_only=injection.full_page_only,
+                            skip_htmx=injection.skip_htmx,
+                        )
+                        for injection in feature.injections
+                    ]
+                )
         if vt_mode == "off":
             from chirp.middleware.inject import ViewTransitionCssDebugWarning
 
             middleware_list.append(ViewTransitionCssDebugWarning())
-        if config.dev_browser_reload:
-            from chirp.server.dev_browser_reload import (
-                DEV_BROWSER_RELOAD_SNIPPET,
-                is_dev_browser_reload_enabled,
-            )
-
-            if is_dev_browser_reload_enabled(config):
-                middleware_list.append(
-                    HTMLInject(
-                        DEV_BROWSER_RELOAD_SNIPPET,
-                        full_page_only=True,
-                        skip_htmx=True,
-                    ),
-                )
         if config.debug_fragment_validator and oob_registry is not None:
             from chirp.middleware.debug_fragment_validator import DebugFragmentValidator
 
@@ -241,6 +241,35 @@ def _reject_reserved_prefix_collisions(pending_routes: list, prefix: str) -> Non
         f"Route path cannot start with reserved prefix {prefix!r}; "
         "this prefix is owned by the block-fetch dispatcher. "
         f"Rename the following route(s):\n{lines}"
+    )
+
+
+def _reject_internal_route_collisions(
+    pending_routes: list,
+    debug_wiring: RuntimeDebugWiring,
+) -> None:
+    """Raise if a user route collides with Chirp-owned internal URL space."""
+    collisions: list[tuple[str, str, str]] = []
+    for route in pending_routes:
+        path = getattr(route, "path", "")
+        for spec in debug_wiring.routes:
+            if spec.owns(path):
+                reserved = spec.reserved_prefix or spec.path
+                collisions.append((path, spec.owner, reserved))
+                break
+    if not collisions:
+        return
+    from chirp.errors import ConfigurationError
+
+    lines = "\n".join(
+        f"  - {path} (reserved by {owner}, namespace {reserved!r})"
+        for path, owner, reserved in collisions
+    )
+    raise ConfigurationError(
+        "Route path collides with Chirp's reserved internal runtime URL space "
+        "(reserved prefix). "
+        "Rename the following route(s):\n"
+        f"{lines}"
     )
 
 
@@ -304,6 +333,12 @@ class AppCompiler:
             self._registry.discover_and_register_pages(self._mutable.lazy_pages_dir)
             self._mutable.lazy_pages_dir = None
 
+        from chirp.server.debug_runtime import build_runtime_debug_wiring
+
+        debug_wiring = build_runtime_debug_wiring(self._config)
+        self._runtime.debug_wiring = debug_wiring
+        _reject_internal_route_collisions(self._mutable.pending_routes, debug_wiring)
+
         if self._config.debug and self._config.dev_browser_reload:
             from chirp.server.dev_browser_reload import (
                 is_dev_browser_reload_enabled,
@@ -341,6 +376,7 @@ class AppCompiler:
             middleware_list,
             router=router,
             oob_registry=self._mutable.oob_registry,
+            debug_wiring=debug_wiring,
         )
         self._runtime.middleware = tuple(middleware_list)
 
