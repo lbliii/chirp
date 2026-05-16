@@ -58,6 +58,8 @@ def test_htmx_debug_js_enhanced_ui_strings() -> None:
 def test_htmx_debug_js_s_tier_features() -> None:
     """S-tier: render intent header, HX response parse, curl, export, hooks, error body."""
     assert "x-chirp-render-intent" in HTMX_DEBUG_BOOT_JS
+    assert "X-Chirp-Return-Trace" in HTMX_DEBUG_BOOT_JS
+    assert "returnTrace" in HTMX_DEBUG_BOOT_JS
     assert "parseResponseHeaders" in HTMX_DEBUG_BOOT_JS
     assert "buildCurl" in HTMX_DEBUG_BOOT_JS
     assert "ChirpHtmxDebug" in HTMX_DEBUG_BOOT_JS
@@ -73,8 +75,11 @@ def test_htmx_debug_js_s_tier_features() -> None:
 
 
 def test_htmx_debug_js_v3_sse_monitor() -> None:
-    """V3: SSE/EventSource monkey-patch and monitor tab."""
-    assert "EventSource" in HTMX_DEBUG_BOOT_JS
+    """V3: SSE monitor consumes native Chirp EventStream traces."""
+    assert "window.EventSource =" not in HTMX_DEBUG_BOOT_JS
+    assert "ChirpTrackedEventSource" not in HTMX_DEBUG_BOOT_JS
+    assert "DEBUG_TRACES_PATH" in HTMX_DEBUG_BOOT_JS
+    assert "ingestNativeSseTrace" in HTMX_DEBUG_BOOT_JS
     assert "sseConnections" in HTMX_DEBUG_BOOT_JS
     assert "sseEvents" in HTMX_DEBUG_BOOT_JS
     assert "renderSseLog" in HTMX_DEBUG_BOOT_JS

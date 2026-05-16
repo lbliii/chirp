@@ -48,8 +48,8 @@ For htmx fragment requests (`HX-Request: true`), the debug page renders as a com
 
 Debug mode also injects Chirp DevTools into full-page responses. Open the app in
 a browser, press `Ctrl+Shift+D`, and inspect htmx activity, effective `hx-*`
-inheritance, render-plan headers, SSE events, View Transitions, DOM diffs, and
-Swap Doctor warnings.
+inheritance, render-plan headers, native Chirp EventStream traces, View
+Transitions, DOM diffs, and Swap Doctor warnings.
 
 For agent-readable diagnostics, browser-capable agents can evaluate:
 

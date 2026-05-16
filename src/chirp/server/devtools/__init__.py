@@ -16,7 +16,7 @@ Features (v3):
 
 - **Rosettes syntax highlighting**: Highlighted response previews, curl commands,
   and DOM diffs via ``/__chirp/debug/highlight`` endpoint (GET, base64 code).
-- **SSE monitor**: EventSource connection lifecycle and event log.
+- **SSE monitor**: Native Chirp EventStream lifecycle traces and event log.
 - **Network waterfall**: Inline bars for request timing phases.
 - **View Transition tracking**: Hooks ``document.startViewTransition`` lifecycle.
 - **DOM diff**: Before/after swap snapshots with unified diff view.

@@ -53,6 +53,7 @@ class ASGIRuntime:
                 route_layout_chains=self._runtime.route_layout_chains,
                 swap_scope_map=self._runtime.swap_scope_map,
                 discovered_routes=self._runtime.discovered_routes or [],
+                debug_wiring=self._runtime.debug_wiring,
                 suspense_error_template=self._config.suspense_error_template,
                 suspense_error_block=self._config.suspense_error_block,
             )
@@ -97,4 +98,5 @@ class ASGIRuntime:
             oob_registry=self._runtime.oob_registry,
             fragment_target_registry=self._runtime.fragment_target_registry,
             url_for=url_for,
+            debug_wiring=self._runtime.debug_wiring,
         )

@@ -343,8 +343,8 @@ chirp dev myapp:app
 ```
 
 Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools. The drawer
-shows htmx activity, effective `hx-*` inheritance, render plans, SSE events,
-View Transitions, DOM diffs, and Swap Doctor warnings.
+shows htmx activity, effective `hx-*` inheritance, render plans, native Chirp
+EventStream traces, View Transitions, DOM diffs, and Swap Doctor warnings.
 
 Browser-capable agents can discover and export diagnostics with:
 

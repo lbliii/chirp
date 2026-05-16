@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
 
@@ -61,6 +61,65 @@ class MountAppSkip:
 
     key: str
     prefix: str
+
+
+@dataclass(frozen=True, slots=True)
+class InternalRouteSpec:
+    """Framework-owned URL surface published at freeze time."""
+
+    path: str
+    owner: str
+    kind: Literal["asset", "api", "page", "sse", "dispatcher"]
+    transport: Literal["javascript", "json", "html", "sse"]
+    enabled: bool = True
+    visibility: Literal["hidden", "internal", "user"] = "internal"
+    reserved_prefix: str | None = None
+
+    def owns(self, path: str) -> bool:
+        """Return whether this spec reserves *path*."""
+        prefix = self.reserved_prefix
+        if prefix is not None:
+            return path == prefix or path.startswith(prefix + "/")
+        return path == self.path
+
+
+@dataclass(frozen=True, slots=True)
+class DebugInjectionSpec:
+    """One debug runtime browser bootstrap resource."""
+
+    name: str
+    snippet: str
+    asset_path: str | None = None
+    before: str = "</body>"
+    full_page_only: bool = False
+    skip_htmx: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class InternalFeatureSpec:
+    """A native internal/debug feature and the routes/resources it owns."""
+
+    name: str
+    enabled: bool
+    reason: str
+    route_paths: tuple[str, ...] = ()
+    injections: tuple[DebugInjectionSpec, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeDebugWiring:
+    """Frozen debug/internal wiring descriptor published with runtime state."""
+
+    routes: tuple[InternalRouteSpec, ...] = ()
+    features: tuple[InternalFeatureSpec, ...] = ()
+    trace_store: Any = None
+
+    def internal_route_for_path(self, path: str) -> InternalRouteSpec | None:
+        """Return the internal route spec that owns *path*, if any."""
+        for spec in self.routes:
+            if spec.owns(path):
+                return spec
+        return None
 
 
 @dataclass(slots=True)
@@ -130,6 +189,7 @@ class RuntimeAppState:
     swap_scope_map: dict[str, str] = field(default_factory=dict)
     routes_by_name: Any = None
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
+    debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,5 +219,6 @@ class ContractCheckSnapshot:
     page_handler_findings: list[PageHandlerFinding] = field(default_factory=list)
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
