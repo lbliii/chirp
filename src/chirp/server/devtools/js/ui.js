@@ -610,6 +610,10 @@ function renderActivityLog() {
         dc.appendChild(makeSection("Render Plan", '<div class="chirp-dbg-hl">' + renderRenderPlanHTML(r.renderPlan) + '</div>', true));
       }
 
+      if (r.returnTrace) {
+        dc.appendChild(hlSection("Return Trace", hlJSON(esc(JSON.stringify(r.returnTrace, null, 2))), false));
+      }
+
       if (r.requestHeaders && typeof r.requestHeaders === "object") {
         var hxReqLines = [];
         var hxReqKeys = ["HX-Request", "HX-Target", "HX-Trigger", "HX-Trigger-Name",
@@ -696,9 +700,10 @@ function renderActivityLog() {
 
 // --- SSE Panel ---
 function renderSseLog() {
+  refreshNativeSseTraces(false);
   ssePanel.innerHTML = "";
   if (state.sseConnections.length === 0 && state.sseEvents.length === 0) {
-    ssePanel.innerHTML = "<p style='color:#7c8396'>No SSE connections detected yet. EventSource connections will appear here automatically.</p>";
+    ssePanel.innerHTML = "<p style='color:#7c8396'>No Chirp EventStream traces detected yet.</p>";
     return;
   }
 

@@ -23,6 +23,7 @@ var STORAGE_KEYS = {
   redactCurl: "chirp-debug-redact-curl",
 };
 var HIGHLIGHT_PATH = "/__chirp/debug/highlight";
+var DEBUG_TRACES_PATH = "/__chirp/debug/traces.json";
 
 var state = {
   open: false,
@@ -40,6 +41,7 @@ var state = {
   pinnedScroll: false,
   sseConnections: [],
   sseEvents: [],
+  nativeTraceKeys: {},
   vtEvents: [],
 };
 

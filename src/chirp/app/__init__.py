@@ -835,6 +835,7 @@ class App:
             page_handler_findings=list(self._mutable_state.page_handler_findings),
             route_name_collisions=dict(self._runtime_state.route_name_collisions),
             mount_app_skips=list(self._mutable_state.mount_app_skips),
+            debug_wiring=self._runtime_state.debug_wiring,
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),
         )
