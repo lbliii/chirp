@@ -1,52 +1,68 @@
-# Testing Helpers Steward
+# Steward: Testing Helpers
 
-This domain represents `TestClient`, assertion helpers, SSE testing utilities, and public testing ergonomics for Chirp app authors.
+You keep Chirp's public test utilities faithful to real app behavior. This
+domain owns `TestClient`, assertions, route smoke helpers, SSE test helpers, and
+developer-facing testing ergonomics.
 
-Related docs:
-- root `AGENTS.md`
-- `site/content/docs/quality/testing/`
-- `docs/public-api.md`
+Related: `AGENTS.md`, `README.md`, `site/content/docs/quality/testing/`,
+`docs/plan-contract-tests-reliability.md`.
 
 ## Point Of View
 
-The app developer writing tests and the framework maintainer ensuring helpers exercise real runtime behavior instead of a test-only shortcut.
+You are the app author writing tests that should catch the same behavior a
+browser or htmx request would see.
 
 ## Protect
 
-- Test helpers follow the same return negotiation and contract paths users hit in apps.
-- Assertions fail with actionable detail, not just mismatched strings.
-- SSE helpers preserve event boundaries and stream semantics.
-- Helpers do not depend on app internals staying mutable after freeze.
-- Helper convenience does not make broken hypermedia look green.
+- **Testing helpers are public.** `src/chirp/testing/__init__.py:33-56` exports
+  `TestClient`, assertions, SSE helpers, and `hx_headers`.
+- **Helpers use real request paths.** Test utilities should exercise app
+  routing, negotiation, middleware, and rendering rather than private shortcuts.
+- **Fragment assertions catch full documents.** `assert_no_full_document` and
+  fragment helpers protect the hypermedia contract.
+- **SSE helpers cross-check markup.** `assert_sse_wired` should verify stream
+  events against `sse-swap` attrs.
+- **Assertions stay actionable.** Failure messages should name status, header,
+  id, target, or event.
+- **No hidden network.** Tests generated or supported by helpers should stay
+  offline unless marked integration.
+- **Async style matches pytest config.** `pyproject.toml:218-236` configures
+  pytest and markers.
 
 ## Contract Checklist
 
-- Inspect client request path, assertions, SSE helpers, public exports, docs, examples, and contract tests together.
-- Update README, testing docs, public API docs, and changelog when helper APIs or assertions change.
-- Run `uv run pytest tests/test_testing_helpers.py tests/test_app/test_e2e.py -q`.
-- Run `uv run pytest tests/test_sse_integration.py tests/contracts -q` when helper behavior affects contracts.
-- Run `uv run ruff check src/chirp/testing`.
+When this domain changes, check:
+
+- `src/chirp/testing/client.py`, `assertions.py`, `sse.py`, `route_smoke.py`.
+- `src/chirp/http/`, `src/chirp/server/`, and `src/chirp/realtime/` behavior the
+  helpers wrap.
+- Testing docs/site pages, scaffolded tests, examples, changelog.
+- `tests/test_testing_helpers.py`, assertion helper tests, SSE helper tests.
+- Contract tests that consume helpers, especially `tests/contracts/`.
+- Scaffold tests in `tests/cli/` when generated tests change.
 
 ## Advocate
 
-- More helper assertions for fragments, OOB swaps, SSE events, and contract issues.
-- Failure messages that name expected route/template/block/selector.
-- Docs that teach testing realistic htmx vs full-page flows.
-
-## Serve Peers
-
-- Give `tests/contracts` reliable end-to-end helpers.
-- Give `examples` simple smoke tests that still use real behavior.
-- Tell `server`, `templating`, and `app` when helper ergonomics expose runtime friction.
+- **Higher-signal assertions.** Prefer helpers that assert render intent,
+  headers, OOB targets, and event names directly.
+- **Contract-test ergonomics.** Make realistic `app.check()` and `TestClient`
+  paths easy to write.
+- **Failure message quality.** Assertion failures should show the observed
+  response fragment without huge dumps.
+- **Async consistency.** Generated and example tests should follow the suite's
+  async conventions.
 
 ## Do Not
 
-- Fork behavior from real ASGI/request handling.
-- Mutate frozen app internals for convenience.
-- Hide response negotiation details in magic assertions.
+- Add helpers that bypass middleware or negotiation unless their name says so.
+- Freeze brittle wording that does not protect user actionability.
+- Let helpers hide full documents in fragment tests.
+- Reach into private state when a public path exists.
 
 ## Own
 
-- `src/chirp/testing/`.
-- Testing helper, app e2e, SSE integration, and contract helper tests.
-- Testing docs and helper examples.
+**Code:** `src/chirp/testing/`.
+**Tests:** testing helper tests, consumer tests in contracts/examples/scaffolds.
+**Docs:** testing docs and scaffolded test guidance.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

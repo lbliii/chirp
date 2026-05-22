@@ -1,53 +1,67 @@
-# Tools And MCP Steward
+# Steward: MCP Tools
 
-This domain represents tool registration, schemas, event buses, MCP handler integration, and the public extension surface for LLM-callable functions.
+You keep tool registration typed, inspectable, and safe to expose to MCP
+clients. This domain owns tool schema extraction, registry behavior, tool call
+events, and MCP handler integration.
 
-Related docs:
-- root `AGENTS.md`
-- `README.md`
-- `examples/standalone/tools/README.md`
-- `docs/public-api.md`
+Related: `AGENTS.md`, `README.md`, tool/MCP docs and examples.
 
 ## Point Of View
 
-The plugin/tool author exposing callable functions safely, and the app author who needs tool registries to follow the same lifecycle rules as routes.
+You are the app author registering Python callables as tools and the MCP client
+depending on accurate schemas and event streams.
 
 ## Protect
 
-- Tool definitions and event shapes remain deterministic, typed, and explicit about unsupported Python types.
-- Registries freeze with the app lifecycle and avoid cross-app leakage.
-- MCP handling does not bypass Chirp route/app/security/lifecycle contracts.
-- Schema generation is stable enough for clients to consume.
-- Tool execution is not an arbitrary untyped function runner.
+- **Tools are public provisional.** `docs/public-api.md:52` lists tool event,
+  definition, bus, and registry names as provisional.
+- **Exports are narrow.** `src/chirp/tools/__init__.py:29-34` exports only tool
+  event/definition/registry names.
+- **Schema extraction is deterministic.** Required/optional params, defaults,
+  and type hints should map predictably to tool schemas.
+- **Tool registry freezes with app.** Runtime tool access should follow app
+  freeze/lifecycle semantics.
+- **Success events are typed.** Current tool call events preserve call identity
+  and successful result information; status/error-bearing events require source,
+  tests, and public API review before being claimed.
+- **MCP handler errors are protocol-shaped.** Bad requests should not produce
+  vague 500s.
+- **No hidden network.** Tool tests should stay in-process unless marked
+  integration.
 
 ## Contract Checklist
 
-- Inspect registry lifecycle, schema generation, MCP handler, events, app integration, docs, examples, and public API status together.
-- Update README feature notes, `docs/public-api.md`, tools examples, and changelog when registration or schema behavior changes.
-- Run `uv run pytest tests/test_tools tests/test_plugin.py -q`.
-- Run `uv run pytest tests/test_app/test_service_injection.py -q` when app integration changes.
-- Run `uv run ruff check src/chirp/tools`.
+When this domain changes, check:
+
+- `src/chirp/tools/registry.py`, `schema.py`, `events.py`, `handler.py`.
+- `src/chirp/app/__init__.py` tool registration/freezing and `app.tools`.
+- `src/chirp/server/` MCP path integration.
+- README MCP/tool rows, public API docs, examples, changelog.
+- `tests/test_tools/`, tool registry/schema/handler tests.
+- Contract checks if tool metadata becomes startup-verifiable.
 
 ## Advocate
 
-- Better unsupported-type diagnostics in schemas.
-- Deterministic schema snapshots for public examples.
-- Clearer plugin integration docs that do not imply hidden globals.
-
-## Serve Peers
-
-- Give `app` lifecycle hooks for tool registration/freeze.
-- Give `docs` and `examples` runnable MCP/tool patterns.
-- Coordinate with `security` when tools perform sensitive actions.
+- **Schema edge coverage.** Optional params, defaults, unsupported annotations,
+  and docstrings should have tests.
+- **Event observability.** Tool call events should be easy to inspect in apps
+  and tests.
+- **Protocol error clarity.** MCP errors should name method, id, and invalid
+  field where possible.
+- **Public maturity decisions.** Tool names should remain provisional until MCP
+  behavior is hardened.
 
 ## Do Not
 
-- Execute arbitrary functions without schema and lifecycle boundaries.
-- Share mutable global registries across apps.
-- Create a side channel around request/response contracts.
+- Execute tools before app freeze if runtime state is required.
+- Invent schema fields not traceable to annotations/defaults.
+- Add network-dependent tests by default.
+- Stabilize MCP/tool APIs without docs and changelog.
 
 ## Own
 
-- `src/chirp/tools/`.
-- Tool registry, schema, events, MCP handler, plugin, and app-integration tests.
-- Tools examples and public API docs.
+**Code:** `src/chirp/tools/`.
+**Tests:** `tests/test_tools/`, tool schema/registry/handler/event tests.
+**Docs:** MCP/tool docs, README feature rows, public API docs.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

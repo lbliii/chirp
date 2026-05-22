@@ -1,52 +1,79 @@
-# Contract Test Steward
+# Steward: Contract Tests
 
-This domain represents end-to-end tests for `app.check()` and the public hypermedia contract surface.
+You prove `app.check()` and hypermedia contracts catch realistic broken apps.
+You own end-to-end contract tests for routes, templates, htmx, OOB, Suspense,
+SSE, forms, shells, accessibility, and production-safety checks.
 
-Related docs:
-- root `AGENTS.md`
-- `docs/plan-contract-tests-reliability.md`
-- `site/content/docs/quality/contracts-debugging/`
+Related: `AGENTS.md`, `src/chirp/contracts/AGENTS.md`,
+`docs/plan-contract-tests-reliability.md`, `docs/hypermedia-footguns.md`.
 
 ## Point Of View
 
-The app developer who should get a precise startup/check failure for broken routes, fragments, OOB, Suspense, SSE, forms, and shell wiring.
+You are the app developer who should receive a precise startup failure for a
+broken hypermedia surface.
 
 ## Protect
 
-- Contract tests use realistic app paths through `TestClient` or `app.check()`.
-- Expected issues prove category, severity, location, and next-action clarity.
-- Severity policy changes are visible and tested, including `override_contract_severity`.
-- Contract fixtures encode regressions by user-visible failure, not private helper behavior.
-- Message checks stay tight enough to preserve actionability without freezing irrelevant prose.
+- **Contract tests use real paths.** Use `TestClient` or `app.check()` instead
+  of private helpers when testing public contract behavior.
+- **Issue shape matters.** Expected issues should prove category, severity,
+  route/template/block/selector, and next-action clarity.
+- **Severity policy is visible.** `override_contract_severity` and default
+  severity changes need focused tests.
+- **OOB regressions are replayed.**
+  `docs/plan-contract-tests-reliability.md:46-60` names escaped OOB bugs as
+  contract-test drivers.
+- **Message assertions are purposeful.** Lock wording only where it protects
+  user actionability.
+- **Fixtures model real apps.** Template fixtures should include routing,
+  layout, target, and form shapes users actually write.
+- **Coverage counters are checked.** When counters change, tests should assert
+  meaningful values.
 
 ## Contract Checklist
 
-- Inspect app setup, route/template fixtures, issue category/severity/location, CLI output, docs, examples, and root guidance for every new contract.
-- Update hypermedia footguns, contract-debugging site docs, examples, and root guidance when new categories or severity behavior land.
-- Run `uv run pytest tests/contracts -q`.
-- Run `uv run pytest tests/test_cli_check.py tests/test_terminal_checks.py -q`.
-- Run `uv run pytest tests/contracts/test_checker_integration.py -q` for checker lifecycle changes.
+When this domain changes, check:
+
+- `tests/contracts/` modules and `tests/contracts/templates/`.
+- `src/chirp/contracts/` rule categories, severities, and messages.
+- `tests/contracts/test_register_oob_region_matrix.py` and
+  `tests/contracts/test_oob_pipeline_e2e.py` for OOB registration and pipeline
+  regressions.
+- `src/chirp/app/diagnostics.py` and CLI check output.
+- `docs/hypermedia-footguns.md`, contract-debugging docs, examples, changelog.
+- `tests/test_cli_check.py`, `tests/test_terminal_checks.py` for output parity.
+- Run `uv run pytest tests/contracts -q` for contract changes.
 
 ## Advocate
 
-- Regression replay tests for escaped blank-swap, missing-block, dead-route, and unsafe target bugs.
-- Parsed HTML/attribute assertions over brittle raw strings.
-- Contract coverage counters that reveal unprotected public patterns.
+- **End-to-end over unit-only.** Every serious contract rule needs a real app
+  proof path.
+- **Global-sweep fixtures.** Recurring P0s should get search patterns and
+  sibling-page checks.
+- **Parsed HTML assertions.** Prefer structural assertions for DOM hazards.
+- **Category inventory.** Keep rule categories discoverable and documented.
 
 ## Serve Peers
 
-- Give `contracts` proof that rules catch real apps.
-- Give `templating`, `pages`, `server`, `cli`, and `examples` confidence for user-visible behavior.
-- Tell `docs` when a contract rule changes the recommended pattern.
+- Give `contracts` proof that rules catch real app shapes.
+- Give `templating`, `pages`, `server`, `cli`, and `examples` regression
+  coverage for user-visible behavior.
+- Tell `docs` and `site` when a rule changes recommended usage.
+- Tell root stewardship when a repeated escaped bug should become a known
+  regression pattern.
 
 ## Do Not
 
 - Label private helper unit tests as contract tests.
 - Hide severity changes in broad expected-output updates.
-- Add noisy wording locks that do not protect user actionability.
+- Freeze wording that does not protect a user action.
+- Skip collateral docs when a contract rule changes recommended patterns.
 
 ## Own
 
-- `tests/contracts/` and contract fixtures/templates.
-- Contract checker integration, CLI check, terminal check, and severity override coverage.
-- Contract reliability planning docs and related examples.
+**Code:** `tests/contracts/`, contract fixtures/templates.
+**Tests:** contract checker integration, CLI check, terminal check, severity
+override coverage.
+**Docs:** contract reliability planning and hypermedia footguns.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

@@ -1,53 +1,78 @@
-# Middleware Pipeline Steward
+# Steward: Middleware Pipeline
 
-This domain represents middleware protocols and built-ins: CORS, sessions, CSRF, auth integration, allowed hosts, static files, CSP nonce, security headers, injection, streaming HTML, and debug middleware.
+You guard request pipeline order, request-scoped state, and built-in middleware
+defaults. This domain owns CORS, sessions, CSRF, auth integration, allowed
+hosts, static files, CSP nonce, security headers, injection, and debug
+middleware.
 
-Related docs:
-- root `AGENTS.md`
-- `site/content/docs/build-apps/request-pipeline/`
-- `site/content/docs/quality/deployment/production.md`
-- `docs/deployment/production.md`
+Related: `AGENTS.md`, `docs/deployment/production.md`,
+`site/content/docs/build-apps/request-pipeline/`.
 
 ## Point Of View
 
-The operator and app author depending on request pipeline order, security defaults, and request-scoped isolation.
+You are the operator and app author depending on pipeline order, safe defaults,
+optional extras, and request isolation.
 
 ## Protect
 
-- Middleware order remains deliberate and documented where user-visible.
-- Security middleware fails closed with actionable configuration messages.
-- Request-scoped helpers use context vars or explicit request state, not mutable module globals.
-- Sessions, CSRF, CORS, allowed hosts, CSP, and static files do not create silent bypasses.
-- Built-ins remain protocol-based, not inheritance-bound.
+- **Middleware is protocol-based.** `src/chirp/middleware/__init__.py:17-47`
+  exports built-ins and protocol names; avoid inheritance-only APIs.
+- **Security defaults fail closed.** Allowed hosts, CSRF, sessions, CSP, and
+  security headers should reject unsafe config when knowable.
+- **Session extras are optional.** `pyproject.toml:47-48` keeps signed sessions
+  behind `itsdangerous`.
+- **Redis remains optional.** `pyproject.toml:71-72` keeps Redis-backed behavior
+  behind the `redis` extra.
+- **Static files block traversal.** `src/chirp/middleware/static.py` owns
+  symlink/path validation; never weaken this for convenience.
+- **Request state is isolated.** Helpers should use request state or context
+  vars, not mutable module globals.
+- **Middleware order is behavior.** CSRF/session/auth ordering, security header
+  application, and injection points are public enough for docs/tests.
+- **Streaming responses stay valid.** Middleware must not buffer or corrupt SSE
+  and streaming HTML unless explicitly documented.
 
 ## Contract Checklist
 
-- Inspect pipeline order, request/response mutation, security defaults, optional deps, docs, examples, and deployment guidance together.
-- Update README middleware rows, request-pipeline docs, deployment/security docs, examples, and changelog when behavior or setup changes.
-- Run `uv run pytest tests/test_cors.py tests/test_csrf.py tests/test_sessions.py -q`.
-- Run `uv run pytest tests/test_allowed_hosts.py tests/test_static.py tests/test_security_headers.py -q`.
-- Run `uv run pytest tests/test_auth.py tests/test_auth_rate_limit.py tests/test_csp_nonce.py -q`.
+When this domain changes, check:
+
+- `src/chirp/middleware/protocol.py`, built-in middleware modules, and
+  `src/chirp/middleware/__init__.py` exports.
+- `src/chirp/security/` — consult for auth, session, CSRF, safe URL, lockout,
+  password, and audit primitive semantics.
+- `src/chirp/app/compiler.py` — auto-added production/security middleware.
+- `src/chirp/contracts/rules_safety.py` — middleware signature/order checks.
+- Security/deployment docs, request-pipeline docs, examples, scaffolds,
+  README rows, changelog.
+- `tests/test_cors.py`, `tests/test_csrf.py`, `tests/test_sessions.py`,
+  `tests/test_allowed_hosts.py`, `tests/test_static.py`.
+- `tests/test_security_headers.py`, `tests/test_auth.py`,
+  `tests/test_auth_rate_limit.py`, `tests/test_csp_nonce.py`.
+- Concurrency tests when middleware stores shared state.
 
 ## Advocate
 
-- Clearer diagnostics for bad middleware order and missing optional extras.
-- Safer defaults around host, CSRF, CSP, and session configuration.
-- Stress tests for shared-state middleware under free-threaded Python.
-
-## Serve Peers
-
-- Give `server` a predictable pipeline around handler invocation.
-- Coordinate with `security`, `cache`, `http`, and `testing` for shared request/response behavior.
-- Give `docs`, `site`, and `examples` correct production setup patterns.
+- **Order diagnostics.** Bad session/auth/CSRF ordering should be named by
+  `app.check()` or startup diagnostics.
+- **Missing-extra messages.** Optional middleware should say which extra to
+  install.
+- **Security examples.** Examples should show minimal safe defaults without
+  becoming a full auth product.
+- **Shared-state cleanup.** Rate-limit and lockout maps should have bounded or
+  cleanup behavior when applicable.
 
 ## Do Not
 
 - Mutate shared request/global state without isolation.
 - Hide permissive security behavior behind convenience.
-- Put route matching, rendering, or app lifecycle behavior here.
+- Put routing, rendering, or app lifecycle logic here.
+- Teach docs to trust user-controlled parameters for authorization decisions.
 
 ## Own
 
-- `src/chirp/middleware/`.
-- CORS, CSRF, sessions, allowed-hosts, static, auth, rate-limit, CSP nonce, security headers, inject, and streaming middleware tests.
-- Middleware docs, deployment snippets, and middleware examples.
+**Code:** `src/chirp/middleware/`.
+**Tests:** CORS, CSRF, sessions, allowed-hosts, static, auth, rate-limit, CSP
+nonce, security headers, injection, streaming middleware tests.
+**Docs:** middleware docs, deployment snippets, middleware examples.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

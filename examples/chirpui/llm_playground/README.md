@@ -5,7 +5,7 @@ Compare 2 models side-by-side with streaming responses. Built with chirp-ui — 
 ## Run
 
 ```bash
-pip install chirp[ai] chirp-ui
+pip install chirp[ai,markdown] chirp-ui
 ollama pull llama3.2    # or your preferred model
 ollama serve            # in another terminal
 

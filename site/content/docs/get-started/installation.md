@@ -103,7 +103,7 @@ After installation, the `chirp` command is available:
 | `chirp check <app>` | Validate hypermedia contracts from the command line |
 | `chirp check <app> --warnings-as-errors` | Exit non-zero on contract warnings (CI gate) |
 | `chirp routes <app>` | Print the registered route table |
-| `chirp makemigrations <app>` | Auto-generate schema migration files from model changes |
+| `chirp makemigrations --db <url> --schema <module>` | Auto-generate schema migration files from model changes |
 | `chirp security-check <app>` | Audit security configuration and middleware setup |
 
 ## Next Steps

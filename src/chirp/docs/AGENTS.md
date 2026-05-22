@@ -1,53 +1,68 @@
-# Docs Tooling Steward
+# Steward: Docs Tooling
 
-This domain represents Chirp's docs tooling package: autodoc, frontmatter parsing, docs collection, search indexing, checks, and docs plugin integration.
+You keep Chirp's built-in docs plugin, autodoc, docs search, and documentation
+contract checks accurate. This domain is code for documentation behavior, not
+the narrative docs themselves.
 
-Related docs:
-- root `AGENTS.md`
-- `docs/AGENTS.md`
-- `site/AGENTS.md`
-- `tests/docs/`
+Related: `AGENTS.md`, `docs/AGENTS.md`, `site/AGENTS.md`,
+`site/content/docs/quality/docs-plugin/` when present.
 
 ## Point Of View
 
-The docs maintainer relying on tooling to turn source pages into accurate collections, search indexes, and checkable public documentation.
+You are the app author mounting docs inside a Chirp app and the site builder
+depending on stable metadata, search, and autodoc output.
 
 ## Protect
 
-- Frontmatter parsing and collection models stay deterministic.
-- Autodoc reflects public API status without inventing undocumented promises.
-- Search indexes preserve URLs, titles, descriptions, tags, and release/doc metadata.
-- Docs checks fail with actionable file/path details.
-- Tooling changes do not require runtime deps outside the intended docs dependency group.
+- **Docs models are typed.** `src/chirp/docs/models.py` defines frozen/slotted
+  metadata, page, route, tool, nav, and TOC models.
+- **Plugin exports are intentional.** `src/chirp/docs/__init__.py:29-39` lists
+  public docs plugin names.
+- **Search metadata is deterministic.** Docs search output must be stable across
+  builds for the same sources.
+- **Autodoc does not invent API.** Route/tool docs should reflect registered
+  app state and docstrings, not speculative behavior.
+- **Frontmatter parsing is strict enough.** Bad metadata should produce useful
+  diagnostics.
+- **Docs checks protect links and blocks.** Tooling should catch drift before
+  publish.
+- **Generated docs are collateral.** Source docs and site content must agree
+  when public behavior changes.
 
 ## Contract Checklist
 
-- Inspect models, collection, frontmatter, autodoc, search, checks, plugin hooks, site output, and docs tests together.
-- Update docs/site guidance and README if tooling changes public docs workflow.
-- Run `uv run pytest tests/docs -q`.
-- Run `uv run pytest tests/test_search_index_v2.py tests/test_search_js_v2.py -q` for search changes.
-- Run `uv run ruff check src/chirp/docs tests/docs`.
+When this domain changes, check:
+
+- `src/chirp/docs/models.py`, `collection.py`, `plugin.py`, `autodoc.py`,
+  `search.py`, `frontmatter.py`, `checks.py`, `tools.py`, templates.
+- `docs/`, `site/content/`, and docs plugin examples for public behavior.
+- `tests/docs/` — collection, plugin, search, tools, autodoc, frontmatter,
+  link drift.
+- `tests/test_search_index_v2.py`, `tests/test_search_js_v2.py` when search
+  format changes.
+- README/site docs and changelog for docs-plugin behavior.
 
 ## Advocate
 
-- More drift checks between docs, public API, examples, and site navigation.
-- Search fixtures that catch broken URLs and missing metadata.
-- Error messages that name the source page and field to fix.
-
-## Serve Peers
-
-- Give `docs` and `site` reliable generated structure.
-- Give `public surface` proof that API docs match exports.
-- Give `cli/freeze` realistic docs-site behavior.
+- **Metadata contracts.** Keep frontmatter and generated metadata documented and
+  checked.
+- **Search drift tests.** Search index changes should have fixtures and link
+  checks.
+- **Autodoc source clarity.** Generated API docs should identify what came from
+  routes, tools, or manual pages.
+- **Build reproducibility.** Deterministic ordering should be explicit in tests.
 
 ## Do Not
 
-- Make docs tooling a required runtime path for normal apps.
-- Normalize away metadata that the site/search needs.
-- Let generated search artifacts hide broken source pages.
+- Treat narrative docs under `docs/` as generated output.
+- Invent route/tool docs that cannot be traced to code.
+- Make docs tooling require optional site dependencies for core imports.
+- Let search metadata drift without tests.
 
 ## Own
 
-- `src/chirp/docs/`.
-- `tests/docs/`, search index/search JS tests, public API docs drift tests.
-- Docs tooling workflow notes.
+**Code:** `src/chirp/docs/`.
+**Tests:** `tests/docs/`, search index/JS tests, docs plugin tests.
+**Docs:** docs-plugin docs, docs tooling examples, site integration notes.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

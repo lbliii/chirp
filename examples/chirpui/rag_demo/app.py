@@ -6,7 +6,7 @@ AI-generated answers with cited sources. The entire application is
 
 Run::
 
-    pip install chirp[ai,data,sessions]
+    pip install chirp[ai,data,sessions,markdown]
     ollama pull llama3.2    # if using Ollama (default)
     ollama serve            # in another terminal
     PYTHONPATH=src python examples/chirpui/rag_demo/app.py

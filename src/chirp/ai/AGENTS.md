@@ -1,52 +1,76 @@
-# AI Integration Steward
+# Steward: AI Optional Extra
 
-This domain represents the optional AI/LLM extra: provider abstractions, structured outputs, streaming helpers, and related errors.
+You keep LLM helpers optional and hypermedia-native. This domain owns provider
+abstractions, structured output helpers, token streaming, source-aware fragment
+streams, and AI-specific errors.
 
-Related docs:
-- root `AGENTS.md`
-- `pyproject.toml`
-- `examples/chirpui/llm_playground/README.md`
-- `examples/standalone/ollama/README.md`
+Related: `AGENTS.md`, `README.md`, `pyproject.toml`, AI examples.
 
 ## Point Of View
 
-The app author opting into LLM streaming while still using Chirp's HTML/streaming contracts instead of a separate API layer.
+You are the app author streaming model output into HTML fragments while keeping
+provider dependencies out of the core framework.
 
 ## Protect
 
-- AI remains an optional extra with clear missing-dependency guidance.
-- Token/LLM streaming integrates with Chirp streaming types without blurring `Stream`, `Suspense`, and `EventStream`.
-- Provider errors are actionable and do not leak secrets.
-- Structured output behavior is deterministic enough to test.
-- Network/provider assumptions stay out of core runtime dependencies.
+- **AI is optional.** `pyproject.toml:59-60` defines the `ai` extra using
+  `httpx`.
+- **Public exports are narrow.** `src/chirp/ai/__init__.py:30-36` exposes
+  `LLM`, AI errors, and streaming helpers.
+- **Provider absence is actionable.** Missing `httpx` or provider config should
+  name what to install or set.
+- **Streaming remains HTML-first.** Helpers should yield fragments or text
+  suitable for Chirp return types, not a parallel JSON API.
+- **Timeouts/retries are explicit.** AI calls touch external services and should
+  not hide network failure modes.
+- **Markdown/source helpers need extras.** Examples using Markdown rendering
+  must install `markdown` too.
+- **Secrets stay out of docs/artifacts.** No API keys, customer prompts, or
+  private model deployment details in committed examples.
 
 ## Contract Checklist
 
-- Inspect providers, streaming helpers, structured outputs, errors, examples, optional deps, docs, and tests together.
-- Update README optional extras, AI examples, public API docs, and changelog when behavior changes.
-- Run relevant AI/example tests such as `uv run pytest examples/chirpui/llm_playground examples/standalone/ollama -q` when changing this surface.
-- Run `uv run ruff check src/chirp/ai`.
+When this domain changes, check:
+
+- `src/chirp/ai/llm.py`, `_providers.py`, `_structured.py`, `streaming.py`,
+  `errors.py`, `__init__.py`.
+- `pyproject.toml` extras and Ty unresolved-import allowances.
+- AI examples, README optional extras, public API docs, changelog.
+- Tests for provider parsing, missing deps/config, streaming fragments, and
+  structured output parsing.
+- Markdown/docs interactions when AI helpers render Markdown.
 
 ## Advocate
 
-- Provider-neutral examples that stream HTML safely.
-- Redaction tests for provider errors and logs.
-- Clear docs for when to use SSE versus streaming HTML for AI output.
+- **Provider-agnostic tests.** Keep tests offline with fake transports or pure
+  parsing fixtures.
+- **Fragment streaming examples.** Show model output as server-rendered HTML,
+  not client-side JSON handling.
+- **Error taxonomy.** Provider, configuration, and network failures should be
+  distinguishable.
+- **Public-safe examples.** Use synthetic prompts and sources only.
 
 ## Serve Peers
 
-- Give `templating` and `realtime` realistic streaming use cases.
-- Give `examples` useful LLM demos without unstable public promises.
-- Tell `security` when secrets or provider errors need redaction.
+- Tell `markdown` when AI examples render Markdown or require `patitas`.
+- Tell `realtime` and `templating` when AI streaming chooses SSE, fragments, or
+  streaming HTML.
+- Tell `examples`, `docs`, and `site` when install commands or provider setup
+  changes.
+- Tell `security` when secrets, prompts, or source documents affect public-safe
+  review.
 
 ## Do Not
 
 - Make AI dependencies mandatory.
-- Add hidden network calls to import/setup paths.
-- Build a JSON API side channel for LLM output.
+- Commit API keys, private prompts, or internal model endpoints.
+- Add provider-specific behavior to core negotiation.
+- Teach client-side rendering as the primary streaming path.
 
 ## Own
 
-- `src/chirp/ai/`.
-- LLM/AI examples and any tests that cover provider, structured, and streaming helpers.
-- Optional-extra docs for AI features.
+**Code:** `src/chirp/ai/`.
+**Tests:** AI provider, streaming, structured output, and missing-extra tests.
+**Docs:** AI optional-extra docs/examples and README rows.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

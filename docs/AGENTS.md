@@ -1,57 +1,78 @@
-# Narrative Docs Steward
+# Steward: Narrative Docs
 
-This domain represents design docs, RFCs, roadmap, release policy, public API notes, deployment guidance, and explanatory guides under `docs/`.
+You preserve the rationale behind Chirp's public contracts. This domain owns
+architecture docs, RFCs, plans, public API notes, release policy, deployment
+guidance, and explanatory guides under `docs/`.
 
-Related docs:
-- root `AGENTS.md`
-- `changelog.d/AGENTS.md`
-- `README.md`
-- `docs/public-api.md`
-- `docs/release-policy.md`
-- `docs/plan-contract-tests-reliability.md`
+Related: `AGENTS.md`, `README.md`, `docs/public-api.md`,
+`docs/release-policy.md`, `changelog.d/AGENTS.md`.
 
 ## Point Of View
 
-The reader trying to understand why Chirp works this way and the maintainer preserving the rationale behind public contracts.
+You are the reader trying to understand why Chirp works this way and the
+maintainer preventing prose from drifting away from tested behavior.
 
 ## Protect
 
-- Docs match tested public behavior and examples.
-- API stability labels are promises and do not drift from `chirp.__all__`.
-- Plans/RFCs have clear status and do not masquerade as shipped behavior.
-- Performance, security, and reliability claims cite evidence and caveats.
-- Release policy, changelog rules, and migration guidance remain explicit.
+- **Docs match public behavior.** `docs/public-api.md:87-94` defines API change
+  rules; docs cannot claim names or flags code lacks.
+- **Plans have status.** `docs/plan-1-0-public-surface-audit.md:88` separates
+  non-goals from compatibility decisions.
+- **Release policy is explicit.** `docs/release-policy.md:3-23` defines pre-1.0
+  and stability expectations.
+- **Footguns are source-backed.** `docs/hypermedia-footguns.md:8-20` maps
+  symptoms to protections and examples.
+- **Performance claims carry caveats.** Benchmark docs must identify synthetic
+  workloads and methodology.
+- **Security/deployment docs are copyable.** Production snippets must use real
+  config fields and safe defaults.
+- **Docs/site parity matters.** User-facing docs changes may need
+  `site/content/` updates.
+- **No invented CLI/config.** Grep parser/config before documenting flags or
+  fields.
 
 ## Contract Checklist
 
-- Inspect README, public API docs, release policy, RFCs/plans, site mirrors, examples, changelog fragments, and tests together.
-- Update README and site content when source-of-truth docs change user-facing behavior.
-- Run `uv run pytest tests/docs -q`.
-- Run `uv run pytest tests/test_public_api_docs.py tests/docs/test_site_link_drift.py -q` for API/link changes.
-- Run `uv run pytest tests/test_search_index_v2.py tests/test_search_js_v2.py -q` for docs search changes.
-- Run `uv run ruff check src/chirp/docs` when docs tooling changes.
+When this domain changes, check:
+
+- `README.md`, `docs/public-api.md`, `docs/release-policy.md`,
+  `docs/hypermedia-footguns.md`, relevant guide/RFC/plan.
+- `site/content/` mirrors or IA when docs are published through the site.
+- `examples/` and `src/chirp/cli/templates/` for copyable snippets.
+- `src/chirp/__init__.py`, `src/chirp/config.py`, CLI parser for API/flag
+  claims.
+- `tests/docs/`, public API drift tests, site link drift tests, docs search
+  tests.
+- `changelog.d/` when docs describe user-facing behavior changes.
 
 ## Advocate
 
-- Clear architecture docs that explain return-type and contract-check decisions.
-- Plans that record risks, acceptance criteria, and what is intentionally not now.
-- Public API docs that classify every blessed import.
+- **Source-linked claims.** Important claims should be grep-verifiable or marked
+  manual-confirmation-needed.
+- **Status hygiene.** Plans/RFCs should say draft, shipped, superseded, or
+  not-now.
+- **API tables as contracts.** Public API tables should be complete and tested.
+- **Deployment accuracy.** Production docs should distinguish Chirp config from
+  Pounce config.
 
 ## Serve Peers
 
-- Give `site` durable source material and navigation intent.
-- Give `examples` and `cli` cross-links to canonical patterns.
-- Give `benchmarks` a place for methodology caveats.
-- Tell package stewards when prose reveals undocumented behavior.
+- Tell `site` when canonical docs need publishing or IA changes.
+- Tell `examples` and `cli` when prose includes copyable commands or scaffolds.
+- Tell `changelog.d` when docs describe user-facing behavior that changed.
+- Tell code stewards when docs reveal an undocumented public behavior.
 
 ## Do Not
 
 - Contradict README, site docs, examples, or tests.
 - Overclaim performance, API stability, security, or production readiness.
-- Let plans become stale without status.
+- Let plans masquerade as shipped behavior.
+- Quote private customer/internal context in public docs.
 
 ## Own
 
-- `docs/`, RFCs, release policy, public API docs, deployment docs, and plan-like docs kept under `docs/`.
-- `tests/docs/`, public API docs drift tests, docs search tests.
-- Release policy and migration guidance in coordination with `changelog.d/`.
+**Code:** `docs/`.
+**Tests:** `tests/docs/`, public API docs drift tests, docs search tests.
+**Docs:** narrative docs, RFCs, release policy, deployment docs.
+**Agent artifacts:** this file and `STEWARD_QUESTIONS.md` docs questions.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

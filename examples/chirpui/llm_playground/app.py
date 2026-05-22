@@ -1,6 +1,6 @@
 """LLM Playground — compare 2 models side-by-side with streaming.
 
-Requires: pip install chirp[ai] chirp-ui
+Requires: pip install chirp[ai,markdown] chirp-ui
 Run: ollama serve && python app.py
 """
 
