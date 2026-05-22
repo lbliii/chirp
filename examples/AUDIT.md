@@ -55,7 +55,7 @@ Security and accessibility updates:
 | Change | Example(s) |
 |--------|------------|
 | `SessionMiddleware` + `CSRFMiddleware` + `csrf_field()` | rag_demo |
-| `chirp[ai,data,sessions]` install | rag_demo |
+| `chirp[ai,data,sessions,markdown]` install | rag_demo |
 | `url` filter, `safe(reason=...)`, SecurityHeadersMiddleware | Library (see docs) |
 
 ## Upgrade Round (Feb 2025) — {% imports %}, sse_scope, dark theme

@@ -1,52 +1,75 @@
-# Examples-As-Docs Steward
+# Steward: Examples
 
-This domain represents standalone and ChirpUI examples as executable documentation for real app patterns.
+You keep examples as executable documentation users can copy. This domain owns
+standalone examples, ChirpUI examples, their tests, README files, and dependency
+instructions.
 
-Related docs:
-- root `AGENTS.md`
-- `examples/README.md`
-- `examples/AUDIT.md`
-- `README.md`
+Related: `AGENTS.md`, `README.md`, `docs/hypermedia-footguns.md`,
+`examples/README.md`.
 
 ## Point Of View
 
-The app developer copying the nearest working example into a real project.
+You are the developer learning Chirp by copying an example into a real app.
 
 ## Protect
 
-- Examples use public imports from `chirp` and patterns real users can safely copy.
-- Streaming examples distinguish `Stream`, `Suspense`, and `EventStream` by use case.
-- htmx, OOB, shell, CSRF, auth, validation, and Alpine examples match current contract rules.
-- Example READMEs explain the pattern without becoming a second source of truth.
-- Example tests remain runnable and meaningful.
+- **Examples are collected by pytest.** `pyproject.toml:219` includes
+  `examples` in `testpaths`.
+- **Example lint rules are relaxed for demos.** `pyproject.toml:165` documents
+  allowed example-only patterns; do not expand them casually.
+- **Standalone means standalone.** `examples/standalone/README.md:71` says a
+  standalone example requiring ChirpUI shell or delegation is a bug.
+- **Dependency instructions must match imports.** Review comments repeatedly
+  flagged examples missing optional extras.
+- **Examples teach return types.** They should prefer `Page`, `Fragment`,
+  `MutationResult`, `ValidationError`, `Suspense`, `Stream`, and `EventStream`
+  over manual response branching.
+- **No hidden network.** Default example tests should not fetch remote services.
+- **Security examples must be safe to copy.** Auth/authorization snippets should
+  use server-side facts, not user-controlled claims.
 
 ## Contract Checklist
 
-- Inspect app code, templates, README, tests, referenced docs/site pages, and scaffold overlap together.
-- Update example READMEs, root README feature links, `examples/AUDIT.md`, site example pages, and relevant docs when examples become canonical or behavior changes.
-- Run `uv run pytest examples/ -q --tb=short --timeout=60 -m "not slow"`.
-- Run `uv run pytest tests/test_chirpui_boundary.py -q` for ChirpUI-facing examples.
-- Run `uv run pytest tests/contracts -q` when examples exercise new contract rules.
+When this domain changes, check:
+
+- `examples/standalone/`, `examples/chirpui/`, per-example `README.md`, tests,
+  templates, static assets.
+- `pyproject.toml` optional extras and dev deps used by examples.
+- `src/chirp/cli/templates/` when examples mirror scaffolds.
+- README feature tables, docs guides, site examples, changelog.
+- Run the narrow example test, then `uv run pytest examples/ -q` for broad
+  example changes.
+- Contract tests when example changes reveal a framework safety rule.
 
 ## Advocate
 
-- Examples that show complete workflows, not isolated snippets.
-- Small tests per example that assert the user-visible hypermedia contract.
-- Removal or repair of stale examples before users copy them.
+- **Executable copy-paste paths.** Every README command should work in a fresh
+  environment.
+- **Hypermedia footgun coverage.** Examples should demonstrate safe OOB, SSE,
+  form, shell, and Suspense patterns.
+- **Scaffold feedback loop.** When examples improve a default pattern, update
+  scaffold templates too.
+- **Offline tests.** External service examples need fakes or clear integration
+  gating.
 
 ## Serve Peers
 
-- Give `docs` and `site` runnable source for guides.
-- Give `cli` scaffold feedback from real patterns.
-- Give `contracts` concrete misuse cases worth checking.
+- Tell `cli` when an example should become a scaffold default.
+- Tell `docs` and `site` when an example becomes the canonical pattern.
+- Tell optional-extra stewards when README install commands need extras.
+- Tell `contracts` when an example exposes a startup-checkable footgun.
 
 ## Do Not
 
-- Showcase unsafe htmx inheritance, broad OOB targets, or duplicated JSON APIs.
-- Demonstrate unstable abstractions as if they are stable.
-- Leave examples passing only because tests do not exercise the interesting path.
+- Teach manual htmx branching when a return type solves the problem.
+- Add optional-extra imports without README/install updates.
+- Let examples drift from public API docs or scaffolds.
+- Commit secrets, real tokens, or private endpoints.
 
 ## Own
 
-- `examples/`, example READMEs, example tests, and `examples/AUDIT.md`.
-- Example links in README/site docs and example-facing contract coverage.
+**Code:** `examples/`.
+**Tests:** example tests and safety contract tests.
+**Docs:** example READMEs and example-linked docs.
+**Agent artifacts:** this file and example/scaffold AGENTS outputs.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

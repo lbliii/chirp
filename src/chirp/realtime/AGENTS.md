@@ -1,53 +1,74 @@
-# Realtime Steward
+# Steward: Realtime
 
-This domain represents SSE event types, `EventStream`, and realtime protocol helpers that feed server-push UI after a page has loaded.
+You keep server-push UI reliable after the page loads. This domain owns
+`EventStream`, `SSEEvent`, SSE wire formatting, heartbeat/retry behavior, and
+fragment payloads sent over long-lived streams.
 
-Related docs:
-- root `AGENTS.md`
-- `README.md`
-- `site/content/docs/build-apps/streaming-updates/server-sent-events.md`
-- `examples/standalone/sse/README.md`
+Related: `AGENTS.md`, `README.md`, `docs/realtime-production.md`,
+`site/content/docs/build-apps/streaming-updates/server-sent-events.md`.
 
 ## Point Of View
 
-The user watching a long-lived realtime page and the app author expecting each event to render independently without killing the stream.
+You are the user watching a live page and the app author expecting one bad event
+not to kill an hours-long stream.
 
 ## Protect
 
-- SSE remains for post-load updates, not initial render streaming.
-- Heartbeat, disconnect cleanup, retry/id/event formatting, and per-event render boundaries are preserved.
-- `SSEEvent` and Fragment-yield semantics are public return-type behavior.
-- One bad event does not quietly silence an hours-long stream.
-- Reactive event helpers do not introduce shared-state races.
+- **SSE is post-load updates.** `README.md:102-112` distinguishes
+  `EventStream` from `Stream` and `Suspense`.
+- **Event types are public.** `docs/public-api.md:31` lists `EventStream` and
+  `SSEEvent` as stable return types.
+- **Heartbeat bounds matter.** `src/chirp/realtime/events.py` validates
+  impractically short heartbeat intervals.
+- **Fragment-yield semantics are contract.** `Fragment(target=...)` becomes the
+  SSE event name when yielded through streams.
+- **Per-event errors stay bounded.** Do not widen one render failure into a
+  silent stream failure without design review.
+- **Disconnect cleanup is required.** Long-lived generators must release
+  subscriptions and resources.
+- **SSE headers are fixed.** `docs/ARD.md:191` records no-op header helpers for
+  SSE response semantics.
+- **Reactive event helpers need race proof.** Shared buses interact with
+  free-threaded state.
 
 ## Contract Checklist
 
-- Inspect event formatting/parsing, EventStream behavior, fragment payloads, lifecycle cleanup, reactive interaction, docs, and examples together.
-- Update README streaming tables, SSE docs, examples, hypermedia footguns, and changelog when event behavior changes.
-- Run `uv run pytest tests/test_sse_parser.py tests/test_sse_integration.py tests/test_sse_macros.py -q`.
-- Run `uv run pytest tests/contracts/test_sse.py tests/test_reactive_stream.py -q`.
-- Run `uv run pytest examples/standalone/sse -q`.
+When this domain changes, check:
+
+- `src/chirp/realtime/events.py`, `sse.py`, and SSE-adjacent server response
+  handling.
+- `src/chirp/server/negotiation.py`, `sender.py`, SSE integration paths.
+- `src/chirp/pages/reactive/` when reactive streams use SSE.
+- `src/chirp/contracts/rules_sse.py`, `rules_safety.py`.
+- README streaming tables, SSE docs, realtime-production docs, examples,
+  hypermedia footguns, changelog.
+- `tests/test_sse_parser.py`, `tests/test_sse_integration.py`,
+  `tests/test_sse_macros.py`.
+- `tests/contracts/test_sse.py`, `tests/test_reactive_stream.py`,
+  `examples/standalone/sse`.
 
 ## Advocate
 
-- Better stream diagnostics for disconnects, render errors, and retry behavior.
-- Examples that clearly separate `Stream`, `Suspense`, and `EventStream`.
-- Tests for long-lived stream boundaries and malformed events.
-
-## Serve Peers
-
-- Give `server` event lifecycle hooks that preserve protocol correctness.
-- Give `templating` fragment payload contracts for SSE.
-- Give `pages` reactive flows and `examples` realistic post-load updates.
+- **Stream diagnostics.** Make disconnects, retry behavior, render errors, and
+  event names visible in debug tooling.
+- **Long-lived tests.** Add tests for cleanup and malformed events without
+  making the suite slow.
+- **SSE contract coverage.** `sse-connect` and `sse-swap` drift should fail at
+  startup where static inference can prove it.
+- **Examples with separation.** Keep initial-render streaming examples out of
+  the SSE lane.
 
 ## Do Not
 
 - Become a WebSocket abstraction.
 - Replace `Stream` or `Suspense` initial rendering.
-- Widen per-event failures to the whole stream without a design check-in.
+- Let per-event failures silently close the stream.
+- Buffer long-lived streams through ordinary response middleware.
 
 ## Own
 
-- `src/chirp/realtime/` and SSE event contracts.
-- SSE parser, integration, macro, contract, and reactive stream tests.
-- SSE docs and realtime examples.
+**Code:** `src/chirp/realtime/`, SSE response integration in server/http.
+**Tests:** SSE parser, integration, macro, contract, and reactive stream tests.
+**Docs:** SSE docs, realtime production docs, streaming decision tables.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

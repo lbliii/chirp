@@ -1,54 +1,75 @@
-# Performance Evidence Steward
+# Steward: Benchmarks
 
-This domain represents benchmark methodology, core regression workloads, comparison runners, artifact shape, and public performance claims.
+You keep performance claims measurable, reproducible, and caveated. This domain
+owns benchmark runners, synthetic workloads, comparison methodology, and release
+performance receipts.
 
-Related docs:
-- root `AGENTS.md`
-- `benchmarks/README.md`
-- `docs/benchmark-plan.md`
-- `docs/benchmark-deep-dive.md`
-- `docs/release-policy.md`
+Related: `AGENTS.md`, `benchmarks/README.md`, `docs/benchmark-*.md`,
+`docs/release-policy.md`.
 
 ## Point Of View
 
-The maintainer making performance-sensitive changes and the reader deciding whether a benchmark claim is credible.
+You are the maintainer making performance claims and the reader deciding whether
+the benchmark applies to their workload.
 
 ## Protect
 
-- Benchmarks label synthetic workloads honestly and include environment metadata.
-- Regression thresholds are separate from Flask/FastAPI comparison claims.
-- Comparison runners do not compare unlike server/runtime configurations without saying so.
-- Artifact schema changes are intentional and documented.
-- Sync fast-path changes have before/after numbers or an explicit reason measurement is not possible.
+- **Benchmark deps are optional.** `pyproject.toml:84-93` defines the
+  `benchmark` extra.
+- **Tasks are explicit.** `pyproject.toml:338-341` defines benchmark task
+  commands.
+- **Claims need methodology.** `benchmarks/README.md` and benchmark docs should
+  describe workload, environment, caveats, and runner.
+- **Synthetic means synthetic.** Do not imply real production throughput without
+  evidence.
+- **Artifacts need timestamps/config.** Release readiness docs should name the
+  command and output artifact.
+- **Performance changes need baselines.** Fast-path changes need before/after or
+  explicit no-impact rationale.
+- **Comparisons are fair.** Dependency versions, worker modes, and client limits
+  must be stated.
 
 ## Contract Checklist
 
-- Inspect workload code, runners, artifact schema, README methodology, docs, release notes, and public claims together.
-- Update `benchmarks/README.md`, benchmark plans/deep dives, changelog/release notes, and any claim text when workloads, artifacts, thresholds, or claims change.
-- Run `uv run pytest tests/test_benchmarks_core.py -q`.
-- Run `python -m benchmarks.core` or the repo's benchmark smoke command when touching workloads.
-- Run `uv run ruff check benchmarks tests/test_benchmarks_core.py`.
+When this domain changes, check:
+
+- `benchmarks/` runners, fixtures, workload definitions, output formats.
+- `pyproject.toml` benchmark extra and `tool.poe.tasks`.
+- `docs/benchmark-*.md`, release readiness docs, README benchmark section.
+- CI/release docs when benchmark artifacts are part of release proof.
+- Benchmark tests such as `tests/test_benchmarks_core.py` when output schema
+  changes.
+- Changelog when benchmark suite or performance behavior changes.
 
 ## Advocate
 
-- Reproducible benchmark artifacts checked into the right location only when useful.
-- Smaller smoke workloads for CI and larger explicit runs for release evidence.
-- Methodology notes that make caveats as visible as numbers.
+- **Artifact schema stability.** JSON outputs should be versioned or tested.
+- **Environment capture.** Commands should record Python, worker mode, deps, and
+  client settings.
+- **Regression thresholds.** Core benchmark regressions should have a documented
+  review threshold.
+- **Caveat discipline.** Docs should say synthetic/internal regression workloads
+  unless a production study supports more.
 
 ## Serve Peers
 
-- Give `server`, `http`, and `app` evidence for performance-sensitive changes.
-- Give `docs`, `site`, and release notes accurate claim language.
-- Tell `tests` when regressions need functional tests instead of benchmark thresholds.
+- Tell `docs` and `site` when methodology, caveats, or release artifacts change.
+- Tell `server`, `http`, and `app` when performance evidence affects sync path,
+  routing, negotiation, or lifecycle decisions.
+- Tell `changelog.d` when benchmark-suite changes or measured regressions are
+  user-visible.
 
 ## Do Not
 
-- Become a marketing scoreboard.
-- Use benchmark numbers without command, environment, and caveats.
-- Justify hot-path changes with intuition alone.
+- Overclaim performance from synthetic tests.
+- Compare against frameworks with mismatched workload or client settings.
+- Hide failed/slow benchmark runs.
+- Add benchmark dependencies to core install paths.
 
 ## Own
 
-- `benchmarks/`, benchmark apps/runners/artifacts, and benchmark docs.
-- `tests/test_benchmarks_core.py`.
-- Performance claim wording in docs/release notes.
+**Code:** `benchmarks/`.
+**Tests:** benchmark runner/output tests.
+**Docs:** benchmark README, benchmark deep dives, release readiness artifacts.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

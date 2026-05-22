@@ -55,7 +55,7 @@ so those stay in `on_startup`.
 
 ```bash
 # Install dependencies
-pip install chirp[ai,data,sessions] chirp-ui
+pip install chirp[ai,data,sessions,markdown] chirp-ui
 
 # Default: Ollama (no API key). Start Ollama first:
 ollama pull llama3

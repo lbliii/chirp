@@ -1,51 +1,70 @@
-# Markdown Steward
+# Steward: Markdown Optional Extra
 
-This domain represents the optional markdown rendering extra: patitas integration, filters, renderer errors, and markdown-to-template use in docs/examples.
+You keep Markdown rendering useful without making it part of the core framework.
+You own `MarkdownRenderer`, Markdown filters, and missing-dependency guidance
+for the `markdown` extra.
 
-Related docs:
-- root `AGENTS.md`
-- `pyproject.toml`
-- `tests/test_markdown.py`
+Related: `AGENTS.md`, `README.md`, `pyproject.toml`, Markdown docs/examples.
 
 ## Point Of View
 
-The app author who opted into markdown rendering and expects optional dependencies, errors, and rendered output to be explicit.
+You are the app author rendering trusted or sanitized Markdown and the package
+maintainer preserving optional dependency boundaries.
 
 ## Protect
 
-- Markdown remains an optional extra with clear install guidance when missing.
-- Rendering and filters do not silently swallow parse/render errors.
-- Output is safe for the documented use case and does not bypass template contracts.
-- Patitas integration stays isolated from core rendering dependencies.
-- Error messages name the markdown source or renderer option where possible.
+- **Markdown is optional.** `pyproject.toml:62-63` defines `markdown` as
+  `patitas[syntax]`.
+- **Public exports are narrow.** `src/chirp/markdown/__init__.py:29-34` exports
+  Markdown errors, renderer, and filter registration.
+- **Missing dependency is actionable.** Errors should name the markdown extra or
+  direct package needed.
+- **Renderer behavior is explicit.** Syntax highlighting and HTML rendering
+  choices should be documented and tested.
+- **Filters do not bypass template safety.** Markdown output should respect the
+  renderer's safety model and not silently mark unsafe content safe.
+- **Examples install the extra.** Any example importing `chirp.markdown` must
+  include markdown dependency guidance.
 
 ## Contract Checklist
 
-- Inspect renderer, filters, optional import paths, error types, docs/examples, and tests together.
-- Update README optional extras, markdown docs/examples, public API docs, and changelog when behavior changes.
-- Run `uv run pytest tests/test_markdown.py -q`.
-- Run `uv run ruff check src/chirp/markdown`.
+When this domain changes, check:
+
+- `src/chirp/markdown/renderer.py`, `filters.py`, `errors.py`, `__init__.py`.
+- `pyproject.toml` optional extras and Ty allowed unresolved imports.
+- Examples/docs that render Markdown, especially AI/LLM examples.
+- README optional extras, public API docs, changelog.
+- `tests/test_markdown.py` and examples that import Markdown.
 
 ## Advocate
 
-- Better examples for markdown in docs/static-site flows.
-- Clear missing-extra and syntax-error diagnostics.
-- Tests for renderer options and unsafe input boundaries.
+- **Security posture docs.** Clarify trusted vs untrusted Markdown assumptions.
+- **Missing-extra tests.** Prove the no-extra import path fails clearly.
+- **Example parity.** Install commands should include `markdown` wherever
+  needed.
+- **Renderer options audit.** Public options should be stable or documented as
+  provisional.
 
 ## Serve Peers
 
-- Give `docs tooling` and `site` stable markdown behavior when used in content pipelines.
-- Coordinate with `templating` for filters and rendered HTML boundaries.
-- Tell `public surface` when markdown exports change.
+- Tell `ai` when LLM examples depend on Markdown rendering or source formatting.
+- Tell `docs tooling` when Markdown renderer behavior affects docs plugin
+  output.
+- Tell `examples`, `docs`, and `site` when install commands or safety guidance
+  changes.
+- Tell `security` when renderer escaping/sanitization assumptions change.
 
 ## Do Not
 
-- Make markdown a mandatory runtime dependency.
-- Hide renderer failures by returning empty HTML.
-- Invent a parallel template language around markdown.
+- Make Markdown a core dependency.
+- Hide sanitizer/escaping assumptions.
+- Add broad site-generator behavior here.
+- Let docs/examples import Markdown without dependency instructions.
 
 ## Own
 
-- `src/chirp/markdown/`.
-- `tests/test_markdown.py`.
-- Markdown optional-extra docs and examples.
+**Code:** `src/chirp/markdown/`.
+**Tests:** Markdown renderer/filter/missing-extra tests and example tests.
+**Docs:** Markdown optional-extra docs and examples.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.

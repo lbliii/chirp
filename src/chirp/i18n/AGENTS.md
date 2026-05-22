@@ -1,51 +1,74 @@
-# i18n Steward
+# Steward: i18n Optional Surface
 
-This domain represents Chirp's internationalization helpers: catalogs, locale detection, formatting, and i18n middleware.
+You keep internationalization explicit, optional, and compatible with server
+rendering. This domain owns locale detection, catalogs, middleware, and template
+helpers for translated UI.
 
-Related docs:
-- root `AGENTS.md`
-- `tests/test_i18n.py`
-- `docs/rfcs/004-url-for.md`
+Related: `AGENTS.md`, `pyproject.toml`, i18n docs/examples when present.
 
 ## Point Of View
 
-The app author localizing a Chirp app and the user who expects locale detection and formatting to be consistent across requests.
+You are the app author localizing server-rendered pages without introducing a
+client-side translation system.
 
 ## Protect
 
-- Locale detection is deterministic and request-scoped.
-- Catalog lookups and formatting do not leak state across apps or threads.
-- Middleware behavior is explicit about where locale comes from.
-- URL generation and locale prefixes do not become implicit magic.
-- Missing translations fail or fall back according to documented behavior.
+- **i18n config is explicit.** `src/chirp/config.py:259-265` lists i18n fields
+  and defaults.
+- **Exports are narrow.** `src/chirp/i18n/__init__.py:29` exposes catalog,
+  locale, and translation helpers.
+- **Locale detection is deterministic.** Cookie, URL prefix, and default locale
+  behavior should be tested and documented before stabilization.
+- **Catalog loading is optional.** Core imports must not require i18n files or
+  extra runtime dependencies.
+- **Template helpers are request-scoped.** Locale state should not leak across
+  concurrent requests.
+- **Missing translations need policy.** Fallback behavior should be explicit in
+  docs/tests.
 
 ## Contract Checklist
 
-- Inspect catalog loading, detection, formatting, middleware, request context, docs/examples, and tests together.
-- Update public API docs, locale-related route docs/RFCs, examples, and changelog when behavior changes.
-- Run `uv run pytest tests/test_i18n.py tests/test_context.py -q`.
-- Run `uv run ruff check src/chirp/i18n`.
+When this domain changes, check:
+
+- `src/chirp/i18n/catalog.py`, `detection.py`, `formatting.py`,
+  `middleware.py`, `__init__.py`.
+- `src/chirp/config.py` i18n fields and `AppConfig.from_env()` if env parity is
+  added.
+- Template integration and request context interactions.
+- i18n docs/examples, README feature rows, public API docs, changelog.
+- `tests/test_i18n.py` and focused tests for locale detection, formatting, and
+  fallbacks.
+- Concurrency/contextvar tests when locale state changes.
 
 ## Advocate
 
-- Clearer locale detection precedence docs.
-- Tests for concurrent requests with different locales.
-- Explicit integration examples with routing and templates.
+- **Published examples.** i18n needs copyable docs before being treated as
+  mature.
+- **Fallback policy.** Missing-key and unsupported-locale behavior should be
+  deliberate.
+- **Contract checks.** Template translation keys could be checked when catalogs
+  are available.
+- **Request isolation proof.** Locale context should have concurrency tests.
 
 ## Serve Peers
 
-- Give `middleware` request-scoped locale behavior.
-- Give `templating` stable formatting/filter inputs.
-- Tell `routing` and `docs` when locale affects URL guidance.
+- Tell `templating` when translation helpers or filters affect template context.
+- Tell `middleware` when locale detection depends on cookies, headers, or URL
+  prefixes.
+- Tell `docs`, `site`, and `examples` when fallback or setup behavior changes.
+- Tell `public surface` before stabilizing any i18n exports.
 
 ## Do Not
 
-- Store current locale in mutable module globals.
-- Add hidden URL-prefix behavior outside routing/app contracts.
-- Treat missing translations as silent data loss.
+- Add client-side translation runtime assumptions.
+- Make catalogs mandatory for apps that do not enable i18n.
+- Store current locale in mutable globals.
+- Stabilize behavior before docs and tests exist.
 
 ## Own
 
-- `src/chirp/i18n/`.
-- i18n and context isolation tests.
-- Locale-related docs and examples.
+**Code:** `src/chirp/i18n/`.
+**Tests:** i18n catalog, detection, middleware, fallback, and isolation tests.
+**Docs:** i18n optional-surface docs and examples.
+**Agent artifacts:** this file.
+**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
