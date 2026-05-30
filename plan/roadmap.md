@@ -1,7 +1,7 @@
 # Chirp Roadmap
 
 **Status**: Active roadmap synthesis  
-**Updated**: 2026-05-09  
+**Updated**: 2026-05-30
 **Source**: `plan/drafted/`, release-readiness notes, code/test audit, ELBYSODIC consumer research, and affected steward guidance
 
 ---
@@ -26,6 +26,35 @@ true open work is narrower:
 | `epic-pbp-forum-mvp.md` | Superseded historical product draft | ELBYSODIC is the downstream forum/product; do not rebuild it in Chirp |
 | `epic-downstream-product-success.md` | Active product-research roadmap | ELBYSODIC shows reusable framework needs: mounted contracts, tenant URL support, forms/CSRF, shell/OOB/SSE hardening, and diagnostics |
 | `epic-extension-contract-maturity.md` | Draft follow-up from ChirpUI 0.9 steward review | Optional extensions need explicit installed/configured/runtime-ready contracts without becoming core dependencies |
+
+## Next Release Execution: 0.7.1 Candidate
+
+Research pass on 2026-05-30:
+
+- `main` was current with `origin/main` before release work began.
+- GitHub issues: none open.
+- GitHub PRs: PR #131, request-aware filesystem page actions, was the only open
+  PR and directly supports downstream product success by preserving
+  request-scoped services in `_actions.py`.
+- Existing unreleased changelog input: native DevTools debug runtime wiring.
+- Current package and latest tag are both `0.7.0`; the active scope remains
+  patch-sized unless new API work is accepted.
+
+Accepted for the 0.7.1 candidate:
+
+| Work | Status | Required proof | Collateral |
+| --- | --- | --- | --- |
+| Native DevTools debug runtime follow-through | Prepared for `0.7.1` | Existing PR #136 tests plus release gates | Compiled `CHANGELOG.md`, `site/content/releases/0.7.1.md` |
+| Request-aware filesystem page actions | Prepared for `0.7.1` | `uv run pytest tests/test_actions.py tests/test_route_directory_contract_e2e.py tests/test_app/test_service_injection.py -q`; `uv run pytest tests/test_page_resolve.py tests/test_page_discovery_names.py tests/test_shell_actions.py tests/test_shell_regions.py -q` | Compiled `CHANGELOG.md`, `site/content/releases/0.7.1.md` |
+| Release roadmap cleanup | Prepared for `0.7.1` | Markdown review plus release-gate commands before release | Root `ROADMAP.md`, this file |
+
+Deferred from this patch release:
+
+- Request URL scope helpers remain design work under roadmap item 4.
+- New contract categories and severity changes remain out of scope until
+  contract/reactive docs parity settles the emitted category reference.
+- Fragment/SSE browser smoke remains the next large follow-through item after
+  the patch release.
 
 ## Ranked Roadmap
 
