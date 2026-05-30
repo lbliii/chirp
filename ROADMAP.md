@@ -13,8 +13,9 @@ what stays out of scope.
 - Open GitHub issues checked on 2026-05-30: none.
 - Open GitHub PRs checked on 2026-05-30: PR #131, request-aware filesystem
   page actions.
-- Current next-release fragments: native DevTools debug runtime and
-  request-aware `_actions.py` dispatch.
+- Current release-prep branch: `codex/next-release-roadmap`, with native
+  DevTools debug runtime and request-aware `_actions.py` dispatch prepared for
+  `0.7.1`.
 
 ## 0.7.1 Candidate Scope
 
@@ -25,7 +26,8 @@ work is accepted. The current candidate is:
 2. Ship request-aware filesystem `_actions.py` dispatch so action handlers and
    request-aware `app.provide()` factories preserve per-request service scope.
 3. Keep planning collateral honest for the post-0.7 roadmap.
-4. Verify release gates and preview the changelog without compiling it.
+4. Verify release gates, compile the changelog, and prepare the site release
+   page before tagging.
 
 If tenant/base-path URL helpers, new contract categories, or optional-extension
 APIs are added, promote the work to a minor release plan before implementation.

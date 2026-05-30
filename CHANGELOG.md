@@ -5,6 +5,18 @@ All notable changes to chirp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-05-30
+
+### Changed
+
+- **DevTools** — Chirp DevTools now uses native debug runtime wiring and server-owned EventStream traces instead of replacing browser `EventSource`.
+
+    Internal debug/reload routes are classified as framework-owned, hidden from normal DevTools activity by default, and protected from application route collisions at freeze time. Debug responses also include typed return traces so DevTools can report the negotiated `Template`, `Fragment`, `PageComposition`, `OOB`, `Suspense`, `Stream`, `EventStream`, `Action`, or `ValidationError` branch without parsing response bodies.
+
+### Fixed
+
+- `_actions.py` dispatch now passes the current `Request` into action functions and request-aware `app.provide()` factories, preserving request-scoped service context for filesystem actions.
+
 ## [0.7.0] — 2026-05-14
 
 ### Added

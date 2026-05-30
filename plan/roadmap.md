@@ -44,9 +44,9 @@ Accepted for the 0.7.1 candidate:
 
 | Work | Status | Required proof | Collateral |
 | --- | --- | --- | --- |
-| Native DevTools debug runtime follow-through | Already on `main` | Existing PR #136 tests plus release gates | `changelog.d/+native-devtools-debug-runtime.changed.md` |
-| Request-aware filesystem page actions | Integrated on `codex/next-release-roadmap` | `uv run pytest tests/test_actions.py tests/test_route_directory_contract_e2e.py tests/test_app/test_service_injection.py -q`; `uv run pytest tests/test_page_resolve.py tests/test_page_discovery_names.py tests/test_shell_actions.py tests/test_shell_regions.py -q` | `changelog.d/+request-aware-actions.fixed.md` |
-| Release roadmap cleanup | In progress | Markdown review plus release-gate commands before release | Root `ROADMAP.md`, this file |
+| Native DevTools debug runtime follow-through | Prepared for `0.7.1` | Existing PR #136 tests plus release gates | Compiled `CHANGELOG.md`, `site/content/releases/0.7.1.md` |
+| Request-aware filesystem page actions | Prepared for `0.7.1` | `uv run pytest tests/test_actions.py tests/test_route_directory_contract_e2e.py tests/test_app/test_service_injection.py -q`; `uv run pytest tests/test_page_resolve.py tests/test_page_discovery_names.py tests/test_shell_actions.py tests/test_shell_regions.py -q` | Compiled `CHANGELOG.md`, `site/content/releases/0.7.1.md` |
+| Release roadmap cleanup | Prepared for `0.7.1` | Markdown review plus release-gate commands before release | Root `ROADMAP.md`, this file |
 
 Deferred from this patch release:
 
