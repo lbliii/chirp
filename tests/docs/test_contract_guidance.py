@@ -88,6 +88,13 @@ def _documented_category_severities() -> dict[str, set[str]]:
     return rows
 
 
+def _route_contract_doc_severities() -> dict[str, set[str]]:
+    rows: dict[str, set[str]] = {}
+    for category, severity_text in _CATEGORY_ROW_RE.findall(_route_contract_text()):
+        rows[category] = set(re.findall(r"\b(?:ERROR|WARNING|INFO)\b", severity_text))
+    return rows
+
+
 def test_route_contract_docs_name_diagnostic_fix_targets() -> None:
     text = _route_contract_text()
 
@@ -158,6 +165,13 @@ def test_contract_category_reference_matches_representative_source_severities() 
         "component",
     ):
         assert documented[category] == source[category]
+
+
+def test_route_contract_summary_keeps_dead_template_severity_in_sync() -> None:
+    source = _source_contract_severities()
+    documented = _route_contract_doc_severities()
+
+    assert documented["dead"] == source["dead"]
 
 
 def test_contract_category_reference_uses_current_suspense_guidance() -> None:
