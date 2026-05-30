@@ -197,7 +197,7 @@ async def dashboard():
     )
 ```
 
-Use **`{% if stats is not none %}...{% else %}skeleton{% end %}`** (not bare `{% if stats %}`) so an empty resolved `tuple`/`list` does not look like “still loading”. The shell sets awaitable keys to `None` until they resolve; it also sets **`__chirp_defer_pending__`** to a `frozenset` of keys still awaiting resolution (empty once resolved or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer that to `is not none`. The constant **`CHIRP_DEFER_PENDING_KEY`** is the string `__chirp_defer_pending__`. Chirp resolves awaitables concurrently, then streams each block's real content as an OOB swap. Blocks are discovered via static analysis (`block_metadata().depends_on`) with ancestor pruning.
+Use **`{% if stats is deferred %}skeleton{% else %}...{% end %}`** (not bare `{% if stats %}`) so an empty resolved `tuple`/`list` does not look like “still loading”. The shell sets awaitable keys to the `DEFERRED` sentinel until they resolve; it also sets **`__chirp_defer_pending__`** to a `frozenset` of keys still awaiting resolution (empty once resolved or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer the pending-key set. The constant **`CHIRP_DEFER_PENDING_KEY`** is the string `__chirp_defer_pending__`. Chirp resolves awaitables concurrently, then streams each block's real content as an OOB swap. Blocks are discovered via static analysis (`block_metadata().depends_on`) with ancestor pruning.
 
 Optional parameters:
 

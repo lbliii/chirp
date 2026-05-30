@@ -1,14 +1,16 @@
 """Suspense ``{% if key %}`` defer-falsy footgun detection.
 
-A deferred Suspense key is ``None`` in the shell render, then resolves to
-real data. Templates that branch on raw truthiness (``{% if key %}``) treat
-empty list ``[]``, empty string ``""``, ``0`` and ``False`` *identically* to
-the loading state — the skeleton renders forever and a user sees a
-perpetual spinner with no console error.
+A deferred Suspense key is the ``DEFERRED`` sentinel in the shell render, then
+resolves to real data. Templates that branch on raw truthiness
+(``{% if key %}``) treat empty list ``[]``, empty string ``""``, ``0`` and
+``False`` *identically* to an application-defined empty state — the skeleton or
+fallback branch can render forever and a user sees a perpetual spinner with no
+console error.
 
-CLAUDE.md and AGENTS.md document the fix (``{% if key is not none %}`` or
-``"key" in __chirp_defer_pending__``); this rule promotes the docs to a
-startup-time contract check.
+Templates should use the ``deferred`` test or the
+``"key" in __chirp_defer_pending__`` pending-key set to separate loading from
+loaded states; this rule promotes that guidance to a startup-time contract
+check.
 
 Detection is scoped to templates that **self-declare** their defer keys via
 ``"<NAME>" in __chirp_defer_pending__`` or the ``<NAME> is deferred`` test,
@@ -76,10 +78,10 @@ def check_defer_falsy_conditionals(template_sources: dict[str, str]) -> list[Con
                         "False are indistinguishable from the loading state, so the "
                         "skeleton/fallback branch renders forever and the user sees "
                         "a perpetual spinner with no console error. Use "
-                        f"'{{% if {key} is not none %}}' or "
-                        f"'{{% if \"{key}\" in __chirp_defer_pending__ %}}' / "
-                        f"'{{% if {key} is deferred %}}' to distinguish loading "
-                        "from loaded."
+                        f"'{{% if {key} is deferred %}}' or "
+                        f"'{{% if \"{key}\" in __chirp_defer_pending__ %}}' "
+                        "to distinguish loading from loaded before testing "
+                        "the resolved value."
                     ),
                     template=template_name,
                 )

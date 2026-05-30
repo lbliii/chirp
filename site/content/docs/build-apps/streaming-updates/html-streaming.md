@@ -159,14 +159,14 @@ def dashboard():
 Then the template reads `current_user` / `csrf_token_value` from plain context
 instead of calling the ContextVar-backed helpers during the stream.
 
-Use **`{% if stats is not none %}`** for loaded vs loading — not bare `{% if stats %}`, which stays falsy for empty `tuple`/`list`/`""`/`0` after resolution and can look like a perpetual skeleton. Optionally branch on **`"stats" in __chirp_defer_pending__`** (a `frozenset` injected only by Suspense: pending key names in the shell, empty after resolution). The Python constant is **`CHIRP_DEFER_PENDING_KEY`**. The block must still **reference the context key** (e.g. `stats`) somewhere so `block_metadata().depends_on` can associate the block with that deferred key; membership in `__chirp_defer_pending__` alone is not enough for discovery.
+Use **`{% if stats is deferred %}`** for loaded vs loading — not bare `{% if stats %}`, which stays falsy for empty `tuple`/`list`/`""`/`0` after resolution and can look like a perpetual skeleton. Optionally branch on **`"stats" in __chirp_defer_pending__`** (a `frozenset` injected only by Suspense: pending key names in the shell, empty after resolution). The Python constant is **`CHIRP_DEFER_PENDING_KEY`**. The block must still **reference the context key** (e.g. `stats`) somewhere so `block_metadata().depends_on` can associate the block with that deferred key; membership in `__chirp_defer_pending__` alone is not enough for discovery.
 
 ```html
 {% block stats %}
-  {% if stats is not none %}
-    {% for s in stats %}<div class="stat">{{ s.label }}: {{ s.value }}</div>{% end %}
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton">Loading stats...</div>
+  {% else %}
+    {% for s in stats %}<div class="stat">{{ s.label }}: {{ s.value }}</div>{% end %}
   {% end %}
 {% end %}
 ```
@@ -176,7 +176,7 @@ How it works:
 :::{steps}
 :::{step} Render shell with skeletons
 
-Sync context values render in the shell; awaitable values are set to `None`, and `__chirp_defer_pending__` lists their names until they resolve (use `is not none` or membership in that set for skeleton vs loaded — not truthiness alone).
+Sync context values render in the shell; awaitable values are set to the `DEFERRED` sentinel, and `__chirp_defer_pending__` lists their names until they resolve (use `is deferred` or membership in that set for skeleton vs loaded — not truthiness alone).
 
 :::{/step}
 :::{step} Send first chunk
