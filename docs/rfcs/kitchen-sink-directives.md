@@ -262,8 +262,9 @@ Chirp [=version]() was released on [=release_date]().
 > )
 > ```
 >
-> The shell renders with deferred keys set to `None`. Templates use
-> `{% if stats is not none %}` to toggle between skeleton and content.
+> The shell renders with deferred keys set to the `DEFERRED` sentinel.
+> Templates use `{% if stats is deferred %}` to toggle between skeleton and
+> content.
 
 > [!details What's the performance impact?]
 > Zero overhead in normal serving. The ContextVar is `None` outside

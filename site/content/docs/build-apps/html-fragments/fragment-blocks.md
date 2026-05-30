@@ -79,16 +79,16 @@ Read `app.py` alongside the template to see which routes target which blocks.
 
 ## Suspense deferred blocks
 
-**Do not** convert `Suspense` deferred slots to `{% fragment %}`. Suspense works by rendering the **shell** first (with deferred keys set to `None`), then streaming each deferred block as an OOB swap after its awaitable resolves. If the slot were `{% fragment %}`, the shell would render an empty div instead of a skeleton — defeating the "shell-first" UX.
+**Do not** convert `Suspense` deferred slots to `{% fragment %}`. Suspense works by rendering the **shell** first (with deferred keys set to the `DEFERRED` sentinel), then streaming each deferred block as an OOB swap after its awaitable resolves. If the slot were `{% fragment %}`, the shell would render an empty div instead of a skeleton — defeating the "shell-first" UX.
 
 Use a regular `{% block %}` with a loading check:
 
 ```kida
 {% block stats %}
-  {% if stats is not none %}
-    <div>{{ stats.users }} users</div>
-  {% else %}
+  {% if stats is deferred %}
     <div class="skeleton"></div>
+  {% else %}
+    <div>{{ stats.users }} users</div>
   {% endif %}
 {% endblock %}
 ```

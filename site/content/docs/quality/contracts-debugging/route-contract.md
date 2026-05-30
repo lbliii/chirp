@@ -122,8 +122,8 @@ header tells you which surface to inspect before you open the file.
 | `page_handlers` | ERROR / WARNING | `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler` fallback). Handler-shaped typos (`def handle`, `def GET`, `def index`) emit WARNING; an entirely missing handler emits ERROR — the file would register no routes and requests 404/500 at runtime. |
 | `route_names` | ERROR | Two routes at *different* paths claim the same name — `app.url_for(name)` would ambiguously resolve. Method variants of the same URL (e.g. GET from `page.py` + POST from `_actions.py`) are *not* flagged. Fix by renaming one of the pages or setting a module-level `name = "…"` override. |
 | `mount_app_merge` | INFO | `app.mount_app(prefix, sub_app)` dropped a sub-app template global, filter, provider, error handler, or severity override because the parent had already registered one. Parent-wins is intentional; promote via `override_contract_severity("mount_app_merge", Severity.WARNING)` if you want CI to flag them. |
-| `dead` | INFO | A template exists in the template directory but no route, include, import, or layout references it. Usually cleanup, not a deploy blocker. |
-| `component` | ERROR / WARNING | Component-call validation surfaced by Kida/chirp-ui metadata. The Chirp adapter is wired; full precision depends on typed component metadata from the template package. |
+| `dead` | WARNING | A template exists in the template directory but no route, include, import, or layout references it. Usually cleanup, not a deploy blocker. |
+| `component` | ERROR | Component-call validation surfaced by Kida/chirp-ui metadata. The Chirp adapter is wired; full precision depends on typed component metadata from the template package. |
 | `unreachable_block` | WARNING | A filesystem page template defines a sibling block that layout composition will never render, such as `page_scripts` outside `page_content`. Move the content inside the rendered page block or make it a real fragment target. |
 | `composition_extends` | WARNING | A page template extends a registered layout instead of composing into it. Pages should render into the layout content block via `render_with_blocks`; they should not override sibling layout blocks. |
 | `hx-target`, `hx-indicator`, `hx-boost` | ERROR / WARNING | htmx attributes reference missing selectors, invalid boosted links, or unsafe targets. Fix the selector or target element named in the issue. |
@@ -139,7 +139,7 @@ header tells you which surface to inspect before you open the file.
 | `sse_self_swap` | ERROR | `sse-connect` and `sse-swap` appear on the same element. Put `sse-swap` on a child sink so htmx can target the update correctly. |
 | `sse_scope` | ERROR | An SSE connection sits inside a broad inherited htmx target without `hx-disinherit` or another safe scope boundary. |
 | `sse_crossref` | ERROR / INFO | `sse-swap="name"` listens for an event no route declares or infers, or a route emits an event no template listens for. |
-| `defer_falsy` | WARNING | A Suspense template checks a deferred key with bare truthiness (`{% if key %}`), which keeps skeletons visible for empty lists, empty strings, or `0`. Use `is not none` or `__chirp_defer_pending__`. |
+| `defer_falsy` | WARNING | A Suspense template checks a deferred key with bare truthiness (`{% if key %}`), which keeps skeletons visible for empty lists, empty strings, or `0`. Use `{% if key is deferred %}` or `"key" in __chirp_defer_pending__` to distinguish loading from loaded before testing resolved values. |
 | `alpine_cdn_url` | ERROR | A bare jsDelivr Alpine URL would load the package CommonJS entry instead of the browser CDN build. Use `/dist/cdn.min.js`. |
 | `form` | ERROR / WARNING | A route form contract and the template's actual `<input>`, `<select>`, or `<textarea>` names disagree. |
 | `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |

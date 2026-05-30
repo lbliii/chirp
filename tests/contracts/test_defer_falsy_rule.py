@@ -58,7 +58,7 @@ class TestDeferFalsyRule:
         assert issue.category == "defer_falsy"
         assert issue.template == "page.html"
         assert "stats" in issue.message
-        assert "is not none" in issue.message
+        assert "is deferred" in issue.message
         assert "__chirp_defer_pending__" in issue.message
 
     def test_bare_truthy_after_is_deferred_is_flagged(self) -> None:

@@ -74,7 +74,7 @@ precise.
 | A section goes blank after a swap | Targeted block is missing or rendered empty | `chirp check`; verify the `Fragment` or `Page` block name |
 | OOB update does nothing | `hx-swap-oob` target id does not exist in the current layout | Check the OOB registry and layout block ids |
 | Suspense skeleton never resolves | Deferred block was not discovered or mapped to the wrong target | Check `defer_blocks`, `defer_map`, and block dependencies |
-| Empty list looks like loading | Template used `{% if items %}` for a deferred value | Use `{% if items is not none %}` or `__chirp_defer_pending__` |
+| Empty list looks like loading | Template used `{% if items %}` for a deferred value | Use `{% if items is deferred %}` or `__chirp_defer_pending__` before testing resolved values |
 | SSE stream stops after one bad event | Error boundary widened beyond one event | Check `EventStream` generator and fragment render errors |
 | Boosted link reloads the page | Link crosses shell boundaries or boost is disabled | Check `HX-Redirect`, shell layout domains, and `hx-boost` inheritance |
 | Duplicate shell actions or badges appear | OOB region rendered inline and out-of-band | Register the region and keep the DOM id in one owner |
