@@ -39,8 +39,19 @@ delete tasks in one tab — the other tab updates within a second.
 
 This example sets reactive metadata so `app.check()` can validate the stream:
 
+- `reactive_index`: the `DependencyIndex` used by the stream
 - `reactive_emitted_paths`: the store paths this app emits
 - `reactive_connection_scopes`: scopes that pass `ConnectionInfo`
 
 If an example starts emitting audience-filtered events, add the matching scope
 to `reactive_audience_scopes` as well.
+
+From the repository root:
+
+```bash
+uv run pytest examples/standalone/reactive_tasks -q
+```
+
+The test suite asserts page rendering, mutation fragments, SSE response
+headers, and no `check_hypermedia_surface()` errors or warnings for the
+reactive metadata and template wiring.

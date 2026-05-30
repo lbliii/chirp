@@ -108,6 +108,9 @@ Beyond route-level checks, `app.check()` also validates hypermedia surface
 contracts. The table below is a category reference for the checks users most
 often tune in CI:
 
+For the full category list, default severity, and fix target guidance, see
+[[docs/quality/contracts-debugging/categories|Contract Category Reference]].
+
 Read each issue as a pointer to one concrete fix target. A useful diagnostic
 names the route, template, block, selector, middleware, config flag, import string,
 or registration that must change. Terminal output groups categories by concern

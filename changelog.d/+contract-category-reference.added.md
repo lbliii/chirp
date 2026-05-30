@@ -1,0 +1,1 @@
+**Contract diagnostics** - Added a source-backed contract category reference and tightened reactive stream guidance for `ConnectionInfo`, presence, audience scopes, changed-path context builders, and reactive `app.check()` metadata.
