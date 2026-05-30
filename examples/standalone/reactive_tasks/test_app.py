@@ -1,5 +1,6 @@
 """Tests for the reactive tasks example."""
 
+from chirp.contracts import check_hypermedia_surface
 from chirp.testing import TestClient
 
 
@@ -30,6 +31,12 @@ class TestPageRender:
         async with TestClient(example_app.app) as client:
             response = await client.get("/")
             assert "badge" in response.text
+
+    def test_reactive_contract_metadata_is_clean(self, example_app) -> None:
+        result = check_hypermedia_surface(example_app.app)
+
+        assert result.errors == []
+        assert result.warnings == []
 
 
 class TestMutations:

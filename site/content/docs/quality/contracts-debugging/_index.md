@@ -36,6 +36,13 @@ Diagnose broken htmx, OOB, Suspense, SSE, and boosted navigation updates.
 Understand what `app.check()` validates for filesystem routes and app shells.
 :::{/card}
 
+:::{card} Contract Category Reference
+:icon: list-checks
+:link: /chirp/docs/quality/contracts-debugging/categories/
+:description: Categories, default severity, and fix targets
+Tune `chirp check` policy with source-backed category names.
+:::{/card}
+
 :::{card} OOB Registry
 :icon: target
 :link: /chirp/docs/quality/contracts-debugging/oob-registry/

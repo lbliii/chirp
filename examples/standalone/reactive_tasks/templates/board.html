@@ -41,29 +41,34 @@
     }
     button:hover { background: #334155; }
     .error { color: #dc2626; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
   </style>
 </head>
 <body>
-<div hx-ext="sse" sse-connect="/events" sse-close="close">
+<main hx-ext="sse" sse-connect="/events" sse-close="close" hx-disinherit="hx-target hx-swap">
   <header>
     <h1>Reactive Tasks</h1>
-    <span id="task_count" sse-swap="task_count" hx-swap="innerHTML">
+    <span id="task_count" sse-swap="task_count" hx-target="this" hx-swap="innerHTML">
       {% block task_count %}<span class="badge">{{ count }}</span>{% endblock %}
     </span>
-    <span id="presence_count" class="presence" sse-swap="presence_count" hx-swap="innerHTML">
+    <span id="presence_count" class="presence" sse-swap="presence_count" hx-target="this" hx-swap="innerHTML">
       {% block presence_count %}{{ viewer_count }} viewing{% endblock %}
     </span>
-    <span id="last_update" class="timestamp" sse-swap="last_update" hx-swap="innerHTML">
+    <span id="last_update" class="timestamp" sse-swap="last_update" hx-target="this" hx-swap="innerHTML">
       {% block last_update %}{{ last_update }}{% endblock %}
     </span>
   </header>
 
   <form hx-post="{{ url_for('tasks.add') }}" hx-target="#task_list" hx-swap="innerHTML">
-    <input type="text" name="title" placeholder="Add a task..." required autofocus>
+    <label for="new-task" class="sr-only">Task title</label>
+    <input id="new-task" type="text" name="title" placeholder="Add a task..." required autofocus>
     <button type="submit">Add</button>
   </form>
 
-  <div id="task_list" sse-swap="task_list" hx-swap="innerHTML">
+  <div id="task_list" sse-swap="task_list" hx-target="this" hx-swap="innerHTML" hx-disinherit="hx-select hx-target">
     {% block task_list %}
     {% if (error ?? '') %}
     <p class="error">{{ error }}</p>
@@ -83,6 +88,6 @@
     </ul>
     {% endblock %}
   </div>
-</div>
+</main>
 </body>
 </html>

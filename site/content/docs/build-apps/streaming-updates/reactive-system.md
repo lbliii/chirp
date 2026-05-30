@@ -79,7 +79,9 @@ connection = ConnectionInfo(session_id=session_id, user_id=current_user.id)
 
 `session_id` is required. `user_id` can be `None` for anonymous viewers.
 `connected_at` is captured with `time.monotonic()` when the dataclass is
-created.
+created. Anonymous connections still count for presence, but audience-filtered
+events are delivered only to connections whose `user_id` is in the event's
+audience set.
 
 ## ChangeEvent
 
@@ -195,6 +197,17 @@ What happens on each `ChangeEvent`:
    accepts one argument; zero-argument builders still work for older apps
 5. Yield a `Fragment` per affected block
 
+Use the one-argument form when a page has expensive context assembly. The
+argument is the exact `frozenset[str]` from the change event after
+`DependencyIndex` expansion has selected affected blocks:
+
+```python
+def build_doc_context(changed_paths: frozenset[str]) -> dict:
+    if "doc.comments" in changed_paths:
+        return {"comments": store.load_comments()}
+    return {"doc": store.load_doc()}
+```
+
 Error boundary: if `context_builder()` raises, the event is skipped and the stream continues. The next change event retries with fresh data.
 
 ### Presence
@@ -240,10 +253,20 @@ These checks are only active when the app uses `DependencyIndex` or declares
 reactive metadata:
 
 ```python
+app.set_contract_check_data("reactive_index", index)
 app.set_contract_check_data("reactive_emitted_paths", {"tasks", "presence"})
-app.set_contract_check_data("reactive_audience_scopes", {"thread:42"})
-app.set_contract_check_data("reactive_connection_scopes", {"thread:42"})
+app.set_contract_check_data("reactive_connection_scopes", {"board"})
+
+# Add this only when the app emits ChangeEvent(..., audience=...).
+app.set_contract_check_data("reactive_audience_scopes", {"board"})
 ```
+
+Register `reactive_index` once at startup, before the app freezes. Keep
+`reactive_emitted_paths` in sync with every `ChangeEvent.changed_paths` value
+your stores emit. `reactive_connection_scopes` should name scopes whose
+`reactive_stream()` call passes `ConnectionInfo`; if a scope also appears in
+`reactive_audience_scopes`, `app.check()` can warn when audience-filtered
+events would have no connection identity to match.
 
 ## Thread Safety
 

@@ -36,6 +36,17 @@ Current downstream-product fixture guidance:
   contract test that reproduces the framework issue. Leave product semantics,
   schema, moderation, permissions, and workflow state in the downstream app.
 
+Current contract proof guidance:
+
+- Reactive examples should register `reactive_index`, `reactive_emitted_paths`,
+  and `reactive_connection_scopes` so `app.check()` can catch block, path, and
+  audience drift.
+- If an example emits `ChangeEvent(audience=...)`, it should also declare
+  `reactive_audience_scopes` and pass `ConnectionInfo(user_id=...)` from the
+  stream route.
+- Example tests should assert clean contract output for the framework behavior
+  the README claims, not only that the page renders.
+
 ## Examples Expansion (Feb 2025)
 
 Documentation and new examples added:
