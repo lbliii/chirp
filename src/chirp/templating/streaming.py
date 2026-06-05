@@ -98,9 +98,21 @@ async def render_stream_async(
     tmpl = env.get_template(stream.template_name)
     sync_stream: Iterator[str] = tmpl.render_stream(resolved_context)
 
-    # Phase 3: Yield chunks as async iterator
-    # Run sync rendering in a thread to avoid blocking the event loop
-    # (kida's render_stream is CPU-bound template compilation)
+    # Phase 3: Yield chunks as async iterator.
+    #
+    # NOTE (correctness): kida's render_stream() is a CPU-bound *synchronous*
+    # generator and is currently iterated INLINE on the event loop below, so a
+    # slow/large Stream render does block other requests for the duration of
+    # each chunk's compilation. Moving this off the loop is non-trivial: a sync
+    # generator cannot be wrapped in anyio.to_thread.run_sync (that runs a
+    # callable to completion, which would defeat progressive flush). The two
+    # real options — (A) a worker-thread + anyio.create_memory_object_stream
+    # bridge that preserves progressive flush, or (B) buffer-then-flush which
+    # abandons the shell-streams-first value prop — are a deliberate design
+    # fork tracked in issue #145 (sub-issue 1) and left to the steward rather
+    # than guessed at here. This comment states reality; the previous comment
+    # claimed thread offloading that did not exist (a lie-comment that would
+    # defeat review).
     for chunk in sync_stream:
         if chunk:
             yield chunk

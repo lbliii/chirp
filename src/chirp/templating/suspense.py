@@ -336,32 +336,56 @@ async def render_suspense(
         else:
             sync_ctx[key] = value
 
-    # -- Early validation: check defer_blocks names before sending the shell --
-    # This raises ConfigurationError *before* the shell is sent, so the error
-    # is a clean 500 instead of a half-rendered page with frozen skeletons.
-    if suspense.defer_blocks is not None and pending:
-        template = env.get_template(template_name)
+    # -- Early validation: resolve the blocks to re-render BEFORE sending the
+    # shell, for BOTH the explicit defer_blocks path and auto-discovery.
+    # A misconfiguration (unknown defer_blocks, or auto-discovery finding no
+    # blocks) then raises a clean ConfigurationError *before* any shell bytes
+    # are flushed — never a half-rendered page with frozen skeletons + a 500.
+    # The resolved list is reused in Phase 4 so discovery runs exactly once.
+    blocks_to_render: list[str] = []
+    template = env.get_template(template_name)
+    if pending:
         available = set(template.list_blocks())
-        unknown = [b for b in suspense.defer_blocks if b not in available]
-        if unknown:
-            from chirp.contracts.utils import closest_match
-            from chirp.errors import ConfigurationError
+        if suspense.defer_blocks is not None:
+            unknown = [b for b in suspense.defer_blocks if b not in available]
+            if unknown:
+                from chirp.contracts.utils import closest_match
+                from chirp.errors import ConfigurationError
 
-            _close_unstarted_awaitables(pending)
-            hints = []
-            for name in unknown:
-                suggestion = closest_match(name, available, max_dist=3)
-                if suggestion:
-                    hints.append(f"  - '{name}': did you mean '{suggestion}'?")
-                else:
-                    hints.append(f"  - '{name}'")
-            hint_text = "\n".join(hints)
-            msg = (
-                f"Suspense: defer_blocks contains unknown block(s) "
-                f"in template '{template_name}'.\n{hint_text}\n"
-                f"Available blocks: {sorted(available)}"
+                _close_unstarted_awaitables(pending)
+                hints = []
+                for name in unknown:
+                    suggestion = closest_match(name, available, max_dist=3)
+                    if suggestion:
+                        hints.append(f"  - '{name}': did you mean '{suggestion}'?")
+                    else:
+                        hints.append(f"  - '{name}'")
+                hint_text = "\n".join(hints)
+                msg = (
+                    f"Suspense: defer_blocks contains unknown block(s) "
+                    f"in template '{template_name}'.\n{hint_text}\n"
+                    f"Available blocks: {sorted(available)}"
+                )
+                raise ConfigurationError(msg)
+            blocks_to_render = [b for b in suspense.defer_blocks if b in available]
+        else:
+            deferred_keys = set(pending.keys())
+            key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
+            blocks_to_render = list(
+                dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
             )
-            raise ConfigurationError(msg)
+            if not blocks_to_render:
+                from chirp.errors import ConfigurationError
+
+                _close_unstarted_awaitables(pending)
+                msg = (
+                    f"Suspense: no blocks discovered for deferred keys "
+                    f"{sorted(deferred_keys)!r} in template '{template_name}'. "
+                    f"Deferred data would resolve but no OOB swaps would be sent — "
+                    f"skeletons would remain. Use defer_blocks=(...) to list "
+                    f"blocks explicitly."
+                )
+                raise ConfigurationError(msg)
 
     def _wrap_shell(page_html: str, ctx: dict[str, Any]) -> str:
         if not _should_wrap_in_layouts(layout_chain, request):
@@ -382,7 +406,6 @@ async def render_suspense(
 
     # Fast path: no awaitables — render full page in one shot
     if not pending:
-        template = env.get_template(template_name)
         sync_ctx = {**sync_ctx, CHIRP_DEFER_PENDING_KEY: frozenset()}
         page_html = template.render(sync_ctx)
         yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
@@ -394,7 +417,6 @@ async def render_suspense(
         **dict.fromkeys(pending, DEFERRED),
         CHIRP_DEFER_PENDING_KEY: frozenset(pending),
     }
-    template = env.get_template(template_name)
     page_html = template.render(shell_ctx)
     yield _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
 
@@ -436,52 +458,13 @@ async def render_suspense(
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
+    # blocks_to_render was resolved + validated before the shell was sent.
     full_ctx = {
         **layout_ctx,
         **sync_ctx,
         **resolved,
         CHIRP_DEFER_PENDING_KEY: frozenset(),
     }
-
-    if suspense.defer_blocks is not None:
-        available = set(template.list_blocks())
-        unknown = [b for b in suspense.defer_blocks if b not in available]
-        if unknown:
-            from chirp.contracts.utils import closest_match
-            from chirp.errors import ConfigurationError
-
-            hints = []
-            for name in unknown:
-                suggestion = closest_match(name, available, max_dist=3)
-                if suggestion:
-                    hints.append(f"  - '{name}': did you mean '{suggestion}'?")
-                else:
-                    hints.append(f"  - '{name}'")
-            hint_text = "\n".join(hints)
-            msg = (
-                f"Suspense: defer_blocks contains unknown block(s) "
-                f"in template '{template_name}'.\n{hint_text}\n"
-                f"Available blocks: {sorted(available)}"
-            )
-            raise ConfigurationError(msg)
-        blocks_to_render = [b for b in suspense.defer_blocks if b in available]
-    else:
-        deferred_keys = set(pending.keys())
-        key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
-        blocks_to_render = list(
-            dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
-        )
-        if not blocks_to_render and deferred_keys:
-            from chirp.errors import ConfigurationError
-
-            msg = (
-                f"Suspense: no blocks discovered for deferred keys "
-                f"{sorted(deferred_keys)!r} in template '{template_name}'. "
-                f"Deferred data resolved but no OOB swaps will be sent — "
-                f"skeletons will remain. Use defer_blocks=(...) to list "
-                f"blocks explicitly."
-            )
-            raise ConfigurationError(msg)
 
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)
