@@ -30,6 +30,7 @@ async def handle_sse(
     debug: bool = False,
     retry_ms: int | None = None,
     close_event: str | None = None,
+    allow_origin: str | None = None,
     trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
 ) -> None:
@@ -43,19 +44,31 @@ async def handle_sse(
          and cancels the producer.
     3. Sends periodic heartbeat comments (``:``) on idle.
     """
-    # Send SSE headers
+    # Send SSE headers.
+    #
+    # SSE responses default to SAME-ORIGIN: no Access-Control-Allow-Origin
+    # header is emitted unless the EventStream explicitly opts into a specific
+    # cross-origin policy via allow_origin. Previously this always emitted a
+    # hardcoded `*`, which silently bypassed the framework's own CORS
+    # middleware (same-origin + credentials-vs-wildcard guard) — a second,
+    # contradictory, insecure CORS policy (see #146).
+    sse_headers: list[tuple[bytes, bytes]] = [
+        (b"content-type", b"text/event-stream"),
+        (b"cache-control", b"no-cache"),
+        (b"connection", b"keep-alive"),
+        (b"x-accel-buffering", b"no"),
+    ]
+    if allow_origin is not None:
+        sse_headers.append((b"access-control-allow-origin", allow_origin.encode("latin-1")))
+        # Responses vary by Origin once CORS is in play, so caches must not
+        # serve a cross-origin-allowed body to a different origin.
+        sse_headers.append((b"vary", b"Origin"))
+    sse_headers.extend(extra_headers)
     await send(
         {
             "type": "http.response.start",
             "status": 200,
-            "headers": [
-                (b"content-type", b"text/event-stream"),
-                (b"cache-control", b"no-cache"),
-                (b"connection", b"keep-alive"),
-                (b"x-accel-buffering", b"no"),
-                (b"access-control-allow-origin", b"*"),
-                *extra_headers,
-            ],
+            "headers": sse_headers,
         }
     )
     if trace_sink is not None:

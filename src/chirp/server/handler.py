@@ -431,6 +431,7 @@ async def handle_request(
                 debug=debug,
                 retry_ms=sse_retry_ms,
                 close_event=sse_close_event,
+                allow_origin=stream.allow_origin,
                 trace_sink=trace_sink,
                 extra_headers=extra_headers,
             )
