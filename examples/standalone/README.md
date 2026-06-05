@@ -57,6 +57,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `search`
 - `signup`
 - `sse`
+- `sse_reconnect`
 - `static_site`
 - `streaming`
 - `survey`

@@ -1,0 +1,55 @@
+<html>
+<head>
+  <title>Deploy Feed — SSE reconnect</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 600px; margin: 0 auto; padding: 1.5rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; color: #f8fafc; }
+    p.lede { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem; }
+    .deploy-event {
+      padding: 0.75rem; margin: 0.5rem 0;
+      border-left: 3px solid #22c55e; background: #1e293b;
+      border-radius: 0.375rem; color: #e2e8f0;
+    }
+    .deploy-event strong { display: block; margin-bottom: 0.25rem; color: #f8fafc; }
+    .deploy-event p { font-size: 0.9rem; color: #94a3b8; }
+    #placeholder { color: #64748b; font-style: italic; }
+  </style>
+</head>
+<body>
+<h1>Deploy Feed</h1>
+<p class="lede">
+  Each event carries a monotonic <code>id</code>. Reconnect (kill the network
+  or the server briefly) and the browser resends <code>Last-Event-ID</code> —
+  the app replays only the gap.
+</p>
+<div id="feed">
+  <div hx-ext="sse" sse-connect="/events" sse-close="close" hx-disinherit="hx-target hx-swap" style="display: contents">
+    <p id="placeholder">Waiting for events...</p>
+    <div sse-swap="deploy" hx-target="this" hx-swap="beforeend"></div>
+  </div>
+</div>
+<script>
+  const feed = document.getElementById("feed");
+  new MutationObserver(() => {
+    if (feed.querySelector(".deploy-event")) {
+      document.getElementById("placeholder")?.remove();
+    }
+  }).observe(feed, { childList: true, subtree: true });
+</script>
+{% block deploy_event %}
+{% if (title ?? '') %}
+<div class="deploy-event">
+  <strong>{{ title }}</strong>
+  <p>{{ message }}</p>
+</div>
+{% end %}
+{% endblock %}
+</body>
+</html>
