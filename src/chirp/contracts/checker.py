@@ -443,6 +443,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_hx_indicator_selectors(template_sources, all_ids))
         result.issues.extend(check_selector_syntax(template_sources))
         result.issues.extend(check_csrf_form_tokens(template_sources, middleware_list))
+        from .rules_i18n import check_translation_keys
+
+        result.issues.extend(check_translation_keys(template_sources, app.config))
         result.issues.extend(check_hx_boost(template_sources))
         commandfor_issues, commandfor_validated = check_commandfor_targets(
             template_sources, all_ids
@@ -721,6 +724,22 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_middleware_signatures(middleware_list))
     result.issues.extend(check_secret_key(app.config))
     result.issues.extend(check_allowed_hosts(app.config))
+
+    # Deploy-preflight: production misconfiguration (debug/metrics/sentry)
+    from chirp.contracts.rules_deploy import (
+        check_debug_in_production,
+        check_metrics_path_collision,
+        check_sentry_sample_rate,
+    )
+
+    result.issues.extend(check_debug_in_production(app.config))
+    result.issues.extend(check_metrics_path_collision(app.config, router))
+    result.issues.extend(check_sentry_sample_rate(app.config))
+
+    # No-JS progressive-enhancement floor
+    from chirp.contracts.rules_nojs_floor import check_nojs_mutation_fallback
+
+    result.issues.extend(check_nojs_mutation_fallback(router))
 
     live_blocks = getattr(app._mutable_state, "live_blocks", {})
     result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))

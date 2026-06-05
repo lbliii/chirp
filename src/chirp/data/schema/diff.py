@@ -1,5 +1,7 @@
 """Schema diff — compare two SchemaSnapshots and produce Operations."""
 
+import warnings
+
 from chirp.data.schema.operations import (
     AddColumn,
     CreateIndex,
@@ -10,6 +12,39 @@ from chirp.data.schema.operations import (
     Operation,
 )
 from chirp.data.schema.types import SchemaSnapshot
+
+# Canonical type aliases. Introspected types come back in the backend's
+# canonical form (PostgreSQL's information_schema returns SERIAL as 'integer',
+# VARCHAR(n) as 'character varying', TIMESTAMP as 'timestamp without time
+# zone'), while parsed types are the raw DDL token. Without normalizing, every
+# in-sync Postgres column would look like a type change. Map known aliases to a
+# shared canonical form and strip length/precision before comparing.
+_TYPE_ALIASES = {
+    "INT": "INTEGER",
+    "INT4": "INTEGER",
+    "SERIAL": "INTEGER",
+    "BIGSERIAL": "BIGINT",
+    "INT8": "BIGINT",
+    "BOOL": "BOOLEAN",
+    "VARCHAR": "CHARACTER VARYING",
+    "CHAR": "CHARACTER",
+    "TIMESTAMP": "TIMESTAMP WITHOUT TIME ZONE",
+    "TIMESTAMPTZ": "TIMESTAMP WITH TIME ZONE",
+    "DECIMAL": "NUMERIC",
+    "FLOAT": "DOUBLE PRECISION",
+    "DOUBLE": "DOUBLE PRECISION",
+}
+
+
+def _canonical_type(type_str: str) -> str:
+    """Normalize a column type for comparison across introspect vs parse.
+
+    Strips length/precision (``VARCHAR(255)`` -> ``VARCHAR``) and maps known
+    backend aliases to a shared canonical name so an in-sync schema does not
+    register a spurious type change.
+    """
+    base = type_str.split("(", 1)[0].strip().upper()
+    return _TYPE_ALIASES.get(base, base)
 
 
 def diff_schemas(current: SchemaSnapshot, desired: SchemaSnapshot) -> list[Operation]:
@@ -69,6 +104,22 @@ def diff_schemas(current: SchemaSnapshot, desired: SchemaSnapshot) -> list[Opera
                     default=col.default,
                 )
             )
+
+        # Type / nullability changes on shared columns are NOT expressible as a
+        # forward-only SQL-diff on SQLite (no ALTER COLUMN). The diff is
+        # name-set based, so historically these changes were dropped silently.
+        # Surface them loudly instead of pretending the schema is in sync.
+        for col_name in sorted(current_cols & desired_cols):
+            cur_col = current.tables[name].columns[col_name]
+            des_col = desired.tables[name].columns[col_name]
+            if _canonical_type(cur_col.type) != _canonical_type(des_col.type):
+                warnings.warn(
+                    f"Column {name}.{col_name} type change "
+                    f"{cur_col.type!r} -> {des_col.type!r} is not expressible as a "
+                    "forward-only SQL-diff migration (SQLite has no ALTER COLUMN). "
+                    "Write the migration by hand (table rebuild) — it was NOT generated.",
+                    stacklevel=2,
+                )
 
     # Index changes
     current_idxs = set(current.indexes)

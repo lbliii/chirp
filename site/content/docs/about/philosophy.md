@@ -94,17 +94,21 @@ Write the template engine because templates are the thing. Use anyio for the asy
 
 ## Non-Goals
 
-Chirp deliberately does not:
+Chirp deliberately holds **zero per-client server view state**, and the bright
+lines that protect that property are maintained in one canonical place. A few
+headlines:
 
-- **Include an ORM.** Database access is your choice. Chirp serves HTML.
-- **Include an admin panel.** Build it yourself with Chirp's own tools.
-- **Generate OpenAPI specs.** Chirp is an HTML-over-the-wire framework, not a JSON API framework.
-- **Support WSGI.** Chirp is ASGI-only. Synchronous Python is not the future.
-- **Compete with Django.** If you need auth, admin, ORM, email, and background jobs by next Tuesday, use Django. Chirp is for people who want to own their stack.
-- **Abstract away the web platform.** Chirp embraces HTML, CSS, and the browser's native APIs.
+- **No stateful ORM.** "SQL in, frozen dataclasses out" — database access is your choice.
+- **No WebSocket return type.** SSE over WebSockets, always.
+- **No WSGI, no Python floor below 3.14.** The free-threading identity bet.
+
+For the full list — including in-core admin/CRUD, email, background jobs,
+general rate limiting, and telemetry — and the honest alternative for each, see
+the canonical [[docs/about/non-goals|Non-Goals]] doc.
 
 ## Next Steps
 
+- [[docs/about/non-goals|Non-Goals]] -- The bright lines and the alternative for each
 - [[docs/about/architecture|Architecture]] -- How these principles manifest in code
 - [[docs/about/comparison|When to Use Chirp]] — Chirp's approach and fit
 - [[docs/about/thread-safety|Thread Safety]] -- Free-threading patterns

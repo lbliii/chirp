@@ -294,14 +294,13 @@ and thread-based interactions.
 
 ## 9. Out of Scope
 
-See ROADMAP.md Non-Goals section. Additionally:
+See the canonical [Non-Goals](../site/content/docs/about/non-goals.md) doc for the
+authoritative bright-lines list and the honest alternative for each. Additionally:
 
 - GraphQL support
-- WebSocket support (SSE covers the use cases; WebSocket may come later)
-- Built-in database migrations
+- No WebSocket return type (SSE over WebSockets, always — see Non-Goals #5)
 - Background job scheduling
 - Email sending
-- CLI scaffolding / project generators
 - Plugin/extension registry
 
 ---

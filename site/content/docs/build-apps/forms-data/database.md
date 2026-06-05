@@ -351,6 +351,28 @@ async with db.transaction():
     # both committed together
 ```
 
+## Concurrency Model
+
+SQLite and PostgreSQL give you different concurrency, and Chirp does not pretend otherwise.
+
+At the SQLite layer, WAL (Write-Ahead Logging) mode allows concurrent readers alongside a single writer. That is a property of SQLite itself.
+
+Chirp's current SQLite implementation does **not** expose that. The SQLite "pool" is a single shared connection, and every access — reads and writes — is serialized behind one async lock (`_sqlite_lock`). A `transaction()` acquires that same lock for its whole lifetime. So while a SQLite transaction is open, the rest of the app's database access waits. Under Python 3.14 free-threading this means a SQLite transaction effectively serializes database work across the whole app, not just conflicting writes.
+
+PostgreSQL has no such ceiling: `asyncpg` provides a real connection pool, so reads and transactions run concurrently up to `pool_size`.
+
+```python
+# SQLite: one shared connection, all access serialized
+db = Database("sqlite:///app.db")
+
+# PostgreSQL: true connection pool, concurrent reads + transactions
+db = Database("postgresql://user:pass@localhost/mydb", pool_size=10)
+```
+
+:::{note}
+This is an honest description of Chirp's **current** SQLite implementation, not a permanent architectural limit. SQLite is the right default for development, single-writer workloads, and small apps. If you have write-heavy concurrency, reach for PostgreSQL — its `asyncpg` pool runs transactions in parallel rather than behind a single app-wide lock.
+:::
+
 ## Migrations
 
 Forward-only SQL migrations. Create numbered `.sql` files in a directory:

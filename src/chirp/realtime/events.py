@@ -71,6 +71,15 @@ class EventStream:
     generator: AsyncIterator[Any]
     event_type: str | None = None
     heartbeat_interval: float = 15.0
+    allow_origin: str | None = None
+    """Cross-origin policy for this stream.
+
+    Default ``None`` means **same-origin**: no ``Access-Control-Allow-Origin``
+    header is emitted (the SSE endpoint is reachable only from its own origin).
+    Set to an explicit origin (e.g. ``"https://app.example.com"``) to opt into
+    cross-origin access for a deliberate case. Chirp does not emit a wildcard
+    ``*`` — that bypassed the framework's own CORS posture (see #146).
+    """
 
     def __post_init__(self) -> None:
         if self.heartbeat_interval < 1.0:

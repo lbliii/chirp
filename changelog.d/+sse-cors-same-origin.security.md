@@ -1,0 +1,1 @@
+**SSE responses now default to same-origin.** `EventStream` no longer emits a hardcoded `Access-Control-Allow-Origin: *` header that silently bypassed the CORS middleware. Opt into a specific cross-origin policy with `EventStream(gen(), allow_origin="https://app.example.com")`, which also sets `Vary: Origin`.

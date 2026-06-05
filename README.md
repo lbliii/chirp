@@ -49,6 +49,7 @@ See [Public API](docs/public-api.md) for the stable/provisional import surface.
 - **Streaming interfaces** — Progressive HTML delivery and token-by-token responses
 - **Real-time dashboards** — SSE-powered updates without WebSocket complexity
 - **Teams avoiding heavy frontend stacks** — HTML, CSS, templates, and browser-native features
+- **AI-assisted development** — `app.check()` contracts name the fix (stable category + concrete message), so apps stay buildable from the public API and contract errors
 
 ---
 

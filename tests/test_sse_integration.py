@@ -725,3 +725,62 @@ class TestFormatErrorEvent:
 
         assert "<script>" not in result
         assert "&lt;script&gt;" in result
+
+
+# ---------------------------------------------------------------------------
+# CORS posture (#146): SSE defaults to same-origin, never a hardcoded `*`
+# ---------------------------------------------------------------------------
+
+
+class TestSSECors:
+    """SSE must not emit a wildcard CORS header that bypasses the CORS posture."""
+
+    async def test_default_is_same_origin_no_acao_header(self) -> None:
+        """By default, no Access-Control-Allow-Origin header is emitted."""
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "alpha"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        header_names = {k.lower() for k in result.headers}
+        assert "access-control-allow-origin" not in header_names
+
+    async def test_explicit_allow_origin_opt_in(self) -> None:
+        """allow_origin opts into a specific cross-origin policy + Vary: Origin."""
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "alpha"
+
+            return EventStream(gen(), allow_origin="https://app.example.com")
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert result.headers.get("access-control-allow-origin") == "https://app.example.com"
+        assert result.headers.get("vary") == "Origin"
+
+    async def test_no_wildcard_origin_anywhere(self) -> None:
+        """Regression: the framework never emits a hardcoded `*` for SSE."""
+        app = App()
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield "alpha"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert result.headers.get("access-control-allow-origin") != "*"

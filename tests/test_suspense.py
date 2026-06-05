@@ -167,6 +167,25 @@ async def _collect_chunks(
     return [c async for c in render_suspense(env, suspense, is_htmx=is_htmx)]
 
 
+async def _drain_into(
+    env: Environment,
+    suspense: Suspense,
+    sink: list[str],
+    *,
+    is_htmx: bool = False,
+) -> None:
+    """Drain render_suspense into *sink*, appending each chunk as it is yielded.
+
+    Lets a test observe exactly which chunks were emitted before an exception
+    raised mid-stream (e.g. asserting zero shell bytes preceded a discovery
+    failure). Kept as a single awaitable so it fits a ``pytest.raises`` block.
+    """
+    # Incremental append (not a comprehension): we must retain whatever was
+    # emitted if render_suspense raises mid-stream.
+    async for chunk in render_suspense(env, suspense, is_htmx=is_htmx):
+        sink.append(chunk)  # noqa: PERF401
+
+
 async def _delayed_value(value: object, delay: float = 0.01) -> object:
     """Return *value* after a short delay (simulates async data fetch)."""
     await asyncio.sleep(delay)
@@ -911,6 +930,53 @@ class TestEmptyDiscoveryError:
         )
         with pytest.raises(ConfigurationError, match="no blocks discovered"):
             await _collect_chunks(env, s, is_htmx=True)
+
+    async def test_empty_discovery_raises_before_any_shell_bytes(self):
+        """The discovery error must raise BEFORE the shell is flushed (#145).
+
+        Previously auto-discovery validated inside the generator AFTER the shell
+        had already streamed, producing a half-rendered skeleton + a 500. The
+        fix hoists discovery ahead of the first yield so the error is clean.
+        """
+        from chirp.errors import ConfigurationError
+
+        no_dep_template = """\
+<html><body>
+{% block content %}
+<p>Static content only</p>
+{% end %}
+</body></html>"""
+
+        env = Environment(loader=DictLoader({"nodep.html": no_dep_template}))
+        _register_deferred_test(env)
+        s = Suspense("nodep.html", data=_delayed_value("hello"))
+
+        chunks: list[str] = []
+        with pytest.raises(ConfigurationError, match="no blocks discovered"):
+            await _drain_into(env, s, chunks, is_htmx=True)
+        # No shell bytes were emitted before the failure.
+        assert chunks == []
+
+    async def test_unknown_defer_blocks_raises_before_any_shell_bytes(self):
+        """defer_blocks with an unknown name also fails before the shell flushes."""
+        from chirp.errors import ConfigurationError
+
+        template = """\
+<html><body>
+{% block stats %}{{ data }}{% end %}
+</body></html>"""
+        env = Environment(loader=DictLoader({"page.html": template}))
+        _register_deferred_test(env)
+        s = Suspense(
+            "page.html",
+            defer_blocks=("does_not_exist",),
+            data=_delayed_value("hello"),
+        )
+
+        chunks: list[str] = []
+        with pytest.raises(ConfigurationError, match="does_not_exist"):
+            await _drain_into(env, s, chunks, is_htmx=True)
+        assert chunks == []
 
 
 # ---------------------------------------------------------------------------

@@ -409,6 +409,31 @@ class Database:
             finally:
                 self._log_query(sql, params, time.perf_counter() - t0)
 
+    async def fetch_raw(self, sql: str, /, *params: Any) -> list[dict[str, Any]]:
+        """Execute a query and return rows as plain ``dict``s — no dataclass mapping.
+
+        This is the documented low-level row-access contract for queries that
+        have no fixed result dataclass: schema introspection, ``PRAGMA`` output,
+        and other dynamic-column reads. Each row is a ``{column_name: value}``
+        dict on both the SQLite and PostgreSQL backends.
+
+        Prefer :meth:`fetch`/:meth:`fetch_one` with a ``frozen=True`` dataclass
+        for application queries; ``fetch_raw`` exists for tooling that cannot
+        know its columns ahead of time.
+
+        Usage::
+
+            rows = await db.fetch_raw("PRAGMA table_info(users)")
+        """
+        t0 = time.perf_counter()
+        async with self._connection() as conn:
+            try:
+                return await _execute_fetch_all(self._driver, conn, sql, params)
+            except Exception as exc:
+                raise QueryError(str(exc)) from exc
+            finally:
+                self._log_query(sql, params, time.perf_counter() - t0)
+
     # -- LISTEN/NOTIFY (PostgreSQL only) --
 
     async def listen(self, *channels: str) -> AsyncIterator[Notification]:

@@ -58,6 +58,17 @@ When this domain changes, check:
 - Tell `docs`, `site`, and `examples` when fallback or setup behavior changes.
 - Tell `public surface` before stabilizing any i18n exports.
 
+## Decisions
+
+- **ICU is deferred to babel-alongside (2026-06-05, #161 sub-2).** Core keeps
+  JSON key catalogs plus the `i18n_missing_key` contract check (key-coverage
+  fail-loud when catalogs are present). Core deliberately does **not** ship an
+  ICU engine, gettext, or `.po`/`.mo` compilation. ICU pluralization, number,
+  date, and currency formatting are deferred to `babel` used alongside Chirp —
+  `formatting.py` provides only minimal locale-aware number/date helpers and
+  points to babel for full ICU. Do not pull ICU/gettext into core; if richer
+  formatting is needed, document the babel-alongside pattern instead.
+
 ## Do Not
 
 - Add client-side translation runtime assumptions.
