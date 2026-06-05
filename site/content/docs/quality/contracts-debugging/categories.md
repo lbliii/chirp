@@ -69,6 +69,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `template_context` | ERROR / WARNING | Add missing dotted context paths to the provided or optional contract data, or stop reading them. |
 | `template_escape` | WARNING | Review trusted-markup or escaping diagnostics surfaced by Kida. |
 | `template_privacy` | WARNING | Remove private literals or mark non-public template content appropriately. |
+| `i18n_missing_key` | WARNING | Add the `t("…")` key to the locale JSON catalog(s) under the i18n directory, or remove the `t()` call. |
 
 ## HTMX And Swaps
 
@@ -115,6 +116,10 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `csrf_session` | ERROR | Register `SessionMiddleware` before `CSRFMiddleware`. |
 | `middleware_signature` | ERROR / WARNING | Make middleware callable as `async __call__(request, next)`. |
 | `secret_key` | ERROR / WARNING | Set a production `secret_key` and use an adequately long value. |
+| `nojs_floor` | INFO | Return `FormAction` (303 for plain POST, fragments for htmx) from mutating routes instead of an htmx-only `Fragment`/`OOB`. INFO by default (htmx-only mutation is a valid choice); promote with `override_contract_severity("nojs_floor", Severity.ERROR)` to enforce the no-JS floor. |
+| `deploy_debug` | ERROR | Set `debug=False` (or `CHIRP_DEBUG=0`) when `env="production"`. |
+| `deploy_metrics` | ERROR | Change `metrics_path` or move the colliding application route so the Prometheus endpoint does not shadow a route. |
+| `deploy_sentry` | WARNING | Set a non-zero `sentry_traces_sample_rate` when a Sentry DSN is configured, or clear the DSN. |
 
 ## Debug, Extensions, Accessibility, And Plugins
 
