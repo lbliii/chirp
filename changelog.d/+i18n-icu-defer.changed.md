@@ -1,0 +1,1 @@
+**Recorded the ICU-defer scope decision for i18n.** Chirp keeps JSON key catalogs and the `i18n_missing_key` contract check in core, and defers ICU pluralization, number, date, and currency formatting to `babel` used alongside Chirp. Core ships no gettext, no `.po`/`.mo` compilation, and no ICU engine; `formatting.py` provides only minimal locale-aware number/date helpers.

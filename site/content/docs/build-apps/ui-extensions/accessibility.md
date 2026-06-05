@@ -16,6 +16,33 @@ Chirp apps serve HTML over the wire. Following accessibility best practices ensu
 
 This guide covers patterns aligned with [WCAG](https://www.w3.org/WAI/WCAG21/quickref/) (Web Content Accessibility Guidelines). For comprehensive guidance, see the [WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/) and [MDN Accessibility](https://developer.mozilla.org/en-US/docs/Web/Accessibility).
 
+## Static Accessibility Checks
+
+Accessibility is a contract, not a convention. Chirp scans your templates at startup and in CI as part of `app.check()` and reports accessibility regressions before they ship. Five checks run, all at `WARNING` severity:
+
+| Category | Catches |
+|---|---|
+| `a11y_interactive` | htmx URL attributes (`hx-get`/`hx-post`/`hx-put`/`hx-patch`/`hx-delete`) on non-interactive elements that lack `role` and `tabindex` — use `<button>`/`<a>`, or add `role="button" tabindex="0"`. |
+| `a11y_label` | Form fields (`<input>`/`<select>`/`<textarea>`) with no associated label — no matching `<label for="…">`, no wrapping `<label>`, and no `aria-label`/`aria-labelledby`. Hidden, submit, button, and reset inputs are exempt. |
+| `a11y_alt` | `<img>` tags with no `alt` attribute. Use `alt="…"` for meaningful images and `alt=""` for decorative ones. |
+| `a11y_heading` | Heading levels that skip (for example `<h1>` straight to `<h3>` with no `<h2>`), which breaks the document outline for screen readers. |
+| `a11y_landmark` | Layout templates with no `<main>` (or `role="main"`) landmark. Only layouts are checked, since pages inherit their landmark structure from the layout. |
+
+These run automatically wherever `app.check()` runs — at startup in debug mode and in CI via `chirp check myapp:app`. The contract message names the offending template and the concrete fix. See the [[docs/quality/contracts-debugging/categories|Contract Category Reference]] for the full category list.
+
+### Strict accessibility posture
+
+The five checks are `WARNING` by default so they do not block apps mid-migration. If you want accessibility regressions to fail the build, promote individual categories to `ERROR` using the existing severity-override mechanism — no new API:
+
+```python
+from chirp.contracts.types import Severity
+
+app.override_contract_severity("a11y_label", Severity.ERROR)
+app.override_contract_severity("a11y_alt", Severity.ERROR)
+```
+
+Now an unlabeled form field or an image without `alt` text fails `app.check()` outright. Combine with `chirp check myapp:app --warnings-as-errors` if you instead want every warning category to fail in CI.
+
 ## Semantic HTML
 
 Use elements that convey meaning:

@@ -102,3 +102,19 @@ app.add_middleware(
 ```
 
 `AuthRateLimitMiddleware` uses the socket client address by default. When deploying behind a trusted proxy that rewrites forwarded headers, pass `key_header="x-forwarded-for"` explicitly.
+
+## Boundary Contract for Account Flows
+
+Chirp ships session auth, CSRF, rate limiting, and password hashing — but it does **not** own account-recovery flows like password reset or email verification. If such flows land in core later, they must respect these boundaries. This is a deliberate scope decision, consistent with Chirp's [[docs/about/philosophy|Non-Goals]]: no bundled ORM, no bundled email.
+
+### Tokens are stateless or app-owned — never framework-owned
+
+A future password-reset or email-verification flow **must** carry state in a stateless signed token (via `itsdangerous`, the same primitive Chirp already uses for session signing) **or** in a token store the app provides. Chirp will **never** create a framework-owned, per-user token table.
+
+A framework-owned token table would force a schema, a migration, and a storage backend on every app — exactly the ORM-shaped coupling Chirp declines. Signed tokens require no storage; an app-provided store keeps the schema decision with the app that owns its database.
+
+### Email is a BYO callback rendering a Kida body — never a bundled mailer
+
+A future flow **must** render its message body as a Kida template and hand the rendered body to an app-provided mailer callback. Chirp will **never** bundle an SMTP client or mailer dependency.
+
+The callback is shaped like the auth middleware's existing extension seams. `AuthConfig` already takes `load_user` and `verify_token` as app-supplied async callbacks (see `AuthConfig` in `src/chirp/middleware/auth.py`); a delivery hook for account flows would follow the same pattern — Chirp renders the HTML, the app decides how to send it. This keeps Chirp an HTML-over-the-wire framework and leaves transport (SMTP, a provider API, a queue) to the app, matching the [[docs/about/philosophy|Non-Goals]] stance against bundling email.
