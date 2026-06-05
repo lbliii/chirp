@@ -29,7 +29,14 @@ def operation_to_sql(op: Operation) -> str:
                 parts.append(f"DEFAULT {default}")
             return " ".join(parts) + ";"
         case DropColumn(table=table, name=name):
-            return f"ALTER TABLE {table} DROP COLUMN {name};"
+            # SQLite cannot DROP COLUMN before 3.35 and cannot ALTER/RENAME
+            # columns at all. Surface the limitation in the artifact rather
+            # than emitting SQL that silently fails on older SQLite.
+            return (
+                "-- WARNING: SQLite (<3.35) cannot DROP COLUMN and cannot "
+                "ALTER/RENAME columns; review or hand-edit before applying.\n"
+                f"ALTER TABLE {table} DROP COLUMN {name};"
+            )
         case CreateIndex(name=name, table=table, columns=columns, unique=unique):
             u = "UNIQUE " if unique else ""
             cols = ", ".join(columns)

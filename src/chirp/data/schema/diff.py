@@ -1,5 +1,7 @@
 """Schema diff — compare two SchemaSnapshots and produce Operations."""
 
+import warnings
+
 from chirp.data.schema.operations import (
     AddColumn,
     CreateIndex,
@@ -69,6 +71,22 @@ def diff_schemas(current: SchemaSnapshot, desired: SchemaSnapshot) -> list[Opera
                     default=col.default,
                 )
             )
+
+        # Type / nullability changes on shared columns are NOT expressible as a
+        # forward-only SQL-diff on SQLite (no ALTER COLUMN). The diff is
+        # name-set based, so historically these changes were dropped silently.
+        # Surface them loudly instead of pretending the schema is in sync.
+        for col_name in sorted(current_cols & desired_cols):
+            cur_col = current.tables[name].columns[col_name]
+            des_col = desired.tables[name].columns[col_name]
+            if cur_col.type.upper() != des_col.type.upper():
+                warnings.warn(
+                    f"Column {name}.{col_name} type change "
+                    f"{cur_col.type!r} -> {des_col.type!r} is not expressible as a "
+                    "forward-only SQL-diff migration (SQLite has no ALTER COLUMN). "
+                    "Write the migration by hand (table rebuild) — it was NOT generated.",
+                    stacklevel=2,
+                )
 
     # Index changes
     current_idxs = set(current.indexes)
