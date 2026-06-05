@@ -1,0 +1,1 @@
+**`chirp new` (chirpui layout) now ships htmx.** The generated chirpui dashboard uses `hx-*` and the htmx SSE extension, but the layout shipped no htmx script — so the documented example was dead in a browser. The layout now provisions `htmx.org` + `htmx-ext-sse` in `<head>`, symmetric with how Chirp provisions Alpine.

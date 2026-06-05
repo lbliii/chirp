@@ -71,6 +71,27 @@ class TestChirpNewDefaultV2:
         theme = (tmp_path / "myapp" / "static" / "theme.css").read_text()
         assert "app-theme-starter.css" in theme
 
+    def test_generated_v2_chirpui_layout_ships_htmx(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The chirpui layout's dashboard uses hx-*/sse-*, so it must ship htmx.
+
+        Regression for #150: a layout emitting hx-*/sse-* with no htmx script
+        is dead in a browser. htmx + the SSE extension must be provisioned, in
+        the <head> (before the deferred body that uses them).
+        """
+        from chirp.cli import _new
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(_new, "_has_chirpui", lambda: True)
+        main(["new", "myapp"])
+
+        layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text()
+        assert "htmx.org@" in layout
+        assert "htmx-ext-sse@" in layout
+        # htmx must be provisioned in the head, before </head>.
+        assert layout.index("htmx.org@") < layout.index("</head>")
+
     def test_generated_v2_files_are_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
