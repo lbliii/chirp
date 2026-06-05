@@ -15,8 +15,8 @@
 
   {% call metric_grid(cols=4) %}
     {{ metric_card(value=stats.total_settings, label="Total Settings", icon="settings") }}
-    {{ metric_card(value=stats.enabled_count, label="Enabled", icon="check", trend="up") }}
-    {{ metric_card(value=stats.disabled_count, label="Disabled", icon="close") }}
+    {{ metric_card(value=stats.enabled_count, label="Enabled", icon="validate", trend="up") }}
+    {{ metric_card(value=stats.disabled_count, label="Disabled", icon="status") }}
     {{ metric_card(value=stats.categories, label="Categories", icon="grid") }}
   {% end %}
 

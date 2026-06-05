@@ -170,7 +170,19 @@ def check_middleware_signatures(
             )
             continue
 
-        call_method = mw.__call__
+        # Function/method middleware *is* the callable; class-instance
+        # middleware exposes the contract via __call__. Inspecting ``.__call__``
+        # on a plain function yields the generic ``(*args, **kwargs)`` wrapper,
+        # which would misreport a valid ``async def mw(request, next)`` as taking
+        # 0 positional parameters (a false ERROR for every function middleware).
+        if inspect.isfunction(mw) or inspect.ismethod(mw):
+            call_method = mw
+            mw_name = getattr(mw, "__name__", type(mw).__name__)
+            sig_desc = "signature"
+        else:
+            call_method = mw.__call__
+            mw_name = type(mw).__name__
+            sig_desc = "__call__"
         try:
             sig = inspect.signature(call_method)
         except ValueError, TypeError:
@@ -194,7 +206,7 @@ def check_middleware_signatures(
                     severity=Severity.ERROR,
                     category="middleware_signature",
                     message=(
-                        f"Middleware {type(mw).__name__!r} __call__ accepts "
+                        f"Middleware {mw_name!r} {sig_desc} accepts "
                         f"{len(params)} positional parameter(s), expected 2 "
                         f"(request, next). It will fail at request time."
                     ),
@@ -208,9 +220,9 @@ def check_middleware_signatures(
                     severity=Severity.WARNING,
                     category="middleware_signature",
                     message=(
-                        f"Middleware {type(mw).__name__!r} __call__ is not "
-                        f"async. Chirp middleware should be async def "
-                        f"__call__(self, request, next)."
+                        f"Middleware {mw_name!r} {sig_desc} is not "
+                        f"async. Chirp middleware should be an async def "
+                        f"accepting (request, next)."
                     ),
                 )
             )
