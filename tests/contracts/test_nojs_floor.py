@@ -5,7 +5,9 @@ from chirp.templating.returns import Fragment, MutationResult
 
 
 class _Route:
-    def __init__(self, path, methods, handler, *, referenced=False, page_source_handler=None) -> None:
+    def __init__(
+        self, path, methods, handler, *, referenced=False, page_source_handler=None
+    ) -> None:
         self.path = path
         self.methods = set(methods)
         self.handler = handler

@@ -111,7 +111,9 @@ async def test_introspect_then_diff_is_stable(tmp_path) -> None:
     from chirp.data.schema.operations import CreateTable, DropColumn, DropTable
 
     ops = diff_schemas(current, desired)
-    structural = [op for op in ops if isinstance(op, (AddColumn, DropColumn, DropTable, CreateTable))]
+    structural = [
+        op for op in ops if isinstance(op, (AddColumn, DropColumn, DropTable, CreateTable))
+    ]
     assert structural == []
 
 
@@ -120,9 +122,7 @@ async def test_makemigrations_pipeline_roundtrip(tmp_path) -> None:
     db = Database(f"sqlite:///{tmp_path / 'app.db'}")
     await db.connect()
     try:
-        await db.execute_script(
-            "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);"
-        )
+        await db.execute_script("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);")
         current = await introspect(db)
     finally:
         await db.disconnect()

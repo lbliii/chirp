@@ -17,7 +17,15 @@ def _categories(app: App) -> set[str]:
 
 def test_deploy_debug_fires_in_production(tmp_path) -> None:
     (tmp_path / "index.html").write_text("<div id='x'></div>", encoding="utf-8")
-    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path), debug=True, env="production", secret_key="x" * 32))
+    app = App(
+        AppConfig(
+            skip_contract_checks=True,
+            template_dir=str(tmp_path),
+            debug=True,
+            env="production",
+            secret_key="x" * 32,
+        )
+    )
 
     @app.route("/")
     def index():
@@ -28,7 +36,14 @@ def test_deploy_debug_fires_in_production(tmp_path) -> None:
 
 def test_deploy_metrics_collision_fires(tmp_path) -> None:
     (tmp_path / "index.html").write_text("<div id='x'></div>", encoding="utf-8")
-    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path), metrics_enabled=True, metrics_path="/metrics"))
+    app = App(
+        AppConfig(
+            skip_contract_checks=True,
+            template_dir=str(tmp_path),
+            metrics_enabled=True,
+            metrics_path="/metrics",
+        )
+    )
 
     @app.route("/metrics")
     def metrics_route():
