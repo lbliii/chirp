@@ -34,6 +34,19 @@ def test_empty_catalog_is_noop(tmp_path) -> None:
     assert check_translation_keys({"page.html": '{{ t("x") }}'}, cfg) == []
 
 
+def test_member_access_t_not_matched(tmp_path) -> None:
+    """`.t("...")` member calls in inline JS/Alpine must not be flagged."""
+    (tmp_path / "en.json").write_text('{"greeting": "Hello"}', encoding="utf-8")
+    cfg = AppConfig(
+        i18n_enabled=True,
+        i18n_directory=str(tmp_path),
+        i18n_supported_locales=("en",),
+    )
+    # el.t("foo") and obj.t("bar.baz") are member calls, not the i18n t().
+    sources = {"page.html": '<div x-data>{{ el.t("foo") }} {{ obj.t("bar.baz") }}</div>'}
+    assert check_translation_keys(sources, cfg) == []
+
+
 def test_dynamic_keys_skipped(tmp_path) -> None:
     (tmp_path / "en.json").write_text('{"greeting": "Hello"}', encoding="utf-8")
     cfg = AppConfig(

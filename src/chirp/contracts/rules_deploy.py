@@ -47,6 +47,11 @@ def check_metrics_path_collision(config: Any, router: Router) -> list[ContractIs
 
     When metrics are enabled, the metrics endpoint and an application route
     sharing a path silently shadow each other — one of them never serves.
+
+    Scope: this sees metrics configured via ``AppConfig.metrics_enabled`` /
+    ``metrics_path`` only. Metrics enabled solely through
+    ``run_production_server(metrics_enabled=...)`` arguments are not visible at
+    ``app.check()`` time and are not covered here.
     """
     if not getattr(config, "metrics_enabled", False):
         return []

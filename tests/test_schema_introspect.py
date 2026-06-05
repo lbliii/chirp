@@ -153,28 +153,40 @@ def test_drop_column_sql_carries_sqlite_warning() -> None:
     assert "ALTER TABLE users DROP COLUMN legacy;" in sql
 
 
-def test_diff_warns_on_column_type_change() -> None:
-    """A column type change is surfaced (warning), never silently dropped."""
+def _one_col_snapshot(col_type: str):
     from chirp.data.schema.types import ColumnSchema, SchemaSnapshot, TableSchema
 
-    current = SchemaSnapshot(
+    return SchemaSnapshot(
         tables={
             "users": TableSchema(
                 name="users",
-                columns={"id": ColumnSchema(name="id", type="INTEGER")},
+                columns={"id": ColumnSchema(name="id", type=col_type)},
             )
         },
     )
-    desired = SchemaSnapshot(
-        tables={
-            "users": TableSchema(
-                name="users",
-                columns={"id": ColumnSchema(name="id", type="TEXT")},
-            )
-        },
-    )
+
+
+def test_diff_warns_on_real_column_type_change() -> None:
+    """A genuine column type change is surfaced (warning), never silently dropped."""
     with pytest.warns(UserWarning, match="type change"):
-        diff_schemas(current, desired)
+        diff_schemas(_one_col_snapshot("INTEGER"), _one_col_snapshot("TEXT"))
+
+
+def test_diff_no_warning_for_canonical_type_aliases() -> None:
+    """Introspected vs parsed aliases (SERIAL/INTEGER, VARCHAR(n)/CHARACTER VARYING)
+    must NOT produce a spurious type-change warning on in-sync schemas."""
+    import warnings
+
+    for current_type, desired_type in [
+        ("integer", "SERIAL"),  # Postgres introspect 'integer' vs DDL 'SERIAL'
+        ("character varying", "VARCHAR(255)"),
+        ("timestamp without time zone", "TIMESTAMP"),
+        ("boolean", "BOOL"),
+        ("numeric", "DECIMAL(10,2)"),
+    ]:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # any UserWarning would raise
+            diff_schemas(_one_col_snapshot(current_type), _one_col_snapshot(desired_type))
 
 
 def test_introspect_unknown_driver_raises() -> None:

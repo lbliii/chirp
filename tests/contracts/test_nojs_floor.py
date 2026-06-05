@@ -5,11 +5,13 @@ from chirp.templating.returns import Fragment, MutationResult
 
 
 class _Route:
-    def __init__(self, path, methods, handler, *, referenced=False) -> None:
+    def __init__(self, path, methods, handler, *, referenced=False, page_source_handler=None) -> None:
         self.path = path
         self.methods = set(methods)
         self.handler = handler
         self.referenced = referenced
+        if page_source_handler is not None:
+            self.page_source_handler = page_source_handler
 
 
 class _Router:
@@ -66,4 +68,39 @@ def test_full_page_return_not_flagged() -> None:
         return Page("page.html", "row")
 
     router = _Router([_Route("/save", ["POST"], save)])
+    assert _categories(router) == []
+
+
+def test_scans_page_source_handler_for_mounted_routes() -> None:
+    """For mounted-page routes the real source is route.page_source_handler.
+
+    route.handler is an async wrapper containing no return statements; scanning
+    it would miss the htmx-only return (false negative). The rule must scan
+    page_source_handler.
+    """
+
+    async def _page_wrapper(request):  # the async wrapper registered as handler
+        return await request
+
+    def real_page_handler(request):  # the user's real handler
+        return Fragment("page.html", "row")
+
+    router = _Router(
+        [_Route("/save", ["POST"], _page_wrapper, page_source_handler=real_page_handler)]
+    )
+    assert _categories(router) == ["nojs_floor"]
+
+
+def test_page_source_handler_fallback_suppresses() -> None:
+    async def _page_wrapper(request):
+        return await request
+
+    def real_page_handler(request):
+        if request.is_htmx:
+            return Fragment("page.html", "row")
+        return MutationResult("/done")
+
+    router = _Router(
+        [_Route("/save", ["POST"], _page_wrapper, page_source_handler=real_page_handler)]
+    )
     assert _categories(router) == []

@@ -15,9 +15,11 @@ from typing import Any
 
 from chirp.contracts.types import ContractIssue, Severity
 
-# Match t("key") / t('key') with a string literal first argument. Dynamic
-# keys — t(var) or t(f"...") — are intentionally skipped (not statically known).
-_T_CALL_RE = re.compile(r"""\bt\(\s*(["'])(?P<key>(?:(?!\1).)+)\1""")
+# Match a standalone t("key") / t('key') call with a string-literal first
+# argument. The negative lookbehind excludes identifier chars AND '.', so
+# member-access calls in inline JS/Alpine (e.g. el.t("foo"), obj.t("bar"))
+# do not match. Dynamic keys — t(var) / t(f"...") — are skipped (not static).
+_T_CALL_RE = re.compile(r"""(?<![\w.])t\(\s*(["'])(?P<key>(?:(?!\1).)+)\1""")
 
 
 def check_translation_keys(

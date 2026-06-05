@@ -99,7 +99,7 @@ lines that protect that property are maintained in one canonical place. A few
 headlines:
 
 - **No stateful ORM.** "SQL in, frozen dataclasses out" — database access is your choice.
-- **No WebSocket return type.** SSE over WebSockets, always (Opinion #4 above).
+- **No WebSocket return type.** SSE over WebSockets, always.
 - **No WSGI, no Python floor below 3.14.** The free-threading identity bet.
 
 For the full list — including in-core admin/CRUD, email, background jobs,

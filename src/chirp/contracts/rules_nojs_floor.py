@@ -48,7 +48,13 @@ def check_nojs_mutation_fallback(router: Router) -> list[ContractIssue]:
         if getattr(route, "referenced", False):
             continue
 
-        handler = route.handler
+        # For mounted (filesystem-pages) routes, route.handler is an async
+        # wrapper and the user's real handler — the one whose source contains
+        # the return statements — is on route.page_source_handler. Mirror the
+        # established pattern in checker.py / autodoc.py and unwrap decorators.
+        page_src = getattr(route, "page_source_handler", None)
+        handler = page_src if page_src is not None else route.handler
+        handler = inspect.unwrap(handler)
         try:
             src = inspect.getsource(handler)
         except TypeError, OSError:

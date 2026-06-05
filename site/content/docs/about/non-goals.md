@@ -90,10 +90,10 @@ themselves.
 
 ### 5. No WebSocket return type — SSE over WebSockets, always
 
-Chirp will not add a WebSocket return type. As stated in **Opinion #4** of the
-[Philosophy](/chirp/docs/about/philosophy/): SSE is HTTP — it works through
-proxies, load balancers, and CDNs, reconnects automatically, and needs no
-protocol upgrade or client library. Almost every "real-time" feature is
+Chirp will not add a WebSocket return type. As the
+[Philosophy](/chirp/docs/about/philosophy/) puts it: SSE is HTTP — it works
+through proxies, load balancers, and CDNs, reconnects automatically, and needs
+no protocol upgrade or client library. Almost every "real-time" feature is
 server-push, which `EventStream` already covers.
 
 **Instead:** use `EventStream` for server-push. If you genuinely need raw

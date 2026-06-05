@@ -48,10 +48,11 @@ async def handle_sse(
     #
     # SSE responses default to SAME-ORIGIN: no Access-Control-Allow-Origin
     # header is emitted unless the EventStream explicitly opts into a specific
-    # cross-origin policy via allow_origin. Previously this always emitted a
-    # hardcoded `*`, which silently bypassed the framework's own CORS
-    # middleware (same-origin + credentials-vs-wildcard guard) — a second,
-    # contradictory, insecure CORS policy (see #146).
+    # cross-origin policy via allow_origin. handle_sse builds these headers
+    # directly (app-level CORSMiddleware does not apply to the SSE byte stream),
+    # so EventStream.allow_origin is the single, explicit knob. Previously this
+    # always emitted a hardcoded `*` — an unconditional, insecure cross-origin
+    # default with no way to scope it (see #146).
     sse_headers: list[tuple[bytes, bytes]] = [
         (b"content-type", b"text/event-stream"),
         (b"cache-control", b"no-cache"),
