@@ -286,7 +286,8 @@
     <div class="activity-panel">
       <h2>Tool Activity</h2>
       <div class="activity-feed" id="activity"
-           hx-ext="sse" sse-connect="/feed" sse-swap="message" hx-swap="afterbegin">
+           hx-ext="sse" sse-connect="/feed" hx-disinherit="hx-target hx-swap">
+        <div sse-swap="message" hx-target="this" hx-swap="afterbegin"></div>
         <p class="empty">Waiting for tool calls&hellip;</p>
       </div>
     </div>
@@ -319,9 +320,8 @@
   <div class="msg-streaming"
        hx-ext="sse"
        sse-connect="/chat/stream"
-       sse-swap="message"
-       hx-swap="beforeend"
-       sse-close="done"><span class="cursor"></span></div>
+       hx-disinherit="hx-target hx-swap"
+       sse-close="done"><span sse-swap="message" hx-target="this" hx-swap="beforeend"></span><span class="cursor"></span></div>
   {% end %}
   {% end %}
 

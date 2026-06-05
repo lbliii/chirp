@@ -178,6 +178,36 @@ class TestMiddlewareSignatures:
         )
         assert len(issues) == 2  # sync warning + no-arg error
 
+    def test_function_middleware_ok(self) -> None:
+        """Function middleware is inspected directly, not via the generic
+        ``function.__call__`` wrapper (which would falsely report 0 params)."""
+
+        async def timing(request, next):
+            return await next(request)
+
+        issues = check_middleware_signatures([timing])
+        assert len(issues) == 0
+
+    def test_sync_function_middleware_warns(self) -> None:
+        def timing(request, next):
+            return next(request)
+
+        issues = check_middleware_signatures([timing])
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert "not async" in issues[0].message
+        assert "timing" in issues[0].message  # named, not 'function'
+
+    def test_bad_function_middleware_errors(self) -> None:
+        async def broken(request):  # missing `next`
+            return request
+
+        issues = check_middleware_signatures([broken])
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.ERROR
+        assert "1 positional" in issues[0].message
+        assert "broken" in issues[0].message
+
 
 # ---------------------------------------------------------------------------
 # Secret key checks

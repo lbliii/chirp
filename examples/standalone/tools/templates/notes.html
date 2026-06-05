@@ -131,7 +131,8 @@
       <!-- Activity panel -->
       <div class="panel">
         <h2>Agent Activity</h2>
-        <div id="activity" hx-ext="sse" sse-connect="/feed" sse-swap="message" hx-swap="afterbegin">
+        <div id="activity" hx-ext="sse" sse-connect="/feed" hx-disinherit="hx-target hx-swap">
+          <div sse-swap="message" hx-target="this" hx-swap="afterbegin"></div>
           <p class="empty">Waiting for MCP tool calls&hellip;</p>
         </div>
       </div>

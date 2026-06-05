@@ -84,6 +84,7 @@ chirp new myapp && cd myapp && python app.py
 | `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
 | `chirp check <app> --coverage` | Show contract coverage counters |
 | `chirp routes <app>` | Print the registered route table |
+| `chirp --version` | Print chirp, kida, pounce, and Python versions |
 | `App()` | Create an application |
 | `@app.route(path)` | Register a route handler |
 | `Template(name, **ctx)` | Render a full template |

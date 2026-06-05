@@ -47,6 +47,31 @@ class TestCLIMissingArgs:
         assert exc_info.value.code == 2
 
 
+class TestCLIVersion:
+    def test_version_flag_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--version"])
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert out.startswith("chirp ")
+        assert "kida" in out
+        assert "Python" in out
+
+    def test_short_version_flag(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-V"])
+        assert exc_info.value.code == 0
+        assert capsys.readouterr().out.startswith("chirp ")
+
+    def test_version_report_matches_installed_version(self) -> None:
+        import chirp
+        from chirp.cli._version import version_report
+
+        report = version_report()
+        assert report.startswith(f"chirp {chirp.__version__} ")
+        assert "bengal-pounce" in report
+
+
 class TestCLINoCommand:
     def test_no_command_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:

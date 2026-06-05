@@ -10,6 +10,27 @@ import argparse
 import sys
 
 
+class _VersionAction(argparse.Action):
+    """Print the version report and exit.
+
+    A custom action (rather than argparse's built-in ``version`` action) keeps
+    dependency-version lookups lazy: they run only when ``--version`` is passed,
+    not on every ``chirp`` invocation while the parser is built.
+    """
+
+    def __init__(self, option_strings: list[str], dest: str, **kwargs: object) -> None:
+        kwargs.setdefault("nargs", 0)
+        kwargs.setdefault("default", argparse.SUPPRESS)
+        kwargs.setdefault("help", "Show chirp, kida, pounce, and Python versions, then exit")
+        super().__init__(option_strings, dest, **kwargs)  # type: ignore[arg-type]
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        from chirp.cli._version import version_report
+
+        print(version_report())
+        parser.exit()
+
+
 def _add_server_run_args(p: argparse.ArgumentParser) -> None:
     """Shared ``chirp run`` / ``chirp dev`` arguments."""
     p.add_argument(
@@ -58,6 +79,7 @@ def main(argv: list[str] | None = None) -> None:
         prog="chirp",
         description="Chirp — A Python web framework for the modern web platform.",
     )
+    parser.add_argument("-V", "--version", action=_VersionAction)
     subparsers = parser.add_subparsers(dest="command")
 
     # -- chirp new --------------------------------------------------------
