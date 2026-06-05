@@ -114,6 +114,10 @@ When client-side behavior is needed, chirp supports Alpine.js for local state an
 - **Not a static site generator.** Chirp serves dynamic HTML. For static sites in the Bengal ecosystem, see [Bengal](https://github.com/lbliii/bengal).
 - **Not opinionated about your database.** Use SQLAlchemy, SQLModel, raw SQL, or no database at all. Chirp renders HTML — where the data comes from is your choice.
 
+For the full, authoritative list of what the core deliberately won't do — and the
+honest alternative for each — see the canonical
+[Non-Goals](../site/content/docs/about/non-goals.md) doc.
+
 ---
 
 ## The Stack

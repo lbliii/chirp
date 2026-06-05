@@ -28,6 +28,13 @@ This section explains the framework's structure, fit, and core model.
 The instincts that shape every decision.
 :::{/card}
 
+:::{card} Non-Goals
+:icon: ban
+:link: /chirp/docs/about/non-goals/
+:description: The bright lines
+What the core won't do — and the honest alternative for each.
+:::{/card}
+
 :::{card} Architecture
 :icon: cube
 :link: /chirp/docs/about/architecture/

@@ -40,6 +40,45 @@ That gives Chirp its niche: fewer silent fragment failures, clearer debug
 output, and one template that can safely serve full-page, fragment, OOB,
 Suspense, and SSE access patterns.
 
+## AI-Buildable by Construction
+
+Most frameworks become "AI-buildable" by accumulating a large public corpus:
+years of Stack Overflow answers, blog posts, and example repositories an LLM
+can pattern-match against. Chirp does not have that corpus yet, and does not
+depend on one.
+
+Chirp's contracts are independent declarative invariants that name their own
+fix. `app.check()` reports each issue with a stable **category** (the CI handle)
+and a **message** that points at the concrete thing to change — the route,
+template, block, selector, registration, config flag, or contract data. See the
+[[docs/quality/contracts-debugging/categories|Contract Category Reference]]
+preamble: "Treat the category as the stable handle for CI policy and the
+message as the concrete fix target."
+
+That structure lets an agent build correct Chirp apps from two things:
+
+- the public-API surface (typed return values, registration calls, route
+  metadata), and
+- the contract errors, which describe the failure *and* the remedy.
+
+The loop is mechanical: write a route, run `chirp check`, read the named fix,
+apply it. The framework tells the model what is wrong and where, instead of
+requiring the model to have memorized community lore. This is a different bet
+than "wait for the corpus" — Chirp aims to be buildable from its own
+self-describing surface.
+
+- **Accessibility as a contract, not a claim.** Chirp ships five static
+  accessibility checks — `a11y_interactive`, `a11y_label`, `a11y_alt`,
+  `a11y_heading`, `a11y_landmark` — that run inside `app.check()` against your
+  templates. Many frameworks *say* they support accessible UI; Chirp validates
+  concrete a11y affordances at startup and names the fix, so an agent (or a
+  human) gets the same actionable signal.
+
+This positions Chirp **alongside** existing platforms rather than replacing
+them. Chirp is narrower than Django on purpose: keep Django's admin, ORM, and
+auth ecosystem where they fit, and let Chirp own the hypermedia UI surface with
+self-describing contracts an LLM can build against.
+
 ## Compared With Python Frameworks
 
 | Framework | Better fit | Chirp difference |
