@@ -161,6 +161,7 @@ class TestFormatterConcernGroups:
             ("hx-target", "HTMX"),
             ("hx-indicator", "HTMX"),
             ("hx-boost", "HTMX"),
+            ("htmx_provisioning", "HTMX"),
             ("csrf_form", "Forms"),
             ("mount_app_merge", "Setup"),
         ],

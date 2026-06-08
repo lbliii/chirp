@@ -109,6 +109,16 @@ def _collect_builtin_middleware(
         from chirp.server.delegation import DELEGATION_SNIPPET
 
         middleware_list.append(HTMLInject(DELEGATION_SNIPPET, full_page_only=True))
+    if config.htmx:
+        from chirp.middleware.inject import HtmxInject
+        from chirp.server.htmx_inject import htmx_snippet
+
+        middleware_list.append(
+            HtmxInject(
+                htmx_snippet(config.htmx_version, config.htmx_sse),
+                full_page_only=True,
+            )
+        )
     if config.alpine:
         from chirp.middleware.inject import AlpineInject
         from chirp.server.alpine import alpine_snippet

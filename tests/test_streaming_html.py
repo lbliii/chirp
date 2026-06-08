@@ -109,6 +109,64 @@ class TestAsyncStreamInjectBeforeBody:
         ]
         assert "".join(parts) == "aX</body>"
 
+    async def test_no_body_appends_snippet_when_not_full_page_only(self) -> None:
+        # No </body> at all + full_page_only=False -> snippet appended (baseline).
+        async def chunks() -> object:
+            yield "<div>fragment</div>"
+
+        out = [
+            part
+            async for part in async_stream_inject_before_body(
+                chunks(),
+                snippet="<!--SNIP-->",
+                before="</body>",
+                dedup_marker=None,
+                full_page_only=False,
+            )
+        ]
+        assert "".join(out) == "<div>fragment</div><!--SNIP-->"
+
+    async def test_no_body_dedup_marker_suppresses_trailing_append(self) -> None:
+        # No </body> and the dedup marker already present -> no double injection
+        # in the trailing full_page_only=False branch.
+        async def chunks() -> object:
+            yield '<div data-chirp="alpine">already provisioned</div>'
+
+        out = [
+            part
+            async for part in async_stream_inject_before_body(
+                chunks(),
+                snippet="SHOULD_NOT",
+                before="</body>",
+                dedup_marker='data-chirp="alpine"',
+                full_page_only=False,
+            )
+        ]
+        joined = "".join(out)
+        assert "SHOULD_NOT" not in joined
+        assert joined.count('data-chirp="alpine"') == 1
+
+    async def test_no_body_dedup_predicate_suppresses_trailing_append(self) -> None:
+        # No </body> and a dedup_predicate that reports the script is already
+        # present (the htmx_already_present heuristic shape) -> no double inject.
+        async def chunks() -> object:
+            yield '<script src="https://unpkg.com/htmx.org@2.0.4"></script><div>x</div>'
+
+        out = [
+            part
+            async for part in async_stream_inject_before_body(
+                chunks(),
+                snippet='<script src="...htmx..."></script>',
+                before="</body>",
+                dedup_marker='data-chirp="htmx"',
+                dedup_predicate=lambda head: "htmx" in head,
+                full_page_only=False,
+            )
+        ]
+        joined = "".join(out)
+        # Exactly one htmx script — the trailing append was suppressed.
+        assert joined.count("<script") == 1
+
 
 async def test_alpine_middleware_wraps_streaming_response() -> None:
     """AlpineInject rewrites StreamingResponse chunks (same as Suspense output)."""

@@ -52,7 +52,9 @@ async def handler():
         '<div id="result"></div>{% end %}'
     )
 
-    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    # htmx=True so the htmx_provisioning contract is satisfied (these flat
+    # pages emit hx-* but ship no htmx <script>).
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True, htmx=True))
     app.mount_pages(str(pages_dir))
 
     @app.route("/exec", methods=["POST"])

@@ -85,6 +85,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `view_transition_scope` | WARNING | Scope View Transitions to navigation-only elements, not broad OOB/SSE live-update containers. |
 | `oob_registry` | ERROR / WARNING | Add the registered OOB block/target, fix a typo, or make the region optional only when absence is legitimate. |
 | `oob_target` | WARNING | Fix `hx-swap-oob` IDs that do not appear in any known template. |
+| `htmx_provisioning` | ERROR | Provision htmx — set `AppConfig(htmx=True)` or add an htmx `<script src="…htmx…">` to the layout/extends chain — when a page emits `hx-*`/`sse-*` attributes. |
 
 ## SSE And Reactive
 

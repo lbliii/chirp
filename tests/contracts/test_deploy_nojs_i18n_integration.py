@@ -8,7 +8,7 @@ wiring regression or a router-shape change cannot stay green silently).
 from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
-from chirp.templating.returns import Fragment
+from chirp.templating.returns import Fragment, Template
 
 
 def _categories(app: App) -> set[str]:
@@ -79,6 +79,43 @@ def test_nojs_floor_fires_for_htmx_only_mutation(tmp_path) -> None:
         return Fragment("index.html", "x")
 
     assert "nojs_floor" in _categories(app)
+
+
+def test_htmx_provisioning_fires_without_htmx(tmp_path) -> None:
+    # index.html is served as a FULL PAGE (Template) and uses hx-* with no
+    # provisioning -> must fire. Per #185 the rule scopes to full-page renders;
+    # the page that loads in the browser is the one that must ship htmx.
+    (tmp_path / "index.html").write_text(
+        "<html><body><form hx-post='/save'></form></body></html>", encoding="utf-8"
+    )
+    app = App(AppConfig(template_dir=str(tmp_path)))
+
+    @app.route("/")
+    def index():
+        return Template("index.html")
+
+    @app.route("/save", methods=["POST"])
+    def save(request):
+        return Fragment("index.html", "x")
+
+    assert "htmx_provisioning" in _categories(app)
+
+
+def test_htmx_provisioning_does_not_fire_when_provisioned(tmp_path) -> None:
+    (tmp_path / "index.html").write_text(
+        "<html><body><form hx-post='/save'></form></body></html>", encoding="utf-8"
+    )
+    app = App(AppConfig(template_dir=str(tmp_path), htmx=True))
+
+    @app.route("/")
+    def index():
+        return "ok"
+
+    @app.route("/save", methods=["POST"])
+    def save(request):
+        return Fragment("index.html", "x")
+
+    assert "htmx_provisioning" not in _categories(app)
 
 
 def test_i18n_missing_key_fires(tmp_path) -> None:

@@ -180,6 +180,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "command": "HTMX",
     "commandfor": "HTMX",
     "alpine_cdn_url": "HTMX",
+    "htmx_provisioning": "HTMX",
     "islands": "HTMX",
     "fragment_island": "HTMX",
     # Streaming / OOB

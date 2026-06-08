@@ -16,14 +16,23 @@ This tutorial shows how to use Alpine.js and htmx together: Alpine for dropdowns
 
 ## Setup
 
-If you use `chirp-ui`, Alpine is enabled automatically by `use_chirp_ui(app)`. Otherwise, enable it in your config:
+This tutorial uses both htmx (the `hx-*` attributes below) and Alpine, so enable
+both in your config. If you use `chirp-ui`, Alpine is enabled automatically by
+`use_chirp_ui(app)`; you still set `htmx=True` to provision htmx:
 
 ```python
-config = AppConfig(alpine=True)
+config = AppConfig(alpine=True, htmx=True)
 app = App(config=config)
 ```
 
-Chirp auto-injects both htmx and Alpine into full-page HTML responses. For named components that must survive htmx boosted navigation, use `Alpine.safeData()` instead of `Alpine.data()` (see the [Alpine guide](/chirp/docs/build-apps/ui-extensions/alpine/#registering-custom-components-alpinesafedata)).
+With these flags set, Chirp is the single authority for both runtimes and
+auto-injects htmx and Alpine into full-page HTML responses. `htmx=True` is what
+provisions htmx — without it, the `hx-get`/`hx-target`/`hx-trigger` attributes in
+this tutorial are inert and the `htmx_provisioning` contract fails `app.check()`
+with an ERROR (see the [htmx guide](/chirp/docs/build-apps/ui-extensions/htmx/)).
+
+For named components that must survive htmx boosted navigation, use
+`Alpine.safeData()` instead of `Alpine.data()` (see the [Alpine guide](/chirp/docs/build-apps/ui-extensions/alpine/#registering-custom-components-alpinesafedata)).
 
 ## Dropdown with htmx Form
 

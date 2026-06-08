@@ -122,7 +122,9 @@ class TestCheckHypermediaSurface:
         (tmp_path / "index.html").write_text(
             '<div hx-get="/api/items">load</div><button hx-post="/api/items">add</button>'
         )
-        app = App(AppConfig(template_dir=str(tmp_path)))
+        # htmx=True so the htmx_provisioning contract is satisfied; this test
+        # exercises hx-target route matching, not provisioning.
+        app = App(AppConfig(template_dir=str(tmp_path), htmx=True))
 
         @app.route("/api/items")
         async def list_items():
@@ -214,7 +216,9 @@ class TestCheckHypermediaSurface:
         (tmp_path / "index.html").write_text(
             '<div hx-get="/api/items">load</div><button hx-post="/api/items">add</button>'
         )
-        app = App(AppConfig(template_dir=str(tmp_path)))
+        # htmx=True so the htmx_provisioning contract is satisfied; this test
+        # exercises accessibility warnings, not provisioning.
+        app = App(AppConfig(template_dir=str(tmp_path), htmx=True))
 
         @app.route("/api/items")
         async def list_items():
@@ -236,7 +240,9 @@ class TestCheckHypermediaSurface:
         (tmp_path / "index.html").write_text(
             '<a hx-get="/api/items">load</a><button hx-post="/api/items">add</button>'
         )
-        app = App(AppConfig(template_dir=str(tmp_path)))
+        # htmx=True so the htmx_provisioning contract is satisfied; this test
+        # exercises accessibility warnings, not provisioning.
+        app = App(AppConfig(template_dir=str(tmp_path), htmx=True))
 
         @app.route("/api/items")
         async def list_items():

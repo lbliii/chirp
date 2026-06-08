@@ -423,6 +423,10 @@ When `AppConfig(alpine=True)` (including via `use_chirp_ui(app)`), Chirp registe
 
 `HTMLInject` does not run on streaming bodies; Alpine streaming is handled only by `AlpineInject`.
 
+## HtmxInject
+
+When `AppConfig(htmx=True)`, Chirp registers `HtmxInject`, which injects the htmx core `<script>` before the first `</body>` on **buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for example `Suspense`), mirroring `AlpineInject`. It uses the proven unpkg browser build (`https://unpkg.com/htmx.org@{htmx_version}`, default `2.0.4`) — not a jsDelivr bare npm path, which resolves to a CommonJS module and breaks silently in the browser. Set `AppConfig(htmx_sse=True)` to also inject the htmx SSE extension (`htmx-ext-sse`). Injection is skipped when the response already contains `data-chirp="htmx"` before `</body>`, and it respects fragment / render-intent gating for non-streaming bodies. The opt-in defaults to off, so apps that hand-provision htmx (such as the generated chirpui scaffold) are unaffected. See [[docs/build-apps/ui-extensions/htmx|htmx]].
+
 ## HTMLInject
 
 Inject a snippet into every HTML response before `</body>`:

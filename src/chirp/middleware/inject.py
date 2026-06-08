@@ -212,6 +212,74 @@ class AlpineInject(HTMLInject):
         return replace(response, chunks=new_chunks)
 
 
+class HtmxInject(HTMLInject):
+    """HTMLInject that skips when htmx is already present in the page.
+
+    Dedup is robust: injection is skipped when the page carries Chirp's
+    ``data-chirp="htmx"`` marker **or** any htmx ``<script src="...htmx...">``
+    (a marker-less hand-provisioned or third-party script). This prevents
+    double-loading the runtime regardless of how the existing htmx arrived.
+    See :func:`chirp.server.htmx_inject.htmx_already_present`.
+
+    For :class:`~chirp.http.response.StreamingResponse` (e.g. ``Suspense``),
+    the same snippet is inserted before the first ``</body>`` using a bounded
+    buffer so ``</body>`` may be split across chunks.
+    """
+
+    __slots__ = ()
+
+    async def __call__(self, request: Request, next: Next) -> AnyResponse:
+        response = await next(request)
+        if isinstance(response, StreamingResponse):
+            return self._htmx_streaming(response, request)
+        if not isinstance(response, Response):
+            return response
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_htmx:
+            return response
+        body = response.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+        # Local import avoids a server -> middleware import cycle at module load.
+        from chirp.server.htmx_inject import htmx_already_present
+
+        if htmx_already_present(body):
+            return response
+        # Reuse the fetched response — do not call ``next`` again via super().
+        target = self._target
+        snippet = self._snippet
+        if target in body:
+            body = body.replace(target, snippet + target, 1)
+        elif self._full_page_only:
+            return response
+        else:
+            body = body + snippet
+        return replace(response, body=body)
+
+    def _htmx_streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
+        if "text/html" not in response.content_type:
+            return response
+        if response.render_intent == "fragment":
+            return response
+        if response.render_intent == "unknown" and request.is_htmx:
+            return response
+        # Local import avoids a server -> middleware import cycle at module load.
+        from chirp.server.htmx_inject import htmx_already_present
+
+        new_chunks = async_stream_inject_before_body(
+            response.chunks,
+            snippet=self._snippet,
+            before=self._target,
+            dedup_marker='data-chirp="htmx"',
+            dedup_predicate=htmx_already_present,
+            full_page_only=self._full_page_only,
+        )
+        return replace(response, chunks=new_chunks)
+
+
 class ViewTransitionCssDebugWarning:
     """Log when the response body uses View Transition CSS but VT injection is off.
 

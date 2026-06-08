@@ -238,9 +238,11 @@ V2_LAYOUT_CHIRPUI_HTML = """\
     <link rel="stylesheet" href="/static/theme.css">
     <link rel="stylesheet" href="/static/style.css">
     <!-- htmx is the core hypermedia transport; this layout's dashboard uses
-         hx-* and the SSE extension, so both scripts ship here. -->
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+         hx-* and the SSE extension, so both scripts ship here. The
+         data-chirp="htmx" marker lets AppConfig(htmx=True) dedup instead of
+         double-loading if this app later opts into Chirp's htmx injection. -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" data-chirp="htmx"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js" data-chirp="htmx-sse"></script>
 </head>
 <body>
     {% set user = current_user() %}

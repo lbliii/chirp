@@ -46,7 +46,9 @@ async def test_boosted_navigation_to_shell_outlet_includes_selectable_page_conte
     pages = tmp_path / "pages"
     _write_shell_outlet_app(pages)
 
-    app = App(AppConfig(template_dir=str(pages), debug=True))
+    # htmx=True so the htmx_provisioning contract is satisfied (this flat layout
+    # ships no htmx <script>); the test exercises boosted shell-outlet selection.
+    app = App(AppConfig(template_dir=str(pages), debug=True, htmx=True))
     app.register_fragment_target("main", fragment_block="page_root", scope_name="shell")
     app.register_swap_scope("shell", "main")
     app.mount_pages(str(pages))

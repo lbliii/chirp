@@ -42,6 +42,7 @@ from .rules_htmx import (
     check_hx_target_selectors,
     check_selector_syntax,
 )
+from .rules_htmx_provisioning import check_htmx_provisioning
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_kida_analysis import (
@@ -106,6 +107,47 @@ from .types import CheckResult, ContractCoverage, ContractIssue, Severity
 _TEMPLATE_CALL_PATTERN = re.compile(
     r'(?:Template|Fragment|Page|Suspense|Stream|TemplateStream)\s*\(\s*["\']([^"\']+\.html)["\']'
 )
+
+# Full-page render return types. A template rendered through one of these is a
+# *page* the browser loads as a document, so it must self-provision htmx. The
+# set deliberately excludes Fragment / ValidationError / OOB: those swap into an
+# already-loaded (and already-provisioned) host page, so the host owns htmx.
+# Used by the htmx_provisioning rule to scope its per-page check (#185).
+#
+# This intentionally differs from _TEMPLATE_CALL_PATTERN: that pattern includes
+# Fragment (it collects every referenced template, fragments included), whereas
+# this one omits Fragment (fragments are not full-page roots). LayoutPage is
+# omitted from both — it is framework-internal (set by the pages framework, see
+# templating.returns.LayoutPage), never written in a user handler, so scanning
+# handler source for a `LayoutPage("...")` literal would never match. Filesystem
+# page leaves reach the htmx_provisioning rule via page_leaf_templates instead.
+_FULL_PAGE_CALL_PATTERN = re.compile(
+    r'(?:Template|Page|Suspense|Stream|TemplateStream)\s*\(\s*["\']([^"\']+\.html)["\']'
+)
+
+
+def _full_page_render_templates(router: object) -> set[str]:
+    """Template names returned as a full-page document by any route.
+
+    Scans handler (and page-source-handler) sources for full-page return-type
+    calls. Filesystem page leaves are added by the caller (they are always
+    full-page roots). Fragment-only templates are intentionally absent.
+    """
+    names: set[str] = set()
+    for route in getattr(router, "routes", []):
+        handler = getattr(route, "handler", None)
+        page_src = getattr(route, "page_source_handler", None)
+        handler_for_source = page_src if page_src is not None else handler
+        if handler_for_source is None:
+            continue
+        try:
+            src = inspect.getsource(handler_for_source)
+        except TypeError, OSError:
+            continue
+        for m in _FULL_PAGE_CALL_PATTERN.finditer(src):
+            names.add(m.group(1))
+    return names
+
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -591,6 +633,30 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_form_action_contracts(template_sources, router))
         result.issues.extend(check_boundary_coverage(template_sources))
         result.issues.extend(check_alpine_cdn_urls(template_sources))
+        full_page_templates = _full_page_render_templates(router)
+        full_page_templates.update(snapshot.page_leaf_templates)
+        # Map each filesystem page-leaf template to the LayoutChain(s) that
+        # compose it, so the htmx_provisioning rule seeds each page with ONLY its
+        # own composing layouts — never the union of every layout in the app
+        # (#185). A leaf reused by multiple routes accumulates each composing
+        # chain (the rule unions their layouts).
+        layout_chains_by_leaf: dict[str, list[object]] = {}
+        for page_route in getattr(snapshot, "discovered_routes", []):
+            leaf = getattr(page_route, "template_name", None)
+            chain = getattr(page_route, "layout_chain", None)
+            if leaf and chain is not None:
+                layout_chains_by_leaf.setdefault(leaf, []).append(chain)
+        result.issues.extend(
+            check_htmx_provisioning(
+                template_sources,
+                app.config,
+                layout_chains=snapshot.layout_chains,
+                layout_chains_by_leaf=layout_chains_by_leaf,
+                page_leaf_templates=snapshot.page_leaf_templates,
+                full_page_templates=full_page_templates,
+                template_aliases=template_aliases,
+            )
+        )
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
         result.issues.extend(check_fragment_block_scope(template_sources, kida_env))
         result.issues.extend(

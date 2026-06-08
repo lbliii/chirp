@@ -28,6 +28,13 @@ shells, accessibility, client-owned islands, ChirpUI, and tool registration.
 Build inclusive apps with Chirp.
 :::{/card}
 
+:::{card} htmx
+:icon: zap
+:link: /chirp/docs/build-apps/ui-extensions/htmx/
+:description: Chirp-managed htmx — the hypermedia transport for hx-* attributes
+Enable with AppConfig(htmx=True); Chirp injects the runtime and the provisioning contract keeps it wired.
+:::{/card}
+
 :::{card} Alpine.js
 :icon: layers
 :link: /chirp/docs/build-apps/ui-extensions/alpine/

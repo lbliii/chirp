@@ -242,6 +242,27 @@ uv run ruff format . --check # Format check
 - `view_transitions` — `False` (off), `True`/`"htmx"` (swap animations), `"full"` (MPA + htmx)
 - `secret_key` — required for sessions, CSRF
 
+## htmx Injection
+
+Chirp is the **single authority** for htmx when `AppConfig(htmx=True)`.
+`HtmxInject` middleware appends the htmx core `<script>` before `</body>` on
+buffered full-page HTML and rewrites **`StreamingResponse`** chunk streams the
+same way (e.g. `Suspense` shells), mirroring `AlpineInject`. Dedup: if
+`data-chirp="htmx"` already exists before `</body>`, injection is skipped.
+
+The CDN footgun is the **inverse** of Alpine's: htmx uses the proven **unpkg**
+build `https://unpkg.com/htmx.org@{htmx_version}` (the IIFE that defines
+`window.htmx`). Do **not** swap this to a bare jsDelivr npm path
+(`https://cdn.jsdelivr.net/npm/htmx.org@VER`) — that resolves to a CommonJS
+module and breaks silently in the browser. Set `htmx_sse=True` to also inject the
+htmx SSE extension (`htmx-ext-sse@2.2.2/sse.js`).
+
+The `htmx_provisioning` contract enforces this at `app.check()`: a template that
+uses `hx-*`/`sse-*` attributes without htmx provisioned (via `AppConfig(htmx=True)`
+or a reachable htmx `<script>`) is an ERROR — the attributes are inert and the UI
+silently does nothing. See `src/chirp/server/htmx_inject.py`,
+`src/chirp/middleware/inject.py`, and `docs/build-apps/ui-extensions/htmx.md`.
+
 ## Alpine.js Injection
 
 Chirp is the **single authority** for Alpine.js. When `AppConfig(alpine=True)`,

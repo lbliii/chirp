@@ -192,6 +192,11 @@ class AppConfig:
     alpine_version: str = "3.15.8"  # Pinned for reproducibility
     alpine_csp: bool = False  # Use CSP-safe build when True
 
+    # htmx — core hypermedia transport (hx-* attributes, swaps, boosts)
+    htmx: bool = False
+    htmx_version: str = "2.0.4"  # Pinned for reproducibility
+    htmx_sse: bool = False  # Also inject the htmx SSE extension when True
+
     # Islands runtime — framework-agnostic high-state mount lifecycle
     islands: bool = False
     islands_version: str = "1"
