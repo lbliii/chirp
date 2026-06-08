@@ -16,12 +16,11 @@ it with ``app.override_contract_severity("nojs_floor", Severity.ERROR)``.
 import inspect
 from typing import TYPE_CHECKING
 
+from chirp.contracts.rules_security_stack import is_mutating_route
 from chirp.contracts.types import ContractIssue, Severity
 
 if TYPE_CHECKING:
     from chirp.routing.router import Router
-
-_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 # Returns that provide a no-JS fallback (full page or 303 redirect for plain
 # POST). MutationResult is the canonical class; FormAction is its alias.
@@ -42,8 +41,9 @@ def check_nojs_mutation_fallback(router: Router) -> list[ContractIssue]:
     issues: list[ContractIssue] = []
 
     for route in getattr(router, "routes", []):
-        methods = getattr(route, "methods", set())
-        if not (_MUTATING_METHODS & set(methods)):
+        # Single-source the mutating-route definition (owned by
+        # rules_security_stack): method-mutating routes plus form-action pages.
+        if not is_mutating_route(route):
             continue
         if getattr(route, "referenced", False):
             continue

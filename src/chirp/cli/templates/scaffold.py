@@ -41,11 +41,14 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "bengal-chirp>=0.7.0",
+    # SessionMiddleware's default CookieSessionStore signs cookies with
+    # itsdangerous; every scaffold wires the Session/CSRF/SecurityHeaders stack.
+    "itsdangerous>=2.2.0",
 ]
 
 [project.optional-dependencies]
 ui = ["chirp-ui>=0.9.0"]
-auth = ["argon2-cffi>=23.1.0", "itsdangerous>=2.2.0"]
+auth = ["argon2-cffi>=23.1.0"]
 forms = ["python-multipart>=0.0.18"]
 """
 

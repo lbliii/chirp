@@ -51,3 +51,83 @@ def test_scaffold_freezes_with_no_errors(
         f"Scaffold '{mode}' freeze produced ERROR issues: {result.payload.get('errors')}"
     )
     assert result.payload["error_count"] == 0
+
+
+# Drive the GENERATED app with CHIRP_ENV=production so it reports
+# env='production' through its OWN env-aware config (not a substitute
+# AppConfig). The scaffold ships no mutating route, so we add a synthetic POST
+# route to make the rule fire — but the config and middleware list are the
+# generated app's real ones. This proves the env switch (Finding 2) reaches the
+# generated config AND that the wired Session/CSRF/SecurityHeaders stack clears
+# the env-aware ERROR path — #183's acceptance: minimal + shell pass the
+# security_stack contract in production out of the box even once a user adds a
+# mutation.
+_SECURITY_STACK_PROD_CODE = r"""
+import json, sys
+sys.path.insert(0, ".")
+import app as _app
+from chirp.contracts.rules_security_stack import check_security_stack
+
+
+class _Route:
+    methods = {"POST"}
+
+
+class _Router:
+    routes = [_Route()]
+
+
+_app.app.freeze()
+config = _app.app.config
+middleware_list = list(_app.app._mutable_state.middleware_list)
+issues = check_security_stack(_Router(), config, middleware_list)
+print(json.dumps({
+    "config_env": config.env,
+    "config_debug": config.debug,
+    "errors": [i.message for i in issues if i.severity.name == "ERROR"],
+    "warnings": [i.message for i in issues if i.severity.name == "WARNING"],
+    "middleware": [type(mw).__name__ for mw in middleware_list],
+}))
+"""
+
+
+@pytest.mark.parametrize("mode", ["minimal", "shell"])
+def test_scaffold_passes_security_stack_in_production(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    """#183: generated minimal/shell apps are security_stack-clean in production.
+
+    Drives the generated app with CHIRP_ENV=production so it builds its OWN
+    config with env='production' and debug off. The wired
+    Session/CSRF/SecurityHeaders middleware means that even when a user promotes
+    the app to production and adds a mutating route, the security_stack contract
+    emits zero ERRORs (and no SecurityHeaders WARNING).
+    """
+    project = scaffold(tmp_path, monkeypatch, mode=mode)
+    result = run_and_parse(
+        project, _SECURITY_STACK_PROD_CODE, extra_env={"CHIRP_ENV": "production"}
+    )
+    assert result.returncode == 0, (
+        f"Scaffold '{mode}' subprocess failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    # The env switch must reach the generated config, not just a substitute.
+    assert result.payload.get("config_env") == "production", (
+        f"Scaffold '{mode}' generated config did not honour CHIRP_ENV=production: "
+        f"{result.payload.get('config_env')!r}"
+    )
+    assert result.payload.get("config_debug") is False, (
+        f"Scaffold '{mode}' should default debug off in production: "
+        f"{result.payload.get('config_debug')!r}"
+    )
+    assert result.payload.get("errors") == [], (
+        f"Scaffold '{mode}' has security_stack ERRORs in production: {result.payload.get('errors')}"
+    )
+    # The full stack is wired, so SecurityHeaders never warns either.
+    assert result.payload.get("warnings") == [], (
+        f"Scaffold '{mode}' has security_stack WARNINGs in production: "
+        f"{result.payload.get('warnings')}"
+    )
+    middleware = result.payload.get("middleware", [])
+    assert "SessionMiddleware" in middleware
+    assert "CSRFMiddleware" in middleware
+    assert "SecurityHeadersMiddleware" in middleware

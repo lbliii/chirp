@@ -215,6 +215,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     # Safety / plugins / docs
     "sse_speculation": "Production Safety",
     "csrf_session": "Production Safety",
+    "security_stack": "Production Safety",
     "middleware_signature": "Production Safety",
     "secret_key": "Production Safety",
     "mount_app_merge": "Setup",
