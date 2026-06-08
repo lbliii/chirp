@@ -154,6 +154,21 @@ class TestChirpNewMinimal:
         source = (tmp_path / "myapp" / "app.py").read_text()
         compile(source, "app.py", "exec")
 
+    def test_generated_minimal_app_contains_security_defaults(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--minimal wires the full Session/CSRF/SecurityHeaders stack (#183)."""
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--minimal"])
+
+        source = (tmp_path / "myapp" / "app.py").read_text()
+        assert "CHIRP_SECRET_KEY" in source
+        assert "Refusing to start in production with default secret key" in source
+        assert "secure=not config.debug" in source
+        assert "SessionMiddleware" in source
+        assert "CSRFMiddleware(CSRFConfig())" in source
+        assert "SecurityHeadersMiddleware()" in source
+
 
 class TestChirpNewSSE:
     def test_creates_sse_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -197,6 +212,21 @@ class TestChirpNewShell:
         context_source = (tmp_path / "myapp" / "pages" / "_context.py").read_text()
         compile(app_source, "app.py", "exec")
         compile(context_source, "_context.py", "exec")
+
+    def test_generated_shell_app_contains_security_defaults(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--shell wires the full Session/CSRF/SecurityHeaders stack (#183)."""
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--shell"])
+
+        source = (tmp_path / "myapp" / "app.py").read_text()
+        assert "CHIRP_SECRET_KEY" in source
+        assert "Refusing to start in production with default secret key" in source
+        assert "secure=not config.debug" in source
+        assert "SessionMiddleware" in source
+        assert "CSRFMiddleware(CSRFConfig())" in source
+        assert "SecurityHeadersMiddleware()" in source
 
     def test_plain_shell_keeps_transition_off_broad_main(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

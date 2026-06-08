@@ -61,18 +61,23 @@ def run_in_scaffold(
     code: str,
     *,
     timeout: float = 30.0,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``code`` via ``python -c`` inside ``scaffold_dir``.
 
     CHIRP_SECRET_KEY is set so production-guards don't trip. Contract checks
     are skipped at freeze so the test can inspect issues without the process
-    exiting on ERROR.
+    exiting on ERROR. ``extra_env`` overlays additional env vars (e.g.
+    ``CHIRP_ENV=production``) so a test can drive the generated app's own
+    env-aware config.
     """
     env = {
         **os.environ,
         "CHIRP_SECRET_KEY": "test-secret-key-for-contract-tests",
         "CHIRP_SKIP_CONTRACT_CHECKS": "1",
     }
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run(
         [sys.executable, "-c", code],
         cwd=scaffold_dir,
@@ -92,9 +97,11 @@ class SubprocessResult:
     payload: dict[str, Any]
 
 
-def run_and_parse(scaffold_dir: Path, code: str) -> SubprocessResult:
+def run_and_parse(
+    scaffold_dir: Path, code: str, *, extra_env: dict[str, str] | None = None
+) -> SubprocessResult:
     """Run code in the scaffold and parse trailing-line JSON from stdout."""
-    proc = run_in_scaffold(scaffold_dir, code)
+    proc = run_in_scaffold(scaffold_dir, code, extra_env=extra_env)
     payload: dict[str, Any] = {}
     if proc.stdout.strip():
         last = proc.stdout.strip().splitlines()[-1]

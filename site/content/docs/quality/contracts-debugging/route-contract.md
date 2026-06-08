@@ -146,6 +146,7 @@ header tells you which surface to inspect before you open the file.
 | `csrf_form` | WARNING | `CSRFMiddleware` is active and a static mutating `<form>` has no `{{ csrf_field() }}`, `csrf_token()`, or `_csrf_token` field. |
 | `a11y_label`, `a11y_alt`, `a11y_heading`, `a11y_landmark` | WARNING | Accessibility checks for missing labels, missing image alt text, skipped heading levels, or missing landmarks. |
 | `csrf_session`, `secret_key`, `middleware_signature` | ERROR / WARNING | Production-safety checks for security middleware ordering, missing secret keys, and middleware call signatures. |
+| `security_stack` | ERROR / WARNING | An app with mutating routes (POST/PUT/PATCH/DELETE, including filesystem pages with `_actions.py`) is missing the secure-by-default stack. Missing `CSRFMiddleware`/`SessionMiddleware` is ERROR in production, WARNING in staging, silent in development; missing `SecurityHeadersMiddleware` always WARNs. The `chirp new` scaffolds (including `--minimal`) wire this for you — middleware is never force-injected. Canonical owner of the "mutating route" definition; see [[docs/quality/contracts-debugging/categories|Contract Category Reference]]. |
 
 These checks run automatically as part of `chirp check myapp:app`. Some
 categories only activate when the app provides the relevant metadata, such as a

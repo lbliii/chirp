@@ -55,10 +55,17 @@ For an even smaller starting point:
 chirp new myapp --minimal
 ```
 
-This generates only `app.py` and `templates/index.html`.
+This generates a single `app.py` plus `templates/index.html` — no `pages/`
+tree, models, or scaffolded auth routes. The generated `app.py` is **not** bare,
+though: it wires the secure-by-default stack (`SessionMiddleware` →
+`CSRFMiddleware` → `SecurityHeadersMiddleware`), reads the secret key from
+`CHIRP_SECRET_KEY`, and refuses to start in production with the placeholder
+secret. That means even the minimal scaffold passes the `security_stack`
+contract out of the box: its mutating routes are CSRF/session-guarded the moment
+you add them.
 
-If you want to learn the fragment loop without scaffolded auth and middleware,
-use [[docs/get-started/first-fragment-app|First Fragment App]] after this page.
+If you want to learn the fragment loop on top of that secure baseline, use
+[[docs/get-started/first-fragment-app|First Fragment App]] after this page.
 
 ## Hello World (Manual)
 

@@ -58,6 +58,13 @@ myapp/
     index.html
 ```
 
+The minimal layout drops the `pages/` tree, models, and scaffolded auth routes,
+but the generated `app.py` still wires the secure-by-default stack
+(`SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware`) and reads
+the secret key from `CHIRP_SECRET_KEY`. This keeps even the smallest scaffold
+passing the `security_stack` contract — mutating routes you add are
+CSRF/session-guarded by default.
+
 **With SSE** (`chirp new myapp --sse`):
 
 Adds `EventStream` route, boost layout, and `sse-connect` in the template.

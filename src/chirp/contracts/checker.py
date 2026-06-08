@@ -736,6 +736,21 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_metrics_path_collision(app.config, router))
     result.issues.extend(check_sentry_sample_rate(app.config))
 
+    # Security stack: mutating routes need CSRF/Session/SecurityHeaders.
+    # discovered_routes carries filesystem PageRoutes (which expose `.actions`)
+    # so a GET-only page backed by _actions.py form actions is treated as
+    # mutating, not just method-mutating router routes.
+    from chirp.contracts.rules_security_stack import check_security_stack
+
+    result.issues.extend(
+        check_security_stack(
+            router,
+            app.config,
+            middleware_list,
+            getattr(snapshot, "discovered_routes", []),
+        )
+    )
+
     # No-JS progressive-enhancement floor
     from chirp.contracts.rules_nojs_floor import check_nojs_mutation_fallback
 

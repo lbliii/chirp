@@ -162,6 +162,7 @@ class TestFormatterConcernGroups:
             ("hx-indicator", "HTMX"),
             ("hx-boost", "HTMX"),
             ("csrf_form", "Forms"),
+            ("security_stack", "Production Safety"),
             ("mount_app_merge", "Setup"),
         ],
     )

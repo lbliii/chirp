@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
+from chirp.middleware import SecurityHeadersMiddleware
 from chirp.pages.reactive import BlockRef, ChangeEvent, ConnectionInfo, DependencyIndex, ReactiveBus
 from chirp.pages.reactive.stream import reactive_stream
 
@@ -106,6 +107,11 @@ config = AppConfig(
     sse_close_event="close",
 )
 app = App(config=config)
+# Secure-by-default: this demo has mutating routes (POST/DELETE), so it ships
+# SecurityHeadersMiddleware (clickjacking/MIME-sniffing/referrer hardening) to
+# satisfy the security_stack contract. CSRF/Session are required only outside
+# development (env-aware), so this dev-focused reactivity demo keeps them off.
+app.add_middleware(SecurityHeadersMiddleware())
 app.set_contract_check_data("reactive_index", dep_index)
 app.set_contract_check_data("reactive_emitted_paths", {"tasks", "presence"})
 app.set_contract_check_data("reactive_connection_scopes", {"board"})

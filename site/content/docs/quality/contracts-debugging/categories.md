@@ -114,12 +114,63 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `vary` | WARNING | Add required `Vary` behavior for cache-sensitive htmx or middleware paths. |
 | `allowed_hosts` | ERROR / WARNING | Configure explicit hosts outside development instead of `allowed_hosts=("*",)`. |
 | `csrf_session` | ERROR | Register `SessionMiddleware` before `CSRFMiddleware`. |
+| `security_stack` | ERROR / WARNING | Wire the secure-by-default stack on apps with mutating routes. Missing `CSRFMiddleware` or `SessionMiddleware` is **ERROR in production, WARNING in staging, silent in development**; missing `SecurityHeadersMiddleware` is always **WARNING** (env-independent). No middleware is force-injected — register the stack yourself (the `chirp new` scaffolds, including `--minimal`, do this for you). This category is the canonical owner of the "mutating route" definition referenced by the forms (`csrf_form`) and auth contracts; `csrf_session` checks ordering and `csrf_form` checks template `<form>` tags, while `security_stack` is the route-level presence check. See the env-severity matrix and the canonical "mutating route" definition below. |
 | `middleware_signature` | ERROR / WARNING | Make middleware callable as `async __call__(request, next)`. |
 | `secret_key` | ERROR / WARNING | Set a production `secret_key` and use an adequately long value. |
 | `nojs_floor` | INFO | Return `FormAction` (303 for plain POST, fragments for htmx) from mutating routes instead of an htmx-only `Fragment`/`OOB`. INFO by default (htmx-only mutation is a valid choice); promote with `override_contract_severity("nojs_floor", Severity.ERROR)` to enforce the no-JS floor. |
 | `deploy_debug` | ERROR | Set `debug=False` (or `CHIRP_DEBUG=0`) when `env="production"`. |
 | `deploy_metrics` | ERROR | Change `metrics_path` or move the colliding application route so the Prometheus endpoint does not shadow a route. |
 | `deploy_sentry` | WARNING | Set a non-zero `sentry_traces_sample_rate` when a Sentry DSN is configured, or clear the DSN. |
+
+### `security_stack`: canonical reference
+
+`security_stack` is the canonical owner of the **mutating route** definition and
+the secure-by-default presence check. `rules_nojs_floor` already reuses this
+definition (`is_mutating_route` / `MUTATING_METHODS`); the forms (`csrf_form`) and
+auth contracts are the intended future consumers, rather than each re-deriving
+"what counts as a mutating route."
+
+**What is a mutating route?** A route is mutating when **either** condition
+holds:
+
+- It accepts any method in `{POST, PUT, PATCH, DELETE}` — explicit handlers
+  (`@app.route("/save", methods=["POST"])`, or `PUT`/`PATCH`/`DELETE`) and
+  filesystem `page.py` files that define a `post`/`put`/`patch`/`delete` handler.
+- It is a filesystem page that ships `_actions.py` form actions. These pages
+  mutate state via POST-to-self dispatched on the `_action` form field. Crucially,
+  the `page.py` may declare **only** `get()` — Chirp does *not* auto-register a
+  separate POST route variant — so the route is method-`GET` in the router yet is
+  unmistakably a mutating surface. The contract treats a page whose discovered
+  `actions` is non-empty as mutating, so a GET-only `_actions.py` page is held to
+  the same CSRF/Session bar as a POST route (ERROR in production, WARNING in
+  staging). Before this was fixed, such a page was a false negative. Because
+  `_actions.py` is directory-scoped, every page in a directory that ships one is
+  treated as part of that mutating surface — a deliberately conservative,
+  fail-loud attribution, since the directory genuinely handles form mutations.
+
+Referenced (transport) routes such as a mutating SSE/API endpoint are
+**included** — a mutating endpoint still needs CSRF/session protection, unlike
+the no-JS floor (`nojs_floor`), which excludes referenced routes. An app with no
+mutating routes emits no `security_stack` issue.
+
+**Env-severity matrix.** Two distinct severity tracks:
+
+| Missing middleware | development | staging | production |
+|---|---|---|---|
+| `CSRFMiddleware` or `SessionMiddleware` | silent | WARNING | ERROR |
+| `SecurityHeadersMiddleware` | WARNING | WARNING | WARNING |
+
+CSRF/Session is env-aware (silent in development so dev apps and shipped examples
+stay clean). `SecurityHeadersMiddleware` is a separate, env-independent WARNING
+track — missing it warns whenever any mutating route exists, in every env.
+
+**No force-injection.** Per the explicit-over-magic convention, Chirp never
+injects security middleware into `App()`. The lever is this contract plus
+scaffold defaults: every `chirp new` scaffold (including `--minimal`) wires
+`SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware` for you, so
+generated apps pass `security_stack` out of the box. `csrf_session` checks the
+ordering of that stack; `csrf_form` checks individual template `<form>` tags;
+`security_stack` is the route-level presence check.
 
 ## Debug, Extensions, Accessibility, And Plugins
 

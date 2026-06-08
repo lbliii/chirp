@@ -286,6 +286,30 @@ tag with HTML-escaped ids and `json.dumps(..., default=str)` for the payload
 (see `site/content/docs/guides/alpine.md`.)
 The global is not registered when `alpine=False`.
 
+## Secure by Default
+
+Chirp does **not** force-inject security middleware into `App()`
+(explicit-over-magic). The lever is the `security_stack` contract plus scaffold
+defaults. An app with any **mutating route** — POST/PUT/PATCH/DELETE handlers,
+*and* filesystem pages that ship `_actions.py` form actions (a GET-only `page.py`
+that mutates via POST-to-self on the `_action` field — Chirp does *not* register a
+separate POST route, so the page is detected via its non-empty `actions`) — must
+wire the secure-by-default stack: `SessionMiddleware` → `CSRFMiddleware` →
+`SecurityHeadersMiddleware`.
+
+`security_stack` is the canonical owner of the "mutating route" definition
+(`MUTATING_METHODS` / `is_mutating_route` in
+`src/chirp/contracts/rules_security_stack.py`; `rules_nojs_floor` imports it).
+Severity is env-aware: missing CSRF/Session is **ERROR in production, WARNING in
+staging, silent in development**; missing SecurityHeaders is always **WARNING**.
+`csrf_session` checks stack ordering; `csrf_form` checks template `<form>` tags;
+`security_stack` is the route-level presence check.
+
+Every `chirp new` scaffold — including `--minimal` — wires this stack and reads
+the secret key from `CHIRP_SECRET_KEY`, so generated apps pass the contract out
+of the box. See `src/chirp/cli/templates/minimal.py` and
+`site/content/docs/quality/contracts-debugging/categories.md`.
+
 ## Dependencies
 
 Core: `kida-templates`, `anyio`, `bengal-pounce`. Everything else optional:
