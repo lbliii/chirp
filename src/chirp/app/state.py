@@ -19,6 +19,7 @@ from chirp.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
     from chirp.data.database import Database
+    from chirp.data.schema.types import SchemaSnapshot
     from chirp.live_blocks import LiveBlockSpec
 
 
@@ -222,3 +223,7 @@ class ContractCheckSnapshot:
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
+    #: Declared database schema parsed from migrations (or live-introspected),
+    #: or ``None`` for HTML-only / db-less apps. Source for the ``data`` shape
+    #: contract; keeps the typed-SQL column-mapping check no-op without a db.
+    schema: SchemaSnapshot | None = None

@@ -11,7 +11,7 @@ Usage::
 from chirp.data.schema.diff import diff_schemas
 from chirp.data.schema.generate import generate_migration
 from chirp.data.schema.introspect import introspect
-from chirp.data.schema.parse import parse_schema
+from chirp.data.schema.parse import parse_schema, schema_from_migrations
 from chirp.data.schema.types import SchemaSnapshot
 
 __all__ = [
@@ -20,4 +20,5 @@ __all__ = [
     "generate_migration",
     "introspect",
     "parse_schema",
+    "schema_from_migrations",
 ]

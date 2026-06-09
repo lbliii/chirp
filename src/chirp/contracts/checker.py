@@ -30,6 +30,7 @@ from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_composition import check_page_extends_layout
 from .rules_context_cascade import check_context_cascade
 from .rules_csrf_forms import check_csrf_form_tokens
+from .rules_data_shapes import check_data_shapes
 from .rules_debug_wiring import check_debug_wiring
 from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
@@ -110,6 +111,7 @@ _TEMPLATE_CALL_PATTERN = re.compile(
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
+    from chirp.data.schema.types import SchemaSnapshot
 
 
 def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
@@ -140,6 +142,23 @@ def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
         fragment_targets_registered=len(fragment_registry.registered_targets),
         oob_regions_registered=len(oob_registry.registered_blocks) if oob_registry else 0,
     )
+
+
+def _build_contract_schema(migrations_dir: str | None) -> SchemaSnapshot | None:
+    """Build the declared schema snapshot from a migrations directory, or None.
+
+    Mirrors ``chirp.app._build_contract_schema`` for the fallback snapshot
+    builder. Returns ``None`` for db-less apps so the ``data`` shape contract is
+    a silent no-op, and swallows malformed-migration errors (data is optional).
+    """
+    if not migrations_dir:
+        return None
+    try:
+        from chirp.data.schema.parse import schema_from_migrations
+
+        return schema_from_migrations(migrations_dir)
+    except Exception:
+        return None
 
 
 def _route_prepass(
@@ -270,6 +289,9 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
     if kida_env is not None and kida_env.loader is not None:
         ts = load_template_sources(kida_env)
 
+    migrations_dir = getattr(app._mutable_state, "migrations_dir", None)
+    schema = _build_contract_schema(migrations_dir)
+
     return _Snapshot(
         router=router,
         kida_env=kida_env,
@@ -289,6 +311,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         mount_app_skips=list(getattr(app._mutable_state, "mount_app_skips", [])),
         template_sources=ts,
         extras=dict(getattr(app._mutable_state, "contract_check_data", {})),
+        schema=schema,
     )
 
 
@@ -777,6 +800,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     from chirp.contracts.rules_nojs_floor import check_nojs_mutation_fallback
 
     result.issues.extend(check_nojs_mutation_fallback(router))
+
+    # Typed-SQL column-mapping shape contract (#159): SELECTed columns that
+    # map to no field on the fetch(cls, ...) dataclass (and are unknown to the
+    # declared schema) are real drift. No-op for db-less apps -- snapshot.schema
+    # is None without a migrations dir. See rules_data_shapes.
+    result.issues.extend(check_data_shapes(router, snapshot.schema))
 
     live_blocks = getattr(app._mutable_state, "live_blocks", {})
     result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))

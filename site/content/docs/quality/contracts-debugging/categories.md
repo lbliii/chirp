@@ -174,6 +174,12 @@ generated apps pass `security_stack` out of the box. `csrf_session` checks the
 ordering of that stack; `csrf_form` checks individual template `<form>` tags;
 `security_stack` is the route-level presence check.
 
+## Data
+
+| Category | Default severity | Fix target |
+|---|---|---|
+| `data` | ERROR | Fix `db.fetch(cls, sql)` / `fetch_one` / `stream` SELECT columns that map to no field on the target frozen dataclass. The check is static and conservative: it only fires when the `cls` argument resolves to a module-level frozen dataclass **and** the SQL is a string literal with an explicit `SELECT a, b` list. `SELECT *`, expressions, aggregates, dynamic SQL (f-strings, concatenation), and computed `cls` are skipped silently — no false positives. A SELECTed column is flagged only when it is absent from the dataclass fields **and** (when a declared schema is available from a `migrations` directory) absent from every declared table column — that double-guard keeps the check quiet for columns the dataclass intentionally does not read. HTML-only / db-less apps (no `migrations` dir) emit no `data` issues. Overridable via `app.override_contract_severity("data", Severity.WARNING)`. |
+
 ## Debug, Extensions, Accessibility, And Plugins
 
 | Category | Default severity | Fix target |
