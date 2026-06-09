@@ -85,6 +85,7 @@ provisional until those subsystems are stabilized.
 |-------|------|---------|-------------|
 | `static_dir` | `str \| Path \| None` | `"static"` | Directory for static files; `None` disables default static serving |
 | `static_url` | `str` | `"/static"` | URL prefix for static files |
+| `static_stream_threshold` | `int` | `1048576` | File size (bytes) at/above which static files stream from disk in chunks instead of buffering into memory (1 MiB) |
 
 ### SSE And Suspense
 

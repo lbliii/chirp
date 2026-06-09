@@ -19,7 +19,7 @@ from chirp.app.state import RuntimeDebugWiring
 from chirp.context import force_inline_sync_var, g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
-from chirp.http.response import Response, SSEResponse, StreamingResponse
+from chirp.http.response import FileResponse, Response, SSEResponse, StreamingResponse
 from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
@@ -51,7 +51,7 @@ from chirp.server.fragment_targets_debug import (
 from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.negotiation import negotiate
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
-from chirp.server.sender import send_response, send_streaming_response
+from chirp.server.sender import send_file_response, send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.trace import encode_return_trace, get_return_trace
@@ -437,6 +437,14 @@ async def handle_request(
             )
         case StreamingResponse():
             await send_streaming_response(response, send, debug=debug, request_id=rid)
+        case FileResponse():
+            await send_file_response(
+                response,
+                send,
+                request=request,
+                is_head=request.method == "HEAD",
+                request_id=rid,
+            )
         case _:
             await send_response(response, send, request_id=rid)
 

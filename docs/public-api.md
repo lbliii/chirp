@@ -27,7 +27,7 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Area | Names |
 |------|-------|
 | Application | `App`, `AppConfig` |
-| HTTP | `Request`, `Response`, `JSONResponse`, `Redirect`, `hx_redirect` |
+| HTTP | `Request`, `Response`, `FileResponse`, `JSONResponse`, `Redirect`, `hx_redirect` |
 | Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `Action` |
 | Middleware | `Middleware`, `Next`, `AnyResponse` |
 | Request context | `g`, `get_request` |

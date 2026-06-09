@@ -26,6 +26,7 @@ EXPECTED_PUBLIC_API = [
     "DeferredCache",
     "DependencyIndex",
     "EventStream",
+    "FileResponse",
     "FormAction",
     "FormBindingError",
     "Fragment",

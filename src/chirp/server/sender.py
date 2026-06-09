@@ -7,11 +7,11 @@ import logging
 from collections.abc import AsyncIterator
 from contextvars import Token
 from types import MappingProxyType
-from typing import cast
+from typing import Any, cast
 
 from chirp._internal.asgi import Send
 from chirp.context import request_var
-from chirp.http.response import Response, StreamingResponse
+from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.logging import request_id_var
 
 logger = logging.getLogger("chirp.server")
@@ -187,3 +187,270 @@ async def send_streaming_response(
             "more_body": False,
         }
     )
+
+
+def _format_http_date(timestamp: float) -> str:
+    """Format a POSIX timestamp as an RFC 7231 IMF-fixdate string."""
+    from email.utils import formatdate
+
+    return formatdate(timestamp, usegmt=True)
+
+
+def _parse_http_date(value: str) -> float | None:
+    """Parse an HTTP-date header into a POSIX timestamp, or None if invalid."""
+    from email.utils import parsedate_to_datetime
+
+    try:
+        return parsedate_to_datetime(value).timestamp()
+    except TypeError, ValueError, IndexError, OverflowError:
+        return None
+
+
+def _etag_matches(if_none_match: str, etag: str) -> bool:
+    """Return True if *etag* is matched by an ``If-None-Match`` header value.
+
+    Handles the ``*`` wildcard and a comma-separated list of (possibly weak)
+    entity-tags. Weak comparison is used for ``If-None-Match`` per RFC 9110.
+    """
+    if_none_match = if_none_match.strip()
+    if if_none_match == "*":
+        return True
+    bare = etag[2:] if etag.startswith("W/") else etag
+    for candidate in if_none_match.split(","):
+        candidate = candidate.strip()
+        cand_bare = candidate[2:] if candidate.startswith("W/") else candidate
+        if cand_bare == bare:
+            return True
+    return False
+
+
+def _parse_single_range(range_header: str, size: int) -> tuple[int, int] | None | bool:
+    """Parse a single ``bytes=`` Range spec.
+
+    Returns:
+        ``(start, end)`` inclusive byte offsets for a satisfiable single range,
+        ``False`` for an unsatisfiable range (caller should emit 416),
+        ``None`` to ignore the header (multi-range / malformed -> fall back to 200).
+    """
+    range_header = range_header.strip()
+    if not range_header.startswith("bytes="):
+        return None
+    spec = range_header[len("bytes=") :].strip()
+    # Multi-range is not supported — fall back to a full 200 response.
+    if "," in spec:
+        return None
+    if "-" not in spec:
+        return None
+    start_s, _, end_s = spec.partition("-")
+    start_s = start_s.strip()
+    end_s = end_s.strip()
+    if start_s == "":
+        # Suffix range: last N bytes.
+        if end_s == "":
+            return None
+        try:
+            suffix = int(end_s)
+        except ValueError:
+            return None
+        if suffix <= 0:
+            return False
+        if suffix >= size:
+            start, end = 0, size - 1
+        else:
+            start, end = size - suffix, size - 1
+    else:
+        try:
+            start = int(start_s)
+        except ValueError:
+            return None
+        if end_s == "":
+            end = size - 1
+        else:
+            try:
+                end = int(end_s)
+            except ValueError:
+                return None
+            if end >= size:
+                end = size - 1
+        if start >= size:
+            return False
+        if start > end:
+            return None
+    if size == 0:
+        return False
+    return (start, end)
+
+
+async def send_file_response(
+    response: FileResponse,
+    send: Send,
+    *,
+    request: Any = None,
+    is_head: bool = False,
+    request_id: str | None = None,
+) -> None:
+    """Send a :class:`FileResponse` from disk with conditional-GET / Range support.
+
+    Streams the body in ``chunk_size`` reads off the event loop via
+    :func:`anyio.to_thread.run_sync` (matching the data/cache to_thread precedent).
+    Files smaller than ``stream_threshold`` are read in a single shot to keep
+    small-file latency unchanged; larger files stream chunk-by-chunk so worker
+    RSS stays bounded.
+
+    Honours ``If-None-Match`` (weak compare, takes precedence) and
+    ``If-Modified-Since`` -> 304, and a single byte ``Range`` -> 206 (416 when
+    unsatisfiable) when ``response.conditional`` is True.
+
+    On mid-stream IO error the stream is closed without an HTML error body — you
+    cannot inject markup into a half-sent binary payload.
+    """
+    import os
+
+    import anyio.to_thread
+
+    path = response.path
+    try:
+        st = await anyio.to_thread.run_sync(os.stat, path)
+    except OSError:
+        logger.exception("send_file_response: stat failed for %s", path)
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 500,
+                "headers": [
+                    (b"content-type", b"text/plain; charset=utf-8"),
+                    (b"content-length", b"0"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": b""})
+        return
+
+    size = st.st_size
+    etag = f'"{size:x}-{st.st_mtime_ns:x}"'
+    last_modified = _format_http_date(st.st_mtime)
+    content_type = response.resolved_content_type
+
+    # -- Common headers --
+    def _base_headers() -> list[tuple[bytes, bytes]]:
+        raw: list[tuple[bytes, bytes]] = [
+            (b"content-type", _encode_content_type(content_type)),
+        ]
+        # Cache-Control is emitted once by the caller via
+        # _cache_control_or_default; drop any author-supplied one to avoid a
+        # duplicate header.
+        for name, value in response.headers:
+            if name.lower() == "cache-control":
+                continue
+            raw.append((name.lower().encode("latin-1"), value.encode("latin-1")))
+        raw.extend(
+            (b"set-cookie", cookie.to_header_value().encode("latin-1"))
+            for cookie in response.cookies
+        )
+        if request_id is not None:
+            raw.append((b"x-request-id", request_id.encode("latin-1")))
+        return raw
+
+    # -- Conditional GET (304) --
+    status = response.status
+    if response.conditional and status == 200 and request is not None:
+        headers = request.headers
+        inm = headers.get("if-none-match")
+        ims = headers.get("if-modified-since")
+        not_modified = False
+        if inm is not None:
+            # If-None-Match takes precedence over If-Modified-Since (RFC 9110).
+            not_modified = _etag_matches(inm, etag)
+        elif ims is not None:
+            ims_ts = _parse_http_date(ims)
+            # HTTP-date has whole-second resolution; truncate mtime so a file
+            # last modified at e.g. 12:00:00.53 still matches a 12:00:00 header.
+            if ims_ts is not None and int(st.st_mtime) <= int(ims_ts):
+                not_modified = True
+        if not_modified:
+            raw = _base_headers()
+            raw.append((b"etag", etag.encode("latin-1")))
+            raw.append((b"last-modified", last_modified.encode("latin-1")))
+            raw.append((b"cache-control", _cache_control_or_default(response)))
+            raw.append((b"content-length", b"0"))
+            await send({"type": "http.response.start", "status": 304, "headers": raw})
+            await send({"type": "http.response.body", "body": b""})
+            return
+
+    # -- Range (206 / 416) --
+    start = 0
+    end = size - 1
+    is_partial = False
+    if response.conditional and status == 200 and request is not None:
+        range_header = request.headers.get("range")
+        if range_header is not None:
+            parsed = _parse_single_range(range_header, size)
+            if parsed is False:
+                raw = _base_headers()
+                raw.append((b"content-range", f"bytes */{size}".encode("latin-1")))
+                raw.append((b"content-length", b"0"))
+                await send({"type": "http.response.start", "status": 416, "headers": raw})
+                await send({"type": "http.response.body", "body": b""})
+                return
+            if isinstance(parsed, tuple):
+                start, end = parsed
+                is_partial = True
+
+    length = end - start + 1
+    raw = _base_headers()
+    raw.append((b"etag", etag.encode("latin-1")))
+    raw.append((b"last-modified", last_modified.encode("latin-1")))
+    raw.append((b"accept-ranges", b"bytes"))
+    raw.append((b"cache-control", _cache_control_or_default(response)))
+    raw.append((b"content-length", str(length).encode("latin-1")))
+    if is_partial:
+        raw.append((b"content-range", f"bytes {start}-{end}/{size}".encode("latin-1")))
+        status = 206
+
+    await send({"type": "http.response.start", "status": status, "headers": raw})
+
+    if is_head or length == 0:
+        await send({"type": "http.response.body", "body": b""})
+        return
+
+    # -- Stream body in chunks off the event loop --
+    chunk_size = response.chunk_size
+    try:
+
+        def _open():
+            return open(path, "rb")
+
+        fh = await anyio.to_thread.run_sync(_open)
+        try:
+            await anyio.to_thread.run_sync(fh.seek, start)
+            remaining = length
+            # Single-shot for small files; chunked loop at/above the threshold.
+            if size < response.stream_threshold:
+                data = await anyio.to_thread.run_sync(fh.read, remaining)
+                await send({"type": "http.response.body", "body": data, "more_body": True})
+            else:
+                while remaining > 0:
+                    to_read = min(chunk_size, remaining)
+                    data = await anyio.to_thread.run_sync(fh.read, to_read)
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": data,
+                            "more_body": True,
+                        }
+                    )
+        finally:
+            await anyio.to_thread.run_sync(fh.close)
+    except OSError:
+        # Binary-safe error path: no HTML error div into a half-sent payload.
+        logger.exception("send_file_response: read failed for %s", path)
+    await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+
+def _cache_control_or_default(response: FileResponse) -> bytes:
+    """Cache-Control header value, defaulting when not set on the response."""
+    cc = response.header("Cache-Control")
+    return (cc or "public, max-age=3600").encode("latin-1")
