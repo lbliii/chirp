@@ -409,6 +409,10 @@ class StreamingResponse:
     headers: tuple[tuple[str, str], ...] = ()
     render_intent: RenderIntent = "unknown"
     request_context: Request | None = None
+    #: Live CSP nonce captured at construction (inside the middleware/handler
+    #: scope) so the sender can re-establish the nonce ContextVar while the
+    #: chunk generator drains. ``None`` when CSP nonces are not enabled.
+    csp_nonce: str | None = None
 
     def with_status(self, status: int) -> StreamingResponse:
         """Return a new StreamingResponse with a different status code."""

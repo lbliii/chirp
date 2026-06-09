@@ -109,13 +109,18 @@ class TestDefaultCSPAllowsFrameworkScripts:
         assert "https://cdn.jsdelivr.net" in csp
 
     @pytest.mark.anyio
-    async def test_default_csp_allows_inline_scripts(self) -> None:
-        """Inline scripts (dark-mode toggle, Alpine safeData) must run."""
+    async def test_default_csp_drops_unsafe_inline(self) -> None:
+        """Default CSP no longer ships 'unsafe-inline' (#181).
+
+        Framework inline scripts now carry a live nonce (Suspense streams) or
+        are caught by the csp_nonce contract (Alpine bootstrap). The secure
+        default is a nonce-able policy, not an inline-allowing one.
+        """
         app = _make_app()
         async with TestClient(app) as client:
             resp = await client.get("/")
         csp = _header(resp, "content-security-policy") or ""
-        assert "'unsafe-inline'" in csp
+        assert "'unsafe-inline'" not in csp
 
     @pytest.mark.anyio
     async def test_default_csp_no_unsafe_eval(self) -> None:
@@ -131,3 +136,8 @@ class TestDefaultCSPAllowsFrameworkScripts:
         cfg = SecurityHeadersConfig()
         assert cfg.content_security_policy is not None
         assert "script-src" in cfg.content_security_policy
+
+    def test_config_default_drops_unsafe_inline(self) -> None:
+        """Default CSP no longer ships 'unsafe-inline' (#181)."""
+        cfg = SecurityHeadersConfig()
+        assert "'unsafe-inline'" not in (cfg.content_security_policy or "")

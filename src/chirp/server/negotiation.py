@@ -19,6 +19,7 @@ from chirp.http.response import (
     SSEResponse,
     StreamingResponse,
 )
+from chirp.middleware.csp_nonce import csp_nonce as _get_csp_nonce
 from chirp.realtime.events import EventStream
 from chirp.server.debug.render_plan_snapshot import stash_render_debug_for_request
 from chirp.server.negotiation_oob import (
@@ -553,6 +554,7 @@ def negotiate(
                     chunks=chunks,
                     content_type="text/html; charset=utf-8",
                     request_context=request,
+                    csp_nonce=_get_csp_nonce() or None,
                 )
             # All context values are resolved — use sync streaming
             tmpl = kida_env.get_template(value.template_name)
@@ -561,6 +563,7 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,
+                csp_nonce=_get_csp_nonce() or None,
             )
         case TemplateStream():
             _trace_return(
@@ -579,6 +582,7 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,
+                csp_nonce=_get_csp_nonce() or None,
             )
         case LayoutSuspense():
             req = value.request if value.request is not None else request
@@ -620,6 +624,7 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=req,
+                csp_nonce=_get_csp_nonce() or None,
             )
         case Suspense():
             _trace_return(
@@ -649,6 +654,7 @@ def negotiate(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,
+                csp_nonce=_get_csp_nonce() or None,
             )
         case EventStream():
             _trace_return(

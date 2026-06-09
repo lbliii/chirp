@@ -111,7 +111,7 @@ def format_oob_htmx(
     return f'<div id="{target_id}" hx-swap-oob="{swap}">{block_html}</div>'
 
 
-def format_oob_script(block_html: str, target_id: str) -> str:
+def format_oob_script(block_html: str, target_id: str, *, nonce: str = "") -> str:
     """Wrap rendered block HTML as a ``<template>`` + ``<script>`` pair.
 
     Used for initial page loads where htmx OOB is not available.
@@ -120,12 +120,18 @@ def format_oob_script(block_html: str, target_id: str) -> str:
     If the block's first child element has the same ``id`` as the target,
     ``replaceWith`` is used (outerHTML-style) to avoid double-nesting.
     Otherwise ``innerHTML`` replacement is used.
+
+    When *nonce* is non-empty, the emitted ``<script>`` carries a
+    ``nonce="..."`` attribute so it survives a nonce-based CSP that no longer
+    ships ``'unsafe-inline'``. Suspense streams capture the live request nonce
+    (see :func:`chirp.middleware.csp_nonce.csp_nonce`) at this call site.
     """
     escaped_id = target_id.replace('"', "&quot;")
     template_id = f"_chirp_d_{target_id}"
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
     return (
         f'<template id="{template_id}">{block_html}</template>'
-        f"<script>"
+        f"<script{nonce_attr}>"
         f'(function(){{var t=document.getElementById("{template_id}"),'
         f'e=document.getElementById("{escaped_id}");'
         f"if(t&&e){{var c=t.content.cloneNode(true);"
@@ -323,6 +329,12 @@ async def render_suspense(
     defer_map = suspense.defer_map
     use_htmx_fmt = is_htmx
 
+    # Capture the live CSP nonce so initial-load <script> chunks survive a
+    # nonce-based CSP (no 'unsafe-inline'). Empty string when nonces are off.
+    from chirp.middleware.csp_nonce import csp_nonce as _csp_nonce
+
+    _nonce = _csp_nonce()
+
     layout_ctx = layout_context if layout_context is not None else {}
 
     # -- Phase 1: Separate sync vs. async context --
@@ -454,7 +466,7 @@ async def render_suspense(
             if use_htmx_fmt:
                 yield format_oob_htmx(fallback_html, target_id)
             else:
-                yield format_oob_script(fallback_html, target_id)
+                yield format_oob_script(fallback_html, target_id, nonce=_nonce)
         return
 
     # -- Phase 4: Re-render affected blocks with full context --
@@ -477,7 +489,7 @@ async def render_suspense(
                     swap, wrap = "true", True
                 yield format_oob_htmx(block_html, target_id, swap, wrap=wrap)
             else:
-                yield format_oob_script(block_html, target_id)
+                yield format_oob_script(block_html, target_id, nonce=_nonce)
         except Exception as exc:
             logger.warning(
                 "Suspense: error rendering deferred block=%r in template=%r, "
@@ -499,4 +511,4 @@ async def render_suspense(
             if use_htmx_fmt:
                 yield format_oob_htmx(error_html, target_id)
             else:
-                yield format_oob_script(error_html, target_id)
+                yield format_oob_script(error_html, target_id, nonce=_nonce)

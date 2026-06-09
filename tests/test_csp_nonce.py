@@ -105,3 +105,48 @@ class TestNonceCSPAllowsFrameworkScripts:
         assert "nonce-" in csp
         assert "https://unpkg.com" in csp
         assert "https://cdn.jsdelivr.net" in csp
+
+
+# --- StreamingResponse carries the live nonce for the sender (#181) ---
+
+
+@pytest.mark.asyncio
+async def test_streaming_response_carries_nonce():
+    """The middleware stamps the live nonce onto a StreamingResponse so the
+    sender can re-establish it while the generator drains."""
+    from chirp.http.response import StreamingResponse
+
+    async def stream_next(request):
+        return StreamingResponse(chunks=iter(["<p>hi</p>"]), content_type="text/html")
+
+    mw = CSPNonceMiddleware()
+    resp = await mw(FakeRequest(), stream_next)
+    assert isinstance(resp, StreamingResponse)
+    assert resp.csp_nonce
+    csp = _get_header(resp, "content-security-policy")
+    assert f"nonce-{resp.csp_nonce}" in csp
+
+
+@pytest.mark.asyncio
+async def test_streaming_nonce_matches_csp_header():
+    """The nonce stamped on the response equals the one in the CSP header."""
+    from chirp.http.response import StreamingResponse
+
+    async def stream_next(request):
+        return StreamingResponse(chunks=iter(["x"]), content_type="text/html")
+
+    mw = CSPNonceMiddleware()
+    resp = await mw(FakeRequest(), stream_next)
+    assert f"'nonce-{resp.csp_nonce}'" in _get_header(resp, "content-security-policy")
+
+
+def test_set_reset_nonce_helpers_roundtrip():
+    """The private set/reset helpers expose the nonce var to the sender layer."""
+    from chirp.middleware.csp_nonce import _reset_csp_nonce, _set_csp_nonce
+
+    token = _set_csp_nonce("ROUNDTRIP")
+    try:
+        assert get_csp_nonce() == "ROUNDTRIP"
+    finally:
+        _reset_csp_nonce(token)
+    assert csp_nonce() == ""

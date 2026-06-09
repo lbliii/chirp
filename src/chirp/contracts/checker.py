@@ -751,6 +751,21 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         )
     )
 
+    # CSP-nonce: framework inline scripts must be nonceable under an
+    # inline-forbidding CSP (the Alpine bootstrap cannot be nonced through the
+    # precompiled injection path). See rules_csp_nonce for the regression it
+    # catches and #181 for the nonce-lifecycle fix.
+    from chirp.contracts.rules_csp_nonce import check_csp_nonce
+
+    result.issues.extend(
+        check_csp_nonce(
+            router,
+            app.config,
+            middleware_list,
+            getattr(snapshot, "discovered_routes", []),
+        )
+    )
+
     # No-JS progressive-enhancement floor
     from chirp.contracts.rules_nojs_floor import check_nojs_mutation_fallback
 

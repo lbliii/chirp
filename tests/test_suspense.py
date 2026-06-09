@@ -259,6 +259,70 @@ class TestFormatOOBScript:
         html = format_oob_script("<p>X</p>", "my-panel")
         assert 'getElementById("my-panel")' in html
 
+    def test_no_nonce_attr_by_default(self):
+        html = format_oob_script("<p>X</p>", "stats")
+        assert "<script>" in html
+        assert "nonce=" not in html
+
+    def test_nonce_attr_when_provided(self):
+        html = format_oob_script("<p>X</p>", "stats", nonce="abc123")
+        assert '<script nonce="abc123">' in html
+
+
+class TestSuspenseStreamCarriesLiveNonce:
+    """Acceptance: framework inline scripts in a streamed Suspense response
+    carry a *live* nonce — the #181 lifecycle fix.
+
+    Drains a Suspense stream while the CSP nonce ContextVar is set (mirroring
+    what ``send_streaming_response`` does from ``StreamingResponse.csp_nonce``)
+    and asserts the streamed ``<script>`` chunks carry that non-empty nonce.
+    """
+
+    @pytest.mark.asyncio
+    async def test_streamed_scripts_are_nonced(self):
+        from chirp.middleware.csp_nonce import _reset_csp_nonce, _set_csp_nonce
+
+        env = _env()
+
+        async def load_stats():
+            return ["alice", "bob"]
+
+        async def load_feed():
+            return ["post"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+
+        live_nonce = "LIVENONCE123"
+        token = _set_csp_nonce(live_nonce)
+        try:
+            chunks = [chunk async for chunk in render_suspense(env, suspense, is_htmx=False)]
+        finally:
+            _reset_csp_nonce(token)
+
+        body = "".join(chunks)
+        # An inline <script> is emitted for the deferred block; it must carry
+        # the live nonce, not an empty/dead one.
+        assert "<script" in body
+        assert f'<script nonce="{live_nonce}">' in body
+        assert "<script>" not in body  # no un-nonced inline script slipped through
+
+    @pytest.mark.asyncio
+    async def test_streamed_scripts_unnonced_when_no_nonce(self):
+        """With no nonce in scope the script is un-nonced (back-compat)."""
+        env = _env()
+
+        async def load_stats():
+            return ["x", "y"]
+
+        async def load_feed():
+            return ["f"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+        chunks = [chunk async for chunk in render_suspense(env, suspense, is_htmx=False)]
+        body = "".join(chunks)
+        assert "<script>" in body
+        assert "nonce=" not in body
+
 
 # ---------------------------------------------------------------------------
 # Sync-only fallback
