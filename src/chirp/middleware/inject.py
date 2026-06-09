@@ -10,20 +10,55 @@ markup that should appear on every page without modifying templates.
 import logging
 from dataclasses import replace
 
+import anyio
+
 from chirp.http.request import Request
-from chirp.http.response import Response, StreamingResponse
+from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.middleware.streaming_html import async_stream_inject_before_body
 
 _LOG = logging.getLogger("chirp.middleware.inject")
 
 
+async def _materialize_html_file(response: FileResponse) -> Response | FileResponse:
+    """Read a ``text/html`` FileResponse off disk into a buffered Response.
+
+    Snippet injection needs the whole body, so a static HTML page served by
+    :class:`~chirp.middleware.static.StaticFiles` is read into memory and
+    returned as a :class:`~chirp.http.response.Response` that the existing
+    body-injection path can rewrite. Status, headers, cookies, content type
+    and render intent are preserved.
+
+    Non-HTML FileResponses (CSS, images, large binaries) and unreadable files
+    are returned unchanged so they keep streaming from disk.
+    """
+    if not response.resolved_content_type.startswith("text/html"):
+        return response
+    try:
+        raw = await anyio.to_thread.run_sync(response.path.read_bytes)
+    except OSError:
+        _LOG.warning("HTMLInject: could not read %s for injection", response.path)
+        return response
+    return Response(
+        body=raw.decode("utf-8", errors="replace"),
+        status=response.status,
+        content_type=response.resolved_content_type,
+        headers=response.headers,
+        cookies=response.cookies,
+        render_intent=response.render_intent,
+    )
+
+
 class HTMLInject:
     """Middleware that injects HTML content into text/html responses.
 
-    Only affects ``Response`` objects whose ``content_type`` contains
-    ``text/html``.  ``StreamingResponse`` and ``SSEResponse`` are
-    passed through unchanged (see :class:`AlpineInject` for streaming HTML).
+    Affects ``Response`` objects whose ``content_type`` contains
+    ``text/html`` and ``text/html`` :class:`~chirp.http.response.FileResponse`
+    bodies (static HTML pages served by :class:`StaticFiles`), which are read
+    from disk, injected, and returned as a buffered ``Response`` — snippet
+    injection inherently needs the whole body, so streaming is moot here.
+    ``StreamingResponse`` and ``SSEResponse`` are passed through unchanged
+    (see :class:`AlpineInject` for streaming HTML).
 
     When *full_page_only* is ``True``, the snippet is injected **only**
     when the *before* target string is found in the response body.
@@ -57,6 +92,10 @@ class HTMLInject:
         """Inject the snippet into HTML responses."""
         response = await next(request)
 
+        # Static HTML files (FileResponse) are read into a buffered Response so
+        # the snippet can be injected; non-HTML files stream through untouched.
+        if isinstance(response, FileResponse):
+            response = await _materialize_html_file(response)
         # Only modify concrete Response objects with HTML content
         if not isinstance(response, Response):
             return response
@@ -111,6 +150,8 @@ class StreamingHTMLInject(HTMLInject):
         response = await next(request)
         if isinstance(response, StreamingResponse):
             return self._streaming(response, request)
+        if isinstance(response, FileResponse):
+            response = await _materialize_html_file(response)
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
@@ -171,6 +212,8 @@ class AlpineInject(HTMLInject):
         response = await next(request)
         if isinstance(response, StreamingResponse):
             return self._alpine_streaming(response, request)
+        if isinstance(response, FileResponse):
+            response = await _materialize_html_file(response)
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:

@@ -424,9 +424,16 @@ async def send_file_response(
         try:
             await anyio.to_thread.run_sync(fh.seek, start)
             remaining = length
+            # TOCTOU window: Content-Length was committed from the stat-time
+            # ``size``, but the file may be truncated between stat and read.
+            # If a read comes up short we have already promised more bytes in
+            # the header, so we cannot recover the response — detect the
+            # under-send, log it, and stop emitting body. ``remaining`` is the
+            # shortfall checked after the loop.
             # Single-shot for small files; chunked loop at/above the threshold.
             if size < response.stream_threshold:
                 data = await anyio.to_thread.run_sync(fh.read, remaining)
+                remaining -= len(data)
                 await send({"type": "http.response.body", "body": data, "more_body": True})
             else:
                 while remaining > 0:
@@ -442,6 +449,18 @@ async def send_file_response(
                             "more_body": True,
                         }
                     )
+            if remaining > 0:
+                # File shrank under us (truncated between stat and read). We
+                # have sent fewer bytes than the promised Content-Length;
+                # ASGI servers may error or hang waiting for the rest. Nothing
+                # left to do but log loudly — the header is already on the wire.
+                logger.error(
+                    "send_file_response: short read for %s — %d of %d bytes "
+                    "missing (file truncated after stat?); response under-sent",
+                    path,
+                    remaining,
+                    length,
+                )
         finally:
             await anyio.to_thread.run_sync(fh.close)
     except OSError:
