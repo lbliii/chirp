@@ -188,6 +188,33 @@ class TestOOBShowcase:
         assert 'safe_region("refresh-counter")' in V2_DASHBOARD_CHIRPUI_HTML
 
 
+class TestChirpUiCspPosture:
+    """#196 invariant: the chirp-ui scaffold runs the normal Alpine build.
+
+    chirp-ui components rely on inline Alpine expressions (``x-data`` factory
+    calls, inline ``@click``/``x-show``/``:class``) which the ``@alpinejs/csp``
+    build forbids. The scaffold must therefore NOT set ``alpine_csp=True``; it
+    runs the normal build under a per-request nonce CSP (``csp_nonce_enabled``)
+    so the inline expressions keep working while the ``csp_nonce`` contract
+    stays clean.
+    """
+
+    def test_chirpui_app_does_not_request_alpine_csp_build(self) -> None:
+        assert "alpine_csp=True" not in V2_APP_CHIRPUI_PY, (
+            "chirp-ui scaffold must not set alpine_csp=True — the @alpinejs/csp "
+            "build forbids the inline Alpine expressions chirp-ui components use "
+            "(modal/dropdown/sidebar/tray), which would silently break in the "
+            "browser. Use csp_nonce_enabled=True with the normal Alpine build."
+        )
+
+    def test_chirpui_app_enables_csp_nonce(self) -> None:
+        assert "csp_nonce_enabled=True" in V2_APP_CHIRPUI_PY, (
+            "chirp-ui scaffold must set csp_nonce_enabled=True so CSPNonceMiddleware "
+            "is auto-wired and framework inline scripts carry a live nonce, keeping "
+            "the csp_nonce contract clean without 'unsafe-inline'."
+        )
+
+
 class TestLiveUpdateScaffolds:
     """Live-update scaffolds keep listeners and transitions scoped safely."""
 

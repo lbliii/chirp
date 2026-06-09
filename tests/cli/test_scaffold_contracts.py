@@ -131,3 +131,82 @@ def test_scaffold_passes_security_stack_in_production(
     assert "SessionMiddleware" in middleware
     assert "CSRFMiddleware" in middleware
     assert "SecurityHeadersMiddleware" in middleware
+
+
+# Scaffold the chirp-ui v2 variant, freeze it, and report (a) the generated
+# config's CSP posture and (b) every csp_nonce contract issue. #196: the
+# chirp-ui scaffold must run the normal Alpine build under a per-request nonce
+# CSP (csp_nonce_enabled=True), NOT the @alpinejs/csp build (alpine_csp=True),
+# because chirp-ui components use inline Alpine expressions the CSP build forbids.
+_CHIRPUI_CSP_NONCE_CODE = r"""
+import json, sys
+sys.path.insert(0, ".")
+import app as _app
+from chirp.contracts import check_hypermedia_surface
+
+_app.app.freeze()
+config = _app.app.config
+result = check_hypermedia_surface(_app.app)
+csp_nonce_issues = [
+    {"severity": i.severity.name, "message": i.message}
+    for i in result.issues
+    if i.category == "csp_nonce"
+]
+print(json.dumps({
+    "alpine": config.alpine,
+    "alpine_csp": config.alpine_csp,
+    "csp_nonce_enabled": config.csp_nonce_enabled,
+    "csp_nonce_issues": csp_nonce_issues,
+    "ok": result.ok,
+}))
+"""
+
+
+def test_chirpui_scaffold_csp_nonce_posture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#196: chirp-ui scaffold is csp_nonce-clean under the nonce posture.
+
+    The default ``v2`` variant resolves to chirp-ui in the dev/test env (chirp-ui
+    is installed). The generated config must use the normal Alpine build with
+    ``csp_nonce_enabled=True`` (auto-wiring CSPNonceMiddleware), not the
+    ``@alpinejs/csp`` build, and ``app.check()`` must report no ``csp_nonce``
+    issue of any severity.
+
+    The load-bearing regression guard here is the **config shape** below
+    (``alpine_csp is False`` + ``csp_nonce_enabled is True``): those fail if the
+    scaffold reverts to the broken ``alpine_csp=True`` posture. The
+    ``csp_nonce_issues == []`` assertion is a clean-pass check, not a posture
+    discriminator — the scaffold hardcodes its config (no ``from_env``), so it
+    always reports ``env='development'`` where the rule is silent for *both*
+    postures. The genuine old-vs-new rule discrimination (normal Alpine under an
+    inline-forbidding CSP ERRORs in production WITHOUT a nonce mechanism, and is
+    clean WITH ``csp_nonce_enabled``) is proven at the unit level in
+    ``tests/contracts/test_csp_nonce_rule.py`` —
+    ``test_fires_in_production_with_forbidding_csp_no_nonce_mechanism`` paired
+    with ``test_silent_with_csp_nonce_enabled_config``.
+    """
+    project = scaffold(tmp_path, monkeypatch, mode="v2")
+    result = run_and_parse(project, _CHIRPUI_CSP_NONCE_CODE)
+    assert result.returncode == 0, (
+        f"chirp-ui scaffold subprocess failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    # Alpine is auto-enabled by use_chirp_ui; the CSP build is NOT used.
+    assert result.payload.get("alpine") is True
+    assert result.payload.get("alpine_csp") is False, (
+        "chirp-ui scaffold must not use the @alpinejs/csp build — its inline "
+        "Alpine components would silently break in the browser."
+    )
+    assert result.payload.get("csp_nonce_enabled") is True, (
+        "chirp-ui scaffold must enable csp_nonce_enabled to auto-wire "
+        "CSPNonceMiddleware for the nonce CSP."
+    )
+    # Clean-pass check: the nonce mechanism makes every framework inline script
+    # nonceable, so the csp_nonce rule returns early. (Clean in dev for both
+    # postures — see the docstring; the config-shape asserts above are the
+    # posture guard, and the rule unit tests prove the prod discrimination.)
+    assert result.payload.get("csp_nonce_issues") == [], (
+        f"chirp-ui scaffold has csp_nonce contract issues under the nonce "
+        f"posture: {result.payload.get('csp_nonce_issues')}"
+    )
+    assert result.payload.get("ok") is True
