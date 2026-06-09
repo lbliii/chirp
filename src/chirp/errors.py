@@ -85,3 +85,17 @@ class MethodNotAllowed(HTTPError):  # noqa: N818 — conventional name in web fr
             detail=detail or default_detail,
             headers=(("Allow", allow_value),),
         )
+
+
+class PayloadTooLarge(HTTPError):  # noqa: N818 — conventional name in web frameworks
+    """413 — request body or multipart upload exceeds a configured limit.
+
+    Raised at the byte boundary (``Request.body``/``Request.stream``) when an
+    upload exceeds ``AppConfig.max_upload_size``, and by the multipart parser
+    when a submission exceeds ``AppConfig.max_upload_parts``. Surfacing this
+    before the whole body is joined into RAM is what keeps a multi-GB upload
+    or a multipart bomb from OOMing the worker.
+    """
+
+    def __init__(self, detail: str = "Payload Too Large") -> None:
+        super().__init__(status=413, detail=detail)

@@ -95,6 +95,7 @@ _API_STATUS: dict[str, str] = {
     "HTTPError": "stable",
     "MethodNotAllowed": "stable",
     "NotFound": "stable",
+    "PayloadTooLarge": "stable",
     "form_from": "stable",
     "form_or_errors": "stable",
     "form_values": "stable",
@@ -187,6 +188,7 @@ __all__ = [
     "NotFound",
     "Page",
     "PageComposition",
+    "PayloadTooLarge",
     "ReactiveBus",
     "Redirect",
     "RegionUpdate",
@@ -311,6 +313,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "HTTPError": ("chirp.errors", "HTTPError"),
     "MethodNotAllowed": ("chirp.errors", "MethodNotAllowed"),
     "NotFound": ("chirp.errors", "NotFound"),
+    "PayloadTooLarge": ("chirp.errors", "PayloadTooLarge"),
     # Forms
     "form_from": ("chirp.http.forms", "form_from"),
     "form_or_errors": ("chirp.http.forms", "form_or_errors"),

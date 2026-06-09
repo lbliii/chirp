@@ -42,6 +42,7 @@ EXPECTED_PUBLIC_API = [
     "NotFound",
     "Page",
     "PageComposition",
+    "PayloadTooLarge",
     "ReactiveBus",
     "Redirect",
     "RegionUpdate",

@@ -31,7 +31,7 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `Action` |
 | Middleware | `Middleware`, `Next`, `AnyResponse` |
 | Request context | `g`, `get_request` |
-| Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound` |
+| Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
 | Auth and security | `get_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
 | Markdown | `MarkdownRenderer` |

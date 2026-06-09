@@ -334,6 +334,9 @@ async def handle_request(
     sse_heartbeat_interval: float = 15.0,
     sse_retry_ms: int | None = None,
     sse_close_event: str | None = None,
+    max_upload_size: int | None = None,
+    upload_spool_threshold: int | None = None,
+    max_upload_parts: int | None = None,
     compiled_handler: Callable[[Request], Any] | None = None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
@@ -344,8 +347,16 @@ async def handle_request(
     if scope["type"] != "http":
         return
 
-    # Build Request from ASGI scope
-    request = Request.from_asgi(scope, receive, url_for=url_for)
+    # Build Request from ASGI scope, threading the upload/body limits so
+    # body()/stream()/form() can enforce them at the byte boundary.
+    request = Request.from_asgi(
+        scope,
+        receive,
+        url_for=url_for,
+        max_upload_size=max_upload_size,
+        upload_spool_threshold=upload_spool_threshold,
+        max_upload_parts=max_upload_parts,
+    )
 
     # Pounce sync workers set this so sync handlers run directly on the
     # worker thread instead of being dispatched through asyncio.to_thread().
@@ -384,6 +395,13 @@ async def handle_request(
             fragment_target_registry=fragment_target_registry,
         )
     finally:
+        # Release any spooled upload temp files parsed during this request so
+        # spilled-to-disk uploads do not leak fds / temp files after response.
+        cached_form = request._cache.get("_form")
+        if cached_form is not None:
+            close = getattr(cached_form, "close", None)
+            if callable(close):
+                close()
         g._reset()
         request_var.reset(token)
         request_id_var.reset(rid_token)
