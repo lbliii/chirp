@@ -85,6 +85,10 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
+from .rules_suspense_defer import (
+    SUSPENSE_DEFER_BLOCKS,
+    check_suspense_undiscoverable,
+)
 from .rules_swap import check_swap_safety, check_view_transition_safety, collect_broad_targets
 from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
@@ -271,6 +275,32 @@ def _route_prepass(
                         )
                     )
     return referenced_templates, referenced_route_paths
+
+
+def _collect_defer_blocks_templates(router: object) -> frozenset[str]:
+    """Templates whose route handler passes ``defer_blocks=`` to Suspense.
+
+    Those handlers bypass auto-discovery, so the templates they render are
+    exempt from the ``suspense_defer`` check. Conservative by design: any
+    handler source containing a ``defer_blocks=`` kwarg exempts every template
+    that handler references via a ``Suspense(...)``-style call.
+    """
+    exempt: set[str] = set()
+    for route in getattr(router, "routes", []):
+        handler = getattr(route, "handler", None)
+        page_src = getattr(route, "page_source_handler", None)
+        handler_for_source = page_src if page_src is not None else handler
+        if handler_for_source is None:
+            continue
+        try:
+            src = inspect.getsource(handler_for_source)
+        except TypeError, OSError:
+            continue
+        if not SUSPENSE_DEFER_BLOCKS.search(src):
+            continue
+        for match in _TEMPLATE_CALL_PATTERN.finditer(src):
+            exempt.add(match.group(1))
+    return frozenset(exempt)
 
 
 def _build_snapshot(app: App) -> ContractCheckSnapshot:
@@ -615,6 +645,13 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_boundary_coverage(template_sources))
         result.issues.extend(check_alpine_cdn_urls(template_sources))
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
+        result.issues.extend(
+            check_suspense_undiscoverable(
+                template_sources,
+                kida_env,
+                defer_blocks_templates=_collect_defer_blocks_templates(router),
+            )
+        )
         result.issues.extend(check_fragment_block_scope(template_sources, kida_env))
         result.issues.extend(
             check_template_context_contracts(kida_env, template_sources, snapshot.extras)

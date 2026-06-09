@@ -188,6 +188,7 @@ ordering of that stack; `csrf_form` checks individual template `<form>` tags;
 | `chirpui_runtime` | INFO | Call `use_chirp_ui(app)` or install/configure the optional UI runtime required by ChirpUI templates. |
 | `alpine_cdn_url` | ERROR | Replace bare jsDelivr Alpine package URLs with explicit `/dist/cdn.min.js` URLs or Chirp injection helpers. |
 | `defer_falsy` | WARNING | Use `{% if key is deferred %}` or `"key" in __chirp_defer_pending__` to distinguish loading from loaded before testing resolved values. |
+| `suspense_defer` | WARNING | A template declares a Suspense-deferred key (`is deferred` / `__chirp_defer_pending__`) that no block depends on, so auto-discovery finds nothing to re-render. Reference the key inside a `{% block ... %}`, or pass the blocks explicitly with `Suspense(..., defer_blocks=(...))`. |
 | `a11y_interactive` | WARNING | Add keyboard and semantic affordances for interactive elements. |
 | `a11y_label` | WARNING | Add visible or accessible labels for form controls. |
 | `a11y_alt` | WARNING | Add meaningful `alt` text or intentionally empty decorative `alt=""`. |
