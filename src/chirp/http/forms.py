@@ -150,8 +150,11 @@ class UploadFile:
         rolled = getattr(self._spool, "_rolled", None)
         if rolled is not None:
             return bool(rolled)
-        # Fallback: a SpooledTemporaryFile exposes a real fileno() only once
-        # it has rolled to disk.
+        # Defensive / version-robustness fallback only: on CPython 3.14
+        # SpooledTemporaryFile always exposes ``_rolled``, so this branch is
+        # unreachable today. It guards against a future CPython that drops or
+        # renames the private attribute — a SpooledTemporaryFile exposes a real
+        # fileno() only once it has rolled to disk.
         try:
             self._spool.fileno()
         except OSError, ValueError:

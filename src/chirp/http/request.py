@@ -497,6 +497,11 @@ class Request:
                     if total > limit:
                         from chirp.errors import PayloadTooLarge
 
+                        # NOTE: raising here leaves the ASGI receive channel
+                        # partially consumed — the read-once invariant is not
+                        # preserved across a failed-then-retried body()/stream()
+                        # call. Moot in practice: an overflowing request is
+                        # aborted with a 413 and never read again.
                         raise PayloadTooLarge(
                             f"Request body exceeds the maximum upload size of {limit} bytes."
                         )
