@@ -81,12 +81,17 @@ from models import load_user
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
 
+# chirp-ui components use inline Alpine expressions (x-data factory calls,
+# inline @click/x-show/:class), which the @alpinejs/csp build forbids. So we
+# run the normal Alpine build under a per-request nonce CSP instead:
+# csp_nonce_enabled=True auto-wires CSPNonceMiddleware (with 'unsafe-eval' for
+# Alpine), keeping the csp_nonce contract clean while Alpine stays functional.
 config = AppConfig(
     secret_key=_secret,
     template_dir="pages",
     debug=True,
     islands=True,
-    alpine_csp=True,
+    csp_nonce_enabled=True,
 )
 app = App(config=config)
 
