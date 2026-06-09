@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 
+import pytest
+
 from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
@@ -362,3 +364,94 @@ class TestProductionFormStack:
         assert response.status == 422
         assert response.header("hx-retarget") == "#composer"
         assert "intent: Unknown action" in response.text
+
+
+# ---------------------------------------------------------------------------
+# Multipart upload integration through App + TestClient (issue #177)
+# ---------------------------------------------------------------------------
+
+
+def _multipart_upload_body(field: str, filename: str, content: bytes, boundary: str) -> bytes:
+    return (
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n"
+        ).encode()
+        + content
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+
+
+class TestMultipartUploadIntegration:
+    async def test_upload_round_trip_and_save(self, tmp_path) -> None:
+        app = App()
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request):
+            form = await request.form()
+            f = form.files["file"]
+            dest = tmp_path / "saved.bin"
+            await f.save(dest)
+            return f"{f.size}|{dest.read_bytes() == b'payload-bytes'}"
+
+        boundary = "BNDRY"
+        body = _multipart_upload_body("file", "data.bin", b"payload-bytes", boundary)
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/upload",
+                body=body,
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            )
+            assert response.text == "13|True"
+
+    async def test_multipart_bomb_rejected_413(self) -> None:
+        app = App(AppConfig(max_upload_parts=2))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request):
+            await request.form()
+            return "ok"
+
+        boundary = "BNDRY"
+        parts = b""
+        for i in range(5):
+            parts += (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="f{i}"\r\n\r\nv\r\n'
+            ).encode()
+        body = parts + f"--{boundary}--\r\n".encode()
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/upload",
+                body=body,
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            )
+            assert response.status == 413
+
+
+class TestMultipartImportBoundary:
+    """The python-multipart import boundary (chirp[forms]) is preserved."""
+
+    async def test_missing_multipart_raises_configuration_error(self, monkeypatch) -> None:
+        import builtins
+
+        from chirp.errors import ConfigurationError
+        from chirp.http.forms import parse_form_data
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name.startswith("python_multipart"):
+                raise ImportError("simulated missing python-multipart")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+
+        boundary = "BNDRY"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="x"\r\n\r\nv\r\n'
+            f"--{boundary}--\r\n"
+        ).encode()
+        with pytest.raises(ConfigurationError, match="python-multipart"):
+            await parse_form_data(body, f"multipart/form-data; boundary={boundary}")
