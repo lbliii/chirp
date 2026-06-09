@@ -23,9 +23,13 @@ _CDN = "https://cdn.jsdelivr.net/npm"
 def htmx_snippet(version: str, *, nonce: str = "") -> str:
     """Build the htmx core injection ``<script>`` tag.
 
-    The script URL uses the explicit ``/dist/htmx.min.js`` path — a bare
-    ``htmx.org@version`` jsDelivr path resolves to the package ``main`` which is
-    not the browser build, the same CommonJS footgun documented for Alpine.
+    The script URL uses the explicit ``/dist/htmx.min.js`` path — the framework's
+    CDN convention (the same explicit-``/dist`` rule ``rules_alpine_cdn`` enforces
+    for Alpine). Unlike Alpine — whose bare jsDelivr path resolves to a CommonJS
+    module that throws in the browser — htmx's package ``main`` is browser-safe,
+    so for htmx this is a consistency/minification choice rather than a fix for a
+    hard failure; pinning ``/dist/htmx.min.js`` keeps every framework CDN URL on
+    the explicit minified browser bundle.
 
     Args:
         version: htmx version (e.g. "2.0.4").
