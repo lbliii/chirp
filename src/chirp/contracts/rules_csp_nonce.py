@@ -18,11 +18,10 @@ Two framework inline-script surfaces exist:
 
 This check ERRORs on case (2): an app that enables ``alpine=True`` together with
 a nonce-based CSP that forbids inline scripts, because the Alpine bootstrap
-inline script cannot be nonced through the precompiled injection path. The fix
-is to either keep ``'unsafe-inline'`` is *not* the answer (defeats the nonce);
-the supported escape hatch is ``alpine_csp=True`` (the CSP build needs no inline
-bootstrap of that shape) — but the canonical signal is that a regression dropped
-the nonce path for a framework emitter.
+inline script cannot be nonced through the precompiled injection path. Relaxing
+the CSP to keep ``'unsafe-inline'`` is *not* the answer — it defeats the whole
+point of the nonce. The supported escape hatch is ``alpine_csp=True`` (the
+``@alpinejs/csp`` build needs no inline bootstrap of that shape).
 
 Detection follows ``rules_security_stack``: middleware is matched by class
 **name** (``type(mw).__name__``) so this layer never imports middleware classes.

@@ -324,6 +324,84 @@ class TestSuspenseStreamCarriesLiveNonce:
         assert "nonce=" not in body
 
 
+class TestSuspenseStreamNonceIntegration:
+    """End-to-end #181 lifecycle: the integration path the bug actually lived in.
+
+    Unlike :class:`TestSuspenseStreamCarriesLiveNonce` (which simulates the
+    sender by calling ``_set_csp_nonce`` directly), this exercises the real
+    chain:
+
+    1. ``CSPNonceMiddleware`` runs, sets the nonce ContextVar, stamps the live
+       nonce onto the ``StreamingResponse`` (``csp_nonce=``), then its ``finally``
+       **resets the var the instant ``next()`` returns** — before any chunk is
+       produced.
+    2. ``send_streaming_response`` reads ``response.csp_nonce`` and re-establishes
+       the var for the duration of the drain.
+    3. ``render_suspense`` (the chunk generator) reads the *live* nonce at drain
+       time and stamps it onto the framework inline ``<script>`` chunks.
+
+    Without the stamp + re-establish, the generator would observe an empty nonce
+    (the middleware already reset it) and emit a bare ``<script>`` blocked by a
+    nonce-only CSP — the regression #181 fixes.
+    """
+
+    @pytest.mark.asyncio
+    async def test_streamed_scripts_carry_live_nonce_end_to_end(self):
+        from chirp.http.response import StreamingResponse
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware, csp_nonce
+        from chirp.server.sender import send_streaming_response
+
+        env = _env()
+
+        async def load_stats():
+            return ["alice", "bob"]
+
+        async def load_feed():
+            return ["post"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+
+        # The handler builds the StreamingResponse whose chunks are the lazy
+        # render_suspense generator. It is *not* iterated here, so the nonce is
+        # read later — at drain time — exactly as in production.
+        async def stream_next(request):
+            return StreamingResponse(
+                chunks=render_suspense(env, suspense, is_htmx=False),
+                content_type="text/html",
+            )
+
+        # CSPNonceMiddleware never reads the request; a bare sentinel suffices.
+        mw = CSPNonceMiddleware()
+        response = await mw(object(), stream_next)
+        assert isinstance(response, StreamingResponse)
+        live_nonce = response.csp_nonce
+        assert live_nonce, "middleware must stamp the live nonce onto the stream"
+
+        # The middleware's finally has already reset the var: outside the drain
+        # the nonce is gone. This is precisely the window the sender must cover.
+        assert csp_nonce() == ""
+
+        chunks: list[str] = []
+
+        async def fake_send(message):
+            if message["type"] == "http.response.body":
+                body = message.get("body", b"")
+                if body:
+                    chunks.append(body.decode("utf-8"))
+
+        await send_streaming_response(response, fake_send)
+
+        body = "".join(chunks)
+        # Framework inline script(s) streamed for the deferred blocks must carry
+        # the live nonce re-established by the sender — never a bare <script>.
+        assert "<script" in body
+        assert f'<script nonce="{live_nonce}">' in body
+        assert "<script>" not in body  # no un-nonced inline script slipped through
+
+        # The drain restored the pre-drain state: no nonce leaks past the stream.
+        assert csp_nonce() == ""
+
+
 # ---------------------------------------------------------------------------
 # Sync-only fallback
 # ---------------------------------------------------------------------------
