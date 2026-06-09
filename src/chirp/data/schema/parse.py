@@ -194,6 +194,13 @@ def schema_from_migrations(migrations_dir: str | Path) -> SchemaSnapshot | None:
     so the contract stays a silent no-op for HTML-only / db-less apps. This is a
     tolerant, static read: malformed individual statements are simply not parsed
     rather than raising (unlike the migration *runner*, which must be strict).
+
+    Fidelity note: only ``CREATE``/``ADD COLUMN`` are folded; ``ALTER TABLE
+    RENAME COLUMN`` and ``DROP COLUMN`` are *not* applied, so a heavily-altered
+    table's snapshot may list columns that no longer exist. Because the ``data``
+    shape contract uses this snapshot only to *suppress* drift warnings (never to
+    raise on its own), an over-broad column set is the safe direction -- it can
+    miss a real drift but will not invent a false positive.
     """
     path = Path(migrations_dir)
     if not path.is_dir():

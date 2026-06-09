@@ -111,6 +111,7 @@ _TEMPLATE_CALL_PATTERN = re.compile(
 if TYPE_CHECKING:
     from chirp.app import App
     from chirp.app.state import ContractCheckSnapshot
+    from chirp.data.schema.types import SchemaSnapshot
 
 
 def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
@@ -143,7 +144,7 @@ def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
     )
 
 
-def _build_contract_schema(migrations_dir: str | None) -> object | None:
+def _build_contract_schema(migrations_dir: str | None) -> SchemaSnapshot | None:
     """Build the declared schema snapshot from a migrations directory, or None.
 
     Mirrors ``chirp.app._build_contract_schema`` for the fallback snapshot

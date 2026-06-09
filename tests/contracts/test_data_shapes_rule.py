@@ -69,6 +69,22 @@ class TestParseSelectColumns:
     def test_no_from_is_skipped(self) -> None:
         assert _parse_select_columns("PRAGMA table_info(users)") is None
 
+    def test_cte_is_skipped(self) -> None:
+        # The first SELECT/FROM lives inside the CTE body, not the output
+        # projection, so the query is skipped rather than mis-analyzed.
+        sql = "WITH t AS (SELECT id FROM users) SELECT id, bogus FROM t"
+        assert _parse_select_columns(sql) is None
+
+    def test_union_is_skipped(self) -> None:
+        sql = "SELECT id FROM users UNION SELECT id FROM admins"
+        assert _parse_select_columns(sql) is None
+
+    def test_where_subquery_still_analyzed(self) -> None:
+        # A subquery in WHERE does not move the output projection, so the outer
+        # SELECT list is still analyzable (the first SELECT/FROM is the outer).
+        sql = "SELECT id, name FROM users WHERE id IN (SELECT user_id FROM admins)"
+        assert _parse_select_columns(sql) == ("id", "name")
+
 
 class TestCheckDataShapes:
     def test_drifted_column_errors(self) -> None:
@@ -91,6 +107,41 @@ class TestCheckDataShapes:
             return db.fetch(User, "SELECT id, name, email FROM users")
 
         assert check_data_shapes(_FakeRouter(handler), SCHEMA) == []
+
+    def test_non_db_receiver_not_flagged(self) -> None:
+        # ``fetch``/``stream`` are generic method names. A call on an unrelated
+        # object (an LLM client, a query builder) must NOT emit a build-breaking
+        # ERROR even with a dataclass + string-literal SQL-looking first args.
+        def handler():
+            llm = object()
+            client = object()
+            llm.stream(User, "SELECT id, naem FROM users")  # not a db handle
+            return client.fetch(User, "SELECT id, ghost FROM users")
+
+        assert check_data_shapes(_FakeRouter(handler), SCHEMA) == []
+
+    def test_db_attribute_and_get_db_receivers_checked(self) -> None:
+        # The canonical db accessors are still analyzed: ``self.db``, ``app.db``,
+        # a ``*_db`` name, and ``get_db()``.
+        def handler_self():
+            self = object()
+            return self.db.fetch(User, "SELECT id, naem FROM users")
+
+        def handler_app():
+            app = object()
+            return app.db.fetch(User, "SELECT id, naem FROM users")
+
+        def handler_suffix():
+            user_db = object()
+            return user_db.fetch(User, "SELECT id, naem FROM users")
+
+        def handler_get_db():
+            return get_db().fetch(User, "SELECT id, naem FROM users")  # noqa: F821
+
+        for h in (handler_self, handler_app, handler_suffix, handler_get_db):
+            issues = check_data_shapes(_FakeRouter(h), SCHEMA)
+            assert len(issues) == 1, f"{h.__name__}: expected 1 issue, got {issues}"
+            assert "naem" in issues[0].message
 
     def test_fetch_one_checked(self) -> None:
         def handler():

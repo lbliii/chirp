@@ -47,6 +47,16 @@ if TYPE_CHECKING:
 # intentionally excluded -- they do not map onto a dataclass.
 _FETCH_METHODS = frozenset({"fetch", "fetch_one", "stream"})
 
+# Receiver names we treat as a chirp.data ``Database`` handle. The fetch-family
+# method names are generic enough to collide with unrelated APIs (an LLM
+# client's ``.stream()``, a query builder's ``.fetch()``), so we only analyze
+# calls whose receiver is idiomatically the database: a bare ``db`` / ``database``
+# name (or ``*_db``), an attribute ending in those (``self.db``, ``app.db``,
+# ``g.db``), or a ``get_db()`` call. This trades a few false negatives (a db
+# handle bound to an unconventional name) for zero false-positive ERRORs on
+# unrelated objects -- the rule's core promise of no noisy warnings.
+_DB_RECEIVER_NAMES = frozenset({"db", "database"})
+
 # Extract the SELECT column list from a single-table-ish query. Group 1 is the
 # raw projection between SELECT and FROM. We only trust this when the projection
 # is a simple comma-separated identifier list (handled in _parse_select_columns).
@@ -87,6 +97,15 @@ def _parse_select_columns(sql: str) -> tuple[str, ...] | None:
     or the SQL has no analyzable ``SELECT ... FROM`` shape. Returns the resolved
     output names (alias-aware) otherwise.
     """
+    # CTEs put the first SELECT/FROM inside the CTE body, and compound queries
+    # (UNION/INTERSECT/EXCEPT) have several projections; the single first-match
+    # regex below cannot pick the right one, so skip rather than analyze the
+    # wrong arm (a silent false-negative becomes an explicit, documented skip).
+    if re.match(r"\s*WITH\b", sql, re.IGNORECASE):
+        return None
+    if re.search(r"\b(?:UNION|INTERSECT|EXCEPT)\b", sql, re.IGNORECASE):
+        return None
+
     match = _SELECT_RE.search(sql)
     if match is None:
         return None
@@ -140,13 +159,37 @@ def _resolve_cls(node: ast.expr, handler_globals: dict[str, Any]) -> Any:
     return None
 
 
+def _is_db_receiver(value: ast.expr) -> bool:
+    """True when the call receiver looks like a chirp.data ``Database`` handle.
+
+    Recognizes ``db`` / ``database`` / ``*_db`` names, attribute access ending in
+    those (``self.db``, ``app.db``, ``g.db``), and ``get_db()`` calls. Anything
+    else (an arbitrary object that merely exposes a ``fetch``/``stream`` method)
+    is rejected so the rule never ERRORs on an unrelated API.
+    """
+    if isinstance(value, ast.Call):
+        fn = value.func
+        if isinstance(fn, ast.Name):
+            return fn.id == "get_db"
+        if isinstance(fn, ast.Attribute):
+            return fn.attr == "get_db"
+        return False
+    if isinstance(value, ast.Name):
+        return value.id in _DB_RECEIVER_NAMES or value.id.endswith("_db")
+    if isinstance(value, ast.Attribute):
+        return value.attr in _DB_RECEIVER_NAMES or value.attr.endswith("_db")
+    return False
+
+
 def _iter_fetch_calls(tree: ast.AST) -> list[tuple[ast.expr, str]]:
     """Yield ``(cls_node, sql_literal)`` for statically analyzable fetch calls.
 
     A call is analyzable when it is
-    ``<x>.fetch|fetch_one|stream(CLS, "literal sql", ...)`` with a string-literal
-    SQL and at least the ``cls`` positional argument. Dynamic SQL (f-strings,
-    concatenation, names) is skipped.
+    ``<db>.fetch|fetch_one|stream(CLS, "literal sql", ...)`` where ``<db>`` is an
+    idiomatic chirp.data ``Database`` receiver (see :func:`_is_db_receiver`),
+    with a string-literal SQL and at least the ``cls`` positional argument.
+    Dynamic SQL (f-strings, concatenation, names) and calls on unrelated
+    receivers are skipped.
     """
     found: list[tuple[ast.expr, str]] = []
     for node in ast.walk(tree):
@@ -154,6 +197,10 @@ def _iter_fetch_calls(tree: ast.AST) -> list[tuple[ast.expr, str]]:
             continue
         func = node.func
         if not isinstance(func, ast.Attribute) or func.attr not in _FETCH_METHODS:
+            continue
+        if not _is_db_receiver(func.value):
+            # Not a recognizable Database receiver -- a generic .fetch/.stream on
+            # an unrelated object. Skip to avoid a false-positive ERROR.
             continue
         if len(node.args) < 2:
             continue
