@@ -112,6 +112,8 @@ provisional until those subsystems are stabilized.
 | `alpine` | `bool` | `False` | Enable Alpine.js script injection |
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine.js CDN version |
 | `alpine_csp` | `bool` | `False` | Use the CSP-safe Alpine build |
+| `htmx` | `bool` | `False` | Enable opt-in htmx core script injection |
+| `htmx_version` | `str` | `"2.0.4"` | Pinned htmx CDN version |
 
 ### Production Server
 

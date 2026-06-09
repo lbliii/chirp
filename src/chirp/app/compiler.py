@@ -144,6 +144,26 @@ def _collect_builtin_middleware(
                 full_page_only=True,
             )
         )
+    if config.htmx:
+        from chirp.middleware.inject import StreamingHTMLInject
+        from chirp.server.htmx import htmx_snippet
+
+        # Mirror the Alpine path: dedup on ``data-chirp="htmx"`` so a template
+        # that already ships its own htmx <script> (chirp-ui shell/boost, the v2
+        # scaffold) is left untouched, and rewrite StreamingResponse chunks
+        # (Suspense shells) via the same async_stream_inject_before_body path.
+        # The external htmx core tag carries the live per-request nonce so it
+        # survives a strict nonce-only CSP. ``StreamingHTMLInject`` already
+        # implements both the buffered and streaming branches plus dedup, so no
+        # bespoke injection subclass is needed.
+        htmx_version = config.htmx_version
+        middleware_list.append(
+            StreamingHTMLInject(
+                lambda nonce: htmx_snippet(htmx_version, nonce=nonce),
+                full_page_only=True,
+                dedup_marker='data-chirp="htmx"',
+            )
+        )
     if config.islands:
         from chirp.middleware.inject import HTMLInject
         from chirp.server.islands import islands_snippet
