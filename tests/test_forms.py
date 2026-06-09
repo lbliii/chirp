@@ -795,10 +795,13 @@ class TestUploadFilenameSanitization:
 
 
 class TestBodySizeLimit:
+    """The GENERAL request-body cap (max_request_body_size) applies to every
+    content type — JSON, text, urlencoded, multipart — enforced in stream()."""
+
     async def test_oversize_body_rejected_413(self) -> None:
         from chirp.errors import PayloadTooLarge
 
-        app = App(AppConfig(max_upload_size=10))
+        app = App(AppConfig(max_request_body_size=10, max_upload_size=10))
 
         @app.route("/upload", methods=["POST"])
         async def upload(request: Request):
@@ -813,7 +816,7 @@ class TestBodySizeLimit:
             assert response.text == "rejected"
 
     async def test_within_limit_accepted(self) -> None:
-        app = App(AppConfig(max_upload_size=1000))
+        app = App(AppConfig(max_request_body_size=1000, max_upload_size=1000))
 
         @app.route("/upload", methods=["POST"])
         async def upload(request: Request):
@@ -825,7 +828,7 @@ class TestBodySizeLimit:
             assert response.text == "got 100"
 
     async def test_oversize_surfaces_413_status(self) -> None:
-        app = App(AppConfig(max_upload_size=10))
+        app = App(AppConfig(max_request_body_size=10, max_upload_size=10))
 
         @app.route("/upload", methods=["POST"])
         async def upload(request: Request):
@@ -836,6 +839,20 @@ class TestBodySizeLimit:
             response = await client.post("/upload", body=b"x" * 100)
             assert response.status == 413
 
+    async def test_json_body_capped_by_general_limit(self) -> None:
+        """A non-multipart (JSON) body is governed by max_request_body_size,
+        not max_upload_size — the two knobs are independent."""
+        app = App(AppConfig(max_request_body_size=10, max_upload_size=10))
+
+        @app.route("/api", methods=["POST"])
+        async def api(request: Request):
+            await request.body()
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post("/api", body=b'{"k":"vvvvvvvvvv"}')
+            assert response.status == 413
+
     async def test_stream_aborts_before_full_buffer(self) -> None:
         """stream() must raise before the overflowing chunk is buffered."""
         from chirp.errors import PayloadTooLarge
@@ -843,7 +860,7 @@ class TestBodySizeLimit:
         req = Request.from_asgi(
             {"type": "http", "method": "POST", "path": "/", "headers": []},
             _make_receive([b"a" * 6, b"b" * 6]),
-            max_upload_size=10,
+            max_request_body_size=10,
         )
         seen = 0
 
@@ -863,11 +880,64 @@ class TestBodySizeLimit:
         req = Request.from_asgi(
             {"type": "http", "method": "POST", "path": "/", "headers": []},
             _make_receive([b"x" * 100]),
-            max_upload_size=10,
+            max_request_body_size=10,
         )
         with pytest.raises(PayloadTooLarge):
             await req.body()
         assert "_body" not in req._cache
+
+
+class TestMultipartTotalSizeLimit:
+    """max_upload_size caps the cumulative size of multipart parts only — the
+    multipart-specific inner envelope, distinct from max_request_body_size."""
+
+    async def test_oversize_multipart_rejected(self) -> None:
+        from chirp.errors import PayloadTooLarge
+
+        body = _multipart_body([("big", "big.bin", b"x" * 5000)])
+        with pytest.raises(PayloadTooLarge, match="total size"):
+            await parse_form_data(body, _MP_CT, max_total_size=100)
+
+    async def test_multipart_within_total_accepted(self) -> None:
+        body = _multipart_body([("doc", "doc.bin", b"x" * 50)])
+        form = await parse_form_data(body, _MP_CT, max_total_size=1000)
+        assert form.files["doc"].size == 50
+
+    async def test_multipart_total_unbounded_by_default(self) -> None:
+        body = _multipart_body([("doc", "doc.bin", b"x" * 5000)])
+        form = await parse_form_data(body, _MP_CT)  # no max_total_size
+        assert form.files["doc"].size == 5000
+
+    async def test_multipart_total_accumulates_across_parts(self) -> None:
+        from chirp.errors import PayloadTooLarge
+
+        # Two 60-byte parts = 120 bytes total > 100 cap, though no single part
+        # exceeds the cap on its own.
+        body = _multipart_body([("a", "a.bin", b"x" * 60), ("b", "b.bin", b"y" * 60)])
+        with pytest.raises(PayloadTooLarge, match="total size"):
+            await parse_form_data(body, _MP_CT, max_total_size=100)
+
+
+class TestUploadFileImmutability:
+    """UploadFile metadata is immutable (frozen dataclass) — issue #197."""
+
+    def test_metadata_is_frozen(self) -> None:
+        from dataclasses import FrozenInstanceError
+
+        f = UploadFile.from_bytes(filename="a.txt", content_type="text/plain", content=b"x")
+        with pytest.raises(FrozenInstanceError):
+            f.filename = "evil.txt"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            f.content_type = "text/html"  # type: ignore[misc]
+        with pytest.raises(FrozenInstanceError):
+            f.size = 999  # type: ignore[misc]
+
+    async def test_spool_still_usable_while_frozen(self) -> None:
+        # Frozen forbids rebinding fields, not mutating the IO object a field
+        # points to: read() seeks and reads the spool fine.
+        f = UploadFile.from_bytes(filename="a.txt", content_type="text/plain", content=b"hello")
+        assert await f.read() == b"hello"
+        assert await f.read() == b"hello"  # re-readable
 
 
 class TestBodyReadOnceCached:

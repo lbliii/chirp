@@ -414,6 +414,17 @@ class FileResponse:
 
     ``conditional`` controls whether the sender evaluates 304/206 (disabled for
     error bodies such as a custom 404 page, where caching a 304 would be wrong).
+
+    **Injected static HTML.** When an HTML-injection middleware (``HTMLInject`` /
+    ``StreamingHTMLInject`` / ``AlpineInject``) is active, a ``text/html``
+    FileResponse is materialized into a buffered :class:`Response` so the snippet
+    can be inserted; that path does *not* reach ``send_file_response``. The
+    middleware rebuilds conditional-GET over the post-injection body
+    (``Last-Modified`` from mtime, a content-hash ``ETag`` only when the snippet
+    is nonce-free, 304 on match) but **drops Range / Accept-Ranges** — byte
+    offsets shift once a snippet is inserted, so partial fetches against the file
+    would return wrong bytes. Non-HTML files and HTML served without an inject
+    middleware keep full Range here.
     """
 
     path: Path

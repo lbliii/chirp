@@ -7,7 +7,9 @@ Useful for live-reload scripts, analytics, debug toolbars, or any
 markup that should appear on every page without modifying templates.
 """
 
+import hashlib
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -19,11 +21,14 @@ from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.csp_nonce import csp_nonce
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.middleware.streaming_html import async_stream_inject_before_body
+from chirp.server.sender import _etag_matches, _format_http_date, _parse_http_date
 
 _LOG = logging.getLogger("chirp.middleware.inject")
 
 
-async def _materialize_html_file(response: FileResponse) -> Response | FileResponse:
+async def _materialize_html_file(
+    response: FileResponse,
+) -> tuple[Response, float] | tuple[FileResponse, None]:
     """Read a ``text/html`` FileResponse off disk into a buffered Response.
 
     Snippet injection needs the whole body, so a static HTML page served by
@@ -32,17 +37,32 @@ async def _materialize_html_file(response: FileResponse) -> Response | FileRespo
     body-injection path can rewrite. Status, headers, cookies, content type
     and render intent are preserved.
 
+    Returns ``(response, mtime)`` where *mtime* is the file's POSIX
+    modification time, captured alongside the read so the caller can preserve
+    ``Last-Modified`` and rebuild conditional-GET headers over the
+    **post-injection** body (the on-disk size+mtime ETag no longer describes
+    the served bytes once a snippet is inserted — see :func:`_finalize_html`).
+
     Non-HTML FileResponses (CSS, images, large binaries) and unreadable files
-    are returned unchanged so they keep streaming from disk.
+    are returned unchanged (with ``mtime=None``) so they keep streaming from
+    disk via :func:`~chirp.server.sender.send_file_response`, which retains
+    full ETag / Last-Modified / Range support.
     """
     if not response.resolved_content_type.startswith("text/html"):
-        return response
+        return response, None
+
+    def _read() -> tuple[bytes, float]:
+        # stat + read in the same worker call so Last-Modified reflects the
+        # bytes we actually read (one extra stat vs the sender's; acceptable).
+        st = os.stat(response.path)
+        return response.path.read_bytes(), st.st_mtime
+
     try:
-        raw = await anyio.to_thread.run_sync(response.path.read_bytes)
+        raw, mtime = await anyio.to_thread.run_sync(_read)
     except OSError:
         _LOG.warning("HTMLInject: could not read %s for injection", response.path)
-        return response
-    return Response(
+        return response, None
+    buffered = Response(
         body=raw.decode("utf-8", errors="replace"),
         status=response.status,
         content_type=response.resolved_content_type,
@@ -50,6 +70,80 @@ async def _materialize_html_file(response: FileResponse) -> Response | FileRespo
         cookies=response.cookies,
         render_intent=response.render_intent,
     )
+    return buffered, mtime
+
+
+def _finalize_html(
+    response: Response,
+    request: Request,
+    *,
+    mtime: float | None,
+    stable: bool,
+) -> Response:
+    """Attach conditional-GET headers to an injected static-HTML Response.
+
+    PR #190 made :class:`StaticFiles` emit a streaming :class:`FileResponse`
+    with ETag / Last-Modified / 304 / Range. When an inject middleware
+    materializes that file to rewrite its body, the response goes through the
+    buffered :func:`~chirp.server.sender.send_response`, which has no
+    conditional-GET awareness — so caching was silently lost (#198).
+
+    This recomputes caching over the **post-injection** bytes:
+
+    * **Last-Modified** is preserved from the file's *mtime* (the snippet does
+      not change the file on disk).
+    * **ETag** is recomputed only when the injected snippet is *stable* (the
+      same for every request — i.e. nonce-free). A per-request CSP nonce makes
+      the served bytes vary, so emitting a stable ETag would let a cache serve
+      a body carrying a dead nonce; in that case we emit ``Last-Modified`` only
+      and never a 304 (no false cache hits). The stable ETag is a content hash
+      of the injected body so it changes when either the file or the snippet
+      changes.
+    * **304** is returned (body-less) when ``If-None-Match`` matches the
+      recomputed ETag, or ``If-Modified-Since`` covers the file mtime.
+    * **Range / Accept-Ranges is intentionally dropped** for injected HTML:
+      on-disk byte offsets shift once a snippet is inserted, so a Range against
+      the file would return wrong bytes. Clients fall back to a full 200.
+      Verbatim (non-injected) files keep full Range via ``send_file_response``.
+
+    ``mtime is None`` means the response was not a materialized static file
+    (a normal handler Response, or an unreadable/non-HTML file) — return it
+    untouched so dynamic responses keep their existing (cache-less) behavior.
+    """
+    if mtime is None or response.status != 200:
+        return response
+
+    last_modified = _format_http_date(mtime)
+
+    # When the served bytes are NOT stable (per-request nonce), we cannot offer
+    # any validator that would let a cache reuse this body — a 304 (by ETag or
+    # by Last-Modified) would serve a body carrying a dead nonce. Emit
+    # Last-Modified for diagnostics only and never short-circuit to 304.
+    if not stable:
+        return replace(response, headers=(*response.headers, ("Last-Modified", last_modified)))
+
+    digest = hashlib.blake2b(response.body_bytes, digest_size=16).hexdigest()
+    etag = f'"{digest}"'
+
+    headers = request.headers
+    inm = headers.get("if-none-match")
+    ims = headers.get("if-modified-since")
+    not_modified = False
+    if inm is not None:
+        # If-None-Match takes precedence over If-Modified-Since (RFC 9110).
+        not_modified = _etag_matches(inm, etag)
+    elif ims is not None:
+        ims_ts = _parse_http_date(ims)
+        # HTTP-date has whole-second resolution; truncate mtime so a file last
+        # modified at e.g. 12:00:00.53 still matches a 12:00:00 header.
+        if ims_ts is not None and int(mtime) <= int(ims_ts):
+            not_modified = True
+
+    extra = (("Last-Modified", last_modified), ("ETag", etag))
+    if not_modified:
+        # 304: send_response zeroes the body for 304 via _body_allowed.
+        return replace(response, status=304, headers=(*response.headers, *extra))
+    return replace(response, headers=(*response.headers, *extra))
 
 
 class HTMLInject:
@@ -120,14 +214,26 @@ class HTMLInject:
         """
         return self._snippet_factory(csp_nonce())
 
+    def _snippet_is_stable(self) -> bool:
+        """Whether the snippet is identical for every request (nonce-free).
+
+        Renders the factory with two distinct sentinel nonces; a stable snippet
+        ignores the nonce and produces identical output. Only stable snippets
+        may carry a conditional ETag (see :func:`_finalize_html`) — a snippet
+        that embeds the per-request CSP nonce varies per request, so caching it
+        with a strong validator would serve a body with a dead nonce.
+        """
+        return self._snippet_factory("\x00chirp-a") == self._snippet_factory("\x00chirp-b")
+
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Inject the snippet into HTML responses."""
         response = await next(request)
 
         # Static HTML files (FileResponse) are read into a buffered Response so
         # the snippet can be injected; non-HTML files stream through untouched.
+        mtime: float | None = None
         if isinstance(response, FileResponse):
-            response = await _materialize_html_file(response)
+            response, mtime = await _materialize_html_file(response)
         # Only modify concrete Response objects with HTML content
         if not isinstance(response, Response):
             return response
@@ -149,12 +255,15 @@ class HTMLInject:
         snippet = self._render_snippet()
         if self._target in body:
             body = body.replace(self._target, snippet + self._target, 1)
+            stable = self._snippet_is_stable()
         elif self._full_page_only:
-            return response
+            # No injection performed: served bytes equal the file bytes (stable).
+            return _finalize_html(response, request, mtime=mtime, stable=True)
         else:
             body = body + snippet
+            stable = self._snippet_is_stable()
 
-        return replace(response, body=body)
+        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
 
 
 class StreamingHTMLInject(HTMLInject):
@@ -188,8 +297,9 @@ class StreamingHTMLInject(HTMLInject):
         response = await next(request)
         if isinstance(response, StreamingResponse):
             return self._streaming(response, request)
+        mtime: float | None = None
         if isinstance(response, FileResponse):
-            response = await _materialize_html_file(response)
+            response, mtime = await _materialize_html_file(response)
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
@@ -204,15 +314,17 @@ class StreamingHTMLInject(HTMLInject):
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
         if self._dedup_marker and self._dedup_marker in body:
-            return response
+            return _finalize_html(response, request, mtime=mtime, stable=True)
         snippet = self._render_snippet()
         if self._target in body:
             body = body.replace(self._target, snippet + self._target, 1)
+            stable = self._snippet_is_stable()
         elif self._full_page_only:
-            return response
+            return _finalize_html(response, request, mtime=mtime, stable=True)
         else:
             body = body + snippet
-        return replace(response, body=body)
+            stable = self._snippet_is_stable()
+        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
 
     def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
         if "text/html" not in response.content_type:
@@ -263,8 +375,9 @@ class AlpineInject(HTMLInject):
         response = await next(request)
         if isinstance(response, StreamingResponse):
             return self._alpine_streaming(response, request)
+        mtime: float | None = None
         if isinstance(response, FileResponse):
-            response = await _materialize_html_file(response)
+            response, mtime = await _materialize_html_file(response)
         if not isinstance(response, Response):
             return response
         if "text/html" not in response.content_type:
@@ -277,17 +390,19 @@ class AlpineInject(HTMLInject):
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
         if 'data-chirp="alpine"' in body:
-            return response
+            return _finalize_html(response, request, mtime=mtime, stable=True)
         # Reuse the fetched response — do not call ``next`` again via super().
         target = self._target
         snippet = self._render_snippet()
         if target in body:
             body = body.replace(target, snippet + target, 1)
+            stable = self._snippet_is_stable()
         elif self._full_page_only:
-            return response
+            return _finalize_html(response, request, mtime=mtime, stable=True)
         else:
             body = body + snippet
-        return replace(response, body=body)
+            stable = self._snippet_is_stable()
+        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
 
     def _alpine_streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
         if "text/html" not in response.content_type:

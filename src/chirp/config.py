@@ -11,6 +11,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+# Shared default for the request-body / multipart-upload byte ceilings (16 MB).
+# Named so __post_init__ can tell "user left max_upload_size at its default"
+# (safe to clamp down to a smaller body cap) from "user explicitly raised it
+# above the body cap" (a real misconfiguration worth a hard error).
+_DEFAULT_BODY_SIZE = 16 * 1024 * 1024
+
 
 def _env_bool(key: str, default: bool = False) -> bool:
     val = os.environ.get(key, "").lower()
@@ -200,20 +206,23 @@ class AppConfig:
     islands_version: str = "1"
     islands_contract_strict: bool = False  # Validate mount metadata in app.check()
 
-    # Limits
-    max_content_length: int = 16 * 1024 * 1024  # 16 MB
-
-    # Upload limits (multipart / file-upload bodies). These are distinct from
-    # max_content_length, which is not enforced by the request pipeline. The
-    # upload limits below are enforced where the bytes actually flow:
-    #   - max_upload_size: hard ceiling on the request body for upload/form
-    #     reads; Request.body()/stream() abort with 413 PayloadTooLarge before
-    #     the chunks are joined into RAM (reject-before-OOM).
+    # Request body / upload limits. Two distinct concerns, two distinct knobs:
+    #
+    #   - max_request_body_size: the GENERAL envelope — a hard ceiling on the
+    #     raw request body for EVERY content type (JSON, text, urlencoded, and
+    #     multipart). Request.body()/stream() abort with 413 PayloadTooLarge as
+    #     bytes arrive, before the chunks are joined into RAM (reject-before-OOM).
+    #   - max_upload_size: the MULTIPART-SPECIFIC cap — the total accumulated
+    #     size of multipart/form-data parts. Enforced by the multipart parser as
+    #     parts stream in. Distinct from max_request_body_size so an app can cap
+    #     file-upload payloads independently of plain JSON/text bodies. It is the
+    #     inner cap and should be <= max_request_body_size (the outer envelope).
     #   - upload_spool_threshold: bytes an UploadFile keeps in memory before it
     #     spills to a temp file on disk (stdlib SpooledTemporaryFile).
     #   - max_upload_parts: cap on the number of multipart parts, rejecting a
     #     multipart bomb with 413 PayloadTooLarge.
-    max_upload_size: int = 16 * 1024 * 1024  # 16 MB upload/multipart body ceiling
+    max_request_body_size: int = 16 * 1024 * 1024  # 16 MB general request-body ceiling
+    max_upload_size: int = 16 * 1024 * 1024  # 16 MB multipart total ceiling
     upload_spool_threshold: int = 1024 * 1024  # 1 MB held in RAM before spilling to disk
     max_upload_parts: int = 1000  # multipart part-count cap
 
@@ -308,6 +317,25 @@ class AppConfig:
         if isinstance(sc, dict):
             object.__setattr__(self, "static_context", MappingProxyType(sc))
 
+        # Invariant: the multipart cap is the inner envelope and must not exceed
+        # the general body cap (otherwise the body cap would reject first,
+        # making the upload cap unreachable). If the upload cap is still at its
+        # default, silently clamp it to the (smaller) body cap — the common case
+        # of "I only lowered the overall body limit" should just work. If the
+        # caller *explicitly* raised the upload cap above the body cap, that is a
+        # real misconfiguration: fail loud at construction.
+        if self.max_upload_size > self.max_request_body_size:
+            if self.max_upload_size == _DEFAULT_BODY_SIZE:
+                object.__setattr__(self, "max_upload_size", self.max_request_body_size)
+            else:
+                from chirp.errors import ConfigurationError
+
+                raise ConfigurationError(
+                    f"max_upload_size ({self.max_upload_size}) must not exceed "
+                    f"max_request_body_size ({self.max_request_body_size}); the "
+                    "multipart cap is the inner envelope of the general body cap."
+                )
+
         # Guard: empty secret_key outside development is a security risk.
         if self.env != "development" and not self.secret_key:
             from chirp.errors import ConfigurationError
@@ -388,6 +416,7 @@ class AppConfig:
                     "SENTRY_DSN",
                     "SENTRY_ENVIRONMENT",
                     "SENTRY_RELEASE",
+                    "MAX_REQUEST_BODY_SIZE",
                     "MAX_UPLOAD_SIZE",
                     "UPLOAD_SPOOL_THRESHOLD",
                     "MAX_UPLOAD_PARTS",
@@ -422,6 +451,7 @@ class AppConfig:
             sentry_dsn=os.environ.get(f"{p}SENTRY_DSN") or None,
             sentry_environment=os.environ.get(f"{p}SENTRY_ENVIRONMENT") or None,
             sentry_release=os.environ.get(f"{p}SENTRY_RELEASE") or None,
+            max_request_body_size=_env_int(f"{p}MAX_REQUEST_BODY_SIZE", 16 * 1024 * 1024),
             max_upload_size=_env_int(f"{p}MAX_UPLOAD_SIZE", 16 * 1024 * 1024),
             upload_spool_threshold=_env_int(f"{p}UPLOAD_SPOOL_THRESHOLD", 1024 * 1024),
             max_upload_parts=_env_int(f"{p}MAX_UPLOAD_PARTS", 1000),

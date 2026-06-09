@@ -15,6 +15,7 @@ URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 
 import contextlib
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
@@ -47,36 +48,28 @@ def _sanitize_upload_filename(filename: str) -> str:
     return base
 
 
+@dataclass(frozen=True, slots=True)
 class UploadFile:
     """An uploaded file from a multipart form submission.
 
-    Metadata (``filename``, ``content_type``, ``size``) is immutable. The
-    content is backed by a stdlib :class:`~tempfile.SpooledTemporaryFile`:
-    small files stay in memory, larger ones spill to a temp file on disk past
-    ``spool_threshold`` bytes — so a multi-GB upload never lands wholly in RAM.
+    Metadata (``filename``, ``content_type``, ``size``) is **immutable** — this
+    is a frozen dataclass, so rebinding any of those attributes raises
+    ``dataclasses.FrozenInstanceError``. The content is backed by a stdlib
+    :class:`~tempfile.SpooledTemporaryFile` held in the private ``_spool``
+    field: small files stay in memory, larger ones spill to a temp file on disk
+    past ``spool_threshold`` bytes — so a multi-GB upload never lands wholly in
+    RAM. (A frozen dataclass forbids *rebinding* fields, not mutating the object
+    a field points to, so the spool's IO position/buffer remains usable while
+    the metadata stays locked.)
 
     ``read()`` returns the full bytes; ``save()`` streams to disk in chunks and
     sanitizes the destination basename against path traversal.
     """
 
-    __slots__ = ("_spool", "content_type", "filename", "size")
-
     filename: str
     content_type: str
     size: int
     _spool: IO[bytes]
-
-    def __init__(
-        self,
-        filename: str,
-        content_type: str,
-        size: int,
-        spool: IO[bytes],
-    ) -> None:
-        self.filename = filename
-        self.content_type = content_type
-        self.size = size
-        self._spool = spool
 
     @classmethod
     def from_bytes(
@@ -98,7 +91,7 @@ class UploadFile:
             filename=filename,
             content_type=content_type,
             size=len(content),
-            spool=spool,
+            _spool=spool,
         )
 
     async def read(self) -> bytes:
@@ -464,6 +457,7 @@ async def parse_form_data(
     content_type: str,
     *,
     max_parts: int | None = None,
+    max_total_size: int | None = None,
     spool_threshold: int | None = None,
 ) -> FormData:
     """Parse form body into FormData.
@@ -478,6 +472,10 @@ async def parse_form_data(
         max_parts: Optional cap on the number of multipart parts. Exceeding it
             raises ``PayloadTooLarge`` (413) — the multipart-bomb guard.
             ``None`` (default) means unbounded for back-compat.
+        max_total_size: Optional cap on the total accumulated size of multipart
+            parts (the multipart-specific upload ceiling, distinct from the
+            general request-body cap). Exceeding it raises ``PayloadTooLarge``
+            (413). ``None`` (default) means unbounded for back-compat.
         spool_threshold: Bytes a file part keeps in memory before spilling to a
             temp file on disk. Defaults to ``DEFAULT_SPOOL_THRESHOLD``.
 
@@ -487,7 +485,7 @@ async def parse_form_data(
     Raises:
         ConfigurationError: If multipart parsing is needed but
             ``python-multipart`` is not installed.
-        PayloadTooLarge: If ``max_parts`` is exceeded.
+        PayloadTooLarge: If ``max_parts`` or ``max_total_size`` is exceeded.
         ValueError: If content type is not a supported form encoding.
     """
     ct_lower = content_type.lower().split(";")[0].strip()
@@ -500,6 +498,7 @@ async def parse_form_data(
             body,
             content_type,
             max_parts=max_parts,
+            max_total_size=max_total_size,
             spool_threshold=spool_threshold
             if spool_threshold is not None
             else DEFAULT_SPOOL_THRESHOLD,
@@ -526,6 +525,7 @@ async def _parse_multipart(
     content_type: str,
     *,
     max_parts: int | None = None,
+    max_total_size: int | None = None,
     spool_threshold: int = DEFAULT_SPOOL_THRESHOLD,
 ) -> FormData:
     """Parse multipart form data using python-multipart.
@@ -533,10 +533,11 @@ async def _parse_multipart(
     File parts are streamed into a :class:`~tempfile.SpooledTemporaryFile`
     (spilling to disk past ``spool_threshold``) rather than buffered whole in a
     ``bytearray``. ``max_parts`` caps the number of parts to defend against a
-    multipart bomb.
+    multipart bomb; ``max_total_size`` caps the cumulative byte size of all
+    parts (the multipart-specific upload ceiling).
 
     Raises ``ConfigurationError`` if ``python-multipart`` is not installed and
-    ``PayloadTooLarge`` if ``max_parts`` is exceeded.
+    ``PayloadTooLarge`` if ``max_parts`` or ``max_total_size`` is exceeded.
     """
     from chirp.errors import ConfigurationError, PayloadTooLarge
 
@@ -575,6 +576,7 @@ async def _parse_multipart(
     current_field_name: str | None = None
     current_filename: str | None = None
     part_count = 0
+    total_size = 0
 
     def on_part_begin() -> None:
         nonlocal current_headers, current_data, current_spool, current_size
@@ -590,9 +592,14 @@ async def _parse_multipart(
         current_filename = None
 
     def on_part_data(data_chunk: bytes, start: int, end: int) -> None:
-        nonlocal current_spool, current_size
+        nonlocal current_spool, current_size, total_size
         piece = data_chunk[start:end]
         current_size += len(piece)
+        total_size += len(piece)
+        if max_total_size is not None and total_size > max_total_size:
+            raise PayloadTooLarge(
+                f"Multipart upload exceeds the maximum total size of {max_total_size} bytes."
+            )
         if current_filename is not None:
             # File part: stream into the spool (rolls to disk past threshold).
             if current_spool is None:
@@ -617,7 +624,7 @@ async def _parse_multipart(
                 filename=current_filename,
                 content_type=ct,
                 size=current_size,
-                spool=spool,
+                _spool=spool,
             )
         else:
             # Regular field

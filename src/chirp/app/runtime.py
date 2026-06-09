@@ -94,6 +94,7 @@ class ASGIRuntime:
             sse_heartbeat_interval=self._config.sse_heartbeat_interval,
             sse_retry_ms=self._config.sse_retry_ms,
             sse_close_event=self._config.sse_close_event,
+            max_request_body_size=self._config.max_request_body_size,
             max_upload_size=self._config.max_upload_size,
             upload_spool_threshold=self._config.upload_spool_threshold,
             max_upload_parts=self._config.max_upload_parts,
