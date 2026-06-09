@@ -1,9 +1,11 @@
 """Async stream orchestration for progressive rendering.
 
-When a ``Stream()`` return value contains awaitables (coroutines) in its
-context, this module resolves them concurrently using anyio, then feeds
-the resolved context to kida's synchronous ``render_stream()`` for
-progressive chunk delivery.
+Every ``Stream()`` return value is rendered through this module. When the
+context contains awaitables (coroutines) they are resolved concurrently using
+anyio first; the resolved context (sync contexts pass straight through) is then
+fed to kida's synchronous ``render_stream()``, driven on a worker thread so the
+event loop is never blocked by CPU-bound chunk compilation — for either an
+all-sync or a mixed context (issue #179).
 
 This is Chirp-level orchestration around existing Kida primitives —
 no changes to Kida's rendering engine required.
@@ -64,6 +66,7 @@ Shell-first streaming (kida 0.2.3+):
 """
 
 import contextlib
+import contextvars
 import inspect
 import queue
 import threading
@@ -166,7 +169,11 @@ async def render_stream_async(
 
     # Carries a render error from the worker thread back to the loop so the
     # consumer can re-raise it (preserving sender.py's mid-stream error path).
-    error_box: list[BaseException] = []
+    # Only `Exception` is captured/re-raised: sender.py's mid-stream error path
+    # catches `Exception`, so a non-Exception `BaseException` (KeyboardInterrupt,
+    # SystemExit) must propagate on the worker thread rather than be smuggled
+    # back onto the loop where it would escape sender.py uncaught.
+    error_box: list[Exception] = []
 
     def _producer() -> None:
         """Drive kida's sync generator on the worker thread.
@@ -191,9 +198,11 @@ async def render_stream_async(
                             break
                         except queue.Full:
                             continue
-        except BaseException as exc:  # propagate render errors
+        except Exception as exc:  # propagate render errors
             # A real render error (e.g. kida raised mid-stream). Stash it so the
-            # consumer re-raises on the loop.
+            # consumer re-raises on the loop. Narrowed to `Exception` on purpose
+            # (see error_box note) so non-Exception BaseExceptions are not
+            # smuggled onto the loop past sender.py's `except Exception`.
             error_box.append(exc)
         finally:
             # Close kida's generator on the SAME (worker) thread/context that
@@ -203,8 +212,12 @@ async def render_stream_async(
             close = getattr(sync_stream, "close", None)
             if close is not None:
                 close()
-            # Always signal end-of-stream (the reserved queue slot guarantees
-            # this never blocks).
+            # Always signal end-of-stream. This put may block briefly when the
+            # queue is full, but it is bounded: the loop consumer drains exactly
+            # one item per `get` and always keeps draining until it sees
+            # `_STREAM_END` (and the shielded `finally` keeps draining on the
+            # cancel/disconnect path), so the worker is guaranteed to be
+            # unblocked and able to exit.
             chunk_queue.put(_STREAM_END)
 
     # Run the kida render on a dedicated worker thread, bridged to the loop via
@@ -212,8 +225,14 @@ async def render_stream_async(
     # consumer aclose() (GeneratorExit) unwinds cleanly instead of being wrapped
     # into a noisy ExceptionGroup. The shielded finally drives an orderly
     # shutdown and joins the thread, so it cannot leak.
+    # Copy the loop's contextvars onto the worker thread so request_var /
+    # request_id_var are restored during render — get_request() (and request_id)
+    # work inside template globals/filters on the worker, keeping the
+    # html-streaming.md contract ("the request object is restored for chunk
+    # iteration") true for Stream.
+    ctx = contextvars.copy_context()
     worker = threading.Thread(
-        target=_producer,
+        target=lambda: ctx.run(_producer),
         name="chirp-stream-render",
         daemon=True,
     )
