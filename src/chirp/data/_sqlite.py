@@ -103,11 +103,17 @@ class AsyncConnection:
         await _run_sync(self._conn.close)
 
 
-async def connect(path: str) -> AsyncConnection:
+async def connect(path: str, *, uri: bool = False) -> AsyncConnection:
     """Open an async SQLite connection.
 
     Uses ``autocommit=True`` so individual statements commit immediately.
     Uses ``check_same_thread=False`` for safe use with anyio's thread pool.
+
+    Pass ``uri=True`` for URI-style targets such as the shared-cache in-memory
+    path ``file::memory:?cache=shared`` used by the pool so several connections
+    share one logical in-memory database.
     """
-    conn = await _run_sync(lambda: sqlite3.connect(path, autocommit=True, check_same_thread=False))
+    conn = await _run_sync(
+        lambda: sqlite3.connect(path, autocommit=True, check_same_thread=False, uri=uri)
+    )
     return AsyncConnection(conn)

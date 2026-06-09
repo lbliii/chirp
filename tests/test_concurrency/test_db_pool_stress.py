@@ -1,10 +1,17 @@
 """Stress tests for Database connection pool under concurrent task access.
 
-Uses SQLite in-memory to verify:
+In-memory SQLite (single shared connection, serialized) verifies:
 - 50 concurrent tasks can query without pool exhaustion
 - Transactions serialize correctly under contention
 - Connection is returned to pool after each operation
 - No data corruption under concurrent INSERT/SELECT
+
+File-backed SQLite (real WAL pool) verifies the #186 acceptance:
+- Concurrent readers run in parallel (overlap timing), not serialized
+- A long write transaction does not block concurrent reads
+- Concurrent write transactions still serialize (no lost updates)
+- The pool is sized by pool_size for files but collapses to one
+  shared connection for in-memory databases
 """
 
 import asyncio
@@ -160,3 +167,127 @@ class TestDatabasePoolStress:
             await asyncio.gather(*(burst_task(i + 100) for i in range(30)))
             count = await db.fetch_val("SELECT COUNT(*) FROM t")
             assert count == 60
+
+
+class TestSqlitePoolConcurrency:
+    """File-backed SQLite proves WAL concurrency: parallel readers, serialized writer.
+
+    In-memory SQLite uses a single shared connection (serialized), so genuine
+    concurrent-reader throughput is verified against a temp file with WAL.
+    """
+
+    async def test_concurrent_readers_run_in_parallel(self, tmp_path) -> None:
+        """N slow readers overlap in time — they are not serialized.
+
+        Each reader holds a connection while sleeping; if reads serialized on a
+        single lock/connection, total wall time would be ~N * sleep. With a pool
+        of WAL connections they overlap, so total time is far below the serial
+        sum. This is the core acceptance: concurrent readers do not block.
+        """
+        url = f"sqlite:///{tmp_path / 'reads.db'}"
+        n_readers = 5
+        sleep = 0.2
+
+        async with Database(url, pool_size=n_readers) as db:
+            await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER)")
+            await db.execute("INSERT INTO t (v) VALUES (1)")
+
+            async def slow_reader() -> None:
+                # Acquire a pooled read connection, hold it across a sleep, then
+                # read. If reads were serialized, these could not overlap.
+                async with db._connection() as conn:
+                    await asyncio.sleep(sleep)
+                    cursor = await conn.execute("SELECT v FROM t")
+                    await cursor.fetchone()
+
+            start = asyncio.get_event_loop().time()
+            await asyncio.gather(*(slow_reader() for _ in range(n_readers)))
+            elapsed = asyncio.get_event_loop().time() - start
+
+        # Serial would be ~n_readers * sleep (1.0s); parallel is ~sleep (0.2s).
+        # Assert well below the serial floor to prove overlap without flakiness.
+        assert elapsed < (n_readers * sleep) / 2, (
+            f"Readers serialized: {elapsed:.3f}s for {n_readers} x {sleep}s sleeps"
+        )
+
+    async def test_long_write_txn_does_not_block_reads(self, tmp_path) -> None:
+        """An open write transaction must not stall concurrent reads.
+
+        A reader running while a slow write transaction is open should complete
+        promptly (it does not wait for the write lock), proving the write lock no
+        longer serializes the whole app.
+        """
+        url = f"sqlite:///{tmp_path / 'rw.db'}"
+
+        async with Database(url, pool_size=4) as db:
+            await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER)")
+            await db.execute("INSERT INTO t (v) VALUES (10)")
+
+            read_done = asyncio.Event()
+
+            async def slow_writer() -> None:
+                async with db.transaction():
+                    await db.execute("UPDATE t SET v = 20 WHERE id = 1")
+                    # Hold the write transaction open; the reader should still
+                    # complete during this window.
+                    for _ in range(50):
+                        if read_done.is_set():
+                            break
+                        await asyncio.sleep(0.01)
+
+            async def reader() -> None:
+                # Should return the last committed value (10) without waiting for
+                # the writer to commit.
+                val = await db.fetch_val("SELECT v FROM t WHERE id = 1")
+                assert val == 10
+                read_done.set()
+
+            await asyncio.wait_for(
+                asyncio.gather(slow_writer(), reader()),
+                timeout=2.0,
+            )
+            assert read_done.is_set()
+            # Writer committed afterward.
+            assert await db.fetch_val("SELECT v FROM t WHERE id = 1") == 20
+
+    async def test_concurrent_writers_serialize_correctly(self, tmp_path) -> None:
+        """Concurrent write transactions still serialize — no lost updates."""
+        url = f"sqlite:///{tmp_path / 'writers.db'}"
+        n_tasks = 20
+        increment = 10
+
+        async with Database(url, pool_size=5) as db:
+            await db.execute("CREATE TABLE balance (id INTEGER PRIMARY KEY, amount INTEGER)")
+            await db.execute("INSERT INTO balance (id, amount) VALUES (1, 1000)")
+
+            async def transactor() -> None:
+                async with db.transaction():
+                    current = await db.fetch_val("SELECT amount FROM balance WHERE id = 1")
+                    await db.execute(
+                        "UPDATE balance SET amount = ? WHERE id = 1", current + increment
+                    )
+
+            await asyncio.gather(*(transactor() for _ in range(n_tasks)))
+
+            final = await db.fetch_val("SELECT amount FROM balance WHERE id = 1")
+            assert final == 1000 + (n_tasks * increment)
+
+    async def test_pool_sized_by_pool_size(self, tmp_path) -> None:
+        """A file-backed pool opens pool_size connections, not one."""
+        url = f"sqlite:///{tmp_path / 'sized.db'}"
+        async with Database(url, pool_size=4) as db:
+            await db.connect()
+            assert db._pool.size == 4
+            assert db._pool.is_memory is False
+
+    async def test_memory_uses_single_shared_connection(self) -> None:
+        """In-memory DB collapses to one shared connection visible to all tasks."""
+        async with Database("sqlite:///:memory:", pool_size=5) as db:
+            await db.connect()
+            assert db._pool.size == 1
+            assert db._pool.is_memory is True
+
+            # A row written on the shared connection is visible to a later read.
+            await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+            await db.execute("INSERT INTO t (v) VALUES ('x')")
+            assert await db.fetch_val("SELECT COUNT(*) FROM t") == 1
