@@ -224,6 +224,7 @@ class TestNegotiateTemplateTypes:
         result = negotiate(Stream("dash.html", name="World"), kida_env=env)
         assert isinstance(result, StreamingResponse)
         assert result.content_type == "text/html; charset=utf-8"
+
         async def _drain() -> list[str]:
             return [chunk async for chunk in result.chunks]
 
