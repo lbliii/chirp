@@ -2,7 +2,7 @@
 
 The guard fails when a roadmap file statically asserts "no open GitHub issues"
 without a dated-snapshot qualifier, and is a stdlib-only 0/1 exit script with no
-hard network dependency (the live ``gh`` cross-check degrades to a skip).
+network dependency (a pure static-regex check).
 """
 
 import importlib.util
@@ -62,11 +62,3 @@ def test_repo_roadmaps_are_clean():
     """The shipped ROADMAP.md and plan/roadmap.md must pass the guard."""
     files = [str(_REPO_ROOT / "ROADMAP.md"), str(_REPO_ROOT / "plan" / "roadmap.md")]
     assert guard.main(files) == 0
-
-
-def test_with_gh_flag_does_not_fail_on_clean_files(tmp_path, monkeypatch):
-    """--with-gh must never fail on a clean file, even when gh is unavailable."""
-    monkeypatch.setattr(guard, "_gh_has_open_issues", lambda: None)
-    f = tmp_path / "ROADMAP.md"
-    f.write_text("# Roadmap\nLive backlog is authoritative.\n", encoding="utf-8")
-    assert guard.main([str(f), "--with-gh"]) == 0

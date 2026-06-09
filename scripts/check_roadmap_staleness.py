@@ -14,12 +14,11 @@ Design constraints (see issue #199):
 
 - **Stdlib only, returns 0/1, prints an actionable message** — mirrors
   ``scripts/check_changelog_fragments.py`` and runs as a local pre-commit hook.
-- **No hard network dependency.** The default check is a pure static-regex
-  assertion so offline contributors and air-gapped CI are never blocked. When
-  ``gh`` is on ``PATH`` *and* authenticated, ``--with-gh`` additionally fails if
-  the file claims "none open" while the live backlog actually has open issues;
-  a missing/unauthenticated ``gh`` (or any network error) is treated as a skip,
-  not a failure.
+- **No network dependency.** The check is a pure static-regex assertion, so
+  offline contributors and air-gapped CI are never blocked. (Cross-checking a
+  live ``gh`` count is intentionally *not* done: the fix removes the count claim
+  entirely rather than keeping a number in sync, so there is nothing to verify
+  against the live backlog.)
 
 Qualified, historical snapshots are allowed: a line that says "none open *as of*
 …" or otherwise carries a ``snapshot`` / ``point-in-time`` / ``as of`` marker is
@@ -27,8 +26,6 @@ understood to be a dated reading, not a live claim, and does not fail the guard.
 """
 
 import re
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -67,36 +64,8 @@ def _stale_lines(path: Path) -> list[tuple[int, str]]:
     return bad
 
 
-def _gh_has_open_issues() -> bool | None:
-    """Return True/False if ``gh`` can report open issues, else None (skip).
-
-    None means we could not reach a trustworthy answer — gh missing, not
-    authenticated, offline, or any subprocess error — so the caller treats it
-    as "unknown" and does not fail on the live-count basis.
-    """
-    gh = shutil.which("gh")
-    if gh is None:
-        return None
-    try:
-        proc = subprocess.run(  # noqa: S603 — static args, gh resolved from PATH
-            [gh, "issue", "list", "--state", "open", "--json", "number", "--limit", "1"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except subprocess.SubprocessError, OSError:
-        return None
-    if proc.returncode != 0:
-        return None
-    # Non-empty JSON array (anything past "[]") means at least one open issue.
-    return proc.stdout.strip() not in ("", "[]")
-
-
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if a != "--with-gh"]
-    with_gh = "--with-gh" in argv
-
-    paths = [Path(a) for a in args] if args else [Path(p) for p in _DEFAULT_FILES]
+    paths = [Path(a) for a in argv] if argv else [Path(p) for p in _DEFAULT_FILES]
 
     stale: list[tuple[Path, int, str]] = []
     for path in paths:
@@ -112,13 +81,6 @@ def main(argv: list[str]) -> int:
         for path, lineno, line in stale:
             print(f"  {path}:{lineno}: {line[:100]}")
         return 1
-
-    if with_gh:
-        # Optional, network-dependent reinforcement. Absence is a skip, never a
-        # failure, so offline contributors and air-gapped CI are not blocked.
-        has_open = _gh_has_open_issues()
-        if has_open is None:
-            print("note: gh unavailable/unauthenticated; skipped live-backlog cross-check.")
 
     return 0
 

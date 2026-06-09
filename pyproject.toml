@@ -279,6 +279,8 @@ dev = [
     "ruff>=0.15.1", # Require ruff>=0.15.1 for correct handling of newer Python syntax
     # Changelog
     "towncrier>=24.8.0",
+    # Task runner — `poe <task>` / the `poe preflight` pre-push hook + docs rely on it
+    "poethepoet>=0.29.0",
     # Pre-commit (prek = Rust-based drop-in, reads .pre-commit-config.yaml)
     "prek>=0.3.2",
     # Test utilities (optional deps needed for full test suite)
