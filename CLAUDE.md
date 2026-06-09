@@ -231,7 +231,17 @@ uv sync --group dev          # Install deps
 uv run pytest                # Run tests
 uv run ruff check .          # Lint
 uv run ruff format . --check # Format check
+uv run poe preflight         # Fast pre-push invariants (lint + format + ty + API/docs snapshot tests)
 ```
+
+`poe preflight` (alias `make preflight`) runs only the cheap whole-repo
+invariants — `ruff check`, `ruff format --check`, `ty check src/chirp/`, and the
+two repo-wide invariant tests (`tests/test_lazy_imports.py`,
+`tests/test_public_api_docs.py`) — and exits non-zero on the first failure. It
+does **not** run the full pytest suite, so it finishes in seconds and catches
+the public-API-snapshot / docs-coverage / format / ty failure class locally
+before a push instead of via a ~20-minute CI round-trip. Run it before pushing
+(it is also wired as a `pre-push` hook in `.pre-commit-config.yaml`).
 
 ## Configuration
 

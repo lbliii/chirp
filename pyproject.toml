@@ -279,6 +279,8 @@ dev = [
     "ruff>=0.15.1", # Require ruff>=0.15.1 for correct handling of newer Python syntax
     # Changelog
     "towncrier>=24.8.0",
+    # Task runner — `poe <task>` / the `poe preflight` pre-push hook + docs rely on it
+    "poethepoet>=0.29.0",
     # Pre-commit (prek = Rust-based drop-in, reads .pre-commit-config.yaml)
     "prek>=0.3.2",
     # Test utilities (optional deps needed for full test suite)
@@ -299,6 +301,7 @@ test = { cmd = "pytest", help = "Run full test suite" }
 test-fast = { cmd = "pytest tests/ -x -q --timeout=10", help = "Fast feedback loop" }
 test-examples = { cmd = "pytest examples/ -x -q", help = "Run example tests" }
 test-cov = { cmd = "pytest tests/ --cov=chirp --cov-report=term-missing", help = "Run tests with coverage" }
+test-invariants = { cmd = "pytest tests/test_lazy_imports.py tests/test_public_api_docs.py -q", help = "Repo-wide public-API snapshot + docs-coverage invariants (no full suite)" }
 
 # Type Checking
 ty = { cmd = "ty check src/chirp/", help = "Run ty type checker" }
@@ -326,6 +329,12 @@ check = { sequence = [
     "format-check",
     "ty",
 ], help = "Quick check (no tests)" }
+preflight = { sequence = [
+    "lint",
+    "format-check",
+    "ty",
+    "test-invariants",
+], help = "Fast pre-push: cheap whole-repo invariants (no full suite)" }
 
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build --out-dir dist/ && ls -la dist/", help = "Build distribution" }

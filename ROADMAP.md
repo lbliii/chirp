@@ -10,9 +10,12 @@ what stays out of scope.
 
 - Latest released version: `0.7.0` (`CHANGELOG.md`, tag `v0.7.0`).
 - Current package version: `0.7.0` in `pyproject.toml`.
-- Open GitHub issues checked on 2026-05-30: none.
-- Open GitHub PRs checked on 2026-05-30: PR #131, request-aware filesystem
-  page actions.
+- **Live backlog is authoritative.** Do not trust a static "no open issues"
+  count in this file — it goes stale silently. The source of truth for open
+  work is the GitHub backlog and `plan/roadmap.md`:
+  - Open issues: <https://github.com/lbliii/chirp/issues>
+  - Open PRs: <https://github.com/lbliii/chirp/pulls>
+  - Planning detail and ranking: `plan/roadmap.md`
 - Current release-prep branch: `codex/next-release-roadmap`, with native
   DevTools debug runtime and request-aware `_actions.py` dispatch prepared for
   `0.7.1`.

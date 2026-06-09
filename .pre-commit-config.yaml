@@ -7,6 +7,10 @@
 default_language_version:
   python: python3.14
 
+# Install both the commit-time hooks (default) and the pre-push preflight.
+# Run `poe hooks-install` (prek install) to wire these up.
+default_install_hook_types: [pre-commit, pre-push]
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.1
@@ -36,6 +40,19 @@ repos:
         language: system
         files: ^changelog\.d/\+.*\.(added|changed|deprecated|removed|fixed|security)\.md$
         pass_filenames: true
+      - id: roadmap-staleness
+        name: roadmap staleness (no static 'no open issues' claim)
+        entry: python scripts/check_roadmap_staleness.py
+        language: system
+        files: ^(ROADMAP\.md|plan/roadmap\.md)$
+        pass_filenames: false
+      - id: preflight
+        name: preflight (fast whole-repo invariants)
+        entry: uv run poe preflight
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

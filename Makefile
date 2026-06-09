@@ -4,7 +4,7 @@
 PYTHON_VERSION ?= 3.14t
 VENV_DIR ?= .venv
 
-.PHONY: all help setup install test lint format ty clean build publish release gh-release changelog changelog-draft changelog-check
+.PHONY: all help setup install test lint format ty preflight clean build publish release gh-release changelog changelog-draft changelog-check
 
 all: help
 
@@ -20,6 +20,7 @@ help:
 	@echo "  make lint       - Run ruff linter"
 	@echo "  make format     - Run ruff formatter"
 	@echo "  make ty         - Run ty type checker"
+	@echo "  make preflight  - Fast pre-push: cheap whole-repo invariants (no full suite)"
 	@echo "  make changelog  - Compile changelog.d fragments into CHANGELOG.md"
 	@echo "  make changelog-draft - Preview changelog from fragments (stdout)"
 	@echo "  make changelog-check - Verify branch adds a fragment (vs main)"
@@ -52,6 +53,12 @@ format:
 
 ty:
 	uv run ty check src/chirp/
+
+# Fast invariants check before pushing: lint + format-check + ty + repo-wide
+# invariant tests (public-API snapshot, docs coverage). Does NOT run the full
+# pytest suite — completes in seconds, not the ~20-minute CI test job.
+preflight:
+	uv run poe preflight
 
 # =============================================================================
 # Build & Release
