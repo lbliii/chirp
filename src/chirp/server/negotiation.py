@@ -546,17 +546,14 @@ def negotiate(
                 notes=("async_context" if async_context else "sync_context",),
             )
             kida_env = _require_kida_env(kida_env, "Stream")
-            if async_context:
-                # Async sources detected — resolve concurrently, then stream
-                chunks = render_stream_async(kida_env, value)
-                return StreamingResponse(
-                    chunks=chunks,
-                    content_type="text/html; charset=utf-8",
-                    request_context=request,
-                )
-            # All context values are resolved — use sync streaming
-            tmpl = kida_env.get_template(value.template_name)
-            chunks = tmpl.render_stream(value.context)
+            # Always render off the event loop via the worker-thread + bounded
+            # queue bridge — for an all-sync context render_stream_async simply
+            # resolves nothing and drives kida's CPU-bound sync generator on the
+            # worker thread. Iterating render_stream() inline here (the old sync
+            # branch) would block the loop for every concurrent request, which is
+            # exactly what issue #179 targets. (async_context is kept only for
+            # the trace note above.)
+            chunks = render_stream_async(kida_env, value)
             return StreamingResponse(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
