@@ -213,13 +213,16 @@ class TestSuspenseDeferRuleIntegration:
 
         template_dir = tmp_path / "templates"
         template_dir.mkdir()
-        # Undiscoverable key, but the handler opts out via defer_blocks=.
+        # `stats` is declared deferred OUTSIDE any block, so it is genuinely
+        # undiscoverable — identical to the template in
+        # ``test_app_check_flags_undiscoverable_key`` (which gets 1 issue). The
+        # ONLY thing that suppresses the warning here is the handler's
+        # ``defer_blocks=`` opt-out, so this test is load-bearing for the
+        # exemption (it would fail if ``_collect_defer_blocks_templates`` broke).
         (template_dir / "page.html").write_text(
             "<html><body>"
-            "{% block stats_card %}"
             "{% if stats is deferred %}<span>loading…</span>"
             "{% else %}<span>{{ stats }}</span>{% endif %}"
-            "{% endblock %}"
             "</body></html>"
         )
         app = App(config=AppConfig(template_dir=str(template_dir)))
@@ -233,7 +236,7 @@ class TestSuspenseDeferRuleIntegration:
 
             return Suspense(
                 "page.html",
-                defer_blocks=("stats_card",),
+                defer_blocks=("stats",),
                 stats=_load(),
             )
 
@@ -273,3 +276,47 @@ class TestSuspenseDeferRuleIntegration:
         issues = [i for i in result.issues if i.category == "suspense_defer"]
         assert len(issues) == 1
         assert issues[0].severity == Severity.ERROR
+
+
+# Module-level handlers so inspect.getsource() can read their bodies, exercising
+# the handler-source scan in _collect_defer_blocks_templates directly.
+def _handler_with_defer_blocks():
+    from chirp.templating.returns import Suspense
+
+    return Suspense("dash.html", defer_blocks=("stats",), stats=None)
+
+
+def _handler_without_defer_blocks():
+    from chirp.templating.returns import Suspense
+
+    return Suspense("plain.html", stats=None)
+
+
+class _Route:
+    def __init__(self, handler) -> None:
+        self.handler = handler
+        self.page_source_handler = None
+
+
+class _Router:
+    def __init__(self, *handlers) -> None:
+        self.routes = [_Route(h) for h in handlers]
+
+
+class TestCollectDeferBlocksTemplates:
+    """Direct coverage of the defer_blocks= handler-source exemption scan."""
+
+    def test_handler_with_defer_blocks_is_exempt(self) -> None:
+        from chirp.contracts.checker import _collect_defer_blocks_templates
+
+        exempt = _collect_defer_blocks_templates(
+            _Router(_handler_with_defer_blocks, _handler_without_defer_blocks)
+        )
+        # Only the template rendered by a defer_blocks= handler is exempt.
+        assert "dash.html" in exempt
+        assert "plain.html" not in exempt
+
+    def test_no_handlers_is_empty(self) -> None:
+        from chirp.contracts.checker import _collect_defer_blocks_templates
+
+        assert _collect_defer_blocks_templates(_Router()) == frozenset()
