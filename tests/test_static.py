@@ -513,3 +513,253 @@ class TestCustomNotFoundPage:
             response = await client.get("/api/health")
             assert response.status == 200
             assert "ok" in response.text
+
+
+# ------------------------------------------------------------------
+# Streaming + conditional GET / Range (#178)
+# ------------------------------------------------------------------
+
+
+def _header(response, name):
+    """First header value (case-insensitive) from a TestClient Response."""
+    target = name.lower()
+    for n, v in response.headers:
+        if n.lower() == target:
+            return v
+    return None
+
+
+class TestStaticConditionalGet:
+    async def test_etag_and_last_modified_emitted(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css")
+            assert response.status == 200
+            assert _header(response, "ETag") is not None
+            assert _header(response, "Last-Modified") is not None
+            assert _header(response, "Accept-Ranges") == "bytes"
+            assert "body { color: red; }" in response.text
+
+    async def test_if_none_match_returns_304(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            first = await client.get("/static/style.css")
+            etag = _header(first, "ETag")
+            assert etag is not None
+
+            second = await client.get("/static/style.css", headers={"If-None-Match": etag})
+            assert second.status == 304
+            assert second.text == ""  # empty body on 304
+
+    async def test_if_none_match_wildcard_returns_304(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css", headers={"If-None-Match": "*"})
+            assert response.status == 304
+
+    async def test_if_modified_since_returns_304(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            first = await client.get("/static/style.css")
+            last_modified = _header(first, "Last-Modified")
+            assert last_modified is not None
+
+            second = await client.get(
+                "/static/style.css", headers={"If-Modified-Since": last_modified}
+            )
+            assert second.status == 304
+
+    async def test_stale_if_modified_since_returns_200(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/static/style.css",
+                headers={"If-Modified-Since": "Mon, 01 Jan 1990 00:00:00 GMT"},
+            )
+            assert response.status == 200
+            assert "body { color: red; }" in response.text
+
+
+class TestStaticRange:
+    async def test_range_returns_206_and_slice(self, static_dir) -> None:
+        # "body { color: red; }" — bytes 0-3 == "body"
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css", headers={"Range": "bytes=0-3"})
+            assert response.status == 206
+            assert response.text == "body"
+            content_range = _header(response, "Content-Range")
+            assert content_range is not None
+            assert content_range.startswith("bytes 0-3/")
+
+    async def test_suffix_range(self, static_dir) -> None:
+        full = "body { color: red; }"
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css", headers={"Range": "bytes=-4"})
+            assert response.status == 206
+            assert response.text == full[-4:]
+
+    async def test_unsatisfiable_range_returns_416(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css", headers={"Range": "bytes=9999-10000"})
+            assert response.status == 416
+            content_range = _header(response, "Content-Range")
+            assert content_range is not None
+            assert content_range.startswith("bytes */")
+
+    async def test_multi_range_falls_back_to_200(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css", headers={"Range": "bytes=0-1,3-4"})
+            # Multi-range is unsupported — serve the full body, not a malformed
+            # multipart/byteranges response.
+            assert response.status == 200
+            assert "body { color: red; }" in response.text
+
+
+class TestStaticHeadConditional:
+    async def test_head_sends_no_body(self, static_dir) -> None:
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.request("HEAD", "/static/style.css")
+            assert response.status == 200
+            assert "text/css" in response.content_type
+            assert _header(response, "ETag") is not None
+            assert response.text == ""  # HEAD: headers only, no body
+
+
+class TestStaticStreamingLargeFile:
+    async def test_large_file_streamed_intact(self, tmp_path) -> None:
+        """A file above the stream threshold is served byte-for-byte via the
+        chunked read path."""
+        static = tmp_path / "static"
+        static.mkdir()
+        # Deterministic, larger-than-threshold binary payload.
+        payload = bytes(range(256)) * 5000  # ~1.28 MiB
+        (static / "big.bin").write_bytes(payload)
+
+        app = App()
+        app.add_middleware(
+            StaticFiles(directory=static, prefix="/static", stream_threshold=64 * 1024)
+        )
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/big.bin")
+            assert response.status == 200
+            assert response.body == payload
+            assert len(response.body) == len(payload)
+
+    async def test_small_file_single_read_path(self, tmp_path) -> None:
+        static = tmp_path / "static"
+        static.mkdir()
+        payload = b"small"
+        (static / "small.bin").write_bytes(payload)
+
+        app = App()
+        app.add_middleware(
+            StaticFiles(directory=static, prefix="/static", stream_threshold=1024 * 1024)
+        )
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/small.bin")
+            assert response.status == 200
+            assert response.body == payload
+
+
+class TestStaticCustom404NotConditional:
+    async def test_custom_404_does_not_304(self, static_dir) -> None:
+        """A custom 404 page is served with status 404 and never 304s, even
+        when the client sends a matching validator-style header."""
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/", not_found_page="404.html"))
+
+        async with TestClient(app) as client:
+            response = await client.get("/nonexistent", headers={"If-None-Match": "*"})
+            assert response.status == 404
+            assert "<h1>Not Found</h1>" in response.text
+
+
+class TestStaticStreamingContract:
+    async def test_negative_threshold_warns(self, tmp_path) -> None:
+        from chirp.contracts.rules_static_streaming import check_static_streaming
+
+        mw = StaticFiles(directory=tmp_path, prefix="/static", stream_threshold=-1)
+        issues = check_static_streaming([mw])
+        assert any(issue.category == "static_streaming" for issue in issues)
+
+    async def test_sane_threshold_no_warning(self, tmp_path) -> None:
+        from chirp.contracts.rules_static_streaming import check_static_streaming
+
+        mw = StaticFiles(directory=tmp_path, prefix="/static")
+        issues = check_static_streaming([mw])
+        assert issues == []

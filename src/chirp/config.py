@@ -151,6 +151,9 @@ class AppConfig:
     # Static files
     static_dir: str | Path | None = "static"
     static_url: str = "/static"
+    # Files at/above this size (bytes) stream from disk in chunks instead of
+    # being read into memory in one shot; caps worker RSS for large static GETs.
+    static_stream_threshold: int = 1024 * 1024  # 1 MiB
 
     # SSE
     sse_heartbeat_interval: float = 15.0

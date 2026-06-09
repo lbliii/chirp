@@ -5,8 +5,10 @@ built incrementally by design.
 """
 
 import json as json_module
+import mimetypes
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from chirp.http.cookies import SetCookie
@@ -386,6 +388,107 @@ def hx_redirect(
     if headers:
         response = response.with_headers(headers)
     return response
+
+
+@dataclass(frozen=True, slots=True)
+class FileResponse:
+    """A file response served from disk with conditional-GET and Range support.
+
+    The body is streamed from disk by a dedicated ASGI sender
+    (:func:`chirp.server.sender.send_file_response`) rather than read fully into
+    memory, so large files do not grow worker RSS unboundedly. The sender emits
+    ``ETag``, ``Last-Modified`` and ``Accept-Ranges: bytes`` and honours
+    conditional requests (``If-None-Match`` / ``If-Modified-Since`` -> 304) and a
+    single byte ``Range`` (-> 206, ``416`` when unsatisfiable).
+
+    ``content_type`` is auto-detected from the path via :mod:`mimetypes` when
+    left as ``None`` (defaulting to ``application/octet-stream``).
+
+    The file is ``stat``-ed at *send* time, not at construction, so the dataclass
+    stays cheap and immutable. ``ETag`` is derived from size + mtime (not a content
+    hash) — it is stable for a given file on disk but changes across rebuilds that
+    rewrite mtimes; this is intentional given Chirp ships no asset pipeline.
+
+    Like :class:`Response`, exposes the chainable ``.with_*()`` / ``.header()``
+    API so middleware can modify headers/status without special-casing the type.
+
+    ``conditional`` controls whether the sender evaluates 304/206 (disabled for
+    error bodies such as a custom 404 page, where caching a 304 would be wrong).
+    """
+
+    path: Path
+    status: int = 200
+    content_type: str | None = None
+    headers: tuple[tuple[str, str], ...] = ()
+    chunk_size: int = 64 * 1024
+    stream_threshold: int = 1024 * 1024
+    conditional: bool = True
+    cookies: tuple[SetCookie, ...] = ()
+    render_intent: RenderIntent = "unknown"
+
+    @property
+    def resolved_content_type(self) -> str:
+        """Content type, auto-detected from the path when not set explicitly."""
+        if self.content_type is not None:
+            return self.content_type
+        guessed, _ = mimetypes.guess_type(str(self.path))
+        return guessed or "application/octet-stream"
+
+    # -- Chainable transformations (mirror Response so middleware composes) --
+
+    def with_status(self, status: int) -> FileResponse:
+        """Return a new FileResponse with a different status code."""
+        return replace(self, status=status)
+
+    def with_header(self, name: str, value: str) -> FileResponse:
+        """Return a new FileResponse with an additional header."""
+        return replace(self, headers=(*self.headers, (name, value)))
+
+    def with_headers(self, headers: Mapping[str, str]) -> FileResponse:
+        """Return a new FileResponse with additional headers."""
+        new = tuple(headers.items())
+        return replace(self, headers=(*self.headers, *new))
+
+    def with_content_type(self, content_type: str) -> FileResponse:
+        """Return a new FileResponse with an explicit content type."""
+        return replace(self, content_type=content_type)
+
+    def with_render_intent(self, render_intent: RenderIntent) -> FileResponse:
+        """Return a new FileResponse with response render intent metadata."""
+        return replace(self, render_intent=render_intent)
+
+    def with_cookie(
+        self,
+        name: str,
+        value: str,
+        *,
+        max_age: int | None = None,
+        path: str = "/",
+        domain: str | None = None,
+        secure: bool = False,
+        httponly: bool = True,
+        samesite: str = "lax",
+    ) -> FileResponse:
+        """Return a new FileResponse with an additional Set-Cookie."""
+        cookie = SetCookie(
+            name=name,
+            value=value,
+            max_age=max_age,
+            path=path,
+            domain=domain,
+            secure=secure,
+            httponly=httponly,
+            samesite=samesite,
+        )
+        return replace(self, cookies=(*self.cookies, cookie))
+
+    def header(self, name: str, default: str | None = None) -> str | None:
+        """Return the first header value matching *name* (case-insensitive)."""
+        target = name.lower()
+        for hname, hvalue in self.headers:
+            if hname.lower() == target:
+                return hvalue
+        return default
 
 
 @dataclass(frozen=True, slots=True)

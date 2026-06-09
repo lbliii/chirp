@@ -5,6 +5,11 @@ root-level serving (``prefix="/"``) with automatic index file resolution
 and optional custom error pages.
 
 Falls through to the next handler for non-matching paths.
+
+File bodies are streamed from disk by :func:`chirp.server.sender.send_file_response`
+(via :class:`~chirp.http.response.FileResponse`) rather than read fully into
+memory, and carry ``ETag`` / ``Last-Modified`` / ``Accept-Ranges`` so clients
+can do conditional GETs (304) and range requests (206).
 """
 
 import mimetypes
@@ -12,7 +17,7 @@ from pathlib import Path
 
 from chirp.errors import HTTPError
 from chirp.http.request import Request
-from chirp.http.response import Response
+from chirp.http.response import FileResponse, Response
 from chirp.middleware.protocol import AnyResponse, Next
 
 
@@ -40,9 +45,20 @@ class StaticFiles:
             not_found_page="404.html",
             cache_control="no-cache",
         ))
+
+    Large files stream from disk in chunks once they reach
+    ``stream_threshold`` bytes (default 1 MiB), keeping worker RSS bounded;
+    smaller files are read in a single shot so latency is unchanged.
     """
 
-    __slots__ = ("_cache_control", "_directory", "_index", "_not_found_page", "_prefix")
+    __slots__ = (
+        "_cache_control",
+        "_directory",
+        "_index",
+        "_not_found_page",
+        "_prefix",
+        "_stream_threshold",
+    )
 
     def __init__(
         self,
@@ -52,11 +68,15 @@ class StaticFiles:
         index: str = "index.html",
         not_found_page: str | None = None,
         cache_control: str = "public, max-age=3600",
+        stream_threshold: int | None = None,
     ) -> None:
         self._directory = Path(directory).resolve()
         self._index = index
         self._not_found_page = not_found_page
         self._cache_control = cache_control
+        # None inherits the AppConfig default (1 MiB) when auto-wired; an
+        # explicit value (including from config) overrides.
+        self._stream_threshold = 1024 * 1024 if stream_threshold is None else stream_threshold
 
         # Normalize prefix: ensure leading slash, strip trailing.
         # Root prefix "/" normalizes to "/" (not "").
@@ -113,19 +133,30 @@ class StaticFiles:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _serve_file(self, file_path: Path, *, status: int = 200) -> Response:
-        """Read a file and build a response."""
+    def _serve_file(
+        self,
+        file_path: Path,
+        *,
+        status: int = 200,
+        conditional: bool = True,
+    ) -> FileResponse:
+        """Build a FileResponse — the body is streamed from disk by the sender.
+
+        Conditional-GET / Range evaluation happens in the sender, which reads
+        the request headers; the middleware no longer reads the file into RAM
+        or sets Content-Length (the sender owns both).
+        """
         content_type, _ = mimetypes.guess_type(str(file_path))
         if content_type is None:
             content_type = "application/octet-stream"
 
-        body = file_path.read_bytes()
-
-        return (
-            Response(body=body, content_type=content_type, status=status)
-            .with_header("Content-Length", str(len(body)))
-            .with_header("Cache-Control", self._cache_control)
-        )
+        return FileResponse(
+            path=file_path,
+            status=status,
+            content_type=content_type,
+            conditional=conditional,
+            stream_threshold=self._stream_threshold,
+        ).with_header("Cache-Control", self._cache_control)
 
     async def _handle_not_found(self, next: Next, request: Request) -> AnyResponse:
         """Fall through to the inner handler; serve custom 404 if it also fails.
@@ -149,4 +180,5 @@ class StaticFiles:
         except HTTPError as exc:
             if exc.status != 404:
                 raise
-            return self._serve_file(error_path, status=404)
+            # 404 bodies must not 304/206 — disable conditional handling.
+            return self._serve_file(error_path, status=404, conditional=False)

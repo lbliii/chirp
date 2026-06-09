@@ -216,6 +216,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "sse_speculation": "Production Safety",
     "csrf_session": "Production Safety",
     "security_stack": "Production Safety",
+    "static_streaming": "Production Safety",
     "middleware_signature": "Production Safety",
     "secret_key": "Production Safety",
     "mount_app_merge": "Setup",
