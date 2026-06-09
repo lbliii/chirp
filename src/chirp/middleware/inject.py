@@ -11,6 +11,7 @@ import logging
 from dataclasses import replace
 
 import anyio
+import anyio.to_thread
 
 from chirp.http.request import Request
 from chirp.http.response import FileResponse, Response, StreamingResponse
