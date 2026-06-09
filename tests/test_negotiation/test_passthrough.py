@@ -224,13 +224,10 @@ class TestNegotiateTemplateTypes:
         result = negotiate(Stream("dash.html", name="World"), kida_env=env)
         assert isinstance(result, StreamingResponse)
         assert result.content_type == "text/html; charset=utf-8"
-        collected: list[str] = []
+        async def _drain() -> list[str]:
+            return [chunk async for chunk in result.chunks]
 
-        async def _drain() -> None:
-            async for chunk in result.chunks:
-                collected.append(chunk)
-
-        anyio.run(_drain)
+        collected = anyio.run(_drain)
         assert "".join(collected) == "Hello World"
 
     def test_event_stream_returns_sse_response(self) -> None:
