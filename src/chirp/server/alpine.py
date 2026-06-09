@@ -25,7 +25,7 @@ _CDN = "https://cdn.jsdelivr.net/npm"
 
 PLUGIN_NAMES = ("mask", "intersect", "focus")
 
-SAFE_DATA_HELPER = """<script>
+_SAFE_DATA_BODY = """
 (function(){
   var q=[];
   window._chirpAlpineData=function(n,f){
@@ -38,8 +38,22 @@ SAFE_DATA_HELPER = """<script>
     q.forEach(function(r){Alpine.data(r[0],r[1]);});q=[];
   });
 })();
-</script>
 """
+
+
+def safe_data_helper(nonce: str = "") -> str:
+    """Build the Alpine ``safeData`` helper inline ``<script>``.
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return f"<script{nonce_attr}>{_SAFE_DATA_BODY}</script>\n"
+
+
+#: Back-compat module constant (un-nonced). Prefer :func:`safe_data_helper`.
+SAFE_DATA_HELPER = safe_data_helper()
 
 
 def _html_escape_attr(value: str) -> str:
@@ -57,7 +71,7 @@ def plugin_snippet(version: str) -> str:
     )
 
 
-def alpine_json_config(dom_id: str, data: Any) -> Markup:
+def alpine_json_config(dom_id: str, data: Any, *, nonce: str = "") -> Markup:
     """Emit a ``<script type="application/json">`` tag for Alpine component config.
 
     Provides a safe bridge for passing server-side data to client-side Alpine
@@ -76,10 +90,13 @@ def alpine_json_config(dom_id: str, data: Any) -> Markup:
     json_str = json.dumps(data, default=str)
     json_str = json_str.replace("</", "<\\/")
     escaped_id = _html_escape_attr(dom_id)
-    return Markup(f'<script id="{escaped_id}" type="application/json">{json_str}</script>')
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return Markup(
+        f'<script id="{escaped_id}" type="application/json"{nonce_attr}>{json_str}</script>'
+    )
 
 
-def alpine_snippet(version: str, csp: bool = False) -> str:
+def alpine_snippet(version: str, csp: bool = False, *, nonce: str = "") -> str:
     """Build the full Alpine.js injection block.
 
     Includes plugins (Mask, Intersect, Focus) pinned to the same version as the
@@ -104,4 +121,4 @@ def alpine_snippet(version: str, csp: bool = False) -> str:
     else:
         path = f"alpinejs@{version}/dist/cdn.min.js"
     script = f'<script defer src="{_CDN}/{path}" data-chirp="alpine"></script>'
-    return SAFE_DATA_HELPER + plugin_snippet(version) + script
+    return safe_data_helper(nonce) + plugin_snippet(version) + script

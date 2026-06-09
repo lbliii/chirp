@@ -116,9 +116,17 @@ async def send_streaming_response(
 
     request_token: Token | None = None
     request_id_token: Token | None = None
+    csp_nonce_token: Token | None = None
     if response.request_context is not None:
         request_token = request_var.set(response.request_context)
         request_id_token = request_id_var.set(response.request_context.request_id)
+    if response.csp_nonce is not None:
+        # Re-establish the CSP nonce while the generator drains. The middleware
+        # finally already reset the var, so this is a self-contained set/reset
+        # with its own token (no double-reset).
+        from chirp.middleware.csp_nonce import _set_csp_nonce
+
+        csp_nonce_token = _set_csp_nonce(response.csp_nonce)
 
     try:
         if isinstance(response.chunks, AsyncIterator):
@@ -178,6 +186,10 @@ async def send_streaming_response(
             request_var.reset(request_token)
         if request_id_token is not None:
             request_id_var.reset(request_id_token)
+        if csp_nonce_token is not None:
+            from chirp.middleware.csp_nonce import _reset_csp_nonce
+
+            _reset_csp_nonce(csp_nonce_token)
 
     # Close the stream
     await send(

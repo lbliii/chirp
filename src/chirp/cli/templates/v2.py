@@ -86,6 +86,7 @@ config = AppConfig(
     template_dir="pages",
     debug=True,
     islands=True,
+    alpine_csp=True,
 )
 app = App(config=config)
 

@@ -4,14 +4,31 @@ Generates a cryptographically random nonce per request, stores it in a
 ContextVar, and injects it into the CSP header on the way out.
 """
 
+import dataclasses
 import secrets
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 
 from chirp.http.request import Request
 from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
 
 _csp_nonce_var: ContextVar[str] = ContextVar("chirp_csp_nonce")
+
+
+def _set_csp_nonce(value: str) -> Token:
+    """Set the request-scoped CSP nonce ContextVar, returning its reset token.
+
+    Internal helper so :mod:`chirp.server.sender` can re-establish the nonce
+    while a ``StreamingResponse`` generator drains, without importing the
+    middleware class (keeps the server -> middleware layering one-directional,
+    mirroring ``request_var`` usage).
+    """
+    return _csp_nonce_var.set(value)
+
+
+def _reset_csp_nonce(token: Token) -> None:
+    """Reset the CSP nonce ContextVar from a token returned by :func:`_set_csp_nonce`."""
+    _csp_nonce_var.reset(token)
 
 
 def get_csp_nonce() -> str:
@@ -70,6 +87,12 @@ class CSPNonceMiddleware:
                 eval_token = " 'unsafe-eval'" if self._unsafe_eval else ""
                 csp = f"{self._base_csp}; script-src 'self'{eval_token} 'nonce-{nonce}' {self._script_origins}"
                 response = response.with_header("Content-Security-Policy", csp)
+                if isinstance(response, StreamingResponse):
+                    # Carry the live nonce onto the streaming response so the
+                    # sender can re-establish it while the generator drains —
+                    # this finally resets the var the instant next() returns,
+                    # which is *before* any Suspense chunk is produced.
+                    response = dataclasses.replace(response, csp_nonce=nonce)
             return response
         finally:
             _csp_nonce_var.reset(token)
