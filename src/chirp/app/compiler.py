@@ -99,28 +99,48 @@ def _collect_builtin_middleware(
                     stream_threshold=config.static_stream_threshold,
                 )
             )
+    # Every framework inline-script injection below is registered with a
+    # per-request snippet *factory* (``nonce -> snippet``) rather than a fixed
+    # string, so each ``<script>`` carries the live CSP nonce when a nonce
+    # mechanism is active (CSPNonceMiddleware / csp_nonce_enabled) and survives a
+    # strict nonce-only CSP. ``HTMLInject`` resolves the factory in request scope
+    # from ``csp_nonce()`` (empty string when nonces are off). The per-request
+    # cost is one string format. View-transitions HEAD markup is a
+    # ``<meta>``/``<style>`` pair governed by ``style-src`` (not ``script-src``),
+    # so it stays un-nonced.
     if config.safe_target:
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.htmx_safe_target import SAFE_TARGET_SNIPPET
+        from chirp.server.htmx_safe_target import safe_target_snippet
 
-        middleware_list.append(HTMLInject(SAFE_TARGET_SNIPPET, full_page_only=True))
+        middleware_list.append(
+            HTMLInject(lambda nonce: safe_target_snippet(nonce), full_page_only=True)
+        )
     if config.sse_lifecycle:
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.sse_lifecycle import SSE_LIFECYCLE_SNIPPET
+        from chirp.server.sse_lifecycle import sse_lifecycle_snippet
 
-        middleware_list.append(HTMLInject(SSE_LIFECYCLE_SNIPPET, full_page_only=True))
+        middleware_list.append(
+            HTMLInject(lambda nonce: sse_lifecycle_snippet(nonce), full_page_only=True)
+        )
     if config.delegation:
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.delegation import DELEGATION_SNIPPET
+        from chirp.server.delegation import delegation_snippet
 
-        middleware_list.append(HTMLInject(DELEGATION_SNIPPET, full_page_only=True))
+        middleware_list.append(
+            HTMLInject(lambda nonce: delegation_snippet(nonce), full_page_only=True)
+        )
     if config.alpine:
         from chirp.middleware.inject import AlpineInject
         from chirp.server.alpine import alpine_snippet
 
+        # The inline ``safeData`` bootstrap is nonced; the external plugin/core
+        # ``src=`` tags are unchanged. This lets a standard ``alpine=True`` app
+        # run under a strict nonce-only CSP without adopting ``alpine_csp=True``.
+        alpine_version = config.alpine_version
+        alpine_csp = config.alpine_csp
         middleware_list.append(
             AlpineInject(
-                alpine_snippet(config.alpine_version, config.alpine_csp),
+                lambda nonce: alpine_snippet(alpine_version, alpine_csp, nonce=nonce),
                 full_page_only=True,
             )
         )
@@ -128,21 +148,29 @@ def _collect_builtin_middleware(
         from chirp.middleware.inject import HTMLInject
         from chirp.server.islands import islands_snippet
 
+        islands_version = config.islands_version
         middleware_list.append(
-            HTMLInject(islands_snippet(config.islands_version), full_page_only=True)
+            HTMLInject(
+                lambda nonce: islands_snippet(islands_version, nonce=nonce),
+                full_page_only=True,
+            )
         )
     from chirp.server.view_transitions import normalize_view_transitions
 
     vt_mode = normalize_view_transitions(config.view_transitions)
     if vt_mode in ("htmx", "full"):
         from chirp.middleware.inject import HTMLInject
-        from chirp.server.view_transitions import VIEW_TRANSITIONS_SCRIPT_SNIPPET
+        from chirp.server.view_transitions import view_transitions_script_snippet
 
-        middleware_list.append(HTMLInject(VIEW_TRANSITIONS_SCRIPT_SNIPPET, full_page_only=True))
+        middleware_list.append(
+            HTMLInject(lambda nonce: view_transitions_script_snippet(nonce), full_page_only=True)
+        )
     if vt_mode == "full":
         from chirp.middleware.inject import HTMLInject
         from chirp.server.view_transitions import VIEW_TRANSITIONS_HEAD_SNIPPET
 
+        # HEAD markup is a <meta>/<style> pair governed by style-src, not
+        # script-src — left un-nonced by design.
         middleware_list.append(
             HTMLInject(
                 VIEW_TRANSITIONS_HEAD_SNIPPET,
@@ -152,18 +180,31 @@ def _collect_builtin_middleware(
         )
     if config.speculation_rules and router is not None:
         from chirp.server.speculation_rules import (
-            build_speculation_rules_snippet,
+            build_speculation_rules_json,
             normalize_speculation_rules,
         )
 
         sr_mode = normalize_speculation_rules(config.speculation_rules)
         if sr_mode != "off":
-            sr_snippet = build_speculation_rules_snippet(router, sr_mode)
-            if sr_snippet:
+            # Compute the rules JSON once at freeze time (it depends only on the
+            # router); the factory only varies the nonce attribute per request.
+            # A <script type="speculationrules"> element is governed by
+            # script-src, so it must carry the live nonce under a nonce-only CSP.
+            rules_json = build_speculation_rules_json(router, sr_mode)
+            if rules_json:
                 from chirp.middleware.inject import HTMLInject
 
+                safe_json = rules_json.replace("<", "\\u003c").replace("&", "\\u0026")
+
+                def _speculation_snippet(nonce: str, _json: str = safe_json) -> str:
+                    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+                    return (
+                        f'<script type="speculationrules" '
+                        f'data-chirp="speculation-rules"{nonce_attr}>{_json}</script>'
+                    )
+
                 middleware_list.append(
-                    HTMLInject(sr_snippet, before="</head>", full_page_only=True)
+                    HTMLInject(_speculation_snippet, before="</head>", full_page_only=True)
                 )
     if config.debug:
         from chirp.middleware.inject import HTMLInject

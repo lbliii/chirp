@@ -1,5 +1,6 @@
 """Tests for LayoutPage slot context and boosted navigation."""
 
+import time
 from pathlib import Path
 
 import pytest
@@ -494,3 +495,123 @@ class TestLayoutPageSlotContext:
         assert 'id="panel"' in result.text
         assert "Hello" in result.text
         assert 'class="page-root"' not in result.text
+
+
+class TestLayoutSuspenseChainedOOBOffLoop:
+    """The OOB streams chained onto LayoutSuspense must render off the loop (#193).
+
+    ``append_layout_oob_stream`` and ``append_shell_actions_oob_stream`` each run
+    a discrete CPU-bound layout render. If that render runs inline on the loop the
+    LayoutSuspense path stalls concurrent tasks even though the shell body and
+    layout wrap already run off-loop.
+    """
+
+    @staticmethod
+    async def _count_ticks_during(coro_factory):
+        """Drain a stream while a ticker counts loop iterations."""
+        import anyio
+
+        counter = {"n": 0}
+
+        async def ticker() -> None:
+            while True:
+                counter["n"] += 1
+                await anyio.sleep(0.002)
+
+        chunks: list[str] = []
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(ticker)
+            chunks = [chunk async for chunk in coro_factory()]
+            tg.cancel_scope.cancel()
+        return chunks, counter["n"]
+
+    @pytest.mark.asyncio
+    async def test_chained_layout_oob_stream_does_not_block_loop(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A heavy layout OOB block render does not freeze a concurrent ticker."""
+        from chirp.http.response import StreamingResponse
+        from chirp.pages.types import LayoutChain, LayoutInfo
+        from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
+
+        # Page body is trivial; the blocking work lives in the layout OOB region.
+        (tmp_path / "page.html").write_text(
+            "<h1>{{ title }}</h1>"
+            '<div id="data">{% block data %}'
+            "{% if data is deferred %}<p>Loading...</p>{% else %}<p>{{ data }}</p>{% end %}"
+            "{% end %}</div>",
+            encoding="utf-8",
+        )
+        (tmp_path / "_layout.html").write_text(
+            "{# target: body #}\n"
+            "<html><body>\n"
+            '<nav id="sidebar-nav">\n'
+            '{% region sidebar_oob(current_path="/") %}\n'
+            "{{ heavy() }}"
+            '<a class="{{ "active" if current_path == "/about" else "" }}">About</a>\n'
+            "{% end %}\n"
+            "</nav>\n"
+            '<main id="main">{% block content %}{% end %}</main></body></html>',
+            encoding="utf-8",
+        )
+
+        def heavy() -> str:
+            # Blocking sleep stands in for CPU-bound layout OOB compilation.
+            time.sleep(0.2)
+            return ""
+
+        env = create_environment(
+            AppConfig(template_dir=tmp_path), filters={}, globals_={"heavy": heavy}
+        )
+
+        oob_registry = OOBRegistry()
+        oob_registry.register(
+            "sidebar_oob", OOBRegionConfig(target_id="sidebar-nav", swap="innerHTML", wrap=True)
+        )
+        oob_registry.freeze()
+
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request.from_asgi(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/about",
+                "headers": [
+                    (b"hx-request", b"true"),
+                    (b"hx-boosted", b"true"),
+                    (b"hx-target", b"main"),
+                ],
+                "query_string": b"",
+                "http_version": "1.1",
+                "server": ("127.0.0.1", 8000),
+                "client": ("127.0.0.1", 1234),
+            },
+            receive=_receive,
+        )
+
+        async def _data():
+            return "resolved"
+
+        result = negotiate(
+            LayoutSuspense(
+                Suspense("page.html", title="About", data=_data()),
+                LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),)),
+                context={"current_path": "/about"},
+                request=request,
+            ),
+            kida_env=env,
+            request=request,
+            oob_registry=oob_registry,
+        )
+
+        assert isinstance(result, StreamingResponse)
+        chunks, ticks = await self._count_ticks_during(lambda: result.chunks)
+        combined = "".join(chunks)
+        # Chained layout OOB swap actually emitted (heavy block rendered).
+        assert 'id="sidebar-nav"' in combined
+        assert 'hx-swap-oob="innerHTML"' in combined
+        assert 'class="active"' in combined
+        assert ticks > 10, f"loop appears blocked during chained layout OOB render: ticks={ticks}"

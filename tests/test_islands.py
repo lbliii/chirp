@@ -30,6 +30,13 @@ class TestIslandsSnippet:
         assert "register: register" in s
         assert "import(payload.src)" in s
 
+    def test_default_is_unnonced(self) -> None:
+        assert "nonce=" not in islands_snippet("1")
+
+    def test_nonce_kwarg_adds_attr(self) -> None:
+        s = islands_snippet("1", nonce="ISLNONCE")
+        assert '<script data-chirp="islands" nonce="ISLNONCE">' in s
+
 
 class TestIslandsInjection:
     async def test_injected_when_enabled(self) -> None:

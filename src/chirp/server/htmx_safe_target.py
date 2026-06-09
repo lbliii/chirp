@@ -43,4 +43,17 @@ SAFE_TARGET_JS = """\
 })();
 """
 
-SAFE_TARGET_SNIPPET = '<script data-chirp="safe-target">' + SAFE_TARGET_JS + "</script>"
+
+def safe_target_snippet(nonce: str = "") -> str:
+    """Build the safe-target inline ``<script>``.
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return f'<script data-chirp="safe-target"{nonce_attr}>{SAFE_TARGET_JS}</script>'
+
+
+#: Back-compat module constant (un-nonced). Prefer :func:`safe_target_snippet`.
+SAFE_TARGET_SNIPPET = safe_target_snippet()

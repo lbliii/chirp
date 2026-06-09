@@ -6,10 +6,16 @@ listen to these events to mount/unmount framework islands.
 """
 
 
-def islands_snippet(version: str) -> str:
-    """Return runtime bootstrap script for island lifecycle events."""
+def islands_snippet(version: str, *, nonce: str = "") -> str:
+    """Return runtime bootstrap script for island lifecycle events.
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
     runtime = f"""
-<script data-chirp="islands">
+<script data-chirp="islands"{nonce_attr}>
 (function() {{
   if (window.__chirpIslands) return;
   const mounts = new WeakMap();

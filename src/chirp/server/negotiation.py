@@ -664,6 +664,7 @@ def negotiate(
             return SSEResponse(
                 event_stream=value,
                 kida_env=kida_env,
+                csp_nonce=_get_csp_nonce() or None,
             )
         case str():
             _trace_return(

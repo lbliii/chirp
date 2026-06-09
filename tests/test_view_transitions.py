@@ -10,6 +10,7 @@ from chirp.server.view_transitions import (
     VIEW_TRANSITIONS_JS,
     VIEW_TRANSITIONS_SCRIPT_SNIPPET,
     normalize_view_transitions,
+    view_transitions_script_snippet,
 )
 from chirp.testing import TestClient
 
@@ -52,6 +53,20 @@ class TestViewTransitionsConstants:
     def test_js_handles_deferred_htmx(self) -> None:
         """Listener for htmx:load handles the case where htmx loads after the script."""
         assert "htmx:load" in VIEW_TRANSITIONS_JS
+
+    def test_builder_default_is_unnonced_and_matches_constant(self) -> None:
+        assert view_transitions_script_snippet() == VIEW_TRANSITIONS_SCRIPT_SNIPPET
+        assert "nonce=" not in view_transitions_script_snippet()
+
+    def test_builder_adds_nonce_attr_when_provided(self) -> None:
+        s = view_transitions_script_snippet("VTNONCE")
+        assert '<script data-chirp="view-transitions" nonce="VTNONCE">' in s
+        assert VIEW_TRANSITIONS_JS in s
+
+    def test_head_snippet_left_unnonced_style_not_script_src(self) -> None:
+        """The HEAD <meta>/<style> pair is governed by style-src, not script-src,
+        so it intentionally carries no nonce."""
+        assert "nonce=" not in VIEW_TRANSITIONS_HEAD_SNIPPET
 
 
 # ---------------------------------------------------------------------------

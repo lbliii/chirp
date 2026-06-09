@@ -32,12 +32,14 @@ Pipeline::
     7. Yield OOB swap chunks (htmx or <template>+<script>)
 """
 
+import contextvars
 import inspect
 import logging
-from collections.abc import AsyncIterator, Awaitable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 import anyio
+import anyio.to_thread
 from kida import Environment
 
 from chirp.templating.oob_registry import OOBRegistry
@@ -152,7 +154,7 @@ _DEFAULT_ERROR_HTML = (
 )
 
 
-def _render_error_html(
+async def _render_error_html(
     env: Environment,
     *,
     block_name: str,
@@ -169,6 +171,10 @@ def _render_error_html(
        ``error_template`` (caller should pass this as *suspense_error_block*)
     2. Global ``error_template`` + ``error_block`` from AppConfig
     3. Hardcoded default HTML
+
+    The fallback ``render_block`` is CPU-bound, so it runs off the event loop
+    (see :func:`_render_off_loop`) — the error path must not reintroduce the
+    inline-on-loop blocking the main render path avoids.
     """
     error_ctx = {
         "error": error,
@@ -183,7 +189,7 @@ def _render_error_html(
     if tmpl_name is not None:
         try:
             tmpl = env.get_template(tmpl_name)
-            return tmpl.render_block(blk_name, error_ctx)
+            return await _render_off_loop(lambda: tmpl.render_block(blk_name, error_ctx))
         except Exception:
             logger.warning(
                 "Suspense: failed to render error fallback block=%r from template=%r, "
@@ -282,6 +288,29 @@ def _close_unstarted_awaitables(awaitables: dict[str, Awaitable[Any]]) -> None:
         close = getattr(awaitable, "close", None)
         if callable(close):
             close()
+
+
+async def _render_off_loop[T](fn: Callable[[], T]) -> T:
+    """Run a discrete, CPU-bound kida render off the event loop (issue #145).
+
+    Each Suspense render (the shell ``template.render(...)`` and every deferred
+    ``template.render_block(...)``) is a *complete* synchronous call that returns
+    a full string — unlike ``Stream`` (one lazy progressive generator that cannot
+    use ``run_sync``). So the correct tool is ``anyio.to_thread.run_sync`` *per
+    render call*: it moves the blocking work to a worker thread so concurrent
+    loop tasks make progress, while Suspense's progressiveness (shell first, then
+    one OOB chunk per resolved awaitable) is preserved by ``render_suspense``
+    yielding between calls. A single complete render on one worker thread also
+    satisfies kida's single-thread renderer contract.
+
+    The loop's contextvars are copied onto the worker (mirroring
+    ``render_stream_async``) so ``get_request()`` and the live CSP nonce (#181)
+    are visible inside template globals/filters during the render. anyio>=4 also
+    copies the current context, but the explicit copy is the established,
+    unambiguous pattern.
+    """
+    ctx = contextvars.copy_context()
+    return await anyio.to_thread.run_sync(lambda: ctx.run(fn))
 
 
 async def render_suspense(
@@ -399,28 +428,35 @@ async def render_suspense(
                 )
                 raise ConfigurationError(msg)
 
-    def _wrap_shell(page_html: str, ctx: dict[str, Any]) -> str:
+    async def _wrap_shell(page_html: str, ctx: dict[str, Any]) -> str:
         if not _should_wrap_in_layouts(layout_chain, request):
             return page_html
         from chirp.pages.renderer import render_with_layouts
 
         htmx_target = getattr(request, "htmx_target", None) if request else None
         is_history_restore = getattr(request, "is_history_restore", False) if request else False
-        return render_with_layouts(
-            env,
-            layout_chain=layout_chain,
-            page_html=page_html,
-            context=ctx,
-            htmx_target=htmx_target,
-            is_history_restore=is_history_restore,
-            fragment_target_registry=fragment_target_registry,
+        # render_with_layouts is a discrete, complete sync render (one
+        # template.render_with_blocks per layout) — the same CPU-bound shape
+        # _render_off_loop handles for the page body. Wrapping inline on the
+        # loop here would re-block the LayoutSuspense path (#193) even though
+        # the page body already rendered off-loop.
+        return await _render_off_loop(
+            lambda: render_with_layouts(
+                env,
+                layout_chain=layout_chain,
+                page_html=page_html,
+                context=ctx,
+                htmx_target=htmx_target,
+                is_history_restore=is_history_restore,
+                fragment_target_registry=fragment_target_registry,
+            )
         )
 
     # Fast path: no awaitables — render full page in one shot
     if not pending:
         sync_ctx = {**sync_ctx, CHIRP_DEFER_PENDING_KEY: frozenset()}
-        page_html = template.render(sync_ctx)
-        yield _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
+        page_html = await _render_off_loop(lambda: template.render(sync_ctx))
+        yield await _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
         return
 
     # -- Phase 2: Render shell with DEFERRED sentinel for deferred keys --
@@ -429,8 +465,8 @@ async def render_suspense(
         **dict.fromkeys(pending, DEFERRED),
         CHIRP_DEFER_PENDING_KEY: frozenset(pending),
     }
-    page_html = template.render(shell_ctx)
-    yield _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
+    page_html = await _render_off_loop(lambda: template.render(shell_ctx))
+    yield await _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
 
     # -- Phase 3: Resolve awaitables concurrently --
     resolved: dict[str, Any] = {}
@@ -454,7 +490,7 @@ async def render_suspense(
         # so skeletons are replaced with error indicators, not left spinning.
         for key in pending:
             target_id = defer_map.get(key, key)
-            fallback_html = _render_error_html(
+            fallback_html = await _render_error_html(
                 env,
                 block_name=key,
                 deferred_key=key,
@@ -481,7 +517,9 @@ async def render_suspense(
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)
         try:
-            block_html = template.render_block(block_name, full_ctx)
+            block_html = await _render_off_loop(
+                lambda bn=block_name: template.render_block(bn, full_ctx)
+            )
             if use_htmx_fmt:
                 if oob_registry is not None:
                     swap, wrap = oob_registry.resolve_serialization(target_id)
@@ -499,7 +537,7 @@ async def render_suspense(
                 target_id,
                 exc_info=True,
             )
-            error_html = _render_error_html(
+            error_html = await _render_error_html(
                 env,
                 block_name=block_name,
                 deferred_key=block_name,

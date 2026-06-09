@@ -98,9 +98,15 @@ better for large payloads and matches Django’s `json_script` style.
 |-------|------|---------|-------------|
 | `alpine` | `bool` | `False` | Enable Alpine.js script injection (`use_chirp_ui` sets this to `True` automatically) |
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine version (jsdelivr CDN) |
-| `alpine_csp` | `bool` | `False` | Use CSP-safe build for strict Content-Security-Policy |
+| `alpine_csp` | `bool` | `False` | Use the `@alpinejs/csp` build (no `eval`) for `eval`-forbidding policies |
 
-For strict CSP, set `alpine_csp=True` and ensure your CSP allows the Alpine script.
+A standard `alpine=True` app runs under a strict **nonce-only** CSP (a `script-src`
+without `'unsafe-inline'`) out of the box: Chirp builds the single inline Alpine
+bootstrap (`Alpine.safeData`) per request and stamps it with the live CSP nonce.
+You no longer need `alpine_csp=True` just to satisfy a nonce policy. Reach for
+`alpine_csp=True` when your policy also forbids `eval` — the `@alpinejs/csp` build
+avoids the `Function`/`eval` evaluation the default build uses for `x-data`
+expressions.
 
 ## Using the Macros
 
@@ -201,8 +207,23 @@ Alpine initializes the dropdown when the fragment is swapped in.
 
 ## CSP Setup
 
-For strict Content-Security-Policy:
+For a strict **nonce-only** Content-Security-Policy (`script-src` without
+`'unsafe-inline'`):
 
-1. Set `AppConfig(alpine_csp=True)`
-2. Ensure your CSP allows the Alpine script source (e.g. `https://unpkg.com`)
-3. If using `eval()`-based policies, Alpine's CSP build avoids `eval`
+1. Enable a per-request nonce mechanism — `AppConfig(csp_nonce_enabled=True)`
+   (which auto-wires `CSPNonceMiddleware`) or add `CSPNonceMiddleware` yourself.
+   This is what makes the nonce *live*: every framework inline `<script>` (the
+   `Alpine.safeData` bootstrap and the `safe_target` / `sse_lifecycle` /
+   `delegation` / `view_transitions` / `islands` / `speculation_rules` scripts,
+   plus Suspense initial-load scripts) is rebuilt per request and stamped with
+   that nonce, so it survives a nonce-only policy. Without a nonce mechanism, a
+   static inline-forbidding CSP blocks these scripts and `app.check()` flags it
+   via the `csp_nonce` contract.
+2. Keep `AppConfig(alpine=True)` — no `alpine_csp` needed for a nonce policy.
+3. Ensure your CSP allows the external Alpine script source (e.g.
+   `https://cdn.jsdelivr.net`). The plugin/core tags are external `src=` scripts
+   and need no nonce.
+
+For an `eval`-**forbidding** policy, also set `AppConfig(alpine_csp=True)`: the
+`@alpinejs/csp` build evaluates `x-data` expressions without `eval`/`Function`,
+so you can keep `'unsafe-eval'` out of your `script-src`.

@@ -45,4 +45,17 @@ SSE_LIFECYCLE_JS = """\
 })();
 """
 
-SSE_LIFECYCLE_SNIPPET = '<script data-chirp="sse-lifecycle">' + SSE_LIFECYCLE_JS + "</script>"
+
+def sse_lifecycle_snippet(nonce: str = "") -> str:
+    """Build the SSE-lifecycle inline ``<script>``.
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return f'<script data-chirp="sse-lifecycle"{nonce_attr}>{SSE_LIFECYCLE_JS}</script>'
+
+
+#: Back-compat module constant (un-nonced). Prefer :func:`sse_lifecycle_snippet`.
+SSE_LIFECYCLE_SNIPPET = sse_lifecycle_snippet()

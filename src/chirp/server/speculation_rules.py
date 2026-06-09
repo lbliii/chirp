@@ -129,13 +129,24 @@ def build_speculation_rules_json(router: object, mode: SpeculationRulesMode) -> 
     return json.dumps(rules, separators=(",", ":"))
 
 
-def build_speculation_rules_snippet(router: object, mode: SpeculationRulesMode) -> str:
+def build_speculation_rules_snippet(
+    router: object, mode: SpeculationRulesMode, *, nonce: str = ""
+) -> str:
     """Build the full ``<script type="speculationrules">`` snippet.
 
     Returns empty string when mode is ``"off"`` or no rules are generated.
+
+    A ``<script type="speculationrules">`` element is governed by the CSP
+    ``script-src`` directive, so when *nonce* is non-empty the ``<script>``
+    carries a ``nonce="..."`` attribute and survives a nonce-based CSP that no
+    longer ships ``'unsafe-inline'``.
     """
     rules_json = build_speculation_rules_json(router, mode)
     if not rules_json:
         return ""
     safe_json = rules_json.replace("<", "\\u003c").replace("&", "\\u0026")
-    return f'<script type="speculationrules" data-chirp="speculation-rules">{safe_json}</script>'
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return (
+        f'<script type="speculationrules" data-chirp="speculation-rules"{nonce_attr}>'
+        f"{safe_json}</script>"
+    )

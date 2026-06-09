@@ -6,12 +6,14 @@ dispatches to handle_sse(), and the TestClient collects structured events.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from chirp import App
 from chirp.config import AppConfig
+from chirp.middleware.csp_nonce import get_csp_nonce
 from chirp.realtime.events import EventStream, SSEEvent
 from chirp.templating.returns import Fragment
 from chirp.testing import TestClient
@@ -784,3 +786,78 @@ class TestSSECors:
             result = await client.sse("/events", max_events=1)
 
         assert result.headers.get("access-control-allow-origin") != "*"
+
+
+# ---------------------------------------------------------------------------
+# CSP nonce carried across the SSE drain (#194, epic #146)
+# ---------------------------------------------------------------------------
+
+# Matches the nonce attribute on a framework-emitted inline <script>.
+_NONCE_SCRIPT = re.compile(r'<script nonce="([^"]*)"')
+
+
+class TestSSECspNonce:
+    """A framework inline script emitted inside an SSE Fragment must carry the
+    live request nonce.
+
+    Regression: ``CSPNonceMiddleware`` resets its nonce ``ContextVar`` in a
+    ``finally`` the instant the handler returns — *before* ``handle_sse`` drains
+    the stream — so ``csp_nonce()`` (the source for ``<script nonce="...">``)
+    rendered empty for every yielded Fragment. ``handle_sse`` now re-establishes
+    the nonce captured at negotiation time for the stream's whole lifetime.
+    """
+
+    async def test_sse_fragment_inline_script_is_nonced(self) -> None:
+        """An inline script in an SSE Fragment carries the live request nonce."""
+        app = _app(csp_nonce_enabled=True)
+        captured: list[str] = []
+
+        @app.route("/events")
+        def events():
+            # The handler runs while the nonce var is still live (inside the
+            # middleware scope), so capture the request's actual nonce here to
+            # assert the streamed script carries the *same* value, not just a
+            # non-empty one.
+            captured.append(get_csp_nonce())
+
+            async def gen():
+                yield Fragment("sse_nonce.html", "ticker", target="ticker", tick=1)
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert len(result.events) == 1
+        match = _NONCE_SCRIPT.search(result.events[0].data)
+        assert match is not None, f"no nonced <script> in: {result.events[0].data!r}"
+        streamed_nonce = match.group(1)
+        # The streamed nonce is non-empty (the var was live at render time) and
+        # equals the request's actual nonce (not some stale/other value).
+        assert streamed_nonce
+        assert streamed_nonce == captured[0]
+
+    async def test_sse_nonce_stable_for_stream_lifetime(self) -> None:
+        """A long-lived stream keeps the same nonce across sequential events."""
+        app = _app(csp_nonce_enabled=True)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment("sse_nonce.html", "ticker", target="ticker", tick=1)
+                yield Fragment("sse_nonce.html", "ticker", target="ticker", tick=2)
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=2)
+
+        assert len(result.events) == 2
+        nonces = []
+        for evt in result.events:
+            match = _NONCE_SCRIPT.search(evt.data)
+            assert match is not None, f"no nonced <script> in: {evt.data!r}"
+            nonces.append(match.group(1))
+        assert all(nonces), "every event's script must carry a non-empty nonce"
+        # Both events on one connection share the same per-request nonce.
+        assert nonces[0] == nonces[1]
