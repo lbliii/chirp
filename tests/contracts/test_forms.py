@@ -361,3 +361,32 @@ class TestCSRFFormTokenChecks:
         csrf_warnings = [issue for issue in result.warnings if issue.category == "csrf_form"]
 
         assert csrf_warnings == []
+
+
+class TestUploadLimitsAreRuntimeNotContract:
+    """Upload limits (issue #177) are enforced at runtime, not via app.check().
+
+    The design (issue #177) deliberately does NOT add a contract category for
+    upload limits: max_upload_size / upload_spool_threshold / max_upload_parts
+    are byte-boundary runtime concerns enforced in Request.body()/stream() and
+    the multipart parser, not statically analyzable surface like form fields or
+    CSRF wiring. This test documents that decision so a future reader does not
+    assume a missing 'uploads' contract category is an oversight.
+    """
+
+    def test_no_upload_contract_category_emitted(self, tmp_path):
+        app = App(AppConfig(template_dir=str(tmp_path), max_upload_size=1024))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        upload_issues = [issue for issue in result.issues if "upload" in issue.category]
+        assert upload_issues == []
+
+    def test_upload_config_defaults_are_sane(self):
+        cfg = AppConfig()
+        assert cfg.max_upload_size == 16 * 1024 * 1024
+        assert cfg.upload_spool_threshold == 1024 * 1024
+        assert cfg.max_upload_parts == 1000

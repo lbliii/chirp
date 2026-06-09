@@ -9,7 +9,7 @@ import secrets
 from contextvars import ContextVar, Token
 
 from chirp.http.request import Request
-from chirp.http.response import Response, StreamingResponse
+from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
 
 _csp_nonce_var: ContextVar[str] = ContextVar("chirp_csp_nonce")
@@ -81,7 +81,9 @@ class CSPNonceMiddleware:
         token = _csp_nonce_var.set(nonce)
         try:
             response = await next(request)
-            if isinstance(response, (Response, StreamingResponse)):
+            # FileResponse included so static HTML files served through the
+            # middleware stack still receive the per-request nonce CSP header.
+            if isinstance(response, (Response, StreamingResponse, FileResponse)):
                 eval_token = " 'unsafe-eval'" if self._unsafe_eval else ""
                 csp = f"{self._base_csp}; script-src 'self'{eval_token} 'nonce-{nonce}' {self._script_origins}"
                 response = response.with_header("Content-Security-Policy", csp)

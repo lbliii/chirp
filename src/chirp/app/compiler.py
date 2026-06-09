@@ -92,7 +92,12 @@ def _collect_builtin_middleware(
             prefix = config.static_url.strip("/") or "static"
             cache = "no-cache" if config.debug else "public, max-age=3600"
             middleware_list.append(
-                StaticFiles(directory=str(static_path), prefix=f"/{prefix}", cache_control=cache)
+                StaticFiles(
+                    directory=str(static_path),
+                    prefix=f"/{prefix}",
+                    cache_control=cache,
+                    stream_threshold=config.static_stream_threshold,
+                )
             )
     if config.safe_target:
         from chirp.middleware.inject import HTMLInject

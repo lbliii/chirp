@@ -13,41 +13,162 @@ for repeated fields such as checkbox groups and multi-selects.
 URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 """
 
+import contextlib
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, cast, get_args, get_origin, get_type_hints, overload
+from tempfile import SpooledTemporaryFile
+from typing import IO, Any, cast, get_args, get_origin, get_type_hints, overload
 
 from chirp.templating.returns import ValidationError
 
+# Default spool threshold: bytes an UploadFile keeps in memory before spilling
+# to a real temp file on disk. Mirrors AppConfig.upload_spool_threshold so the
+# parser has a sane bound even when called directly (tests, library use).
+DEFAULT_SPOOL_THRESHOLD = 1024 * 1024  # 1 MB
 
-@dataclass(frozen=True, slots=True)
+# Chunk size used when streaming an UploadFile to disk in save().
+_SAVE_CHUNK_SIZE = 64 * 1024  # 64 KB
+
+
+def _sanitize_upload_filename(filename: str) -> str:
+    """Reduce an attacker-influenced filename to a safe basename.
+
+    Strips directory components (POSIX ``/`` and Windows ``\\``), removes NUL
+    bytes, and rejects traversal so a multipart ``filename="../../etc/passwd"``
+    cannot escape a chosen directory. Returns ``"upload"`` when nothing usable
+    remains (e.g. ``".."`` or all separators).
+    """
+    # Drop NUL and normalize Windows separators to POSIX before taking basename.
+    cleaned = filename.replace("\x00", "").replace("\\", "/")
+    base = cleaned.rsplit("/", 1)[-1].strip()
+    if base in ("", ".", ".."):
+        return "upload"
+    return base
+
+
 class UploadFile:
     """An uploaded file from a multipart form submission.
 
-    Immutable metadata with lazy content access. The file content
-    is held in memory as bytes (suitable for typical web uploads).
+    Metadata (``filename``, ``content_type``, ``size``) is immutable. The
+    content is backed by a stdlib :class:`~tempfile.SpooledTemporaryFile`:
+    small files stay in memory, larger ones spill to a temp file on disk past
+    ``spool_threshold`` bytes — so a multi-GB upload never lands wholly in RAM.
 
-    For large file handling, read the raw body via ``request.stream()``.
+    ``read()`` returns the full bytes; ``save()`` streams to disk in chunks and
+    sanitizes the destination basename against path traversal.
     """
+
+    __slots__ = ("_spool", "content_type", "filename", "size")
 
     filename: str
     content_type: str
     size: int
-    _content: bytes
+    _spool: IO[bytes]
+
+    def __init__(
+        self,
+        filename: str,
+        content_type: str,
+        size: int,
+        spool: IO[bytes],
+    ) -> None:
+        self.filename = filename
+        self.content_type = content_type
+        self.size = size
+        self._spool = spool
+
+    @classmethod
+    def from_bytes(
+        cls,
+        *,
+        filename: str,
+        content_type: str,
+        content: bytes,
+    ) -> UploadFile:
+        """Build an in-memory UploadFile from bytes (compat / tests).
+
+        The content stays in memory regardless of size — this is the
+        convenience constructor for small fixtures and direct callers.
+        """
+        spool: IO[bytes] = SpooledTemporaryFile(max_size=len(content) + 1)  # noqa: SIM115 — spool outlives this scope
+        spool.write(content)
+        spool.seek(0)
+        return cls(
+            filename=filename,
+            content_type=content_type,
+            size=len(content),
+            spool=spool,
+        )
 
     async def read(self) -> bytes:
-        """Return the file content as bytes."""
-        return self._content
+        """Return the full file content as bytes."""
+        self._spool.seek(0)
+        return self._spool.read()
 
     async def save(self, path: Path) -> None:
-        """Write the file content to disk.
+        """Write the file content to ``path``, streaming in fixed-size chunks.
+
+        The destination is the *sink* for attacker-influenced bytes, so it is
+        hardened against path traversal: any ``..`` component anywhere in
+        ``path`` is rejected, and the final *basename* is sanitized (directory
+        separators, NUL, and bare ``.``/``..`` stripped). The caller's chosen
+        directory is otherwise authoritative. This makes the common sink
+        ``await upload.save(upload_dir / upload.filename)`` safe even when
+        ``upload.filename`` is ``"../../etc/passwd"``. Works identically for
+        in-memory and spilled-to-disk uploads (no whole-file buffering).
 
         Args:
             path: Destination file path. Parent directories must exist.
+
+        Raises:
+            ValueError: If ``path`` contains a ``..`` traversal component.
         """
-        path.write_bytes(self._content)
+        path = Path(path)
+        if ".." in path.parts:
+            msg = (
+                f"Refusing to save upload to a path with a '..' traversal component: {path!r}. "
+                "Sanitize the upload filename or choose an explicit destination directory."
+            )
+            raise ValueError(msg)
+        safe_name = _sanitize_upload_filename(path.name)
+        dest = path.with_name(safe_name)
+        self._spool.seek(0)
+        with open(dest, "wb") as out:
+            while True:
+                chunk = self._spool.read(_SAVE_CHUNK_SIZE)
+                if not chunk:
+                    break
+                out.write(chunk)
+
+    @property
+    def spilled_to_disk(self) -> bool:
+        """True if the backing spool has rolled over to a real temp file.
+
+        Useful in tests to assert large uploads are not held in RAM.
+        """
+        rolled = getattr(self._spool, "_rolled", None)
+        if rolled is not None:
+            return bool(rolled)
+        # Defensive / version-robustness fallback only: on CPython 3.14
+        # SpooledTemporaryFile always exposes ``_rolled``, so this branch is
+        # unreachable today. It guards against a future CPython that drops or
+        # renames the private attribute — a SpooledTemporaryFile exposes a real
+        # fileno() only once it has rolled to disk.
+        try:
+            self._spool.fileno()
+        except OSError, ValueError:
+            return False
+        return True
+
+    def close(self) -> None:
+        """Close the backing spool, releasing any temp file on disk.
+
+        Idempotent and exception-safe — called by the request teardown to
+        avoid leaking file descriptors / temp files after the response.
+        """
+        with contextlib.suppress(Exception):
+            self._spool.close()
 
     def __repr__(self) -> str:
         return f"UploadFile({self.filename!r}, {self.content_type!r}, {self.size} bytes)"
@@ -119,6 +240,11 @@ class FormData(Mapping[str, str]):
     def get_list(self, key: str) -> list[str]:
         """Return all values for *key* (checkboxes, multi-selects)."""
         return list(self._data.get(key, []))
+
+    def close(self) -> None:
+        """Close all uploaded-file spools (request teardown hook)."""
+        for upload in self._files.values():
+            upload.close()
 
 
 class FormBindingError(Exception):
@@ -336,6 +462,9 @@ def _type_name(value: Any) -> str:
 async def parse_form_data(
     body: bytes,
     content_type: str,
+    *,
+    max_parts: int | None = None,
+    spool_threshold: int | None = None,
 ) -> FormData:
     """Parse form body into FormData.
 
@@ -346,6 +475,11 @@ async def parse_form_data(
     Args:
         body: Raw request body bytes.
         content_type: The Content-Type header value.
+        max_parts: Optional cap on the number of multipart parts. Exceeding it
+            raises ``PayloadTooLarge`` (413) — the multipart-bomb guard.
+            ``None`` (default) means unbounded for back-compat.
+        spool_threshold: Bytes a file part keeps in memory before spilling to a
+            temp file on disk. Defaults to ``DEFAULT_SPOOL_THRESHOLD``.
 
     Returns:
         Parsed FormData instance.
@@ -353,6 +487,7 @@ async def parse_form_data(
     Raises:
         ConfigurationError: If multipart parsing is needed but
             ``python-multipart`` is not installed.
+        PayloadTooLarge: If ``max_parts`` is exceeded.
         ValueError: If content type is not a supported form encoding.
     """
     ct_lower = content_type.lower().split(";")[0].strip()
@@ -361,7 +496,14 @@ async def parse_form_data(
         return _parse_urlencoded(body)
 
     if ct_lower == "multipart/form-data":
-        return await _parse_multipart(body, content_type)
+        return await _parse_multipart(
+            body,
+            content_type,
+            max_parts=max_parts,
+            spool_threshold=spool_threshold
+            if spool_threshold is not None
+            else DEFAULT_SPOOL_THRESHOLD,
+        )
 
     msg = (
         f"Unsupported form content type: {content_type!r}. "
@@ -379,12 +521,24 @@ def _parse_urlencoded(body: bytes) -> FormData:
     return FormData(parsed)
 
 
-async def _parse_multipart(body: bytes, content_type: str) -> FormData:
+async def _parse_multipart(
+    body: bytes,
+    content_type: str,
+    *,
+    max_parts: int | None = None,
+    spool_threshold: int = DEFAULT_SPOOL_THRESHOLD,
+) -> FormData:
     """Parse multipart form data using python-multipart.
 
-    Raises ``ConfigurationError`` if ``python-multipart`` is not installed.
+    File parts are streamed into a :class:`~tempfile.SpooledTemporaryFile`
+    (spilling to disk past ``spool_threshold``) rather than buffered whole in a
+    ``bytearray``. ``max_parts`` caps the number of parts to defend against a
+    multipart bomb.
+
+    Raises ``ConfigurationError`` if ``python-multipart`` is not installed and
+    ``PayloadTooLarge`` if ``max_parts`` is exceeded.
     """
-    from chirp.errors import ConfigurationError
+    from chirp.errors import ConfigurationError, PayloadTooLarge
 
     try:
         from python_multipart.multipart import parse_options_header
@@ -412,36 +566,58 @@ async def _parse_multipart(body: bytes, content_type: str) -> FormData:
     data: dict[str, list[str]] = {}
     files: dict[str, UploadFile] = {}
 
-    # Track current part state
+    # Track current part state. File parts stream into a spool; non-file
+    # fields are small, so they accumulate in a bytearray.
     current_headers: dict[str, str] = {}
     current_data = bytearray()
+    current_spool: IO[bytes] | None = None
+    current_size = 0
     current_field_name: str | None = None
     current_filename: str | None = None
+    part_count = 0
 
     def on_part_begin() -> None:
-        nonlocal current_headers, current_data, current_field_name, current_filename
+        nonlocal current_headers, current_data, current_spool, current_size
+        nonlocal current_field_name, current_filename, part_count
+        part_count += 1
+        if max_parts is not None and part_count > max_parts:
+            raise PayloadTooLarge(f"Multipart form exceeds the maximum of {max_parts} parts.")
         current_headers = {}
         current_data = bytearray()
+        current_spool = None
+        current_size = 0
         current_field_name = None
         current_filename = None
 
     def on_part_data(data_chunk: bytes, start: int, end: int) -> None:
-        current_data.extend(data_chunk[start:end])
+        nonlocal current_spool, current_size
+        piece = data_chunk[start:end]
+        current_size += len(piece)
+        if current_filename is not None:
+            # File part: stream into the spool (rolls to disk past threshold).
+            if current_spool is None:
+                current_spool = SpooledTemporaryFile(max_size=spool_threshold)  # noqa: SIM115 — spool outlives callback
+            current_spool.write(piece)
+        else:
+            current_data.extend(piece)
 
     def on_part_end() -> None:
-        nonlocal current_field_name, current_filename
+        nonlocal current_field_name, current_filename, current_spool
         if current_field_name is None:
             return
 
         if current_filename is not None:
-            # File upload
+            # File upload — back the UploadFile with the streamed spool.
             ct = current_headers.get("content-type", "application/octet-stream")
-            content = bytes(current_data)
+            spool = current_spool
+            if spool is None:
+                spool = SpooledTemporaryFile(max_size=spool_threshold)  # noqa: SIM115 — spool outlives callback
+            spool.seek(0)
             files[current_field_name] = UploadFile(
                 filename=current_filename,
                 content_type=ct,
-                size=len(content),
-                _content=content,
+                size=current_size,
+                spool=spool,
             )
         else:
             # Regular field

@@ -16,10 +16,10 @@ from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 from chirp.http.request import Request
-from chirp.http.response import Response, SSEResponse, StreamingResponse
+from chirp.http.response import FileResponse, Response, SSEResponse, StreamingResponse
 
 # Any response type the pipeline can produce
-type AnyResponse = Response | StreamingResponse | SSEResponse
+type AnyResponse = Response | StreamingResponse | SSEResponse | FileResponse
 
 # The next handler in the middleware chain
 type Next = Callable[[Request], Awaitable[AnyResponse]]

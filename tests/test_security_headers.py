@@ -141,3 +141,108 @@ class TestDefaultCSPAllowsFrameworkScripts:
         """Default CSP no longer ships 'unsafe-inline' (#181)."""
         cfg = SecurityHeadersConfig()
         assert "'unsafe-inline'" not in (cfg.content_security_policy or "")
+
+# --- Static HTML FileResponse must keep security headers (issue #178) ---
+
+
+class TestStaticFileResponseHeaders:
+    """A static .html served via StaticFiles is a ``FileResponse``, not a
+    ``Response``/``StreamingResponse``. The middleware must still apply
+    security headers — otherwise root-prefix static sites and custom 404
+    pages silently lose X-Frame-Options / X-Content-Type-Options /
+    Referrer-Policy / CSP (regression introduced with FileResponse).
+    """
+
+    @pytest.fixture
+    def static_dir(self, tmp_path):
+        static = tmp_path / "static"
+        static.mkdir()
+        (static / "index.html").write_text("<h1>Home</h1>")
+        (static / "404.html").write_text("<h1>Not Found</h1>")
+        (static / "style.css").write_text("body { color: red; }")
+        return static
+
+    @pytest.mark.anyio
+    async def test_static_html_gets_security_headers(self, static_dir) -> None:
+        from chirp.middleware.static import StaticFiles
+
+        app = App()
+        app.add_middleware(SecurityHeadersMiddleware())
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/index.html")
+        assert response.status == 200
+        assert "text/html" in response.content_type
+        assert _header(response, "x-frame-options") == "DENY"
+        assert _header(response, "x-content-type-options") == "nosniff"
+        assert _header(response, "referrer-policy") == "strict-origin-when-cross-origin"
+        assert _header(response, "content-security-policy") is not None
+
+    @pytest.mark.anyio
+    async def test_static_css_does_not_get_html_headers(self, static_dir) -> None:
+        """Non-HTML static files (CSS) must NOT receive the HTML-only headers."""
+        from chirp.middleware.static import StaticFiles
+
+        app = App()
+        app.add_middleware(SecurityHeadersMiddleware())
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/style.css")
+        assert response.status == 200
+        assert _header(response, "x-frame-options") is None
+
+    @pytest.mark.anyio
+    async def test_custom_404_html_gets_security_headers(self, static_dir) -> None:
+        """The custom 404.html FileResponse must also carry security headers."""
+        from chirp.middleware.static import StaticFiles
+
+        app = App()
+        app.add_middleware(SecurityHeadersMiddleware())
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/", not_found_page="404.html"))
+
+        async with TestClient(app) as client:
+            response = await client.get("/missing-page")
+        assert response.status == 404
+        assert "text/html" in response.content_type
+        assert _header(response, "x-frame-options") == "DENY"
+        assert _header(response, "content-security-policy") is not None
+
+
+class TestStaticFileResponseCSPNonce:
+    """CSPNonceMiddleware must also reach static HTML FileResponses."""
+
+    @pytest.fixture
+    def static_dir(self, tmp_path):
+        static = tmp_path / "static"
+        static.mkdir()
+        (static / "index.html").write_text("<h1>Home</h1>")
+        return static
+
+    @pytest.mark.anyio
+    async def test_static_html_gets_csp_nonce(self, static_dir) -> None:
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+        from chirp.middleware.static import StaticFiles
+
+        app = App()
+        app.add_middleware(CSPNonceMiddleware())
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get("/static/index.html")
+        assert response.status == 200
+        csp = _header(response, "content-security-policy") or ""
+        assert "nonce-" in csp

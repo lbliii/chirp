@@ -765,6 +765,11 @@ def check_hypermedia_surface(app: App) -> CheckResult:
             getattr(snapshot, "discovered_routes", []),
         )
     )
+    # Static streaming: StaticFiles must keep a sane stream threshold so large
+    # files stream from disk rather than buffering into memory (#178).
+    from chirp.contracts.rules_static_streaming import check_static_streaming
+
+    result.issues.extend(check_static_streaming(middleware_list))
 
     # No-JS progressive-enhancement floor
     from chirp.contracts.rules_nojs_floor import check_nojs_mutation_fallback

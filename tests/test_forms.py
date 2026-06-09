@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from chirp import App
+from chirp.config import AppConfig
 from chirp.http.forms import (
     FormBindingError,
     FormData,
@@ -73,11 +74,10 @@ class TestFormData:
         assert len(form.files) == 0
 
     def test_files_access(self) -> None:
-        upload = UploadFile(
+        upload = UploadFile.from_bytes(
             filename="test.txt",
             content_type="text/plain",
-            size=5,
-            _content=b"hello",
+            content=b"hello",
         )
         form = FormData({"name": ["alice"]}, files={"avatar": upload})
         assert form.files["avatar"].filename == "test.txt"
@@ -85,17 +85,19 @@ class TestFormData:
 
 class TestUploadFile:
     async def test_read(self) -> None:
-        f = UploadFile(filename="test.txt", content_type="text/plain", size=5, _content=b"hello")
+        f = UploadFile.from_bytes(filename="test.txt", content_type="text/plain", content=b"hello")
         assert await f.read() == b"hello"
 
     async def test_save(self, tmp_path) -> None:
-        f = UploadFile(filename="test.txt", content_type="text/plain", size=5, _content=b"hello")
+        f = UploadFile.from_bytes(filename="test.txt", content_type="text/plain", content=b"hello")
         dest = tmp_path / "output.txt"
         await f.save(dest)
         assert dest.read_bytes() == b"hello"
 
     def test_repr(self) -> None:
-        f = UploadFile(filename="photo.jpg", content_type="image/jpeg", size=1024, _content=b"x")
+        f = UploadFile.from_bytes(
+            filename="photo.jpg", content_type="image/jpeg", content=b"x" * 1024
+        )
         assert "photo.jpg" in repr(f)
         assert "1024" in repr(f)
 
@@ -673,3 +675,224 @@ class TestTopLevelImports:
         from chirp import form_values as fn
 
         assert callable(fn)
+
+
+# ---------------------------------------------------------------------------
+# Upload spooling + limits (issue #177)
+# ---------------------------------------------------------------------------
+
+
+def _multipart_body(parts: list[tuple[str, str | None, bytes]], boundary: str = "BOUND") -> bytes:
+    """Build a multipart/form-data body.
+
+    Each part is (field_name, filename_or_None, content_bytes).
+    """
+    chunks: list[bytes] = []
+    for name, filename, content in parts:
+        chunks.append(f"--{boundary}\r\n".encode())
+        if filename is not None:
+            chunks.append(
+                f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode()
+            )
+            chunks.append(b"Content-Type: application/octet-stream\r\n")
+        else:
+            chunks.append(f'Content-Disposition: form-data; name="{name}"\r\n'.encode())
+        chunks.append(b"\r\n")
+        chunks.append(content)
+        chunks.append(b"\r\n")
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks)
+
+
+_MP_CT = "multipart/form-data; boundary=BOUND"
+
+
+class TestUploadSpooling:
+    async def test_small_upload_stays_in_memory(self) -> None:
+        body = _multipart_body([("avatar", "a.bin", b"small")])
+        form = await parse_form_data(body, _MP_CT, spool_threshold=1024 * 1024)
+        upload = form.files["avatar"]
+        assert await upload.read() == b"small"
+        assert upload.spilled_to_disk is False
+
+    async def test_large_upload_spills_to_disk(self) -> None:
+        # Threshold of 100 bytes, payload of 5000 bytes → must roll to disk.
+        payload = b"x" * 5000
+        body = _multipart_body([("big", "big.bin", payload)])
+        form = await parse_form_data(body, _MP_CT, spool_threshold=100)
+        upload = form.files["big"]
+        assert upload.size == 5000
+        assert upload.spilled_to_disk is True, "large upload should not be held in RAM"
+        assert await upload.read() == payload
+
+    async def test_max_parts_cap_rejects_bomb(self) -> None:
+        from chirp.errors import PayloadTooLarge
+
+        # 5 parts, cap at 3 → multipart bomb guard fires.
+        parts = [(f"f{i}", None, b"v") for i in range(5)]
+        body = _multipart_body(parts)
+        with pytest.raises(PayloadTooLarge):
+            await parse_form_data(body, _MP_CT, max_parts=3)
+
+    async def test_max_parts_unbounded_by_default(self) -> None:
+        parts = [(f"f{i}", None, b"v") for i in range(50)]
+        body = _multipart_body(parts)
+        form = await parse_form_data(body, _MP_CT)  # no max_parts
+        assert len(form) == 50
+
+    async def test_save_in_memory_upload(self, tmp_path) -> None:
+        body = _multipart_body([("doc", "doc.txt", b"hello world")])
+        form = await parse_form_data(body, _MP_CT, spool_threshold=1024 * 1024)
+        dest = tmp_path / "out.txt"
+        await form.files["doc"].save(dest)
+        assert dest.read_bytes() == b"hello world"
+
+    async def test_save_spilled_upload(self, tmp_path) -> None:
+        payload = b"y" * 4096
+        body = _multipart_body([("doc", "doc.bin", payload)])
+        form = await parse_form_data(body, _MP_CT, spool_threshold=64)
+        upload = form.files["doc"]
+        assert upload.spilled_to_disk is True
+        dest = tmp_path / "out.bin"
+        await upload.save(dest)
+        assert dest.read_bytes() == payload
+
+
+class TestUploadFilenameSanitization:
+    async def test_save_rejects_traversal_path(self, tmp_path) -> None:
+        # The realistic sink: handler joins an attacker-controlled upload
+        # filename onto a chosen directory. A traversal attempt is rejected
+        # outright rather than silently escaping the directory.
+        f = UploadFile.from_bytes(filename="x", content_type="text/plain", content=b"pwned")
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        with pytest.raises(ValueError, match="traversal"):
+            await f.save(upload_dir / "../../etc/passwd")
+        assert not (tmp_path / "etc").exists()
+        assert not (tmp_path.parent / "passwd").exists()
+
+    async def test_save_sanitizes_basename_separators(self, tmp_path) -> None:
+        # A filename with a leading slash (no '..') is reduced to its basename
+        # inside the caller's directory.
+        f = UploadFile.from_bytes(filename="x", content_type="text/plain", content=b"data")
+        await f.save(tmp_path / "evil.txt")
+        assert (tmp_path / "evil.txt").read_bytes() == b"data"
+
+    async def test_save_rejects_dotdot_only_basename(self, tmp_path) -> None:
+        f = UploadFile.from_bytes(filename="x", content_type="text/plain", content=b"data")
+        # Path("/x/..").parts contains '..', so this is rejected as traversal.
+        with pytest.raises(ValueError, match="traversal"):
+            await f.save(tmp_path / "..")
+
+    def test_sanitize_helper_rejects_traversal(self) -> None:
+        from chirp.http.forms import _sanitize_upload_filename
+
+        assert _sanitize_upload_filename("../../etc/passwd") == "passwd"
+        assert _sanitize_upload_filename("/abs/path/file.txt") == "file.txt"
+        assert _sanitize_upload_filename("C:\\windows\\evil.exe") == "evil.exe"
+        assert _sanitize_upload_filename("..") == "upload"
+        assert _sanitize_upload_filename("with\x00nul") == "withnul"
+
+
+class TestBodySizeLimit:
+    async def test_oversize_body_rejected_413(self) -> None:
+        from chirp.errors import PayloadTooLarge
+
+        app = App(AppConfig(max_upload_size=10))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request):
+            try:
+                await request.body()
+            except PayloadTooLarge:
+                return "rejected"
+            return "accepted"
+
+        async with TestClient(app) as client:
+            response = await client.post("/upload", body=b"x" * 100)
+            assert response.text == "rejected"
+
+    async def test_within_limit_accepted(self) -> None:
+        app = App(AppConfig(max_upload_size=1000))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request):
+            data = await request.body()
+            return f"got {len(data)}"
+
+        async with TestClient(app) as client:
+            response = await client.post("/upload", body=b"x" * 100)
+            assert response.text == "got 100"
+
+    async def test_oversize_surfaces_413_status(self) -> None:
+        app = App(AppConfig(max_upload_size=10))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request):
+            await request.body()  # raises PayloadTooLarge → 413
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post("/upload", body=b"x" * 100)
+            assert response.status == 413
+
+    async def test_stream_aborts_before_full_buffer(self) -> None:
+        """stream() must raise before the overflowing chunk is buffered."""
+        from chirp.errors import PayloadTooLarge
+
+        req = Request.from_asgi(
+            {"type": "http", "method": "POST", "path": "/", "headers": []},
+            _make_receive([b"a" * 6, b"b" * 6]),
+            max_upload_size=10,
+        )
+        seen = 0
+
+        async def _consume() -> None:
+            nonlocal seen
+            async for chunk in req.stream():
+                seen += len(chunk)
+
+        with pytest.raises(PayloadTooLarge):
+            await _consume()
+        # First 6-byte chunk yielded (under limit); second pushes over and raises.
+        assert seen == 6
+
+    async def test_body_cache_not_poisoned_on_overflow(self) -> None:
+        from chirp.errors import PayloadTooLarge
+
+        req = Request.from_asgi(
+            {"type": "http", "method": "POST", "path": "/", "headers": []},
+            _make_receive([b"x" * 100]),
+            max_upload_size=10,
+        )
+        with pytest.raises(PayloadTooLarge):
+            await req.body()
+        assert "_body" not in req._cache
+
+
+class TestBodyReadOnceCached:
+    async def test_body_cached_across_calls(self) -> None:
+        app = App()
+
+        @app.route("/echo", methods=["POST"])
+        async def echo(request: Request):
+            b1 = await request.body()
+            b2 = await request.body()
+            return f"{b1 == b2}|{b1.decode()}"
+
+        async with TestClient(app) as client:
+            response = await client.post("/echo", body=b"payload")
+            assert response.text == "True|payload"
+
+
+def _make_receive(chunks: list[bytes]):
+    """Build an ASGI receive callable yielding the given body chunks."""
+    queue = list(chunks)
+
+    async def receive():
+        if queue:
+            body = queue.pop(0)
+            return {"type": "http.request", "body": body, "more_body": bool(queue)}
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return receive

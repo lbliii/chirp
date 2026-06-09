@@ -297,6 +297,12 @@ class Request:
     # Private: request-bound route reversal; set by the app/server layer
     _url_for: Callable[..., str] | None = field(default=None, repr=False, compare=False)
 
+    # Private: upload/body limits threaded from AppConfig by the handler.
+    # Defaults are unbounded/sane so direct construction (tests) is unaffected.
+    _max_upload_size: int | None = field(default=None, repr=False, compare=False)
+    _upload_spool_threshold: int | None = field(default=None, repr=False, compare=False)
+    _max_upload_parts: int | None = field(default=None, repr=False, compare=False)
+
     # Private: mutable cache for body and parsed form data
     # (dict contents are mutable even though the field reference is frozen)
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
@@ -459,6 +465,11 @@ class Request:
 
         Result is cached — the ASGI receive is consumed once, then
         the same bytes are returned on subsequent calls.
+
+        Raises ``PayloadTooLarge`` (413) if the accumulated body exceeds
+        ``_max_upload_size`` before the chunks are joined into RAM. On
+        overflow the cache is *not* poisoned with a partial buffer, so the
+        read-once guarantee still holds for the (failed) call.
         """
         if "_body" in self._cache:
             return self._cache["_body"]
@@ -468,11 +479,32 @@ class Request:
         return result
 
     async def stream(self) -> AsyncGenerator[bytes]:
-        """Stream the request body in chunks."""
+        """Stream the request body in chunks.
+
+        Enforces the ``_max_upload_size`` body cap as bytes arrive: if the
+        running total would exceed the limit, raises ``PayloadTooLarge`` (413)
+        *before* yielding the overflowing chunk — so an oversize upload is
+        rejected without ever joining the whole body into memory.
+        """
+        limit = self._max_upload_size
+        total = 0
         while True:
             message = await self._receive()
             body = message.get("body", b"")
             if body:
+                if limit is not None:
+                    total += len(body)
+                    if total > limit:
+                        from chirp.errors import PayloadTooLarge
+
+                        # NOTE: raising here leaves the ASGI receive channel
+                        # partially consumed — the read-once invariant is not
+                        # preserved across a failed-then-retried body()/stream()
+                        # call. Moot in practice: an overflowing request is
+                        # aborted with a 413 and never read again.
+                        raise PayloadTooLarge(
+                            f"Request body exceeds the maximum upload size of {limit} bytes."
+                        )
                 yield body
             if not message.get("more_body", False):
                 break
@@ -513,7 +545,12 @@ class Request:
 
         ct = self.content_type or "application/x-www-form-urlencoded"
         raw = await self.body()
-        result = await parse_form_data(raw, ct)
+        result = await parse_form_data(
+            raw,
+            ct,
+            max_parts=self._max_upload_parts,
+            spool_threshold=self._upload_spool_threshold,
+        )
 
         # Cache in the mutable dict (frozen dataclass allows mutating
         # the dict object itself, just not replacing the field reference)
@@ -530,6 +567,9 @@ class Request:
         path_params: dict[str, str] | None = None,
         *,
         url_for: Callable[..., str] | None = None,
+        max_upload_size: int | None = None,
+        upload_spool_threshold: int | None = None,
+        max_upload_parts: int | None = None,
     ) -> Request:
         """Create a Request from an ASGI scope and receive callable.
 
@@ -560,4 +600,7 @@ class Request:
             request_id=request_id,
             _receive=receive,
             _url_for=url_for,
+            _max_upload_size=max_upload_size,
+            _upload_spool_threshold=upload_spool_threshold,
+            _max_upload_parts=max_upload_parts,
         )
