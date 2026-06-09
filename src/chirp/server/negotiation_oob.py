@@ -1,9 +1,12 @@
 """OOB helpers for negotiation — shell actions, layout regions, streamed append."""
 
+import contextvars
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING, Any
 
+import anyio
+import anyio.to_thread
 from kida import Environment
 
 from chirp.pages.shell_actions import (
@@ -24,6 +27,25 @@ if TYPE_CHECKING:
     from chirp.pages.types import LayoutChain
 
 _log = logging.getLogger(__name__)
+
+
+async def _render_off_loop[T](fn: Callable[[], T]) -> T:
+    """Run a discrete, CPU-bound kida render off the event loop (issue #193).
+
+    The OOB streams chained onto a ``LayoutSuspense`` response
+    (``append_layout_oob_stream`` / ``append_shell_actions_oob_stream``) each
+    render a *complete* batch of layout blocks via synchronous
+    ``template.render_block`` calls. Running them inline on the loop would
+    re-block the LayoutSuspense path even though the shell body and layout
+    wrapping already render off-loop (see
+    :func:`chirp.templating.suspense._render_off_loop`, which this mirrors).
+
+    The loop's contextvars are copied onto the worker so ``get_request()`` and
+    the live CSP nonce (#181) stay visible inside template globals/filters
+    during the render.
+    """
+    ctx = contextvars.copy_context()
+    return await anyio.to_thread.run_sync(lambda: ctx.run(fn))
 
 
 def _triggers_shell_update(
@@ -125,7 +147,10 @@ async def append_shell_actions_oob_stream(
 ) -> AsyncIterator[str]:
     """Append shell action OOB markup to the first streamed chunk."""
     first_chunk = True
-    oob = render_shell_actions_oob(context, kida_env)
+    # render_shell_actions_oob is a discrete CPU-bound render — keep it off the
+    # loop so the chained shell-actions OOB stream does not re-block the
+    # LayoutSuspense path (#193).
+    oob = await _render_off_loop(lambda: render_shell_actions_oob(context, kida_env))
     async for chunk in chunks:
         if first_chunk:
             yield "\n".join((chunk, oob))
@@ -238,7 +263,12 @@ async def append_layout_oob_stream(
     oob_registry: OOBRegistry | None,
 ) -> AsyncIterator[str]:
     """Append layout OOB markup (sidebar, breadcrumbs, title) to the first chunk."""
-    oob = render_layout_oob_blocks(kida_env, layout_chain, context, oob_registry)
+    # render_layout_oob_blocks renders one or more layout blocks via synchronous
+    # render_block calls — a discrete CPU-bound batch. Run it off the loop so the
+    # chained layout-OOB stream does not re-block the LayoutSuspense path (#193).
+    oob = await _render_off_loop(
+        lambda: render_layout_oob_blocks(kida_env, layout_chain, context, oob_registry)
+    )
     if not oob:
         async for chunk in chunks:
             yield chunk

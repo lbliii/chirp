@@ -8,6 +8,7 @@ markup that should appear on every page without modifying templates.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 
 import anyio
@@ -15,6 +16,7 @@ import anyio.to_thread
 
 from chirp.http.request import Request
 from chirp.http.response import FileResponse, Response, StreamingResponse
+from chirp.middleware.csp_nonce import csp_nonce
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.middleware.streaming_html import async_stream_inject_before_body
 
@@ -59,35 +61,64 @@ class HTMLInject:
     from disk, injected, and returned as a buffered ``Response`` — snippet
     injection inherently needs the whole body, so streaming is moot here.
     ``StreamingResponse`` and ``SSEResponse`` are passed through unchanged
-    (see :class:`AlpineInject` for streaming HTML).
+    (see :class:`StreamingHTMLInject` / :class:`AlpineInject` for streaming
+    HTML).
 
     When *full_page_only* is ``True``, the snippet is injected **only**
     when the *before* target string is found in the response body.
     When ``False`` (the default), the snippet is appended at the end
     if the target string is absent.
 
+    **Per-request snippet factories.** *snippet* may be a plain string **or** a
+    *factory* — ``Callable[[str], str]`` taking the live per-request CSP nonce
+    and returning the snippet. A factory is resolved inside request scope from
+    :func:`chirp.middleware.csp_nonce.csp_nonce` (empty string when nonces are
+    disabled), so an inline ``<script>`` it builds carries the live ``nonce``
+    attribute and survives a nonce-only CSP that no longer ships
+    ``'unsafe-inline'``. Every framework inline-script injection (safe_target,
+    sse_lifecycle, delegation, view_transitions, islands, speculation_rules,
+    Alpine) passes a factory so its inline script is nonced per request; a plain
+    string is still accepted for back-compat and treated as a constant factory.
+
     Usage::
 
         app.add_middleware(HTMLInject(
-            '<script src="/__reload.js"></script>',
+            lambda nonce: f'<script nonce="{nonce}">…</script>',
             before="</body>",
         ))
     """
 
-    __slots__ = ("_full_page_only", "_skip_htmx", "_snippet", "_target")
+    __slots__ = ("_full_page_only", "_skip_htmx", "_snippet", "_snippet_factory", "_target")
 
     def __init__(
         self,
-        snippet: str,
+        snippet: str | Callable[[str], str],
         *,
         before: str = "</body>",
         full_page_only: bool = False,
         skip_htmx: bool = False,
     ) -> None:
-        self._snippet = snippet
+        if isinstance(snippet, str):
+            self._snippet_factory: Callable[[str], str] = lambda _nonce: snippet
+            self._snippet = snippet
+        else:
+            self._snippet_factory = snippet
+            # Keep ``_snippet`` as a nonce-less rendering for introspection;
+            # injection always goes through :meth:`_render_snippet`.
+            self._snippet = snippet("")
         self._target = before
         self._full_page_only = full_page_only
         self._skip_htmx = skip_htmx
+
+    def _render_snippet(self) -> str:
+        """Build the snippet with the live request CSP nonce.
+
+        ``csp_nonce()`` returns the per-request nonce when CSP nonces are enabled
+        and an empty string otherwise (never raises). A plain-string snippet is
+        wrapped in a constant factory at construction time, so this returns the
+        verbatim string for legacy callers.
+        """
+        return self._snippet_factory(csp_nonce())
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Inject the snippet into HTML responses."""
@@ -115,24 +146,30 @@ class HTMLInject:
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
 
+        snippet = self._render_snippet()
         if self._target in body:
-            body = body.replace(self._target, self._snippet + self._target, 1)
+            body = body.replace(self._target, snippet + self._target, 1)
         elif self._full_page_only:
             return response
         else:
-            body = body + self._snippet
+            body = body + snippet
 
         return replace(response, body=body)
 
 
 class StreamingHTMLInject(HTMLInject):
-    """HTMLInject variant that also rewrites full-page StreamingResponse HTML."""
+    """HTMLInject variant that also rewrites full-page StreamingResponse HTML.
+
+    Inherits the per-request snippet-factory support from :class:`HTMLInject`:
+    both the buffered and streaming paths resolve the snippet from the live
+    request nonce, so a factory-built inline script is nonced on either path.
+    """
 
     __slots__ = ("_dedup_marker",)
 
     def __init__(
         self,
-        snippet: str,
+        snippet: str | Callable[[str], str],
         *,
         before: str = "</body>",
         full_page_only: bool = False,
@@ -168,12 +205,13 @@ class StreamingHTMLInject(HTMLInject):
             body = body.decode("utf-8", errors="replace")
         if self._dedup_marker and self._dedup_marker in body:
             return response
+        snippet = self._render_snippet()
         if self._target in body:
-            body = body.replace(self._target, self._snippet + self._target, 1)
+            body = body.replace(self._target, snippet + self._target, 1)
         elif self._full_page_only:
             return response
         else:
-            body = body + self._snippet
+            body = body + snippet
         return replace(response, body=body)
 
     def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
@@ -185,9 +223,11 @@ class StreamingHTMLInject(HTMLInject):
             return response
         if response.render_intent == "unknown" and request.is_htmx:
             return response
+        # Read the live nonce here, in request scope — the chunk generator drains
+        # later, but the snippet string is fixed up front from the live nonce.
         new_chunks = async_stream_inject_before_body(
             response.chunks,
-            snippet=self._snippet,
+            snippet=self._render_snippet(),
             before=self._target,
             dedup_marker=self._dedup_marker,
             full_page_only=self._full_page_only,
@@ -196,15 +236,25 @@ class StreamingHTMLInject(HTMLInject):
 
 
 class AlpineInject(HTMLInject):
-    """HTMLInject that skips when Alpine is already present in the page.
+    """HTMLInject that also rewrites streaming HTML and skips on dedup.
 
     Checks for ``data-chirp="alpine"`` in the response body before injecting.
     This prevents double-loading when the document already includes Alpine
     from another source.
 
+    The Alpine bootstrap contains one inline ``<script>`` (the ``safeData``
+    helper); the plugin/core tags are external ``src=`` references. To survive a
+    nonce-based CSP that no longer ships ``'unsafe-inline'``, that inline script
+    must carry the **live per-request nonce**, which the base-class snippet
+    factory (``Callable[[str], str]``, resolved from
+    :func:`chirp.middleware.csp_nonce.csp_nonce`) provides.
+
     For :class:`~chirp.http.response.StreamingResponse` (e.g. ``Suspense``),
-    the same snippet is inserted before the first ``</body>`` using a bounded
-    buffer so ``</body>`` may be split across chunks.
+    the same per-request snippet is inserted before the first ``</body>`` using
+    a bounded buffer so ``</body>`` may be split across chunks. The nonce is read
+    in :meth:`_alpine_streaming`, which runs in request scope (the streaming
+    chunks drain later, but the snippet string is fixed up front from the live
+    nonce here).
     """
 
     __slots__ = ()
@@ -230,7 +280,7 @@ class AlpineInject(HTMLInject):
             return response
         # Reuse the fetched response — do not call ``next`` again via super().
         target = self._target
-        snippet = self._snippet
+        snippet = self._render_snippet()
         if target in body:
             body = body.replace(target, snippet + target, 1)
         elif self._full_page_only:
@@ -246,9 +296,11 @@ class AlpineInject(HTMLInject):
             return response
         if response.render_intent == "unknown" and request.is_htmx:
             return response
+        # Read the live nonce here, in request scope — the chunk generator drains
+        # later, but the snippet string is fixed up front from the live nonce.
         new_chunks = async_stream_inject_before_body(
             response.chunks,
-            snippet=self._snippet,
+            snippet=self._render_snippet(),
             before=self._target,
             dedup_marker='data-chirp="alpine"',
             full_page_only=self._full_page_only,

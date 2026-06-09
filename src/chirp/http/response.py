@@ -589,6 +589,13 @@ class SSEResponse:
 
     event_stream: Any  # EventStream (avoided import cycle)
     kida_env: Any = None  # kida Environment | None
+    #: Live CSP nonce captured at negotiation time (inside the middleware/handler
+    #: scope) so the SSE drain can re-establish the nonce ContextVar while events
+    #: are produced. ``CSPNonceMiddleware`` resets the var the instant the handler
+    #: returns — before ``handle_sse`` runs — so framework inline scripts emitted
+    #: inside a yielded ``Fragment`` would otherwise render with a dead nonce.
+    #: ``None`` when CSP nonces are not enabled.
+    csp_nonce: str | None = None
     _noop_warned: bool = False
 
     def _warn_noop(self, method: str) -> None:

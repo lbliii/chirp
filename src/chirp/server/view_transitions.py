@@ -56,9 +56,23 @@ VIEW_TRANSITIONS_JS = """\
 })();
 """
 
-VIEW_TRANSITIONS_SCRIPT_SNIPPET = (
-    '<script data-chirp="view-transitions">' + VIEW_TRANSITIONS_JS + "</script>"
-)
+
+def view_transitions_script_snippet(nonce: str = "") -> str:
+    """Build the View-Transitions inline ``<script>`` (htmx + full modes).
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``. The ``"full"`` head snippet
+    (:data:`VIEW_TRANSITIONS_HEAD_SNIPPET`) is a ``<meta>``/``<style>`` pair
+    governed by ``style-src``, not ``script-src``, so it is intentionally left
+    un-nonced.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return f'<script data-chirp="view-transitions"{nonce_attr}>{VIEW_TRANSITIONS_JS}</script>'
+
+
+#: Back-compat module constant (un-nonced). Prefer :func:`view_transitions_script_snippet`.
+VIEW_TRANSITIONS_SCRIPT_SNIPPET = view_transitions_script_snippet()
 
 
 # ---------------------------------------------------------------------------

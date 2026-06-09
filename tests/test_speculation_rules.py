@@ -124,3 +124,17 @@ class TestBuildSnippet:
         assert 'data-chirp="speculation-rules"' in snippet
         assert snippet.endswith("</script>")
         assert "/about" in snippet
+
+    def test_snippet_default_is_unnonced(self):
+        router = _FakeRouter([_FakeRoute("/"), _FakeRoute("/about")])
+        assert "nonce=" not in build_speculation_rules_snippet(router, "conservative")
+
+    def test_snippet_carries_nonce_attr(self):
+        """<script type="speculationrules"> is script-src governed, so under a
+        nonce-only CSP it must carry the live nonce."""
+        router = _FakeRouter([_FakeRoute("/"), _FakeRoute("/about")])
+        snippet = build_speculation_rules_snippet(router, "conservative", nonce="SRNONCE")
+        assert (
+            '<script type="speculationrules" data-chirp="speculation-rules" nonce="SRNONCE">'
+            in (snippet)
+        )

@@ -327,6 +327,222 @@ class TestAlpineInjectDedup:
 
 
 # ---------------------------------------------------------------------------
+# AlpineInject CSP-nonce tests (#195) — the inline safeData bootstrap must carry
+# the live per-request nonce so a standard alpine=True app runs under a strict
+# nonce-only CSP without alpine_csp=True.
+# ---------------------------------------------------------------------------
+
+
+class TestAlpineInjectNonce:
+    """The inline safeData <script> carries the live request nonce."""
+
+    @staticmethod
+    def _factory():
+        """Mirror the compiler's per-request snippet factory."""
+        return lambda nonce: alpine_snippet("3.15.8", False, nonce=nonce)
+
+    @staticmethod
+    def _safe_data_script(text: str) -> str:
+        """Return the inline safeData <script>...</script> from injected HTML.
+
+        The plugin/core tags are external ``src=`` scripts; the only inline
+        script is the safeData bootstrap, identified by ``_chirpAlpineData``.
+        """
+        marker = "_chirpAlpineData"
+        assert marker in text, "safeData bootstrap not injected"
+        start = text.rfind("<script", 0, text.index(marker))
+        end = text.index("</script>", text.index(marker)) + len("</script>")
+        return text[start:end]
+
+    async def test_buffered_full_page_carries_live_nonce(self) -> None:
+        from chirp.http.response import Response
+        from chirp.middleware.csp_nonce import _reset_csp_nonce, _set_csp_nonce
+        from chirp.middleware.inject import AlpineInject
+
+        class FakeRequest:
+            is_htmx = False
+
+        mw = AlpineInject(self._factory(), full_page_only=True)
+
+        async def next_ok(_req: object) -> Response:
+            return Response(
+                body="<html><body><h1>Hi</h1></body></html>",
+                content_type="text/html; charset=utf-8",
+            )
+
+        token = _set_csp_nonce("LIVE-NONCE-123")
+        try:
+            resp = await mw(FakeRequest(), next_ok)
+        finally:
+            _reset_csp_nonce(token)
+
+        assert isinstance(resp, Response)
+        text = resp.body if isinstance(resp.body, str) else resp.body.decode()
+        inline = self._safe_data_script(text)
+        assert 'nonce="LIVE-NONCE-123"' in inline
+        # External plugin/core tags must NOT be nonced (they need no nonce).
+        assert 'src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8/dist/cdn.min.js"' in text
+        assert "@alpinejs/focus" in text
+
+    async def test_streaming_suspense_shell_carries_live_nonce(self) -> None:
+        from chirp.http.response import StreamingResponse
+        from chirp.middleware.csp_nonce import _reset_csp_nonce, _set_csp_nonce
+        from chirp.middleware.inject import AlpineInject
+
+        class FakeRequest:
+            is_htmx = False
+
+        mw = AlpineInject(self._factory(), full_page_only=True)
+
+        async def next_ok(_req: object) -> StreamingResponse:
+            def chunks():
+                yield "<!DOCTYPE html><html><head></head><body>ok"
+                yield "</body></html>"
+
+            return StreamingResponse(chunks=chunks())
+
+        token = _set_csp_nonce("STREAM-NONCE-456")
+        try:
+            resp = await mw(FakeRequest(), next_ok)
+            assert isinstance(resp, StreamingResponse)
+            parts = [chunk async for chunk in resp.chunks]
+        finally:
+            _reset_csp_nonce(token)
+
+        text = "".join(parts)
+        inline = self._safe_data_script(text)
+        assert 'nonce="STREAM-NONCE-456"' in inline
+        assert "cdn.jsdelivr.net/npm/alpinejs" in text
+
+    async def test_no_nonce_when_nonces_disabled(self) -> None:
+        """No live nonce in scope -> bootstrap injected without a nonce attr."""
+        from chirp.http.response import Response
+        from chirp.middleware.inject import AlpineInject
+
+        class FakeRequest:
+            is_htmx = False
+
+        mw = AlpineInject(self._factory(), full_page_only=True)
+
+        async def next_ok(_req: object) -> Response:
+            return Response(
+                body="<html><body>x</body></html>",
+                content_type="text/html; charset=utf-8",
+            )
+
+        resp = await mw(FakeRequest(), next_ok)
+        assert isinstance(resp, Response)
+        text = resp.body if isinstance(resp.body, str) else resp.body.decode()
+        inline = self._safe_data_script(text)
+        assert "nonce=" not in inline
+
+    async def test_string_snippet_backward_compatible(self) -> None:
+        """A plain string snippet (legacy callers) still injects verbatim."""
+        from chirp.http.response import Response
+        from chirp.middleware.inject import AlpineInject
+
+        class FakeRequest:
+            is_htmx = False
+
+        mw = AlpineInject("<!--ALPINE-->", full_page_only=True)
+
+        async def next_ok(_req: object) -> Response:
+            return Response(
+                body="<html><body>x</body></html>",
+                content_type="text/html; charset=utf-8",
+            )
+
+        resp = await mw(FakeRequest(), next_ok)
+        assert isinstance(resp, Response)
+        text = resp.body if isinstance(resp.body, str) else resp.body.decode()
+        assert "<!--ALPINE--></body>" in text
+
+    async def test_end_to_end_nonce_under_csp_nonce_middleware(self) -> None:
+        """Full app: alpine=True + CSPNonceMiddleware emits a nonced bootstrap
+        whose nonce matches the response CSP header — no alpine_csp needed."""
+        import re
+
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        app = App(config=AppConfig(alpine=True))
+        app.add_middleware(CSPNonceMiddleware())
+
+        @app.route("/")
+        def index():
+            return "<html><body><h1>Hi</h1></body></html>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            csp = response.header("content-security-policy") or ""
+            m = re.search(r"'nonce-([^']+)'", csp)
+            assert m, f"no nonce in CSP header: {csp!r}"
+            nonce = m.group(1)
+            inline = TestAlpineInjectNonce._safe_data_script(response.text)
+            assert f'nonce="{nonce}"' in inline
+
+
+class TestAllFrameworkInlineScriptsNonced:
+    """#195: every framework inline-script injection (not just Alpine) is built
+    through a per-request snippet factory, so it carries the live response nonce
+    under CSPNonceMiddleware. This covers safe_target, sse_lifecycle, delegation,
+    view_transitions, islands, and Alpine wired through the real compiler."""
+
+    async def test_all_enabled_features_carry_response_nonce(self) -> None:
+        import re
+
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        app = App(
+            config=AppConfig(
+                alpine=True,
+                safe_target=True,
+                sse_lifecycle=True,
+                delegation=True,
+                view_transitions=True,
+                islands=True,
+            )
+        )
+        app.add_middleware(CSPNonceMiddleware())
+
+        @app.route("/")
+        def index():
+            return "<html><body><h1>Hi</h1></body></html>"
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            csp = response.header("content-security-policy") or ""
+            m = re.search(r"'nonce-([^']+)'", csp)
+            assert m, f"no nonce in CSP header: {csp!r}"
+            nonce = m.group(1)
+            body = response.text
+
+            # Each framework inline script carries the live response nonce.
+            for marker in (
+                "safe-target",
+                "sse-lifecycle",
+                "delegation",
+                "view-transitions",
+                "islands",
+            ):
+                assert f'data-chirp="{marker}" nonce="{nonce}"' in body, (
+                    f"{marker} inline script not nonced with response nonce"
+                )
+
+            # Alpine's inline safeData bootstrap is nonced too.
+            assert "_chirpAlpineData" in body
+            alpine_start = body.rfind("<script", 0, body.index("_chirpAlpineData"))
+            alpine_end = body.index("</script>", body.index("_chirpAlpineData"))
+            assert f'nonce="{nonce}"' in body[alpine_start:alpine_end]
+
+            # No bare inline <script> slipped through under the nonce CSP. (The
+            # external Alpine plugin/core scripts are `<script defer src=...>`,
+            # never `<script>`.)
+            assert "<script>" not in body
+
+
+# ---------------------------------------------------------------------------
 # Macro tests — dropdown, modal, tabs
 # ---------------------------------------------------------------------------
 

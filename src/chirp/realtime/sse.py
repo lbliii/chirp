@@ -10,6 +10,7 @@ import contextlib
 import json as json_module
 import logging
 from collections.abc import Callable
+from contextvars import Token
 from typing import Any
 
 from kida import Environment
@@ -33,6 +34,7 @@ async def handle_sse(
     allow_origin: str | None = None,
     trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+    csp_nonce: str | None = None,
 ) -> None:
     """Stream Server-Sent Events over an ASGI connection.
 
@@ -43,6 +45,14 @@ async def handle_sse(
        - **Disconnect monitor**: awaits ``http.disconnect`` from the client
          and cancels the producer.
     3. Sends periodic heartbeat comments (``:``) on idle.
+
+    *csp_nonce* is the live CSP nonce captured at negotiation time.
+    ``CSPNonceMiddleware`` resets its nonce ``ContextVar`` the instant the
+    handler returns — before any event is produced here — so it is
+    re-established inside ``produce_events`` for the lifetime of the stream,
+    keeping framework inline scripts emitted by yielded ``Fragment`` renders
+    nonced under a CSP that no longer ships ``'unsafe-inline'`` (mirrors the
+    ``StreamingResponse`` drain in :func:`chirp.server.sender`).
     """
     # Send SSE headers.
     #
@@ -113,6 +123,17 @@ async def handle_sse(
         the ``finally`` block could suppress the exception.
         """
         pending_next: asyncio.Task[Any] | None = None
+        csp_nonce_token: Token | None = None
+        if csp_nonce is not None:
+            # Re-establish the CSP nonce for the whole stream lifetime. The
+            # middleware finally already reset the var (it runs before the SSE
+            # drain), so this is a self-contained set/reset with its own token.
+            # produce_events runs in its own task, so setting here guarantees the
+            # var is live for every _format_event (render_fragment) call and
+            # stable across the connection's lifetime.
+            from chirp.middleware.csp_nonce import _set_csp_nonce
+
+            csp_nonce_token = _set_csp_nonce(csp_nonce)
         try:
             heartbeat_interval = event_stream.heartbeat_interval
             gen_iter = event_stream.generator.__aiter__()
@@ -259,6 +280,12 @@ async def handle_sse(
             if _aclose is not None:
                 with contextlib.suppress(Exception):
                     await _aclose()
+            # Reset the CSP nonce var last so it stays live through generator
+            # aclose() (user try/finally blocks may render a final Fragment).
+            if csp_nonce_token is not None:
+                from chirp.middleware.csp_nonce import _reset_csp_nonce
+
+                _reset_csp_nonce(csp_nonce_token)
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())

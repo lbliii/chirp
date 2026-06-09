@@ -452,6 +452,7 @@ async def handle_request(
                 allow_origin=stream.allow_origin,
                 trace_sink=trace_sink,
                 extra_headers=extra_headers,
+                csp_nonce=response.csp_nonce,
             )
         case StreamingResponse():
             await send_streaming_response(response, send, debug=debug, request_id=rid)

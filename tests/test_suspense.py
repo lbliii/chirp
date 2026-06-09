@@ -17,7 +17,9 @@ Covers:
 
 import asyncio
 import inspect
+import time
 
+import anyio
 import pytest
 from kida import DictLoader, Environment
 
@@ -400,6 +402,91 @@ class TestSuspenseStreamNonceIntegration:
 
         # The drain restored the pre-drain state: no nonce leaks past the stream.
         assert csp_nonce() == ""
+
+
+class TestSuspenseAlpineNonceEndToEnd:
+    """#195 integration: a real App returning a Suspense, driven through
+    TestClient, emits BOTH a nonced Alpine ``safeData`` bootstrap AND a nonced
+    Suspense OOB ``<script>``, both carrying the SAME nonce as the response CSP
+    header.
+
+    This is the end-to-end test the integration reviewer flagged as missing: it
+    exercises the live chain (CSPNonceMiddleware sets the nonce + stamps the
+    StreamingResponse, the sender re-establishes it during the drain,
+    ``AlpineInject`` builds the bootstrap from the live nonce, and
+    ``render_suspense`` stamps the OOB scripts) rather than any one layer in
+    isolation.
+    """
+
+    @pytest.mark.asyncio
+    async def test_alpine_and_suspense_scripts_share_response_nonce(self, tmp_path):
+        import re
+
+        from chirp import App
+        from chirp.config import AppConfig
+        from chirp.testing import TestClient
+
+        # A full-page template with a deferred block so Suspense streams an OOB
+        # <script> for the resolved block. Alpine injects its bootstrap before
+        # </body>.
+        (tmp_path / "dashboard.html").write_text(
+            "<html><body>"
+            "<h1>{{ title }}</h1>"
+            '<div id="stats">'
+            "{% block stats %}"
+            "{% if stats is deferred %}<span class='skel'>…</span>"
+            "{% else %}<ul>{% for s in stats %}<li>{{ s }}</li>{% end %}</ul>{% end %}"
+            "{% end %}"
+            "</div>"
+            "</body></html>"
+        )
+
+        # csp_nonce_enabled auto-wires CSPNonceMiddleware at freeze; alpine=True
+        # (non-CSP build) ships the inline safeData bootstrap.
+        app = App(
+            config=AppConfig(
+                template_dir=tmp_path,
+                alpine=True,
+                csp_nonce_enabled=True,
+            )
+        )
+
+        async def load_stats():
+            return ["alice", "bob"]
+
+        @app.route("/")
+        def index():
+            from chirp.templating.returns import Suspense
+
+            return Suspense("dashboard.html", title="Dash", stats=load_stats())
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+
+            csp = response.header("content-security-policy") or ""
+            m = re.search(r"'nonce-([^']+)'", csp)
+            assert m, f"no nonce in CSP header: {csp!r}"
+            nonce = m.group(1)
+
+            body = response.text
+
+            # 1. The Alpine safeData bootstrap is nonced with the response nonce.
+            assert "_chirpAlpineData" in body, "Alpine bootstrap not injected"
+            alpine_start = body.rfind("<script", 0, body.index("_chirpAlpineData"))
+            alpine_end = body.index("</script>", body.index("_chirpAlpineData"))
+            alpine_script = body[alpine_start:alpine_end]
+            assert f'nonce="{nonce}"' in alpine_script, (
+                f"Alpine bootstrap missing live nonce; got: {alpine_script[:120]!r}"
+            )
+
+            # 2. The Suspense OOB <script> (resolved deferred block) is nonced
+            #    with the SAME response nonce.
+            assert "<li>alice</li>" in body, "deferred block did not resolve into the stream"
+            assert f'<script nonce="{nonce}">' in body, "Suspense OOB script missing live nonce"
+
+            # 3. No un-nonced inline <script> slipped through under the nonce CSP.
+            assert "<script>" not in body
 
 
 # ---------------------------------------------------------------------------
@@ -1362,3 +1449,374 @@ class TestDeferredCacheIntegration:
         assert await _resolve_deferred(cache.get_or_defer("fragile", recover)) == "ok"
         assert cache.get_or_defer("fragile", recover) == "ok"
         assert calls == 2
+
+
+# ---------------------------------------------------------------------------
+# Off-loop rendering (issue #145 / #193): shell + deferred blocks render on a
+# worker thread so a heavy Suspense render does not block concurrent requests.
+#
+# Mirrors the Stream off-loop concurrency probe in tests/test_streaming_html.py:
+# a ticker coroutine counts how many times it advances during the render; if the
+# render ran inline on the loop the ticker could not tick, so a high count proves
+# the loop stayed free.
+# ---------------------------------------------------------------------------
+
+# Per-block CPU-bound work simulated by a blocking sleep inside a template global.
+_SLOW_SHELL_TEMPLATE = """\
+<html><body>
+{% block content %}
+  {% if data is deferred %}
+    <p class="loading">{{ heavy() }}Loading...</p>
+  {% else %}
+    <p>{{ heavy() }}{{ data }}</p>
+  {% end %}
+{% end %}
+</body></html>"""
+
+# Template global reads the request ContextVar during render — proves the worker
+# thread runs inside a copied contextvars.Context (the #181/#191 contract).
+_REQ_GLOBAL_TEMPLATE = """\
+<html><body>
+{% block content %}
+  {% if data is deferred %}
+    <p class="loading">shell:{{ who() }}</p>
+  {% else %}
+    <p class="ready">block:{{ who() }}:{{ data }}</p>
+  {% end %}
+{% end %}
+</body></html>"""
+
+
+def _slow_suspense_env(sleep_s: float = 0.02) -> Environment:
+    """Environment whose render blocks (simulates a CPU-bound Suspense render)."""
+    env = Environment(loader=DictLoader({"slow.html": _SLOW_SHELL_TEMPLATE}))
+    _register_deferred_test(env)
+
+    def heavy() -> str:
+        # Blocking sleep stands in for CPU-bound kida compilation. If this runs
+        # inline on the loop, no concurrent task can advance for its duration.
+        time.sleep(sleep_s)
+        return ""
+
+    env.add_global("heavy", heavy)
+    return env
+
+
+async def _count_ticks_during(coro_factory) -> tuple[list[str], int]:
+    """Drain a Suspense stream while a ticker counts loop iterations.
+
+    Returns (chunks, tick_count). A non-blocked loop ticks many times during the
+    render; an inline-on-loop render would freeze the ticker at ~0.
+    """
+    counter = {"n": 0}
+
+    async def ticker() -> None:
+        while True:
+            counter["n"] += 1
+            await anyio.sleep(0.002)
+
+    chunks: list[str] = []
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(ticker)
+        chunks = [chunk async for chunk in coro_factory()]
+        tg.cancel_scope.cancel()
+    return chunks, counter["n"]
+
+
+# The blocking work lives in the *layout*, not the page template, so this probes
+# the LayoutSuspense wrap render (render_with_layouts via _wrap_shell) — the
+# production path #193 targets, distinct from the page-body render off-loop
+# already covered by TestSuspenseOffLoop.
+_HEAVY_LAYOUT_TEMPLATE = """\
+{# target: body #}
+<!DOCTYPE html><html><head><title>{{ title }}{{ heavy() }}</title></head>
+<body><div id="body">{% block content %}{% end %}</div></body></html>"""
+
+# Fast page template — all the slowness must come from the heavy layout wrap.
+_LIGHT_PAGE_TEMPLATE = """\
+<html><body>
+{% block content %}
+  {% if data is deferred %}
+    <p class="loading">Loading...</p>
+  {% else %}
+    <p>{{ data }}</p>
+  {% end %}
+{% end %}
+</body></html>"""
+
+
+def _heavy_layout_env(sleep_s: float = 0.2) -> Environment:
+    """Environment whose *layout* render blocks (CPU-bound layout wrap)."""
+    env = Environment(
+        loader=DictLoader(
+            {
+                "page.html": _LIGHT_PAGE_TEMPLATE,
+                "_layout.html": _HEAVY_LAYOUT_TEMPLATE,
+            }
+        )
+    )
+    _register_deferred_test(env)
+
+    def heavy() -> str:
+        # Blocking sleep stands in for CPU-bound layout compilation. If the
+        # layout wrap runs inline on the loop, no concurrent task advances.
+        time.sleep(sleep_s)
+        return ""
+
+    env.add_global("heavy", heavy)
+    return env
+
+
+class TestSuspenseOffLoop:
+    """A slow Suspense render must not block concurrent event-loop tasks."""
+
+    @pytest.mark.asyncio
+    async def test_slow_shell_render_does_not_block_loop(self) -> None:
+        """The shell render (sync-only fast path) runs off the loop.
+
+        The fast path renders the whole page in one ``template.render`` call; a
+        heavy template there must not stall concurrent tasks.
+        """
+        env = _slow_suspense_env(sleep_s=0.2)
+        # Sync-only context → fast-path single shell render.
+        suspense = Suspense("slow.html", data="hello")
+
+        chunks, ticks = await _count_ticks_during(
+            lambda: render_suspense(env, suspense, is_htmx=True)
+        )
+
+        assert len(chunks) == 1
+        assert "hello" in chunks[0]
+        assert ticks > 10, f"loop appears blocked during shell render: ticks={ticks}"
+
+    @pytest.mark.asyncio
+    async def test_slow_deferred_block_render_does_not_block_loop(self) -> None:
+        """The Phase-2 shell render AND the Phase-4 block render run off the loop.
+
+        With a deferred awaitable the render path takes the shell + per-block OOB
+        route. Both the shell and the deferred-block re-render call ``heavy()``,
+        so the loop must stay free across both renders.
+        """
+        env = _slow_suspense_env(sleep_s=0.1)
+
+        async def load() -> str:
+            return "resolved"
+
+        suspense = Suspense("slow.html", data=load())
+
+        chunks, ticks = await _count_ticks_during(
+            lambda: render_suspense(env, suspense, is_htmx=True)
+        )
+
+        # Shell + one OOB block chunk.
+        assert len(chunks) == 2
+        assert "loading" in chunks[0].lower()
+        assert "resolved" in chunks[1]
+        # Two heavy renders (~0.2s total) — a non-blocked loop ticks many times.
+        assert ticks > 10, f"loop appears blocked during render: ticks={ticks}"
+
+
+class TestLayoutSuspenseOffLoop:
+    """The LayoutSuspense wrap render must not block the event loop (#193).
+
+    Distinct from TestSuspenseOffLoop, which only exercises ``layout_chain=None``
+    (no wrap). Here the blocking work lives in ``_layout.html`` so the probe fails
+    if ``_wrap_shell`` runs ``render_with_layouts`` inline on the loop.
+    """
+
+    @pytest.mark.asyncio
+    async def test_slow_layout_wrap_does_not_block_loop_fast_path(self) -> None:
+        """The fast-path (sync-only) layout wrap runs off the loop.
+
+        Sync-only context → fast-path single shell render + one ``_wrap_shell``
+        call. The page body is trivial; the heavy work is the layout wrap.
+        """
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        env = _heavy_layout_env(sleep_s=0.2)
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+        suspense = Suspense("page.html", data="hello")
+
+        chunks, ticks = await _count_ticks_during(
+            lambda: render_suspense(
+                env,
+                suspense,
+                is_htmx=True,
+                layout_chain=chain,
+                layout_context={"title": "Dashboard"},
+            )
+        )
+
+        assert len(chunks) == 1
+        # Wrap actually happened (layout shell present, page body injected).
+        assert "<!DOCTYPE html>" in chunks[0]
+        assert "<p>hello</p>" in chunks[0]
+        assert ticks > 10, f"loop appears blocked during layout wrap: ticks={ticks}"
+
+    @pytest.mark.asyncio
+    async def test_slow_layout_wrap_does_not_block_loop_deferred(self) -> None:
+        """The Phase-2 shell wrap (deferred path) also runs off the loop.
+
+        With a deferred awaitable the shell is wrapped in the heavy layout before
+        the OOB block streams. The wrap must not stall concurrent tasks.
+        """
+        from chirp.pages.types import LayoutChain, LayoutInfo
+
+        env = _heavy_layout_env(sleep_s=0.2)
+        chain = LayoutChain(layouts=(LayoutInfo("_layout.html", "body", 0),))
+
+        async def load() -> str:
+            return "resolved"
+
+        suspense = Suspense("page.html", data=load())
+
+        chunks, ticks = await _count_ticks_during(
+            lambda: render_suspense(
+                env,
+                suspense,
+                is_htmx=True,
+                layout_chain=chain,
+                layout_context={"title": "Dashboard"},
+            )
+        )
+
+        # Shell (wrapped in layout) + one OOB block chunk.
+        assert len(chunks) == 2
+        assert "<!DOCTYPE html>" in chunks[0]
+        assert "loading" in chunks[0].lower()
+        assert "resolved" in chunks[1]
+        assert ticks > 10, f"loop appears blocked during layout wrap: ticks={ticks}"
+
+
+class TestSuspenseProgressiveFlush:
+    """Shell-first + one OOB chunk per deferred block is preserved off-loop."""
+
+    @pytest.mark.asyncio
+    async def test_shell_first_then_one_chunk_per_block(self) -> None:
+        env = _env()
+
+        async def load_stats() -> list[str]:
+            await asyncio.sleep(0.01)
+            return ["a", "b"]
+
+        async def load_feed() -> list[str]:
+            await asyncio.sleep(0.02)
+            return ["x"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+        chunks = await _collect_chunks(env, suspense, is_htmx=True)
+
+        # Shell first (skeletons, no real data), then exactly one OOB chunk per
+        # deferred block — two blocks, two OOB chunks.
+        assert len(chunks) == 3
+        shell = chunks[0]
+        assert "Loading stats..." in shell
+        assert "Loading feed..." in shell
+        assert "<li>a</li>" not in shell
+
+        oob_chunks = chunks[1:]
+        assert all('hx-swap-oob="true"' in c for c in oob_chunks)
+        # Each block resolved into its own chunk.
+        joined = "".join(oob_chunks)
+        assert "<li>a</li>" in joined
+        assert "<li>x</li>" in joined
+        assert sum("<li>a</li>" in c for c in oob_chunks) == 1
+
+    @pytest.mark.asyncio
+    async def test_chunks_arrive_incrementally(self) -> None:
+        """Shell arrives well before deferred blocks (not buffered then flushed)."""
+        env = _env()
+
+        async def load_stats() -> list[str]:
+            await asyncio.sleep(0.05)
+            return ["a"]
+
+        async def load_feed() -> list[str]:
+            await asyncio.sleep(0.05)
+            return ["x"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+
+        t0 = time.monotonic()
+        arrival = [
+            time.monotonic() - t0 async for _chunk in render_suspense(env, suspense, is_htmx=True)
+        ]
+
+        assert len(arrival) == 3
+        # The shell (first arrival) precedes the deferred OOB chunks by a margin
+        # comparable to the awaitable delay — a buffer-then-flush impl would
+        # deliver everything at roughly the same instant.
+        assert arrival[-1] - arrival[0] > 0.02
+
+
+class TestSuspenseOffLoopContextPropagation:
+    """get_request() and the live CSP nonce survive the off-loop render (#181/#191)."""
+
+    @pytest.mark.asyncio
+    async def test_get_request_resolves_on_worker_for_shell_and_block(self) -> None:
+        """A template global calling get_request() works in both shell and block.
+
+        The render runs on a worker thread, so this only passes because
+        ``_render_off_loop`` copies the loop's contextvars onto the worker.
+        """
+        from chirp.context import request_var
+
+        env = Environment(loader=DictLoader({"req.html": _REQ_GLOBAL_TEMPLATE}))
+        _register_deferred_test(env)
+
+        def who() -> str:
+            from chirp.context import get_request
+
+            return str(get_request())
+
+        env.add_global("who", who)
+
+        async def load() -> str:
+            return "done"
+
+        suspense = Suspense("req.html", data=load())
+
+        sentinel = "req-OFFLOOP-123"
+        token = request_var.set(sentinel)  # type: ignore[arg-type]
+        try:
+            chunks = await _collect_chunks(env, suspense, is_htmx=True)
+        finally:
+            request_var.reset(token)
+
+        # Shell render (worker) saw the request.
+        assert f"shell:{sentinel}" in chunks[0]
+        # Deferred block render (worker) also saw the request.
+        oob = "".join(chunks[1:])
+        assert f"block:{sentinel}:done" in oob
+
+    @pytest.mark.asyncio
+    async def test_live_nonce_appears_on_streamed_script_off_loop(self) -> None:
+        """A nonce set before the drain is stamped onto the streamed <script>.
+
+        Exercises the same #181 contract as TestSuspenseStreamCarriesLiveNonce
+        but is retained here as the #193 acceptance check: the nonce is captured
+        by render_suspense and used to format the OOB <script> emitted after the
+        block render returns from the worker thread.
+        """
+        from chirp.middleware.csp_nonce import _reset_csp_nonce, _set_csp_nonce
+
+        env = _env()
+
+        async def load_stats() -> list[str]:
+            return ["alice"]
+
+        async def load_feed() -> list[str]:
+            return ["post"]
+
+        suspense = Suspense("dashboard.html", title="T", stats=load_stats(), feed=load_feed())
+
+        live_nonce = "OFFLOOPNONCE"
+        token = _set_csp_nonce(live_nonce)
+        try:
+            chunks = [chunk async for chunk in render_suspense(env, suspense, is_htmx=False)]
+        finally:
+            _reset_csp_nonce(token)
+
+        body = "".join(chunks)
+        assert f'<script nonce="{live_nonce}">' in body
+        assert "<script>" not in body  # no un-nonced inline script slipped through

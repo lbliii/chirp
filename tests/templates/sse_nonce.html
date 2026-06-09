@@ -1,0 +1,10 @@
+<html>
+<body>
+<div id="ticker">
+{% block ticker %}
+<script nonce="{{ csp_nonce() }}">window.__tick = {{ tick }};</script>
+<span class="tick">{{ tick }}</span>
+{% endblock %}
+</div>
+</body>
+</html>

@@ -46,4 +46,17 @@ DELEGATION_JS = """\
 })();
 """
 
-DELEGATION_SNIPPET = '<script data-chirp="delegation">' + DELEGATION_JS + "</script>"
+
+def delegation_snippet(nonce: str = "") -> str:
+    """Build the event-delegation inline ``<script>``.
+
+    When *nonce* is non-empty the ``<script>`` carries a ``nonce="..."``
+    attribute so it survives a nonce-based CSP that no longer ships
+    ``'unsafe-inline'``.
+    """
+    nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    return f'<script data-chirp="delegation"{nonce_attr}>{DELEGATION_JS}</script>'
+
+
+#: Back-compat module constant (un-nonced). Prefer :func:`delegation_snippet`.
+DELEGATION_SNIPPET = delegation_snippet()
