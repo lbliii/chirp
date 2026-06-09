@@ -29,12 +29,16 @@ true open work is narrower:
 
 ## Next Release Execution: 0.7.1 Candidate
 
-Research pass on 2026-05-30:
+Research pass on 2026-05-30 (open-issue/PR counts below are a point-in-time
+snapshot; the live GitHub backlog at <https://github.com/lbliii/chirp/issues>
+and <https://github.com/lbliii/chirp/pulls> is authoritative — do not treat the
+historical "none open" reading as current state):
 
 - `main` was current with `origin/main` before release work began.
-- GitHub issues: none open.
+- GitHub issues: none open *as of the 2026-05-30 research pass* (the backlog has
+  since grown — check the live issues list above for current open work).
 - GitHub PRs: PR #131, request-aware filesystem page actions, was the only open
-  PR and directly supports downstream product success by preserving
+  PR at that time and directly supports downstream product success by preserving
   request-scoped services in `_actions.py`.
 - Existing unreleased changelog input: native DevTools debug runtime wiring.
 - Current package and latest tag are both `0.7.0`; the active scope remains
