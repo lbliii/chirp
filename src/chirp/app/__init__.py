@@ -33,11 +33,30 @@ if TYPE_CHECKING:
     from pounce.server import LifecycleCollector
 
     from chirp.data.database import Database
+    from chirp.data.schema.types import SchemaSnapshot
 
 
 # Backwards-compatible symbol aliases (historically imported from chirp.app).
 _PendingRoute = PendingRoute
 _PendingTool = PendingTool
+
+
+def _build_contract_schema(migrations_dir: str | None) -> SchemaSnapshot | None:
+    """Build the declared schema snapshot for the ``data`` shape contract.
+
+    Returns ``None`` when no migrations directory is configured (HTML-only /
+    db-less apps) so the contract is a silent no-op. The static parser reads
+    only the declared migration SQL -- no live database connection is opened.
+    """
+    if not migrations_dir:
+        return None
+    try:
+        from chirp.data.schema.parse import schema_from_migrations
+
+        return schema_from_migrations(migrations_dir)
+    except Exception:
+        # Data is optional; never let a malformed migrations dir break check().
+        return None
 
 
 class App:
@@ -818,6 +837,7 @@ class App:
             from chirp.contracts.template_scan import load_template_sources
 
             ts = load_template_sources(kida_env)
+        schema = _build_contract_schema(self._mutable_state.migrations_dir)
         return ContractCheckSnapshot(
             router=self._runtime_state.router,
             kida_env=kida_env,
@@ -838,4 +858,5 @@ class App:
             debug_wiring=self._runtime_state.debug_wiring,
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),
+            schema=schema,
         )
