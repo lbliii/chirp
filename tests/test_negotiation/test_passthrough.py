@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import anyio
 import pytest
 from kida import Environment, FileSystemLoader
 
@@ -223,7 +224,14 @@ class TestNegotiateTemplateTypes:
         result = negotiate(Stream("dash.html", name="World"), kida_env=env)
         assert isinstance(result, StreamingResponse)
         assert result.content_type == "text/html; charset=utf-8"
-        assert "".join(result.chunks) == "Hello World"
+        collected: list[str] = []
+
+        async def _drain() -> None:
+            async for chunk in result.chunks:
+                collected.append(chunk)
+
+        anyio.run(_drain)
+        assert "".join(collected) == "Hello World"
 
     def test_event_stream_returns_sse_response(self) -> None:
         from chirp.http.response import SSEResponse
