@@ -172,6 +172,19 @@ def test_chirpui_scaffold_csp_nonce_posture(
     ``csp_nonce_enabled=True`` (auto-wiring CSPNonceMiddleware), not the
     ``@alpinejs/csp`` build, and ``app.check()`` must report no ``csp_nonce``
     issue of any severity.
+
+    The load-bearing regression guard here is the **config shape** below
+    (``alpine_csp is False`` + ``csp_nonce_enabled is True``): those fail if the
+    scaffold reverts to the broken ``alpine_csp=True`` posture. The
+    ``csp_nonce_issues == []`` assertion is a clean-pass check, not a posture
+    discriminator — the scaffold hardcodes its config (no ``from_env``), so it
+    always reports ``env='development'`` where the rule is silent for *both*
+    postures. The genuine old-vs-new rule discrimination (normal Alpine under an
+    inline-forbidding CSP ERRORs in production WITHOUT a nonce mechanism, and is
+    clean WITH ``csp_nonce_enabled``) is proven at the unit level in
+    ``tests/contracts/test_csp_nonce_rule.py`` —
+    ``test_fires_in_production_with_forbidding_csp_no_nonce_mechanism`` paired
+    with ``test_silent_with_csp_nonce_enabled_config``.
     """
     project = scaffold(tmp_path, monkeypatch, mode="v2")
     result = run_and_parse(project, _CHIRPUI_CSP_NONCE_CODE)
@@ -188,8 +201,10 @@ def test_chirpui_scaffold_csp_nonce_posture(
         "chirp-ui scaffold must enable csp_nonce_enabled to auto-wire "
         "CSPNonceMiddleware for the nonce CSP."
     )
-    # The nonce mechanism makes every framework inline script nonceable, so the
-    # csp_nonce rule returns early — no issue at any severity.
+    # Clean-pass check: the nonce mechanism makes every framework inline script
+    # nonceable, so the csp_nonce rule returns early. (Clean in dev for both
+    # postures — see the docstring; the config-shape asserts above are the
+    # posture guard, and the rule unit tests prove the prod discrimination.)
     assert result.payload.get("csp_nonce_issues") == [], (
         f"chirp-ui scaffold has csp_nonce contract issues under the nonce "
         f"posture: {result.payload.get('csp_nonce_issues')}"
