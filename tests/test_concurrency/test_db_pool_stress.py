@@ -320,13 +320,15 @@ class TestSqlitePoolConcurrency:
             await asyncio.gather(*(reader(99) for _ in range(12)))
 
     async def test_failed_migration_does_not_poison_pool(self, tmp_path) -> None:
-        """A migration failing mid-script rolls back on its own pooled connection.
+        """End-to-end smoke: a failed migration leaves a clean, usable pool.
 
-        Regression test for the pooled-connection rollback bug: the script's
-        ``BEGIN``/``COMMIT`` and the failure-path ``ROLLBACK`` must run on the
-        same connection. Otherwise the connection that opened the transaction is
-        returned to the pool mid-transaction and poisons the next acquirer (its
-        writes never commit), while the ROLLBACK no-ops on a different one.
+        Functional check that the migration error path is well-behaved (001
+        committed, failed 002 rolled back, no connection left mid-transaction,
+        pool still serves work). Note: in this single-task path the pool's LIFO
+        acquire/release happens to hand the ROLLBACK back the same connection
+        even without the fix, so this test does NOT by itself distinguish the
+        pinned-connection remediation from the bug — that precise guard is
+        ``test_failed_migration_pins_single_connection`` below.
         """
         mig_dir = tmp_path / "migrations"
         mig_dir.mkdir()
@@ -373,3 +375,60 @@ class TestSqlitePoolConcurrency:
 
             await asyncio.gather(*(worker(i) for i in range(10)))
             assert await db.fetch_val("SELECT COUNT(*) FROM ok_table") == 10
+
+    async def test_failed_migration_pins_single_connection(self, tmp_path, monkeypatch) -> None:
+        """A failed migration's script + ROLLBACK acquire exactly ONE connection.
+
+        Precise regression guard for the rollback-on-wrong-connection bug,
+        independent of pool acquire/release ordering. With the fix,
+        ``_apply_migration`` wraps the script and its failure-path ROLLBACK in
+        ``Database._pinned_connection()``, so the entire failing apply checks out
+        exactly one pooled connection (both statements reuse it via
+        ``_current_conn``). Without the pin, ``execute_script`` acquires+releases
+        one connection and the separate ``ROLLBACK`` acquires a second — so an
+        acquisition count of 1 (not 2) is what proves the connection is held
+        across the failure, the property that prevents the ROLLBACK landing on a
+        different connection under concurrency.
+        """
+        import chirp.data.drivers.sqlite as sqlite_driver
+        from chirp.data.migrate import (
+            Migration,
+            _apply_migration,
+            _ensure_tracking_table,
+        )
+
+        url = f"sqlite:///{tmp_path / 'pin.db'}"
+        async with Database(url, pool_size=3) as db:
+            await db.connect()
+            await _ensure_tracking_table(db)
+
+            # Count pooled-connection checkouts during the failing apply only.
+            orig_acquire = sqlite_driver.SqlitePool.acquire
+            acquisitions = 0
+
+            async def counting_acquire(self):
+                nonlocal acquisitions
+                acquisitions += 1
+                return await orig_acquire(self)
+
+            monkeypatch.setattr(sqlite_driver.SqlitePool, "acquire", counting_acquire)
+
+            # CREATE succeeds inside the txn, then the bad statement aborts it.
+            bad = Migration(
+                version=1,
+                name="001_bad",
+                sql="CREATE TABLE doomed (id INTEGER);\nINSERT INTO missing (id) VALUES (1);",
+            )
+            with pytest.raises(Exception):  # noqa: B017,PT011 — driver raises a wrapped error
+                await _apply_migration(db, bad)
+
+            assert acquisitions == 1, (
+                f"failed migration acquired {acquisitions} pooled connections; the "
+                "script and its ROLLBACK must share one pinned connection (>1 means "
+                "the ROLLBACK could land on the wrong connection under contention)"
+            )
+
+            # And the connection that ran the failed script was rolled back, not
+            # left mid-transaction.
+            for conn in db._pool._all:
+                assert conn._conn.in_transaction is False
