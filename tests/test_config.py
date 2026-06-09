@@ -31,7 +31,8 @@ class TestAppConfig:
         assert cfg.static_url == "/static"
         assert cfg.sse_heartbeat_interval == 15.0
         assert cfg.mcp_path == "/mcp"
-        assert cfg.max_content_length == 16 * 1024 * 1024
+        assert cfg.max_request_body_size == 16 * 1024 * 1024
+        assert cfg.max_upload_size == 16 * 1024 * 1024
         assert cfg.view_transitions is False
         assert cfg.static_context is None
 
@@ -48,6 +49,12 @@ class TestAppConfig:
 
         with pytest.raises(AttributeError):
             cfg.debug = True  # type: ignore[misc]
+
+    def test_upload_cap_exceeding_body_cap_raises(self) -> None:
+        from chirp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="max_upload_size"):
+            AppConfig(max_request_body_size=100, max_upload_size=1000)
 
     def test_static_context_frozen_to_mapping_proxy(self) -> None:
         cfg = AppConfig(static_context={"site": "Chirp"})

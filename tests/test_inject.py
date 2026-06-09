@@ -196,6 +196,129 @@ class TestHTMLInjectWithStaticFiles:
             assert SCRIPT_TAG not in response.text
 
 
+def _header(response, name):
+    """First header value (case-insensitive) from a TestClient Response."""
+    target = name.lower()
+    for n, v in response.headers:
+        if n.lower() == target:
+            return v
+    return None
+
+
+def _static_app(tmp_path, *middleware):
+    """App serving a single injected static HTML page from tmp_path."""
+    from chirp.middleware.static import StaticFiles
+
+    site = tmp_path / "public"
+    site.mkdir(parents=True)
+    (site / "index.html").write_text("<html><body><p>Hello</p></body></html>")
+
+    app = App()
+    for mw in middleware:
+        app.add_middleware(mw)
+    app.add_middleware(StaticFiles(directory=site, prefix="/"))
+    return app
+
+
+class TestInjectedStaticConditionalGet:
+    """#198: injected static HTML must keep conditional-GET (ETag/304/Last-Modified)."""
+
+    async def test_emits_etag_and_last_modified(self, tmp_path) -> None:
+        app = _static_app(tmp_path, HTMLInject(SCRIPT_TAG))
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert SCRIPT_TAG + "</body>" in response.text
+            assert _header(response, "ETag") is not None
+            assert _header(response, "Last-Modified") is not None
+
+    async def test_etag_covers_injected_body_not_file(self, tmp_path) -> None:
+        """The ETag must describe the served (injected) bytes, not the file."""
+        app_plain = _static_app(tmp_path / "a", HTMLInject(SCRIPT_TAG))
+        app_other = _static_app(tmp_path / "b", HTMLInject("<!--different snippet-->"))
+        async with TestClient(app_plain) as c1, TestClient(app_other) as c2:
+            e1 = _header(await c1.get("/"), "ETag")
+            e2 = _header(await c2.get("/"), "ETag")
+            assert e1 is not None
+            assert e2 is not None
+            # Same file bytes, different snippet -> different ETag.
+            assert e1 != e2
+
+    async def test_if_none_match_returns_304(self, tmp_path) -> None:
+        app = _static_app(tmp_path, HTMLInject(SCRIPT_TAG))
+        async with TestClient(app) as client:
+            first = await client.get("/")
+            etag = _header(first, "ETag")
+            assert etag is not None
+            second = await client.get("/", headers={"If-None-Match": etag})
+            assert second.status == 304
+            assert second.text == ""
+
+    async def test_if_modified_since_returns_304(self, tmp_path) -> None:
+        app = _static_app(tmp_path, HTMLInject(SCRIPT_TAG))
+        async with TestClient(app) as client:
+            first = await client.get("/")
+            last_modified = _header(first, "Last-Modified")
+            assert last_modified is not None
+            second = await client.get("/", headers={"If-Modified-Since": last_modified})
+            assert second.status == 304
+
+    async def test_does_not_advertise_accept_ranges(self, tmp_path) -> None:
+        """Injected HTML drops Range — on-disk offsets shift after injection."""
+        app = _static_app(tmp_path, HTMLInject(SCRIPT_TAG))
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert _header(response, "Accept-Ranges") is None
+
+    async def test_nonce_snippet_skips_etag_but_keeps_last_modified(self, tmp_path) -> None:
+        """A per-request nonce snippet must not get a strong ETag (would cache a
+        dead nonce), but Last-Modified is still safe."""
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        app = _static_app(
+            tmp_path,
+            HTMLInject(lambda nonce: f'<script nonce="{nonce}">x</script>'),
+            CSPNonceMiddleware(),
+        )
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert _header(response, "ETag") is None
+            assert _header(response, "Last-Modified") is not None
+
+    async def test_nonce_snippet_never_returns_304(self, tmp_path) -> None:
+        from chirp.middleware.csp_nonce import CSPNonceMiddleware
+
+        app = _static_app(
+            tmp_path,
+            HTMLInject(lambda nonce: f'<script nonce="{nonce}">x</script>'),
+            CSPNonceMiddleware(),
+        )
+        async with TestClient(app) as client:
+            first = await client.get("/")
+            last_modified = _header(first, "Last-Modified")
+            assert _header(first, "ETag") is None
+            assert last_modified is not None
+            # A valid If-Modified-Since must NOT short-circuit to 304 for a
+            # nonce body — that would serve a body carrying a dead nonce.
+            second = await client.get("/", headers={"If-Modified-Since": last_modified})
+            assert second.status == 200
+            assert "<script nonce=" in second.text
+
+    async def test_alpine_injected_static_html_keeps_caching(self, tmp_path) -> None:
+        from chirp.middleware.inject import AlpineInject
+
+        # Alpine bootstrap with a constant snippet (no nonce in scope) is stable.
+        app = _static_app(tmp_path, AlpineInject("<!--ALPINE-->"))
+        async with TestClient(app) as client:
+            first = await client.get("/")
+            assert "<!--ALPINE-->" in first.text
+            etag = _header(first, "ETag")
+            assert etag is not None
+            second = await client.get("/", headers={"If-None-Match": etag})
+            assert second.status == 304
+
+
 class TestHTMLInjectFullPageOnly:
     async def test_full_page_only_injects_when_target_present(self) -> None:
         """full_page_only=True still injects when </body> is found."""

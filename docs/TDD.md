@@ -770,7 +770,7 @@ class AppConfig:
     sse_heartbeat_interval: float = 15.0
 
     # Limits
-    max_content_length: int = 16 * 1024 * 1024  # 16MB
+    max_request_body_size: int = 16 * 1024 * 1024  # 16MB
 ```
 
 ---

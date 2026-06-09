@@ -27,7 +27,7 @@ deprecation path:
 |-------|--------|
 | Server basics | `host`, `port`, `debug`, `env` |
 | Development reload | `reload_include`, `reload_dirs`, `dev_browser_reload`, `reload_timeout` |
-| Security | `secret_key`, `allowed_hosts`, `csp_nonce_enabled`, `strict_transport_security`, `max_content_length` |
+| Security | `secret_key`, `allowed_hosts`, `csp_nonce_enabled`, `strict_transport_security`, `max_request_body_size`, `max_upload_size` |
 | Templates | `template_dir`, `component_dirs`, `extra_loaders`, `autoescape`, `trim_blocks`, `lstrip_blocks`, `strict_undefined`, `static_context` |
 | Static files | `static_dir`, `static_url` |
 | SSE and Suspense | `sse_heartbeat_interval`, `sse_retry_ms`, `sse_close_event`, `suspense_error_template`, `suspense_error_block` |

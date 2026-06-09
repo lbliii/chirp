@@ -387,6 +387,7 @@ class TestUploadLimitsAreRuntimeNotContract:
 
     def test_upload_config_defaults_are_sane(self):
         cfg = AppConfig()
+        assert cfg.max_request_body_size == 16 * 1024 * 1024
         assert cfg.max_upload_size == 16 * 1024 * 1024
         assert cfg.upload_spool_threshold == 1024 * 1024
         assert cfg.max_upload_parts == 1000

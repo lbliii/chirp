@@ -64,8 +64,8 @@ provisional until those subsystems are stabilized.
 | `allowed_hosts` | `tuple[str, ...]` | `("*",)` | Host allowlist for production host validation |
 | `csp_nonce_enabled` | `bool` | `False` | Enable nonce-aware CSP helpers |
 | `strict_transport_security` | `str \| None` | `None` | Strict-Transport-Security header value |
-| `max_content_length` | `int` | `16777216` | Maximum request body size in bytes (16 MB) |
-| `max_upload_size` | `int` | `16777216` | Hard ceiling on the request body for uploads/forms (16 MB); rejected with 413 before buffering |
+| `max_request_body_size` | `int` | `16777216` | General request-body ceiling for **every** content type (JSON, text, urlencoded, multipart), 16 MB; oversize bodies are rejected with 413 *before* buffering into RAM |
+| `max_upload_size` | `int` | `16777216` | Multipart-specific ceiling on the **total** size of `multipart/form-data` parts (16 MB); the inner envelope, must be `<=` `max_request_body_size` |
 | `upload_spool_threshold` | `int` | `1048576` | Bytes an `UploadFile` keeps in RAM before spilling to a temp file (1 MB) |
 | `max_upload_parts` | `int` | `1000` | Maximum number of multipart parts; rejects multipart bombs |
 

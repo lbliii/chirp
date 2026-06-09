@@ -299,6 +299,10 @@ class Request:
 
     # Private: upload/body limits threaded from AppConfig by the handler.
     # Defaults are unbounded/sane so direct construction (tests) is unaffected.
+    # _max_request_body_size is the GENERAL body cap (every content type),
+    # enforced in stream(); _max_upload_size is the MULTIPART-total cap,
+    # enforced by the multipart parser via form().
+    _max_request_body_size: int | None = field(default=None, repr=False, compare=False)
     _max_upload_size: int | None = field(default=None, repr=False, compare=False)
     _upload_spool_threshold: int | None = field(default=None, repr=False, compare=False)
     _max_upload_parts: int | None = field(default=None, repr=False, compare=False)
@@ -467,7 +471,7 @@ class Request:
         the same bytes are returned on subsequent calls.
 
         Raises ``PayloadTooLarge`` (413) if the accumulated body exceeds
-        ``_max_upload_size`` before the chunks are joined into RAM. On
+        ``_max_request_body_size`` before the chunks are joined into RAM. On
         overflow the cache is *not* poisoned with a partial buffer, so the
         read-once guarantee still holds for the (failed) call.
         """
@@ -481,12 +485,15 @@ class Request:
     async def stream(self) -> AsyncGenerator[bytes]:
         """Stream the request body in chunks.
 
-        Enforces the ``_max_upload_size`` body cap as bytes arrive: if the
-        running total would exceed the limit, raises ``PayloadTooLarge`` (413)
-        *before* yielding the overflowing chunk — so an oversize upload is
-        rejected without ever joining the whole body into memory.
+        Enforces the general ``_max_request_body_size`` cap (applies to EVERY
+        content type — JSON, text, urlencoded, multipart) as bytes arrive: if
+        the running total would exceed the limit, raises ``PayloadTooLarge``
+        (413) *before* yielding the overflowing chunk — so an oversize body is
+        rejected without ever joining the whole body into memory. The
+        multipart-specific ``_max_upload_size`` is enforced separately by the
+        multipart parser (see ``form()``); this cap is the outer envelope.
         """
-        limit = self._max_upload_size
+        limit = self._max_request_body_size
         total = 0
         while True:
             message = await self._receive()
@@ -503,7 +510,7 @@ class Request:
                         # call. Moot in practice: an overflowing request is
                         # aborted with a 413 and never read again.
                         raise PayloadTooLarge(
-                            f"Request body exceeds the maximum upload size of {limit} bytes."
+                            f"Request body exceeds the maximum size of {limit} bytes."
                         )
                 yield body
             if not message.get("more_body", False):
@@ -549,6 +556,7 @@ class Request:
             raw,
             ct,
             max_parts=self._max_upload_parts,
+            max_total_size=self._max_upload_size,
             spool_threshold=self._upload_spool_threshold,
         )
 
@@ -567,6 +575,7 @@ class Request:
         path_params: dict[str, str] | None = None,
         *,
         url_for: Callable[..., str] | None = None,
+        max_request_body_size: int | None = None,
         max_upload_size: int | None = None,
         upload_spool_threshold: int | None = None,
         max_upload_parts: int | None = None,
@@ -600,6 +609,7 @@ class Request:
             request_id=request_id,
             _receive=receive,
             _url_for=url_for,
+            _max_request_body_size=max_request_body_size,
             _max_upload_size=max_upload_size,
             _upload_spool_threshold=upload_spool_threshold,
             _max_upload_parts=max_upload_parts,
