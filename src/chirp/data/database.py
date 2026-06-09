@@ -13,6 +13,12 @@ Free-threading safety:
     - Connection pool uses ``anyio.Lock`` for async-safe initialization
     - Connections are per-task (ContextVar), never shared between tasks
     - All public methods are async — no sync I/O on the calling thread
+
+Concurrency model:
+    - SQLite uses a small bounded pool (sized by ``pool_size``) of WAL-mode
+      connections. Readers acquire any free connection and run concurrently;
+      write transactions serialize behind ``_sqlite_lock`` (single-writer).
+    - PostgreSQL uses asyncpg's native pool with transaction-level isolation.
 """
 
 import asyncio
@@ -142,22 +148,26 @@ class Database:
     # -- Connection management --
 
     @asynccontextmanager
-    async def _connection(self) -> AsyncIterator[Any]:
+    async def _connection(self, *, write: bool = False) -> AsyncIterator[Any]:
         """Acquire a connection, release when done.
 
         If inside a ``transaction()`` block, reuses the transaction's
         connection (no acquire/release — the transaction owns it).
         Otherwise acquires from the pool and releases on exit.
 
-        SQLite connections are serialized via an async lock to prevent
-        concurrent thread-pool dispatches on the same connection — matching
-        the serialization guarantee that ``aiosqlite`` provided via its
-        dedicated thread.
+        Both backends use a real bounded pool: readers acquire any free pooled
+        connection and run concurrently up to ``pool_size``. For SQLite, reads
+        no longer take the app-wide write lock — WAL mode lets many readers run
+        alongside a single writer. ``write=True`` callers (autocommit
+        INSERT/UPDATE/DELETE and ``transaction()``) serialize behind
+        ``_sqlite_lock`` to honor SQLite's single-writer model; readers never
+        wait on it.
         """
         if not self._initialized:
             await self.connect()
 
-        # Inside a transaction — reuse its connection (lock already held)
+        # Inside a transaction — reuse its connection (the transaction owns it,
+        # and the write lock — if any — is already held by the transaction).
         try:
             conn = _current_conn.get()
             yield conn
@@ -165,16 +175,26 @@ class Database:
         except LookupError:
             pass
 
-        # Acquire fresh connection from pool
-        if self._driver == "sqlite":
+        # SQLite writers serialize on the app-wide write lock (single writer);
+        # file-backed readers and all PostgreSQL access acquire lock-free. An
+        # in-memory SQLite DB is a single shared connection, so *every* access
+        # (reads included) must serialize on the lock to avoid concurrent
+        # thread-pool dispatch on one connection.
+        if self._driver == "sqlite" and (write or self._pool.is_memory):
             async with self._sqlite_lock:
-                yield self._pool  # SQLite: pool IS the connection
-        else:
-            conn = await self._pool.acquire()
-            try:
-                yield conn
-            finally:
-                await self._pool.release(conn)
+                conn = await self._pool.acquire()
+                try:
+                    yield conn
+                finally:
+                    await self._pool.release(conn)
+            return
+
+        # Acquire a fresh connection from the pool (both backends).
+        conn = await self._pool.acquire()
+        try:
+            yield conn
+        finally:
+            await self._pool.release(conn)
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:
@@ -207,10 +227,14 @@ class Database:
             yield
             return
 
-        # Top-level transaction — acquire a dedicated connection
+        # Top-level transaction — acquire a dedicated connection from the pool.
         if self._driver == "sqlite":
+            # SQLite allows N concurrent readers + a single writer (WAL), so the
+            # write lock is scoped to write transactions only — reads outside a
+            # transaction never wait on it. The lock serializes writers against
+            # each other for the whole transaction body (single-writer model).
             async with self._sqlite_lock:
-                conn = self._pool
+                conn = await self._pool.acquire()
                 token = _current_conn.set(conn)
                 try:
                     conn.autocommit = False
@@ -222,6 +246,7 @@ class Database:
                 finally:
                     conn.autocommit = True
                     _current_conn.reset(token)
+                    await self._pool.release(conn)
         else:
             conn = await self._pool.acquire()
             token = _current_conn.set(conn)
@@ -233,6 +258,48 @@ class Database:
             except BaseException:
                 await tr.rollback()
                 raise
+            finally:
+                _current_conn.reset(token)
+                await self._pool.release(conn)
+
+    @asynccontextmanager
+    async def _pinned_connection(self) -> AsyncIterator[Any]:
+        """Pin one pooled connection for a sequence of writes.
+
+        Acquires a single connection (holding the SQLite write lock for the
+        whole block) and binds it via ``_current_conn`` so every nested
+        ``execute``/``execute_script`` call reuses the *same* connection. The
+        migration runner needs this: a multi-statement script wraps its own
+        ``BEGIN``/``COMMIT``, and on failure the ROLLBACK must land on the
+        connection that opened the transaction — never a different pooled one
+        (which would leave the aborted transaction dangling on a connection
+        handed back to the next acquirer).
+
+        Unlike :meth:`transaction` this does *not* toggle autocommit or
+        auto-commit/rollback; the caller owns the transaction boundaries.
+        """
+        if not self._initialized:
+            await self.connect()
+
+        # Join an already-pinned connection (transaction or outer pin).
+        if _in_transaction():
+            yield _current_conn.get()
+            return
+
+        if self._driver == "sqlite":
+            async with self._sqlite_lock:
+                conn = await self._pool.acquire()
+                token = _current_conn.set(conn)
+                try:
+                    yield conn
+                finally:
+                    _current_conn.reset(token)
+                    await self._pool.release(conn)
+        else:
+            conn = await self._pool.acquire()
+            token = _current_conn.set(conn)
+            try:
+                yield conn
             finally:
                 _current_conn.reset(token)
                 await self._pool.release(conn)
@@ -319,7 +386,7 @@ class Database:
             )
         """
         t0 = time.perf_counter()
-        async with self._connection() as conn:
+        async with self._connection(write=True) as conn:
             try:
                 return await _execute_statement(self._driver, conn, sql, params)
             except Exception as exc:
@@ -341,7 +408,7 @@ class Database:
         inside a ``transaction()`` block instead.
         """
         t0 = time.perf_counter()
-        async with self._connection() as conn:
+        async with self._connection(write=True) as conn:
             try:
                 if self._driver == "sqlite":
                     await conn.executescript(sql)
@@ -371,7 +438,7 @@ class Database:
             )
         """
         t0 = time.perf_counter()
-        async with self._connection() as conn:
+        async with self._connection(write=True) as conn:
             try:
                 return await _execute_many(self._driver, conn, sql, params_seq)
             except Exception as exc:

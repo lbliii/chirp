@@ -165,7 +165,7 @@ Every Lock-protected module has concurrency stress tests in `tests/test_concurre
 | Lockout backend | Concurrent lockout checks | Threshold triggers at correct count |
 | OOB registry | Concurrent contract builds | Single build, cache hit on subsequent access |
 | ContextVar | 50 concurrent async tasks | Each task sees only its own `g`, `request_var`, `_session_var` |
-| Database pool | 50 concurrent queries | No pool exhaustion, transactions serialize correctly |
+| Database pool | 50 concurrent queries + parallel-reader timing | Concurrent readers run in parallel (WAL pool); writes serialize behind a single writer; no pool exhaustion |
 
 ## Summary
 
