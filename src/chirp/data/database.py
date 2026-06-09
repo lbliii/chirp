@@ -262,6 +262,48 @@ class Database:
                 _current_conn.reset(token)
                 await self._pool.release(conn)
 
+    @asynccontextmanager
+    async def _pinned_connection(self) -> AsyncIterator[Any]:
+        """Pin one pooled connection for a sequence of writes.
+
+        Acquires a single connection (holding the SQLite write lock for the
+        whole block) and binds it via ``_current_conn`` so every nested
+        ``execute``/``execute_script`` call reuses the *same* connection. The
+        migration runner needs this: a multi-statement script wraps its own
+        ``BEGIN``/``COMMIT``, and on failure the ROLLBACK must land on the
+        connection that opened the transaction — never a different pooled one
+        (which would leave the aborted transaction dangling on a connection
+        handed back to the next acquirer).
+
+        Unlike :meth:`transaction` this does *not* toggle autocommit or
+        auto-commit/rollback; the caller owns the transaction boundaries.
+        """
+        if not self._initialized:
+            await self.connect()
+
+        # Join an already-pinned connection (transaction or outer pin).
+        if _in_transaction():
+            yield _current_conn.get()
+            return
+
+        if self._driver == "sqlite":
+            async with self._sqlite_lock:
+                conn = await self._pool.acquire()
+                token = _current_conn.set(conn)
+                try:
+                    yield conn
+                finally:
+                    _current_conn.reset(token)
+                    await self._pool.release(conn)
+        else:
+            conn = await self._pool.acquire()
+            token = _current_conn.set(conn)
+            try:
+                yield conn
+            finally:
+                _current_conn.reset(token)
+                await self._pool.release(conn)
+
     # -- Echo / query logging --
 
     def _log_query(self, sql: str, params: tuple[Any, ...] | Sequence[Any], elapsed: float) -> None:

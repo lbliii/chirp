@@ -146,12 +146,17 @@ async def _apply_migration(db: Database, migration: Migration) -> None:
             f"VALUES ({migration.version}, {_sql_literal(migration.name)}, {_sql_literal(now)});\n"
             "COMMIT;"
         )
-        try:
-            await db.execute_script(script)
-        except Exception:
-            with contextlib.suppress(Exception):
-                await db.execute("ROLLBACK")
-            raise
+        # Pin one connection so the script's BEGIN/COMMIT and the failure-path
+        # ROLLBACK run on the *same* pooled connection. Without the pin the
+        # ROLLBACK could land on a different connection (a no-op) while the one
+        # that ran the failed BEGIN is returned to the pool mid-transaction.
+        async with db._pinned_connection():
+            try:
+                await db.execute_script(script)
+            except Exception:
+                with contextlib.suppress(Exception):
+                    await db.execute("ROLLBACK")
+                raise
         return
 
     async with db.transaction():

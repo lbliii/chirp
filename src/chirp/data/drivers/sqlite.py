@@ -23,6 +23,7 @@ from collections.abc import Sequence
 
 import anyio
 
+from chirp.data._sqlite import AsyncConnection
 from chirp.data.errors import DataError
 from chirp.data.types import DatabaseConfig
 
@@ -92,9 +93,9 @@ class SqlitePool:
 
     __slots__ = ("_all", "_available", "_lock", "_semaphore", "is_memory")
 
-    def __init__(self, connections: Sequence[object], *, is_memory: bool = False) -> None:
-        self._all: list[object] = list(connections)
-        self._available: list[object] = list(connections)
+    def __init__(self, connections: Sequence[AsyncConnection], *, is_memory: bool = False) -> None:
+        self._all: list[AsyncConnection] = list(connections)
+        self._available: list[AsyncConnection] = list(connections)
         # Caps concurrent checkouts at pool_size; the list holds the free conns.
         self._semaphore = anyio.Semaphore(len(self._all))
         self._lock = anyio.Lock()
@@ -107,13 +108,13 @@ class SqlitePool:
         """Total number of connections managed by the pool."""
         return len(self._all)
 
-    async def acquire(self) -> object:
+    async def acquire(self) -> AsyncConnection:
         """Check out a connection, blocking until one is free."""
         await self._semaphore.acquire()
         async with self._lock:
             return self._available.pop()
 
-    async def release(self, conn: object) -> None:
+    async def release(self, conn: AsyncConnection) -> None:
         """Return a previously acquired connection to the pool."""
         async with self._lock:
             self._available.append(conn)
@@ -122,7 +123,7 @@ class SqlitePool:
     async def close(self) -> None:
         """Close every connection in the pool."""
         for conn in self._all:
-            await conn.close()  # type: ignore[attr-defined]
+            await conn.close()
         self._available.clear()
         self._all.clear()
 
@@ -146,7 +147,7 @@ async def create_pool(config: DatabaseConfig) -> SqlitePool:
     # file DBs use a real bounded pool sized by pool_size.
     size = 1 if in_memory else max(1, config.pool_size)
 
-    connections: list[object] = []
+    connections: list[AsyncConnection] = []
     for _ in range(size):
         conn = await sqlite_connect(target, uri=uri)
         conn.row_factory = sqlite3.Row

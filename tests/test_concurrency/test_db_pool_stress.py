@@ -17,7 +17,11 @@ File-backed SQLite (real WAL pool) verifies the #186 acceptance:
 import asyncio
 from dataclasses import dataclass
 
+import pytest
+
 from chirp.data.database import Database
+from chirp.data.errors import MigrationError
+from chirp.data.migrate import migrate
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,3 +295,81 @@ class TestSqlitePoolConcurrency:
             await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
             await db.execute("INSERT INTO t (v) VALUES ('x')")
             assert await db.fetch_val("SELECT COUNT(*) FROM t") == 1
+
+    async def test_cross_connection_read_your_writes(self, tmp_path) -> None:
+        """A committed write on one pooled connection is visible on another (WAL).
+
+        With a multi-connection pool a write may commit on connection A while a
+        later read is served by connection B. WAL guarantees B observes A's
+        committed write — this pins that safety property after splitting reads
+        and writes across distinct pooled connections.
+        """
+        url = f"sqlite:///{tmp_path / 'ryw.db'}"
+        async with Database(url, pool_size=4) as db:
+            await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER)")
+            await db.execute("INSERT INTO t (v) VALUES (?)", 42)
+
+            async def reader(expected: int) -> None:
+                assert await db.fetch_val("SELECT v FROM t WHERE id = 1") == expected
+
+            # Reads spread across pooled connections must all see the commit.
+            await asyncio.gather(*(reader(42) for _ in range(12)))
+
+            # An update committed on one connection is visible to later reads.
+            await db.execute("UPDATE t SET v = ? WHERE id = 1", 99)
+            await asyncio.gather(*(reader(99) for _ in range(12)))
+
+    async def test_failed_migration_does_not_poison_pool(self, tmp_path) -> None:
+        """A migration failing mid-script rolls back on its own pooled connection.
+
+        Regression test for the pooled-connection rollback bug: the script's
+        ``BEGIN``/``COMMIT`` and the failure-path ``ROLLBACK`` must run on the
+        same connection. Otherwise the connection that opened the transaction is
+        returned to the pool mid-transaction and poisons the next acquirer (its
+        writes never commit), while the ROLLBACK no-ops on a different one.
+        """
+        mig_dir = tmp_path / "migrations"
+        mig_dir.mkdir()
+        # 001 applies cleanly.
+        (mig_dir / "001_ok.sql").write_text(
+            "CREATE TABLE ok_table (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);"
+        )
+        # 002 fails mid-script: the CREATE succeeds inside the transaction, then
+        # a statement against a missing table aborts it, leaving an open txn.
+        (mig_dir / "002_bad.sql").write_text(
+            "CREATE TABLE doomed (id INTEGER PRIMARY KEY);\n"
+            "INSERT INTO does_not_exist (id) VALUES (1);"
+        )
+        url = f"sqlite:///{tmp_path / 'mig.db'}"
+        async with Database(url, pool_size=3) as db:
+            with pytest.raises(MigrationError):
+                await migrate(db, mig_dir)
+
+            # 001 committed; the failed 002 left nothing behind (rolled back).
+            assert (
+                await db.fetch_val(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ok_table'"
+                )
+                == 1
+            )
+            assert (
+                await db.fetch_val(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='doomed'"
+                )
+                == 0
+            )
+
+            # No pooled connection is left mid-transaction — the failure rolled
+            # back on the connection that opened it, not a different pooled one.
+            for conn in db._pool._all:
+                assert conn._conn.in_transaction is False
+
+            # And the pool still accepts work: drive > pool_size concurrent
+            # writes/reads; every insert must durably commit (a poisoned
+            # connection would swallow its writes in an uncommitted txn).
+            async def worker(i: int) -> None:
+                await db.execute("INSERT INTO ok_table (name) VALUES (?)", f"w{i}")
+                await db.fetch_val("SELECT COUNT(*) FROM ok_table")
+
+            await asyncio.gather(*(worker(i) for i in range(10)))
+            assert await db.fetch_val("SELECT COUNT(*) FROM ok_table") == 10
