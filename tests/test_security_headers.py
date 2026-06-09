@@ -142,6 +142,7 @@ class TestDefaultCSPAllowsFrameworkScripts:
         cfg = SecurityHeadersConfig()
         assert "'unsafe-inline'" not in (cfg.content_security_policy or "")
 
+
 # --- Static HTML FileResponse must keep security headers (issue #178) ---
 
 
