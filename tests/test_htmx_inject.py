@@ -25,8 +25,10 @@ class TestHtmxSnippet:
         assert "defer" in s
 
     def test_uses_explicit_dist_path(self) -> None:
-        """Bare jsDelivr package paths resolve to a non-browser build — same
-        CommonJS footgun as Alpine. The src must use the explicit /dist path."""
+        """The src must use the explicit /dist path — the framework CDN
+        convention (same explicit-/dist rule enforced for Alpine). htmx's bare
+        package main is browser-safe (unlike Alpine's CJS module), so for htmx
+        this pins the minified browser bundle for consistency."""
         s = htmx_snippet("2.0.4")
         assert "htmx.org@2.0.4/dist/htmx.min.js" in s
 
