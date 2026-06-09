@@ -10,7 +10,7 @@ static files, and other non-HTML content types.
 from dataclasses import dataclass
 
 from chirp.http.request import Request
-from chirp.http.response import Response, SSEResponse, StreamingResponse
+from chirp.http.response import FileResponse, Response, SSEResponse, StreamingResponse
 from chirp.middleware.protocol import AnyResponse, Next
 
 
@@ -36,14 +36,20 @@ def _is_html_response(response: AnyResponse) -> bool:
     """True if response is HTML and should receive security headers."""
     if isinstance(response, SSEResponse):
         return False
-    ct = getattr(response, "content_type", "") or ""
+    # FileResponse auto-detects its content type from the path; use the
+    # resolved value so a static .html served with content_type=None still
+    # counts as HTML (StaticFiles sets it explicitly, but other callers may not).
+    if isinstance(response, FileResponse):
+        ct = response.resolved_content_type
+    else:
+        ct = getattr(response, "content_type", "") or ""
     return ct.startswith("text/html")
 
 
 def _add_headers(
-    response: Response | StreamingResponse, config: SecurityHeadersConfig
+    response: Response | StreamingResponse | FileResponse, config: SecurityHeadersConfig
 ) -> AnyResponse:
-    """Add security headers to a Response or StreamingResponse."""
+    """Add security headers to a Response, StreamingResponse, or FileResponse."""
     secured = (
         response.with_header("X-Frame-Options", config.x_frame_options)
         .with_header("X-Content-Type-Options", config.x_content_type_options)
@@ -91,6 +97,9 @@ class SecurityHeadersMiddleware:
         response = await next(request)
         if not _is_html_response(response):
             return response
-        if isinstance(response, (Response, StreamingResponse)):
+        # FileResponse included so static HTML files (root-prefix static
+        # sites, custom 404.html) keep their clickjacking/MIME/CSP headers —
+        # it exposes with_header()/content_type and composes like Response.
+        if isinstance(response, (Response, StreamingResponse, FileResponse)):
             return _add_headers(response, self.config)
         return response

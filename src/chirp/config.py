@@ -151,6 +151,9 @@ class AppConfig:
     # Static files
     static_dir: str | Path | None = "static"
     static_url: str = "/static"
+    # Files at/above this size (bytes) stream from disk in chunks instead of
+    # being read into memory in one shot; caps worker RSS for large static GETs.
+    static_stream_threshold: int = 1024 * 1024  # 1 MiB
 
     # SSE
     sse_heartbeat_interval: float = 15.0
@@ -199,6 +202,20 @@ class AppConfig:
 
     # Limits
     max_content_length: int = 16 * 1024 * 1024  # 16 MB
+
+    # Upload limits (multipart / file-upload bodies). These are distinct from
+    # max_content_length, which is not enforced by the request pipeline. The
+    # upload limits below are enforced where the bytes actually flow:
+    #   - max_upload_size: hard ceiling on the request body for upload/form
+    #     reads; Request.body()/stream() abort with 413 PayloadTooLarge before
+    #     the chunks are joined into RAM (reject-before-OOM).
+    #   - upload_spool_threshold: bytes an UploadFile keeps in memory before it
+    #     spills to a temp file on disk (stdlib SpooledTemporaryFile).
+    #   - max_upload_parts: cap on the number of multipart parts, rejecting a
+    #     multipart bomb with 413 PayloadTooLarge.
+    max_upload_size: int = 16 * 1024 * 1024  # 16 MB upload/multipart body ceiling
+    upload_spool_threshold: int = 1024 * 1024  # 1 MB held in RAM before spilling to disk
+    max_upload_parts: int = 1000  # multipart part-count cap
 
     # Production (pounce Phase 6 features)
     workers: int = 0  # 0 = auto-detect from CPU count (multi-worker for production)
@@ -371,6 +388,9 @@ class AppConfig:
                     "SENTRY_DSN",
                     "SENTRY_ENVIRONMENT",
                     "SENTRY_RELEASE",
+                    "MAX_UPLOAD_SIZE",
+                    "UPLOAD_SPOOL_THRESHOLD",
+                    "MAX_UPLOAD_PARTS",
                 }
             ),
         )
@@ -402,6 +422,9 @@ class AppConfig:
             sentry_dsn=os.environ.get(f"{p}SENTRY_DSN") or None,
             sentry_environment=os.environ.get(f"{p}SENTRY_ENVIRONMENT") or None,
             sentry_release=os.environ.get(f"{p}SENTRY_RELEASE") or None,
+            max_upload_size=_env_int(f"{p}MAX_UPLOAD_SIZE", 16 * 1024 * 1024),
+            upload_spool_threshold=_env_int(f"{p}UPLOAD_SPOOL_THRESHOLD", 1024 * 1024),
+            max_upload_parts=_env_int(f"{p}MAX_UPLOAD_PARTS", 1000),
         )
 
     def feature(self, name: str) -> bool:

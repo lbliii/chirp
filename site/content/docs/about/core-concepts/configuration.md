@@ -65,6 +65,9 @@ provisional until those subsystems are stabilized.
 | `csp_nonce_enabled` | `bool` | `False` | Enable nonce-aware CSP helpers |
 | `strict_transport_security` | `str \| None` | `None` | Strict-Transport-Security header value |
 | `max_content_length` | `int` | `16777216` | Maximum request body size in bytes (16 MB) |
+| `max_upload_size` | `int` | `16777216` | Hard ceiling on the request body for uploads/forms (16 MB); rejected with 413 before buffering |
+| `upload_spool_threshold` | `int` | `1048576` | Bytes an `UploadFile` keeps in RAM before spilling to a temp file (1 MB) |
+| `max_upload_parts` | `int` | `1000` | Maximum number of multipart parts; rejects multipart bombs |
 
 ### Templates
 
@@ -85,6 +88,7 @@ provisional until those subsystems are stabilized.
 |-------|------|---------|-------------|
 | `static_dir` | `str \| Path \| None` | `"static"` | Directory for static files; `None` disables default static serving |
 | `static_url` | `str` | `"/static"` | URL prefix for static files |
+| `static_stream_threshold` | `int` | `1048576` | File size (bytes) at/above which static files stream from disk in chunks instead of buffering into memory (1 MiB) |
 
 ### SSE And Suspense
 
