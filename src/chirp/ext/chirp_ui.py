@@ -174,6 +174,13 @@ def use_chirp_ui(
     single authority for Alpine injection — the ``app_shell_layout.html`` does
     not include its own Alpine scripts.
 
+    htmx is **not** auto-enabled: unlike Alpine, the chirp-ui layouts
+    (``shell.html``/``boost.html``) already ship their own htmx ``<script>``
+    tags (plus the SSE extension), so ``AppConfig(htmx=True)`` injection is left
+    opt-in to avoid double-loading. Those hardcoded tags carry
+    ``data-chirp="htmx"`` so that if an app *does* set ``htmx=True`` alongside
+    chirp-ui, the injector's dedup skips re-adding the core script.
+
     ``strict`` controls chirp-ui variant validation (invalid variants escalate
     from warning to ``ValueError``). ``None`` (default) mirrors
     ``app.config.debug``. ``True``/``False`` set the mode explicitly.

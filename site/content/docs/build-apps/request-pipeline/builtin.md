@@ -423,6 +423,10 @@ When `AppConfig(alpine=True)` (including via `use_chirp_ui(app)`), Chirp registe
 
 `HTMLInject` does not run on streaming bodies; Alpine streaming is handled only by `AlpineInject`.
 
+## htmx injection
+
+When `AppConfig(htmx=True)`, Chirp injects the htmx core `<script>` before the first `</body>` on **buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for example `Suspense`), mirroring `AlpineInject`. The tag uses the explicit jsDelivr `https://cdn.jsdelivr.net/npm/htmx.org@<version>/dist/htmx.min.js` path and carries the live per-request CSP nonce. It skips injection when the response already contains `data-chirp="htmx"` before `</body>` (dedup), and it respects the same fragment / render-intent gating as `AlpineInject`. It is **opt-in** and default off; `use_chirp_ui(app)` does not auto-enable it because the chirp-ui layouts already ship their own htmx tags (now marked `data-chirp="htmx"` so the injector dedups if you opt in anyway).
+
 ## HTMLInject
 
 Inject a snippet into every HTML response before `</body>`:
