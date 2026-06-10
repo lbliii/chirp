@@ -15,7 +15,7 @@ from chirp.data.database import Database
 from chirp.data.schema import diff_schemas, generate_migration, introspect, parse_schema
 from chirp.data.schema.generate import operation_to_sql
 from chirp.data.schema.introspect import introspect_sqlite
-from chirp.data.schema.operations import AddColumn, CreateTable
+from chirp.data.schema.operations import AddColumn, CreateTable, DropColumn
 
 
 async def test_introspect_smoke_memory() -> None:
@@ -142,6 +142,47 @@ async def test_makemigrations_pipeline_roundtrip(tmp_path) -> None:
     assert path is not None
     content = (migrations_dir / path.split("/")[-1]).read_text()
     assert "CREATE TABLE tags" in content
+
+
+async def test_makemigrations_pipeline_add_drop_column_drift(tmp_path) -> None:
+    """Full introspect -> diff -> generate emits the expected ADD/DROP COLUMN drift.
+
+    The CREATE TABLE round-trip is covered above; this anchors the ALTER axis
+    against an in-memory SQLite DB so a regression in introspect's column read
+    (the original dead-on-arrival path) shows up as a missing drift statement in
+    the generated .sql, not as a silent no-op migration.
+    """
+    db = Database("sqlite:///:memory:")
+    await db.connect()
+    try:
+        await db.execute_script(
+            "CREATE TABLE board (id INTEGER PRIMARY KEY, title TEXT NOT NULL, legacy TEXT);"
+        )
+        current = await introspect(db)
+    finally:
+        await db.disconnect()
+
+    # Round-trip the live schema: 'legacy' is dropped, 'archived' is added.
+    assert set(current.tables["board"].columns) == {"id", "title", "legacy"}
+
+    desired = parse_schema(
+        "CREATE TABLE board (id INTEGER PRIMARY KEY, title TEXT NOT NULL, archived INTEGER);"
+    )
+    ops = diff_schemas(current, desired)
+
+    assert any(
+        isinstance(op, AddColumn) and op.table == "board" and op.name == "archived" for op in ops
+    )
+    assert any(
+        isinstance(op, DropColumn) and op.table == "board" and op.name == "legacy" for op in ops
+    )
+
+    migrations_dir = tmp_path / "migrations"
+    path = generate_migration(ops, str(migrations_dir))
+    assert path is not None
+    content = (migrations_dir / path.split("/")[-1]).read_text()
+    assert "ALTER TABLE board ADD COLUMN archived" in content
+    assert "ALTER TABLE board DROP COLUMN legacy;" in content
 
 
 def test_drop_column_sql_carries_sqlite_warning() -> None:

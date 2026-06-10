@@ -80,6 +80,7 @@ from .rules_route_contract import (
     check_shell_mode_blocks,
 )
 from .rules_route_names import check_route_names
+from .rules_shapecheck import check_shapecheck
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,
@@ -843,6 +844,12 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     # declared schema) are real drift. No-op for db-less apps -- snapshot.schema
     # is None without a migrations dir. See rules_data_shapes.
     result.issues.extend(check_data_shapes(router, snapshot.schema))
+
+    # Verified-Shape render contract (#166/#168/#173): block field reads vs the
+    # bound @shape's provided columns/computed, plus surface-contract registry
+    # drift. Runs even with no contract data (auto shape_registry). The whole
+    # rule is wrapped so an analysis error returns [] and never crashes check().
+    result.issues.extend(check_shapecheck(snapshot))
 
     live_blocks = getattr(app._mutable_state, "live_blocks", {})
     result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))

@@ -201,6 +201,37 @@ def main(argv: list[str] | None = None) -> None:
         help="Output directory for migration files (default: migrations)",
     )
 
+    # -- chirp shapes-codegen ---------------------------------------------
+    shapes_parser = subparsers.add_parser(
+        "shapes-codegen",
+        help="Suggest @shape decorators for dataclass/SELECT pairs and audit Shape drift",
+    )
+    shapes_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help=(
+            "Directory or file to scan for dataclass/SELECT pairs (default: .); "
+            "with --audit this is an app import string (e.g. myapp:app)"
+        ),
+    )
+    shapes_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print suggested @shape decorators without writing files (default behavior)",
+    )
+    shapes_parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Audit the app's surface_contracts registry for names with no backing Shape",
+    )
+    shapes_parser.add_argument(
+        "--migrations",
+        dest="migrations_dir",
+        default="migrations",
+        help="Migrations directory (reserved for future incremental codegen output)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -240,3 +271,7 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._makemigrations import run_makemigrations
 
         run_makemigrations(args)
+    elif args.command == "shapes-codegen":
+        from chirp.cli._shapes_codegen import run_shapes_codegen
+
+        run_shapes_codegen(args)
