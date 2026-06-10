@@ -17,6 +17,7 @@ from typing import Any
 
 from chirp.app import App
 from chirp.http.response import Response
+from chirp.testing.chunks import CapturedStream
 from chirp.testing.sse import SSETestResult, parse_sse_frames
 
 
@@ -347,6 +348,142 @@ class TestClient:
             status=response_status,
             headers=resp_headers,
         )
+
+    async def request_chunks(
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+    ) -> CapturedStream:
+        """Send a request and capture the ordered ASGI body chunks.
+
+        Unlike :meth:`request`, which joins every ``http.response.body`` message
+        into one buffered :class:`~chirp.http.response.Response`, this records
+        the framing: one :class:`~chirp.testing.chunks.CapturedStream` entry per
+        non-empty body message, in send order. Use it to assert that a streaming
+        response (``Stream`` / ``TemplateStream`` / ``Suspense``) arrives as more
+        than one chunk, that the shell precedes deferred/streamed-block bytes,
+        and that markers land in the expected chunk.
+
+        Backward-compatible: this is a new method; :meth:`request` and every
+        other method are unchanged.
+
+        Usage::
+
+            captured = await client.request_chunks("GET", "/dashboard")
+            assert captured.chunk_count > 1
+            assert captured.index_of("shell") < captured.index_of("loaded-stats")
+        """
+        # Split path and query string
+        if "?" in path:
+            path_part, query_string = path.split("?", 1)
+        else:
+            path_part = path
+            query_string = ""
+
+        # Build raw ASGI headers
+        raw_headers: list[tuple[bytes, bytes]] = []
+        for name, value in (headers or {}).items():
+            raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
+
+        scope: dict[str, Any] = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": method.upper(),
+            "path": path_part,
+            "raw_path": path_part.encode("latin-1"),
+            "query_string": query_string.encode("latin-1"),
+            "root_path": "",
+            "headers": raw_headers,
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 0),
+        }
+
+        request_body = body or b""
+        body_sent = False
+
+        async def receive() -> dict[str, Any]:
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": request_body, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        response_status = 200
+        response_headers: list[tuple[bytes, bytes]] = []
+        captured_chunks: list[bytes] = []
+        # Streaming is signalled by the sender via more_body=True on body
+        # messages — buffered responses omit it. Track whether we ever saw it.
+        saw_more_body = False
+
+        async def send(message: MutableMapping[str, Any]) -> None:
+            nonlocal response_status, response_headers, saw_more_body
+            if message["type"] == "http.response.start":
+                response_status = message["status"]
+                response_headers = list(message.get("headers", []))
+            elif message["type"] == "http.response.body":
+                if message.get("more_body", False):
+                    saw_more_body = True
+                chunk = message.get("body", b"")
+                # Skip the terminal empty close message and any empty bodies —
+                # they carry no framing signal and would add noise to ordering
+                # assertions.
+                if chunk:
+                    captured_chunks.append(chunk)
+
+        await self.app(scope, receive, send)
+
+        decoded_headers = tuple(
+            (name_b.decode("latin-1"), value_b.decode("latin-1"))
+            for name_b, value_b in response_headers
+        )
+
+        return CapturedStream(
+            chunks=tuple(c.decode("utf-8", errors="replace") for c in captured_chunks),
+            status=response_status,
+            headers=decoded_headers,
+            streaming=saw_more_body,
+            raw_chunks=tuple(captured_chunks),
+        )
+
+    async def get_chunks(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> CapturedStream:
+        """Send a GET request and capture its ordered ASGI body chunks.
+
+        Convenience wrapper around :meth:`request_chunks`.
+        """
+        return await self.request_chunks("GET", path, headers=headers)
+
+    async def fragment_chunks(
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        target: str | None = None,
+        trigger: str | None = None,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+    ) -> CapturedStream:
+        """Send a fragment (HX-Request) request and capture its body chunks.
+
+        Mirrors :meth:`fragment` header handling so streaming fragment / OOB
+        framing (e.g. htmx-format Suspense chunks) can be asserted.
+        """
+        fragment_headers: dict[str, str] = {"HX-Request": "true"}
+        if target is not None:
+            fragment_headers["HX-Target"] = target
+        if trigger is not None:
+            fragment_headers["HX-Trigger"] = trigger
+        if headers:
+            fragment_headers.update(headers)
+        return await self.request_chunks(method, path, headers=fragment_headers, body=body)
 
     async def request(
         self,

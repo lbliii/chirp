@@ -26,11 +26,13 @@ from chirp.testing.assertions import (
     assert_status,
     hx_headers,
 )
+from chirp.testing.chunks import CapturedStream
 from chirp.testing.client import TestClient
 from chirp.testing.route_smoke import RouteSmokeCase, assert_route_smoke
 from chirp.testing.sse import SSETestResult, assert_sse_wired, extract_sse_attrs
 
 __all__ = [
+    "CapturedStream",
     "RouteSmokeCase",
     "SSETestResult",
     "TestClient",
