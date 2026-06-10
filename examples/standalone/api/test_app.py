@@ -168,3 +168,37 @@ class TestCRUDFlow:
             # Verify gone
             get_after = await client.get(f"/api/items/{item_id}")
             assert get_after.status == 404
+
+
+class TestCORSPreflight:
+    """CORSMiddleware answers OPTIONS preflight with the configured policy."""
+
+    async def test_options_preflight_returns_cors_headers(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.request(
+                "OPTIONS",
+                "/api/items",
+                headers={
+                    "Origin": "https://client.example.com",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "Content-Type",
+                },
+            )
+            # Preflight short-circuits before route dispatch.
+            assert response.status == 204
+            assert response.header("Access-Control-Allow-Origin") == "*"
+            allow_methods = response.header("Access-Control-Allow-Methods") or ""
+            assert "POST" in allow_methods
+            assert "OPTIONS" in allow_methods
+            assert "Content-Type" in (response.header("Access-Control-Allow-Headers") or "")
+
+
+class TestUnknownRoute:
+    """Unknown routes fall through to the global 404 handler."""
+
+    async def test_unknown_route_returns_404_json(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/no/such/route")
+            assert response.status == 404
+            assert response.json["status"] == 404
+            assert "not found" in response.json["error"].lower()

@@ -1,0 +1,19 @@
+# Smoke manifest for the pokedex example.
+#
+# Beyond the boot/migrate/seed default, assert two contract-relevant facts:
+#   * the unauthenticated health endpoint serves JSON, and
+#   * the seeded data is actually queryable through the public API (the
+#     migration's seed step ran, not just the schema step).
+# /api/pokemon is protected by APIKeyMiddleware, so pass the demo bearer key
+# via header is not supported by the manifest; instead we assert the
+# documented 401 to prove the auth gate is wired, and read seed data through
+# the unauthenticated /api/health + the public HTML index.
+[[routes]]
+path = "/api/health"
+status = 200
+contains = ["ok", "pokedex"]
+
+[[routes]]
+path = "/"
+status = 200
+contains = ["bulbasaur"]

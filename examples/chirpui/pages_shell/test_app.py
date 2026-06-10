@@ -54,3 +54,54 @@ class TestPagesShell:
 
     def test_example_app_passes_contract_check(self, example_app) -> None:
         example_app.check()
+
+
+class TestSuspenseDeferredStats:
+    """Drain the chunked Suspense response and assert the *resolved* deferred
+    values stream in after the shell — not just the skeleton placeholders.
+
+    The detail page defers ``stats`` and ``activity`` (see page.py). The shell
+    renders first with skeleton placeholders, then each deferred block streams
+    as a swap wrapped in a ``<template id="_chirp_d_...">`` element appended
+    after ``</html>``. A regression that dropped the deferred resolve would
+    still pass the shell-only smoke test but fail here.
+    """
+
+    async def test_resolved_stats_stream_in_after_shell(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/projects/apollo")
+            assert response.status == 200
+            html = response.text
+
+            # Shell renders first: skeleton placeholders appear before </html>.
+            end_of_shell = html.find("</html>")
+            assert end_of_shell != -1
+            assert "chirpui-skeleton" in html[:end_of_shell]
+
+            # Deferred blocks stream in after the shell, wrapped in OOB templates
+            # keyed to the defer_map targets.
+            assert "_chirp_d_project-stats" in html
+            assert "_chirp_d_project-activity" in html
+
+            deferred_tail = html[end_of_shell:]
+            # Resolved stat values (from _load_stats) — not present in the shell.
+            assert "42 ms" in deferred_tail
+            assert "18 this week" in deferred_tail
+            assert "99.98%" in deferred_tail
+            # Resolved activity (from _load_activity) interpolates the project name.
+            assert "passed layout-chain smoke tests" in deferred_tail
+
+    async def test_shell_does_not_contain_resolved_values(self, example_app) -> None:
+        """The shell itself must show skeletons, not resolved stats.
+
+        Guards against a regression where deferred values are resolved eagerly
+        into the shell (defeating the instant-shell point of Suspense).
+        """
+        async with TestClient(example_app) as client:
+            response = await client.get("/projects/apollo")
+            html = response.text
+            end_of_shell = html.find("</html>")
+            assert end_of_shell != -1
+            shell = html[:end_of_shell]
+            assert "42 ms" not in shell
+            assert "passed layout-chain smoke tests" not in shell

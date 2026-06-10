@@ -1,0 +1,14 @@
+# Smoke manifest for the sse example.
+#
+# The /events stream emits on connect (a "status" lifecycle event, then
+# rendered notification fragments), so the harness can assert real SSE
+# delivery -- not just that the shell page renders. SSE_DELAY shrinks the
+# inter-event sleep so a couple of events arrive well within the timeout.
+[env]
+SSE_DELAY = "0.05"
+
+[[sse]]
+path = "/events"
+min_events = 2
+events = ["status"]
+timeout = 3.0
