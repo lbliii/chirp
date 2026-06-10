@@ -67,6 +67,72 @@ _SELECT_RE = re.compile(r"\bSELECT\b\s+(.*?)\s+\bFROM\b", re.IGNORECASE | re.DOT
 _ALIAS_RE = re.compile(r"\bAS\s+(\w+)\s*$", re.IGNORECASE)
 
 
+def _strip_sql_comments(sql: str) -> str:
+    """Return ``sql`` with SQL comments replaced by a single space, string-aware.
+
+    ``_parse_select_columns`` is the single-source-of-truth SELECT parser (also
+    consumed by codegen and the data contract, and -- via ``shapes._scope_injectable``
+    -- the tenant-scope injectability gate). A comment in the PROJECTION list
+    (``SELECT id /* note */, name FROM t`` or ``SELECT id -- c\\nFROM t``) is NOT
+    opaque SQL, but a naive regex parse choked on it and returned ``None`` --
+    surfacing a misleading "CTE / UNION / SELECT * / derived-table" rejection for
+    what is really just a comment. We strip comments first so a commented column
+    list still parses.
+
+    Comment forms (mirroring the SQL standard): line comments ``-- ... EOL`` and
+    block comments ``/* ... */`` (non-nesting). Each is replaced by a single
+    space (never deleted) so adjacent tokens cannot merge (``a/**/b`` must not
+    become ``ab``). The scan is **string-literal aware**: a ``--`` / ``/*`` inside
+    a ``'...'`` or ``"..."`` literal (honoring doubled-quote ``''`` / ``""``
+    escapes) is NOT a comment and is preserved verbatim, so a quoted identifier or
+    string body is never corrupted. A line comment's terminating newline is
+    preserved (kept outside the replacement) so line structure is unchanged.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(sql)
+    while i < n:
+        ch = sql[i]
+        # String literal: copy its body verbatim, honoring doubled-quote escapes.
+        if ch == "'" or ch == '"':
+            quote = ch
+            out.append(ch)
+            j = i + 1
+            while j < n:
+                out.append(sql[j])
+                if sql[j] == quote:
+                    if j + 1 < n and sql[j + 1] == quote:
+                        out.append(sql[j + 1])  # doubled-quote escape, stay inside
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            i = j
+            continue
+        # Line comment: ``-- ... EOL`` -> single space (newline preserved).
+        if ch == "-" and i + 1 < n and sql[i + 1] == "-":
+            j = i + 2
+            while j < n and sql[j] != "\n":
+                j += 1
+            out.append(" ")
+            i = j
+            continue
+        # Block comment: ``/* ... */`` (non-nesting) -> single space.
+        if ch == "/" and i + 1 < n and sql[i + 1] == "*":
+            j = i + 2
+            while j < n and not (sql[j] == "*" and j + 1 < n and sql[j + 1] == "/"):
+                j += 1
+            out.append(" ")
+            # Skip the closing ``*/`` when present; an unterminated block comment
+            # runs to end-of-string.
+            i = j + 2 if j < n else n
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _split_top_level(projection: str) -> list[str]:
     """Split a projection on top-level commas (ignoring commas inside parens)."""
     parts: list[str] = []
@@ -97,6 +163,11 @@ def _parse_select_columns(sql: str) -> tuple[str, ...] | None:
     or the SQL has no analyzable ``SELECT ... FROM`` shape. Returns the resolved
     output names (alias-aware) otherwise.
     """
+    # Strip SQL comments first (string-literal aware) so a comment in the
+    # projection list does not make an otherwise-simple SELECT opaque and surface
+    # a misleading "CTE / UNION / SELECT * / derived-table" rejection. All
+    # downstream keyword/projection analysis then reasons over comment-free SQL.
+    sql = _strip_sql_comments(sql)
     # CTEs put the first SELECT/FROM inside the CTE body, and compound queries
     # (UNION/INTERSECT/EXCEPT) have several projections; the single first-match
     # regex below cannot pick the right one, so skip rather than analyze the
