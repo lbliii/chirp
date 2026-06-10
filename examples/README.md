@@ -5,6 +5,8 @@ Examples are now organized by runtime layer so the support matrix is obvious:
 - [`examples/standalone`](examples/standalone/README.md): baseline Chirp without `chirp_ui`
 - [`examples/chirpui`](examples/chirpui/README.md): app-shell and component-driven examples using ChirpUI
 
+> **Featured:** [`examples/standalone/shapes_workspaces`](standalone/shapes_workspaces/README.md) — the verified, multi-tenant `chirp.data` Shapes data layer: a startup-checked SQL→render contract, tenant `scope=` isolation with no hand-written `WHERE`, and bounded `nested()`/`@composite` queries (no N+1).
+
 ## Which Bucket To Use
 
 Use `examples/standalone` when you want to learn or validate:

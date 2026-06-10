@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ workspace.name }} — Workspaces</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 820px; margin: 2rem auto; color: #1a1a1a; }
+    h1 { margin-bottom: 0; }
+    .tenant { color: #666; margin-top: .2rem; }
+    .project { border: 1px solid #e2e2e2; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+    .project h3 { margin: 0; }
+    .status { font-size: .8rem; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+    ul { margin: .5rem 0; padding-left: 1.25rem; }
+    .task { margin: .35rem 0; }
+    .done { text-decoration: line-through; color: #999; }
+    .pri { display: inline-block; min-width: 1.4rem; color: #c0392b; font-weight: 600; }
+    .comments { color: #555; font-size: .9rem; margin: .2rem 0 .2rem 1rem; }
+    .feed li { color: #444; }
+    a { color: #2563eb; text-decoration: none; }
+  </style>
+</head>
+<body>
+  {% block dashboard %}
+  <h1>{{ workspace.name }}</h1>
+  <p class="tenant">Workspace #{{ workspace.id }} — you only ever see your own tenant's data.</p>
+
+  <h2>Recent activity</h2>
+  <ul class="feed">
+    {% for t in page.recent %}
+      <li><span class="pri">P{{ t.priority }}</span> {{ t.title }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Projects</h2>
+  {% for project in page.projects %}
+    <div class="project">
+      <h3><a href="/projects/{{ project.id }}">{{ project.name }}</a></h3>
+      <div class="status">{{ project.status }}</div>
+      <ul>
+        {% for task in project.tasks %}
+          <li class="task {{ 'done' if task.done else '' }}">
+            <span class="pri">P{{ task.priority }}</span> {{ task.title }}
+            {% for c in task.comments %}
+              <div class="comments">&ldquo;{{ c.body }}&rdquo; — {{ c.author }}</div>
+            {% endfor %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endfor %}
+  {% endblock %}
+</body>
+</html>
