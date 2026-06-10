@@ -9,13 +9,28 @@ regression to a nonexistent ``Database`` method (the original
 ``db.fetch_rows()`` / ``db._driver_name`` bug) fails here, not in production.
 """
 
+import os
+
 import pytest
 
 from chirp.data.database import Database
 from chirp.data.schema import diff_schemas, generate_migration, introspect, parse_schema
 from chirp.data.schema.generate import operation_to_sql
-from chirp.data.schema.introspect import introspect_sqlite
+from chirp.data.schema.introspect import introspect_postgres, introspect_sqlite
 from chirp.data.schema.operations import AddColumn, CreateTable, DropColumn
+
+# Live PostgreSQL round-trip coverage. The SQLite path above runs everywhere;
+# the PostgreSQL path only has live coverage when a DSN is configured (the
+# dedicated ``test-postgres`` CI job sets ``CHIRP_TEST_PG_DSN`` against a real
+# Postgres service). Without a DSN these tests skip — so local SQLite-only runs
+# and the free-threaded main test job (which does not ship asyncpg) stay green.
+# asyncpg is imported lazily by the driver inside ``connect()``, so a skipped
+# test never touches it.
+PG_DSN = os.environ.get("CHIRP_TEST_PG_DSN")
+requires_pg = pytest.mark.skipif(
+    not PG_DSN,
+    reason="CHIRP_TEST_PG_DSN not set — PostgreSQL round-trip coverage skipped",
+)
 
 
 async def test_introspect_smoke_memory() -> None:
@@ -251,3 +266,122 @@ async def test_introspect_sqlite_direct_helper(tmp_path) -> None:
     finally:
         await db.disconnect()
     assert "t" in snapshot.tables
+
+
+# ---------------------------------------------------------------------------
+# Live PostgreSQL round-trip (gated on CHIRP_TEST_PG_DSN; see the skip guard).
+#
+# These close the second half of the acceptance criterion for issue #143: the
+# introspect -> diff -> generate pipeline must round-trip on *both* backends in
+# CI. introspect_postgres reads tables + columns (name/type/nullable/default)
+# from information_schema — it does not introspect PK/FK/index metadata — so the
+# assertions below cover exactly that surface and no more.
+# ---------------------------------------------------------------------------
+
+
+async def _drop_mig_tables(db: Database) -> None:
+    """Idempotent teardown so the suite is rerunnable against a persistent DB."""
+    # Child table first to respect the FK; CASCADE belt-and-braces.
+    await db.execute("DROP TABLE IF EXISTS mig_posts CASCADE")
+    await db.execute("DROP TABLE IF EXISTS mig_tags CASCADE")
+    await db.execute("DROP TABLE IF EXISTS mig_users CASCADE")
+
+
+@requires_pg
+async def test_introspect_postgres_roundtrip() -> None:
+    """introspect() auto-dispatches to Postgres and round-trips columns + nullability.
+
+    This is the Postgres mirror of test_introspect_sqlite_roundtrip and the
+    live coverage the original dead-on-arrival introspect_postgres never had.
+    """
+    db = Database(PG_DSN)
+    await db.connect()
+    try:
+        assert db._driver == "postgresql"
+        await _drop_mig_tables(db)
+        await db.execute_script(
+            """
+            CREATE TABLE mig_users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT
+            );
+            CREATE TABLE mig_posts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES mig_users(id),
+                title TEXT NOT NULL
+            );
+            """
+        )
+
+        # Auto-detected dispatch (introspect) and the direct helper agree.
+        snapshot = await introspect(db)
+        direct = await introspect_postgres(db)
+
+        assert {"mig_users", "mig_posts"} <= set(snapshot.tables)
+        assert set(snapshot.tables) == set(direct.tables)
+
+        users = snapshot.tables["mig_users"]
+        assert set(users.columns) == {"id", "name", "email"}
+        assert users.columns["name"].nullable is False
+        assert users.columns["email"].nullable is True
+
+        posts = snapshot.tables["mig_posts"]
+        assert set(posts.columns) == {"id", "user_id", "title"}
+        assert posts.columns["user_id"].nullable is False
+    finally:
+        try:
+            await _drop_mig_tables(db)
+        finally:
+            await db.disconnect()
+
+
+@requires_pg
+async def test_makemigrations_pipeline_postgres_roundtrip(tmp_path) -> None:
+    """Full introspect -> diff -> generate against a real Postgres DB.
+
+    Introspecting a live schema and diffing it against a desired schema that
+    adds a table emits a CreateTable (and, crucially, no spurious drift on the
+    unchanged table — proving the SERIAL/INTEGER alias and PK-not-introspected
+    cases do not produce false structural ops on Postgres).
+    """
+    db = Database(PG_DSN)
+    await db.connect()
+    try:
+        assert db._driver == "postgresql"
+        await _drop_mig_tables(db)
+        await db.execute_script(
+            "CREATE TABLE mig_users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);"
+        )
+        current = await introspect(db)
+    finally:
+        # Keep the schema diff deterministic, then clean up.
+        try:
+            await _drop_mig_tables(db)
+        finally:
+            await db.disconnect()
+
+    desired = parse_schema(
+        """
+        CREATE TABLE mig_users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+        CREATE TABLE mig_tags (id SERIAL PRIMARY KEY, label TEXT NOT NULL);
+        """
+    )
+    ops = diff_schemas(current, desired)
+
+    # The new table is added...
+    assert any(isinstance(op, CreateTable) and op.name == "mig_tags" for op in ops)
+    # ...and the unchanged table is NOT dropped or column-drifted (no false drift
+    # from SERIAL<->INTEGER aliasing or the un-introspected primary key).
+    from chirp.data.schema.operations import DropColumn, DropTable
+
+    assert not any(isinstance(op, DropTable) and op.name == "mig_users" for op in ops)
+    assert not any(
+        isinstance(op, (DropColumn, AddColumn)) and op.table == "mig_users" for op in ops
+    )
+
+    migrations_dir = tmp_path / "migrations"
+    path = generate_migration(ops, str(migrations_dir))
+    assert path is not None
+    content = (migrations_dir / path.split("/")[-1]).read_text()
+    assert "CREATE TABLE mig_tags" in content
