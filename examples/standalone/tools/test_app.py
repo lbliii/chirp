@@ -1,5 +1,6 @@
 """Tests for the MCP tools example."""
 
+import asyncio
 import json
 
 from chirp.testing import TestClient
@@ -189,3 +190,48 @@ class TestToolCalls:
             response = await client.get("/")
             assert "Agent note" in response.text
             assert "ai" in response.text
+
+
+class TestActivityFeedSSE:
+    """The /feed SSE stream pushes an activity row when a tool is called.
+
+    The page wires ``sse-connect="/feed"`` with a default ``sse-swap="message"``
+    listener (see notes.html). Calling a tool emits a tool event that the feed
+    re-renders as the ``activity_row`` fragment and streams over SSE. This
+    asserts both the rendered fragment *body* (tool name + arguments) and that
+    it arrives on the default ``message`` event the page listens for — not just
+    the response headers.
+    """
+
+    async def test_tool_call_pushes_activity_row_over_sse(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+
+            async def call_tool_after_delay():
+                await asyncio.sleep(0.1)
+                await client.post(
+                    "/mcp",
+                    json=_mcp(
+                        "tools/call",
+                        params={
+                            "name": "add_note",
+                            "arguments": {"text": "SSE feed note", "tag": "probe"},
+                        },
+                    ),
+                )
+                await asyncio.sleep(0.15)
+
+            task = asyncio.create_task(call_tool_after_delay())
+            result = await client.sse("/feed", max_events=1, timeout=2.0)
+            await task
+
+            assert result.status == 200
+            assert result.headers.get("content-type") == "text/event-stream"
+            assert result.events, "expected an activity_row event after the tool call"
+
+            event = result.events[0]
+            # Default SSE event — matches the page's sse-swap="message" listener.
+            assert (event.event or "message") == "message"
+            # The rendered activity_row fragment carries the tool name + args.
+            assert "add_note" in event.data
+            assert 'class="tool-name"' in event.data
+            assert "SSE feed note" in event.data
