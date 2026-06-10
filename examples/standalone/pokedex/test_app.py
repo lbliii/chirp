@@ -227,3 +227,42 @@ class TestStats:
             assert "averages" in data
             assert "types" in data
             assert data["averages"]["hp"] > 0
+
+
+class TestCORSPreflight:
+    """CORSMiddleware answers OPTIONS preflight before the API key gate."""
+
+    async def test_options_preflight_bypasses_auth(self, example_app) -> None:
+        """Preflight on a protected /api/ route must not require an API key.
+
+        CORS runs ahead of APIKeyMiddleware, so a browser preflight (which never
+        carries the Authorization header) must short-circuit to 204 rather than
+        getting a 401. A regression in middleware ordering would surface here.
+        """
+        async with TestClient(example_app) as client:
+            response = await client.request(
+                "OPTIONS",
+                "/api/pokemon",
+                headers={
+                    "Origin": "https://client.example.com",
+                    "Access-Control-Request-Method": "GET",
+                    "Access-Control-Request-Headers": "Authorization",
+                },
+            )
+            assert response.status == 204
+            assert response.header("Access-Control-Allow-Origin") == "*"
+            allow_methods = response.header("Access-Control-Allow-Methods") or ""
+            assert "GET" in allow_methods
+            assert "OPTIONS" in allow_methods
+            assert "Authorization" in (response.header("Access-Control-Allow-Headers") or "")
+
+
+class TestUnknownRoute:
+    """Unknown routes fall through to the JSON 404 handler."""
+
+    async def test_unknown_route_returns_404_json(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/no/such/page")
+            assert response.status == 404
+            assert response.json["status"] == 404
+            assert "not found" in response.json["error"].lower()
