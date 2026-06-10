@@ -1,0 +1,13 @@
+# Smoke manifest for the streaming example.
+#
+# GET /live returns a TemplateStream that yields one item every 2 seconds
+# (5 items = ~10s), which would blow the smoke run's per-request budget.
+# The example honours STREAMING_FAST=1 to collapse the delay to 50ms for
+# tests -- set it here so the auto-smoke can buffer the full stream quickly.
+[env]
+STREAMING_FAST = "1"
+
+[[routes]]
+path = "/live"
+status = 200
+contains = ["First item"]

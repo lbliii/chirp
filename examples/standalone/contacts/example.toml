@@ -1,0 +1,10 @@
+# Smoke manifest for the contacts example.
+#
+# Drive the add-contact mutation and assert the new row renders back via the
+# OOB table fragment -- the canonical htmx create flow, end to end.
+[[mutations]]
+method = "POST"
+path = "/contacts"
+form = { name = "Smoke Tester", email = "smoke@example.com" }
+status = [200]
+contains = ["Smoke Tester", "smoke@example.com"]
