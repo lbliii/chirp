@@ -38,6 +38,28 @@ sidecar, the `shapecheck` contract, and the bounded nested/composite compilers o
 top. Import everything from `chirp.data`.
 :::
 
+### `@shape` vs `db.fetch` vs `Query` — pick the right one
+
+Shapes are not a replacement for the [[docs/build-apps/forms-data/database|Database]]
+layer — they sit on top of it for a specific job. Reach for `@shape` when a block
+needs a *verified, co-located* row contract: the SQL lives next to the row model,
+`shapecheck` proves at startup that the template reads only fetched fields, and you
+get nested-relationship batching and tenant `scope=` injection for free. Reach for a
+plain `db.fetch` when the query is one-off, dynamic, or deliberately opaque (a
+`SELECT *`, an aggregate, a hand-tuned join) and the contract would only get in the
+way. Reach for the `Query` builder when you are composing a `WHERE` clause
+programmatically from optional filters at request time.
+
+| Reach for | When | What you get | What you give up |
+|-----------|------|--------------|------------------|
+| `@shape` | A block renders a stable, named row contract; you want it verified and possibly nested or tenant-scoped | `shapecheck` field + registry-drift contract, bounded `nested()` batching, `scope=` injection, co-located SQL | Fixed SQL shape (dynamic `WHERE` belongs in `Query`); opaque SQL can't be field-verified |
+| `db.fetch` | A one-off, dynamic, or opaque query — aggregates, ad-hoc joins, `SELECT *` | Full SQL freedom, zero ceremony | No startup contract; drift between SQL and template is invisible until a user hits the page |
+| `Query` | A `WHERE`/`ORDER BY`/`LIMIT` assembled from optional, request-time filters | Immutable chainable builder, transparent `.sql`/`.params` | No `shapecheck` contract; you still bind a plain dataclass, not a Shape |
+
+A useful rule of thumb: if the same `(template, block, row model)` triple ships in
+every render and you'd be sad to find it silently rendering `None`, it wants a Shape.
+If the SQL is computed per request, it wants `Query`. Everything else is `db.fetch`.
+
 ## Declaring a Shape with `@shape`
 
 Decorate a `@dataclass(frozen=True, slots=True)` row model with `@shape("SELECT
@@ -107,7 +129,15 @@ board = await Shape.fetch_one(BoardDetail, db, community=1, id=42)
 A placeholder referenced but not passed raises `ShapeError`. A repeated `:name`
 reuses the same value (SQLite repeats it positionally; PostgreSQL reuses one
 `$N`). PostgreSQL `::cast` syntax is passed through verbatim — it is not a
-placeholder.
+placeholder — and a colon inside a string literal (a time literal like
+`'12:30:00'`, an interval string) is **not** misread as a placeholder either: the
+binder is quoted-string aware.
+
+Shape SQL is analyzed by a comment- and string-literal-aware scanner. Tokens that
+look like placeholders, scope columns, or clause keywords but sit inside an SQL
+comment (`-- ...`, `/* ... */`) or a quoted string literal are not treated as
+analyzable SQL — so a `:name`-shaped fragment in a comment is not bound, and a
+column name mentioned in a comment does not perturb scope or column analysis.
 
 :::{note}
 Opaque SQL — `SELECT *`, expression projections, CTEs (`WITH`), `UNION` — parses
@@ -190,18 +220,41 @@ ERROR fired.
 
 ### Severity levers
 
-Every claim is promotable or demotable per app:
+`override_contract_severity` operates on the **whole `shapecheck` category**, not
+on an individual claim. There is no per-claim targeting — the override pins every
+claim the category emits to the one severity you pass:
 
 ```python
 from chirp.contracts.types import Severity
 
-app.override_contract_severity("shapecheck", Severity.ERROR)   # promote over-fetch
-app.override_contract_severity("shapecheck", Severity.WARNING) # soften during migration
-app.override_contract_severity("shapecheck", Severity.INFO)
+# Pins ALL shapecheck claims to one severity — registry drift, under-fetch,
+# over-fetch, and un-injectable scope alike.
+app.override_contract_severity("shapecheck", Severity.WARNING)
 ```
 
-Promoting over-fetch to ERROR is useful once your templates are loop/macro-light
-and you want every fetched column accounted for.
+This cuts both ways. Promoting to `ERROR` is useful once your templates are
+loop/macro-light and you want over-fetch (a WARNING by default) to fail the build
+along with the rest:
+
+```python
+app.override_contract_severity("shapecheck", Severity.ERROR)
+```
+
+But softening the category to demote over-fetch during a migration **also demotes
+the marquee fail-loud claims** — registry drift and under-fetch (both ERROR by
+default) drop to the same level, and so does un-injectable tenant scope:
+
+```python
+# Footgun: this does NOT just quiet over-fetch. It silently demotes
+# registry drift, under-fetch, AND un-injectable scope to WARNING too,
+# so a build that would render None or query across tenants no longer fails.
+app.override_contract_severity("shapecheck", Severity.WARNING)
+```
+
+If you only want to quiet over-fetch, prefer fixing or declaring the unread
+columns (drop them from the `SELECT`, or accept the WARNING) over softening the
+whole category — a blanket soften forfeits the contract's most valuable
+guarantees.
 
 ### Worked under-fetch example
 
@@ -267,6 +320,12 @@ check is intentionally silent:
   only the collection root `cards` appears in the block's dependency set; the
   per-item `c.field` reads are invisible. `shapecheck` verifies the root is
   bound, not the per-item fields.
+- **`nested()` field reads** — a `nested(Child, ...)` relationship is a real
+  dataclass field but not a `SELECT` output column. `shapecheck` recognizes
+  nested fields as Shape-provided, so iterating a relationship —
+  `{% for card in board.cards %}` over `cards = nested(Card, ...)` — is **not** a
+  false under-fetch. (This is the framework's own headline feature reading
+  cleanly through its own contract.)
 - **Macro / `def`-arg reads** — the def name leaks into dependencies, but field
   reads behind an arg name do not.
 - **Opaque Shapes** — `SELECT *` / expression projections / CTE / UNION resolve
@@ -278,6 +337,13 @@ checks `meta`, never `created`; `board.title.upper()` checks `title` (a real
 column), never `.upper`. Genuine typos still fire even on a Shape that also has a
 derived accessor — the escape hatches narrow the claim, they do not swallow real
 drift.
+
+Reads are attributed to the block where they **syntactically occur**. A bound
+block's dependency set is a conservative superset that absorbs the reads of its
+nested child blocks; `shapecheck` subtracts each nested child block's reads back
+out so a read living in a child block bound to a *different* Shape does not
+false-fire against the parent, and a genuine under-fetch names the innermost
+block where the read actually lives — not the bound ancestor.
 
 ## Registry drift detection
 
@@ -350,19 +416,85 @@ card with its comments — all frozen.
 
 ### Bounded query count
 
-The compiler runs **one** batched `IN`-list query per child *level*, never one
-query per parent row. For a tree of depth *d* the total is exactly `1 +
-num_child_levels` queries, **independent of the row count**. The depth-2 tree
-above is always three queries — one for boards, one for all their cards, one for
-all those cards' comments — whether there is one board or three hundred. The
-compiler collects the distinct parent keys, runs the single batched query, groups
-children by their join column, and rebuilds each parent via
+The compiler runs a batched `IN`-list query per child *level*, never one query
+per parent row. The query count is **independent of the child row count** — a
+level that joins three comments or thirty thousand still issues the same handful
+of batched queries.
+
+The count is bounded, not literally a fixed three, because the parent keys for a
+level's `IN`-list are **chunked to the driver's variable limit**: a single
+SQLite statement can bind only so many `?` placeholders (the historical
+`SQLITE_MAX_VARIABLE_NUMBER` floor), so a level with more distinct parent keys
+than the chunk size is split across a few batched queries and merged. The
+total is `1 + Σ ceil(distinct_keys_per_level / chunk_size)` — for the depth-2
+tree above with a normal number of parents, that is exactly three queries (one
+for boards, one for all their cards, one for all those cards' comments), and it
+stays three whether each board has one comment or three hundred. Only when a
+single level has thousands of distinct parent keys does it spill into additional
+chunk queries — still O(chunks per level), never O(child rows). The compiler
+collects the distinct parent keys, runs the batched query per chunk, merges and
+groups children by their join column, and rebuilds each parent via
 `dataclasses.replace`.
+
+The bounded compiler reserves the `__chirp_` placeholder prefix (generated batch
+keys, the `__chirp_rn` row number, and the per-parent limit) in child queries, so
+author `:name` placeholders in a child Shape must not begin with `__chirp_`. This
+is **enforced**, not just convention: declaring a Shape whose SQL uses a
+`:__chirp_…` placeholder fails loud with a `ShapeError` at `@shape` decoration
+(naming the reserved prefix and the offending placeholder), so a reserved-name
+collision can never silently mis-bind at fetch time.
 
 ```python
 arguments = (BoardDetail, db)
-boards = await Shape.fetch(*arguments, id=1)   # 3 queries regardless of N
+boards = await Shape.fetch(*arguments, id=1)   # bounded, independent of child rows
 ```
+
+### Ordered and limited children
+
+The batched `IN`-list rewrite **preserves a child SQL's trailing `ORDER BY` and
+per-parent `LIMIT`** — it does not silently flatten "top 5 recent comments per
+card" into "all comments, arbitrary order." A child `ORDER BY` is re-attached
+after the `IN`-list, and a per-parent `LIMIT` is compiled into a window-function
+top-N (`ROW_NUMBER() OVER (PARTITION BY {on} ORDER BY ...)` with an outer
+`row <= :limit` filter) so each parent gets its own top-N slice in the single
+batched query. Window functions are available on both backends (SQLite ≥ 3.25 and
+PostgreSQL), so this is one query, not one per parent.
+
+```python
+@shape("SELECT id, card_id, body, created_at FROM comments "
+       "WHERE card_id = :card_id ORDER BY created_at DESC LIMIT 5")
+@dataclass(frozen=True, slots=True)
+class Comment:
+    id: int
+    card_id: int
+    body: str
+    created_at: str
+```
+
+Now each card carries its **5 most recent** comments, ordered, batched.
+
+This is deliberately a **bounded top-N compilation, not a general query engine**.
+Chirp compiles a child's declared `ORDER BY` + per-parent `LIMIT` into a single
+batched top-N (`ROW_NUMBER()` partitioned by the join column) — and *only* that
+shape. Cases the window rewrite cannot express deterministically **fail loud at
+startup** rather than silently degrade into "all rows, arbitrary order": a `LIMIT`
+with **no `ORDER BY`** (the per-parent top-N would be nondeterministic), an
+`OFFSET`, a per-parent `LIMIT` on a child that *also* has its own nested
+grandchildren (the partition plus further batching is ambiguous), or a join
+predicate the compiler cannot isolate.
+
+What the rewrite *does* preserve, alongside the `ORDER BY`/`LIMIT`, is the child's
+own non-join `WHERE` filter predicates. A child whose SQL filters with, say, `AND
+deleted = 0` keeps that predicate in the batched form — the `IN`-list join column is
+swapped in, but a `deleted = 0` (or any non-join filter) still applies per row, so
+the batched query returns the same filtered, ordered, per-parent top-N a per-parent
+query would.
+
+A per-parent `LIMIT` that the window rewrite cannot make deterministic fails loud
+at startup rather than guessing (see below): a `LIMIT` with **no `ORDER BY`**
+(the per-parent top-N would be nondeterministic), an `OFFSET`, or a child that has
+**both** a per-parent `LIMIT` *and* its own nested grandchildren (the partition
+plus further batching is ambiguous).
 
 ### Nested fields come last
 
@@ -375,14 +507,23 @@ argument."
 ### Fail-loud on unexpressible relationships
 
 A nested relationship the bounded compiler cannot express is caught at startup,
-not silently degraded. `Shape.validate(cls)` (run by `shapecheck`) raises
-`ShapeError` when:
+not silently degraded. `Shape.validate(cls)` raises `ShapeError` when:
 
 - the child SQL is opaque (`SELECT *` / CTE / UNION / no analyzable `FROM`), so
   the batched `WHERE {on} IN (...)` query cannot be built;
 - the child does not carry its `on` join column as a dataclass field (the
   compiler needs it to group children);
-- the parent does not carry the `key` field the `IN` list seeds from.
+- the parent does not carry the `key` field the `IN` list seeds from;
+- a per-parent `LIMIT` cannot be compiled deterministically — a `LIMIT` with no
+  `ORDER BY`, an `OFFSET`, or a `LIMIT` on a child that also has its own nested
+  grandchildren (see [Ordered and limited children](#ordered-and-limited-children)).
+
+These checks run at `app.check()` startup, not just on the first fetch:
+`shapecheck` calls `Shape.validate(cls)` on every Shape your app uses (the same
+hook covers the [un-injectable tenant scope](#fail-loud-when-un-injectable)
+case), so a malformed nested or scoped declaration is an ERROR before you serve a
+byte, and `Shape.fetch` / `Shape.validate` also raise `ShapeError` directly at
+runtime as a backstop.
 
 `optional=True` skips the child level for parents whose `key` value is `None`.
 Streaming is incompatible with nested assembly (the compiler must buffer parents
@@ -422,29 +563,43 @@ boards = await Shape.fetch(Board, db, scope=1)
 The compiler rewrites `SELECT id, title FROM boards` into `SELECT id, title FROM
 boards WHERE community_id = :scope`, and the child `IN`-list query is scoped the
 same way — so a cross-tenant child row that happens to join to an in-tenant
-parent is excluded. Injection is idempotent: if you already wrote the predicate,
-it is not duplicated.
+parent is excluded.
+
+The scope predicate is the **compiler's** to own, not the author's. Injection is
+idempotent only against the compiler's own canonical form: if your SQL already
+contains exactly `community_id = :scope`, it is not duplicated. But a *different*
+author-written predicate on the scope column — `community_id = :tenant`,
+`community_id IN (...)`, or any non-canonical form — is a fail-loud `ShapeError`,
+not something the compiler silently augments with a second `AND community_id =
+:scope`. Remove the hand-written scope predicate and let the compiler inject it.
 
 ### Fail-loud when un-injectable
 
-The scope guarantee is unconditional. If a scoped Shape's SQL is opaque — a CTE,
-a `UNION`, a `SELECT *`, or anything with no analyzable `FROM` — the compiler
-**cannot** inject the predicate, so it refuses rather than ship a query that would
-silently query across tenants. This surfaces two ways:
+The scope guarantee is unconditional. If a scoped Shape's SQL is one the compiler
+cannot structurally analyze a single outer `WHERE` target on, it refuses rather
+than ship a query that would silently query across tenants. That covers the
+opaque cases — a CTE, a `UNION`, a `SELECT *`, or anything with no analyzable
+`FROM` — **and** any outer query whose `FROM` is a derived table or subquery
+(`SELECT ... FROM (SELECT ... WHERE ...) x`) or that carries a correlated/scalar
+subquery: there, naively appending `AND community_id = :scope` would attach to the
+*inner* subquery's `WHERE` and produce invalid or unscoped SQL, so the compiler
+rejects the whole declaration instead. This surfaces two ways:
 
 - `shapecheck` reports an ERROR at startup for any scoped Shape your app uses
-  whose SQL is un-injectable, with a closest-match-free message naming the scope
-  key.
+  whose SQL is un-injectable, with a message naming the scope key.
 - `Shape.fetch` / `Shape.validate` raise `ShapeError` directly.
 
 ```
 ERROR  shapecheck  Shape 'SecretBoard' declares scope='community_id', but its
-       SQL is opaque/un-injectable (CTE / UNION / SELECT * / no analyzable
-       FROM): the tenant-scope predicate cannot be structurally injected.
+       SQL is opaque/un-injectable (CTE / UNION / SELECT * / derived-table or
+       subquery FROM / no single analyzable WHERE target): the tenant-scope
+       predicate cannot be structurally injected.
 ```
 
 The fix is always to rewrite the SQL as a simple single `SELECT` with an explicit
-column list and an analyzable `FROM`.
+column list and a single analyzable `FROM` — flatten the derived table or
+subquery into the outer query so the scope predicate has one unambiguous place to
+land.
 
 ## Page-composite Shapes
 

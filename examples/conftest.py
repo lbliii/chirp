@@ -18,6 +18,23 @@ _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
+from tests.helpers.shape_registry import isolated_shape_registry
+
+
+@pytest.fixture(autouse=True)
+def _isolate_shape_registry():
+    """Restore the process-global ``@shape`` registry around each example test.
+
+    Examples that use ``@shape`` register Shapes by name. Behavior tests reload
+    ``app.py`` once per test (see ``example_app``), so without restoration the
+    second load would collide on duplicate Shape names. This autouse fixture
+    snapshots the registry before the test and restores it after, mirroring the
+    module-purge isolation already done per load.
+    """
+    with isolated_shape_registry():
+        yield
+
+
 _EXAMPLES_ROOT = str(Path(__file__).resolve().parent)
 
 

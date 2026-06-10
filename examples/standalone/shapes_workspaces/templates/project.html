@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ project.name }} — Workspaces</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; color: #1a1a1a; }
+    .status { font-size: .8rem; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+    ul { padding-left: 1.25rem; }
+    .task { margin: .35rem 0; }
+    .done { text-decoration: line-through; color: #999; }
+    .pri { display: inline-block; min-width: 1.4rem; color: #c0392b; font-weight: 600; }
+    .comments { color: #555; font-size: .9rem; margin: .2rem 0 .2rem 1rem; }
+    a { color: #2563eb; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; Dashboard</a></p>
+  {% block project_detail %}
+  <h1>{{ project.name }}</h1>
+  <div class="status">{{ project.status }}</div>
+  <ul>
+    {% for task in project.tasks %}
+      <li class="task {{ 'done' if task.done else '' }}">
+        <span class="pri">P{{ task.priority }}</span> {{ task.title }}
+        {% for c in task.comments %}
+          <div class="comments">&ldquo;{{ c.body }}&rdquo; — {{ c.author }}</div>
+        {% endfor %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% endblock %}
+</body>
+</html>

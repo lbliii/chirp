@@ -15,10 +15,10 @@ from types import SimpleNamespace
 
 from kida import DictLoader, Environment
 
-from chirp.contracts.rules_data_shapes import check_data_shapes
+from chirp.contracts.rules_data_shapes import _parse_select_columns, check_data_shapes
 from chirp.contracts.rules_shapecheck import check_shapecheck
 from chirp.contracts.types import Severity
-from chirp.data import Composite, Shape, composite, get_db, shape
+from chirp.data import Composite, Shape, composite, get_db, nested, shape
 from chirp.templating.returns import Fragment
 
 
@@ -483,6 +483,40 @@ def test_explicit_binding_verifies_root() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Un-analyzable route source (#12) — INFO, not a silent binding drop
+# ---------------------------------------------------------------------------
+
+
+def test_unanalyzable_route_source_emits_info() -> None:
+    # #12 (B2 round-2): a handler whose ``inspect.getsource`` fails (here an
+    # exec-compiled function with no on-disk source -> OSError) cannot have its
+    # Shape render bindings statically recovered. Rather than SILENTLY dropping
+    # every binding for the route with no diagnostic, shapecheck must surface an
+    # INFO so a developer wondering why a route is unverified sees it was skipped.
+    env = _env("{% block detail %}<h1>{{ board.title }}</h1>{% endblock %}")
+
+    ns: dict = {}
+    # An exec-compiled handler: real callable, but inspect.getsource raises
+    # OSError ("could not get source code") -> the #12 INFO branch. The exec is
+    # the *mechanism under test* (a handler with no on-disk source), not a
+    # production pattern -> intentional S102.
+    exec("def dynamic_handler():\n    return None", ns)  # noqa: S102
+    handler = ns["dynamic_handler"]
+
+    snap = _snapshot(env, handler, path="/dynamic")
+    issues = check_shapecheck(snap)
+    info = _of(issues, Severity.INFO)
+    skipped = [i for i in info if "shapecheck skipped route" in i.message]
+    assert len(skipped) == 1, [i.message for i in info]
+    assert skipped[0].category == "shapecheck"
+    assert "/dynamic" in skipped[0].message
+    assert "dynamic_handler" in skipped[0].message
+    # The skip is a diagnostic, not an error/warning.
+    assert not _of(issues, Severity.ERROR)
+    assert not _of(issues, Severity.WARNING)
+
+
+# ---------------------------------------------------------------------------
 # Tenant scope (#169, §8.1) — the ONE statically-decidable scope ERROR
 # ---------------------------------------------------------------------------
 
@@ -533,6 +567,62 @@ def test_injectable_scoped_shape_does_not_error() -> None:
     )
     errors = _of(check_shapecheck(snap), Severity.ERROR)
     assert not [e for e in errors if "ShapeCheckInjectableScoped" in e.message]
+
+
+# ---------------------------------------------------------------------------
+# Comment-aware projection parsing (R3-5) — a comment in the SELECT list is not
+# opaque, so a scoped Shape carrying one must NOT be false-rejected.
+# ---------------------------------------------------------------------------
+
+
+# A scoped Shape with an inline block comment AND a line comment in the
+# projection. Before the fix _parse_select_columns returned None (the comment
+# defeated the regex), the SQL looked opaque, and the scope-injectability check
+# false-rejected it with a misleading "CTE / UNION / SELECT * / derived-table"
+# message. The columns are perfectly analyzable once comments are stripped.
+@shape(
+    "SELECT id /* the row id */, title -- the display title\nFROM "
+    "shapecheck_commented WHERE id = :id",
+    scope="community_id",
+)
+@dataclass(frozen=True, slots=True)
+class ShapeCheckCommentedScoped:
+    id: int
+    title: str
+
+
+def test_parse_select_columns_is_comment_aware() -> None:
+    # R3-5: inline block + line comments in the projection no longer make the
+    # SELECT opaque -- the analyzable column list is recovered.
+    assert _parse_select_columns("SELECT id /* note */, name FROM t WHERE id = :id") == (
+        "id",
+        "name",
+    )
+    assert _parse_select_columns("SELECT id, -- trailing\nname FROM t") == ("id", "name")
+    # A comment that hides part of a column name is stripped to a space, so
+    # adjacent tokens never merge into a bogus identifier.
+    assert _parse_select_columns("SELECT a /**/ , b FROM t") == ("a", "b")
+    # String-literal aware: a ``/*`` inside a ``'...'`` literal is NOT a comment,
+    # so it does not swallow the rest of the SQL -- the trailing alias and FROM
+    # are still recovered (the literal column is non-analyzable, but the aliased
+    # one resolves to its output name).
+    assert _parse_select_columns("SELECT 'a /* b' AS note, id FROM t") == ("note", "id")
+
+
+def test_commented_scoped_shape_is_injectable_not_false_rejected() -> None:
+    # R3-5: a scoped Shape whose projection carries comments parses cleanly and is
+    # injectable -> NO scope ERROR (it would have been a misleading false-reject
+    # before the comment-aware parse).
+    snap = SimpleNamespace(
+        kida_env=None,
+        router=SimpleNamespace(routes=[]),
+        route_templates={},
+        extras={"surface_contracts": {"commented": "ShapeCheckCommentedScoped"}},
+    )
+    errors = _of(check_shapecheck(snap), Severity.ERROR)
+    assert not [e for e in errors if "ShapeCheckCommentedScoped" in e.message], [
+        e.message for e in errors if "ShapeCheckCommentedScoped" in e.message
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -606,3 +696,425 @@ def test_composite_unknown_field_is_skipped() -> None:
 
     issues = check_shapecheck(_snapshot(env, handler))
     assert not _of(issues, Severity.ERROR)
+
+
+# ---------------------------------------------------------------------------
+# Nested-field render (#1) — the framework's headline nested() feature
+# ---------------------------------------------------------------------------
+
+
+# A child Shape and a parent Shape that declares a ``nested()`` field. ``cards``
+# is a REAL dataclass field (the bounded compiler fills it) but NOT a SELECT
+# column -- so a ``{% for c in board.cards %}`` read of the collection root must
+# never false-fire under-fetch. Neutral ``ShapeCheck`` prefix for registry
+# uniqueness (§8.7).
+@shape("SELECT id, name, board_id FROM shapecheck_cards WHERE board_id = :board_id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckNestedCard:
+    id: int
+    name: str
+    board_id: int
+
+
+@shape("SELECT id, title FROM shapecheck_nest_boards WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckNestedBoard:
+    id: int
+    title: str
+    cards: tuple[ShapeCheckNestedCard, ...] = nested(ShapeCheckNestedCard, on="board_id", key="id")
+
+
+def test_nested_field_read_is_not_underfetch() -> None:
+    # #1: ``board.cards`` is a ``nested()`` field (not a SELECT column). Reading
+    # the collection root must be clean -- before the fix this false-fired an
+    # under-fetch ERROR on the framework's own marquee nested() feature. The
+    # per-item ``c.name`` reads collapse to the loop root and stay invisible.
+    env = _env(
+        "{% block detail %}<h1>{{ board.title }}</h1>"
+        "<ul>{% for c in board.cards %}<li>{{ c.name }}</li>{% endfor %}</ul>"
+        "<p>{{ board.id }}</p>{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckNestedBoard, db, id=1)
+        return Fragment("board.html", "detail", board=board)
+
+    issues = check_shapecheck(_snapshot(env, handler))
+    assert not _of(issues, Severity.ERROR), [i.message for i in _of(issues, Severity.ERROR)]
+    # ``cards`` is a nested field, not a column, so it must NOT count as an
+    # over-fetch column either; both scalar columns (id, title) are read.
+    assert not _of(issues, Severity.WARNING), [i.message for i in _of(issues, Severity.WARNING)]
+    assert _of(issues, Severity.INFO)  # clean PASS
+
+
+# ---------------------------------------------------------------------------
+# Nested-block bleed (#2) — parent + nested child bound to DIFFERENT Shapes
+# ---------------------------------------------------------------------------
+
+
+@shape("SELECT id, title FROM shapecheck_bleed_boards WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckBleedBoard:
+    id: int
+    title: str
+
+
+@shape("SELECT id, body FROM shapecheck_bleed_comments WHERE card_id = :cid")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckBleedComment:
+    id: int
+    body: str
+
+
+def _multi_handler_snapshot(env, handler, *, path="/boards"):
+    route = SimpleNamespace(handler=handler, page_source_handler=None, path=path)
+    router = SimpleNamespace(routes=[route])
+    return SimpleNamespace(
+        kida_env=env,
+        router=router,
+        route_templates={path: "board.html"},
+        extras={},
+    )
+
+
+def test_nested_block_bleed_no_false_positive_on_parent() -> None:
+    # #2: the parent block reads ``board.title`` (valid). A nested child block --
+    # nested under a ``{% for %}`` -- reads ``board.extra`` under the SAME var
+    # name, where ``extra`` is NOT a parent column. kida's depends_on for the
+    # parent is a conservative SUPERSET that absorbs the child's ``board.extra``;
+    # without own-reads subtraction this false-fires an under-fetch ERROR on the
+    # PARENT. The subtraction must remove the nested child's reads at any depth.
+    env = _env(
+        "{% block parent %}<h1>{{ board.title }}</h1>"
+        "{% for x in board.title %}{% block child %}<span>{{ board.extra }}</span>"
+        "{% endblock %}{% endfor %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBleedBoard, db, id=1)
+        # Only the PARENT block is bound here.
+        return Fragment("board.html", "parent", board=board)
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    # No false under-fetch on the parent for the child's ``board.extra`` read.
+    assert not _of(issues, Severity.ERROR), [i.message for i in _of(issues, Severity.ERROR)]
+
+
+def test_nested_block_bleed_shared_read_fires_parent_underfetch() -> None:
+    # #2 (B1 round-2): a dotted read (``board.owner``) that occurs in BOTH the
+    # parent block body AND a nested child block under the SAME shapevar, where
+    # ``owner`` is not a column. A naive set-difference own-reads (subtract the
+    # child's depends_on from the parent's) would remove ``board.owner`` from the
+    # parent ENTIRELY -- silently MISSING a genuine parent under-fetch (renders
+    # None at runtime). Occurrence-granular own reads must RETAIN the parent's own
+    # ``board.owner`` read so the under-fetch ERROR fires. Only the parent block
+    # is bound; the only path to an ERROR is the retained shared read.
+    env = _env(
+        "{% block header %}<h1>{{ board.title }} by {{ board.owner }}</h1>"
+        "{% if board.id %}{% block badge %}{{ board.owner }}{% endblock %}{% endif %}"
+        "{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBleedBoard, db, id=1)
+        # Only the PARENT (header) block is bound.
+        return Fragment("board.html", "header", board=board)
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    errors = _of(issues, Severity.ERROR)
+    owner = [e for e in errors if "board.owner" in e.message]
+    # The marquee assertion: the under-fetch FIRES (zero before the fix).
+    assert len(owner) == 1, [e.message for e in errors]
+    assert "ShapeCheckBleedBoard" in owner[0].message
+    assert "owner" in owner[0].message
+    # R3-6: the innermost OWNER of ``board.owner`` is the UNBOUND nested ``badge``
+    # block, but attribution must name the BOUND binding whose contract was
+    # actually verified (``header``) -- not a sibling/child block never bound to a
+    # Shape. The read still fires; only the block NAME is the verified binding.
+    assert "Block 'header'" in owner[0].message
+    assert "Block 'badge'" not in owner[0].message
+    # ``board.title`` and ``board.id`` are real columns -> no other under-fetch.
+    assert not [e for e in errors if "board.title" in e.message]
+    assert not [e for e in errors if "board.id" in e.message]
+
+
+def test_nested_block_bleed_child_only_read_still_no_parent_false_positive() -> None:
+    # B1 guardrail: the precise own-reads must keep the existing bleed property --
+    # a read occurring ONLY inside a nested child (never in the parent body) must
+    # NOT fire on the parent. ``board.extra`` lives solely in the nested child;
+    # the parent reads only the real column ``board.title``. With only the parent
+    # bound, no ERROR may fire (the child's read does not bleed up).
+    env = _env(
+        "{% block parent %}<h1>{{ board.title }}</h1>"
+        "{% if board.title %}{% block child %}<span>{{ board.extra }}</span>"
+        "{% endblock %}{% endif %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBleedBoard, db, id=1)
+        return Fragment("board.html", "parent", board=board)
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    assert not _of(issues, Severity.ERROR), [i.message for i in _of(issues, Severity.ERROR)]
+
+
+def test_nested_block_bleed_attributes_to_correct_child_block() -> None:
+    # #2 second half: when both parent and child are bound (to DIFFERENT Shapes),
+    # the child's genuine under-fetch (``comment.bogus``) must be reported against
+    # the block where the read SYNTACTICALLY lives (``child``), not the bound
+    # ancestor (``parent``).
+    env = _env(
+        "{% block parent %}<h1>{{ board.title }}</h1>"
+        "{% block child %}<span>{{ comment.bogus }}</span>{% endblock %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBleedBoard, db, id=1)
+        comment = Shape.fetch(ShapeCheckBleedComment, db, cid=1)
+        return [
+            Fragment("board.html", "parent", board=board),
+            Fragment("board.html", "child", comment=comment),
+        ]
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    errors = _of(issues, Severity.ERROR)
+    # Exactly one under-fetch: ``comment.bogus`` -- attributed to ``child``.
+    bogus = [e for e in errors if "comment.bogus" in e.message]
+    assert len(bogus) == 1
+    assert "Block 'child'" in bogus[0].message
+    assert "Block 'parent'" not in bogus[0].message
+    # The parent's ``board.title`` read is valid -> no parent under-fetch.
+    assert not [e for e in errors if "board." in e.message]
+
+
+# ---------------------------------------------------------------------------
+# Column literally named 'form' / 'error' (#10) — still checkable
+# ---------------------------------------------------------------------------
+
+
+@shape("SELECT id, form FROM shapecheck_form_things WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckHasFormColumn:
+    id: int
+    form: str
+
+
+def test_column_named_form_is_still_checkable() -> None:
+    # #10: noise/global/local subtraction must key off the context KEY (parts[0],
+    # the shapevar root), not the ``.field`` attribute (parts[1]). A Shape column
+    # literally named ``form`` is a real column -> reading ``board.form`` is
+    # clean; reading ``board.error`` (not a column) is a genuine under-fetch. If
+    # the rule keyed off the attribute, both would be silently suppressed.
+    env = _env(
+        "{% block detail %}<p>{{ board.form }}</p>"
+        "<p>{{ board.error }}</p><p>{{ board.id }}</p>{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckHasFormColumn, db, id=1)
+        return Fragment("board.html", "detail", board=board)
+
+    errors = _of(check_shapecheck(_multi_handler_snapshot(env, handler)), Severity.ERROR)
+    # ``form`` is a real column -> not flagged; ``error`` is the only under-fetch.
+    assert len(errors) == 1
+    assert "board.error" in errors[0].message
+    assert "board.form" not in errors[0].message
+
+
+# ---------------------------------------------------------------------------
+# Conditional default(none) hint (#11)
+# ---------------------------------------------------------------------------
+
+
+def test_default_none_hint_only_when_guard_present() -> None:
+    # #11: the remediation hint "then delete the '| default(none)' guard" must
+    # appear only when the flagged read actually carries that guard.
+    guarded = _env(
+        "{% block detail %}<p>{{ board.author | default(none) }}</p>"
+        "<p>{{ board.id }}</p><p>{{ board.title }}</p>{% endblock %}"
+    )
+    unguarded = _env(
+        "{% block detail %}<p>{{ board.author }}</p>"
+        "<p>{{ board.id }}</p><p>{{ board.title }}</p>{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBoardCard, db, id=1)
+        return Fragment("board.html", "detail", board=board)
+
+    g_errors = _of(check_shapecheck(_multi_handler_snapshot(guarded, handler)), Severity.ERROR)
+    u_errors = _of(check_shapecheck(_multi_handler_snapshot(unguarded, handler)), Severity.ERROR)
+    assert len(g_errors) == 1
+    assert len(u_errors) == 1
+    assert "default(none)" in (g_errors[0].details or "")
+    assert "default(none)" not in (u_errors[0].details or "")
+
+
+# ---------------------------------------------------------------------------
+# Over-fetch multi-binding dedup (#13)
+# ---------------------------------------------------------------------------
+
+
+def test_overfetch_dedups_across_repeated_bindings() -> None:
+    # The same (template, block, shapevar, column) over-fetch must be reported
+    # at most once even when the same binding is collected twice (e.g. two
+    # returns to the same block). ``summary`` is fetched but never read.
+    env = _env("{% block detail %}<h1>{{ board.title }}</h1><p>{{ board.id }}</p>{% endblock %}")
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBoardDetail, db, id=1)
+        if board:
+            return Fragment("board.html", "detail", board=board)
+        return Fragment("board.html", "detail", board=board)
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    overfetch = [w for w in _of(issues, Severity.WARNING) if "summary" in w.message]
+    # Two identical bindings collected, but the over-fetch fires exactly once.
+    assert len(overfetch) == 1
+    assert not _of(issues, Severity.ERROR)
+
+
+# ---------------------------------------------------------------------------
+# Under-fetch dedup carries the bound-shape identity (F6)
+# ---------------------------------------------------------------------------
+
+
+@shape("SELECT id, title FROM f6_alpha WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckDedupAlpha:
+    id: int
+    title: str
+
+
+@shape("SELECT id, body FROM f6_beta WHERE cid = :cid")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckDedupBeta:
+    id: int
+    body: str
+
+
+def test_underfetch_dedup_distinguishes_bound_shapes() -> None:
+    # F6: a bound PARENT (ShapeCheckDedupAlpha) and a bound nested CHILD
+    # (ShapeCheckDedupBeta) share the var name ``item`` and each reads ``item.x``
+    # -- a field neither Shape provides. R3-6 re-attributes both reads to the
+    # innermost BOUND owner (the nested ``child`` block), so before the fix the
+    # dedup key (template, block, var, field) collided and ONE of the two real
+    # under-fetches was silently dropped (and even mislabeled with the wrong
+    # Shape). Including the resolved Shape NAME in the dedup key reports both
+    # distinct (shape, var, field) under-fetches separately.
+    env = _env(
+        "{% block parent %}<h1>{{ item.title }}</h1><p>{{ item.x }}</p>"
+        "{% block child %}<span>{{ item.body }}</span><p>{{ item.x }}</p>"
+        "{% endblock %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        alpha = Shape.fetch(ShapeCheckDedupAlpha, db, id=1)
+        beta = Shape.fetch(ShapeCheckDedupBeta, db, cid=1)
+        return [
+            Fragment("board.html", "parent", item=alpha),
+            Fragment("board.html", "child", item=beta),
+        ]
+
+    errors = _of(check_shapecheck(_multi_handler_snapshot(env, handler)), Severity.ERROR)
+    item_x = [e for e in errors if "item.x" in e.message]
+    # TWO distinct under-fetch ERRORs -- one per bound Shape -- not one.
+    assert len(item_x) == 2, [e.message for e in item_x]
+    shapes_named = {
+        s for s in ("ShapeCheckDedupAlpha", "ShapeCheckDedupBeta") for e in item_x if s in e.message
+    }
+    assert shapes_named == {"ShapeCheckDedupAlpha", "ShapeCheckDedupBeta"}, [
+        e.message for e in item_x
+    ]
+
+
+def test_underfetch_dedup_collapses_genuine_duplicate() -> None:
+    # Guardrail for F6: the SAME (shape, var, field) under-fetch collected twice
+    # (e.g. two returns to the same bound block on the same Shape) is still
+    # reported exactly once -- the shape-identity key de-dups genuine duplicates,
+    # it only stops collapsing GENUINELY DISTINCT shapes.
+    env = _env("{% block detail %}<p>{{ board.ghost }}</p><h1>{{ board.title }}</h1>{% endblock %}")
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckBoardCard, db, id=1)
+        if board:
+            return Fragment("board.html", "detail", board=board)
+        return Fragment("board.html", "detail", board=board)
+
+    errors = _of(check_shapecheck(_multi_handler_snapshot(env, handler)), Severity.ERROR)
+    ghost = [e for e in errors if "board.ghost" in e.message]
+    assert len(ghost) == 1, [e.message for e in ghost]
+
+
+# ---------------------------------------------------------------------------
+# Over-fetch is computed against the shape-group read UNION (F7)
+# ---------------------------------------------------------------------------
+
+
+@shape("SELECT id, title, sidebar FROM f7_boards WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class ShapeCheckF7Board:
+    id: int
+    title: str
+    sidebar: str
+
+
+def test_overfetch_not_fired_when_nested_child_of_same_shape_reads_column() -> None:
+    # F7: R3/round-2 switched over-fetch's read set to occurrence-granular OWN
+    # reads. A column the PARENT block SELECTs that is read ONLY by a nested CHILD
+    # block bound to the SAME shape (``sidebar``, read in ``child``) would
+    # false-fire an over-fetch WARNING on the parent under own-reads. The column
+    # IS consumed by a binding of the shape, so over-fetch must be computed
+    # against the UNION of reads across all bound blocks of the shape: no WARNING
+    # on either block.
+    env = _env(
+        "{% block parent %}<h1>{{ board.title }}</h1><p>{{ board.id }}</p>"
+        "{% block child %}<aside>{{ board.sidebar }}</aside>{% endblock %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckF7Board, db, id=1)
+        return [
+            Fragment("board.html", "parent", board=board),
+            Fragment("board.html", "child", board=board),
+        ]
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    # ``sidebar`` is read by the child; ``id``/``title`` by the parent -> the
+    # union covers every column -> no over-fetch on either block.
+    assert not _of(issues, Severity.WARNING), [w.message for w in _of(issues, Severity.WARNING)]
+    assert not _of(issues, Severity.ERROR), [e.message for e in _of(issues, Severity.ERROR)]
+
+
+def test_overfetch_still_fires_when_no_binding_reads_the_column() -> None:
+    # Guardrail for F7: the union must NOT mask a genuinely unread column. Here
+    # ``sidebar`` is read by NO binding of the shape -> it is truly over-fetch and
+    # the WARNING must still fire (the union only excuses a column some binding
+    # consumes).
+    env = _env(
+        "{% block parent %}<h1>{{ board.title }}</h1><p>{{ board.id }}</p>"
+        "{% block child %}<span>read nothing extra</span>{% endblock %}{% endblock %}"
+    )
+
+    def handler():
+        db = get_db()
+        board = Shape.fetch(ShapeCheckF7Board, db, id=1)
+        return [
+            Fragment("board.html", "parent", board=board),
+            Fragment("board.html", "child", board=board),
+        ]
+
+    issues = check_shapecheck(_multi_handler_snapshot(env, handler))
+    overfetch = [w for w in _of(issues, Severity.WARNING) if "sidebar" in w.message]
+    assert overfetch, [w.message for w in _of(issues, Severity.WARNING)]

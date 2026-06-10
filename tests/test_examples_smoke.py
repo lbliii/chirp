@@ -46,6 +46,21 @@ import pytest
 
 from chirp.testing.client import TestClient
 from chirp.testing.sse import assert_sse_wired
+from tests.helpers.shape_registry import isolated_shape_registry
+
+
+@pytest.fixture(autouse=True)
+def _isolate_shape_registry():
+    """Restore the process-global ``@shape`` registry around each example load.
+
+    An ``@shape`` example registers Shapes by name; loading the same example here
+    and in ``test_examples_contract_clean.py`` (one process) would otherwise
+    collide on duplicate names. Snapshot/restore mirrors the module-purge
+    isolation ``_load_isolated``/``_unwind`` already perform.
+    """
+    with isolated_shape_registry():
+        yield
+
 
 _EXAMPLES_ROOT = Path(__file__).resolve().parent.parent / "examples"
 _APP_FILES = sorted(_EXAMPLES_ROOT.rglob("app.py"))

@@ -26,6 +26,7 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
 from chirp.contracts.types import Severity
+from chirp.data import nested, shape
 
 
 def _issues(app: App) -> list:
@@ -435,3 +436,116 @@ def test_shapecheck_silent_for_clean_app(tmp_path) -> None:
     shapecheck issue at all (not even a PASS line, since nothing is verified)."""
     app = _shapecheck_app(tmp_path, drift=False)
     assert "shapecheck" not in _categories(app)
+
+
+# ---------------------------------------------------------------------------
+# shapecheck (#167/#169) -- Shape.validate fail-loud + nested-field no-false-ERROR
+# through the orchestrator. These prove the #3 wiring (Shape.validate over every
+# USED Shape) AND the #1 nested-field union, end-to-end through app.check().
+# ---------------------------------------------------------------------------
+
+
+# A child Shape that does NOT carry its ``on`` join column as a field. The parent
+# declares it nested -> Shape.validate rejects the parent as un-compilable.
+@shape("SELECT id, name FROM wiring_bad_cards WHERE x = :x")
+@dataclass(frozen=True, slots=True)
+class _WiringBadCard:
+    id: int
+    name: str
+
+
+@shape("SELECT id, title FROM wiring_bad_boards WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class _WiringBadBoard:
+    id: int
+    title: str
+    cards: tuple = nested(_WiringBadCard, on="board_id", key="id")
+
+
+# A well-formed nested Shape pair: the child carries ``board_id`` (its ``on``),
+# the parent carries ``id`` (the ``key``). No malformation -> validate passes.
+@shape("SELECT id, name, board_id FROM wiring_ok_cards WHERE board_id = :bid")
+@dataclass(frozen=True, slots=True)
+class _WiringOkCard:
+    id: int
+    name: str
+    board_id: int
+
+
+@shape("SELECT id, title FROM wiring_ok_boards WHERE id = :id")
+@dataclass(frozen=True, slots=True)
+class _WiringOkBoard:
+    id: int
+    title: str
+    cards: tuple = nested(_WiringOkCard, on="board_id", key="id")
+
+
+def _nested_shape_app(tmp_path, *, malformed: bool) -> App:
+    """A db-less App whose one route binds a (malformed or clean) nested Shape.
+
+    The handler references a module-level Shape name DIRECTLY (not via a closure
+    variable) so ``inspect.getsource`` + the static binding walk -- which
+    resolves the first ``Shape.fetch`` arg against the handler's ``__globals__``
+    -- recover the route -> Shape binding, marking the Shape "used" for the
+    ``Shape.validate`` pass.
+    """
+    (tmp_path / "board.html").write_text(
+        "{% block detail %}<h1>{{ board.title }}</h1>"
+        "<ul>{% for c in board.cards %}<li>{{ c.name }}</li>{% endfor %}</ul>"
+        "<p>{{ board.id }}</p>{% endblock %}",
+        encoding="utf-8",
+    )
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)))
+
+    if malformed:
+
+        @app.route("/b")
+        def board_bad():
+            from chirp.data import Shape, get_db
+            from chirp.templating.returns import Fragment
+
+            db = get_db()
+            rows = Shape.fetch(_WiringBadBoard, db, id=1)
+            return Fragment("board.html", "detail", board=rows)
+    else:
+
+        @app.route("/b")
+        def board_ok():
+            from chirp.data import Shape, get_db
+            from chirp.templating.returns import Fragment
+
+            db = get_db()
+            rows = Shape.fetch(_WiringOkBoard, db, id=1)
+            return Fragment("board.html", "detail", board=rows)
+
+    return app
+
+
+def test_shapecheck_fires_for_malformed_nested_shape(tmp_path) -> None:
+    """A route binds a Shape whose nested() child cannot be batched (missing the
+    ``on`` join column as a field). ``Shape.validate`` raises ShapeError, which
+    the orchestrator-wired ``_check_shape_validate`` pass surfaces as a
+    shapecheck ERROR. Proves #3 wiring (Shape.validate over every USED Shape)
+    reaches ``check_hypermedia_surface``. Drop that wiring and this fails."""
+    app = _nested_shape_app(tmp_path, malformed=True)
+    errors = [
+        i for i in _issues(app) if i.category == "shapecheck" and i.severity is Severity.ERROR
+    ]
+    assert errors, "Shape.validate fail-loud did not reach check_hypermedia_surface"
+    assert any("_WiringBadBoard" in i.message for i in errors)
+    assert any("board_id" in i.message for i in errors)
+
+
+def test_shapecheck_no_false_underfetch_for_nested_field(tmp_path) -> None:
+    """A realistic nested-Shape app: a block iterates ``board.cards`` (a
+    ``nested()`` field, NOT a SELECT column). Through ``app.check()`` this must
+    produce NO false under-fetch ERROR (#1 nested-field union) and NO
+    ``Shape.validate`` failure (#3, the child is well-formed) -- only a clean
+    PASS. Negative control proving the firing test is not vacuous."""
+    app = _nested_shape_app(tmp_path, malformed=False)
+    shapecheck = [i for i in _issues(app) if i.category == "shapecheck"]
+    assert not [i for i in shapecheck if i.severity is Severity.ERROR], [
+        i.message for i in shapecheck if i.severity is Severity.ERROR
+    ]
+    # The binding was verified clean -> a PASS line surfaces.
+    assert any(i.severity is Severity.INFO for i in shapecheck)

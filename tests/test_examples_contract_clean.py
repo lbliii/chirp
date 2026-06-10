@@ -22,10 +22,24 @@ from pathlib import Path
 import pytest
 
 from chirp.contracts import check_hypermedia_surface
+from tests.helpers.shape_registry import isolated_shape_registry
 
 _EXAMPLES_ROOT = Path(__file__).resolve().parent.parent / "examples"
 _APP_FILES = sorted(_EXAMPLES_ROOT.rglob("app.py"))
 _IDS = [str(p.parent.relative_to(_EXAMPLES_ROOT)) for p in _APP_FILES]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_shape_registry():
+    """Restore the process-global ``@shape`` registry around each example load.
+
+    An ``@shape`` example registers Shapes by name; loading many examples — and
+    the same example across this file and ``test_examples_smoke.py`` — in one
+    process would otherwise collide on duplicate names. Snapshot/restore mirrors
+    the module-purge isolation this file already performs.
+    """
+    with isolated_shape_registry():
+        yield
 
 
 def _load_isolated(app_path: Path):

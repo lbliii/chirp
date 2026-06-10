@@ -1,0 +1,12 @@
+# Smoke expectations for the parameterized detail route. The second entry is the
+# tenant-isolation canary: project #3 belongs to workspace 2 (Globex), so for
+# "you" (workspace 1) it 404s — proven by the standard example smoke harness.
+
+[[routes]]
+path = "/projects/1"
+status = 200
+contains = ["Website Redesign", "Wireframes"]
+
+[[routes]]
+path = "/projects/3"
+status = 404

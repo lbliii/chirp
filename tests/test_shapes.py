@@ -24,10 +24,17 @@ from chirp.data import (
     shape,
     shape_registry,
 )
+from chirp.data import shapes as _shapes_mod
 from chirp.data.shapes import (
+    _batched_child_sql,
     _bind_params,
+    _decompose_child,
+    _depth0_scope_predicate,
     _has_scope_predicate,
     _inject_scope,
+    _member_params,
+    _placeholder_names,
+    _scan_placeholders,
     _scope_injectable,
     _ShapeMeta,
 )
@@ -966,3 +973,1603 @@ class TestRepositorySeam:
             isinstance(getattr(CPBoardPage, n, None), str) and "SELECT" in getattr(CPBoardPage, n)
             for n in dir(CPBoardPage)
         )
+
+
+# ===========================================================================
+# SQL-compiler hardening (findings #4/#5/#6/#7/#8)
+# ===========================================================================
+
+
+# -- #8: one shared, quoted-string + cast aware placeholder scanner ----------
+
+
+class TestDecomposeChild:
+    def test_captures_order_by_and_limit(self) -> None:
+        d = _decompose_child(
+            "SELECT id, card_id, body FROM comments WHERE card_id = :card_id "
+            "ORDER BY created_at DESC LIMIT 5",
+            "card_id",
+        )
+        assert d.head == "SELECT id, card_id, body FROM comments"
+        assert d.order_by == "created_at DESC"
+        assert d.limit == "5"
+        assert d.has_offset is False
+        # Only the join equality was in the WHERE -> no residual filter.
+        assert d.residual_where is None
+        assert d.join_isolated is True
+
+    def test_order_by_only(self) -> None:
+        d = _decompose_child("SELECT id FROM t WHERE a = :a ORDER BY id", "a")
+        assert d.order_by == "id"
+        assert d.limit is None
+
+    def test_offset_flagged(self) -> None:
+        d = _decompose_child("SELECT id FROM t WHERE a = :a ORDER BY id LIMIT 2 OFFSET 5", "a")
+        assert d.has_offset is True
+        assert d.limit == "2"
+
+    def test_subquery_order_by_left_on_head(self) -> None:
+        """A depth>0 ORDER BY (inside an IN-subquery) is NOT the child's tail."""
+        d = _decompose_child(
+            "SELECT id FROM t WHERE id IN (SELECT y FROM u ORDER BY y) AND card_id = :card_id",
+            "card_id",
+        )
+        # The only depth-0 boundary is the WHERE; the subquery ORDER BY stays in head.
+        assert d.head == "SELECT id FROM t"
+        assert d.order_by is None
+        assert d.limit is None
+        # The residual is the leading IN-subquery predicate; the join equality
+        # (``card_id = :card_id``) is isolated and dropped from the residual.
+        assert d.join_isolated is True
+        assert d.residual_where == "id IN (SELECT y FROM u ORDER BY y)"
+
+    def test_residual_where_preserved(self) -> None:
+        """A non-join WHERE filter survives the IN-list rewrite (finding A3)."""
+        d = _decompose_child(
+            "SELECT id, card_id, body FROM comments WHERE card_id = :card_id AND deleted = 0",
+            "card_id",
+        )
+        assert d.head == "SELECT id, card_id, body FROM comments"
+        assert d.join_isolated is True
+        assert d.residual_where == "deleted = 0"
+
+    def test_join_predicate_ord_at_top_level_not_isolated(self) -> None:
+        """An OR'd join predicate cannot be safely isolated (finding A3)."""
+        d = _decompose_child(
+            "SELECT id, card_id FROM c WHERE card_id = :card_id OR x = 1", "card_id"
+        )
+        assert d.join_isolated is False
+
+    def test_non_equality_join_predicate_not_isolated(self) -> None:
+        d = _decompose_child("SELECT id, card_id FROM c WHERE card_id > :card_id", "card_id")
+        assert d.join_isolated is False
+
+    def test_absent_join_predicate_not_isolated(self) -> None:
+        d = _decompose_child("SELECT id, card_id FROM c WHERE deleted = 0", "card_id")
+        assert d.join_isolated is False
+
+    def test_no_where_is_vacuously_isolated(self) -> None:
+        d = _decompose_child("SELECT id, card_id FROM c", "card_id")
+        assert d.join_isolated is True
+        assert d.residual_where is None
+
+
+class TestSharedPlaceholderScanner:
+    def test_scan_skips_colon_in_string_literal(self) -> None:
+        """A ``:name``-shaped token inside a string literal is NOT a placeholder."""
+        names = [n for n, _, _ in _scan_placeholders("SELECT '12:30:00' AS t, id FROM x")]
+        assert names == []
+        names = _placeholder_names("SELECT '12:30:00' AS t FROM x WHERE id = :id")
+        assert names == {"id"}
+
+    def test_scan_skips_cast(self) -> None:
+        names = _placeholder_names("SELECT id::text FROM t WHERE id = :id")
+        assert names == {"id"}
+
+    def test_scan_double_quote_string(self) -> None:
+        """A colon inside a double-quoted string is not a placeholder either."""
+        names = _placeholder_names('SELECT "a:b" FROM t WHERE id = :id')
+        assert names == {"id"}
+
+    def test_scan_doubled_quote_escape(self) -> None:
+        """A doubled-quote escape ('') keeps the scanner inside the string."""
+        names = _placeholder_names("SELECT 'it''s :30' AS t FROM x WHERE id = :id")
+        assert names == {"id"}
+
+    def test_bind_params_string_literal_not_a_placeholder(self) -> None:
+        """_bind_params must not treat a colon inside a literal as a placeholder."""
+        sql, params = _bind_params(
+            "SELECT * FROM t WHERE label = '12:00' AND id = :id", "sqlite", {"id": 7}
+        )
+        # The literal is untouched; only :id is rewritten to ?.
+        assert sql == "SELECT * FROM t WHERE label = '12:00' AND id = ?"
+        assert params == (7,)
+
+    def test_bind_and_names_agree(self) -> None:
+        """The two callers agree because they share one scanner."""
+        sql = "SELECT '::not a cast', id FROM t WHERE a = :a AND b = :b AND c = :a"
+        names = _placeholder_names(sql)
+        bound, params = _bind_params(sql, "postgresql", {"a": 1, "b": 2})
+        assert names == {"a", "b"}
+        # PG reuses $1 for the repeated :a (one value per distinct name).
+        assert bound.count("$1") == 2
+        assert params == (1, 2)
+
+
+# -- #6: derived-table / subquery scope-injection rejection (fail loud) ------
+
+
+class TestDerivedTableScopeRejection:
+    def test_from_subquery_not_injectable(self) -> None:
+        sql = "SELECT id FROM (SELECT id FROM t WHERE a = 1) x WHERE x.id = :id"
+        assert not _scope_injectable(sql)
+
+    def test_scalar_subquery_projection_not_injectable(self) -> None:
+        sql = "SELECT id, (SELECT count(*) FROM u) AS n FROM t WHERE id = :id"
+        assert not _scope_injectable(sql)
+
+    def test_in_subquery_in_where_is_injectable(self) -> None:
+        """A subquery in the WHERE (after the depth-0 WHERE) stays injectable."""
+        sql = "SELECT id FROM t WHERE id IN (SELECT y FROM u WHERE z = 1)"
+        assert _scope_injectable(sql)
+
+    def test_inject_into_in_subquery_query_targets_outer_where(self) -> None:
+        """Scope lands in the OUTER WHERE, not inside the IN-subquery."""
+        out = _inject_scope(
+            "SELECT id FROM t WHERE id IN (SELECT y FROM u WHERE z = 1) ORDER BY id",
+            "community_id",
+        )
+        # The predicate is appended to the outer query, before the outer ORDER BY,
+        # and the inner subquery's ORDER-less WHERE is untouched.
+        assert out == (
+            "SELECT id FROM t WHERE id IN (SELECT y FROM u WHERE z = 1) "
+            "AND community_id = :scope ORDER BY id"
+        )
+
+    def test_inject_raises_on_from_subquery(self) -> None:
+        with pytest.raises(ShapeError, match=r"opaque|derived"):
+            _inject_scope(
+                "SELECT id FROM (SELECT id FROM t WHERE a = 1) x WHERE x.id = :id",
+                "community_id",
+            )
+
+    def test_validate_rejects_scoped_from_subquery_shape(self) -> None:
+        @shape(
+            "SELECT id, board_id FROM (SELECT id, board_id FROM raw WHERE ok = 1) x "
+            "WHERE x.board_id = :board_id",
+            scope="community_id",
+        )
+        @dataclass(frozen=True, slots=True)
+        class DerivedScoped:
+            id: int
+            board_id: int
+
+        with pytest.raises(ShapeError, match=r"opaque|derived|cannot be"):
+            Shape.validate(DerivedScoped)
+
+
+# -- #7: scope idempotency + author-predicate fail-loud ----------------------
+
+
+class TestScopeAuthorPredicate:
+    def test_idempotent_canonical_form(self) -> None:
+        sql = "SELECT id FROM t WHERE community_id = :scope"
+        assert _inject_scope(sql, "community_id") == sql
+
+    def test_idempotent_canonical_with_table_qualifier(self) -> None:
+        sql = "SELECT id FROM t WHERE t.community_id = :scope"
+        assert _inject_scope(sql, "community_id") == sql
+
+    def test_author_predicate_different_placeholder_fails_loud(self) -> None:
+        """An author-written scope predicate with a non-canonical RHS fails loud."""
+        with pytest.raises(ShapeError, match=r"author-written|owned by the compiler"):
+            _inject_scope("SELECT id FROM t WHERE community_id = :tenant", "community_id")
+
+    def test_author_predicate_in_list_fails_loud(self) -> None:
+        with pytest.raises(ShapeError, match=r"author-written|owned by the compiler"):
+            _inject_scope("SELECT id FROM t WHERE community_id IN (1, 2)", "community_id")
+
+    def test_has_scope_predicate_is_depth_aware(self) -> None:
+        """A scope predicate inside a subquery does not fool the backstop."""
+        # The only scope predicate is at depth>0 (inside the IN-subquery) -> the
+        # outer query is NOT considered already-scoped.
+        sql = "SELECT id FROM t WHERE id IN (SELECT y FROM u WHERE community_id = :scope)"
+        assert not _has_scope_predicate(sql, "community_id")
+
+    def test_no_double_injection(self) -> None:
+        """The canonical predicate is injected exactly once (idempotent re-run)."""
+        once = _inject_scope("SELECT id FROM t WHERE a = :a", "community_id")
+        twice = _inject_scope(once, "community_id")
+        assert once == twice
+        assert once.count("community_id = :scope") == 1
+
+
+# -- #4: ordered / limited child correctness (re-attach + window top-N) -------
+
+
+@shape(
+    "SELECT id, card_id, body FROM oc_comments WHERE card_id = :card_id ORDER BY id DESC LIMIT 2"
+)
+@dataclass(frozen=True, slots=True)
+class OCComment:
+    id: int
+    card_id: int
+    body: str
+
+
+@shape("SELECT id, name FROM oc_cards")
+@dataclass(frozen=True, slots=True)
+class OCCard:
+    id: int
+    name: str
+    comments: tuple[OCComment, ...] = nested(OCComment, on="card_id", key="id")
+
+
+@shape("SELECT id, card_id, body FROM oo_comments WHERE card_id = :card_id ORDER BY id ASC")
+@dataclass(frozen=True, slots=True)
+class OOComment:
+    id: int
+    card_id: int
+    body: str
+
+
+@shape("SELECT id, name FROM oc_cards")
+@dataclass(frozen=True, slots=True)
+class OOCard:
+    id: int
+    name: str
+    comments: tuple[OOComment, ...] = nested(OOComment, on="card_id", key="id")
+
+
+class TestOrderedLimitedChild:
+    @pytest.fixture
+    async def ordered_db(self, tmp_path):
+        db_path = tmp_path / "ordered.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE oc_cards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE oc_comments (id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT)"
+        )
+        await database.execute(
+            "CREATE TABLE oo_comments (id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT)"
+        )
+        # Two cards, four comments each (ids ascending).
+        await database.execute("INSERT INTO oc_cards (id, name) VALUES (1, 'A')")
+        await database.execute("INSERT INTO oc_cards (id, name) VALUES (2, 'B')")
+        cid = 0
+        for card in (1, 2):
+            for _ in range(4):
+                cid += 1
+                await database.execute(
+                    "INSERT INTO oc_comments (id, card_id, body) VALUES (?, ?, ?)",
+                    cid,
+                    card,
+                    f"c{cid}",
+                )
+                await database.execute(
+                    "INSERT INTO oo_comments (id, card_id, body) VALUES (?, ?, ?)",
+                    cid,
+                    card,
+                    f"c{cid}",
+                )
+        yield database
+        await database.disconnect()
+
+    async def test_per_parent_limit_is_window_top_n(self, ordered_db) -> None:
+        """LIMIT 2 ORDER BY id DESC -> each card keeps its OWN top-2, not global 2."""
+        cards = await Shape.fetch(OCCard, ordered_db)
+        by_id = {c.id: c for c in cards}
+        # Card 1's comments are ids 1-4; top-2 by id DESC -> [4, 3].
+        assert [cm.id for cm in by_id[1].comments] == [4, 3]
+        # Card 2's comments are ids 5-8; top-2 by id DESC -> [8, 7]. Per-parent,
+        # NOT a single global LIMIT 2 (which would starve card 2 entirely).
+        assert [cm.id for cm in by_id[2].comments] == [8, 7]
+
+    async def test_order_by_preserved_without_limit(self, ordered_db) -> None:
+        """ORDER BY (no LIMIT) is re-attached so child order is deterministic."""
+        cards = await Shape.fetch(OOCard, ordered_db)
+        by_id = {c.id: c for c in cards}
+        # All four comments per card, ascending by id (the declared ORDER BY).
+        assert [cm.id for cm in by_id[1].comments] == [1, 2, 3, 4]
+        assert [cm.id for cm in by_id[2].comments] == [5, 6, 7, 8]
+
+    def test_limit_without_order_by_fails_loud(self) -> None:
+        @shape("SELECT id, card_id, body FROM lc WHERE card_id = :card_id LIMIT 3")
+        @dataclass(frozen=True, slots=True)
+        class LimitNoOrder:
+            id: int
+            card_id: int
+            body: str
+
+        @shape("SELECT id, name FROM lc_cards")
+        @dataclass(frozen=True, slots=True)
+        class LimitNoOrderParent:
+            id: int
+            name: str
+            kids: tuple[LimitNoOrder, ...] = nested(LimitNoOrder, on="card_id", key="id")
+
+        with pytest.raises(ShapeError, match="ORDER BY"):
+            Shape.validate(LimitNoOrderParent)
+
+    def test_offset_fails_loud(self) -> None:
+        @shape(
+            "SELECT id, card_id, body FROM oc WHERE card_id = :card_id ORDER BY id LIMIT 3 OFFSET 2"
+        )
+        @dataclass(frozen=True, slots=True)
+        class OffsetChild:
+            id: int
+            card_id: int
+            body: str
+
+        @shape("SELECT id, name FROM oc_cards2")
+        @dataclass(frozen=True, slots=True)
+        class OffsetParent:
+            id: int
+            name: str
+            kids: tuple[OffsetChild, ...] = nested(OffsetChild, on="card_id", key="id")
+
+        with pytest.raises(ShapeError, match="OFFSET"):
+            Shape.validate(OffsetParent)
+
+    def test_limit_with_grandchildren_fails_loud(self) -> None:
+        @shape("SELECT id, comment_id, txt FROM replies WHERE comment_id = :comment_id")
+        @dataclass(frozen=True, slots=True)
+        class GCReply:
+            id: int
+            comment_id: int
+            txt: str
+
+        @shape(
+            "SELECT id, card_id, body FROM gc_comments WHERE card_id = :card_id ORDER BY id LIMIT 2"
+        )
+        @dataclass(frozen=True, slots=True)
+        class GCComment:
+            id: int
+            card_id: int
+            body: str
+            replies: tuple[GCReply, ...] = nested(GCReply, on="comment_id", key="id")
+
+        @shape("SELECT id, name FROM gc_cards")
+        @dataclass(frozen=True, slots=True)
+        class GCCard:
+            id: int
+            name: str
+            comments: tuple[GCComment, ...] = nested(GCComment, on="card_id", key="id")
+
+        with pytest.raises(ShapeError, match=r"grandchildren|nested"):
+            Shape.validate(GCCard)
+
+
+# -- optional=True nested: skip-None-key branch AND all-None branch ----------
+
+
+@shape("SELECT id, owner_id, label FROM opt_tags WHERE owner_id = :owner_id")
+@dataclass(frozen=True, slots=True)
+class OptTag:
+    id: int
+    owner_id: int
+    label: str
+
+
+@shape("SELECT id, name, group_id FROM opt_items")
+@dataclass(frozen=True, slots=True)
+class OptItem:
+    id: int
+    name: str
+    group_id: int | None
+    tags: tuple[OptTag, ...] = nested(OptTag, on="owner_id", key="group_id", optional=True)
+
+
+class TestOptionalNested:
+    @pytest.fixture
+    async def opt_db(self, tmp_path):
+        db_path = tmp_path / "opt.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute(
+            "CREATE TABLE opt_items (id INTEGER PRIMARY KEY, name TEXT, group_id INTEGER)"
+        )
+        await database.execute(
+            "CREATE TABLE opt_tags (id INTEGER PRIMARY KEY, owner_id INTEGER, label TEXT)"
+        )
+        yield database
+        await database.disconnect()
+
+    async def test_skip_none_key_branch(self, opt_db) -> None:
+        """A parent with key=None is skipped; non-None parents still load tags."""
+        await opt_db.execute("INSERT INTO opt_items (id, name, group_id) VALUES (1, 'has', 100)")
+        await opt_db.execute("INSERT INTO opt_items (id, name, group_id) VALUES (2, 'none', NULL)")
+        await opt_db.execute("INSERT INTO opt_tags (id, owner_id, label) VALUES (1, 100, 't1')")
+        items = await Shape.fetch(OptItem, opt_db)
+        by_id = {i.id: i for i in items}
+        assert [t.label for t in by_id[1].tags] == ["t1"]
+        # The None-group parent gets an empty tuple (skipped from the IN-list).
+        assert by_id[2].tags == ()
+
+    async def test_all_none_key_branch(self, opt_db) -> None:
+        """When EVERY parent key is None, no child query runs; all tuples empty."""
+        await opt_db.execute("INSERT INTO opt_items (id, name, group_id) VALUES (1, 'a', NULL)")
+        await opt_db.execute("INSERT INTO opt_items (id, name, group_id) VALUES (2, 'b', NULL)")
+        counting = _CountingDB(opt_db)
+        items = await Shape.fetch(OptItem, counting)  # type: ignore[arg-type]
+        assert all(i.tags == () for i in items)
+        # Only the parent query runs (no key values -> no child IN-list query).
+        assert counting.fetch_count == 1
+
+
+# -- #5: chunking boundary (lowered module constant) -------------------------
+
+
+class TestChunkingBoundary:
+    async def test_keys_exceeding_chunk_size_issue_multiple_batches(
+        self, nested_db, monkeypatch
+    ) -> None:
+        """With _MAX_IN_LIST_KEYS lowered to 2, 3 boards -> the card level chunks."""
+        await _seed(nested_db, 3)  # 3 boards, 2 cards each, 2 comments each
+        monkeypatch.setattr(_shapes_mod, "_MAX_IN_LIST_KEYS", 2)
+        counting = _CountingDB(nested_db)
+        boards = await Shape.fetch(NCBoard, counting)  # type: ignore[arg-type]
+        assert len(boards) == 3
+        # 1 parent query.
+        # Card level: 3 distinct board ids / chunk 2 -> 2 batches.
+        # Comment level: 6 distinct card ids / chunk 2 -> 3 batches.
+        # Total: 1 + 2 + 3 == 6.
+        assert counting.fetch_count == 6
+
+    async def test_chunked_merge_is_correct(self, nested_db, monkeypatch) -> None:
+        """Chunking merges to the SAME grouped result as a single batch."""
+        await _seed(nested_db, 3)
+        monkeypatch.setattr(_shapes_mod, "_MAX_IN_LIST_KEYS", 2)
+        boards = await Shape.fetch(NCBoard, nested_db)
+        by_id = {b.id: b for b in boards}
+        for bid, board in by_id.items():
+            assert len(board.cards) == 2
+            assert all(c.board_id == bid for c in board.cards)
+            for card in board.cards:
+                assert len(card.comments) == 2
+                assert all(cm.card_id == card.id for cm in card.comments)
+
+
+# -- Postgres ($N) end-to-end through nested compiler + Composite + scope -----
+
+
+class _FakePGDB:
+    """A fake PostgreSQL Database: records bound SQL/params and returns canned rows.
+
+    Reports ``_driver == 'postgresql'`` so _bind_params emits ``$N`` placeholders.
+    ``_tables`` maps a (table-name predicate) to canned dict rows; the fake
+    filters by the bound params and maps via the real ``map_row`` so the result
+    is the same frozen-dataclass shape the production path produces.
+    """
+
+    def __init__(self, tables):
+        self._tables = tables
+        self.statements: list[str] = []
+
+    @property
+    def _driver(self) -> str:
+        return "postgresql"
+
+    def _rows_for(self, cls, sql):
+        from chirp.data._mapping import map_row
+
+        self.statements.append(sql)
+        canned = self._tables.get(cls, [])
+        return [map_row(cls, row) for row in canned]
+
+    async def fetch(self, cls, sql, /, *params):
+        return self._rows_for(cls, sql)
+
+    async def fetch_one(self, cls, sql, /, *params):
+        rows = self._rows_for(cls, sql)
+        return rows[0] if rows else None
+
+
+@shape("SELECT id, board_id, title FROM pg_cards WHERE board_id = :board_id", scope="community_id")
+@dataclass(frozen=True, slots=True)
+class PGCard:
+    id: int
+    board_id: int
+    title: str
+
+
+@shape("SELECT id, name FROM pg_boards", scope="community_id")
+@dataclass(frozen=True, slots=True)
+class PGBoard:
+    id: int
+    name: str
+    cards: tuple[PGCard, ...] = nested(PGCard, on="board_id", key="id")
+
+
+@shape("SELECT id, title FROM pgc_boards WHERE id = :board_id", scope="community_id")
+@dataclass(frozen=True, slots=True)
+class PGCBoard:
+    id: int
+    title: str
+
+
+@composite(scope="community_id")
+@dataclass(frozen=True, slots=True)
+class PGCPage:
+    board: PGCBoard
+    cards: tuple[PGCard, ...]
+
+
+class TestPostgresEndToEnd:
+    async def test_nested_compiler_emits_dollar_placeholders(self) -> None:
+        fake = _FakePGDB(
+            {
+                PGBoard: [{"id": 1, "name": "B1"}],
+                PGCard: [{"id": 10, "board_id": 1, "title": "C10"}],
+            }
+        )
+        boards = await Shape.fetch(PGBoard, fake, scope=1)  # type: ignore[arg-type]
+        assert boards[0].name == "B1"
+        assert [c.id for c in boards[0].cards] == [10]
+        # Every executed statement uses $N (PG), never a leftover :name token; and
+        # the scope predicate ($N) is present in both parent and child queries.
+        assert all("$" in s for s in fake.statements)
+        assert all(":" not in s for s in fake.statements)
+        # Both the parent and the child IN-list query carry the scope predicate.
+        assert sum("community_id = $" in s for s in fake.statements) == 2
+
+    async def test_composite_load_pg_threads_scope_dollar(self) -> None:
+        fake = _FakePGDB(
+            {
+                PGCBoard: [{"id": 7, "title": "Owned"}],
+                PGCard: [{"id": 10, "board_id": 7, "title": "C10"}],
+            }
+        )
+        page = await Composite.load(PGCPage, fake, board_id=7, scope=1)  # type: ignore[arg-type]
+        assert page.board is not None
+        assert page.board.title == "Owned"
+        assert [c.id for c in page.cards] == [10]
+        assert all("$" in s for s in fake.statements)
+        assert any("community_id = $" in s for s in fake.statements)
+
+
+# -- _member_params adversarial (extra ignored, missing fails loud) ----------
+
+
+class TestMemberParamsAdversarial:
+    def test_extra_param_ignored(self) -> None:
+        meta = _meta_for(CPMember)
+        out = _member_params(meta, None, {"board_id": 7, "irrelevant": "x"})
+        # Only :board_id (the placeholder the member SQL references) is kept.
+        assert out == {"board_id": 7}
+
+    def test_scope_threaded_when_member_scoped(self) -> None:
+        meta = _meta_for(CSCMember)
+        out = _member_params(meta, "community_id", {"board_id": 7, "scope": 1})
+        assert out == {"board_id": 7, "scope": 1}
+
+    async def test_missing_param_fails_loud_at_fetch(self, composite_db) -> None:
+        """A member whose required :name is absent fails loud (not silently)."""
+        # CPMember references :board_id; omit it -> _bind_params raises.
+        with pytest.raises(ShapeError, match=":board_id"):
+            await Shape.fetch(CPMember, composite_db)
+
+
+def _meta_for(cls):
+    """Helper: the frozen _ShapeMeta sidecar for a Shape (test-only accessor)."""
+    return cls.__chirp_shape__
+
+
+# ===========================================================================
+# Round-2 adversarial re-audit fixes (A1/A2/A3/A4/A5)
+# ===========================================================================
+
+
+# -- A1: scope-column matcher anchoring (the tenant-isolation BLOCKER) -------
+
+
+class TestScopeColumnAnchoring:
+    def test_suffix_column_is_not_already_scoped(self) -> None:
+        """scope='community_id' must NOT substring-match 'actor_community_id'.
+
+        Without a left word boundary, 'WHERE actor_community_id = :scope' was
+        judged already-scoped, so the compiler injected NOTHING and shipped an
+        UNSCOPED cross-tenant query (and the validate backstop also passed clean).
+        """
+        sql = "SELECT id FROM t WHERE actor_community_id = :scope"
+        # No depth-0 predicate on the *real* scope column is detected.
+        assert _depth0_scope_predicate(sql, "community_id") is None
+        # The backstop must NOT consider the query already-scoped.
+        assert not _has_scope_predicate(sql, "community_id")
+        # And injection must add a REAL standalone scope predicate.
+        out = _inject_scope(sql, "community_id")
+        assert out == (
+            "SELECT id FROM t WHERE actor_community_id = :scope AND community_id = :scope"
+        )
+        # The injected predicate is a standalone scope predicate the backstop sees.
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_scope_id_matches_only_bare_id_not_user_id(self) -> None:
+        """scope='id' must not match the suffix of '*_id' columns."""
+        sql = "SELECT id FROM t WHERE user_id = :uid"
+        assert _depth0_scope_predicate(sql, "id") is None
+        out = _inject_scope(sql, "id")
+        assert out == "SELECT id FROM t WHERE user_id = :uid AND id = :scope"
+
+    def test_org_id_not_false_rejected_by_parent_org_id(self) -> None:
+        """scope='org_id' + 'parent_org_id' must inject (no false author-conflict)."""
+        sql = "SELECT id FROM t WHERE parent_org_id = :p"
+        # parent_org_id is NOT a predicate on the org_id scope column -> inject.
+        out = _inject_scope(sql, "org_id")
+        assert out == "SELECT id FROM t WHERE parent_org_id = :p AND org_id = :scope"
+
+    def test_real_scope_column_still_idempotent(self) -> None:
+        """The genuine scope column (bare or qualified) is still detected."""
+        assert _inject_scope("SELECT id FROM t WHERE community_id = :scope", "community_id") == (
+            "SELECT id FROM t WHERE community_id = :scope"
+        )
+        assert _inject_scope("SELECT id FROM t WHERE t.community_id = :scope", "community_id") == (
+            "SELECT id FROM t WHERE t.community_id = :scope"
+        )
+
+    def test_suffix_column_runtime_leak_excluded(self, tmp_path) -> None:
+        """End-to-end: a shape whose WHERE names a *_community_id suffix column
+        still gets a REAL tenant predicate injected, so a cross-tenant row is
+        excluded at runtime (the leak the suffix bug would have shipped)."""
+        import asyncio
+
+        @shape(
+            "SELECT id, community_id, actor_community_id, body FROM a1_events "
+            "WHERE actor_community_id = :actor",
+            scope="community_id",
+        )
+        @dataclass(frozen=True, slots=True)
+        class A1Event:
+            id: int
+            community_id: int
+            actor_community_id: int
+            body: str
+
+        async def run() -> list[A1Event]:
+            db_path = tmp_path / "a1.db"
+            database = Database(f"sqlite:///{db_path}")
+            await database.connect()
+            await database.execute(
+                "CREATE TABLE a1_events (id INTEGER PRIMARY KEY, community_id INTEGER, "
+                "actor_community_id INTEGER, body TEXT)"
+            )
+            # Tenant 1's own row (community_id=1) and a LEAK row owned by tenant 2
+            # (community_id=2) but with the SAME actor_community_id=5.
+            await database.execute(
+                "INSERT INTO a1_events (id, community_id, actor_community_id, body) "
+                "VALUES (1, 1, 5, 'mine')"
+            )
+            await database.execute(
+                "INSERT INTO a1_events (id, community_id, actor_community_id, body) "
+                "VALUES (2, 2, 5, 'LEAK')"
+            )
+            try:
+                # validate() must pass (compiler output carries the scope predicate).
+                Shape.validate(A1Event)
+                return await Shape.fetch(A1Event, database, actor=5, scope=1)
+            finally:
+                await database.disconnect()
+
+        rows = asyncio.run(run())
+        # Tenant 1 sees ONLY its own row; the cross-tenant LEAK row is excluded.
+        assert [r.id for r in rows] == [1]
+        assert all(r.community_id == 1 for r in rows)
+
+
+# -- A2: comment-aware scanners (no scope into a comment, no phantom binds) ---
+
+
+class TestCommentAwareScanners:
+    def test_placeholder_inside_line_comment_ignored(self) -> None:
+        assert _placeholder_names("SELECT id FROM t WHERE a = :a -- :phantom") == {"a"}
+
+    def test_placeholder_inside_block_comment_ignored(self) -> None:
+        assert _placeholder_names("SELECT id FROM t /* :phantom */ WHERE a = :a") == {"a"}
+
+    def test_bind_params_ignores_comment_placeholder(self) -> None:
+        sql, params = _bind_params("SELECT id FROM t WHERE a = :a -- :phantom", "sqlite", {"a": 7})
+        assert sql == "SELECT id FROM t WHERE a = ? -- :phantom"
+        assert params == (7,)
+
+    def test_scope_injected_before_trailing_line_comment(self) -> None:
+        """The injected predicate must land in EXECUTABLE SQL, not after '--'."""
+        out = _inject_scope("SELECT id FROM t WHERE a = :a -- note", "community_id")
+        assert out == "SELECT id FROM t WHERE a = :a AND community_id = :scope -- note"
+        # The predicate is real SQL (the backstop sees it), not commented out.
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_scope_injected_with_inline_block_comment(self) -> None:
+        out = _inject_scope("SELECT id FROM t WHERE a = :a /* x */", "community_id")
+        assert out == "SELECT id FROM t WHERE a = :a AND community_id = :scope /* x */"
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_commented_close_paren_does_not_drive_depth_negative(self) -> None:
+        """A commented-out ')' must not make the real WHERE look depth>0."""
+        out = _inject_scope("SELECT id FROM t -- )\nWHERE a = :a", "community_id")
+        # Exactly one WHERE: the injected predicate joins the real WHERE with AND
+        # (no spurious second WHERE from a mis-tracked depth).
+        assert out.count("WHERE") == 1
+        assert "AND community_id = :scope" in out
+
+    def test_commented_out_where_not_counted_as_second_depth0_where(self) -> None:
+        """A commented '/* WHERE x */' is not a second depth-0 WHERE."""
+        sql = "SELECT id FROM t /* WHERE x */ WHERE a = :a"
+        # Still injectable (only ONE real depth-0 WHERE).
+        assert _scope_injectable(sql)
+        out = _inject_scope(sql, "community_id")
+        assert out == "SELECT id FROM t /* WHERE x */ WHERE a = :a AND community_id = :scope"
+
+    def test_child_order_by_after_comment_with_unbalanced_paren(self) -> None:
+        """A child ORDER BY following a comment with a stray ')' is still captured."""
+        d = _decompose_child(
+            "SELECT id, card_id FROM t /* ) */ WHERE card_id = :card_id ORDER BY id", "card_id"
+        )
+        assert d.order_by == "id"
+        assert d.join_isolated is True
+
+    def test_scope_predicate_inside_line_comment_is_not_already_scoped(self) -> None:
+        """A 'community_id = :scope' written inside a '--' comment is NOT real SQL.
+
+        Treating it as an existing predicate would suppress injection and ship an
+        UNSCOPED query (the same leak class as A1).
+        """
+        sql = "SELECT id FROM t WHERE a = :a -- community_id = :scope"
+        assert _depth0_scope_predicate(sql, "community_id") is None
+        assert not _has_scope_predicate(sql, "community_id")
+        out = _inject_scope(sql, "community_id")
+        # A REAL predicate is injected before the trailing comment (executable).
+        assert "AND community_id = :scope -- community_id = :scope" in out
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_scope_predicate_inside_block_comment_is_not_already_scoped(self) -> None:
+        sql = "SELECT id FROM t /* community_id = :scope */ WHERE a = :a"
+        assert not _has_scope_predicate(sql, "community_id")
+        out = _inject_scope(sql, "community_id")
+        assert out == (
+            "SELECT id FROM t /* community_id = :scope */ WHERE a = :a AND community_id = :scope"
+        )
+
+    def test_scope_predicate_inside_string_literal_is_not_already_scoped(self) -> None:
+        sql = "SELECT id FROM t WHERE label = 'community_id = :scope' AND a = :a"
+        assert not _has_scope_predicate(sql, "community_id")
+        out = _inject_scope(sql, "community_id")
+        assert "AND community_id = :scope" in out
+        assert _has_scope_predicate(out, "community_id")
+
+
+# -- A3: nested child residual WHERE preserved (runtime row exclusion) --------
+
+
+@shape(
+    "SELECT id, card_id, body, deleted FROM a3_comments WHERE card_id = :card_id AND deleted = 0"
+)
+@dataclass(frozen=True, slots=True)
+class A3Comment:
+    id: int
+    card_id: int
+    body: str
+    deleted: int
+
+
+@shape("SELECT id, name FROM a3_cards")
+@dataclass(frozen=True, slots=True)
+class A3Card:
+    id: int
+    name: str
+    comments: tuple[A3Comment, ...] = nested(A3Comment, on="card_id", key="id")
+
+
+@shape(
+    "SELECT id, card_id, body, deleted FROM a3_comments "
+    "WHERE card_id = :card_id AND deleted = 0 ORDER BY id DESC LIMIT 2"
+)
+@dataclass(frozen=True, slots=True)
+class A3LimitComment:
+    id: int
+    card_id: int
+    body: str
+    deleted: int
+
+
+@shape("SELECT id, name FROM a3_cards")
+@dataclass(frozen=True, slots=True)
+class A3LimitCard:
+    id: int
+    name: str
+    comments: tuple[A3LimitComment, ...] = nested(A3LimitComment, on="card_id", key="id")
+
+
+class TestResidualChildWhere:
+    @pytest.fixture
+    async def a3_db(self, tmp_path):
+        db_path = tmp_path / "a3.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE a3_cards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE a3_comments "
+            "(id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT, deleted INTEGER)"
+        )
+        await database.execute("INSERT INTO a3_cards (id, name) VALUES (1, 'A')")
+        await database.execute("INSERT INTO a3_cards (id, name) VALUES (2, 'B')")
+        # Card 1: 2 live + 1 soft-deleted; card 2: 1 live + 1 soft-deleted.
+        rows = [
+            (1, 1, "live1", 0),
+            (2, 1, "live2", 0),
+            (3, 1, "GONE", 1),
+            (4, 2, "live3", 0),
+            (5, 2, "GONE", 1),
+        ]
+        for r in rows:
+            await database.execute(
+                "INSERT INTO a3_comments (id, card_id, body, deleted) VALUES (?, ?, ?, ?)", *r
+            )
+        yield database
+        await database.disconnect()
+
+    def test_batched_sql_preserves_residual_filter(self) -> None:
+        sql = _batched_child_sql(A3Comment.__chirp_shape__, "card_id", ("__chirp_k0", "__chirp_k1"))
+        assert "card_id IN (:__chirp_k0, :__chirp_k1)" in sql
+        # The author's deleted=0 filter survives the IN-list rewrite (finding A3).
+        assert "deleted = 0" in sql
+
+    async def test_residual_filter_excludes_rows_at_runtime(self, a3_db) -> None:
+        cards = await Shape.fetch(A3Card, a3_db)
+        by_id = {c.id: c for c in cards}
+        # Soft-deleted comments (ids 3, 5) are excluded by the preserved filter.
+        assert sorted(cm.id for cm in by_id[1].comments) == [1, 2]
+        assert sorted(cm.id for cm in by_id[2].comments) == [4]
+        assert all(cm.deleted == 0 for c in cards for cm in c.comments)
+
+    def test_batched_window_sql_preserves_residual_and_outer_order(self) -> None:
+        sql = _batched_child_sql(
+            A3LimitComment.__chirp_shape__, "card_id", ("__chirp_k0", "__chirp_k1")
+        )
+        # Residual filter lives in the inner (pre-ranking) query.
+        assert "deleted = 0" in sql
+        # The inner derived table ranks by the declared ORDER BY (id DESC).
+        assert "ORDER BY id DESC" in sql
+        # A4/R3-1: the OUTER select orders on the PROJECTED ``card_id, __chirp_rn``
+        # so within-parent order is deterministic without referencing a column the
+        # inner derived table might not expose.
+        assert sql.rstrip().endswith("ORDER BY card_id, __chirp_rn")
+        assert "__chirp_rn <= 2" in sql
+
+    async def test_residual_filter_with_per_parent_limit_window(self, a3_db) -> None:
+        """Residual filter + per-parent LIMIT window path excludes soft-deleted."""
+        cards = await Shape.fetch(A3LimitCard, a3_db)
+        by_id = {c.id: c for c in cards}
+        # Card 1 has 2 live comments; top-2 by id DESC -> [2, 1] (GONE id=3 excluded).
+        assert [cm.id for cm in by_id[1].comments] == [2, 1]
+        # Card 2 has 1 live comment -> [4] (GONE id=5 excluded).
+        assert [cm.id for cm in by_id[2].comments] == [4]
+
+    def test_un_isolable_join_predicate_fails_loud(self) -> None:
+        @shape("SELECT id, card_id, body FROM uic WHERE card_id = :card_id OR shared = 1")
+        @dataclass(frozen=True, slots=True)
+        class UnIsolableChild:
+            id: int
+            card_id: int
+            body: str
+
+        @shape("SELECT id, name FROM uic_cards")
+        @dataclass(frozen=True, slots=True)
+        class UnIsolableParent:
+            id: int
+            name: str
+            kids: tuple[UnIsolableChild, ...] = nested(UnIsolableChild, on="card_id", key="id")
+
+        with pytest.raises(ShapeError, match=r"cannot be cleanly isolated|top-level AND"):
+            Shape.validate(UnIsolableParent)
+
+
+# -- A4: window top-N outer ORDER BY -----------------------------------------
+
+
+class TestWindowOuterOrderBy:
+    def test_window_path_has_outer_order_by(self) -> None:
+        meta = _ShapeMeta(
+            sql=(
+                "SELECT id, card_id, body FROM c WHERE card_id = :card_id "
+                "ORDER BY created_at DESC LIMIT 3"
+            ),
+            columns=("id", "card_id", "body"),
+            computed=frozenset(),
+            scope=None,
+            name="W",
+        )
+        sql = _batched_child_sql(meta, "card_id", ("__chirp_k0",))
+        # The outer SELECT (not just the inner derived table) carries an ORDER BY
+        # so within-parent order is not driver-dependent (PostgreSQL warns against
+        # relying on inner ORDER BY propagation). But the outer order is on the
+        # PROJECTED columns ``{on}, __chirp_rn`` -- NOT the raw ``created_at``,
+        # which the inner derived table does not expose (it is ordered/ranked but
+        # not SELECTed). Re-emitting ``ORDER BY created_at DESC`` on the outer
+        # query would crash with "no such column: created_at" (finding R3-1).
+        assert sql.rstrip().endswith("ORDER BY card_id, __chirp_rn")
+        # The within-parent order is encoded by __chirp_rn (rank 1 == first by the
+        # inner ORDER BY), so the outer query never references the raw sort column.
+        assert "ORDER BY created_at" not in sql.rsplit("__chirp_rn <=", 1)[1]
+        # The outer ORDER BY sits AFTER the row-number filter.
+        assert sql.index("__chirp_rn <=") < sql.rindex("ORDER BY")
+
+
+# -- A5: chunking x window-top-N interaction ---------------------------------
+
+
+@shape(
+    "SELECT id, card_id, body FROM a5_comments WHERE card_id = :card_id ORDER BY id DESC LIMIT 2"
+)
+@dataclass(frozen=True, slots=True)
+class A5Comment:
+    id: int
+    card_id: int
+    body: str
+
+
+@shape("SELECT id, name FROM a5_cards")
+@dataclass(frozen=True, slots=True)
+class A5Card:
+    id: int
+    name: str
+    comments: tuple[A5Comment, ...] = nested(A5Comment, on="card_id", key="id")
+
+
+class TestChunkingWindowInteraction:
+    @pytest.fixture
+    async def a5_db(self, tmp_path):
+        db_path = tmp_path / "a5.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE a5_cards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE a5_comments (id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT)"
+        )
+        # 3 cards, 4 comments each (ids ascending, globally unique).
+        cid = 0
+        for card in (1, 2, 3):
+            await database.execute(
+                "INSERT INTO a5_cards (id, name) VALUES (?, ?)", card, f"Card {card}"
+            )
+            for _ in range(4):
+                cid += 1
+                await database.execute(
+                    "INSERT INTO a5_comments (id, card_id, body) VALUES (?, ?, ?)",
+                    cid,
+                    card,
+                    f"c{cid}",
+                )
+        yield database
+        await database.disconnect()
+
+    async def test_per_parent_top_n_correct_across_chunks(self, a5_db, monkeypatch) -> None:
+        """Per-parent top-N stays correct when parent keys chunk across batches.
+
+        With _MAX_IN_LIST_KEYS lowered to 2, the 3 card keys span two chunks. Each
+        PARTITION BY key lands wholly in ONE chunk (chunking is on the parent
+        keys, and a card's comments are all returned by the chunk that includes
+        that card's id), so the window top-N is computed correctly per card.
+        """
+        monkeypatch.setattr(_shapes_mod, "_MAX_IN_LIST_KEYS", 2)
+        counting = _CountingDB(a5_db)
+        cards = await Shape.fetch(A5Card, counting)  # type: ignore[arg-type]
+        by_id = {c.id: c for c in cards}
+        # Each card keeps its OWN top-2 by id DESC despite the chunked batches.
+        assert [cm.id for cm in by_id[1].comments] == [4, 3]
+        assert [cm.id for cm in by_id[2].comments] == [8, 7]
+        assert [cm.id for cm in by_id[3].comments] == [12, 11]
+        # 1 parent query + ceil(3 / 2) == 2 child window batches.
+        assert counting.fetch_count == 3
+
+
+# -- R3-1: window top-N outer ORDER BY on a NON-projected sort column --------
+
+
+@shape(
+    "SELECT id, card_id, body FROM r31_comments "
+    "WHERE card_id = :card_id ORDER BY created_at DESC LIMIT 2"
+)
+@dataclass(frozen=True, slots=True)
+class R31Comment:
+    # NOTE: created_at is the ORDER BY column but is deliberately NOT SELECTed /
+    # declared -- the canonical "top-N most recent" child. The window rewrite must
+    # therefore order the OUTER query on projected columns only (finding R3-1).
+    id: int
+    card_id: int
+    body: str
+
+
+@shape("SELECT id, name FROM r31_cards")
+@dataclass(frozen=True, slots=True)
+class R31Card:
+    id: int
+    name: str
+    comments: tuple[R31Comment, ...] = nested(R31Comment, on="card_id", key="id")
+
+
+class TestWindowOuterOrderByNonProjectedColumn:
+    """R3-1: ``ORDER BY <non-projected col> LIMIT N`` must not crash at runtime.
+
+    The inner derived table exposes only the child's declared columns + the
+    synthetic ``__chirp_rn``. A top-N child that sorts by a column it does NOT
+    SELECT (``ORDER BY created_at DESC`` with no ``created_at`` field) made the
+    OLD outer ``ORDER BY created_at`` reference a column the derived table never
+    exposes -> "no such column: created_at". The fix orders the outer query on
+    ``{on}, __chirp_rn`` (both projected); within-parent order is preserved
+    because the inner ROW_NUMBER ranks by the declared ORDER BY.
+    """
+
+    @pytest.fixture
+    async def r31_db(self, tmp_path):
+        db_path = tmp_path / "r31.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE r31_cards (id INTEGER PRIMARY KEY, name TEXT)")
+        # created_at exists in the table but is NOT in the child SELECT list.
+        await database.execute(
+            "CREATE TABLE r31_comments "
+            "(id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT, created_at TEXT)"
+        )
+        await database.execute("INSERT INTO r31_cards (id, name) VALUES (1, 'A')")
+        await database.execute("INSERT INTO r31_cards (id, name) VALUES (2, 'B')")
+        # Card 1: three comments; created_at ascending with id so id=3 is newest.
+        # Card 2: three comments; id=6 is newest. Top-2 by created_at DESC per card.
+        rows = [
+            (1, 1, "c1", "2024-01-01"),
+            (2, 1, "c2", "2024-01-02"),
+            (3, 1, "c3", "2024-01-03"),
+            (4, 2, "c4", "2024-02-01"),
+            (5, 2, "c5", "2024-02-02"),
+            (6, 2, "c6", "2024-02-03"),
+        ]
+        for r in rows:
+            await database.execute(
+                "INSERT INTO r31_comments (id, card_id, body, created_at) VALUES (?, ?, ?, ?)",
+                *r,
+            )
+        yield database
+        await database.disconnect()
+
+    async def test_non_projected_order_column_does_not_crash(self, r31_db) -> None:
+        # Before the fix this raised sqlite3.OperationalError: no such column:
+        # created_at, surfaced through the Database facade. It must now succeed.
+        cards = await Shape.fetch(R31Card, r31_db)
+        by_id = {c.id: c for c in cards}
+        # Card 1 top-2 most-recent by created_at DESC -> ids [3, 2].
+        assert [cm.id for cm in by_id[1].comments] == [3, 2]
+        # Card 2 top-2 most-recent -> ids [6, 5]. Per-parent, not a global LIMIT 2.
+        assert [cm.id for cm in by_id[2].comments] == [6, 5]
+
+
+# -- R3-2: author residual placeholder named ``k0`` must not collide ---------
+
+
+@shape("SELECT id, card_id, body, owner FROM r32_comments WHERE card_id = :card_id AND owner = :k0")
+@dataclass(frozen=True, slots=True)
+class R32Comment:
+    # The residual filter deliberately uses an author placeholder NAMED ``k0`` --
+    # the exact name the OLD compiler generated for its first batch key. With the
+    # reserved ``__chirp_k0`` prefix it can no longer collide (finding R3-2).
+    id: int
+    card_id: int
+    body: str
+    owner: str
+
+
+@shape("SELECT id, name FROM r32_cards")
+@dataclass(frozen=True, slots=True)
+class R32Card:
+    id: int
+    name: str
+    comments: tuple[R32Comment, ...] = nested(R32Comment, on="card_id", key="id")
+
+
+class TestResidualPlaceholderNamedK0:
+    """R3-2: an author placeholder named ``k0`` must thread its own value.
+
+    The compiler used to generate batch-key placeholders ``k0, k1, ...`` and seed
+    them from the parent keys. An author residual placeholder literally named
+    ``:k0`` was NEVER threaded (the loop skipped names already in child_params),
+    so it silently bound to a PARENT-KEY value -- ``fetch(id=1, k0='alice')``
+    returned ``[]`` because ``:k0`` carried the parent key ``1`` instead of
+    ``'alice'``. With the reserved ``__chirp_k0`` prefix the author ``:k0`` is
+    threaded from the fetch params and the right rows come back.
+    """
+
+    @pytest.fixture
+    async def r32_db(self, tmp_path):
+        db_path = tmp_path / "r32.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE r32_cards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE r32_comments "
+            "(id INTEGER PRIMARY KEY, card_id INTEGER, body TEXT, owner TEXT)"
+        )
+        await database.execute("INSERT INTO r32_cards (id, name) VALUES (1, 'A')")
+        await database.execute("INSERT INTO r32_cards (id, name) VALUES (2, 'B')")
+        # Card 1: one alice + one bob; card 2: one alice. The author filter keeps
+        # only owner='alice'.
+        rows = [
+            (1, 1, "by-alice", "alice"),
+            (2, 1, "by-bob", "bob"),
+            (3, 2, "by-alice-2", "alice"),
+        ]
+        for r in rows:
+            await database.execute(
+                "INSERT INTO r32_comments (id, card_id, body, owner) VALUES (?, ?, ?, ?)", *r
+            )
+        yield database
+        await database.disconnect()
+
+    async def test_author_k0_filter_is_applied(self, r32_db) -> None:
+        # k0='alice' must filter on owner, NOT collide with the generated batch
+        # keys. Before the fix this returned no comments (k0 bound to a card id).
+        cards = await Shape.fetch(R32Card, r32_db, k0="alice")
+        by_id = {c.id: c for c in cards}
+        assert [cm.id for cm in by_id[1].comments] == [1]
+        assert all(cm.owner == "alice" for c in cards for cm in c.comments)
+        # Card 2's alice comment also comes back -> proves no collision starved it.
+        assert [cm.id for cm in by_id[2].comments] == [3]
+
+    async def test_author_k0_filter_excludes_non_matching(self, r32_db) -> None:
+        # k0='bob' returns only bob's comment on card 1; card 2 has no bob.
+        cards = await Shape.fetch(R32Card, r32_db, k0="bob")
+        by_id = {c.id: c for c in cards}
+        assert [cm.id for cm in by_id[1].comments] == [2]
+        assert by_id[2].comments == ()
+
+
+# -- R3-3: scoped child author scope-predicate fail-loud parity --------------
+
+
+@shape(
+    "SELECT id, board_id, title FROM r33_cards "
+    "WHERE board_id = :board_id AND community_id = :other",
+    scope="community_id",
+)
+@dataclass(frozen=True, slots=True)
+class R33ScopedCardAuthorScope:
+    # The author wrote their OWN predicate on the scope column (``community_id``)
+    # with a non-canonical RHS. On the PARENT path this fails loud; the child path
+    # must reach the same fail-loud (finding R3-3) -- the child residual is
+    # re-parenthesized at runtime so the depth-0 conflict check would miss it.
+    id: int
+    board_id: int
+    title: str
+
+
+@shape("SELECT id, name FROM r33_boards", scope="community_id")
+@dataclass(frozen=True, slots=True)
+class R33Board:
+    id: int
+    name: str
+    cards: tuple[R33ScopedCardAuthorScope, ...] = nested(
+        R33ScopedCardAuthorScope, on="board_id", key="id"
+    )
+
+
+class TestScopedChildAuthorPredicateParity:
+    """R3-3: a scoped child with an author scope predicate fails loud at validate.
+
+    The parent path already fails loud (``_inject_scope``) when the author wrote
+    their own predicate on the scope column. A scoped nested child must reach the
+    same fail-loud: at runtime the child's ``community_id = :other`` lands inside
+    the IN-list residual parens (depth 1), so the runtime depth-0 conflict check
+    misses it and the compiler would silently add ``AND community_id = :scope``
+    alongside. ``Shape.validate`` now runs the same injection on the child's
+    ORIGINAL SQL so the ambiguity surfaces at startup.
+    """
+
+    def test_scoped_child_author_scope_predicate_fails_loud(self) -> None:
+        with pytest.raises(ShapeError, match=r"author-written predicate"):
+            Shape.validate(R33Board)
+
+    def test_clean_scoped_child_still_validates(self) -> None:
+        # Parity check: a scoped child WITHOUT an author scope predicate must
+        # still validate cleanly (the new injection is idempotent for it).
+        Shape.validate(ScopedBoard)
+        Shape.validate(ScopedCard)
+
+
+# ===========================================================================
+# F1 — the reserved ``__chirp_`` placeholder prefix is fail-loud enforced
+# ===========================================================================
+#
+# Round-3 moved generated batch keys to ``__chirp_k0`` / ``__chirp_k1`` ... and
+# DOCUMENTED ``__chirp_`` as reserved, but nothing ENFORCED it. An author whose
+# DECLARED SQL writes ``:__chirp_k0`` reproduces the exact silent mis-bind the
+# prefix was reserved to prevent: ``Shape.validate`` PASSES, but ``Shape.fetch``
+# binds ``:__chirp_k0`` to the parent-key value seeded into the batched IN-list,
+# returning wrong/empty rows. The author's declared SQL never legitimately
+# contains a ``__chirp_`` placeholder, so a fail-loud guard at decoration is safe
+# and precise (finding F1).
+
+
+class TestReservedPlaceholderPrefix:
+    def test_reserved_prefix_placeholder_fails_loud_at_decoration(self) -> None:
+        # An author residual filter naming a reserved placeholder must fail loud
+        # at @shape decoration -- not silently pass validate() then mis-bind at
+        # fetch(). Assert the message names the reserved prefix and the offender.
+        with pytest.raises(ShapeError) as excinfo:
+
+            @shape(
+                "SELECT id, board_id FROM f1_cards "
+                "WHERE board_id = :board_id AND owner = :__chirp_k0"
+            )
+            @dataclass(frozen=True, slots=True)
+            class F1ReservedChild:
+                id: int
+                board_id: int
+
+        msg = str(excinfo.value)
+        assert "__chirp_" in msg
+        assert "__chirp_k0" in msg
+        assert "reserved" in msg.lower()
+
+    def test_reserved_prefix_rejected_on_nested_child_sql(self) -> None:
+        # The guard runs at decoration, so it catches a nested CHILD whose SQL
+        # uses the reserved prefix even before the parent references it.
+        with pytest.raises(ShapeError, match=r"reserved"):
+
+            @shape("SELECT id, card_id FROM f1_kids WHERE card_id = :__chirp_rn")
+            @dataclass(frozen=True, slots=True)
+            class F1ReservedNestedChild:
+                id: int
+                card_id: int
+
+    def test_normal_shape_with_ordinary_placeholders_is_unaffected(self) -> None:
+        # A normal shape whose placeholders do NOT use the reserved prefix
+        # decorates cleanly -- the guard is precise, not blanket.
+        @shape("SELECT id, name FROM f1_ok WHERE id = :id AND chirp_owner = :owner")
+        @dataclass(frozen=True, slots=True)
+        class F1OkShape:
+            id: int
+            name: str
+
+        # ``chirp_owner`` / ``:owner`` are not under ``__chirp_`` -> fine.
+        assert F1OkShape.__chirp_shape__.columns == ("id", "name")
+
+    def test_reserved_prefix_inside_comment_is_not_rejected(self) -> None:
+        # The guard scans via the comment-aware shared scanner, so a ``:__chirp_``
+        # token inside a comment is NOT a real placeholder and must not fail loud.
+        @shape("SELECT id FROM f1_c WHERE id = :id -- not a bind :__chirp_k0")
+        @dataclass(frozen=True, slots=True)
+        class F1CommentShape:
+            id: int
+
+        assert F1CommentShape.__chirp_shape__.columns == ("id",)
+
+
+# ===========================================================================
+# F2 — _scope_injectable keyword gates are comment-aware
+# ===========================================================================
+#
+# R3-5 made _parse_select_columns comment-aware, but the WITH / UNION / INTERSECT
+# / EXCEPT / FROM keyword gates in _scope_injectable still ran on RAW SQL, so a
+# scoped shape merely MENTIONING one of those keywords inside a comment was
+# false-rejected as a compound/opaque query (finding F2).
+
+
+class TestScopeInjectableCommentAware:
+    def test_block_comment_union_is_injectable(self) -> None:
+        # ``UNION`` inside a /* ... */ comment is not a compound query.
+        sql = "SELECT id, a FROM t /* UNION ALL hack */ WHERE a = :a"
+        assert _scope_injectable(sql)
+
+    def test_line_comment_union_is_injectable(self) -> None:
+        sql = "SELECT id, a FROM t WHERE a = :a -- UNION SELECT pwd FROM secrets"
+        assert _scope_injectable(sql)
+
+    def test_line_comment_with_keyword_scope_injected_correctly(self) -> None:
+        # Scope is injected into a query whose comment merely mentions WITH/UNION.
+        sql = "SELECT id, a FROM t WHERE a = :a -- WITH cte AS (...) UNION ..."
+        out = _inject_scope(sql, "community_id")
+        assert "AND community_id = :scope" in out
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_block_comment_with_keyword_scope_injected_correctly(self) -> None:
+        sql = "SELECT id, a FROM t /* INTERSECT EXCEPT */ WHERE a = :a"
+        out = _inject_scope(sql, "community_id")
+        assert out == (
+            "SELECT id, a FROM t /* INTERSECT EXCEPT */ WHERE a = :a AND community_id = :scope"
+        )
+        assert _has_scope_predicate(out, "community_id")
+
+
+# ===========================================================================
+# F3 — _inject_scope handles a depth-0 WHERE that begins with a comment
+# ===========================================================================
+#
+# When a scoped WHERE starts with a comment before its first predicate
+# (``WHERE -- c\n a = :a`` or ``WHERE /* c */ a = :a``) the old tail-position
+# logic treated that leading comment as the WHERE clause's tail boundary and
+# produced malformed ``WHERE AND <pred>`` SQL (finding F3).
+
+
+@shape(
+    "SELECT id, community_id, name FROM f3_rows WHERE /* tenant rows only */ name IS NOT NULL",
+    scope="community_id",
+)
+@dataclass(frozen=True, slots=True)
+class F3BlockCommentRow:
+    id: int
+    community_id: int
+    name: str
+
+
+@shape(
+    "SELECT id, community_id, name FROM f3_rows\nWHERE -- tenant rows only\n name IS NOT NULL",
+    scope="community_id",
+)
+@dataclass(frozen=True, slots=True)
+class F3LineCommentRow:
+    id: int
+    community_id: int
+    name: str
+
+
+class TestInjectScopeLeadingComment:
+    def test_block_comment_after_where_injects_valid_sql(self) -> None:
+        out = _inject_scope("SELECT id FROM t WHERE /* c */ a = :a", "community_id")
+        # No malformed ``WHERE AND`` -- the predicate lands after ``a = :a``.
+        assert "WHERE AND" not in out
+        assert "a = :a AND community_id = :scope" in out
+        assert _has_scope_predicate(out, "community_id")
+
+    def test_line_comment_after_where_injects_valid_sql(self) -> None:
+        out = _inject_scope("SELECT id FROM t WHERE -- c\n a = :a", "community_id")
+        assert "WHERE AND" not in out
+        assert "a = :a AND community_id = :scope" in out
+        assert _has_scope_predicate(out, "community_id")
+
+    async def test_leading_block_comment_scope_executes_and_isolates(self, tmp_path) -> None:
+        # DB-EXECUTED: the injected scoped SQL is valid and excludes a cross-tenant
+        # row. Proves the leading-comment fix produces EXECUTABLE scoped SQL, not
+        # the old malformed ``WHERE AND``.
+        db_path = tmp_path / "f3b.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        try:
+            await database.execute(
+                "CREATE TABLE f3_rows (id INTEGER PRIMARY KEY, community_id INTEGER, name TEXT)"
+            )
+            await database.execute(
+                "INSERT INTO f3_rows (id, community_id, name) VALUES (1, 1, 'mine')"
+            )
+            await database.execute(
+                "INSERT INTO f3_rows (id, community_id, name) VALUES (2, 2, 'theirs')"
+            )
+            rows = await Shape.fetch(F3BlockCommentRow, database, scope=1)
+            assert [r.id for r in rows] == [1]
+            assert all(r.community_id == 1 for r in rows)
+        finally:
+            await database.disconnect()
+
+    async def test_leading_line_comment_scope_executes_and_isolates(self, tmp_path) -> None:
+        db_path = tmp_path / "f3l.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        try:
+            await database.execute(
+                "CREATE TABLE f3_rows (id INTEGER PRIMARY KEY, community_id INTEGER, name TEXT)"
+            )
+            await database.execute(
+                "INSERT INTO f3_rows (id, community_id, name) VALUES (1, 1, 'mine')"
+            )
+            await database.execute(
+                "INSERT INTO f3_rows (id, community_id, name) VALUES (2, 2, 'theirs')"
+            )
+            rows = await Shape.fetch(F3LineCommentRow, database, scope=1)
+            assert [r.id for r in rows] == [1]
+            assert all(r.community_id == 1 for r in rows)
+        finally:
+            await database.disconnect()
+
+
+# ===========================================================================
+# F4 — highest-risk isolation path + window coverage (DB-EXECUTED)
+# ===========================================================================
+#
+# (a) A SCOPED nested child with a per-parent LIMIT window AND a residual filter,
+#     all together: a cross-tenant LEAK row that would rank into the top-N if
+#     unscoped must NEVER appear (proves scope is injected BEFORE the window
+#     ranking). (b) a multi-column window ORDER BY returns the correct per-parent
+#     top-N. (c) a parameterized ``LIMIT :n`` window path via Shape.fetch(n=2).
+
+
+@shape(
+    "SELECT id, board_id, community_id, title, archived FROM f4_cards "
+    "WHERE board_id = :board_id AND archived = 0 "
+    "ORDER BY priority DESC, id DESC LIMIT 2",
+    scope="community_id",
+)
+@dataclass(frozen=True, slots=True)
+class F4ScopedWindowChild:
+    id: int
+    board_id: int
+    community_id: int
+    title: str
+    archived: int
+
+
+@shape("SELECT id, name FROM f4_boards", scope="community_id")
+@dataclass(frozen=True, slots=True)
+class F4ScopedWindowBoard:
+    id: int
+    name: str
+    cards: tuple[F4ScopedWindowChild, ...] = nested(F4ScopedWindowChild, on="board_id", key="id")
+
+
+@shape(
+    "SELECT id, board_id, priority, created_at FROM f4_mc "
+    "WHERE board_id = :board_id "
+    "ORDER BY priority DESC, created_at DESC LIMIT 2"
+)
+@dataclass(frozen=True, slots=True)
+class F4MultiColWindowChild:
+    id: int
+    board_id: int
+    priority: int
+    created_at: int
+
+
+@shape("SELECT id, name FROM f4_mc_boards")
+@dataclass(frozen=True, slots=True)
+class F4MultiColWindowBoard:
+    id: int
+    name: str
+    items: tuple[F4MultiColWindowChild, ...] = nested(
+        F4MultiColWindowChild, on="board_id", key="id"
+    )
+
+
+@shape(
+    "SELECT id, board_id, body FROM f4_param WHERE board_id = :board_id ORDER BY id DESC LIMIT :n"
+)
+@dataclass(frozen=True, slots=True)
+class F4ParamLimitChild:
+    id: int
+    board_id: int
+    body: str
+
+
+@shape("SELECT id, name FROM f4_param_boards")
+@dataclass(frozen=True, slots=True)
+class F4ParamLimitBoard:
+    id: int
+    name: str
+    items: tuple[F4ParamLimitChild, ...] = nested(F4ParamLimitChild, on="board_id", key="id")
+
+
+class TestScopedWindowResidualIsolation:
+    @pytest.fixture
+    async def f4_scoped_db(self, tmp_path):
+        db_path = tmp_path / "f4scoped.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        # The board is a SCOPED parent, so the compiler injects community_id into
+        # its query too -- the table must carry the scope column.
+        await database.execute(
+            "CREATE TABLE f4_boards (id INTEGER PRIMARY KEY, community_id INTEGER, name TEXT)"
+        )
+        await database.execute(
+            "CREATE TABLE f4_cards (id INTEGER PRIMARY KEY, board_id INTEGER, "
+            "community_id INTEGER, title TEXT, archived INTEGER, priority INTEGER)"
+        )
+        await database.execute(
+            "INSERT INTO f4_boards (id, community_id, name) VALUES (1, 1, 'Board 1')"
+        )
+        # Tenant 1's own cards on board 1.
+        rows = [
+            # id, board_id, community_id, title, archived, priority
+            (1, 1, 1, "mine-low", 0, 1),
+            (2, 1, 1, "mine-high", 0, 5),
+            (3, 1, 1, "mine-archived", 1, 9),  # excluded by residual archived=0
+            # A cross-tenant LEAK row: HIGHEST priority -> would rank #1 in the
+            # per-parent top-2 window if scope were applied AFTER the ranking.
+            (99, 1, 2, "LEAK-highest", 0, 99),
+        ]
+        for r in rows:
+            await database.execute(
+                "INSERT INTO f4_cards "
+                "(id, board_id, community_id, title, archived, priority) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                *r,
+            )
+        yield database
+        await database.disconnect()
+
+    async def test_scope_applied_before_window_excludes_leak(self, f4_scoped_db) -> None:
+        # Tenant 1 fetch: the LEAK row (community_id=2, priority=99) would be the
+        # window top-1 if scope were applied after ranking. It must NEVER appear,
+        # and the archived row (id=3) is excluded by the residual filter. The
+        # surviving top-2 by priority DESC, id DESC -> [2 (pri 5), 1 (pri 1)].
+        boards = await Shape.fetch(F4ScopedWindowBoard, f4_scoped_db, scope=1)
+        assert [b.id for b in boards] == [1]
+        card_ids = [c.id for c in boards[0].cards]
+        assert 99 not in card_ids
+        assert 3 not in card_ids
+        assert card_ids == [2, 1]
+        assert all(c.community_id == 1 for c in boards[0].cards)
+
+
+class TestMultiColumnWindowOrder:
+    @pytest.fixture
+    async def f4_mc_db(self, tmp_path):
+        db_path = tmp_path / "f4mc.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE f4_mc_boards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE f4_mc (id INTEGER PRIMARY KEY, board_id INTEGER, "
+            "priority INTEGER, created_at INTEGER)"
+        )
+        for b in (1, 2):
+            await database.execute("INSERT INTO f4_mc_boards (id, name) VALUES (?, ?)", b, f"B{b}")
+        # Neither priority nor created_at is the projected sort key alone; the
+        # window must rank by (priority DESC, created_at DESC).
+        rows = [
+            # id, board_id, priority, created_at
+            (1, 1, 5, 100),
+            (2, 1, 5, 200),  # same priority, newer -> ranks above id=1
+            (3, 1, 9, 50),  # highest priority -> ranks #1
+            (4, 1, 1, 999),
+            (5, 2, 2, 10),
+            (6, 2, 2, 20),  # newer within same priority -> ranks #1 on board 2
+            (7, 2, 1, 30),
+        ]
+        for r in rows:
+            await database.execute(
+                "INSERT INTO f4_mc (id, board_id, priority, created_at) VALUES (?, ?, ?, ?)",
+                *r,
+            )
+        yield database
+        await database.disconnect()
+
+    async def test_multi_column_window_top_n_per_parent(self, f4_mc_db) -> None:
+        boards = await Shape.fetch(F4MultiColWindowBoard, f4_mc_db)
+        by_id = {b.id: b for b in boards}
+        # Board 1 top-2 by (priority DESC, created_at DESC): id=3 (pri 9), then
+        # id=2 (pri 5, created 200 beats id=1's 100).
+        assert [it.id for it in by_id[1].items] == [3, 2]
+        # Board 2 top-2: id=6 (pri 2, created 20), id=5 (pri 2, created 10).
+        assert [it.id for it in by_id[2].items] == [6, 5]
+
+
+class TestParameterizedLimitWindow:
+    @pytest.fixture
+    async def f4_param_db(self, tmp_path):
+        db_path = tmp_path / "f4param.db"
+        database = Database(f"sqlite:///{db_path}")
+        await database.connect()
+        await database.execute("CREATE TABLE f4_param_boards (id INTEGER PRIMARY KEY, name TEXT)")
+        await database.execute(
+            "CREATE TABLE f4_param (id INTEGER PRIMARY KEY, board_id INTEGER, body TEXT)"
+        )
+        for b in (1, 2):
+            await database.execute(
+                "INSERT INTO f4_param_boards (id, name) VALUES (?, ?)", b, f"B{b}"
+            )
+        cid = 0
+        for board in (1, 2):
+            for _ in range(4):
+                cid += 1
+                await database.execute(
+                    "INSERT INTO f4_param (id, board_id, body) VALUES (?, ?, ?)",
+                    cid,
+                    board,
+                    f"c{cid}",
+                )
+        yield database
+        await database.disconnect()
+
+    async def test_parameterized_limit_threaded_through_fetch(self, f4_param_db) -> None:
+        # A ``LIMIT :n`` window path: the placeholder is threaded from
+        # Shape.fetch(..., n=2) into the per-parent window top-N.
+        boards = await Shape.fetch(F4ParamLimitBoard, f4_param_db, n=2)
+        by_id = {b.id: b for b in boards}
+        # Board 1 ids 1..4 -> top-2 by id DESC == [4, 3]; board 2 ids 5..8 -> [8, 7].
+        assert [it.id for it in by_id[1].items] == [4, 3]
+        assert [it.id for it in by_id[2].items] == [8, 7]
