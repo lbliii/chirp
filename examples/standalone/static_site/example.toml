@@ -1,0 +1,16 @@
+# Smoke manifest for the static_site example.
+#
+# This app registers no navigable app routes -- every page is served by
+# StaticFiles middleware mounted at "/", so route discovery finds nothing to
+# auto-smoke. Declare the static surface explicitly so the example still
+# proves it actually serves content (index + a stylesheet), not just that it
+# boots. The /__reload__ SSE endpoint is referenced/long-lived and is left to
+# the SSE-aware examples; here we just confirm the static delivery path works.
+[[routes]]
+path = "/"
+status = 200
+contains = ["<!DOCTYPE html>"]
+
+[[routes]]
+path = "/style.css"
+status = 200
