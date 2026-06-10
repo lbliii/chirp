@@ -29,21 +29,41 @@ from chirp.data.errors import (
     DriverNotInstalledError,
     MigrationError,
     QueryError,
+    ShapeError,
 )
 from chirp.data.migrate import migrate
 from chirp.data.pagination import PageResult
 from chirp.data.query import Query
+from chirp.data.shapes import (
+    Composite,
+    NestedShape,
+    Shape,
+    composite,
+    nested,
+    register_shape,
+    shape,
+    shape_registry,
+)
 
 __all__ = [
+    "Composite",
     "DataError",
     "Database",
     "DatabaseConnectionError",
     "DriverNotInstalledError",
     "MigrationError",
+    "NestedShape",
     "Notification",
     "PageResult",
     "Query",
     "QueryError",
+    "Shape",
+    "ShapeError",
+    "composite",
     "get_db",
     "migrate",
+    "nested",
+    "register_shape",
+    "shape",
+    "shape_registry",
 ]

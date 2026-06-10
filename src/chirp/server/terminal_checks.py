@@ -140,6 +140,7 @@ _CONCERN_ORDER: tuple[str, ...] = (
     "Accessibility",
     "Components",
     "Reactive",
+    "Shapes",
     "Production Safety",
     "Plugins",
     "Docs",
@@ -212,6 +213,8 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "reactive_cycle": "Reactive",
     "reactive_paths": "Reactive",
     "reactive_audience": "Reactive",
+    # Verified Shapes
+    "shapecheck": "Shapes",
     # Safety / plugins / docs
     "sse_speculation": "Production Safety",
     "csrf_session": "Production Safety",

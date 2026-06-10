@@ -1,6 +1,11 @@
 # RFC: Shapes — the verified SQL→render data contract
 
-**Status**: Draft
+**Status**: Completed — landed 2026-06-10 (#143, #165–#173; epic #174). Shipped as
+`chirp.data.Shape`/`@shape`/`nested`/`@composite` + the `shapecheck` contract
+category + the `chirp shapes-codegen` CLI. Guide:
+`site/content/docs/build-apps/forms-data/shapes.md`. Honest scope of what landed
+vs. bounded-v1 limits is recorded in the changelog fragments and the guide's
+escape-hatch section.
 **Date**: 2026-06-05
 **Scope**: `src/chirp/data/`, `src/chirp/contracts/`, `src/chirp/templating/`, `src/chirp/server/`, `src/chirp/cli/`
 **Related**: RFC Shared Store, RFC Contract Extensions, #143 (schema introspection), #159 (typed-SQL data layer as a contract), #162 (non-goals: no ORM)

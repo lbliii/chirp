@@ -391,3 +391,47 @@ def test_suspense_defer_silent_when_block_depends_on_key(tmp_path) -> None:
     finds it and the rule stays silent."""
     app = _suspense_app(tmp_path, _SUSPENSE_DISCOVERABLE)
     assert "suspense_defer" not in _categories(app)
+
+
+# ---------------------------------------------------------------------------
+# shapecheck (#166/#168/#173) -- surface-contract registry drift
+# ---------------------------------------------------------------------------
+
+
+def _shapecheck_app(tmp_path, *, drift: bool) -> App:
+    """A db-less App; the firing case registers a surface contract naming a
+    Shape that does not exist (registry drift -- the headline check)."""
+    (tmp_path / "index.html").write_text("<div id='x'></div>", encoding="utf-8")
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)))
+
+    @app.route("/")
+    def index():
+        from chirp.templating.returns import Template
+
+        return Template("index.html")
+
+    if drift:
+        # No @shape named "MissingBoardSurface" is registered anywhere in the
+        # suite -> drift ERROR. Runs even with no Shape bindings on the routes.
+        app.set_contract_check_data("surface_contracts", {"home-board": "MissingBoardSurface"})
+
+    return app
+
+
+def test_shapecheck_fires_for_registry_drift(tmp_path) -> None:
+    """A surface-contract registry name with no backing Shape -> shapecheck
+    ERROR through the orchestrator. Drop the ``check_shapecheck`` wiring and this
+    fails. Proves the rule runs even for a db-less, Shape-less app via the auto
+    ``shape_registry()`` (and that extras flow into the rule)."""
+    app = _shapecheck_app(tmp_path, drift=True)
+    shapecheck = [i for i in _issues(app) if i.category == "shapecheck"]
+    assert shapecheck, "shapecheck did not fire through check_hypermedia_surface"
+    assert any(i.severity is Severity.ERROR for i in shapecheck)
+    assert any("MissingBoardSurface" in i.message for i in shapecheck)
+
+
+def test_shapecheck_silent_for_clean_app(tmp_path) -> None:
+    """Negative control: no surface contracts, no Shape bindings -> no
+    shapecheck issue at all (not even a PASS line, since nothing is verified)."""
+    app = _shapecheck_app(tmp_path, drift=False)
+    assert "shapecheck" not in _categories(app)

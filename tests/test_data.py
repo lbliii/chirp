@@ -723,17 +723,26 @@ class TestExports:
         import chirp.data
 
         expected = {
+            "Composite",
             "Database",
             "DatabaseConnectionError",
             "DataError",
             "DriverNotInstalledError",
             "MigrationError",
+            "NestedShape",
             "Notification",
             "PageResult",
             "Query",
             "QueryError",
+            "Shape",
+            "ShapeError",
+            "composite",
             "get_db",
             "migrate",
+            "nested",
+            "register_shape",
+            "shape",
+            "shape_registry",
         }
         assert set(chirp.data.__all__) == expected
 
