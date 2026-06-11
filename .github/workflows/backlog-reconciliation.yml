@@ -1,0 +1,42 @@
+name: Backlog reconciliation
+
+# Weekly (and on-demand) sweep that re-derives backlog truth from merged PRs +
+# acceptance-test coverage and labels the drift, so the tracker can't silently
+# rot behind a fast, agent-driven merge cadence. Read-derives, then applies the
+# derived labels (merged-pending-close / stale-epic-review / acceptance-tracked).
+# See docs/backlog-automation.md.
+
+on:
+  schedule:
+    - cron: "17 13 * * 1" # Mondays 13:17 UTC
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply derived labels (uncheck for a dry-run report only)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+
+      - name: Reconcile backlog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          ARGS=""
+          if [ "$APPLY" = "true" ]; then ARGS="--apply"; fi
+          uv run --no-project python scripts/reconcile_backlog.py $ARGS | tee -a "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No-JS Floor &mdash; Notes</title>
+  <!-- htmx is the *enhancement*, not the floor. Delete this line (or block it
+       with CSP / NoScript) and every form below still works via 303 + 422. -->
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #fafaf9; color: #1c1917;
+      max-width: 640px; margin: 0 auto; padding: 2rem 1rem;
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.85rem; color: #78716c; margin-bottom: 1.5rem; }
+    fieldset { border: 1px solid #d6d3d1; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; }
+    legend { font-size: 0.8rem; font-weight: 600; padding: 0 0.4rem; color: #44403c; }
+    label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 0.2rem; }
+    input[type="text"], textarea {
+      width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem;
+      border: 1px solid #d6d3d1; border-radius: 0.375rem;
+      font-size: 0.9rem; background: white; font-family: inherit;
+    }
+    input:focus, textarea:focus { outline: 2px solid #0ea5e9; outline-offset: -1px; }
+    .field-error { color: #991b1b; font-size: 0.75rem; margin: -0.5rem 0 0.75rem; }
+    button {
+      padding: 0.45rem 0.9rem; border: none; border-radius: 0.375rem;
+      font-size: 0.85rem; cursor: pointer; font-weight: 500;
+    }
+    .btn-primary { background: #0ea5e9; color: white; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-danger { background: #fecaca; color: #991b1b; }
+    .btn-danger:hover { background: #fca5a5; }
+    ul { list-style: none; }
+    li.note { padding: 1rem 0; border-bottom: 1px solid #e7e5e4; }
+    .note-title { font-weight: 600; }
+    .note-body { color: #57534e; font-size: 0.9rem; margin: 0.25rem 0 0.6rem; }
+    .row-forms { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+    .row-forms .edit { display: flex; gap: 0.4rem; align-items: flex-end; flex-wrap: wrap; }
+    .row-forms .edit input[type="text"] { width: auto; margin: 0; }
+    .empty { color: #a8a29e; font-style: italic; padding: 1rem 0; }
+    footer { margin-top: 2rem; font-size: 0.75rem; color: #a8a29e; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>Notes &mdash; No-JS Floor</h1>
+  {% block note_count %}
+  <p id="note-count" class="subtitle">{{ count }} note{{ 's' if count != 1 else '' }}</p>
+  {% endblock %}
+
+  {% block create_form %}
+  <form id="create-form" method="post" action="{{ url_for('notes.add') }}"
+        hx-post="{{ url_for('notes.add') }}" hx-target="#note-list" hx-swap="outerHTML">
+    <fieldset>
+      <legend>New note</legend>
+      <label for="new-title">Title</label>
+      <input type="text" id="new-title" name="title" value="{{ form?.title ?? '' }}"
+             autocomplete="off" placeholder="What needs doing?">
+      {% for msg in errors.get("title", []) %}<p class="field-error">{{ msg }}</p>{% endfor %}
+
+      <label for="new-body">Body</label>
+      <textarea id="new-body" name="body" rows="2" placeholder="Optional details">{{ form?.body ?? '' }}</textarea>
+      {% for msg in errors.get("body", []) %}<p class="field-error">{{ msg }}</p>{% endfor %}
+
+      <button type="submit" class="btn-primary">Add note</button>
+    </fieldset>
+  </form>
+  {% endblock %}
+
+  {% block note_list %}
+  <ul id="note-list">
+    {% if notes %}
+      {% for note in notes %}
+      <li class="note">
+        <div class="note-title">{{ note.title }}</div>
+        {% if note.body %}<div class="note-body">{{ note.body }}</div>{% endif %}
+        <div class="row-forms">
+          {# Edit: plain POST form, pre-filled with current values. No JS needed. #}
+          <form class="edit" method="post" action="{{ url_for('notes.edit', note_id=note.id) }}"
+                hx-post="{{ url_for('notes.edit', note_id=note.id) }}"
+                hx-target="#note-list" hx-swap="outerHTML">
+            <input type="text" name="title" value="{{ note.title }}" aria-label="Edit title">
+            <input type="text" name="body" value="{{ note.body }}" aria-label="Edit body">
+            <button type="submit" class="btn-primary">Save</button>
+          </form>
+          {# Delete: plain POST form (HTML forms can't issue DELETE). No JS needed. #}
+          <form method="post" action="{{ url_for('notes.delete', note_id=note.id) }}"
+                hx-post="{{ url_for('notes.delete', note_id=note.id) }}"
+                hx-target="#note-list" hx-swap="outerHTML">
+            <button type="submit" class="btn-danger">Delete</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="empty">No notes yet. Add one above.</li>
+    {% endif %}
+  </ul>
+  {% endblock %}
+
+  {% block edit_form %}
+  {# Standalone re-render target for a failed edit (422). Shows the rejected
+     values plus the inline error, so a no-JS browser still sees what went wrong.
+     Guarded so the full-page render (where `note` is undefined) stays empty —
+     the block only produces markup when targeted as a fragment. #}
+  {% set errors = errors ?? {} %}
+  {% if (note ?? none) %}
+  <form class="edit" method="post" action="{{ url_for('notes.edit', note_id=note.id) }}">
+    <fieldset>
+      <legend>Edit note</legend>
+      <label>Title</label>
+      <input type="text" name="title" value="{{ note.title }}">
+      {% for msg in errors.get("title", []) %}<p class="field-error">{{ msg }}</p>{% endfor %}
+      <label>Body</label>
+      <input type="text" name="body" value="{{ note.body }}">
+      {% for msg in errors.get("body", []) %}<p class="field-error">{{ msg }}</p>{% endfor %}
+      <button type="submit" class="btn-primary">Save</button>
+    </fieldset>
+  </form>
+  {% end %}
+  {% endblock %}
+
+  <footer>
+    No-JS floor &mdash; create, edit, and delete all work as plain
+    <code>&lt;form method="post"&gt;</code> submissions: 303 redirect on success,
+    422 + re-rendered form on a validation error. htmx is layered on top as an
+    enhancement; disable it and the floor still holds.
+  </footer>
+</body>
+</html>

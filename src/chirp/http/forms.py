@@ -6,17 +6,22 @@ Implements ``MultiValueMapping`` for consistent access across
 ``form_from()`` provides lightweight dataclass binding: define a
 frozen dataclass, pass it to ``form_from(request, MyForm)``, and get
 a populated instance. No magic validation — just binding with type
-coercion for ``str``, ``int``, ``float``, ``bool``, and ``list[T]``
-for repeated fields such as checkbox groups and multi-selects.
+coercion for ``str``, ``int``, ``float``, ``bool``, ``datetime.date``,
+``datetime.datetime`` (ISO 8601), ``decimal.Decimal``, ``uuid.UUID``,
+``enum.Enum`` subclasses, and ``list[T]`` for repeated fields such as
+checkbox groups and multi-selects.
 
 ``python-multipart`` is an optional dependency (``pip install chirp[forms]``).
 URL-encoded forms use stdlib ``urllib.parse`` — no extra dependency.
 """
 
 import contextlib
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from dataclasses import fields as dc_fields
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+from enum import Enum
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
 from typing import (
@@ -29,6 +34,7 @@ from typing import (
     get_type_hints,
     overload,
 )
+from uuid import UUID
 
 from chirp.templating.returns import ValidationError
 from chirp.validation import Validator, validate
@@ -263,13 +269,74 @@ class FormBindingError(Exception):
         super().__init__(f"Form binding failed for: {fields}")
 
 
-# Type coercion map for form_from()
-_COERCIONS: dict[type, Any] = {
+def _coerce_decimal(value: str) -> Decimal:
+    """Coerce a string to ``Decimal``, normalizing failure to ``ValueError``.
+
+    ``Decimal("nope")`` raises ``InvalidOperation`` (an ``ArithmeticError``),
+    not ``ValueError`` — so without this the existing
+    ``except ValueError, TypeError`` path in ``form_from`` would miss it and
+    the error would escape as an uncaught exception instead of a
+    ``FormBindingError``.
+    """
+    try:
+        return Decimal(value)
+    except InvalidOperation as exc:
+        raise ValueError(f"invalid Decimal: {value!r}") from exc
+
+
+# Type coercion map for form_from(). Each entry maps a target field type to a
+# callable that turns a raw form string into that type. Callables must signal
+# bad input by raising ``ValueError`` or ``TypeError`` (the pair caught in
+# ``form_from``); coercions whose stdlib constructor raises something else are
+# wrapped to normalize the failure.
+_COERCIONS: dict[type, Callable[[str], Any]] = {
     str: lambda v: v.strip(),
     int: int,
     float: float,
     bool: lambda v: v.lower() in ("true", "1", "yes", "on"),
+    date: date.fromisoformat,
+    datetime: datetime.fromisoformat,
+    Decimal: _coerce_decimal,
+    UUID: UUID,
 }
+
+
+def _coerce_enum(enum_cls: type[Enum], value: str) -> Enum:
+    """Coerce a raw form string to an ``Enum`` member.
+
+    Tries by *value* first (``EnumCls(value)`` — the common case for forms whose
+    ``<option value=...>`` carries the member value), then falls back to by
+    *name* (``EnumCls[value]``) which is handy for string enums declared as
+    ``RED = "red"`` but submitted by member name. Unknown inputs raise
+    ``ValueError`` so ``form_from`` reports a ``FormBindingError`` naming the
+    field — consistent with the int/float path. ``EnumCls(value)`` may raise
+    ``KeyError`` for some enum shapes, so that is caught too.
+    """
+    try:
+        return enum_cls(value)
+    except ValueError, KeyError:
+        pass
+    try:
+        return enum_cls[value]
+    except KeyError as exc:
+        raise ValueError(f"invalid {enum_cls.__name__}: {value!r}") from exc
+
+
+def _resolve_coercion(target_type: Any) -> Callable[[str], Any]:
+    """Return the coercion callable for a field's resolved target type.
+
+    Looks up the fixed ``_COERCIONS`` table first, then special-cases ``Enum``
+    subclasses (each subclass is a distinct type, so it cannot be a static table
+    key). Falls back to calling the type directly (mirrors the prior behavior
+    for unknown types such as plain custom classes).
+    """
+    coerce = _COERCIONS.get(target_type)
+    if coerce is not None:
+        return coerce
+    if isinstance(target_type, type) and issubclass(target_type, Enum):
+        enum_cls = target_type
+        return lambda v: _coerce_enum(enum_cls, v)
+    return target_type
 
 
 async def form_from[T](request: Any, datacls: type[T]) -> T:
@@ -279,9 +346,11 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
     Fields with defaults are optional; fields without defaults are required.
     String fields are stripped of whitespace by default.
 
-    Supports ``str``, ``int``, ``float``, ``bool``, and ``list[T]``
-    type coercion. Missing list fields bind to ``[]`` because browsers
-    omit unchecked checkbox groups entirely. Raises ``FormBindingError``
+    Supports ``str``, ``int``, ``float``, ``bool``, ``datetime.date`` and
+    ``datetime.datetime`` (ISO 8601), ``decimal.Decimal``, ``uuid.UUID``,
+    ``enum.Enum`` subclasses (coerced by member value, then by name), and
+    ``list[T]`` type coercion. Missing list fields bind to ``[]`` because
+    browsers omit unchecked checkbox groups entirely. Raises ``FormBindingError``
     with a dict of errors for missing or invalid fields.
 
     Usage::
@@ -336,7 +405,7 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
 
         # Coerce to target type
         if list_item_type is not None:
-            item_coerce = _COERCIONS.get(list_item_type, list_item_type)
+            item_coerce = _resolve_coercion(list_item_type)
             try:
                 values[f.name] = [item_coerce(item) for item in form.get_list(f.name)]
             except ValueError, TypeError:
@@ -345,7 +414,7 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
                 )
             continue
 
-        coerce = _COERCIONS.get(base_type, base_type)
+        coerce = _resolve_coercion(base_type)
 
         try:
             values[f.name] = coerce(raw)

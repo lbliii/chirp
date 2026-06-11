@@ -43,7 +43,7 @@ async def upload(request: Request):
 
 ## Dataclass Binding
 
-`form_from()` binds form data to a frozen dataclass. Define the shape, and Chirp handles type coercion for `str`, `int`, `float`, and `bool`:
+`form_from()` binds form data to a frozen dataclass. Define the shape, and Chirp handles type coercion for `str`, `int`, `float`, `bool`, `datetime.date` and `datetime.datetime` (ISO 8601), `decimal.Decimal`, `uuid.UUID`, `enum.Enum` subclasses (by value, then by name), and `list[T]` for repeated fields:
 
 ```python
 from dataclasses import dataclass

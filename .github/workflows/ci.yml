@@ -88,3 +88,51 @@ jobs:
         env:
           PYTHON_GIL: "0"
         run: uv run pytest -q --tb=short --timeout=60 -m "not slow"
+
+  # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded
+  # 3.14t and does not ship asyncpg (a C-extension dependency), so live Postgres
+  # coverage is isolated here on the standard 3.14 build against a real Postgres
+  # service. This closes the "round-trip on sqlite AND postgres in CI" gap for
+  # the makemigrations pipeline (issue #143) without putting asyncpg on the
+  # free-threaded critical path.
+  test-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: chirp
+          POSTGRES_PASSWORD: chirp
+          POSTGRES_DB: chirp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-pg-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-pg-
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies (with PostgreSQL driver)
+        run: uv sync --no-sources --group dev --extra data-pg
+
+      - name: PostgreSQL round-trip tests
+        env:
+          CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+        run: uv run pytest tests/test_schema_introspect.py -q --tb=short --timeout=60

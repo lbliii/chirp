@@ -1,0 +1,30 @@
+name: Issue closure gate
+
+# A PR that says "Closes #N" must ship an executable acceptance test
+# (@pytest.mark.issue(N)) — or declare "Acceptance: n/a (reason)" in the body.
+# See docs/backlog-automation.md. This check is intentionally NOT a required
+# status check by default; enable it in branch protection once markers are
+# adopted across the active backlog.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  closure-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+
+      - name: Closure-acceptance gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: uv run --no-project python scripts/check_closure_acceptance.py
