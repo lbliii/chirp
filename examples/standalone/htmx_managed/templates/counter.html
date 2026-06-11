@@ -1,0 +1,41 @@
+<html>
+<head>
+  <title>Chirp-managed htmx</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; max-width: 520px; margin: 0 auto; padding: 2rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; color: #f8fafc; }
+    p.lede { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.5rem; }
+    .count { font-size: 3rem; font-weight: 700; color: #22c55e; margin: 1rem 0; }
+    button {
+      font: inherit; padding: 0.6rem 1.2rem; border: 0; border-radius: 0.375rem;
+      background: #22c55e; color: #0f172a; font-weight: 600; cursor: pointer;
+    }
+    code { background: #1e293b; padding: 0.1rem 0.35rem; border-radius: 0.25rem; }
+  </style>
+</head>
+<body>
+<main>
+<h1>Chirp-managed htmx</h1>
+<p class="lede">
+  This page uses <code>hx-post</code> but declares no htmx
+  <code>&lt;script&gt;</code>. <code>AppConfig(htmx=True)</code> tells Chirp to
+  inject the htmx runtime, so the button below swaps the counter without a full
+  page reload.
+</p>
+
+{% block counter %}
+<div id="counter">
+  <div class="count">{{ count }}</div>
+  <button hx-post="/increment" hx-target="#counter" hx-swap="outerHTML">
+    Increment
+  </button>
+</div>
+{% endblock %}
+</main>
+</body>
+</html>

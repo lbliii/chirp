@@ -45,6 +45,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `freeze_site`
 - `hackernews`
 - `hello`
+- `htmx_managed`
 - `islands`
 - `islands_swap`
 - `kanban`

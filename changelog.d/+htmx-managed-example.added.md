@@ -1,0 +1,1 @@
+Added the `examples/standalone/htmx_managed/` example — a runnable demonstration of Mode A htmx provisioning (`AppConfig(htmx=True)`): a template that ships `hx-*` attributes and no htmx `<script>`, with Chirp injecting the runtime so `app.check()` stays clean and the swap works.
