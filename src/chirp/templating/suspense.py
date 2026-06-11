@@ -468,45 +468,62 @@ async def render_suspense(
     page_html = await _render_off_loop(lambda: template.render(shell_ctx))
     yield await _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
 
-    # -- Phase 3: Resolve awaitables concurrently --
+    # -- Phase 3: Resolve awaitables concurrently, isolating per-key failures --
+    # Each task swallows its OWN exception into ``errors`` so one failing data
+    # source never cancels its siblings (true per-block isolation, issue #158).
+    # Catch ``Exception`` only — ``CancelledError`` / ``KeyboardInterrupt`` /
+    # ``SystemExit`` must still propagate and tear the task group down.
     resolved: dict[str, Any] = {}
+    errors: dict[str, BaseException] = {}
 
     async def _resolve(key: str, awaitable: Awaitable[Any]) -> None:
-        resolved[key] = await awaitable
+        try:
+            resolved[key] = await awaitable
+        except Exception as exc:  # isolate per-block failure (siblings keep resolving)
+            errors[key] = exc
 
-    try:
-        async with anyio.create_task_group() as tg:
-            for key, awaitable in pending.items():
-                tg.start_soon(_resolve, key, awaitable)
-    except BaseException as exc:
+    async with anyio.create_task_group() as tg:
+        for key, awaitable in pending.items():
+            tg.start_soon(_resolve, key, awaitable)
+
+    if errors:
         logger.warning(
-            "Suspense: error resolving deferred context for template=%r, "
-            "deferred_keys=%r — shell already sent, replacing skeletons with error indicators",
+            "Suspense: %d deferred key(s) failed to resolve for template=%r "
+            "(failed=%r) — shell already sent, replacing those skeletons with "
+            "error indicators while sibling blocks render real data",
+            len(errors),
             template_name,
-            sorted(pending.keys()),
-            exc_info=True,
+            sorted(errors.keys()),
+            exc_info=errors[next(iter(errors))],
         )
-        # Shell is already sent; yield a visible error for each pending block
-        # so skeletons are replaced with error indicators, not left spinning.
-        for key in pending:
-            target_id = defer_map.get(key, key)
-            fallback_html = await _render_error_html(
-                env,
-                block_name=key,
-                deferred_key=key,
-                error=exc,
-                error_template=error_template,
-                error_block=error_block,
-                suspense_error_block=suspense.error_block,
-            )
-            if use_htmx_fmt:
-                yield format_oob_htmx(fallback_html, target_id)
-            else:
-                yield format_oob_script(fallback_html, target_id, nonce=_nonce)
-        return
+
+    async def _emit_error(*, block_name: str, deferred_key: str) -> str:
+        """Render and OOB-wrap the error fallback for *deferred_key*.
+
+        ``block_name`` is the *context key* (not the template block name),
+        matching the historical Phase 3 behavior so existing error tests stay
+        green (default HTML reads "Error loading data"; custom error blocks see
+        ``block_name == "data"``).
+        """
+        fallback_html = await _render_error_html(
+            env,
+            block_name=block_name,
+            deferred_key=deferred_key,
+            error=errors[deferred_key],
+            error_template=error_template,
+            error_block=error_block,
+            suspense_error_block=suspense.error_block,
+        )
+        target_id = defer_map.get(deferred_key, deferred_key)
+        if use_htmx_fmt:
+            return format_oob_htmx(fallback_html, target_id)
+        return format_oob_script(fallback_html, target_id, nonce=_nonce)
 
     # -- Phase 4: Re-render affected blocks with full context --
     # blocks_to_render was resolved + validated before the shell was sent.
+    # Errored keys are deliberately absent from full_ctx (they are not in
+    # ``resolved``) so any block that touches one raises in render and hits the
+    # render-time except — the defer_blocks fallback for keys discovery missed.
     full_ctx = {
         **layout_ctx,
         **sync_ctx,
@@ -514,8 +531,26 @@ async def render_suspense(
         CHIRP_DEFER_PENDING_KEY: frozenset(),
     }
 
+    block_deps = template.block_metadata()
+
     for block_name in blocks_to_render:
         target_id = defer_map.get(block_name, block_name)
+
+        # If any deferred key this block depends on failed, render that key's
+        # error fallback instead of attempting the real block render — a sibling
+        # block bound to a resolved key still gets real data below.
+        meta = block_deps.get(block_name)
+        failed_key: str | None = None
+        if meta is not None:
+            for dep_path in meta.depends_on:
+                root_key = dep_path.split(".")[0]
+                if root_key in errors:
+                    failed_key = root_key
+                    break
+        if failed_key is not None:
+            yield await _emit_error(block_name=failed_key, deferred_key=failed_key)
+            continue
+
         try:
             block_html = await _render_off_loop(
                 lambda bn=block_name: template.render_block(bn, full_ctx)

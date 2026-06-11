@@ -713,6 +713,41 @@ class TestErrorMidStream:
         # Should NOT contain the default hardcoded error
         assert "chirp-suspense-error" not in combined
 
+    async def test_one_block_fails_siblings_render_real_data(self):
+        """A failing deferred key isolates to its block; siblings still resolve.
+
+        ``stats`` raises while ``feed`` resolves. The failed block must show an
+        error indicator and the sibling block must render the *real* feed data —
+        not be swept into an error indicator (the all-or-nothing bug, #158).
+        """
+
+        async def _fail():
+            raise ValueError("stats source down")
+
+        env = _env()
+        s = Suspense(
+            "dashboard.html",
+            title="Dashboard",
+            stats=_fail(),
+            feed=_delayed_value(["post-1", "post-2"]),
+        )
+        chunks = await _collect_chunks(env, s, is_htmx=True)
+
+        # Shell + one OOB chunk per discovered block (stats error, feed data).
+        assert len(chunks) >= 2
+        oob = "".join(chunks[1:])
+
+        # The failed stats block resolves to an error indicator targeting `stats`.
+        assert "chirp-suspense-error" in oob
+        assert 'data-block="stats"' in oob
+
+        # The sibling feed block rendered REAL data, not an error.
+        assert "<li>post-1</li>" in oob
+        assert "<li>post-2</li>" in oob
+        assert 'data-block="feed"' not in oob
+        # No error indicator wiped the feed region.
+        assert "Error loading feed" not in oob
+
 
 # ---------------------------------------------------------------------------
 # defer_map override
