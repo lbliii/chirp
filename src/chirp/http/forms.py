@@ -19,9 +19,19 @@ from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import IO, Any, cast, get_args, get_origin, get_type_hints, overload
+from typing import (
+    IO,
+    Annotated,
+    Any,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+    overload,
+)
 
 from chirp.templating.returns import ValidationError
+from chirp.validation import Validator, validate
 
 # Default spool threshold: bytes an UploadFile keeps in memory before spilling
 # to a real temp file on disk. Mirrors AppConfig.upload_spool_threshold so the
@@ -350,6 +360,68 @@ async def form_from[T](request: Any, datacls: type[T]) -> T:
     return datacls(**values)
 
 
+def _extract_field_rules(datacls: type) -> dict[str, list[Validator]]:
+    """Collect ``chirp.validation`` rules attached via ``Annotated`` metadata.
+
+    A field declared as ``Annotated[str, required, max_length(100)]`` carries
+    its validation rules in the type-hint metadata. This walks the dataclass
+    fields, resolves hints with ``include_extras=True`` (so ``Annotated`` is
+    preserved rather than stripped — note ``form_from`` resolves them *without*
+    extras, which is why those rules are otherwise never run), and gathers the
+    **callable** metadata items as validators. Non-callable metadata (doc
+    strings, sentinels, etc.) is ignored, so ``Annotated`` can be shared with
+    other tooling.
+
+    ``Optional`` nesting is unwrapped to find the ``Annotated`` layer in either
+    order — both ``Annotated[str | None, required]`` (metadata on the outer
+    wrapper) and ``Optional[Annotated[str, required]]`` /
+    ``Annotated[str, required] | None`` (metadata on a union member) yield the
+    same rules. Only fields with at least one rule appear in the returned map;
+    a plain dataclass with no ``Annotated`` rules yields ``{}``, so binding
+    behavior is unchanged.
+    """
+    hints = get_type_hints(datacls, include_extras=True)
+    rules: dict[str, list[Validator]] = {}
+
+    for f in dc_fields(datacls):
+        hint = hints.get(f.name)
+        if hint is None:
+            continue
+
+        metadata = _annotated_metadata(hint)
+        if metadata is None:
+            # Optional[Annotated[...]] / Annotated[...] | None — unwrap the
+            # union (PEP 604 ``types.UnionType`` or ``typing.Union``) to find
+            # an Annotated member carrying the metadata.
+            for arg in get_args(hint):
+                if arg is type(None):
+                    continue
+                metadata = _annotated_metadata(arg)
+                if metadata is not None:
+                    break
+
+        if not metadata:
+            continue
+
+        field_rules = [cast(Validator, m) for m in metadata if callable(m)]
+        if field_rules:
+            rules[f.name] = field_rules
+
+    return rules
+
+
+def _annotated_metadata(hint: Any) -> tuple[Any, ...] | None:
+    """Return the ``Annotated`` metadata tuple for *hint*, else ``None``.
+
+    The metadata lives directly on the ``Annotated`` wrapper regardless of the
+    base type's own optionality (``Annotated[str | None, required]`` still
+    exposes ``__metadata__`` here).
+    """
+    if get_origin(hint) is Annotated or hasattr(hint, "__metadata__"):
+        return tuple(getattr(hint, "__metadata__", ()))
+    return None
+
+
 async def form_or_errors[T](
     request: Any,
     datacls: type[T],
@@ -384,19 +456,44 @@ async def form_or_errors[T](
 
     Returns:
         An instance of ``datacls`` on success, or a ``ValidationError`` on failure.
+
+    Notes:
+        Fields declared with ``Annotated`` rules from ``chirp.validation`` (e.g.
+        ``Annotated[str, required, max_length(100)]``) are validated in the same
+        pass as binding. Rule errors and binding errors are merged per field
+        (message lists concatenated), so one declarative schema yields either the
+        typed instance or a ``ValidationError`` carrying every field's messages.
     """
+    rules = _extract_field_rules(datacls)
+    raw = await request.form()
+    rule_errors = validate(raw, rules).errors if rules else {}
+
+    bound: tuple[T] | None
     try:
-        return await form_from(request, datacls)
+        # Wrap in a 1-tuple so a successful bind of ``None`` (a valid bound
+        # value) stays distinguishable from "binding failed".
+        bound = (await form_from(request, datacls),)
+        binding_errors: dict[str, list[str]] = {}
     except FormBindingError as e:
-        form_data = await request.form()
+        bound = None
+        binding_errors = e.errors
+
+    merged: dict[str, list[str]] = {}
+    for field_errors in (rule_errors, binding_errors):
+        for name, messages in field_errors.items():
+            merged.setdefault(name, []).extend(messages)
+
+    if merged or bound is None:
         return ValidationError(
             template_name,
             block_name,
             retarget=retarget,
-            errors=e.errors,
-            form=dict(form_data),
+            errors=merged,
+            form=dict(raw),
             **extra_context,
         )
+
+    return bound[0]
 
 
 def form_values(form: Any) -> dict[str, str]:
