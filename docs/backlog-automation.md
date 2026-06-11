@@ -89,8 +89,13 @@ python scripts/reconcile_backlog.py --apply     # also (idempotently) labels iss
 ## Rollout
 
 1. Land this PR — nothing becomes blocking; the gate/sweep are inert until used.
-2. Prefer **GitHub sub-issues** over markdown `- [ ] #N` checklists in epics, so
-   parent progress is maintained by GitHub, not by hand.
+2. Start every new epic as a parent of **native GitHub sub-issues** — never a
+   markdown `- [ ] #N` checklist — so parent progress is maintained by GitHub,
+   not by hand. The roadmap epic #164 is the worked example: its open children
+   are linked as sub-issues (its progress bar auto-updates as they close). A
+   single issue's own acceptance criteria stay an inline checklist and become
+   `@pytest.mark.issue` tests (step 3); only cross-issue parent→child trees
+   become sub-issues.
 3. Tag acceptance tests with `@pytest.mark.issue` as issues are worked.
 4. Once adoption is broad, mark **Issue closure gate** as a required status check
    in branch protection to make the forcing function binding.
