@@ -23,4 +23,8 @@ def run_check(args: argparse.Namespace) -> None:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
-    app.check(warnings_as_errors=args.warnings_as_errors, coverage=args.coverage)
+    app.check(
+        deploy=args.deploy,
+        warnings_as_errors=args.warnings_as_errors or args.deploy,
+        coverage=args.coverage,
+    )

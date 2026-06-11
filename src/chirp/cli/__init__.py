@@ -142,6 +142,14 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Show route/template contract coverage counters",
     )
+    check_parser.add_argument(
+        "--deploy",
+        action="store_true",
+        help=(
+            "Run checks with production-posture severity (deploy preflight); "
+            "implies --warnings-as-errors"
+        ),
+    )
 
     # -- chirp routes -----------------------------------------------------
     routes_parser = subparsers.add_parser("routes", help="List registered routes")

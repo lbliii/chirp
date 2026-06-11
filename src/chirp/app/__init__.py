@@ -752,7 +752,13 @@ class App:
         self._assert_contracts_ready()
         self._contract_checks.run_debug_checks(self)
 
-    def check(self, *, warnings_as_errors: bool = False, coverage: bool = False) -> None:
+    def check(
+        self,
+        *,
+        warnings_as_errors: bool = False,
+        coverage: bool = False,
+        deploy: bool = False,
+    ) -> None:
         """Validate hypermedia contracts against the frozen app and print a report.
 
         Runs every registered contract check (routes, fragment targets, OOB
@@ -769,6 +775,12 @@ class App:
             coverage: When True, include contract coverage counters for POST
                 form contracts, mounted page contracts, app-shell targets, and
                 OOB regions.
+            deploy: When True, run env-aware rules (secret_key, allowed_hosts,
+                debug/metrics/sentry, security_stack, csp_nonce) with
+                production posture so deploy-blocking misconfigurations escalate
+                to ERROR as they would in production. Does not mutate the app;
+                a genuinely deploy-ready app still passes. ``chirp check
+                --deploy`` wraps this (and implies ``warnings_as_errors``).
 
         Raises:
             SystemExit: With code 1 when any ERROR issue is found, or any
@@ -782,6 +794,7 @@ class App:
             self,
             warnings_as_errors=warnings_as_errors,
             coverage=coverage,
+            deploy=deploy,
         )
 
     def render(self, value: Fragment | Template | InlineTemplate) -> str:

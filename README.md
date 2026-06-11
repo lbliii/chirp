@@ -84,6 +84,7 @@ chirp new myapp && cd myapp && python app.py
 | `chirp check <app>` | Validate hypermedia contracts |
 | `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
 | `chirp check <app> --coverage` | Show contract coverage counters |
+| `chirp check <app> --deploy` | Deploy preflight: production-posture severity (implies `--warnings-as-errors`) |
 | `chirp routes <app>` | Print the registered route table |
 | `chirp --version` | Print chirp, kida, pounce, and Python versions |
 | `App()` | Create an application |

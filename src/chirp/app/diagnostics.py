@@ -50,11 +50,12 @@ class ContractCheckRunner:
         *,
         warnings_as_errors: bool = False,
         coverage: bool = False,
+        deploy: bool = False,
     ) -> None:
         from chirp.contracts import check_hypermedia_surface
 
         started = time.perf_counter()
-        result = check_hypermedia_surface(app)
+        result = check_hypermedia_surface(app, deploy=deploy)
         result.elapsed_ms = (time.perf_counter() - started) * 1000
         print(
             format_check_result(
