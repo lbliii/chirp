@@ -49,6 +49,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `islands_swap`
 - `kanban`
 - `llm_streaming_kida`
+- `nojs_floor`
 - `ollama`
 - `oob_layout_chain`
 - `pokedex`
