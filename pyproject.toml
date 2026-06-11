@@ -164,7 +164,7 @@ ignore = [
 "tests/**/*.py" = ["S101", "S104", "S105", "S106", "S107", "S603", "TRY301"] # Tests use asserts, test secrets, subprocess, raise-in-try
 "examples/**/*.py" = ["E402", "S101", "S105", "S106", "S107", "S307", "S311", "S608", "T20"] # Examples are demos
 "benchmarks/**/*.py" = ["T20", "S101", "S603"] # Prints, asserts, subprocess in benchmarks
-"scripts/**/*.py" = ["T20"]           # Scripts use print for output
+"scripts/**/*.py" = ["T20", "S603", "S607"] # Scripts print, and may shell out to gh/git
 "src/chirp/cli/**/*.py" = ["T20"]     # CLI commands use print for user output
 "src/chirp/app/diagnostics.py" = ["T20"] # Startup diagnostics use print
 "src/chirp/app/server.py" = ["T20"]   # Server startup uses print
@@ -234,6 +234,7 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: integration tests requiring full app setup",
+    "issue: associate a test with the GitHub issue(s) whose acceptance criteria it proves, e.g. @pytest.mark.issue(143) (see docs/backlog-automation.md)",
 ]
 
 # =============================================================================
