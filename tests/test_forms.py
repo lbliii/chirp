@@ -1,6 +1,10 @@
 """Tests for form data parsing, binding, and multipart."""
 
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
+from uuid import UUID
 
 import pytest
 
@@ -235,6 +239,22 @@ class ListForm:
     item_ids: list[int]
 
 
+class Priority(Enum):
+    LOW = "low"
+    HIGH = "high"
+
+
+@dataclass(frozen=True, slots=True)
+class RichTypedForm:
+    """Exercises the richer typed coercions added for issue #151 (criterion 4)."""
+
+    due_date: date
+    created_at: datetime
+    amount: Decimal
+    priority: Priority
+    ref: UUID
+
+
 class TestFormFrom:
     """Tests for form_from() — dataclass form binding."""
 
@@ -433,6 +453,258 @@ class TestFormFrom:
                 data={"title": "Batch", "item_ids": ["1", "nope"]},
             )
             assert "expected list[int]" in response.text
+
+    async def test_date_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.due_date.isoformat()}|{type(form.due_date).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "2026-06-10|date"
+
+    async def test_datetime_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.created_at.isoformat()}|{type(form.created_at).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "2026-06-10T09:30:00|datetime"
+
+    async def test_decimal_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.amount}|{type(form.amount).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "19.99|Decimal"
+
+    async def test_enum_coercion_by_value(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.priority.name}|{form.priority.value}|{type(form.priority).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "HIGH|high|Priority"
+
+    async def test_enum_coercion_by_name_fallback(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.priority.name}|{form.priority.value}"
+
+        async with TestClient(app) as client:
+            # "LOW" is the member *name*, not its value ("low") — by-name fallback.
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "LOW",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "LOW|low"
+
+    async def test_uuid_coercion(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            form = await form_from(request, RichTypedForm)
+            return f"{form.ref}|{type(form.ref).__name__}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert response.text == "12345678-1234-5678-1234-567812345678|UUID"
+
+    async def test_invalid_date_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, RichTypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['due_date'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "not-a-date",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert "due_date" in response.text
+            assert "expected date" in response.text
+
+    async def test_invalid_datetime_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, RichTypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['created_at'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "not-a-datetime",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert "created_at" in response.text
+            assert "expected datetime" in response.text
+
+    async def test_invalid_decimal_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, RichTypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['amount'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "not-money",
+                    "priority": "high",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert "amount" in response.text
+            assert "expected Decimal" in response.text
+
+    async def test_invalid_enum_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, RichTypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['priority'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "nope",
+                    "ref": "12345678-1234-5678-1234-567812345678",
+                },
+            )
+            assert "priority" in response.text
+            assert "expected Priority" in response.text
+
+    async def test_invalid_uuid_raises_binding_error(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            try:
+                await form_from(request, RichTypedForm)
+                return "ok"
+            except FormBindingError as e:
+                return f"error: {e.errors['ref'][0]}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                data={
+                    "due_date": "2026-06-10",
+                    "created_at": "2026-06-10T09:30:00",
+                    "amount": "19.99",
+                    "priority": "high",
+                    "ref": "not-a-uuid",
+                },
+            )
+            assert "ref" in response.text
+            assert "expected UUID" in response.text
 
 
 # ---------------------------------------------------------------------------
