@@ -906,6 +906,7 @@ class FalsyForm:
     tags: list[str]
 
 
+@pytest.mark.issue(151)
 class TestUnifiedValidation:
     """form_or_errors runs Annotated rules in the same pass as binding."""
 
