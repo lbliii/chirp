@@ -1,5 +1,6 @@
 """Hypermedia contracts checker orchestration."""
 
+import copy
 import inspect
 import logging
 import re
@@ -348,8 +349,22 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
     )
 
 
-def check_hypermedia_surface(app: App) -> CheckResult:
-    """Validate app route/template contract consistency."""
+def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
+    """Validate app route/template contract consistency.
+
+    Args:
+        app: The frozen app whose hypermedia surface is validated.
+        deploy: When True, run env-aware rules (secret_key, allowed_hosts,
+            debug/metrics/sentry, security_stack, csp_nonce) against a
+            production-posture *view* of the config so deploy-blocking
+            misconfigurations escalate to ERROR exactly as they would in
+            production. The view is a shallow copy with ``env="production"``
+            set via ``object.__setattr__`` (the config is frozen+slotted, and
+            ``dataclasses.replace`` would re-run ``__post_init__`` and raise on
+            the very empty-secret_key case we want to *report*). The user's
+            real ``app.config`` is never mutated. Tighten-only: a genuinely
+            deploy-ready app still passes.
+    """
     result = CheckResult()
     try:
         snapshot = _build_snapshot(app)
@@ -366,6 +381,18 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     kida_env = snapshot.kida_env
     result.coverage = _build_coverage(snapshot)
     middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
+
+    # Deploy-preflight posture (#160): the env-aware rules below decide severity
+    # from config.env. To answer "would this app pass in production?" without a
+    # second deploy, build a production-posture VIEW of the config. We cannot use
+    # dataclasses.replace — AppConfig is frozen+slotted and replace re-runs
+    # __post_init__, which raises ConfigurationError on the empty-secret_key case
+    # we specifically want to report. A shallow copy + object.__setattr__ bypasses
+    # validation and never mutates the user's real app.config. Tighten-only.
+    posture_config = app.config
+    if deploy:
+        posture_config = copy.copy(app.config)
+        object.__setattr__(posture_config, "env", "production")
 
     route_paths = collect_route_paths(router)
     result.routes_checked = len(route_paths)
@@ -802,8 +829,8 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(check_sse_speculation(router))
     result.issues.extend(check_csrf_session_order(middleware_list))
     result.issues.extend(check_middleware_signatures(middleware_list))
-    result.issues.extend(check_secret_key(app.config))
-    result.issues.extend(check_allowed_hosts(app.config))
+    result.issues.extend(check_secret_key(posture_config))
+    result.issues.extend(check_allowed_hosts(posture_config))
 
     # Deploy-preflight: production misconfiguration (debug/metrics/sentry)
     from chirp.contracts.rules_deploy import (
@@ -812,9 +839,9 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         check_sentry_sample_rate,
     )
 
-    result.issues.extend(check_debug_in_production(app.config))
-    result.issues.extend(check_metrics_path_collision(app.config, router))
-    result.issues.extend(check_sentry_sample_rate(app.config))
+    result.issues.extend(check_debug_in_production(posture_config))
+    result.issues.extend(check_metrics_path_collision(posture_config, router))
+    result.issues.extend(check_sentry_sample_rate(posture_config))
 
     # Security stack: mutating routes need CSRF/Session/SecurityHeaders.
     # discovered_routes carries filesystem PageRoutes (which expose `.actions`)
@@ -825,7 +852,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(
         check_security_stack(
             router,
-            app.config,
+            posture_config,
             middleware_list,
             getattr(snapshot, "discovered_routes", []),
         )
@@ -842,7 +869,7 @@ def check_hypermedia_surface(app: App) -> CheckResult:
     result.issues.extend(
         check_csp_nonce(
             router,
-            app.config,
+            posture_config,
             middleware_list,
             getattr(snapshot, "discovered_routes", []),
         )

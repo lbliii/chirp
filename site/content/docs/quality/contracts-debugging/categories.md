@@ -126,6 +126,20 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `deploy_metrics` | ERROR | Change `metrics_path` or move the colliding application route so the Prometheus endpoint does not shadow a route. |
 | `deploy_sentry` | WARNING | Set a non-zero `sentry_traces_sample_rate` when a Sentry DSN is configured, or clear the DSN. |
 
+### `chirp check --deploy`: production-posture preflight
+
+The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
+`csp_nonce`, `deploy_debug`, `deploy_metrics`, `deploy_sentry`) pick their
+severity from `config.env`. In development most are silent or WARNING, so a dev
+app passes `app.check()` while still carrying production-blocking
+misconfigurations. `chirp check myapp:app --deploy` answers "would this pass in
+production?" without changing your config: it runs those rules against a
+throwaway **production-posture view** of the config and treats warnings as
+errors (`--deploy` implies `--warnings-as-errors`). It is tighten-only — only
+severities rise, so a genuinely deploy-ready app still passes — and it never
+mutates the running app. Programmatically this is `app.check(deploy=True)`. Use
+it as a CI deploy gate.
+
 ### `security_stack`: canonical reference
 
 `security_stack` is the canonical owner of the **mutating route** definition and

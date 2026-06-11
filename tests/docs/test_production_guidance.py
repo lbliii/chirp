@@ -34,7 +34,7 @@ def test_production_docs_do_not_imply_pounce_env_vars_configure_chirp() -> None:
 def test_production_docs_separate_chirp_and_pounce_preflight() -> None:
     for path in _PRODUCTION_DOCS:
         text = path.read_text()
-        assert "chirp check myapp:app --warnings-as-errors" in text
+        assert "chirp check myapp:app --deploy" in text
         assert "pounce check --app myapp:app" in text
         assert "pounce.toml" in text
         assert "not read by `app.run()` or `chirp run`" in text
