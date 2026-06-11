@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Annotated
 from uuid import UUID
 
 import pytest
@@ -22,6 +23,7 @@ from chirp.http.forms import (
 from chirp.http.request import Request
 from chirp.templating.returns import ValidationError
 from chirp.testing import TestClient
+from chirp.validation import max_length, required
 
 # ---------------------------------------------------------------------------
 # FormData unit tests
@@ -873,6 +875,189 @@ class TestFormOrErrors:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             assert response.text == "Hello||medium"
+
+
+# ---------------------------------------------------------------------------
+# form_or_errors() — unified bind + Annotated validation
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotatedForm:
+    """One declarative schema: binding + per-field rules via Annotated."""
+
+    title: Annotated[str, required, max_length(5)]
+    note: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MixedForm:
+    """A binding-typed field plus a separately-validated Annotated field."""
+
+    age: int
+    name: Annotated[str, required, max_length(3)]
+
+
+@dataclass(frozen=True, slots=True)
+class FalsyForm:
+    """Falsy-but-valid values: "0" satisfies required; an empty list is fine."""
+
+    count: Annotated[str, required]
+    tags: list[str]
+
+
+@pytest.mark.issue(151)
+class TestUnifiedValidation:
+    """form_or_errors runs Annotated rules in the same pass as binding."""
+
+    async def test_valid_annotated_binds_instance(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, AnnotatedForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return "error"
+            return f"ok:{result.title}|{result.note}"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=Hi&note=howdy",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "ok:Hi|howdy"
+
+    async def test_rule_failure_returns_validation_error_with_messages(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, AnnotatedForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                msgs = result.context["errors"].get("title", [])
+                return f"errors:{'|'.join(msgs)}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=waytoolong&note=hi",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "Must be at most 5 characters" in response.text
+
+    async def test_required_rule_failure_on_empty(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, AnnotatedForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return f"errors:{sorted(result.context['errors'].keys())}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=&note=hi",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert "title" in response.text
+
+    async def test_failure_repopulates_raw_form_values(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, AnnotatedForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return f"form:{result.context.get('form', {})}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            response = await client.post(
+                "/submit",
+                body=b"title=waytoolong&note=keepme",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            # The raw (unbound) submitted values are echoed back for re-render.
+            assert "waytoolong" in response.text
+            assert "keepme" in response.text
+
+    async def test_binding_and_rule_errors_merge(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, MixedForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return f"errors:{sorted(result.context['errors'].keys())}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            # age fails binding (int coercion), name fails the max_length rule.
+            response = await client.post(
+                "/submit",
+                body=b"age=abc&name=toolong",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            # Both fields surface in the merged error map.
+            assert "age" in response.text
+            assert "name" in response.text
+
+    async def test_falsy_valid_values_not_flagged(self) -> None:
+        app = App()
+
+        @app.route("/submit", methods=["POST"])
+        async def submit(request: Request):
+            result = await form_or_errors(request, FalsyForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return f"error:{sorted(result.context['errors'].keys())}"
+            return f"ok:{result.count}|{result.tags}"
+
+        async with TestClient(app) as client:
+            # count="0" satisfies required; tags omitted binds to [] (valid).
+            response = await client.post(
+                "/submit",
+                body=b"count=0",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.text == "ok:0|[]"
+
+    async def test_plain_dataclass_unchanged(self) -> None:
+        """No Annotated rules → behavior identical to the binding-only path."""
+        app = App()
+
+        @app.route("/ok", methods=["POST"])
+        async def ok(request: Request):
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return "error"
+            return f"ok:{result.title}|{result.priority}"
+
+        @app.route("/missing", methods=["POST"])
+        async def missing(request: Request):
+            result = await form_or_errors(request, SimpleForm, "form.html", "form_body")
+            if isinstance(result, ValidationError):
+                return f"errors:{sorted(result.context['errors'].keys())}"
+            return "ok"
+
+        async with TestClient(app) as client:
+            good = await client.post(
+                "/ok",
+                body=b"title=Hello&priority=high",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert good.text == "ok:Hello|high"
+
+            bad = await client.post(
+                "/missing",
+                body=b"description=stuff",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            # Missing required "title" still raises FormBindingError → ValidationError.
+            assert "title" in bad.text
 
 
 # ---------------------------------------------------------------------------

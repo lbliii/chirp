@@ -95,6 +95,51 @@ result = await form_or_errors(
 )
 ```
 
+## Unified Bind + Validate with `Annotated` Rules
+
+One schema, one pass. Attach `chirp.validation` rules directly to the dataclass
+field with `Annotated`, and `form_or_errors()` runs them in the *same* pass as
+binding — no separate `validate()` call, no `Form`/`ModelForm` class:
+
+```python
+from dataclasses import dataclass
+from typing import Annotated
+
+from chirp import form_or_errors, ValidationError
+from chirp.validation import required, max_length
+
+@dataclass(frozen=True, slots=True)
+class TaskForm:
+    title: Annotated[str, required, max_length(100)]
+    description: str = ""
+
+@app.route("/tasks", methods=["POST"])
+async def add_task(request: Request):
+    result = await form_or_errors(request, TaskForm, "tasks.html", "task_form")
+    if isinstance(result, ValidationError):
+        return result  # 422 fragment with per-field errors + raw values
+
+    # result is a TaskForm instance — title is bound and validated.
+    save_task(result.title, result.description)
+    return FormAction("/tasks")
+```
+
+The rules in the `Annotated` metadata are any callable matching
+`(str) -> str | None` — the built-ins (`required`, `email`, `url`, `integer`,
+`number`, `max_length(n)`, `min_length(n)`, `matches(p)`, `one_of(*choices)`) or
+your own. Non-callable metadata is ignored, so the annotation can be shared with
+other tooling.
+
+Rule errors and binding errors **merge per field** (their message lists are
+concatenated): a type-coercion failure on one field and a rule failure on
+another both appear in `result.context["errors"]`, and the raw submitted values
+are echoed back in `result.context["form"]` for re-population. Falsy-but-valid
+values stay valid — `"0"` satisfies `required`, and an omitted `list[str]` binds
+to `[]` without being flagged.
+
+A plain dataclass with no `Annotated` rules behaves exactly as before — only
+binding runs.
+
 ## Re-populating Forms
 
 When validation fails, use `form_values()` to convert a dataclass back to a `dict[str, str]` for template re-population:
