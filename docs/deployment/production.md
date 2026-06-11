@@ -64,12 +64,21 @@ Run both checks in CI or before deployment because they validate different
 contracts:
 
 ```bash
-chirp check myapp:app --warnings-as-errors
+chirp check myapp:app --deploy
 pounce check --app myapp:app --config pounce.toml
 ```
 
 `chirp check` validates Chirp's hypermedia contracts: routes, templates,
 blocks, OOB targets, forms, SSE wiring, and app-level checks.
+
+The `--deploy` flag runs the env-aware safety rules (`secret_key`,
+`allowed_hosts`, `debug`/`metrics`/`sentry`, `security_stack`, `csp_nonce`) with
+**production posture** and treats warnings as errors. It answers "would this app
+pass `app.check()` if `env="production"`?" without changing your config — it
+builds a throwaway production-posture *view* and never mutates the running app.
+It is tighten-only: a genuinely deploy-ready app still passes. Use it in CI as a
+deploy gate; use `--warnings-as-errors` alone when you only want strict warnings
+without escalating production-only severities.
 
 `pounce check` validates Pounce's server-facing inputs: import path, config
 file, bind address, TLS files, worker settings, and related server options.
@@ -163,7 +172,7 @@ security-facing and need a separate public API decision before adoption.
 
 - Set `debug=False` in production.
 - Use a strong `secret_key` generated with `secrets.token_urlsafe()`.
-- Run `chirp check myapp:app --warnings-as-errors`.
+- Run `chirp check myapp:app --deploy`.
 - Run `pounce check --app myapp:app` with your production server config.
 - Set explicit `allowed_hosts`; wildcard hosts are reported by `app.check()`
   outside development.

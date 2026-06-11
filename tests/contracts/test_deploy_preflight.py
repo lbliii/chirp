@@ -1,5 +1,7 @@
 """Deploy-preflight contract checks (#160)."""
 
+import pytest
+
 from chirp.config import AppConfig
 from chirp.contracts.rules_deploy import (
     check_debug_in_production,
@@ -73,6 +75,7 @@ def test_sentry_no_dsn_ok() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.issue(160)
 def test_deploy_posture_escalates_debug_without_mutating_app() -> None:
     """deploy=True runs env-aware rules in production posture, not mutating the app.
 
