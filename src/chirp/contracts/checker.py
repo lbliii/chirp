@@ -43,6 +43,7 @@ from .rules_htmx import (
     check_hx_target_selectors,
     check_selector_syntax,
 )
+from .rules_htmx_provisioned import check_htmx_provisioned
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
 from .rules_kida_analysis import (
@@ -59,6 +60,7 @@ from .rules_kida_analysis import (
 )
 from .rules_layout import check_layout_chains
 from .rules_live_blocks import check_live_blocks
+from .rules_macro_css import check_macro_css
 from .rules_mount_app import check_mount_app_merge
 from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
@@ -645,6 +647,23 @@ def check_hypermedia_surface(app: App) -> CheckResult:
         result.issues.extend(check_form_action_contracts(template_sources, router))
         result.issues.extend(check_boundary_coverage(template_sources))
         result.issues.extend(check_alpine_cdn_urls(template_sources))
+        # #148 child 1: core macro classes (chirp-dropdown/field--error/...) have
+        # no backing CSS without chirp-ui. extras['chirpui_components'] is a non-None
+        # mapping/frozenset when use_chirp_ui(app) ran; falsy/None means inactive.
+        result.issues.extend(
+            check_macro_css(
+                template_sources,
+                chirpui_active=bool(snapshot.extras.get("chirpui_components")),
+            )
+        )
+        # #185: hx-*/sse-* attributes are inert unless htmx is provisioned via
+        # AppConfig(htmx=True) or an htmx <script> marker in the template chain.
+        result.issues.extend(
+            check_htmx_provisioned(
+                template_sources,
+                htmx_config_enabled=bool(app.config.htmx),
+            )
+        )
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
         result.issues.extend(
             check_suspense_undiscoverable(

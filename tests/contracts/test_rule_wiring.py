@@ -549,3 +549,97 @@ def test_shapecheck_no_false_underfetch_for_nested_field(tmp_path) -> None:
     ]
     # The binding was verified clean -> a PASS line surfaces.
     assert any(i.severity is Severity.INFO for i in shapecheck)
+
+
+# ---------------------------------------------------------------------------
+# macro_css (#148 child 1) -- core macro classes with no backing CSS, chirp-ui off
+# ---------------------------------------------------------------------------
+
+# A template emitting a core-macro dangling class with chirp-ui NOT active.
+_MACRO_CSS_DANGLING = (
+    '<div id="x" class="chirp-dropdown"><button class="chirp-dropdown-trigger"></button></div>'
+)
+# Clean: a custom class that does not collide with any core-macro token.
+_MACRO_CSS_CLEAN = '<div id="x" class="my-dropdown"><button class="my-trigger"></button></div>'
+
+
+def _macro_css_app(tmp_path, template_html: str) -> App:
+    (tmp_path / "index.html").write_text(template_html, encoding="utf-8")
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)))
+
+    @app.route("/")
+    def index():
+        from chirp.templating.returns import Template
+
+        return Template("index.html")
+
+    return app
+
+
+def test_macro_css_fires_for_dangling_class_without_chirpui(tmp_path) -> None:
+    """A template emitting core-macro classes (chirp-dropdown) with chirp-ui not
+    active -> macro_css WARNING. Proves check_macro_css is wired AND that the
+    chirpui_components signal (absent here) reaches the rule as chirpui_active."""
+    app = _macro_css_app(tmp_path, _MACRO_CSS_DANGLING)
+    macro = [i for i in _issues(app) if i.category == "macro_css"]
+    assert macro, "macro_css (#148) did not fire through check_hypermedia_surface"
+    assert all(i.severity is Severity.WARNING for i in macro)
+    assert any("chirp-dropdown" in i.message for i in macro)
+
+
+def test_macro_css_silent_for_custom_classes(tmp_path) -> None:
+    """Negative control: a template with no core-macro import and no dangling
+    class -> no macro_css issue."""
+    app = _macro_css_app(tmp_path, _MACRO_CSS_CLEAN)
+    assert "macro_css" not in _categories(app)
+
+
+# ---------------------------------------------------------------------------
+# htmx_provisioned (#185) -- hx-*/sse-* attrs with htmx not provisioned
+# ---------------------------------------------------------------------------
+
+# hx-get with no AppConfig(htmx=True) and no htmx <script> marker.
+_HTMX_UNPROVISIONED = '<div id="x"><button hx-get="/data" hx-target="#x">Load</button></div>'
+# Same template, but the layout ships an htmx <script> marker.
+_HTMX_PROVISIONED_MARKER = (
+    '<div id="x"><script data-chirp="htmx" src="/static/htmx.js"></script>'
+    '<button hx-get="/data" hx-target="#x">Load</button></div>'
+)
+
+
+def _htmx_app(tmp_path, template_html: str, *, htmx_config: bool = False) -> App:
+    (tmp_path / "index.html").write_text(template_html, encoding="utf-8")
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path), htmx=htmx_config))
+
+    @app.route("/")
+    def index():
+        from chirp.templating.returns import Template
+
+        return Template("index.html")
+
+    return app
+
+
+def test_htmx_provisioned_fires_when_not_provisioned(tmp_path) -> None:
+    """A template emitting hx-* attributes with htmx neither config-enabled nor
+    script-provisioned -> htmx_provisioned WARNING. Proves check_htmx_provisioned
+    is wired AND that app.config.htmx (False here) reaches the rule."""
+    app = _htmx_app(tmp_path, _HTMX_UNPROVISIONED)
+    htmx = [i for i in _issues(app) if i.category == "htmx_provisioned"]
+    assert htmx, "htmx_provisioned (#185) did not fire through check_hypermedia_surface"
+    assert all(i.severity is Severity.WARNING for i in htmx)
+
+
+def test_htmx_provisioned_silent_when_config_enabled(tmp_path) -> None:
+    """Negative control: AppConfig(htmx=True) provisions htmx, so the same
+    hx-*-bearing template stays silent. If this fired, the config flag would not
+    be reaching the rule."""
+    app = _htmx_app(tmp_path, _HTMX_UNPROVISIONED, htmx_config=True)
+    assert "htmx_provisioned" not in _categories(app)
+
+
+def test_htmx_provisioned_silent_when_script_marker_present(tmp_path) -> None:
+    """Negative control: an htmx <script> marker in the template chain counts as
+    provisioned -> the rule stays silent."""
+    app = _htmx_app(tmp_path, _HTMX_PROVISIONED_MARKER)
+    assert "htmx_provisioned" not in _categories(app)

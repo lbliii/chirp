@@ -169,6 +169,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "context_cascade": "Templates",
     "composition_extends": "Templates",
     "boundary": "Templates",
+    "macro_css": "Templates",
     # HTMX / browser wiring
     "hx-target": "HTMX",
     "hx-indicator": "HTMX",
@@ -181,6 +182,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "command": "HTMX",
     "commandfor": "HTMX",
     "alpine_cdn_url": "HTMX",
+    "htmx_provisioned": "HTMX",
     "islands": "HTMX",
     "fragment_island": "HTMX",
     # Streaming / OOB
