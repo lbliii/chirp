@@ -70,6 +70,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `template_escape` | WARNING | Review trusted-markup or escaping diagnostics surfaced by Kida. |
 | `template_privacy` | WARNING | Remove private literals or mark non-public template content appropriately. |
 | `i18n_missing_key` | WARNING | Add the `t("…")` key to the locale JSON catalog(s) under the i18n directory, or remove the `t()` call. |
+| `macro_css` | WARNING | Activate chirp-ui (`use_chirp_ui(app)`) or ship your own CSS for the core-macro classes (`chirp-dropdown`, `chirp-modal`, `field--error`, …) when neither is present. |
 
 ## HTMX And Swaps
 
@@ -85,6 +86,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `view_transition_scope` | WARNING | Scope View Transitions to navigation-only elements, not broad OOB/SSE live-update containers. |
 | `oob_registry` | ERROR / WARNING | Add the registered OOB block/target, fix a typo, or make the region optional only when absence is legitimate. |
 | `oob_target` | WARNING | Fix `hx-swap-oob` IDs that do not appear in any known template. |
+| `htmx_provisioned` | WARNING | Provision htmx with `AppConfig(htmx=True)` or an htmx `<script>` in the layout chain when a template emits `hx-*`/`sse-*` attributes. |
 
 ## SSE And Reactive
 
