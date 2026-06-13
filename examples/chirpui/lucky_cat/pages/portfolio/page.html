@@ -1,0 +1,265 @@
+{% imports %}
+  {% from "chirp/sse.html" import sse_scope %}
+  {% from "chirpui/empty.html" import empty_state %}
+{% end %}
+
+{#-
+  Portfolio Suspense dashboard (#224).
+
+  The shell paints instantly with skeletons; each deferred panel below streams in
+  as an OOB swap once its awaitable resolves (page.py wraps the sync trade_store
+  reads in asyncio.to_thread so Suspense defers them). Every loading branch tests
+  `is deferred` — NOT `is not none` — because a deferred key is the DEFERRED
+  sentinel, and `DEFERRED is not none` is True (it would take the loaded branch
+  against the sentinel). `is deferred` is also why an *empty resolved* holdings
+  tuple shows the empty state instead of a stuck skeleton.
+
+  Block-name → DOM-id: open_orders→#open-orders, activity→#activity-feed, and
+  portfolio_value→#portfolio-value are remapped via defer_map in page.py (the
+  deferred OOB swap targets the section id, so an un-remapped block id would
+  match no DOM element and silently drop).
+
+  Duplicate-id de-dup: the deferred OOB wrapper htmx emits is
+  `<div id="<section-id>" hx-swap-oob="true">…</div>` (outerHTML swap against the
+  same-id shell element). So each `<section>` carries its `id` ONLY on the shell
+  skeleton paint (`is deferred`) — the loaded re-render drops the inner id and
+  lets the OOB wrapper own it, so the swapped DOM never holds two same-id nodes.
+  The shell element (with the id) is what the first OOB swap lands on.
+-#}
+
+{#- Emit `id="<dom_id>"` only while the panel is a deferred skeleton: the shell
+    needs the id as the OOB swap target, but the loaded re-render must NOT repeat
+    it (the OOB wrapper div carries it) or the swapped DOM would hold a duplicate
+    id. `deferred` is the loading sentinel; once resolved, the id is dropped. -#}
+{% def panel_id(dom_id, val) %}{% if val is deferred %}id="{{ dom_id }}" {% end %}{% end %}
+
+{#- Shared formatting helper: signed P&L class + sign prefix. -#}
+{% def signed_class(n) %}{{ 'luckycat-pf__delta--up' if n >= 0 else 'luckycat-pf__delta--down' }}{% end %}
+
+{#- FT panel inner body — single source of truth for the full-page render and the
+    /ft/stream SSE twin, so the markup can never drift. Declared at top level so
+    render_block dispatch sees it (kida K-RUN-001). ticks_per_sec is None until
+    the first SSE tick arrives. -#}
+{% def ft_panel_body(gil_enabled, workers, markets, ticks_per_sec) %}
+<dl class="luckycat-ft__stats">
+  <div class="luckycat-ft__stat">
+    <dt>GIL</dt>
+    <dd class="{{ 'luckycat-ft__bad' if gil_enabled else 'luckycat-ft__good' }}">
+      {{ 'enabled ✗' if gil_enabled else 'disabled ✓' }}
+    </dd>
+  </div>
+  <div class="luckycat-ft__stat">
+    <dt>Worker threads</dt>
+    <dd>{{ workers }}</dd>
+  </div>
+  <div class="luckycat-ft__stat">
+    <dt>Markets / tick</dt>
+    <dd>{{ markets }}</dd>
+  </div>
+  <div class="luckycat-ft__stat">
+    <dt>Ticks / sec</dt>
+    <dd>{% if (ticks_per_sec ?? none) is not none %}{{ ticks_per_sec }}{% else %}<span class="chirpui-text-muted">…</span>{% end %}</dd>
+  </div>
+</dl>
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">💼</span>
+      Portfolio
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Your holdings, open orders, and trade history. All settled in $MEOW.
+    </p>
+  </header>
+
+  <div class="luckycat-pf-grid">
+
+    {#- Value + P&L — deferred. References `value` and `pnl`. The hero focal
+        point of the screen: a spacious card, an uppercase eyebrow, the big
+        tabular balance, and a signed P&L pill (jade up / red down). -#}
+    {% block portfolio_value %}
+    <section {{ panel_id("portfolio-value", value) }}class="luckycat-pf-card luckycat-pf-card--value luckycat-pf-card--hero" aria-label="Portfolio value">
+      <h2 class="luckycat-pf-card__title luckycat-pf-card__eyebrow">Portfolio value</h2>
+      {% if value is deferred %}
+      <div class="luckycat-skel luckycat-skel--big"></div>
+      <div class="luckycat-skel luckycat-skel--line" style="width: 45%;"></div>
+      {% else %}
+      <div class="luckycat-pf__big">{{ value }} <span class="luckycat-pf__unit">$MEOW</span></div>
+      <div class="luckycat-pf__delta luckycat-pf__delta--pill {{ signed_class(pnl) }}">
+        <span class="luckycat-pf__delta-arrow" aria-hidden="true">{{ '▲' if pnl >= 0 else '▼' }}</span>
+        {{ '+' if pnl >= 0 else '' }}{{ pnl }} $MEOW unrealized P&amp;L
+      </div>
+      {% end %}
+    </section>
+    {% end %}
+
+    {#- Allocation — deferred. Rendered via macro-fed rows; named in defer_blocks. -#}
+    {% block allocation %}
+    <section {{ panel_id("allocation", allocation) }}class="luckycat-pf-card" aria-label="Allocation">
+      <h2 class="luckycat-pf-card__title">Allocation</h2>
+      {% if allocation is deferred %}
+      {% for _ in range(3) %}<div class="luckycat-skel luckycat-skel--line"></div>{% end %}
+      {% else %}
+        {% if (allocation | length) > 0 %}
+        <ul class="luckycat-alloc">
+          {% for row in allocation %}
+          <li class="luckycat-alloc__row">
+            <span class="luckycat-alloc__sym">{{ row.symbol }}</span>
+            <span class="luckycat-alloc__bar" aria-hidden="true">
+              <span class="luckycat-alloc__fill" style="width: {{ row.pct }}%;"></span>
+            </span>
+            <span class="luckycat-alloc__pct">{{ row.pct }}%</span>
+          </li>
+          {% end %}
+        </ul>
+        {% else %}
+        <p class="chirpui-text-muted luckycat-pf__empty">All cash. Place an order to allocate. 🐾</p>
+        {% end %}
+      {% end %}
+    </section>
+    {% end %}
+
+    {#- Holdings table — deferred. The empty-resolved-tuple → empty-state path is
+        the headline `is deferred` correctness proof (a stuck skeleton would mean
+        `is not none` was used by mistake). -#}
+    {% block holdings %}
+    <section {{ panel_id("holdings", holdings) }}class="luckycat-pf-card luckycat-pf-card--wide" aria-label="Holdings">
+      <h2 class="luckycat-pf-card__title">Holdings</h2>
+      {% if holdings is deferred %}
+      {% for _ in range(3) %}<div class="luckycat-skel luckycat-skel--line"></div>{% end %}
+      {% else %}
+        {% if (holdings | length) > 0 %}
+        <table class="luckycat-positions">
+          <thead>
+            <tr><th>Market</th><th>Size</th><th>Avg cost</th></tr>
+          </thead>
+          <tbody>
+            {% for p in holdings %}
+            <tr class="luckycat-positions__row">
+              <td class="luckycat-positions__sym">{{ p.symbol }}</td>
+              <td>{{ p.size }}</td>
+              <td>{{ p.avg_price }} $MEOW</td>
+            </tr>
+            {% end %}
+          </tbody>
+        </table>
+        {% else %}
+        {% call empty_state(icon="diamond", title="No holdings yet") %}
+        <p>Your positions show up here after your first fill. The lucky paw is ready.</p>
+        <p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+        {% end %}
+        {% end %}
+      {% end %}
+    </section>
+    {% end %}
+
+    {#- Open orders — deferred. Also renders the #open-order-count badge so the
+        #225 trade-flow OOB count target exists on this page too. -#}
+    {% block open_orders %}
+    <section {{ panel_id("open-orders", open_orders) }}class="luckycat-pf-card" aria-label="Open orders">
+      <h2 class="luckycat-pf-card__title">
+        Open orders
+        <span class="luckycat-pf-card__badge">
+          <span id="open-order-count">{{ (open_orders | length) if open_orders is not deferred else 0 }}</span> resting
+        </span>
+      </h2>
+      {% if open_orders is deferred %}
+      {% for _ in range(2) %}<div class="luckycat-skel luckycat-skel--line"></div>{% end %}
+      {% else %}
+        {% if (open_orders | length) > 0 %}
+        <ul class="luckycat-orders">
+          {% for o in open_orders %}
+          <li class="luckycat-orders__row">
+            <span class="luckycat-orders__sym">{{ o.symbol }}</span>
+            <span class="luckycat-orders__meta chirpui-text-muted chirpui-font-sm">
+              {{ o.side | capitalize }} {{ o.size }} @ {{ o.limit_price }}
+            </span>
+          </li>
+          {% end %}
+        </ul>
+        {% else %}
+        <p class="chirpui-text-muted luckycat-pf__empty">No resting orders.</p>
+        {% end %}
+      {% end %}
+    </section>
+    {% end %}
+
+    {#- Recent activity (fills) — deferred. DOM id activity-feed (defer_map). -#}
+    {% block activity %}
+    <section {{ panel_id("activity-feed", activity) }}class="luckycat-pf-card luckycat-pf-card--wide" aria-label="Recent activity">
+      <h2 class="luckycat-pf-card__title">Recent activity</h2>
+      {% if activity is deferred %}
+      {% for _ in range(4) %}<div class="luckycat-skel luckycat-skel--line"></div>{% end %}
+      {% else %}
+        {% if (activity | length) > 0 %}
+        <ul class="luckycat-feed">
+          {% for f in activity %}
+          <li class="luckycat-feed__row luckycat-feed__row--{{ f.side }}">
+            <span class="luckycat-feed__side">{{ f.side | upper }}</span>
+            <span class="luckycat-feed__sym">{{ f.symbol }}</span>
+            <span class="luckycat-feed__detail chirpui-text-muted chirpui-font-sm">
+              {{ f.size }} @ {{ f.price }} $MEOW
+            </span>
+          </li>
+          {% end %}
+        </ul>
+        {% else %}
+        <p class="chirpui-text-muted luckycat-pf__empty">No trades yet. Your fills will tape here.</p>
+        {% end %}
+      {% end %}
+    </section>
+    {% end %}
+
+    {#- Free-threading proof panel (#227 Part A). SYNC — rendered in the shell, not
+        deferred. The #ft-panel wrapper is the OOB target; ft_panel_body is its
+        single source of truth, re-rendered live by the /ft/stream SSE twin. -#}
+    <section class="luckycat-pf-card luckycat-pf-card--wide luckycat-ft" aria-label="Free-threading proof">
+      <h2 class="luckycat-pf-card__title">
+        🧵 Free-threading proof
+        <span class="luckycat-pf-card__badge chirpui-font-sm">honest CPU parallelism</span>
+      </h2>
+      {% block ft_panel %}
+      <div id="ft-panel" class="luckycat-ft__panel" aria-live="polite">
+        {{ ft_panel_body(
+            ft_gil_enabled ?? true,
+            ft_workers ?? 0,
+            ft_markets ?? 0,
+            ft_ticks_per_sec ?? none) }}
+      </div>
+      {% end %}
+      <p class="chirpui-text-muted chirpui-font-sm luckycat-ft__note">
+        The SimFeed fans every tick across a worker pool — genuine CPU-bound work,
+        no sleeps. On a free-threaded build (<code>python3.14t</code>) the GIL is
+        disabled and these threads run in parallel. The ticks/sec figure streams
+        live as the engine advances.
+      </p>
+      {#- Open the live FT channel. hx-disinherit keeps the OOB fragment off #main. -#}
+      {{ sse_scope("/ft/stream") }}
+    </section>
+
+  </div>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}
+
+{#- SSE twin for the FT panel. render_fragment() emits a block verbatim (no OOB
+    wrapper), so this fragment bakes the #ft-panel id + hx-swap-oob itself (same
+    DOM id as the full-page wrapper so the innerHTML swap lands). The /ft/stream
+    route yields this fragment per tick window. Mirrors ticker_strip_sse. -#}
+{% fragment ft_panel_oob %}
+<div id="ft-panel" hx-swap-oob="innerHTML">
+  {{ ft_panel_body(
+      ft_gil_enabled ?? true,
+      ft_workers ?? 0,
+      ft_markets ?? 0,
+      ft_ticks_per_sec ?? none) }}
+</div>
+{% endfragment %}

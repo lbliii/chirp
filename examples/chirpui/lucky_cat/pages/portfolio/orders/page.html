@@ -1,0 +1,120 @@
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+{% end %}
+
+{#- Portfolio → Open orders. Lists resting limit orders from trade_store in a
+    styled fills table (Geist Mono figures, jade/red side pill), each row with a
+    Cancel form posting to the trade.cancel route (CSRF-protected).
+
+    The Cancel form lives inside the boosted shell (#main: hx-target=#main /
+    hx-swap=innerHTML / hx-select=#page-content), and those attrs are INHERITED
+    by descendants. So we override them on the form itself: hx-target="closest tr"
+    + hx-swap="delete" makes the only local DOM change the row removing itself on
+    a 2xx (delete ignores the response body, so the inherited hx-select can't
+    swap #main empty). The cancel route's FormAction OOB-swaps the
+    #open-order-count badge (rendered below) + a toast, which apply regardless of
+    the swap mode — so the count stays honest with no full-page churn.
+
+    Cancelling the LAST open order would otherwise leave a bare thead (the row
+    deletes itself but the empty-state never appears until reload). So the table
+    + empty-state live inside #open-orders-table, and the cancel route OOB-swaps
+    that container to the empty-state when the count hits zero — fail-loud against
+    a real id. orders_table_body is the single source of truth for BOTH the
+    full-page paint and that OOB swap, so the markup can never drift. The
+    #open-order-count id reuses the #225 trade-flow OOB count target so the badge
+    updates here too. -#}
+
+{#- The table-or-empty body — rendered for the first paint inside #open-orders-table
+    and re-emitted by the orders_table_oob fragment when the cancel route empties
+    the book. A {% def %} so it is callable from both; emits only the inner markup
+    (the #open-orders-table wrapper is supplied by each caller). -#}
+{% def orders_table_body(rows=()) %}
+{% set _rows = rows | default(()) %}
+{% if (_rows | length) > 0 %}
+<table class="luckycat-fills">
+  <thead>
+    <tr>
+      <th>Placed</th>
+      <th>Market</th>
+      <th>Side</th>
+      <th class="luckycat-fills__num">Size</th>
+      <th class="luckycat-fills__num">Limit</th>
+      <th class="luckycat-fills__action"><span class="chirpui-visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in _rows %}
+    <tr class="luckycat-fills__row luckycat-fills__row--actionable">
+      <td class="luckycat-fills__time">{{ o.when }}</td>
+      <td class="luckycat-fills__sym">{{ o.symbol }}</td>
+      <td>
+        <span class="luckycat-fills__side luckycat-fills__side--{{ o.side }}">{{ o.side | upper }}</span>
+      </td>
+      <td class="luckycat-fills__num">{{ o.size }}</td>
+      <td class="luckycat-fills__num">{{ o.limit_price }} $MEOW</td>
+      <td class="luckycat-fills__action">
+        <form class="luckycat-orders__cancel"
+              hx-post="{{ url_for('trade.cancel', order_id=o.id) }}"
+              hx-target="closest tr" hx-swap="delete">
+          {{ csrf_field() }}
+          <button type="submit" class="chirpui-btn chirpui-btn--sm chirpui-btn--ghost"
+                  aria-label="Cancel {{ o.side }} {{ o.symbol }} order">Cancel</button>
+        </form>
+      </td>
+    </tr>
+    {% end %}
+  </tbody>
+</table>
+{% else %}
+{% call empty_state(icon="list", title="No resting orders") %}
+<p>Place a <strong>limit</strong> order on the Trade page and it rests here until filled or cancelled.</p>
+<p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+{% end %}
+{% end %}
+{% end %}
+
+{#- OOB twin for the orders table — the cancel route returns this fragment when
+    it empties the book. render_fragment() emits a block verbatim with no OOB
+    wrapping, so this fragment bakes the #open-orders-table id + hx-swap-oob
+    itself (same DOM id as the full-page wrapper so the innerHTML swap lands).
+    Mirrors the trade page's positions_oob / open_order_count_oob idiom. -#}
+{% fragment orders_table_oob %}
+<div id="open-orders-table" hx-swap-oob="innerHTML">
+  {{ orders_table_body(rows=orders | default(())) }}
+</div>
+{% endfragment %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">📋</span>
+      Open orders
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Resting limit orders waiting for the lucky paw.
+    </p>
+  </header>
+
+  {% set rows = orders | default(()) %}
+  <section class="luckycat-trade-panel" aria-label="Open orders">
+    <p class="luckycat-subpage-summary">
+      <span class="luckycat-subpage-summary__count" id="open-order-count">{{ rows | length }}</span>
+      <span class="chirpui-text-muted">resting · cancel to release reserved $MEOW</span>
+    </p>
+    {#- The table + empty-state container. Its own id so the cancel route can
+        OOB-swap it to the empty-state when the last order is cancelled. Renders
+        the shared orders_table_body so the full-page paint and the OOB swap can
+        never drift. -#}
+    <div id="open-orders-table">
+      {{ orders_table_body(rows=orders | default(())) }}
+    </div>
+  </section>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

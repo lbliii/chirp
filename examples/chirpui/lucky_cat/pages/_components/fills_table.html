@@ -1,0 +1,48 @@
+{#- Shared fills table — the single source of truth for Portfolio → History and
+    Activity → Trades, so the two views can never drift. Renders the trade_store
+    fill log (newest first) in the dense .luckycat-fills table: a leading mono
+    time column, a jade/red directional side pill, and right-aligned mono size /
+    price / notional figures. Rows are plain dicts built in each page.py
+    (symbol / side / size / price / notional / when), so this macro emits only
+    strings — no model coupling, no datetime-filter assumptions.
+
+    `rows` is the formatted view-model tuple; `empty_message` customises the
+    empty-state body so each room frames the same data in its own voice. -#}
+{% from "chirpui/empty.html" import empty_state %}
+
+{% def fills_table(rows=(), empty_title="No trades yet", empty_message="") %}
+{% set _rows = rows | default(()) %}
+{% if (_rows | length) > 0 %}
+<table class="luckycat-fills">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Side</th>
+      <th>Market</th>
+      <th class="luckycat-fills__num">Size</th>
+      <th class="luckycat-fills__num">Price</th>
+      <th class="luckycat-fills__num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in _rows %}
+    <tr class="luckycat-fills__row">
+      <td class="luckycat-fills__time">{{ f.when }}</td>
+      <td>
+        <span class="luckycat-fills__side luckycat-fills__side--{{ f.side }}">{{ f.side | upper }}</span>
+      </td>
+      <td class="luckycat-fills__sym">{{ f.symbol }}</td>
+      <td class="luckycat-fills__num">{{ f.size }}</td>
+      <td class="luckycat-fills__num">{{ f.price }}</td>
+      <td class="luckycat-fills__num">{{ f.notional }} $MEOW</td>
+    </tr>
+    {% end %}
+  </tbody>
+</table>
+{% else %}
+{% call empty_state(icon="list", title=empty_title) %}
+<p>{{ empty_message }}</p>
+<p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+{% end %}
+{% end %}
+{% end %}

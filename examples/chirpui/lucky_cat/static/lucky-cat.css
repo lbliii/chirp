@@ -1,0 +1,2374 @@
+/* Lucky Cat — Maneki-neko crypto-exchange chrome.
+
+   A Robinhood-grade polish LAYER over chirp-ui — NOT a fork. The design tokens
+   live in _layout.html head_extra (dark-first under :root, light under
+   [data-theme="light"] + the system media query):
+
+     * --lc-*        the Lucky Cat product token layer (planes, jade/red/gold,
+                     --lc-elevation-* soft shadows, radii, type scale, motion).
+     * --chirpui-*   re-pointed at the --lc-* layer there, so chirp-ui chrome
+                     inherits depth-over-borders for free.
+     * --luckycat-*  legacy alias tokens this file still references; re-anchored
+                     to the --lc-* layer (--luckycat-red now = the jade accent).
+
+   Anti-wireframe moves applied below: tinted ELEVATED surfaces + soft shadows +
+   larger radii instead of flat 1px borders; tabular numerals on every figure;
+   proportional depth bars on the order book; price-tick flash + skeleton
+   shimmer + hover/press micro-interactions (all gated on prefers-reduced-motion). */
+
+/* ---------------------------------------------------------------------------
+   Self-hosted brand fonts (Geist + Geist Mono, variable woff2). Self-hosted so
+   there's no CDN/CSP fuss and it works offline / clone-and-run; font-src 'self'
+   in the example CSP covers /static/fonts/. UI in Geist, dense data zones
+   (order book / trade tape) in Geist Mono — set via the --lc-font-* tokens.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Geist Variable";
+  src: url("/static/fonts/geist-sans.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono Variable";
+  src: url("/static/fonts/geist-mono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Brand logo mark (custom maneki-neko SVG; replaces the 🐾 emoji). */
+.luckycat-brand__logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: block;
+  flex: 0 0 auto;
+}
+.luckycat-inner-rail__logo {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Brand + house token (top bar)
+   --------------------------------------------------------------------------- */
+
+.luckycat-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.luckycat-brand__paw {
+  font-size: 1.15rem;
+}
+.luckycat-brand__name {
+  background: linear-gradient(90deg, var(--luckycat-red), var(--luckycat-gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.luckycat-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--lc-radius-pill);
+  font-weight: 700;
+  font-size: var(--lc-text-sm);
+  letter-spacing: var(--lc-tracking-tight);
+  color: var(--lc-on-gold);
+  background: linear-gradient(135deg, var(--lc-gold) 0%, var(--lc-gold-strong) 100%);
+  box-shadow: var(--lc-elevation-1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.luckycat-token__coin {
+  font-size: 0.95rem;
+}
+.luckycat-token__amount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Notifications bell (top-bar) — a dropdown popover over the recent feed, with a
+   live unread badge. Composes over chirp-ui's .chirpui-dropdown (Alpine
+   chirpuiDropdown drives open/close + reposition); these rules style the bell
+   trigger, the unread badge pill, and the panel rows in the Lucky Cat language.
+   --------------------------------------------------------------------------- */
+
+.luckycat-notif-bell {
+  position: relative;
+  display: inline-flex;
+}
+/* Hide the inert SSE-scope wrapper (the bell's live channel has no visible UI;
+   the streamed fragments are pure OOB swaps into the bell). */
+.luckycat-notif-sse {
+  display: none;
+}
+.luckycat-notif-bell__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lc-radius-sm);
+  background: transparent;
+  color: var(--lc-ink-muted);
+  cursor: pointer;
+  transition:
+    background var(--lc-motion-fast),
+    color var(--lc-motion-fast);
+}
+.luckycat-notif-bell__trigger:hover,
+.luckycat-notif-bell__trigger:focus-visible {
+  background: var(--lc-plane-raised);
+  color: var(--lc-ink);
+  outline: none;
+}
+.luckycat-notif-bell__trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--chirpui-focus-ring);
+}
+.luckycat-notif-bell__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+/* Unread count pill — anchored to the top-right of the bell. The wrap is an
+   empty positioned anchor (the OOB innerHTML target); the pill renders inside it
+   only when there is something unread. */
+.luckycat-notif-bell__badge-wrap {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  display: inline-flex;
+}
+.luckycat-notif-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.28rem;
+  border-radius: var(--lc-radius-pill);
+  background: var(--lc-red);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-shadow:
+    0 0 0 2px var(--chirpui-bg),
+    var(--lc-elevation-1);
+}
+/* The dropdown panel — an elevated overlay plane (depth over a flat border). */
+.luckycat-notif-bell__panel {
+  /* Raise max-inline-size too: the .chirpui-dropdown__menu base clamps to ~20rem,
+     so the intended 22rem width never took effect without this. The chirp-ui
+     viewport-padding clamp + the alignX="end" reposition still keep it on-screen
+     on a phone, so 22rem is the desktop intent, not a mobile overflow risk. */
+  width: min(22rem, calc(100vw - 1.5rem));
+  max-inline-size: min(22rem, calc(100vw - 1.5rem));
+  max-height: min(26rem, 70vh);
+  overflow-y: auto;
+  padding: 0.35rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-overlay);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-pop);
+  scrollbar-width: thin;
+}
+.luckycat-notif-bell__head {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.55rem 0.5rem;
+}
+.luckycat-notif-bell__title {
+  font-size: var(--lc-text-sm);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+  color: var(--lc-ink);
+}
+.luckycat-notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* One notification row — an icon chip + a two-line text stack, with a
+   directional left accent keyed off the kind. */
+.luckycat-notif {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.55rem;
+  border-radius: var(--lc-radius-sm);
+  border-left: 2px solid transparent;
+  transition: background var(--lc-motion-fast);
+}
+.luckycat-notif:hover {
+  background: var(--lc-plane-raised);
+}
+.luckycat-notif__icon {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.luckycat-notif__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.luckycat-notif__title {
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  color: var(--lc-ink);
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-notif__body {
+  font-size: var(--lc-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* Directional accents — fills jade (an account gain), deposits gold ($MEOW),
+   price alerts jade (the bell hue). */
+.luckycat-notif--fill {
+  border-left-color: var(--lc-jade);
+}
+.luckycat-notif--deposit {
+  border-left-color: var(--lc-gold);
+}
+.luckycat-notif--price {
+  border-left-color: var(--lc-jade);
+}
+/* Empty state — a calm maneki paw, matching the activity empty state. */
+.luckycat-notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.6rem 1rem;
+  text-align: center;
+}
+.luckycat-notif-empty__paw {
+  font-size: 1.5rem;
+  opacity: 0.6;
+}
+
+/* Reduced-motion floor for the bell: kill the hover/focus transitions so the
+   only motion is the (CSS-gated) chirp-ui dropdown transition, which itself
+   respects prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-notif-bell__trigger,
+  .luckycat-notif {
+    transition: none;
+  }
+  /* The dropdown panel opens via Alpine's x-transition (JS/CSS-class driven),
+     which our luckycat-* keyframe gates do NOT cover. Zero the panel transition
+     under reduced motion so the fade/scale on the bell popover is honored too. */
+  .luckycat-notif-bell__panel {
+    transition: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Cross-page ticker strip (top-bar center)
+   --------------------------------------------------------------------------- */
+
+.luckycat-ticker {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: 1.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+.luckycat-ticker__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-ticker__sym {
+  font-weight: 700;
+  color: var(--chirpui-text);
+}
+.luckycat-ticker__price {
+  color: var(--chirpui-text);
+}
+.luckycat-ticker__chg--up,
+.luckycat-ticker__chg--down {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+.luckycat-ticker__chg--up {
+  color: var(--luckycat-up);
+}
+.luckycat-ticker__chg--down {
+  color: var(--luckycat-down);
+}
+/* Directional arrow so the strip is never color-ONLY (matches the card grid +
+   hero ticker idiom). aria-hidden in the template; purely a visual cue. */
+.luckycat-ticker__arrow {
+  font-size: 0.7em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Markets grid (landing)
+   --------------------------------------------------------------------------- */
+
+.luckycat-page {
+  padding-block: 1.5rem 2.5rem;
+}
+.luckycat-page__header {
+  margin-bottom: 1.5rem;
+}
+.luckycat-page__title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.3rem;
+  font-size: var(--lc-text-xl);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+}
+.luckycat-page__cat {
+  font-size: 1.6rem;
+}
+.luckycat-page__tagline {
+  margin: 0;
+}
+
+.luckycat-markets-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+/* Premium market card — a borderless ELEVATED surface on the page plane (depth
+   over a flat 1px border). A hairline ring is carried by an inset box-shadow
+   instead of `border` so the radius reads clean and the hover lift has no border
+   color to fight. A directional top-edge accent (jade up / red down) fades in on
+   hover so each card declares its 24h direction without shouting. */
+.luckycat-market-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1.05rem 1.15rem 0;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+  color: var(--chirpui-text);
+  text-decoration: none;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform var(--lc-motion-fast),
+    box-shadow var(--lc-motion-fast),
+    background var(--lc-motion-fast);
+}
+/* Directional top-edge accent — sits above the card body (z-index isolation). */
+.luckycat-market-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity var(--lc-motion-fast);
+}
+.luckycat-market-card--up::before {
+  background: linear-gradient(90deg, transparent, var(--lc-up), transparent);
+}
+.luckycat-market-card--down::before {
+  background: linear-gradient(90deg, transparent, var(--lc-down), transparent);
+}
+.luckycat-market-card:hover,
+.luckycat-market-card:focus-visible {
+  background: var(--lc-plane-raised);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 28%, var(--lc-hairline)),
+    var(--lc-elevation-2),
+    var(--lc-glow-jade);
+  transform: translateY(var(--lc-lift));
+}
+.luckycat-market-card--down:hover,
+.luckycat-market-card--down:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--lc-down) 26%, var(--lc-hairline)),
+    var(--lc-elevation-2),
+    0 0 0 1px color-mix(in srgb, var(--lc-down) 22%, transparent),
+    0 8px 28px color-mix(in srgb, var(--lc-down) 16%, transparent);
+}
+.luckycat-market-card:hover::before,
+.luckycat-market-card:focus-visible::before {
+  opacity: 1;
+}
+.luckycat-market-card:active {
+  transform: translateY(0);
+}
+.luckycat-market-card:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--lc-jade));
+  outline-offset: 2px;
+}
+
+/* Header row: identity (sym + name) on the left, the 24h delta pill on the right. */
+.luckycat-market-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.luckycat-market-card__id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.luckycat-market-card__sym {
+  font-size: var(--lc-text-base);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+}
+.luckycat-market-card__name {
+  font-size: var(--lc-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.luckycat-market-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+  font-size: var(--lc-text-xl);
+  font-weight: 800;
+  letter-spacing: var(--lc-tracking-display);
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-market-card__unit {
+  font-size: var(--lc-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-market-card__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--lc-radius-pill);
+  font-size: var(--lc-text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.luckycat-market-card__arrow {
+  font-size: 0.7em;
+  line-height: 1;
+}
+.luckycat-market-card__change.is-up {
+  color: var(--lc-up);
+  background: color-mix(in srgb, var(--lc-up) 14%, transparent);
+}
+.luckycat-market-card__change.is-down {
+  color: var(--lc-down);
+  background: color-mix(in srgb, var(--lc-down) 14%, transparent);
+}
+
+/* Signature gradient sparkline — bleeds to the card edges as the visual anchor.
+   The fixed 100×36 viewBox is stretched to the strip (preserveAspectRatio="none"
+   in the SVG), so the chart fills the full card width regardless of column size. */
+.luckycat-market-card__spark {
+  display: block;
+  margin-top: 0.75rem;
+  margin-inline: -1.15rem;
+}
+.luckycat-spark {
+  display: block;
+  width: 100%;
+  height: 2.75rem;
+}
+.luckycat-spark__line {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.luckycat-spark--up .luckycat-spark__line {
+  stroke: var(--lc-chart-up-line);
+}
+.luckycat-spark--down .luckycat-spark__line {
+  stroke: var(--lc-chart-down-line);
+}
+.luckycat-spark--up .luckycat-spark__stop-top {
+  stop-color: var(--lc-chart-up-fill-top);
+}
+.luckycat-spark--up .luckycat-spark__stop-bottom {
+  stop-color: var(--lc-chart-up-fill-bottom);
+}
+.luckycat-spark--down .luckycat-spark__stop-top {
+  stop-color: var(--lc-chart-down-fill-top);
+}
+.luckycat-spark--down .luckycat-spark__stop-bottom {
+  stop-color: var(--lc-chart-down-fill-bottom);
+}
+/* Subtle line-draw reveal on first paint (no JS); skipped under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .luckycat-spark__line {
+    stroke-dasharray: 220;
+    stroke-dashoffset: 220;
+    animation: luckycat-spark-draw 900ms var(--lc-ease-out) forwards;
+  }
+}
+@keyframes luckycat-spark-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.luckycat-empty__paw {
+  font-size: 1.5rem;
+  margin: 0.5rem 0 0;
+}
+.luckycat-sidebar__empty {
+  padding-inline: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   WATCHLIST STAR — the per-market star toggle (the first functional filter).
+
+   FOOTGUN #1 guard in CSS: the star lives in a position:relative .market-card-cell
+   wrapper as a SIBLING of the card <a> (never a descendant), absolutely positioned
+   over the top-right corner and lifted above the card by z-index so it remains
+   clickable without being inside the anchor. ★/☆ glyph; gold (--lc-gold) when
+   starred. The detail-header variant sits in its own flex slot (not absolute).
+   --------------------------------------------------------------------------- */
+.luckycat-market-card-cell {
+  position: relative;
+  display: flex;
+}
+.luckycat-market-card-cell > .luckycat-market-card {
+  flex: 1 1 auto;
+}
+.luckycat-watchlist-star {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lc-radius-pill);
+  background: color-mix(in srgb, var(--lc-plane-overlay) 72%, transparent);
+  box-shadow: var(--lc-elevation-1);
+  color: var(--lc-ink-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  transition:
+    transform var(--lc-motion-fast),
+    color var(--lc-motion-fast),
+    background var(--lc-motion-fast),
+    box-shadow var(--lc-motion-fast);
+}
+.luckycat-watchlist-star:hover,
+.luckycat-watchlist-star:focus-visible {
+  color: var(--lc-gold);
+  background: color-mix(in srgb, var(--lc-gold) 16%, var(--lc-plane-overlay));
+  transform: scale(1.08);
+}
+.luckycat-watchlist-star:active {
+  transform: scale(0.96);
+}
+.luckycat-watchlist-star:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--lc-gold));
+  outline-offset: 2px;
+}
+.luckycat-watchlist-star.is-starred {
+  color: var(--lc-gold);
+  background: color-mix(in srgb, var(--lc-gold) 18%, var(--lc-plane-overlay));
+  box-shadow:
+    var(--lc-elevation-1),
+    var(--lc-glow-gold);
+}
+.luckycat-watchlist-star__glyph {
+  display: block;
+}
+
+/* Detail-header star: a flex sibling of the back link + the H1 (not absolute). */
+.luckycat-detail__star {
+  margin-left: auto;
+  display: inline-flex;
+}
+.luckycat-detail__star .luckycat-watchlist-star {
+  position: static;
+  width: 2.1rem;
+  height: 2.1rem;
+  font-size: 1.2rem;
+}
+
+/* Rail Watchlist-lane count pill — reuses the chirp-ui sidebar badge sizing but
+   tinted gold to read as the "starred" tally. */
+.luckycat-watchlist-count-wrap {
+  display: inline-flex;
+}
+.luckycat-watchlist-count {
+  background: color-mix(in srgb, var(--lc-gold) 20%, transparent);
+  color: var(--lc-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Watchlist page empty state — centers the polished maneki empty within the grid
+   column flow (matches the markets-grid gutter). */
+.luckycat-watchlist-empty {
+  display: block;
+}
+.luckycat-watchlist-empty__star {
+  color: var(--lc-gold);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-watchlist-star {
+    transition: none;
+  }
+  .luckycat-watchlist-star:hover,
+  .luckycat-watchlist-star:focus-visible,
+  .luckycat-watchlist-star:active {
+    transform: none;
+  }
+}
+
+/* Touch-target floor: the per-card star is the primary functional filter control
+   (the watchlist empty state tells users to tap it), but at 1.85rem (~30px) it is
+   below the 44px touch floor and even below chirp-ui's --chirpui-control-touch-
+   target. chirp-ui's mobile control-bump only reaches the topbar/sidebar, not
+   this star inside #main, so grow the hit box here on coarse pointers / narrow
+   viewports. The glyph font-size is unchanged — only the box grows; the offset is
+   nudged out so the larger box still clears the card's top-right change pill. */
+@media (max-width: 48rem), (pointer: coarse) {
+  .luckycat-watchlist-star {
+    width: var(--chirpui-control-touch-target, 2.75rem);
+    height: var(--chirpui-control-touch-target, 2.75rem);
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+  .luckycat-detail__star .luckycat-watchlist-star {
+    width: var(--chirpui-control-touch-target, 2.75rem);
+    height: var(--chirpui-control-touch-target, 2.75rem);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Two-tier progressive rail (#231) — elbysodic full-viewport structure.
+
+   A persistent outer ICON RAIL (--luckycat-icon-rail-width, ~4.25rem) + an
+   inner CONTEXTUAL rail (--luckycat-rail-width, continuous/resizable) that
+   changes per route, side-by-side inside the chirp-ui app-shell sidebar slot
+   (#chirpui-sidebar-nav). The chirp-ui grid already gives the shell its
+   100dvh / sticky-topbar / 1fr-main scaffold; the full-viewport rules below
+   (ported from elbysodic 20-shell.css:84-173) pin the sidebar CELL to the
+   viewport height and move the scroll INTO the inner rail's nav so the rail
+   chrome (header/footer/resize handle) stays put while only the link list
+   scrolls — and #main scrolls independently via the document.
+
+   The shell column width is icon-rail + inner-rail, so dragging the handle
+   (BUILD 2) changes ONLY --luckycat-rail-width (the inner column).
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Outer icon-rail width (elbysodic --elbysodic-primary-rail-width: 4.25rem). */
+  --luckycat-icon-rail-width: 4.25rem;
+  /* Inner contextual-rail width — continuous/resizable in BUILD 2. */
+  --luckycat-rail-width: clamp(13rem, 18vw, 18rem);
+}
+
+/* The shell sidebar column = icon rail + inner rail. Dragging the handle
+   changes only --luckycat-rail-width, so the icon rail stays a fixed gutter. */
+.chirpui-app-shell {
+  --chirpui-sidebar-width: calc(var(--luckycat-icon-rail-width) + var(--luckycat-rail-width));
+}
+
+.luckycat-shell-sidebar-frame,
+.luckycat-shell-sidebar {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Full-viewport desktop shell (>=48rem). On mobile the chirp-ui grid stacks
+   the sidebar above #main and gives it its own bounded scroll, so these
+   viewport-pinning rules are desktop-only. */
+@media (min-width: 48rem) {
+  /* Pin the sidebar cell to the viewport; the rail content owns the scroll.
+     overflow:visible lets tooltips and the resize handle escape the cell. */
+  .chirpui-app-shell__sidebar {
+    height: calc(100dvh - var(--chirpui-shell-offset-top, 0px));
+    max-height: calc(100dvh - var(--chirpui-shell-offset-top, 0px));
+    overflow: visible;
+    display: flex;
+    align-self: stretch;
+  }
+  /* The two-tier frame fills the cell height and anchors the resize handle. */
+  .luckycat-shell-sidebar-frame,
+  .luckycat-shell-sidebar {
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    position: relative;
+  }
+  /* Outer icon rail: full height, internal scroll if the rooms overflow. */
+  .luckycat-primary-rail {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  /* Inner contextual rail: flex column. The NAV scrolls; header/footer pinned. */
+  .luckycat-inner-rail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .luckycat-inner-rail .chirpui-sidebar__nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .luckycat-inner-rail .chirpui-sidebar__header,
+  .luckycat-inner-rail .chirpui-sidebar__footer {
+    flex: 0 0 auto;
+  }
+}
+
+/* Outer icon rail — fixed narrow column of room icons on the deepest plane
+   (page floor), so the inner rail's surface reads as an elevated layer over it.
+   A hairline divider via inset shadow, not a flat border. */
+.luckycat-primary-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 var(--luckycat-icon-rail-width);
+  width: var(--luckycat-icon-rail-width);
+  padding-block: 0.75rem;
+  background: var(--lc-plane-base);
+  box-shadow: inset -1px 0 0 var(--lc-hairline);
+}
+.luckycat-primary-rail__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--lc-radius-sm);
+  color: var(--lc-ink-muted);
+  text-decoration: none;
+  transition:
+    background var(--lc-motion-fast),
+    color var(--lc-motion-fast),
+    transform var(--lc-motion-instant);
+}
+.luckycat-primary-rail__link:hover,
+.luckycat-primary-rail__link:focus-visible {
+  background: color-mix(in srgb, var(--lc-jade) 12%, transparent);
+  color: var(--lc-jade);
+  outline: none;
+}
+.luckycat-primary-rail__link:active {
+  transform: scale(0.94);
+}
+.luckycat-primary-rail__link--active,
+.luckycat-primary-rail__link[aria-current="page"] {
+  color: var(--lc-jade);
+  background: color-mix(in srgb, var(--lc-jade) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 26%, transparent);
+}
+/* Active pip — a jade bar pinned to the rail's right edge (the elevated boundary
+   between rail and main), so it reads as the room marker the inner rail extends. */
+.luckycat-primary-rail__link--active::before {
+  content: "";
+  position: absolute;
+  right: calc(-0.5 * (var(--luckycat-icon-rail-width) - 2.4rem) - 1px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.2rem;
+  height: 1.5rem;
+  border-radius: 0.2rem 0 0 0.2rem;
+  background: var(--lc-jade);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--lc-jade) 60%, transparent);
+}
+.luckycat-primary-rail__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.luckycat-primary-rail__count {
+  position: absolute;
+  top: -0.15rem;
+  right: -0.15rem;
+  min-width: 1rem;
+  padding: 0 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: var(--lc-red);
+  border-radius: var(--lc-radius-pill);
+  box-shadow: 0 0 0 2px var(--lc-plane-base);
+}
+/* Tooltip on hover/focus — the rail is icon-only. */
+.luckycat-primary-rail__link[data-rail-tooltip]:hover::after,
+.luckycat-primary-rail__link[data-rail-tooltip]:focus-visible::after {
+  content: attr(data-rail-tooltip);
+  position: absolute;
+  left: calc(100% + 0.5rem);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--chirpui-text);
+  background: var(--lc-plane-overlay, var(--chirpui-surface));
+  border: 1px solid var(--lc-hairline);
+  border-radius: var(--lc-radius-xs);
+  box-shadow: var(--lc-elevation-2);
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Inner contextual rail — fills the remaining sidebar width, sitting one
+   elevation plane above the icon rail (surface over base) with a hairline
+   right divider via inset shadow so it reads as a layered panel, not a
+   bordered box. */
+.luckycat-inner-rail {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--lc-plane-surface);
+  box-shadow: inset -1px 0 0 var(--lc-hairline);
+}
+.luckycat-inner-rail__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  color: var(--chirpui-text);
+  text-decoration: none;
+}
+.luckycat-inner-rail__paw {
+  font-size: 1.05rem;
+}
+.luckycat-inner-rail__badge {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-inner-rail__balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  justify-content: center;
+  font-size: var(--lc-text-sm);
+  color: var(--lc-on-gold);
+  background: linear-gradient(135deg, var(--lc-gold) 0%, var(--lc-gold-strong) 100%);
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--lc-radius-pill);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+  box-shadow: var(--lc-elevation-1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.luckycat-inner-rail__balance-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Visible collapse/expand toggle (discoverability — #231 follow-up).
+
+   A real <button> (data-luckycat-rail-toggle) that toggles .luckycat-rail--collapsed
+   via lucky-cat-shell.js — the discoverable alternative to the
+   double-click-the-resize-handle gesture. Two placements share one look:
+
+     * .luckycat-rail-toggle--icon  — pinned at the TOP of the icon rail. It must
+       stay reachable when collapsed (the icon rail is the only thing visible),
+       so it is NEVER hidden by the collapsed class.
+     * .luckycat-rail-toggle--inner — in the inner-rail header, the obvious
+       affordance while expanded. It rides inside .luckycat-inner-rail, so the
+       collapsed `display:none` hides it (you re-expand from the icon-rail copy).
+
+   The chevron glyph rotates 180° in the collapsed state so it reads as
+   "expand →" rather than "collapse ←". Desktop only — on mobile the chirp-ui
+   shell overlays the sidebar so the collapse affordance is inert.
+   --------------------------------------------------------------------------- */
+
+.luckycat-rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--chirpui-text-muted, var(--chirpui-text));
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.luckycat-rail-toggle:hover,
+.luckycat-rail-toggle:focus-visible {
+  background: color-mix(in srgb, var(--luckycat-red) 12%, transparent);
+  color: var(--luckycat-red);
+  border-color: color-mix(in srgb, var(--luckycat-red) 30%, transparent);
+  outline: none;
+}
+.luckycat-rail-toggle:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--luckycat-red));
+  outline-offset: 1px;
+}
+.luckycat-rail-toggle__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  letter-spacing: -0.1em;
+  transition: transform 0.15s ease;
+}
+/* Collapsed → the glyph flips so it points "open it back out". */
+.luckycat-rail--collapsed .luckycat-rail-toggle__icon {
+  transform: rotate(180deg);
+}
+
+/* Icon-rail copy: a small affordance pinned at the top, separated from the
+   room icons. ALWAYS visible (it is the only way to re-expand when collapsed). */
+.luckycat-rail-toggle--icon {
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+
+/* Inner-rail copy lives in the header row beside the brand. */
+.luckycat-inner-rail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+.luckycat-rail-toggle--inner {
+  flex: 0 0 auto;
+}
+
+/* Mobile: the chirp-ui grid stacks the sidebar; collapse is meaningless. */
+@media (max-width: 48rem) {
+  .luckycat-rail-toggle {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Rail resize handle (#231, BUILD 2) — elbysodic .elbysodic-sidebar-resize.
+   A rail-edge handle (cursor: ew-resize) sitting on the inner-rail's right edge,
+   between the rail and #main. lucky-cat-shell.js wires a GENUINE continuous
+   pointer-drag resize (sets --luckycat-rail-width live), double-click
+   collapse/expand, and arrow-key/Home/End keyboard resize. role="separator" +
+   aria-orientation="vertical" is the correct ARIA for a resize splitter (NOT a
+   button), with aria-valuemin/max/now (176..416 px) kept in sync by the JS.
+   Absolutely positioned on the frame so it spans the full rail height regardless
+   of inner-rail scroll.
+
+   Both preferences are cookie-persisted AND read server-side for a no-flash first
+   paint (shell.py rail_width()/rail_is_collapsed() → head_extra <style>): the
+   dragged width (--luckycat-rail-width) and the collapse boolean (the runtime
+   .luckycat-rail--collapsed class shrinks the shell column to the icon-rail width
+   and hides the inner rail). Desktop only (>=48rem) — on mobile the chirp-ui grid
+   stacks the sidebar, so the resize/collapse affordance is inert.
+   --------------------------------------------------------------------------- */
+
+.luckycat-sidebar-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: calc(var(--chirpui-z-sticky, 50) + 2);
+}
+/* Accent bar (mirrors elbysodic 20-shell.css:323-351) — fades in on hover/focus
+   so the resize affordance reads as a draggable edge. */
+.luckycat-sidebar-resize::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: calc(50% - 1.2rem);
+  width: 2px;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--luckycat-red) 42%, transparent);
+  opacity: 0;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+.luckycat-sidebar-resize:hover::before,
+.luckycat-sidebar-resize:focus-visible::before {
+  background: color-mix(in srgb, var(--luckycat-red) 62%, transparent);
+  opacity: 1;
+}
+.luckycat-sidebar-resize:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--luckycat-red));
+  outline-offset: -2px;
+}
+
+@media (min-width: 48rem) {
+  .chirpui-app-shell.luckycat-rail--collapsed {
+    --chirpui-sidebar-width: var(--luckycat-icon-rail-width, 4.25rem);
+  }
+  /* Truly remove the inner rail from layout when collapsed (opacity alone left
+     it occupying its full width — the "it just shrinks" bug). The flex row then
+     reflows to the icon-rail only, matching the collapsed --chirpui-sidebar-width. */
+  .luckycat-rail--collapsed .luckycat-inner-rail {
+    display: none;
+  }
+}
+
+/* On mobile the chirp-ui grid stacks the sidebar; the edge handle is meaningless. */
+@media (max-width: 48rem) {
+  .luckycat-sidebar-resize {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chirpui-app-shell {
+    transition: grid-template-columns 0.18s ease;
+  }
+  .luckycat-inner-rail {
+    transition: opacity 0.15s ease;
+  }
+}
+
+/* During an active pointer-drag the JS adds this class: kill the column
+   transition so the rail tracks the pointer 1:1 (no easing lag), and suppress
+   text selection / pointer hit-testing inside the rail so the drag is smooth. */
+.chirpui-app-shell.luckycat-rail--dragging {
+  transition: none;
+  cursor: ew-resize;
+  user-select: none;
+}
+.chirpui-app-shell.luckycat-rail--dragging .luckycat-inner-rail,
+.chirpui-app-shell.luckycat-rail--dragging .luckycat-primary-rail,
+.chirpui-app-shell.luckycat-rail--dragging .chirpui-app-shell__main {
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Market detail — page layout (#223)
+   --------------------------------------------------------------------------- */
+
+.luckycat-detail {
+  padding-block: 1.5rem 2.5rem;
+}
+.luckycat-detail__header {
+  margin-bottom: 1rem;
+}
+.luckycat-detail__back {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: var(--chirpui-text-muted);
+  text-decoration: none;
+}
+.luckycat-detail__back:hover,
+.luckycat-detail__back:focus-visible {
+  color: var(--luckycat-red);
+}
+.luckycat-detail__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+.luckycat-detail__cat {
+  font-size: 1.4rem;
+}
+.luckycat-detail__grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  align-items: start;
+}
+.luckycat-detail__panel-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+/* Market info — a static meta panel below the order-book/tape grid (the real
+   scroll target for the inner rail's #info anchor). One surface plane matching
+   the rest of the detail chrome; a simple definition grid + a demo-only note. */
+.luckycat-detail__info {
+  margin-top: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+}
+.luckycat-detail__info-grid {
+  display: grid;
+  gap: 0.6rem 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin: 0;
+}
+.luckycat-detail__info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-block: 0.35rem;
+  border-bottom: 1px solid var(--lc-hairline);
+}
+.luckycat-detail__info-row dt {
+  color: var(--lc-ink-muted);
+  font-size: var(--lc-text-sm);
+}
+.luckycat-detail__info-row dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-detail__info-note {
+  margin: 1rem 0 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Market detail — HERO (big tabular price + signed delta over the signature
+   gradient AREA chart). One spacious focal point per screen: generous padding,
+   one elevation plane above the page floor, a soft jade wash anchored top-left,
+   and the chart bleeding to the card edges as the visual anchor.
+   --------------------------------------------------------------------------- */
+
+.luckycat-detail__hero {
+  position: relative;
+  margin-bottom: 1.75rem;
+  padding: 1.6rem 1.75rem 0;
+  border-radius: var(--lc-radius-lg);
+  background:
+    radial-gradient(130% 150% at 0% 0%, color-mix(in srgb, var(--lc-jade) 9%, transparent) 0%, transparent 58%),
+    var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-2);
+  overflow: hidden;
+  isolation: isolate;
+}
+.luckycat-detail__hero-head {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hero ticker — the focal numeral. Big tabular price, the quote unit dimmed,
+   and a signed delta pill that reads up=jade / down=red. */
+.luckycat-hero-ticker {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--lc-radius-sm);
+}
+.luckycat-hero-ticker__price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+}
+.luckycat-hero-ticker__price {
+  font-size: var(--lc-display);
+  font-weight: 800;
+  letter-spacing: var(--lc-tracking-display);
+  line-height: var(--lc-leading-display);
+}
+.luckycat-hero-ticker__quote {
+  font-size: var(--lc-text-base);
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+}
+.luckycat-hero-ticker__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: var(--lc-radius-pill);
+  font-size: var(--lc-text-base);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.luckycat-hero-ticker__arrow {
+  font-size: 0.72em;
+  line-height: 1;
+}
+.luckycat-hero-ticker__pct {
+  opacity: 0.85;
+}
+.luckycat-hero-ticker__delta--up {
+  color: var(--lc-up);
+  background: color-mix(in srgb, var(--lc-up) 14%, transparent);
+}
+.luckycat-hero-ticker__delta--down {
+  color: var(--lc-down);
+  background: color-mix(in srgb, var(--lc-down) 14%, transparent);
+}
+
+/* Dense 24h stat strip under the hero numeral — generous negative space above
+   it, tabular figures, uppercase eyebrow labels. */
+.luckycat-hero-ticker__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  margin: 0;
+}
+.luckycat-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.luckycat-hero-stat dt {
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--chirpui-text-muted);
+}
+.luckycat-hero-stat dd {
+  margin: 0;
+  font-size: var(--lc-text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Signature gradient AREA chart — bleeds to the hero card edges as the focal
+   anchor. The fixed 100x36 viewBox is stretched (preserveAspectRatio="none" in
+   the SVG) so the chart fills the full hero width. A taller height than the
+   grid sparkline so it reads as the screen's centerpiece. */
+.luckycat-detail__hero-chart {
+  margin: 0.9rem -1.75rem 0;
+}
+.luckycat-hero-chart {
+  display: block;
+  width: 100%;
+  height: 9rem;
+}
+.luckycat-hero-chart__line {
+  stroke-width: 2;
+}
+
+/* Chart region (#market-chart) — wraps the timeframe toggle + the area chart.
+   The toggle swap replaces this whole region (outerHTML), so the region is the
+   relative positioning context for the hover crosshair tooltip. */
+.luckycat-detail__chart {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.4rem;
+}
+
+/* Segmented timeframe toggle — a pill-grouped control above the chart. The
+   active timeframe reads as a raised jade-tinted chip; the rest are quiet. */
+.luckycat-chart-toggle {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border-radius: var(--lc-radius-pill);
+  background: color-mix(in srgb, var(--lc-plane-raised) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--lc-hairline);
+}
+.luckycat-chart-toggle__btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.32rem 0.85rem;
+  border-radius: var(--lc-radius-pill);
+  background: transparent;
+  color: var(--lc-ink-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-tight);
+  line-height: 1.2;
+  transition: color var(--lc-motion-fast), background var(--lc-motion-fast);
+}
+.luckycat-chart-toggle__btn:hover {
+  color: var(--lc-ink);
+}
+.luckycat-chart-toggle__btn:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+}
+.luckycat-chart-toggle__btn--active {
+  color: var(--lc-jade);
+  background: color-mix(in srgb, var(--lc-jade) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 34%, transparent);
+}
+
+/* Hover crosshair figure — wraps the SVG so the tooltip can position over it.
+   The figure is focusable (keyboard parity), so it gets a focus ring. */
+.luckycat-hero-chart-figure {
+  position: relative;
+  display: block;
+  margin: 0;
+  border-radius: var(--lc-radius-sm);
+}
+.luckycat-hero-chart-figure:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+}
+.luckycat-hero-chart__crosshair {
+  stroke: var(--lc-ink-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.luckycat-hero-chart__crosshair[hidden] {
+  display: none;
+}
+/* The tooltip rides above the chart, centered on the crosshair x (left set by
+   JS). translateX(-50%) keeps it centered; the controller clamps left to keep
+   it inside the figure. */
+.luckycat-hero-chart__tip {
+  position: absolute;
+  top: -0.25rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--lc-radius-xs);
+  background: var(--lc-plane-overlay);
+  box-shadow: var(--lc-elevation-2), inset 0 0 0 1px var(--lc-hairline);
+  font-family: var(--lc-font-mono);
+  line-height: 1.15;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.luckycat-hero-chart__tip[hidden] {
+  display: none;
+}
+.luckycat-hero-chart__tip-price {
+  font-size: var(--lc-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-ink);
+}
+.luckycat-hero-chart__tip-time {
+  font-size: var(--lc-text-xs);
+  color: var(--lc-ink-muted);
+}
+/* Reduced-motion floor: the crosshair snap carries no transition; the toggle
+   buttons drop their color/background transition so motion-sensitive users get
+   instant, jump-free state changes. */
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-chart-toggle__btn {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Market detail — order book, trade tape
+   --------------------------------------------------------------------------- */
+
+.luckycat-orderbook {
+  border-radius: var(--lc-radius);
+  overflow: hidden;
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+  font-family: var(--lc-font-mono);
+}
+.luckycat-orderbook__head {
+  font-weight: 600;
+  font-family: var(--lc-font-sans);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 var(--lc-hairline);
+}
+.luckycat-orderbook__rowpair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.luckycat-orderbook__rowpair .luckycat-orderbook__row {
+  grid-template-columns: 1fr auto;
+}
+.luckycat-orderbook__empty,
+.luckycat-tape__empty {
+  margin: 0;
+  padding: 1rem 0.75rem;
+  text-align: center;
+}
+.luckycat-orderbook__row {
+  /* --lc-depth: proportional size, 0–100%, set inline per row (template).
+     Default 38% so the depth bars read even before the template wires sizes. */
+  --lc-depth: 38%;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.2rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--lc-text-sm);
+  isolation: isolate;
+}
+/* Proportional depth bar — a soft gradient sized to --lc-depth, sitting behind
+   the figures (z-index isolation keeps text on top). Bids fill from the right
+   edge inward, asks from the left, mirroring a centered book. */
+.luckycat-orderbook__row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: var(--lc-depth);
+  transition: width var(--lc-motion-base);
+}
+.luckycat-orderbook__row--bid::before {
+  right: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lc-up) 22%, transparent));
+}
+.luckycat-orderbook__row--ask::before {
+  left: 0;
+  background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--lc-down) 22%, transparent));
+}
+/* Depth decay by ladder position — the SimFeed book sizes decay with distance
+   from mid (depth_decay = exp(-0.08·i)), so the bars taper down the ladder. A
+   template can still override --lc-depth inline per row for exact proportions;
+   this gives a faithful descending book out of the box. The first child of
+   .luckycat-orderbook is the head row, so the ladder starts at nth-child(2). */
+.luckycat-orderbook__rowpair:nth-child(2) .luckycat-orderbook__row { --lc-depth: 92%; }
+.luckycat-orderbook__rowpair:nth-child(3) .luckycat-orderbook__row { --lc-depth: 80%; }
+.luckycat-orderbook__rowpair:nth-child(4) .luckycat-orderbook__row { --lc-depth: 70%; }
+.luckycat-orderbook__rowpair:nth-child(5) .luckycat-orderbook__row { --lc-depth: 61%; }
+.luckycat-orderbook__rowpair:nth-child(6) .luckycat-orderbook__row { --lc-depth: 53%; }
+.luckycat-orderbook__rowpair:nth-child(7) .luckycat-orderbook__row { --lc-depth: 46%; }
+.luckycat-orderbook__rowpair:nth-child(8) .luckycat-orderbook__row { --lc-depth: 40%; }
+.luckycat-orderbook__rowpair:nth-child(9) .luckycat-orderbook__row { --lc-depth: 35%; }
+.luckycat-orderbook__rowpair:nth-child(10) .luckycat-orderbook__row { --lc-depth: 30%; }
+.luckycat-orderbook__rowpair:nth-child(n + 11) .luckycat-orderbook__row { --lc-depth: 26%; }
+
+.luckycat-orderbook__row--bid .luckycat-orderbook__price {
+  color: var(--lc-up);
+  font-weight: 600;
+}
+.luckycat-orderbook__row--ask .luckycat-orderbook__price {
+  color: var(--lc-down);
+  font-weight: 600;
+}
+
+.luckycat-tape {
+  border-radius: var(--lc-radius);
+  overflow: hidden;
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+  font-family: var(--lc-font-mono);
+}
+.luckycat-tape__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  padding: 0.22rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--lc-text-sm);
+  box-shadow: inset 0 -1px 0 var(--lc-hairline);
+}
+.luckycat-tape__row:last-child {
+  box-shadow: none;
+}
+/* Newest print pulses on each SSE swap — a brief directional tint on the top
+   (freshest) tape row. The OOB innerHTML replace re-creates the row each tick,
+   so the one-shot animation re-fires. Older rows stay calm. */
+.luckycat-tape__row--fresh.luckycat-tape__row--buy {
+  animation: luckycat-flash-up var(--lc-flash-duration) var(--lc-ease-out);
+}
+.luckycat-tape__row--fresh.luckycat-tape__row--sell {
+  animation: luckycat-flash-down var(--lc-flash-duration) var(--lc-ease-out);
+}
+.luckycat-tape__row--buy .luckycat-tape__price {
+  color: var(--lc-up);
+  font-weight: 600;
+}
+.luckycat-tape__row--sell .luckycat-tape__price {
+  color: var(--lc-down);
+  font-weight: 600;
+}
+.luckycat-tape__side {
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-tape__row--buy .luckycat-tape__side {
+  color: color-mix(in srgb, var(--lc-up) 80%, var(--lc-ink-muted));
+}
+.luckycat-tape__row--sell .luckycat-tape__side {
+  color: color-mix(in srgb, var(--lc-down) 80%, var(--lc-ink-muted));
+}
+
+/* ---------------------------------------------------------------------------
+   Live price flash — applied by #223 SSE swaps via a transient class.
+   --------------------------------------------------------------------------- */
+
+@keyframes luckycat-flash-up {
+  0% { background: color-mix(in srgb, var(--lc-up) 32%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lc-up) 38%, transparent); }
+  100% { background: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+@keyframes luckycat-flash-down {
+  0% { background: color-mix(in srgb, var(--lc-down) 32%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lc-down) 38%, transparent); }
+  100% { background: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+.luckycat-flash--up {
+  animation: luckycat-flash-up var(--lc-flash-duration) var(--lc-ease-out);
+  border-radius: var(--lc-radius-sm);
+}
+.luckycat-flash--down {
+  animation: luckycat-flash-down var(--lc-flash-duration) var(--lc-ease-out);
+  border-radius: var(--lc-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-flash--up,
+  .luckycat-flash--down,
+  .luckycat-tape__row--fresh.luckycat-tape__row--buy,
+  .luckycat-tape__row--fresh.luckycat-tape__row--sell {
+    animation: none;
+  }
+  .luckycat-market-card,
+  .luckycat-orderbook__row::before {
+    transition: none;
+  }
+  .luckycat-market-card:hover,
+  .luckycat-market-card:focus-visible {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Trade flow (#225) — place-order form, positions table, field errors.
+ * ------------------------------------------------------------------------- */
+.luckycat-trade-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 52rem) {
+  .luckycat-trade-layout { grid-template-columns: 1fr; }
+}
+.luckycat-trade-panel {
+  background: var(--lc-plane-surface);
+  border: 1px solid var(--lc-hairline);
+  border-radius: var(--lc-radius);
+  box-shadow: var(--lc-elevation-1);
+  padding: 1.25rem;
+}
+.luckycat-trade-panel__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.luckycat-trade-panel__badge {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--chirpui-text-muted, #6b6b6b);
+}
+.luckycat-order-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.luckycat-field-errors {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  color: var(--luckycat-down);
+  font-size: 0.8125rem;
+}
+.luckycat-positions {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.luckycat-positions th,
+.luckycat-positions td {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--lc-hairline);
+}
+.luckycat-positions th {
+  color: var(--chirpui-text-muted, #6b6b6b);
+  font-weight: 600;
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-positions__sym { font-weight: 600; }
+.luckycat-positions__empty { margin: 0; }
+
+/* ---------------------------------------------------------------------------
+ * Portfolio Suspense dashboard (#224) + free-threading panel (#227 Part A).
+ * Shell paints instantly with .luckycat-skel skeletons; deferred panels stream
+ * in over OOB swaps.
+ * ------------------------------------------------------------------------- */
+.luckycat-pf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 52rem) {
+  .luckycat-pf-grid { grid-template-columns: 1fr; }
+}
+.luckycat-pf-card {
+  background: var(--lc-plane-surface);
+  border: 1px solid var(--lc-hairline);
+  border-radius: var(--lc-radius);
+  box-shadow: var(--lc-elevation-1);
+  padding: 1.25rem;
+  min-height: 7rem;
+}
+.luckycat-pf-card--wide { grid-column: 1 / -1; }
+/* Hero value card — the focal point. Jade gradient (the signature accent) with
+   a soft glow so the big balance number reads as the screen's anchor. */
+.luckycat-pf-card--value {
+  background: linear-gradient(135deg, var(--lc-jade-strong) 0%, var(--lc-jade-dim) 100%);
+  color: var(--lc-on-accent);
+  border-color: transparent;
+  box-shadow: var(--lc-elevation-2), var(--lc-glow-jade);
+}
+/* The value card spans the full grid as the one spacious focal point per screen
+   (generous negative space; the big balance is the anchor). */
+.luckycat-pf-card--hero {
+  grid-column: 1 / -1;
+  padding: 1.75rem 1.9rem;
+}
+.luckycat-pf-card--hero .luckycat-pf__big {
+  font-size: var(--lc-display);
+  margin-top: 0.25rem;
+}
+.luckycat-pf-card__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+  font-size: var(--lc-text-xs);
+}
+/* Signed P&L pill on the jade hero — a soft on-accent chip so the delta reads
+   as a distinct figure against the gradient (its own arrow + tabular figure). */
+.luckycat-pf__delta--pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin-top: 0.7rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--lc-radius-pill);
+  font-size: var(--lc-text-base);
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-pf__delta-arrow {
+  font-size: 0.72em;
+  line-height: 1;
+}
+.luckycat-pf-card--value .luckycat-pf__delta--pill {
+  background: color-mix(in srgb, var(--lc-on-accent) 16%, transparent);
+}
+.luckycat-pf-card__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.luckycat-pf-card--value .luckycat-pf-card__title { color: color-mix(in srgb, var(--lc-on-accent) 82%, transparent); }
+.luckycat-pf-card__badge {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--chirpui-text-muted, #6b6b6b);
+}
+.luckycat-pf__big {
+  font-size: var(--lc-display-sm);
+  font-weight: 800;
+  line-height: var(--lc-leading-display);
+  letter-spacing: var(--lc-tracking-display);
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-pf__unit { font-size: var(--lc-text-base); font-weight: 600; opacity: 0.7; letter-spacing: 0; }
+.luckycat-pf__delta { margin-top: 0.45rem; font-size: var(--lc-text-sm); font-weight: 600; }
+/* On the jade hero card the deltas read against the on-accent ink. */
+.luckycat-pf-card--value .luckycat-pf__delta--up { color: color-mix(in srgb, var(--lc-on-accent) 88%, transparent); }
+.luckycat-pf-card--value .luckycat-pf__delta--down { color: color-mix(in srgb, var(--lc-on-accent) 88%, transparent); }
+.luckycat-pf__delta--up { color: var(--lc-up); }
+.luckycat-pf__delta--down { color: var(--lc-down); }
+.luckycat-pf__empty { margin: 0; }
+
+/* Skeleton placeholders (shell loading state) — a moving shimmer sweep, not just
+   an opacity pulse, so Suspense panels read as "loading" with fintech polish. */
+.luckycat-skel {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--lc-ink) 8%, var(--lc-plane-surface));
+  border-radius: var(--lc-radius-xs);
+}
+.luckycat-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--lc-ink) 10%, transparent) 50%,
+    transparent 100%
+  );
+  animation: luckycat-shimmer var(--lc-shimmer-duration) ease-in-out infinite;
+}
+.luckycat-skel--line { height: 1.1rem; margin: 0.45rem 0; }
+.luckycat-skel--big { height: 2.6rem; width: 60%; margin: 0.3rem 0 0.6rem; }
+@keyframes luckycat-shimmer {
+  100% { transform: translateX(100%); }
+}
+/* Reduced-motion: drop the sweep, fall back to a static low-contrast block. */
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-skel::after { animation: none; }
+}
+
+/* Allocation bars. */
+.luckycat-alloc { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.luckycat-alloc__row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 3rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.luckycat-alloc__sym { font-weight: 600; }
+.luckycat-alloc__bar {
+  display: block;
+  height: 0.55rem;
+  background: color-mix(in srgb, var(--lc-ink) 8%, transparent);
+  border-radius: var(--lc-radius-pill);
+  overflow: hidden;
+}
+.luckycat-alloc__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--lc-gold) 0%, var(--lc-gold-strong) 100%);
+  border-radius: var(--lc-radius-pill);
+  transition: width var(--lc-motion-slow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-alloc__fill { transition: none; }
+}
+.luckycat-alloc__pct { text-align: right; color: var(--chirpui-text-muted, #6b6b6b); }
+
+/* Open-orders + activity feed lists. */
+.luckycat-orders,
+.luckycat-feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.luckycat-orders__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.luckycat-orders__sym { font-weight: 600; }
+.luckycat-feed__row {
+  display: grid;
+  grid-template-columns: 2.75rem 6rem 1fr;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--lc-hairline);
+}
+.luckycat-feed__side {
+  font-weight: 700;
+  font-size: var(--lc-text-xs);
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-feed__row--buy .luckycat-feed__side { color: var(--luckycat-up); }
+.luckycat-feed__row--sell .luckycat-feed__side { color: var(--luckycat-down); }
+.luckycat-feed__sym { font-weight: 600; }
+
+/* ---------------------------------------------------------------------------
+ * Inner-rail sub-pages — fills/orders tables, deposit ledger, settings rows.
+ * Reuses the same plane/elevation/hairline/tabular-numeral language as the
+ * portfolio + trade surfaces (depth over flat borders, Geist Mono on figures,
+ * jade-up / red-down side semantics).
+ * ------------------------------------------------------------------------- */
+
+/* Dense fills / ledger table — mirrors .luckycat-positions but tuned for the
+   trade-tape data shape (mono numerals, a right-aligned figure rail, a leading
+   time column). Used by Portfolio → Open orders / History and the Activity
+   sub-pages so they read like one exchange. */
+.luckycat-fills {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.luckycat-fills th,
+.luckycat-fills td {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--lc-hairline);
+}
+.luckycat-fills tr:last-child td {
+  border-bottom: 0;
+}
+.luckycat-fills th {
+  color: var(--chirpui-text-muted);
+  font-weight: 600;
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-fills__sym {
+  font-weight: 600;
+}
+/* Right-align + mono the numeric columns so figures stack cleanly. */
+.luckycat-fills__num,
+.luckycat-fills th.luckycat-fills__num {
+  text-align: right;
+  font-family: var(--lc-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-fills__time {
+  color: var(--chirpui-text-muted);
+  font-family: var(--lc-font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Side cell — a compact directional pill (jade buy / red sell), matching the
+   trade-tape + feed side semantics. */
+.luckycat-fills__side {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--lc-radius-pill);
+  font-size: var(--lc-text-xs);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-label);
+}
+.luckycat-fills__side--buy {
+  color: var(--lc-up);
+  background: color-mix(in srgb, var(--lc-up) 14%, transparent);
+}
+.luckycat-fills__side--sell {
+  color: var(--lc-down);
+  background: color-mix(in srgb, var(--lc-down) 14%, transparent);
+}
+/* Hover affordance on actionable rows (open orders). */
+.luckycat-fills__row--actionable:hover {
+  background: color-mix(in srgb, var(--lc-ink) 4%, transparent);
+}
+
+/* Per-row Cancel control — the action cell hugs the right edge; the button is a
+   quiet ghost that warms to the red (down/danger) accent on hover. */
+.luckycat-fills__action {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+.luckycat-orders__cancel {
+  margin: 0;
+  display: inline-flex;
+}
+
+/* A summary strip above a table — a count + a quiet hint, tabular figure. */
+.luckycat-subpage-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  flex-wrap: wrap;
+}
+.luckycat-subpage-summary__count {
+  font-family: var(--lc-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Deposit-card muted note — replaces an inline style on the jade value card so
+   the legend reads against the on-accent ink (no nonce-less inline style). */
+.luckycat-pf-card--value .luckycat-pf__note {
+  margin: 0.6rem 0 0;
+  color: color-mix(in srgb, var(--lc-on-accent) 78%, transparent);
+  font-size: var(--lc-text-sm);
+}
+
+/* ---------------------------------------------------------------------------
+ * Settings sub-pages — sectioned config cards with label | control rows. Built
+ * on chirp-ui's field / toggle / segmented controls; the rows borrow the
+ * config-row two-column rhythm without depending on the chirp-ui config-row CSS.
+ * ------------------------------------------------------------------------- */
+.luckycat-settings {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 42rem;
+}
+.luckycat-settings__section-title {
+  margin: 0 0 0.35rem;
+  font-size: var(--lc-text-base);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+}
+.luckycat-settings__section-hint {
+  margin: 0 0 1.1rem;
+  font-size: var(--lc-text-sm);
+}
+/* A label | control row — the label/description on the left, the control on the
+   right, separated by a hairline. The chirp-ui field the control sits in keeps
+   its own internal spacing; we just lay out the two columns. */
+.luckycat-setting-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--lc-hairline);
+}
+.luckycat-setting-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.luckycat-setting-row__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.luckycat-setting-row__name {
+  font-weight: 600;
+}
+.luckycat-setting-row__desc {
+  font-size: var(--lc-text-sm);
+  color: var(--chirpui-text-muted);
+}
+/* The control column: keep chirp-ui fields from stretching, and drop the field's
+   trailing error/hint slot margin so it sits flush in the row. */
+.luckycat-setting-row__control {
+  justify-self: end;
+}
+.luckycat-setting-row__control .chirpui-field {
+  margin: 0;
+}
+/* When the setting NAME rides on a native toggle's own label (the chirp-ui
+   pattern, so the switch has a real accessible name), match it to the row-name
+   weight and let the description sit on the left as the secondary line. The
+   toggle wrap reverses so the switch leads and the bold name trails it. */
+.luckycat-setting-row--toggle {
+  grid-template-columns: 1fr auto;
+}
+.luckycat-setting-row--toggle .chirpui-toggle__label {
+  font-weight: 600;
+  font-size: var(--lc-text-base);
+  color: var(--chirpui-text);
+}
+.luckycat-setting-row--toggle .chirpui-field--toggle .chirpui-field__errors:empty {
+  display: none;
+}
+@media (max-width: 38rem) {
+  .luckycat-setting-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .luckycat-setting-row__control {
+    justify-self: start;
+  }
+}
+
+/* Free-threading proof panel (#227 Part A). */
+.luckycat-ft__panel { margin-bottom: 0.75rem; }
+.luckycat-ft__stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+.luckycat-ft__stat {
+  background: color-mix(in srgb, var(--lc-ink) 5%, var(--lc-plane-surface));
+  border: 1px solid var(--lc-hairline);
+  border-radius: var(--lc-radius-sm);
+  padding: 0.6rem 0.75rem;
+}
+.luckycat-ft__stat dt {
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--chirpui-text-muted, #6b6b6b);
+}
+.luckycat-ft__stat dd {
+  margin: 0.25rem 0 0;
+  font-size: var(--lc-text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-ft__good { color: var(--luckycat-up); }
+.luckycat-ft__bad { color: var(--luckycat-down); }
+
+/* ---------------------------------------------------------------------------
+   Command palette (Cmd/Ctrl-K) — the "pro app" signal.
+
+   A polish LAYER over chirp-ui's command_palette component (which already reads
+   the re-pointed --chirpui-* chrome vars). These rules lift the dialog onto the
+   Lucky Cat overlay plane with real elevation, give the ⌘K topbar trigger the
+   elevated-surface treatment, and key the active/focused result to the jade
+   accent so the palette feels first-class — not the flat default.
+   --------------------------------------------------------------------------- */
+
+/* The ⌘K topbar affordance — an elevated pill matching the topbar chrome. */
+.luckycat-palette-trigger {
+  gap: 0.5rem;
+  padding: 0.32rem 0.55rem 0.32rem 0.7rem;
+  border: none;
+  border-radius: var(--lc-radius-pill);
+  background: var(--lc-plane-raised);
+  color: var(--lc-ink-muted);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+  transition:
+    color var(--lc-motion-fast),
+    box-shadow var(--lc-motion-fast),
+    background var(--lc-motion-fast);
+}
+.luckycat-palette-trigger:hover,
+.luckycat-palette-trigger:focus-visible {
+  color: var(--lc-ink);
+  background: var(--lc-plane-overlay);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 28%, var(--lc-hairline)),
+    var(--lc-elevation-2);
+}
+.luckycat-palette-trigger__label {
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+}
+.luckycat-palette-trigger__kbd {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-xs);
+  padding: 0.12em 0.45em;
+  border-radius: var(--lc-radius-xs);
+  background: color-mix(in srgb, var(--lc-ink) 6%, var(--lc-plane-base));
+  border: 1px solid var(--lc-hairline);
+  color: var(--lc-ink-muted);
+}
+/* On a narrow topbar the label collapses to just the icon + ⌘K. Below 38rem the
+   ⌘K kbd hint also hides: a touch user has no Cmd/Ctrl-K key, and dropping the
+   pill reclaims width for the balance token + bell so the topbar-end cluster does
+   not crush on a 375px phone (the trigger icon still opens the palette). */
+@media (max-width: 38rem) {
+  .luckycat-palette-trigger__label,
+  .luckycat-palette-trigger__kbd {
+    display: none;
+  }
+}
+
+/* The dialog itself — lift onto the overlay plane with real elevation + a
+   blurred backdrop, larger radius, and the Lucky Cat surface. */
+.luckycat-palette__dialog.chirpui-command-palette {
+  border: none;
+  border-radius: var(--lc-radius-lg);
+}
+.luckycat-palette__dialog .chirpui-command-palette__inner {
+  background: var(--lc-plane-overlay);
+  border: none;
+  border-radius: var(--lc-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline-strong),
+    var(--lc-elevation-pop);
+}
+.luckycat-palette__dialog::backdrop {
+  background: color-mix(in srgb, var(--lc-plane-base) 60%, transparent);
+  backdrop-filter: blur(6px);
+}
+.luckycat-palette__dialog .chirpui-command-palette__input {
+  border-bottom: 1px solid var(--lc-hairline);
+  font-family: var(--lc-font-sans);
+  font-size: var(--lc-text-lg);
+  letter-spacing: var(--lc-tracking-tight);
+  color: var(--lc-ink);
+}
+.luckycat-palette__dialog .chirpui-command-palette__input::placeholder {
+  color: var(--lc-ink-subtle);
+}
+
+/* Result groups + items. */
+.luckycat-palette__group + .luckycat-palette__group {
+  border-top: 1px solid var(--lc-hairline);
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+}
+.luckycat-palette__group-title {
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--lc-ink-muted);
+}
+.luckycat-palette__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: var(--lc-radius-sm);
+  margin-inline: 0.4rem;
+  padding-inline: 0.85rem;
+  color: var(--lc-ink);
+  transition: background var(--lc-motion-fast), box-shadow var(--lc-motion-fast);
+}
+/* The first result row overall is the Enter target — give it a resting accent
+   ring so the keyboard default is visible, and light up hover/focus the same
+   way. Scoped to the FIRST group's first item (not per-group) so exactly one
+   row carries the resting accent — matching the @keydown.enter handler, which
+   clicks the first [data-lc-palette-item] in document order. */
+.luckycat-palette__group:first-child .luckycat-palette__item:first-of-type,
+.luckycat-palette__item:hover,
+.luckycat-palette__item:focus-visible {
+  background: color-mix(in srgb, var(--lc-jade) 12%, var(--lc-plane-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 28%, transparent);
+  outline: none;
+}
+.luckycat-palette__label {
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-tight);
+}
+/* Symbols read as figures — mono + tabular so the directory aligns. */
+.luckycat-palette__hint {
+  font-family: var(--lc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-ink-muted);
+  white-space: nowrap;
+}
+.luckycat-palette__empty {
+  padding: 0.85rem 1.25rem;
+  margin: 0;
+  font-size: var(--lc-text-sm);
+}
+.luckycat-ft__note { margin: 0; }
+
+/* ===========================================================================
+   MOBILE / RESPONSIVE PASS (<48rem) — composes over chirp-ui; DESKTOP UNCHANGED.
+
+   The chirp-ui app-shell already stacks topbar / sidebar / main vertically under
+   48rem (083_app-shell.css) and moves the ticker (topbar-center) to a full-width
+   scrollable row. Two problems remained on a 390px viewport:
+
+     1. The topbar CRAMMED: chirp-ui's shell-actions (Deposit $MEOW + a "More"
+        dropdown) plus Search + balance + theme all wrapped into a messy
+        multi-row bar.
+     2. The two-tier rail (icon rail + inner contextual rail) STACKED at the top
+        and ate a big chunk of the viewport before any content.
+
+   The fix, ALL behind a max-width: 48rem media query (the shell's own breakpoint),
+   so the full-viewport desktop shell is byte-for-byte unchanged:
+
+     * Hide the inline two-tier rail on mobile and move navigation into a
+       hamburger-triggered chirp-ui drawer (the rooms + the same route-context
+       sections, from the SAME shell_navigation model).
+     * Hide the topbar shell-actions group on mobile (Deposit/More move into the
+       drawer footer) and slim the top action row so it never wraps.
+     * Stack the market-detail order book + trade tape (already 1-col at 390px via
+       auto-fit; the media query makes it explicit/robust).
+
+   Everything here respects prefers-reduced-motion (the drawer transition is
+   chirp-ui's, already reduced-motion-aware; we add no new always-on animation).
+   =========================================================================== */
+
+/* Hamburger nav trigger — a thin three-bar button. HIDDEN on desktop (>=48rem):
+   the inline rail owns navigation there, so the drawer is never opened. Shown on
+   mobile by the media query below. */
+.luckycat-nav-trigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--lc-radius-sm);
+  background: transparent;
+  color: var(--chirpui-text);
+  cursor: pointer;
+  transition: background var(--lc-motion-fast), color var(--lc-motion-fast);
+}
+.luckycat-nav-trigger:hover,
+.luckycat-nav-trigger:focus-visible {
+  background: color-mix(in srgb, var(--lc-jade) 12%, transparent);
+  color: var(--lc-jade);
+  outline: none;
+}
+.luckycat-nav-trigger:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--lc-jade));
+  outline-offset: 1px;
+}
+/* The three bars — a center bar + two pseudo-element bars, drawn with currentColor
+   so they inherit the hover/focus color shift. No animation (reduced-motion safe). */
+.luckycat-nav-trigger__bars,
+.luckycat-nav-trigger__bars::before,
+.luckycat-nav-trigger__bars::after {
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.luckycat-nav-trigger__bars {
+  position: relative;
+}
+.luckycat-nav-trigger__bars::before,
+.luckycat-nav-trigger__bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+.luckycat-nav-trigger__bars::before { top: -0.35rem; }
+.luckycat-nav-trigger__bars::after { top: 0.35rem; }
+
+/* Mobile nav-drawer body — labelled room + section rows. The drawer chrome
+   (panel, slide-in, backdrop, close) is chirp-ui's; these rules style only the
+   nav list + the actions footer inside it. */
+.luckycat-nav-drawer__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.luckycat-nav-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.luckycat-nav-drawer__section-title {
+  margin: 0 0 0.25rem;
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--chirpui-text-muted);
+}
+.luckycat-nav-drawer__link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--lc-radius-sm);
+  color: var(--chirpui-text);
+  text-decoration: none;
+  font-weight: 600;
+  /* Comfortable tap target on touch screens. */
+  min-block-size: var(--chirpui-control-touch-target, 2.75rem);
+  transition: background var(--lc-motion-fast), color var(--lc-motion-fast);
+}
+.luckycat-nav-drawer__link:hover,
+.luckycat-nav-drawer__link:focus-visible {
+  background: color-mix(in srgb, var(--lc-jade) 10%, transparent);
+  color: var(--lc-jade);
+  outline: none;
+}
+.luckycat-nav-drawer__link:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring, var(--lc-jade));
+  outline-offset: -2px;
+}
+.luckycat-nav-drawer__link--active,
+.luckycat-nav-drawer__link[aria-current="page"] {
+  color: var(--lc-jade);
+  background: color-mix(in srgb, var(--lc-jade) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 24%, transparent);
+}
+.luckycat-nav-drawer__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.luckycat-nav-drawer__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.luckycat-nav-drawer__actions {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lc-hairline);
+}
+.luckycat-nav-drawer__actions .chirpui-shell-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+@media (max-width: 48rem) {
+  /* Surface the hamburger; it sits at the topbar start, before the brand. */
+  .luckycat-nav-trigger {
+    display: inline-flex;
+  }
+  /* Slim the top action row: the brand max-width stays chirp-ui's; keep the
+     ticker row (topbar-center, order:3) — it is horizontally scrollable and
+     informative. Hide the chirp-ui shell-actions (Deposit $MEOW + the "More"
+     dropdown) here; they move into the drawer footer. This is what was
+     wrapping/cramming the top row. */
+  .chirpui-app-shell__topbar .chirpui-app-shell__shell-actions {
+    display: none;
+  }
+  /* Let the remaining topbar-end controls (palette trigger, bell, $MEOW balance,
+     theme toggle) wrap among themselves instead of forcing horizontal overflow /
+     crushing the balance token. chirp-ui makes the topbar itself flex-wrap and
+     the brand max-inline-size ~58vw, but .chirpui-app-shell__topbar-end is a
+     single non-wrapping flex row — at 375px the brand + hamburger leave too little
+     for four controls in one line, so wrap them with a small row gap. */
+  .chirpui-app-shell__topbar .chirpui-app-shell__topbar-end {
+    flex-wrap: wrap;
+    row-gap: var(--chirpui-spacing-xs, 0.35rem);
+    justify-content: flex-end;
+  }
+  /* Hide the inline two-tier rail (the whole stacked sidebar cell). Navigation
+     lives in the #lucky-cat-nav drawer on mobile, so the rail no longer eats the
+     top of the viewport. This collapses the shell to topbar + main. */
+  .chirpui-app-shell__sidebar {
+    display: none;
+  }
+
+  /* Market detail: stack the order book + trade tape (one focal column). The
+     grid is auto-fit/minmax(18rem) which is already 1-col at 390px; force it so
+     the stack is robust across the whole mobile range, not just the narrowest. */
+  .luckycat-detail__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Belt-and-braces: never let the nav drawer or its trigger show on desktop even
+   if the dialog markup is present in the persistent shell. The trigger default is
+   already display:none; the drawer is a closed <dialog> (inert) until opened, and
+   it is only opened by the mobile-only trigger, so no desktop rule is needed for
+   the dialog itself. */
+@media (min-width: 48.01rem) {
+  .luckycat-nav-trigger {
+    display: none;
+  }
+}

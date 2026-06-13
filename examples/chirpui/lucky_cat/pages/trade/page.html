@@ -1,0 +1,174 @@
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+{% end %}
+
+{#- Single source of truth for the order-form body so the full-page render and
+    the ValidationError / OOB re-render emit identical markup. `form` holds the
+    submitted values on a 422 re-render (preserved field state); `errors` is the
+    field-keyed dict[str, list[str]]. -#}
+{% def order_form_body(markets=(), form=none, errors=none) %}
+{% set f = form ?? {} %}
+{% set errs = errors ?? {} %}
+<form id="order-form" class="luckycat-order-form chirpui-stack chirpui-stack--sm"
+      hx-post="{{ url_for('trade.order') }}" hx-swap="none"
+      hx-disabled-elt="find button">
+  {{ csrf_field() }}
+  <div class="chirpui-field">
+    <label class="chirpui-field__label" for="order-symbol">Market</label>
+    <select id="order-symbol" name="symbol" class="chirpui-field__input">
+      {% for m in markets %}
+      <option value="{{ m.symbol }}" {{ "selected" if m.symbol == (f?["symbol"] ?? "") else "" }}>
+        {{ m.symbol }} · {{ m.display_name }}
+      </option>
+      {% end %}
+    </select>
+  </div>
+
+  <div class="luckycat-order-form__row">
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="order-side">Side</label>
+      <select id="order-side" name="side" class="chirpui-field__input">
+        {% for s in ("buy", "sell") %}
+        <option value="{{ s }}" {{ "selected" if s == (f?["side"] ?? "buy") else "" }}>{{ s | capitalize }}</option>
+        {% end %}
+      </select>
+    </div>
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="order-kind">Type</label>
+      <select id="order-kind" name="kind" class="chirpui-field__input">
+        {% for k in ("market", "limit") %}
+        <option value="{{ k }}" {{ "selected" if k == (f?["kind"] ?? "market") else "" }}>{{ k | capitalize }}</option>
+        {% end %}
+      </select>
+    </div>
+  </div>
+
+  <div class="luckycat-order-form__row">
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="order-size">Size</label>
+      <input id="order-size" class="chirpui-field__input" type="number" name="size"
+             min="0" step="any" inputmode="decimal"
+             value="{{ f?['size'] ?? '' }}" placeholder="0.0">
+      {% if errs?["size"] %}
+      <ul class="luckycat-field-errors" data-field="size">
+        {% for msg in errs["size"] %}<li>{{ msg }}</li>{% end %}
+      </ul>
+      {% end %}
+    </div>
+    <div class="chirpui-field">
+      <label class="chirpui-field__label" for="order-limit">Limit price</label>
+      <input id="order-limit" class="chirpui-field__input" type="number" name="limit_price"
+             min="0" step="any" inputmode="decimal"
+             value="{{ f?['limit_price'] ?? '' }}" placeholder="market">
+      {% if errs?["limit_price"] %}
+      <ul class="luckycat-field-errors" data-field="limit_price">
+        {% for msg in errs["limit_price"] %}<li>{{ msg }}</li>{% end %}
+      </ul>
+      {% end %}
+    </div>
+  </div>
+
+  {% if errs?["_form"] %}
+  <ul class="luckycat-field-errors" data-field="_form">
+    {% for msg in errs["_form"] %}<li>{{ msg }}</li>{% end %}
+  </ul>
+  {% end %}
+
+  <div class="chirpui-form-actions chirpui-form-actions--end">
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Place order</button>
+  </div>
+</form>
+{% end %}
+
+{#- Positions table body (single source of truth for the full-page render and
+    the OOB re-render of the whole container — re-rendering the container avoids
+    swapping into a per-row id that may not pre-exist on a brand-new position). -#}
+{% def positions_body(positions=()) %}
+{% if positions %}
+<table class="luckycat-positions">
+  <thead>
+    <tr><th>Market</th><th>Size</th><th>Avg cost</th></tr>
+  </thead>
+  <tbody>
+    {% for p in positions %}
+    {{ position_row_body(p) }}
+    {% end %}
+  </tbody>
+</table>
+{% else %}
+<p class="chirpui-text-muted luckycat-positions__empty">No open positions. Place an order to get started.</p>
+{% end %}
+{% end %}
+
+{% def position_row_body(position) %}
+<tr id="position-{{ position.symbol }}" class="luckycat-positions__row">
+  <td class="luckycat-positions__sym">{{ position.symbol }}</td>
+  <td>{{ position.size }}</td>
+  <td>{{ position.avg_price }} $MEOW</td>
+</tr>
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🔁</span>
+      Trade
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Spot and convert. Place an order and let the lucky paw fill it.
+    </p>
+    {#- THE declare-once / bind-many SHOWCASE (in normal DOM flow, NOT a dialog):
+        the SAME `balance` signal bound a SECOND time — the topbar token is the
+        first home. Deposit or place an order → app.emit('balance', …) fans one
+        `event: balance` to BOTH this line and the topbar over the single
+        /_chirp/live connection; they swap together with zero hand-maintained
+        OOB twin. -#}
+    <p class="luckycat-trade__buying-power chirpui-text-muted chirpui-font-sm">
+      Buying power: <strong class="luckycat-token__amount">{{ signal('balance') }}</strong> $MEOW
+    </p>
+  </header>
+
+  <div class="luckycat-trade-layout">
+    <section class="luckycat-trade-panel" aria-label="Place order">
+      <h2 class="luckycat-trade-panel__title">Place order</h2>
+      {#- The order_form block is the ValidationError / OOB re-render target. -#}
+      {% block order_form %}
+      {{ order_form_body(markets=markets | default(()), form=form ?? none, errors=errors ?? none) }}
+      {% end %}
+    </section>
+
+    <section class="luckycat-trade-panel" aria-label="Open positions">
+      <h2 class="luckycat-trade-panel__title">
+        Positions
+        <span class="luckycat-trade-panel__badge">
+          Open orders: {% block open_order_count %}<span id="open-order-count">{{ open_order_count ?? 0 }}</span>{% end %}
+        </span>
+      </h2>
+      {% block positions %}
+      <div id="positions">
+        {{ positions_body(positions | default(())) }}
+      </div>
+      {% end %}
+    </section>
+  </div>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}
+
+{#- OOB twins. render_fragment() emits a block verbatim (no OOB wrapper), so the
+    fragments the /trade/order route returns bake their own id + hx-swap-oob. -#}
+{% fragment positions_oob %}
+<div id="positions" hx-swap-oob="innerHTML">
+  {{ positions_body(positions | default(())) }}
+</div>
+{% endfragment %}
+
+{% fragment open_order_count_oob %}
+<span id="open-order-count" hx-swap-oob="innerHTML">{{ open_order_count ?? 0 }}</span>
+{% endfragment %}

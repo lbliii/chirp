@@ -1,0 +1,834 @@
+{# target: body #}
+{# outlet: main #}
+{% extends "chirpui/app_shell_layout.html" %}
+{% from "chirpui/theme_toggle.html" import theme_toggle %}
+{% from "chirpui/drawer.html" import drawer %}
+{% from "chirpui/sidebar.html" import shell_brand_link %}
+{% from "_components/sidebar.html" import primary_icon_rail, inner_sidebar_shell, mobile_drawer_nav, watchlist_count_body, drawer_actions %}
+{% from "_components/command_palette.html" import command_palette_dialog, command_palette_trigger %}
+
+{% block title %}Lucky Cat{% end %}
+
+{#- Inner ticker-strip body — the single source of truth for both the layout
+    region (full-page render) and the SSE fragment twin, so the markup can never
+    drift. `ticker` is None on the initial paint (the strip shows a hint); the
+    SSE stream supplies a live `ticker`. -#}
+{% def ticker_strip_body(ticker=none) %}
+{% if (ticker ?? none) is not none %}
+{% set up = ticker.change_pct_24h >= 0 %}
+<span class="luckycat-ticker__item">
+  <a class="luckycat-ticker__sym" href="/markets/{{ ticker.symbol }}">{{ ticker.symbol }}</a>
+  <span class="luckycat-ticker__price">{{ ticker.price }}</span>
+  <span class="luckycat-ticker__chg--{{ 'up' if up else 'down' }}">
+    <span class="luckycat-ticker__arrow" aria-hidden="true">{{ '▲' if up else '▼' }}</span>
+    {{ '+' if up else '' }}{{ ticker.change_pct_24h }}%
+  </span>
+</span>
+{% else %}
+<span class="luckycat-ticker__hint chirpui-text-muted chirpui-font-sm">Waiting for the lucky paw…</span>
+{% end %}
+{% end %}
+
+{#- Cross-page ticker strip — now a live `ticker` SIGNAL ({{ signal_block('ticker') }}
+    in topbar_center below). The app.py `ticker` signal renders THIS block as its
+    SSE/SSR payload (render=_render_ticker_strip -> app.render(ticker_signal)), so
+    the live strip and the initial paint share one body and can never drift. The
+    block emits ONLY the inner body — the signal_block() sink owns the
+    <div sse-swap="ticker"> wrapper, so this fragment bakes NO id / hx-swap-oob
+    (unlike the old OOB ticker_strip_sse twin a plain Fragment(target) needed). -#}
+{% fragment ticker_signal %}
+{{ ticker_strip_body(ticker ?? none) }}
+{% endfragment %}
+
+{#- House-token balance body — single source of truth for the topbar token AND
+    the deposit-modal balance line (page.html), so the chrome can never drift. The
+    amount is now a live `balance` SIGNAL: {{ signal('balance') }} fans one
+    `event: balance` out to EVERY binding (topbar + modal) over the single
+    /_chirp/live connection. The coin + $MEOW sym are static chrome around the
+    live scalar. ZERO hand-maintained OOB twin — /deposit + /trade call
+    app.emit('balance', ...) and both homes swap in lockstep (the showcase). -#}
+{% def meow_balance_body() %}
+<span class="luckycat-token__coin" aria-hidden="true">🪙</span>
+<span class="luckycat-token__amount">{{ signal('balance') }}</span>
+<span class="luckycat-token__sym">$MEOW</span>
+{% end %}
+
+{#- =========================================================================
+    NOTIFICATIONS BELL — the topbar bell + unread badge + dropdown feed, folded
+    onto the ONE /_chirp/live signal connection (the headline N→1 win).
+
+    A global piece of shell chrome (every page) so it lives here, not in any
+    page-content block. Three body defs are the SSR seeds AND the signal renders
+    (one source of truth — the live update and the initial paint can never drift):
+
+      * notification_row(note)        — single source of truth for one row;
+      * notification_list_body(notes) — the dropdown's list (rows or empty state),
+        the `notifications` SIGNAL's render;
+      * notif_badge_body(n)           — the unread-count pill, the `notif_badge`
+        DERIVED signal's render;
+      * notif_announce_body(n)        — the spoken count, the `notif_announce`
+        DERIVED signal's render.
+
+    The bell's sinks are EXISTING elements (<ul id="notif-list">, the badge span,
+    the announce span), so each carries a MANUAL `sse-swap="..."` attribute bound
+    to its signal — NOT the signal_block() helper, which would inject its own
+    <div> wrapper (invalid inside/around the <ul>). app.py's `notifications`
+    source generator drains the log + raises price alerts and emits the recent
+    list; the derived `notif_badge` / `notif_announce` recompute the count in the
+    same cascade. Opening the bell POSTs /notifications/read, which marks read +
+    emits the signal so the badge derives to 0 over the live connection.
+    ========================================================================= -#}
+
+{#- One notification row — shared by the dropdown list and the SSE prepend twin,
+    so the markup can never drift. `kind` picks the icon + jade/red/gold accent. -#}
+{% def notification_row(note) %}
+{% set _icon = {"fill": "📈", "deposit": "🪙", "price": "🔔"}.get(note.kind, "🐾") %}
+<li class="luckycat-notif luckycat-notif--{{ note.kind }}" role="listitem">
+  <span class="luckycat-notif__icon" aria-hidden="true">{{ _icon }}</span>
+  <span class="luckycat-notif__text">
+    <span class="luckycat-notif__title">{{ note.title }}</span>
+    {% if note.body %}<span class="luckycat-notif__body chirpui-text-muted">{{ note.body }}</span>{% end %}
+  </span>
+</li>
+{% end %}
+
+{#- The dropdown list body — the rows newest-first, or a polished empty state.
+    Single source of truth for the full-page paint AND the `notifications` SIGNAL
+    render (app.py _render_notification_list re-renders this block). The
+    <ul id="notif-list"> carries sse-swap="notifications", so every
+    `event: notifications` over /_chirp/live innerHTML-swaps this whole list. -#}
+{% def notification_list_body(notes=()) %}
+{% set _notes = notes ?? () %}
+{% if (_notes | length) > 0 %}
+{% for note in _notes %}
+{{ notification_row(note) }}
+{% end %}
+{% else %}
+<li class="luckycat-notif-empty" role="listitem">
+  <span class="luckycat-notif-empty__paw" aria-hidden="true">🐾</span>
+  <span class="chirpui-text-muted chirpui-font-sm">No notifications yet. Make a deposit or a trade.</span>
+</li>
+{% end %}
+{% end %}
+
+{#- Unread-count badge body — a pill when there is anything unread, nothing when
+    clear. Single source of truth for the topbar paint + the `notif_badge` DERIVED
+    signal render. The visual pill is aria-hidden: it lives inside the labelled
+    bell <button> (whose aria-label="Notifications" fixes the button's accessible
+    name), so a live region buried here is unreliably announced. The spoken count
+    rides the sibling visually-hidden live region (notif_announce_body) instead. -#}
+{% def notif_badge_body(unread=0) %}
+{% set _n = unread ?? 0 %}
+{% if _n > 0 %}
+<span class="luckycat-notif-badge" aria-hidden="true">{{ _n if _n < 100 else '99+' }}</span>
+{% end %}
+{% end %}
+
+{#- The SPOKEN unread count — a sibling visually-hidden polite live region OUTSIDE
+    the bell button (a live region nested in a labelled <button> is suppressed by
+    NVDA/JAWS/VoiceOver). Single source of truth for the topbar paint + the
+    `notif_announce` DERIVED signal render. The announce span carries
+    sse-swap="notif_announce", so each count change is announced exactly once over
+    the live connection, without the label/text ambiguity of a live region inside
+    the control. Empty when clear (silent). -#}
+{% def notif_announce_body(unread=0) %}
+{% set _n = unread ?? 0 %}
+{% if _n > 0 %}{{ _n }} unread {{ 'notification' if _n == 1 else 'notifications' }}{% end %}
+{% end %}
+
+{#- SIGNAL RENDER FRAGMENTS — the `notifications` / `notif_badge` / `notif_announce`
+    signals render THESE blocks as their SSE payload (app.py _render_* ->
+    app.render(Fragment("_layout.html", <fragment>))). Each is a thin
+    {% fragment %} wrapper around the matching {% def %} body so render_fragment()
+    (which addresses blocks/fragments, not {% def %} macros) can emit them, and
+    the live update + the SSR seed share ONE body and can never drift. They bake
+    NO id / hx-swap-oob — the manual sse-swap sink on the existing element owns
+    the wrapper, so the payload is the inner body only (the ticker_signal idiom). -#}
+{% fragment notification_list_signal %}
+{{ notification_list_body(notes ?? ()) }}
+{% endfragment %}
+
+{% fragment notif_badge_signal %}
+{{ notif_badge_body(unread ?? 0) }}
+{% endfragment %}
+
+{% fragment notif_announce_signal %}
+{{ notif_announce_body(unread ?? 0) }}
+{% endfragment %}
+
+{#- =========================================================================
+    WATCHLIST RAIL COUNT — the live tally on the Markets-room "Watchlist" filter
+    lane. The #watchlist-count element is rendered by the inner rail
+    (_components/sidebar.html inner_rail_link, the flt:watchlist lane), so the OOB
+    target lives in the rail, not here. This region is declared top-level so
+    app.check()'s oob_registry rule discovers the registered watchlist_count_oob
+    block; the fragment twin is what the /watchlist/toggle route returns to keep
+    the tally honest from any page (the kanban *_oob twin idiom — this is now the
+    one remaining OOB region; the ticker/balance/bell chrome moved to signals).
+    Both share the watchlist_count_body single source of truth imported from
+    sidebar.html.
+    ========================================================================= -#}
+
+{#- Registry-discovered region (carries NO wrapper — the rail supplies the
+    #watchlist-count element; this region body is the inner content the toggle
+    route innerHTML-swaps). Registered wrap=False, so its OOB serialization is
+    verbatim. -#}
+{% region watchlist_count_oob(watchlist_count=0) %}
+{{ watchlist_count_body(watchlist_count) }}
+{% end %}
+
+{#- OOB twin for the watchlist count — the /watchlist/toggle route returns this.
+    render_fragment emits the block verbatim with no OOB wrapping, so the fragment
+    bakes the #watchlist-count id + hx-swap-oob itself (same DOM id as the rail
+    wrapper so the innerHTML swap lands). -#}
+{% fragment watchlist_count_swap %}
+<span id="watchlist-count" hx-swap-oob="innerHTML">
+  {{ watchlist_count_body(watchlist_count ?? 0) }}
+</span>
+{% endfragment %}
+
+{#- =========================================================================
+    THE ONE LIVE-SIGNAL CONNECTION. signal_connect() opens a single
+    <div hx-ext="sse" sse-connect="/_chirp/live?topics=..." hx-disinherit="...">
+    that must be a common ANCESTOR of every signal sink — htmx's sse-swap binds
+    via querySelectorAll over the connect element's descendants. The topbar
+    $MEOW token + ticker strip + notifications bell live in the persistent
+    <header>; the deposit-modal balance line lives in #main. To put ALL of them
+    under ONE connection the connect element has to enclose the whole chirp-ui
+    app shell (topbar + #main).
+
+    Kida has no {{ super() }}, so a child cannot wrap the parent's {% block shell %}.
+    We therefore reproduce the chirp-ui app_shell_layout shell scaffold here — the
+    ONLY structural deviation from stock chirp-ui (the CSS/token layer in
+    head_extra still rides chirp-ui unforked). It mirrors
+    chirpui/app_shell_layout.html's shell block 1:1 (non-collapsible sidebar
+    variant) so every block hook (brand_link / topbar_center / topbar_end /
+    sidebar / content / main_shell_class / page_scripts) keeps working, then wraps
+    it in signal_connect().
+
+    This replaces the THREE persistent shell SSE scopes the original layout
+    opened (/ticker/stream + /notifications/stream + the balance OOB twin): the
+    ticker is the `ticker` signal, the balance the `balance` signal, and the bell
+    the `notifications` source + `notif_badge` / `notif_announce` derived signals
+    — ALL on the single /_chirp/live connection (the headline N→1 win: exactly
+    one sse-connect per page). The connect's hx-disinherit keeps live bindings in
+    the boosted shell from inheriting #main as their target. Boost-safe: the
+    connect wrapper is OUTSIDE #main, so a boosted #main swap leaves the
+    connection intact and htmx re-binds freshly-swapped sinks (the re-rendered
+    deposit modal) to the ancestor.
+    ========================================================================= -#}
+{% block shell %}
+{% from "chirpui/shell_frame.html" import shell_outlet, shell_outlet_attrs, shell_runtime_script %}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+{% from "chirpui/toast.html" import toast_container %}
+{% set _shell_actions = shell_actions | default(none) %}
+{% set _shell_actions_target = _shell_actions.target if _shell_actions else "chirp-shell-actions" %}
+{{ signal_connect() }}
+<div class="chirpui-app-shell"
+     x-data="chirpuiSidebar({ collapsible: false, resizable: false })"
+     x-init="init()">
+  <header class="chirpui-app-shell__topbar" data-chirpui-shell-topbar>
+    {% block brand_link %}{% end %}
+    <div class="chirpui-app-shell__topbar-center">{% block topbar_center %}{% end %}</div>
+    <div class="chirpui-app-shell__topbar-end">
+      <div id="{{ _shell_actions_target }}" class="chirpui-app-shell__shell-actions">
+        {% if _shell_actions %}
+        {{ shell_actions_bar(_shell_actions) }}
+        {% end %}
+      </div>
+      {% block topbar_end %}{% end %}
+    </div>
+  </header>
+  <aside class="chirpui-app-shell__sidebar">{% block sidebar %}{% end %}</aside>
+  <main id="main" class="chirpui-app-shell__main{% block main_shell_class %}{% end %}"
+        data-chirp-scroll="auto" tabindex="-1"
+        {{ shell_outlet_attrs() }}>
+    {% call shell_outlet(include_boost_attrs=false) %}
+      {% block content %}{% end %}
+    {% end %}
+  </main>
+</div>
+</div>{#- /signal_connect() — close the one shared sse-connect wrapper -#}
+<script nonce="{{ csp_nonce() }}">
+document.body.addEventListener("htmx:configRequest", function(event) {
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) { event.detail.headers["X-CSRF-Token"] = meta.content; }
+});
+(function() {
+  var S = "chirpui-sidebar__link--active";
+  var N = "chirpui-navbar__link--active";
+  function syncNav() {
+    var p = location.pathname;
+    document.querySelectorAll(".chirpui-sidebar__link, .chirpui-navbar__link").forEach(function(a) {
+      var h = a.getAttribute("href");
+      if (!h || h.startsWith("http")) return;
+      var m = h === "/" ? p === "/" : (p === h || p.startsWith(h + "/"));
+      var c = a.classList.contains("chirpui-sidebar__link") ? S : N;
+      a.classList.toggle(c, m);
+      if (m) { a.setAttribute("aria-current", "page"); }
+      else { a.removeAttribute("aria-current"); }
+    });
+  }
+  document.body.addEventListener("htmx:pushedIntoHistory", syncNav);
+  document.body.addEventListener("htmx:replacedInHistory", syncNav);
+})();
+(function () {
+  function responseUpdatesShellActionsOob(xhr) {
+    if (!xhr || !xhr.responseText) return false;
+    var body = xhr.responseText;
+    return body.indexOf("chirp-shell-actions") !== -1 && body.indexOf("hx-swap-oob") !== -1;
+  }
+  document.body.addEventListener("htmx:beforeSwap", function (e) {
+    var t = e.detail && e.detail.target;
+    if (!t || t.id !== "main") return;
+    if (!responseUpdatesShellActionsOob(e.detail.xhr)) return;
+    var shell = document.getElementById("chirp-shell-actions");
+    if (shell) shell.replaceChildren();
+  });
+})();
+</script>
+{{ shell_runtime_script() }}
+{{ toast_container() }}
+{% block page_scripts %}{% end %}
+{% end %}
+
+{% block head_extra %}
+{#- LUCKY CAT DESIGN TOKENS — a Robinhood-grade polish LAYER over chirp-ui.
+
+    Strategy (elbysodic model): we do NOT fork chirp-ui. We declare a product
+    token layer (--lc-*) and then re-point chirp-ui's own --chirpui-* chrome
+    vars at it, so every chirp-ui component (cards, buttons, sidebar, modals,
+    fields) inherits the new look — depth instead of flat borders — for free.
+
+    Dark-first (crypto default) under :root, with an intentional light theme under
+    [data-theme="light"] and the system-preference media query (the chirp-ui theme
+    toggle switches data-theme). Both themes are tuned independently: layered
+    surface planes (base/surface/raised), a single jade accent, semantic
+    jade-up / red-down, gold brand, soft elevation shadows, a confident type
+    scale with tabular numerals, and motion tokens with a reduced-motion floor.
+
+    Inline + csp_nonce() because chirp-ui's theme toggle relies on :root cascade
+    order; the bulk of component CSS lives in the external lucky-cat.css. -#}
+<style nonce="{{ csp_nonce() }}">
+  /* ========================================================================
+     DARK THEME (default — crypto-native). :root holds the dark palette so the
+     app boots dark even before the theme cookie/data-theme attribute applies.
+     ======================================================================== */
+  :root {
+    color-scheme: dark;
+
+    /* --- Signature brand + semantic hues (shared anchor; theme-tuned below) --- */
+    --lc-jade: #2fd49a;            /* signature accent + market UP */
+    --lc-jade-strong: #16b886;     /* hover / pressed accent */
+    --lc-jade-dim: #0f6f57;        /* low-emphasis accent fills */
+    --lc-red: #ff5a6a;             /* market DOWN + danger */
+    --lc-red-strong: #e23a4c;
+    --lc-red-dim: #7a2733;
+    --lc-gold: #f5b13d;            /* $MEOW / brand coin accent */
+    --lc-gold-strong: #e09a1f;
+
+    /* Directional semantics — map up=jade, down=red everywhere. */
+    --lc-up: var(--lc-jade);
+    --lc-down: var(--lc-red);
+
+    /* --- Layered canvas planes (warm near-black; NOT one flat bg) --- */
+    --lc-plane-base: #0e0f12;      /* page floor */
+    --lc-plane-surface: #16181d;   /* default card surface */
+    --lc-plane-raised: #1e2128;    /* elevated / hovered surface */
+    --lc-plane-overlay: #262a33;   /* popovers, menus, modals */
+    --lc-hairline: rgba(255, 255, 255, 0.08);   /* near-borderless divider */
+    --lc-hairline-strong: rgba(255, 255, 255, 0.14);
+
+    /* --- Ink (text) --- */
+    --lc-ink: #f4f6fb;
+    --lc-ink-muted: #9aa3b2;
+    --lc-ink-subtle: rgba(244, 246, 251, 0.5);
+    --lc-on-accent: #06241b;       /* text on jade fills (AA on #2fd49a) */
+    --lc-on-gold: #2a2008;         /* text on gold chips */
+
+    /* --- Soft elevation shadows (the #1 anti-wireframe move) --- */
+    --lc-elevation-0: none;
+    --lc-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --lc-elevation-2: 0 4px 12px rgba(0, 0, 0, 0.42), 0 1px 4px rgba(0, 0, 0, 0.3);
+    --lc-elevation-3: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.32);
+    --lc-elevation-pop: 0 18px 48px rgba(0, 0, 0, 0.55);
+    /* Accent glow for hover/focus on interactive surfaces. */
+    --lc-glow-jade: 0 0 0 1px color-mix(in srgb, var(--lc-jade) 28%, transparent), 0 8px 28px color-mix(in srgb, var(--lc-jade) 18%, transparent);
+    --lc-glow-gold: 0 0 0 1px color-mix(in srgb, var(--lc-gold) 30%, transparent), 0 8px 28px color-mix(in srgb, var(--lc-gold) 16%, transparent);
+
+    /* --- Chart gradient stops (signature area/sparkline fill) --- */
+    --lc-chart-up-line: var(--lc-jade);
+    --lc-chart-up-fill-top: color-mix(in srgb, var(--lc-jade) 34%, transparent);
+    --lc-chart-up-fill-bottom: color-mix(in srgb, var(--lc-jade) 0%, transparent);
+    --lc-chart-down-line: var(--lc-red);
+    --lc-chart-down-fill-top: color-mix(in srgb, var(--lc-red) 32%, transparent);
+    --lc-chart-down-fill-bottom: color-mix(in srgb, var(--lc-red) 0%, transparent);
+    --lc-chart-grid: var(--lc-hairline);
+
+    /* --- Radii (larger, softer; kills the wireframe look) --- */
+    --lc-radius-xs: 0.4rem;
+    --lc-radius-sm: 0.625rem;
+    --lc-radius: 0.875rem;
+    --lc-radius-lg: 1.15rem;
+    --lc-radius-pill: 999px;
+
+    /* --- Type scale + numerals --- */
+    --lc-font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    --lc-font-num: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --lc-font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    --lc-text-xs: 0.75rem;
+    --lc-text-sm: 0.875rem;
+    --lc-text-base: 1rem;
+    --lc-text-lg: 1.25rem;
+    --lc-text-xl: 1.625rem;
+    --lc-display-sm: 2.25rem;      /* hero numbers (prices/balances) */
+    --lc-display: 3.25rem;
+    --lc-display-lg: 4rem;
+    --lc-tracking-display: -0.022em;   /* tight letter-spacing on big numerals */
+    --lc-tracking-tight: -0.01em;
+    --lc-tracking-label: 0.06em;       /* uppercase eyebrow labels */
+    --lc-leading-display: 1.04;
+
+    /* --- Motion (respect prefers-reduced-motion; overridden to ~0 below) --- */
+    --lc-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --lc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --lc-motion-instant: 90ms var(--lc-ease);
+    --lc-motion-fast: 140ms var(--lc-ease);
+    --lc-motion-base: 200ms var(--lc-ease);
+    --lc-motion-slow: 320ms var(--lc-ease-out);
+    --lc-flash-duration: 620ms;        /* price-tick flash pulse */
+    --lc-shimmer-duration: 1.6s;       /* skeleton shimmer sweep */
+    --lc-lift: -2px;                   /* card hover translateY */
+    --lc-press: 1px;                   /* button press translateY */
+
+    /* --- Legacy alias tokens (existing lucky-cat.css references; keep stable) ---
+       The original layer used vermilion --luckycat-red as primary. We re-anchor
+       it to the polished jade/red/gold so existing classes inherit the new look
+       without a rename churn. --luckycat-red now means "brand/primary accent". */
+    --luckycat-red: var(--lc-jade);
+    --luckycat-red-deep: var(--lc-jade-strong);
+    --luckycat-gold: var(--lc-gold);
+    --luckycat-cream: var(--lc-plane-surface);
+    --luckycat-ink: var(--lc-on-gold);
+    --luckycat-up: var(--lc-up);
+    --luckycat-down: var(--lc-down);
+
+    /* ====================================================================
+       Re-point chirp-ui chrome at the Lucky Cat planes so every chirp-ui
+       component inherits depth-over-borders without forking the package.
+       ==================================================================== */
+    --chirpui-bg: var(--lc-plane-base);
+    --chirpui-bg-subtle: color-mix(in srgb, var(--lc-plane-base) 60%, var(--lc-plane-surface));
+    --chirpui-surface: var(--lc-plane-surface);
+    --chirpui-surface-alt: var(--lc-plane-raised);
+    --chirpui-surface-elevated: var(--lc-plane-raised);
+    --chirpui-border: var(--lc-hairline);
+    --chirpui-border-strong: var(--lc-hairline-strong);
+    --chirpui-border-subtle: var(--lc-hairline);
+    --chirpui-text: var(--lc-ink);
+    --chirpui-text-muted: var(--lc-ink-muted);
+    --chirpui-text-subtle: var(--lc-ink-subtle);
+    --chirpui-accent: var(--lc-jade);
+    --chirpui-accent-hover: var(--lc-jade-strong);
+    --chirpui-accent-dim: var(--lc-jade-dim);
+    --chirpui-primary: var(--lc-jade);
+    --chirpui-on-accent: var(--lc-on-accent);
+    --chirpui-success: var(--lc-jade);
+    --chirpui-error: var(--lc-red);
+    --chirpui-danger: var(--lc-red);
+    --chirpui-warning: var(--lc-gold);
+    --chirpui-info: var(--lc-jade);
+    --chirpui-link: color-mix(in srgb, var(--lc-jade) 70%, var(--lc-ink));
+    --chirpui-link-hover: var(--lc-jade-strong);
+    --chirpui-focus-ring: color-mix(in srgb, var(--lc-jade) 55%, transparent);
+    --chirpui-radius: var(--lc-radius-sm);
+    --chirpui-radius-sm: var(--lc-radius-xs);
+    --chirpui-radius-md: var(--lc-radius);
+    --chirpui-radius-lg: var(--lc-radius-lg);
+    --chirpui-shadow-sm: var(--lc-elevation-1);
+    --chirpui-shadow-md: var(--lc-elevation-2);
+    --chirpui-shadow-lg: var(--lc-elevation-3);
+    --chirpui-card-hover-border: color-mix(in srgb, var(--lc-jade) 40%, var(--lc-hairline));
+    --chirpui-card-hover-shadow: var(--lc-elevation-2);
+    --chirpui-font-family: var(--lc-font-sans);
+    --chirpui-ui-font-family: var(--lc-font-sans);
+    --chirpui-transition: var(--lc-motion-fast);
+  }
+
+  /* ========================================================================
+     LIGHT THEME — clean, intentional near-white layered planes. Applied when
+     the chirp-ui theme toggle sets data-theme="light", and as the system
+     default for data-theme="system" under prefers-color-scheme: light.
+     ======================================================================== */
+  [data-theme="light"] {
+    color-scheme: light;
+
+    --lc-jade: #0f9d6b;
+    --lc-jade-strong: #0a7d54;
+    --lc-jade-dim: #c7efdd;
+    --lc-red: #e23a4c;
+    --lc-red-strong: #c52638;
+    --lc-red-dim: #f8d4d9;
+    --lc-gold: #c98a16;
+    --lc-gold-strong: #a06d0c;
+
+    --lc-up: var(--lc-jade);
+    --lc-down: var(--lc-red);
+
+    --lc-plane-base: #f4f5f7;
+    --lc-plane-surface: #ffffff;
+    --lc-plane-raised: #ffffff;
+    --lc-plane-overlay: #ffffff;
+    --lc-hairline: rgba(15, 23, 36, 0.1);
+    --lc-hairline-strong: rgba(15, 23, 36, 0.16);
+
+    --lc-ink: #12161d;
+    --lc-ink-muted: #5b6573;
+    --lc-ink-subtle: rgba(18, 22, 29, 0.5);
+    --lc-on-accent: #ffffff;
+    --lc-on-gold: #2a2008;
+
+    --lc-elevation-0: none;
+    --lc-elevation-1: 0 1px 2px rgba(15, 23, 36, 0.08), 0 1px 3px rgba(15, 23, 36, 0.06);
+    --lc-elevation-2: 0 6px 18px rgba(15, 23, 36, 0.1), 0 1px 4px rgba(15, 23, 36, 0.06);
+    --lc-elevation-3: 0 16px 40px rgba(15, 23, 36, 0.14), 0 2px 8px rgba(15, 23, 36, 0.07);
+    --lc-elevation-pop: 0 22px 52px rgba(15, 23, 36, 0.18);
+    --lc-glow-jade: 0 0 0 1px color-mix(in srgb, var(--lc-jade) 30%, transparent), 0 8px 24px color-mix(in srgb, var(--lc-jade) 16%, transparent);
+    --lc-glow-gold: 0 0 0 1px color-mix(in srgb, var(--lc-gold) 32%, transparent), 0 8px 24px color-mix(in srgb, var(--lc-gold) 14%, transparent);
+
+    --lc-chart-up-fill-top: color-mix(in srgb, var(--lc-jade) 26%, transparent);
+    --lc-chart-down-fill-top: color-mix(in srgb, var(--lc-red) 24%, transparent);
+    --lc-chart-grid: var(--lc-hairline);
+  }
+
+  @media (prefers-color-scheme: light) {
+    [data-theme="system"] {
+      color-scheme: light;
+
+      --lc-jade: #0f9d6b;
+      --lc-jade-strong: #0a7d54;
+      --lc-jade-dim: #c7efdd;
+      --lc-red: #e23a4c;
+      --lc-red-strong: #c52638;
+      --lc-red-dim: #f8d4d9;
+      --lc-gold: #c98a16;
+      --lc-gold-strong: #a06d0c;
+      --lc-up: var(--lc-jade);
+      --lc-down: var(--lc-red);
+      --lc-plane-base: #f4f5f7;
+      --lc-plane-surface: #ffffff;
+      --lc-plane-raised: #ffffff;
+      --lc-plane-overlay: #ffffff;
+      --lc-hairline: rgba(15, 23, 36, 0.1);
+      --lc-hairline-strong: rgba(15, 23, 36, 0.16);
+      --lc-ink: #12161d;
+      --lc-ink-muted: #5b6573;
+      --lc-ink-subtle: rgba(18, 22, 29, 0.5);
+      --lc-on-accent: #ffffff;
+      --lc-on-gold: #2a2008;
+      --lc-elevation-1: 0 1px 2px rgba(15, 23, 36, 0.08), 0 1px 3px rgba(15, 23, 36, 0.06);
+      --lc-elevation-2: 0 6px 18px rgba(15, 23, 36, 0.1), 0 1px 4px rgba(15, 23, 36, 0.06);
+      --lc-elevation-3: 0 16px 40px rgba(15, 23, 36, 0.14), 0 2px 8px rgba(15, 23, 36, 0.07);
+      --lc-elevation-pop: 0 22px 52px rgba(15, 23, 36, 0.18);
+      --lc-chart-up-fill-top: color-mix(in srgb, var(--lc-jade) 26%, transparent);
+      --lc-chart-down-fill-top: color-mix(in srgb, var(--lc-red) 24%, transparent);
+      --lc-chart-grid: var(--lc-hairline);
+    }
+  }
+
+  /* Base canvas wash: anchor the page floor + UI font so the layered planes
+     read against the warm near-black (dark) / near-white (light) base. */
+  html,
+  body {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+    font-family: var(--lc-font-sans);
+  }
+  .chirpui-app-shell,
+  .chirpui-app-shell__main,
+  .chirpui-app-shell__sidebar {
+    background: var(--chirpui-bg);
+    color: var(--chirpui-text);
+  }
+  /* Tabular numerals everywhere a figure can change width (prices/balances). */
+  .luckycat-token__amount,
+  .luckycat-ticker__item,
+  .luckycat-market-card__price,
+  .luckycat-market-card__change,
+  .luckycat-market-ticker,
+  .luckycat-orderbook__row,
+  .luckycat-tape__row,
+  .luckycat-pf__big,
+  .luckycat-pf__delta,
+  .luckycat-positions {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv01" 1;
+  }
+</style>
+<link rel="icon" href="/static/lucky-cat-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/lucky-cat.css">
+{#- Pre-sized / pre-collapse CSS gate (#231, part 2 + BUILD 2): the layout emits
+    this server-rendered <style> so the FIRST paint already reflects the persisted
+    drag-resize state (no FOUC / no width flash). Two cookie-backed preferences
+    feed it, read server-side (shell.py):
+
+      * `rail_width()` — the dragged inner-rail width in CSS px (clamped/validated,
+        so the echoed value is always a bounded integer — never raw cookie text).
+        Emitted as `--luckycat-rail-width: <clamped>px` so a dragged rail reloads
+        at the same width.
+      * `rail_is_collapsed()` — the double-click collapse boolean. Collapses the
+        shell column to the icon rail and hides the inner rail.
+
+    Both mirror the runtime CSS in lucky-cat.css but keyed on the cookie, not the
+    class — once lucky-cat-shell.js boots it disables this single <style> (id
+    below) and the runtime class/CSS-var take over. Desktop only (>=48rem): on
+    mobile the chirp-ui shell already overlays the sidebar so the rail is inert. -#}
+{% set _rail_px = rail_width() %}
+{% set _rail_collapsed = rail_is_collapsed() %}
+{% if (_rail_px is not none) or _rail_collapsed %}
+<style id="luckycat-rail-cookie-state" nonce="{{ csp_nonce() }}">
+  @media (min-width: 48rem) {
+    {% if _rail_px is not none %}
+    :root {
+      --luckycat-rail-width: {{ _rail_px }}px;
+    }
+    {% end %}
+    {% if _rail_collapsed %}
+    .chirpui-app-shell {
+      --chirpui-sidebar-width: var(--luckycat-icon-rail-width, 4.25rem);
+    }
+    .luckycat-inner-rail {
+      display: none;
+    }
+    {% end %}
+  }
+</style>
+{% end %}
+{#- Rail drag-resize script (BUILD 2). defer so it runs after the shell DOM
+    exists; delegates pointer events off document so the handle survives OOB rail
+    swaps. Writes the width + collapsed cookies the server reads above. -#}
+<script defer src="/static/lucky-cat-shell.js"></script>
+{% end %}
+
+{#- Override brand_link (not brand): chirp-ui renders {% block brand %} INSIDE
+    shell_brand_link's <a href="/">, so a <button> there bubbles its click to the
+    anchor and NAVIGATES instead of opening the drawer. So the mobile hamburger
+    sits as a SIBLING before the brand anchor, and the brand markup goes inside
+    shell_brand_link. -#}
+{% block brand_link %}
+{#- Mobile-only hamburger (hidden >=48rem via CSS). Opens the #lucky-cat-nav
+    drawer (rendered once in topbar_end below) via the same chirpuiDialogTarget
+    Alpine controller chirp-ui's drawer_trigger uses, so the rooms + contextual
+    rail are reachable on mobile where the inline two-tier rail is hidden. -#}
+<button type="button"
+        class="luckycat-nav-trigger"
+        aria-label="Open navigation menu"
+        aria-haspopup="dialog"
+        x-data="chirpuiDialogTarget()"
+        data-dialog-target="lucky-cat-nav"
+        @click="open()">
+  <span class="luckycat-nav-trigger__bars" aria-hidden="true"></span>
+</button>
+{% call shell_brand_link() %}
+<span class="luckycat-brand">
+  <img class="luckycat-brand__logo" src="/static/lucky-cat-logo.svg" alt="" width="24" height="24">
+  <span class="luckycat-brand__name">Lucky&nbsp;Cat</span>
+</span>
+{% end %}
+{% end %}
+
+{% block topbar_center %}
+{#- The #lucky-cat-ticker wrapper is the OOB target; the region body inside it
+    is what the #223 SSE stream re-renders (innerHTML swap). NO aria-live: the SSE
+    stream re-renders this every tick, so a polite live region here would read
+    price/percent on a loop — verbose-to-hostile and it would starve the queue,
+    delaying genuinely-important discrete announcements (deposit success, star
+    toggle). It stays a labelled region a screen-reader user can navigate to on
+    demand; aria-live is reserved for discrete user-initiated state changes. -#}
+<div id="lucky-cat-ticker" class="luckycat-ticker" aria-label="Live market ticker">
+  {#- The live `ticker` SIGNAL sink. signal_block() emits a child
+      <div sse-swap="ticker" hx-target="this"> SSR-seeded with the current
+      spotlight (no empty-then-fill flash); every `event: ticker` over the single
+      /_chirp/live connection innerHTML-swaps it. One rotating-spotlight source
+      (app.py ticker_signal generator) feeds it on EVERY page. -#}
+  {{ signal_block('ticker') }}
+</div>
+{% end %}
+
+{% block topbar_end %}
+{#- ⌘K command-palette affordance — the discoverable open trigger. Click or
+    Cmd/Ctrl-K opens the same #command-palette dialog rendered below. Lives in
+    the persistent topbar shell so it is reachable on every page. -#}
+{{ command_palette_trigger() }}
+{#- NOTIFICATIONS BELL — a dropdown popover over the recent notifications feed,
+    with a live unread badge. It lives in the persistent topbar shell so it is on
+    every page and the SSE stream + Alpine controller bindings are always live.
+
+    Behaviour:
+      * the Alpine chirpuiDropdown() controller (same one chirp-ui's dropdown_menu
+        uses) owns open/close + Escape/outside-close + focus return;
+      * OPEN-MARKS-READ — on open the trigger hx-posts /notifications/read, which
+        clears the server watermark and OOB-swaps the #notif-badge to empty;
+      * CRITICAL boosted-shell override — this control lives inside #main
+        (hx-target=#main / hx-select=#page-content inherited from ancestors). The
+        read POST returns ONLY the #notif-badge OOB swap, so the trigger OVERRIDES
+        the inherited outlet with hx-target="#notif-badge" + hx-swap="none" +
+        hx-select="#notif-badge" (the convert-form / chart-toggle footgun: use
+        hx-select, NOT hx-disinherit which only affects descendants). With
+        hx-swap="none" htmx applies just the OOB badge swap — no #main churn.
+    -#}
+<div class="luckycat-notif-bell chirpui-dropdown" id="notif-bell"
+     x-id="['notif-panel']"
+     :data-align-x="alignX"
+     :data-align-y="alignY"
+     x-data="chirpuiDropdown()"
+     @keydown.escape.prevent.stop="close($refs.trigger)"
+     @focusin.window="!$refs.panel?.contains($event.target) && close($refs.trigger)"
+     @click.outside="close($refs.trigger)"
+     @resize.window="open && reposition()">
+  <button type="button" class="luckycat-notif-bell__trigger chirpui-dropdown__trigger"
+          x-ref="trigger"
+          aria-haspopup="dialog" :aria-expanded="open"
+          :aria-controls="$id('notif-panel')"
+          aria-label="Notifications"
+          hx-post="{{ url_for('notifications.read') }}"
+          hx-swap="none"
+          @click="toggle()">
+    <span class="luckycat-notif-bell__icon" aria-hidden="true">🔔</span>
+    {#- LIVE SIGNAL SINK (manual sse-swap, NOT signal_block()). The bell's badge
+        is the EXISTING #notif-badge span — a derived-signal sink. It carries
+        sse-swap="notif_badge" so every `event: notif_badge` over /_chirp/live
+        innerHTML-swaps the pill body. SSR-seeded with notif_badge_body so there
+        is no empty-then-fill flash. It is aria-hidden — purely decorative INSIDE
+        the labelled button (the spoken count rides the sibling #notif-announce
+        live region below). The read POST returns 204; the visible clear flows
+        over this signal binding, not a response body. -#}
+    <span id="notif-badge" class="luckycat-notif-bell__badge-wrap" aria-hidden="true"
+          sse-swap="notif_badge" hx-target="this">{{ notif_badge_body(notifications_unread | default(0)) }}</span>
+  </button>
+  {#- The SPOKEN unread count — a polite live region OUTSIDE the labelled button
+      (a live region buried inside a button whose accessible name is fixed by
+      aria-label is unreliably announced). The EXISTING #notif-announce span is the
+      `notif_announce` DERIVED-signal sink: sse-swap="notif_announce" so each count
+      change is announced exactly once over the live connection (SSR-seeded). -#}
+  <span id="notif-announce" class="chirpui-visually-hidden" role="status" aria-live="polite"
+        sse-swap="notif_announce" hx-target="this">{{ notif_announce_body(notifications_unread | default(0)) }}</span>
+  <div class="luckycat-notif-bell__panel chirpui-dropdown__menu" x-ref="panel"
+       :id="$id('notif-panel')" role="region" aria-label="Notifications"
+       x-show="open" x-cloak x-transition>
+    <div class="luckycat-notif-bell__head">
+      <span class="luckycat-notif-bell__title">Notifications</span>
+    </div>
+    {#- LIVE SIGNAL SINK (manual sse-swap, NOT signal_block() — the helper would
+        inject its own <div> around/inside this <ul>, which is invalid). The
+        EXISTING #notif-list <ul> is the `notifications` SOURCE-signal sink:
+        sse-swap="notifications" innerHTML-swaps the whole list body on every
+        `event: notifications` over /_chirp/live. SSR-seeded with the recent rows
+        (single-source notification_list_body), so the live list and the initial
+        paint can never drift. -#}
+    <ul id="notif-list" class="luckycat-notif-list" role="list"
+        sse-swap="notifications" hx-target="this">
+      {{ notification_list_body(notifications | default(())) }}
+    </ul>
+  </div>
+</div>
+{#- Topbar $MEOW token — the amount is a live `balance` SIGNAL (inside
+    meow_balance_body -> {{ signal('balance') }}). /deposit + /trade call
+    app.emit('balance', ...) and this binding (plus the deposit-modal one, the
+    SAME signal in a SECOND home) swaps from the shared /_chirp/live connection,
+    with any derived signal recomputing in the same cascade. No #lucky-cat-balance
+    id / OOB twin anymore — the signal's sse-swap sink owns the live behavior. -#}
+<span class="luckycat-token" title="House token balance">
+  {{ meow_balance_body() }}
+</span>
+{{ theme_toggle() }}
+{#- The command-palette <dialog> itself. Rendered once in the persistent topbar
+    shell (NOT inside #main / #page-content), so it survives boosted navigation
+    and the Cmd/Ctrl-K global key binding is always live. Populated with the full
+    markets + rooms directory from _context.py; the /search route re-filters it.
+    The native <dialog closedby="any"> + chirpuiDialogTarget controller supply the
+    focus trap + Escape/backdrop close. -#}
+{{ command_palette_dialog(groups=palette_groups | default(())) }}
+{#- Mobile navigation drawer — the hamburger (in {% block brand %} above) opens
+    this. Rendered once in the persistent topbar shell (NOT inside #main) so it
+    survives boosted navigation and the chirpuiDialogTarget controller binding is
+    always live, exactly like the command palette. It is a chirp-ui drawer
+    (native <dialog closedby="any"> + the chirpuiDialogTarget open/close +
+    focus-trap contract); its body reuses the SAME shell_navigation model the
+    inline two-tier rail builds (mobile_drawer_nav), so the rooms + route-context
+    sections never drift from the desktop rail. The shell_actions (Deposit $MEOW,
+    overflow) are surfaced here too, since they are hidden from the cramped mobile
+    topbar. Desktop (>=48rem) hides the hamburger so the drawer is never opened —
+    the inline rail owns navigation there. -#}
+{% call drawer("lucky-cat-nav", title="Lucky Cat", side="left", cls="luckycat-nav-drawer") %}
+  {{ mobile_drawer_nav(current_path | default("/"), markets=markets | default(()), tickers=tickers | default(none), watchlist_count=watchlist_count | default(0)) }}
+  {{ drawer_actions(shell_actions | default(none)) }}
+{% end %}
+{% end %}
+
+{#- Rail-edge resize handle (#231, part 2) — elbysodic .elbysodic-sidebar-resize.
+    A genuine drag-resize affordance (cursor: ew-resize) on the inner-rail's
+    right edge, between the rail and #main. lucky-cat-shell.js (BUILD 2) wires the
+    continuous pointer-drag resize + double-click collapse + keyboard nudge; it
+    delegates pointer events off document so the handle survives OOB rail swaps.
+    role="separator" + aria-orientation is the correct ARIA for a resize splitter;
+    aria-valuemin/max/now express the inner-rail width in CSS px (the JS keeps
+    aria-valuenow in sync as you drag). The min/max match the JS clamp + shell.py
+    RAIL_WIDTH_MIN_PX/MAX_PX (176..416). aria-valuenow must stay within that range,
+    so it seeds at the min when collapsed, else the persisted dragged width, else a
+    mid default (the collapse itself is conveyed by the shell's collapsed class). -#}
+{% def sidebar_resize_handle(collapsed, width=none) %}
+<div class="luckycat-sidebar-resize"
+     data-luckycat-rail-resize
+     role="separator"
+     aria-orientation="vertical"
+     aria-label="Resize navigation"
+     aria-valuemin="176"
+     aria-valuemax="416"
+     aria-valuenow="{{ 176 if collapsed else (width ?? 256) }}"
+     tabindex="0"
+     title="Drag to resize · double-click to collapse"></div>
+{% end %}
+
+{#- Two-tier rail body (#231): a persistent outer ICON RAIL + an inner CONTEXTUAL
+    rail that changes per route, with the rail-edge resize handle between the
+    rail and #main. Single source of truth for BOTH the full-page paint
+    ({% block sidebar %} below) and the boosted-nav OOB swap (the sidebar_oob
+    region). It builds the server nav model from current_path so the active room
+    + contextual sections recompute on every navigation. markets / tickers /
+    meow_balance flow in from the root _context.py (and are present in the layout
+    context on boosted OOB re-render too). The .luckycat-shell-sidebar frame is
+    position:relative (CSS) so the absolutely-positioned handle spans the full
+    rail height. -#}
+{% def sidebar_content(current_path="/") %}
+{% set _state = route_state(current_path) %}
+{% set _nav = shell_navigation(_state, markets=markets | default(()), tickers=tickers | default(none), symbol="", watchlist_count=watchlist_count | default(0)) %}
+{% set _collapsed = rail_is_collapsed() %}
+{% set _width = rail_width() %}
+<div class="luckycat-shell-sidebar">
+  {{ primary_icon_rail(_nav.primary_items) }}
+  {{ inner_sidebar_shell(_nav, meow_balance | default(0)) }}
+  {{ sidebar_resize_handle(_collapsed, _width) }}
+</div>
+{% end %}
+
+{#- The single sidebar_oob region (owner decision: ONE region). chirp-ui's
+    use_chirp_ui() auto-registers `sidebar_oob` -> target #chirpui-sidebar-nav
+    with swap="innerHTML" + wrap=True, so on boosted nav the render pipeline
+    discovers this region by name and the OOB framework wraps its body in
+    <div id="chirpui-sidebar-nav" hx-swap-oob="innerHTML">…</div> — re-rendering
+    BOTH rails (icon-rail active room + inner contextual sections) in one swap.
+    Because the region body is the INNER content of that wrapper, it carries no
+    id/oob attribute of its own (the layout's {% block sidebar %} supplies the
+    #chirpui-sidebar-nav wrapper for the full-page paint). The region declares
+    its current_path param so build_layout_contract's depends_on discovery wires
+    it to boosted nav. -#}
+{% region sidebar_oob(current_path="/") %}
+{{ sidebar_content(current_path) }}
+{% end %}
+
+{% block sidebar %}
+<div id="chirpui-sidebar-nav" class="luckycat-shell-sidebar-frame">
+  {{ sidebar_oob(current_path=current_path | default("/")) }}
+</div>
+{% end %}

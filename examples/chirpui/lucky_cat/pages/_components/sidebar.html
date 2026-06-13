@@ -1,0 +1,254 @@
+{#- Lucky Cat two-tier rail components (#231).
+
+    Ported from elbysodic's `_components/sidebar.html`, adapted to chirp-ui 0.9.0:
+    icons come from chirp-ui's `| icon` filter (NOT an SVG sprite — Lucky Cat
+    ships none), and the inner rail composes chirp-ui's `sidebar` / `sidebar_section`
+    macros. Every nav link carries the boosted shell-outlet contract
+    (`shell_outlet_attrs()` → target #main, swap innerHTML, select #page-content)
+    plus `hx-sync="#main:replace"` so rapid nav clicks coalesce (an in-flight
+    boosted request is replaced, not stacked).
+
+    Active-state is server-computed on each NavItem and rendered as the active
+    class + `aria-current="page"`, matching the app-shell layout's client
+    `syncNav()` so the two never disagree. -#}
+{% from "chirpui/sidebar.html" import sidebar, sidebar_section %}
+{% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
+
+{#- Outer icon rail: persistent trading "rooms". Icon-only with a hover/focus
+    tooltip (data-rail-tooltip + aria-label for a11y). -#}
+{% def rail_icon_link(item) %}
+<a class="luckycat-primary-rail__link{{ " luckycat-primary-rail__link--active" if item.active else "" }}"
+   href="{{ item.href }}"
+   title="{{ item.label }}"
+   aria-label="{{ item.label }}"
+   data-rail-tooltip="{{ item.label }}"
+   hx-sync="#main:replace"
+   {{ shell_outlet_attrs() }}
+   {% if item.active %}aria-current="page"{% end %}>
+  <span class="luckycat-primary-rail__icon" aria-hidden="true">{{ (item.icon or "bullet") | icon }}</span>
+  {% if item.count %}
+  <span class="luckycat-primary-rail__count">{{ item.count }}</span>
+  {% end %}
+</a>
+{% end %}
+
+{#- VISIBLE collapse/expand control (discoverability — #231 follow-up).
+
+    A real <button> (Enter/Space handled natively) carrying the
+    `data-luckycat-rail-toggle` hook lucky-cat-shell.js delegates a click off the
+    document to, toggling the same `.luckycat-rail--collapsed` state as the
+    double-click-the-handle gesture (`toggleCollapsed` → `setCollapsed`). The JS
+    keeps `aria-expanded` + the label in sync (expanded by default; collapsed
+    flips to `aria-expanded="false"` and the label to "Expand navigation").
+    `aria-controls` points at #chirpui-sidebar-nav (the navigation region the
+    collapse hides). Two placements: one on the icon rail (always reachable —
+    even when the inner rail is collapsed away) and one in the inner-rail header
+    (the obvious affordance while expanded). The chevron is decorative; the CSS
+    rotates it with the collapsed class. -#}
+{% def rail_toggle_button(cls="") %}
+<button type="button"
+        class="luckycat-rail-toggle{{ " " ~ cls if cls else "" }}"
+        data-luckycat-rail-toggle
+        aria-controls="chirpui-sidebar-nav"
+        aria-expanded="true"
+        aria-label="Collapse navigation"
+        title="Collapse navigation">
+  <span class="luckycat-rail-toggle__icon" aria-hidden="true">⟨⟩</span>
+</button>
+{% end %}
+
+{% def primary_icon_rail(items) %}
+<nav class="luckycat-primary-rail" aria-label="Lucky Cat rooms">
+  {{ rail_toggle_button(cls="luckycat-rail-toggle--icon") }}
+  {% for item in items %}
+  {{ rail_icon_link(item) }}
+  {% end %}
+</nav>
+{% end %}
+
+{#- Watchlist rail count badge body — the single source of truth for the inner
+    rail's #watchlist-count pill, shared by the full-page paint (the inner rail
+    link below) and the /watchlist/toggle OOB twin (watchlist_count_swap in
+    _layout.html). A pill when anything is starred, nothing when the watchlist is
+    empty (no zero badge). The wrapper #watchlist-count element is supplied by
+    each caller (the rail link here / the OOB twin in the layout). -#}
+{% def watchlist_count_body(watchlist_count=0) %}
+{% set _n = watchlist_count ?? 0 %}
+{% if _n > 0 %}
+<span class="chirpui-sidebar__badge luckycat-watchlist-count" aria-label="{{ _n }} starred">{{ _n if _n < 100 else '99+' }}</span>
+{% end %}
+{% end %}
+
+{#- Inner-rail link — mirrors chirp-ui `sidebar_link` (same `.chirpui-sidebar__link`
+    class + boosted shell-outlet contract) but adds `hx-sync="#main:replace"`
+    (elbysodic fidelity) and renders server-computed `active`/`badge` directly
+    rather than re-deriving from `match=`.
+
+    The Watchlist filter lane (`item.key == "flt:watchlist"`) is special: its count
+    rides the #watchlist-count OOB target so the /watchlist/toggle route can keep
+    the tally honest from any page (the notif_badge / open-order-count idiom). The
+    count VALUE comes from the rendered NavItem.count, but the wrapper carries the
+    OOB id. -#}
+{% def inner_rail_link(item) %}
+<a class="chirpui-sidebar__link luckycat-inner-rail__link{{ " chirpui-sidebar__link--active" if item.active else "" }}"
+   href="{{ item.href }}"
+   title="{{ item.label }}"
+   hx-sync="#main:replace"
+   {{ shell_outlet_attrs() }}
+   {% if item.active %}aria-current="page"{% end %}>
+  {% if item.icon %}<span class="chirpui-sidebar__icon">{{ item.icon | icon }}</span>{% end %}
+  <span class="chirpui-sidebar__label">{{ item.label }}</span>
+  {% if item.key == "flt:watchlist" %}
+  {#- The #watchlist-count OOB target. Its inner body is what the toggle route's
+      watchlist_count_swap twin re-renders (innerHTML). -#}
+  <span id="watchlist-count" class="luckycat-watchlist-count-wrap" aria-live="polite">{{ watchlist_count_body(item.count or 0) }}</span>
+  {% elif item.badge is not none %}
+  <span class="chirpui-sidebar__badge luckycat-inner-rail__badge" aria-label="{{ item.label }} change {{ item.badge }}">{{ item.badge }}</span>
+  {% elif item.count is not none %}
+  <span class="chirpui-sidebar__badge">{{ item.count }}</span>
+  {% end %}
+</a>
+{% end %}
+
+{% def shell_nav_section(section) %}
+{% call sidebar_section(section.label or "") %}
+  {% for item in section.items %}
+  {{ inner_rail_link(item) }}
+  {% end %}
+{% end %}
+{% end %}
+
+{#- Inner contextual rail. Uses chirp-ui's `sidebar` macro (header/footer slots)
+    so it inherits the shell's sidebar chrome; `header`/`footer` carry the brand
+    and the live $MEOW balance. -#}
+{#- Mobile nav-drawer link — a labelled row reused for BOTH the rooms list and
+    the contextual sections inside the #lucky-cat-nav drawer. Carries the same
+    boosted shell-outlet contract as the rail links (target #main, swap
+    innerHTML, select #page-content) + hx-sync="#main:replace", so a tap
+    navigates through the boosted shell, never a full reload. @click closes the
+    enclosing <dialog> as navigation starts (mirrors the command-palette items),
+    so the drawer dismisses itself on the way out. Server-computed active state
+    renders as aria-current + the active class, agreeing with syncNav(). -#}
+{% def drawer_nav_link(item) %}
+<a class="luckycat-nav-drawer__link{{ " luckycat-nav-drawer__link--active" if item.active else "" }}"
+   href="{{ item.href }}"
+   hx-sync="#main:replace"
+   {{ shell_outlet_attrs() }}
+   @click="$el.closest('dialog')?.close()"
+   {% if item.active %}aria-current="page"{% end %}>
+  {% if item.icon %}<span class="luckycat-nav-drawer__icon" aria-hidden="true">{{ item.icon | icon }}</span>{% end %}
+  <span class="luckycat-nav-drawer__label">{{ item.label }}</span>
+  {#- Truthiness (NOT `is not none`) on the dataclass attrs: a None field on a
+      frozen-dataclass yields an undefined-but-not-none proxy in this Kida build,
+      so `item.badge is not none` is wrongly True for a None badge (it would render
+      an empty badge pill). Truthiness is correct AND safe here — `badge` is the
+      signed-pct string (never an empty-but-set value) and `count` is only ever set
+      when > 0 (the watchlist lane), so neither has a falsy-yet-present case. The
+      desktop inner_rail_link sidesteps this by special-casing the watchlist lane
+      before its badge/count branch; the drawer reaches the branch for the lane. -#}
+  {% if item.badge %}
+  <span class="chirpui-sidebar__badge luckycat-inner-rail__badge" aria-label="{{ item.label }} change {{ item.badge }}">{{ item.badge }}</span>
+  {% elif item.count %}
+  <span class="chirpui-sidebar__badge">{{ item.count }}</span>
+  {% end %}
+</a>
+{% end %}
+
+{#- Mobile drawer actions (#mobile-pass). The topbar shell_actions (Deposit $MEOW
+    + the About overflow) are hidden on the cramped mobile topbar, so they surface
+    here as full-width drawer rows. We deliberately DO NOT reuse chirp-ui's
+    `shell_actions_bar` macro here: it bakes a FIXED `#{target}-overflow` id for
+    its "More" dropdown, and the topbar already renders one instance — a second
+    would duplicate that id (invalid HTML + ambiguous aria-controls/Alpine wiring,
+    a real dup-id bug). A drawer has vertical room, so each action is a plain row
+    instead of a nested overflow dropdown. An href action is a boosted link; an
+    action-id button (e.g. `data-action="deposit"`) rides the SAME #page-root
+    click delegator the topbar button uses (opens the deposit <dialog>), and
+    @click closes the drawer on the way out. -#}
+{% def drawer_action_row(action) %}
+{% if action.href %}
+<a class="luckycat-nav-drawer__link"
+   href="{{ action.href }}"
+   hx-sync="#main:replace"
+   {{ shell_outlet_attrs() }}
+   @click="$el.closest('dialog')?.close()">
+  {% if action.icon %}<span class="luckycat-nav-drawer__icon" aria-hidden="true">{{ action.icon | icon }}</span>{% end %}
+  <span class="luckycat-nav-drawer__label">{{ action.label }}</span>
+</a>
+{% else %}
+<button type="button" class="luckycat-nav-drawer__link"
+        {% if action.action %}data-action="{{ action.action }}"{% end %}
+        @click="$el.closest('dialog')?.close()">
+  {% if action.icon %}<span class="luckycat-nav-drawer__icon" aria-hidden="true">{{ action.icon | icon }}</span>{% end %}
+  <span class="luckycat-nav-drawer__label">{{ action.label }}</span>
+</button>
+{% end %}
+{% end %}
+
+{% def drawer_actions(shell_actions=none) %}
+{% set _a = shell_actions ?? none %}
+{% if (_a ?? none) is not none %}
+<div class="luckycat-nav-drawer__section luckycat-nav-drawer__actions">
+  {% for action in _a.primary.items %}
+  {{ drawer_action_row(action) }}
+  {% end %}
+  {% for action in _a.overflow.items %}
+  {{ drawer_action_row(action) }}
+  {% end %}
+</div>
+{% end %}
+{% end %}
+
+{#- Mobile navigation drawer body (#mobile-pass). Reuses the SAME shell_navigation
+    model the inline two-tier rail builds (route_state + shell_navigation are app
+    template globals), so the drawer's rooms + contextual sections can never drift
+    from the desktop rail. Two stacked groups: the persistent ROOMS (the outer
+    icon rail, here as labelled rows) and the route-context sections (the inner
+    rail). It carries NO #chirpui-sidebar-nav id — that id is the OOB target owned
+    solely by the inline rail; duplicating it would create two elements with the
+    same id and break the boosted-nav OOB swap. Rendered once in the topbar shell
+    (it does not re-stream on boosted nav), and the drawer is hidden behind a
+    >=48rem media query so it is only reachable on mobile. -#}
+{% def mobile_drawer_nav(current_path="/", markets=(), tickers=none, watchlist_count=0) %}
+{% set _state = route_state(current_path) %}
+{% set _nav = shell_navigation(_state, markets=markets, tickers=tickers, symbol="", watchlist_count=watchlist_count) %}
+<nav class="luckycat-nav-drawer__nav" aria-label="Lucky Cat navigation">
+  <div class="luckycat-nav-drawer__section">
+    <p class="luckycat-nav-drawer__section-title">Rooms</p>
+    {% for item in _nav.primary_items %}
+    {{ drawer_nav_link(item) }}
+    {% end %}
+  </div>
+  {% for section in _nav.sidebar_sections %}
+  <div class="luckycat-nav-drawer__section">
+    {% if section.label %}
+    <p class="luckycat-nav-drawer__section-title">{{ section.label }}</p>
+    {% end %}
+    {% for item in section.items %}
+    {{ drawer_nav_link(item) }}
+    {% end %}
+  </div>
+  {% end %}
+</nav>
+{% end %}
+
+{% def inner_sidebar_shell(navigation, meow_balance=0) %}
+{% call sidebar(cls="luckycat-inner-rail") %}
+  {% slot header %}
+  <div class="luckycat-inner-rail__head">
+    <a class="luckycat-inner-rail__brand" href="/" title="Lucky Cat — Markets"
+       hx-sync="#main:replace" {{ shell_outlet_attrs() }}>
+      <img class="luckycat-inner-rail__logo" src="/static/lucky-cat-logo.svg" alt="" width="22" height="22">
+      <span class="luckycat-inner-rail__brand-name">Lucky&nbsp;Cat</span>
+    </a>
+    {{ rail_toggle_button(cls="luckycat-rail-toggle--inner") }}
+  </div>
+  {% end %}
+  {% for section in navigation.sidebar_sections %}
+  {{ shell_nav_section(section) }}
+  {% end %}
+  {#- No footer balance here: the $MEOW balance is GLOBAL account state, so it
+      lives once in the topbar (IA doctrine). Duplicating it in the rail also
+      overflowed the column. -#}
+{% end %}
+{% end %}

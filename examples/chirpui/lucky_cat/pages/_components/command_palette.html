@@ -1,0 +1,132 @@
+{#- Lucky Cat command palette — the Cmd/Ctrl-K "pro app" signal.
+
+    Composes over chirp-ui's command_palette component: a native <dialog
+    closedby="any"> driven by the chirpuiDialogTarget Alpine controller, which
+    opens on Cmd/Ctrl-K (and the trigger button's @click) and closes on Escape /
+    backdrop click / a navigation for free. We supply our OWN palette markup
+    (rather than the stock macro) for two reasons:
+
+      1. Result items must carry the boosted shell-outlet contract
+         (shell_outlet_attrs() → target #main, swap innerHTML, select
+         #page-content) + hx-sync="#main:replace", exactly like the sidebar
+         rail links, so Enter/click navigates through the boosted shell — never a
+         full-page reload — and the dialog closes itself on the way out.
+      2. The results are server-filtered: the search input hx-GETs /search and
+         swaps the results list in place, so typing narrows markets + rooms.
+
+    The layout renders `command_palette_dialog(groups)` once (a layout region so
+    it ships on every page) with the full unfiltered directory; the /search
+    route returns `palette_results_body(groups, query)` to refresh the list. -#}
+{% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
+
+{#- One result row. A real <a> (keyboard + middle-click friendly) carrying the
+    boosted outlet contract; data-lc-palette-item lets the controller find the
+    first match for Enter-to-navigate. @click closes the enclosing <dialog> so
+    the palette dismisses as navigation starts. -#}
+{% def palette_item(item) %}
+<a class="chirpui-command-palette__item luckycat-palette__item"
+   href="{{ item.href }}"
+   data-lc-palette-item
+   role="option"
+   hx-sync="#main:replace"
+   {{ shell_outlet_attrs() }}
+   @click="$root.querySelector('dialog')?.close()">
+  <span class="chirpui-command-palette__item-label luckycat-palette__label">{{ item.label }}</span>
+  {% if item.hint %}
+  <span class="chirpui-command-palette__item-hint luckycat-palette__hint">{{ item.hint }}</span>
+  {% end %}
+</a>
+{% end %}
+
+{#- The results list body — the single source of truth for BOTH the first paint
+    (called by the dialog below) and the /search hx-GET refresh. A {% def %} so
+    it is callable inline; the {% block %} twin below is what the /search route
+    targets via Fragment (a block, not a def, is what render_fragment emits).
+    Empty groups are pruned in palette_results(), so a bare header never renders;
+    a fully empty result set shows a muted "No matches" line. -#}
+{% def palette_results_list(groups=(), query="") %}
+{% set _groups = groups | default(()) %}
+{% if (_groups | length) > 0 %}
+{% for group in _groups %}
+<div class="luckycat-palette__group" role="group" aria-label="{{ group.label }}">
+  <p class="chirpui-command-palette__group-title luckycat-palette__group-title">{{ group.label }}</p>
+  {% for item in group.items %}
+  {{ palette_item(item) }}
+  {% end %}
+</div>
+{% end %}
+{% else %}
+<p class="luckycat-palette__empty chirpui-text-muted">No matches for “{{ query | default('') }}”.</p>
+{% end %}
+{% end %}
+
+{#- Fragment target for the /search route: a named block that delegates to the
+    def, so the keystroke refresh and the resting palette emit identical markup. -#}
+{% block palette_results_body %}
+{{ palette_results_list(groups=groups | default(()), query=query | default("")) }}
+{% end %}
+
+{#- The palette <dialog> + Cmd/Ctrl-K binding. id="command-palette" is the
+    dialog target the trigger button + the global key handler resolve. The input
+    hx-GETs /search (q=...) and swaps #command-palette-results in place; on
+    @keydown.enter we click the first result so Enter navigates via the boosted
+    shell. autofocus + the native <dialog> focus trap + Escape close come from
+    chirp-ui's component contract. -#}
+{% def command_palette_dialog(groups=(), id="command-palette", search_url="/search") %}
+<div class="luckycat-palette"
+     x-data="chirpuiDialogTarget()"
+     data-dialog-target="{{ id }}"
+     @keydown.window.meta.k.prevent="open()"
+     @keydown.window.ctrl.k.prevent="open()">
+  <dialog id="{{ id }}" class="chirpui-command-palette luckycat-palette__dialog" closedby="any">
+    <div class="chirpui-command-palette__inner">
+      {#- combobox semantics: the input controls the results listbox and (via
+          aria-autocomplete="list") tells AT that typing filters a list of options.
+          The results region is a role="listbox" + aria-live="polite" so result-
+          count changes are announced as the user types. aria-activedescendant is
+          intentionally NOT set: keeping it correct would require JS to track the
+          Enter-target on every keystroke/swap, and a stale activedescendant is
+          worse than none — the Enter-selects-first behavior is conveyed by the
+          first option's resting accent + the listbox structure instead. -#}
+      <input type="search"
+             class="chirpui-command-palette__input"
+             placeholder="Search markets and pages…"
+             aria-label="Search markets and pages"
+             role="combobox"
+             aria-expanded="true"
+             aria-controls="{{ id }}-results"
+             aria-autocomplete="list"
+             name="q"
+             autocomplete="off"
+             autofocus
+             hx-get="{{ search_url }}"
+             hx-trigger="input changed delay:150ms, search"
+             hx-target="#{{ id }}-results"
+             hx-swap="innerHTML"
+             @keydown.enter.prevent="$root.querySelector('[data-lc-palette-item]')?.click()">
+      <div id="{{ id }}-results" class="chirpui-command-palette__results luckycat-palette__results"
+           role="listbox" aria-label="Search results" aria-live="polite">
+        {{ palette_results_list(groups=groups) }}
+      </div>
+    </div>
+  </dialog>
+</div>
+{% end %}
+
+{#- The topbar ⌘K affordance. A real <button> resolving the same dialog target,
+    so click + Cmd/Ctrl-K open the identical palette. Mirrors chirp-ui's
+    command_palette_trigger look (icon + label + kbd) but uses Lucky Cat tokens
+    via the luckycat-palette-trigger class for the elevated topbar chrome. -#}
+{% def command_palette_trigger(target="command-palette") %}
+<button type="button"
+        class="chirpui-command-palette__trigger luckycat-palette-trigger"
+        aria-label="Search markets and pages (Command or Control K)"
+        title="Search — ⌘K"
+        x-data="chirpuiDialogTarget()"
+        data-dialog-target="{{ target }}"
+        @click="open()">
+  <span class="chirpui-command-palette__trigger-icon" aria-hidden="true">{{ "search" | icon }}</span>
+  <span class="chirpui-command-palette__trigger-label luckycat-palette-trigger__label">Search</span>
+  <kbd class="chirpui-command-palette__kbd luckycat-palette-trigger__kbd">⌘K</kbd>
+</button>
+{% end %}

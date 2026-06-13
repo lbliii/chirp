@@ -1,0 +1,105 @@
+{% imports %}
+  {% from "chirpui/forms.html" import toggle_field, select_field, form_actions %}
+{% end %}
+
+{#- Settings → Security (demo stub). A real-looking security panel built from
+    chirp-ui's native field / toggle / select controls, laid out as label|control
+    rows inside the Lucky Cat panel surface. Each toggle carries its own real
+    label (so the switch has an accessible name); the row's left column holds the
+    explanatory description. The form is non-mutating — it submits back to its own
+    GET route (method="get"), so there is NO POST handler and no CSRF is required,
+    and app.check()'s security_stack / csrf_form rules stay quiet. Composes into
+    the chirp-ui shell content block. -#}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🔐</span>
+      Security
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Keep the lucky cat’s vault safe. Demo stub — choices aren’t persisted.
+    </p>
+  </header>
+
+  <form id="security-form" class="luckycat-settings"
+        method="get" action="/settings/security">
+
+    <section class="luckycat-trade-panel" aria-label="Sign-in protection">
+      <h2 class="luckycat-settings__section-title">Sign-in protection</h2>
+      <p class="luckycat-settings__section-hint chirpui-text-muted">
+        Extra checks the lucky paw runs before letting anyone onto the trading floor.
+      </p>
+
+      <div class="luckycat-setting-row luckycat-setting-row--toggle">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__desc">Require a one-time code on new devices.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ toggle_field("two_factor", checked=true, label="Two-factor authentication", variant="accent") }}
+        </span>
+      </div>
+
+      <div class="luckycat-setting-row luckycat-setting-row--toggle">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__desc">Only send $MEOW to pre-approved addresses.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ toggle_field("withdrawal_allowlist", checked=false, label="Withdrawal allowlist", variant="accent") }}
+        </span>
+      </div>
+
+      <div class="luckycat-setting-row">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__name">Session timeout</span>
+          <span class="luckycat-setting-row__desc">Sign out automatically after inactivity.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ select_field("session_timeout",
+              options=[
+                {"value": "15", "label": "15 minutes"},
+                {"value": "60", "label": "1 hour"},
+                {"value": "1440", "label": "1 day"},
+              ],
+              selected="60", label="") }}
+        </span>
+      </div>
+    </section>
+
+    <section class="luckycat-trade-panel" aria-label="Alerts">
+      <h2 class="luckycat-settings__section-title">Alerts</h2>
+      <p class="luckycat-settings__section-hint chirpui-text-muted">
+        How the cat pings you when something needs a human.
+      </p>
+
+      <div class="luckycat-setting-row luckycat-setting-row--toggle">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__desc">Notify on each sign-in from an unknown device.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ toggle_field("signin_alerts", checked=true, label="New sign-in alerts", variant="accent") }}
+        </span>
+      </div>
+
+      <div class="luckycat-setting-row luckycat-setting-row--toggle">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__desc">Ask for re-confirmation above a notional threshold.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ toggle_field("large_order_confirm", checked=true, label="Large-order confirmation", variant="accent") }}
+        </span>
+      </div>
+    </section>
+
+    {% call form_actions(align="end") %}
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Save security settings</button>
+    {% end %}
+  </form>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

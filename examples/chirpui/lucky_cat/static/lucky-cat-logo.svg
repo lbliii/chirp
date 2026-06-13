@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lucky Cat">
+  <defs>
+    <linearGradient id="lc-coin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7c45a"/>
+      <stop offset="1" stop-color="#e09a1f"/>
+    </linearGradient>
+    <linearGradient id="lc-fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef1f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Lucky coin (koban-gold token) -->
+  <circle cx="32" cy="32" r="30" fill="url(#lc-coin)"/>
+  <circle cx="32" cy="32" r="30" fill="none" stroke="#00000022" stroke-width="1"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#ffffff55" stroke-width="1"/>
+
+  <!-- Ears -->
+  <path d="M18 22 L20 9 L31 17 Z" fill="url(#lc-fur)"/>
+  <path d="M46 22 L44 9 L33 17 Z" fill="url(#lc-fur)"/>
+  <path d="M21.5 14.5 L22.5 19 L27 17 Z" fill="#2fd49a"/>
+  <path d="M42.5 14.5 L41.5 19 L37 17 Z" fill="#ff5a6a"/>
+
+  <!-- Beckoning paw (raised, upper-left) -->
+  <g transform="rotate(-12 19 22)">
+    <rect x="13" y="17" width="9" height="13" rx="4.5" fill="url(#lc-fur)" stroke="#00000018" stroke-width="0.6"/>
+    <circle cx="17.5" cy="20" r="1.1" fill="#ff5a6a"/>
+  </g>
+
+  <!-- Face -->
+  <path d="M16 30 q0 -13 16 -13 q16 0 16 13 q0 14 -16 14 q-16 0 -16 -14 Z" fill="url(#lc-fur)"/>
+
+  <!-- Happy closed eyes -->
+  <path d="M24 30 q3 3 6 0" fill="none" stroke="#16181d" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 30 q3 3 6 0" fill="none" stroke="#16181d" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Nose + smile -->
+  <path d="M31 34 l2 0 l-1 1.4 Z" fill="#ff5a6a"/>
+  <path d="M32 35.4 q-2 2.4 -4 0.6 M32 35.4 q2 2.4 4 0.6" fill="none" stroke="#16181d" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Whiskers -->
+  <g stroke="#16181d" stroke-width="1" stroke-linecap="round" opacity="0.55">
+    <path d="M22 33 l-6 -1.5 M22 35 l-6 1"/>
+    <path d="M42 33 l6 -1.5 M42 35 l6 1"/>
+  </g>
+
+  <!-- Bell / collar -->
+  <rect x="26" y="40" width="12" height="2.4" rx="1.2" fill="#ff5a6a"/>
+  <circle cx="32" cy="43.5" r="2.6" fill="#f5b13d" stroke="#e09a1f" stroke-width="0.8"/>
+  <circle cx="32" cy="43.5" r="0.7" fill="#7a5a12"/>
+</svg>

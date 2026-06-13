@@ -1,0 +1,366 @@
+{% imports %}
+  {% from "chirp/sse.html" import sse_scope %}
+  {% from "chirpui/empty.html" import empty_state %}
+  {#- Reuse the shared star control (single source of truth) so the detail-header
+      star can never drift from the card star. -#}
+  {% from "_components/market.html" import watchlist_star %}
+{% end %}
+
+{#-
+  Market detail — hero price + signature AREA chart, depth-bar order book, live
+  trade tape (#223).
+
+  Each live region is defined TWICE:
+    * a full-page block (market_ticker / order_book / trade_tape) whose wrapper
+      div carries the canonical DOM id (market-ticker / order-book / trade-tape)
+      with NO hx-swap-oob — this is what the browser-navigation render emits;
+    * a matching *_oob fragment block that re-renders the inner body with
+      hx-swap-oob baked in, targeting the SAME id. The SSE stream (app.py) yields
+      these fragments with no per-swap Fragment target — htmx routes them via the
+      sse-swap="message" sink and applies them as OOB swaps.
+
+  The DOM ids MUST match across the pair or app.check()'s oob_target rule warns
+  and htmx silently no-ops the swap. The inner-body macros below are the single
+  source of truth so the full-page and OOB renders never drift.
+-#}
+
+{#- Hero AREA chart — the focal point. The geometry (HeroChart: line/area points
+    + up direction + per-point crosshair samples) is precomputed in page.py off
+    the candle-close series for the active timeframe, so the template only emits
+    markup — no JS charting lib. A fixed 100x36 viewBox stretched to the hero
+    (preserveAspectRatio="none"); the fill is a <polygon> closed to the baseline
+    under a per-direction CSS-token gradient (jade=up / red=down, agreeing with
+    the 24h delta). The gradient id is namespaced by symbol+direction so it never
+    collides with the landing-grid sparklines. `hero.ok` is False when there are
+    too few candles to draw — the hero then omits the SVG so it never renders an
+    empty/broken chart.
+
+    The crosshair (a vertical line + price/time tooltip) is driven by a small
+    vanilla controller (lucky-cat-shell.js) that reads the per-point samples from
+    a nonced <script type="application/json"> island — no eval, no Alpine
+    dependency, reduced-motion-safe (the line snap has no transition under
+    reduced motion). The island id is namespaced by symbol so concurrent renders
+    never collide; the data-attrs on the figure point the controller at it. -#}
+{% def hero_area(hero, symbol="") %}
+{% if (hero ?? none) is not none and hero.ok %}
+  {% set _grad = "lc-hero-" ~ symbol ~ "-" ~ ("up" if hero.up else "down") %}
+  {% set _island = "lc-chart-data-" ~ symbol %}
+  <figure class="luckycat-hero-chart-figure luckycat-spark--{{ 'up' if hero.up else 'down' }}"
+          data-luckycat-chart
+          data-chart-points="{{ _island }}"
+          tabindex="0"
+          aria-label="{{ symbol }} {{ hero.interval }} price chart — hover or focus for the price at a point">
+    <svg class="luckycat-hero-chart luckycat-spark--{{ 'up' if hero.up else 'down' }}"
+         viewBox="0 0 100 36" preserveAspectRatio="none"
+         role="img" aria-label="{{ symbol }} {{ hero.interval }} price history, {{ 'up' if hero.up else 'down' }}"
+         focusable="false">
+      <defs>
+        <linearGradient id="{{ _grad }}" x1="0" y1="0" x2="0" y2="1">
+          <stop class="luckycat-spark__stop-top" offset="0%"/>
+          <stop class="luckycat-spark__stop-bottom" offset="100%"/>
+        </linearGradient>
+      </defs>
+      <polygon class="luckycat-spark__fill" fill="url(#{{ _grad }})" points="{{ hero.area }}"/>
+      <polyline class="luckycat-hero-chart__line luckycat-spark__line" points="{{ hero.line }}"/>
+      {#- Crosshair vertical line — hidden until the controller positions it on
+          hover/focus. vector-effect keeps the 1px line crisp under the stretched
+          viewBox. -#}
+      <line class="luckycat-hero-chart__crosshair" data-luckycat-crosshair
+            x1="0" y1="0" x2="0" y2="36" hidden></line>
+    </svg>
+    {#- Tooltip — positioned by the controller; aria-hidden because the SVG
+        role="img" label already conveys the series to assistive tech. -#}
+    <figcaption class="luckycat-hero-chart__tip" data-luckycat-chart-tip hidden aria-hidden="true">
+      <span class="luckycat-hero-chart__tip-price" data-luckycat-chart-tip-price></span>
+      <span class="luckycat-hero-chart__tip-time" data-luckycat-chart-tip-time></span>
+    </figcaption>
+    {#- Nonced JSON island — the crosshair sample data ([x, y, price, label]).
+        type="application/json" is inert (never executed); csp_nonce() satisfies
+        the example's script-src even though the payload is data, not code. -#}
+    <script id="{{ _island }}" type="application/json" nonce="{{ csp_nonce() }}">{{ hero.points | tojson }}</script>
+  </figure>
+{% end %}
+{% end %}
+
+{#- Timeframe toggle — a segmented control over the hero chart. Each button
+    hx-gets the chart fragment route for its timeframe and swaps the #market-chart
+    region in place. CRITICAL: this control lives inside the boosted shell (#main:
+    hx-target=#main / hx-select=#page-content inherited from ancestors), so each
+    button MUST OVERRIDE those — hx-target="#market-chart" + hx-swap="outerHTML"
+    + hx-select="#market-chart" picks our own region out of the response (the
+    inherited #page-content isn't in the fragment, which would otherwise swap
+    EMPTY and the chart would vanish — the convert-form footgun app.check's htmx
+    rule warns about). aria-pressed marks the active timeframe. -#}
+{% def chart_toggle(symbol, active, intervals) %}
+<div class="luckycat-chart-toggle" role="group" aria-label="Chart timeframe">
+  {% for tf in intervals %}
+  <button type="button"
+          class="luckycat-chart-toggle__btn{{ ' luckycat-chart-toggle__btn--active' if tf == active else '' }}"
+          aria-pressed="{{ 'true' if tf == active else 'false' }}"
+          hx-get="/markets/{{ symbol }}/chart?tf={{ tf }}"
+          hx-target="#market-chart"
+          hx-swap="outerHTML"
+          hx-select="#market-chart">{{ tf }}</button>
+  {% end %}
+</div>
+{% end %}
+
+{#- Reusable chart-region body — the toggle + the area chart for the active
+    timeframe. Shared by the full-page block and the /chart fragment so the two
+    renders can never drift. -#}
+{% def chart_region_body(symbol, hero, active, intervals) %}
+{{ chart_toggle(symbol, active, intervals) }}
+<div class="luckycat-detail__hero-chart">
+  {{ hero_area(hero, symbol) }}
+</div>
+{% end %}
+
+{#- Reusable inner bodies — shared by the full-page block and its _oob twin so
+    the markup can never diverge. Guarded with (var ?? none) so an empty/None
+    render (e.g. a stray fragment re-render) stays inert. -#}
+
+{#- Ticker hero body — the big tabular price (the focal numeral) + a signed
+    delta pill (jade up / red down). The whole hero flashes on each SSE swap via
+    the directional flash class (the price-tick pulse); since the OOB swap
+    replaces the innerHTML the one-shot animation re-fires on every tick. -#}
+{% def ticker_body(symbol, ticker) %}
+{% if (ticker ?? none) is not none %}
+{% set up = ticker.change_pct_24h >= 0 %}
+<div class="luckycat-hero-ticker {{ 'luckycat-flash--up' if up else 'luckycat-flash--down' }}">
+  <div class="luckycat-hero-ticker__price-row">
+    <span class="luckycat-hero-ticker__price">{{ ticker.price }}</span>
+    <span class="luckycat-hero-ticker__quote chirpui-text-muted">MEOW</span>
+    <span class="luckycat-hero-ticker__delta luckycat-hero-ticker__delta--{{ 'up' if up else 'down' }}">
+      <span class="luckycat-hero-ticker__arrow" aria-hidden="true">{{ '▲' if up else '▼' }}</span>
+      {{ '+' if up else '' }}{{ ticker.change_24h }}
+      <span class="luckycat-hero-ticker__pct">({{ '+' if up else '' }}{{ ticker.change_pct_24h }}%)</span>
+    </span>
+  </div>
+  <dl class="luckycat-hero-ticker__stats">
+    <div class="luckycat-hero-stat">
+      <dt>24h high</dt><dd>{{ ticker.high_24h }}</dd>
+    </div>
+    <div class="luckycat-hero-stat">
+      <dt>24h low</dt><dd>{{ ticker.low_24h }}</dd>
+    </div>
+    <div class="luckycat-hero-stat">
+      <dt>24h volume</dt><dd>{{ ticker.volume_24h }}</dd>
+    </div>
+  </dl>
+</div>
+{% else %}
+<div class="luckycat-hero-ticker">
+  <div class="luckycat-hero-ticker__price-row">
+    <span class="chirpui-text-muted">Waiting for the lucky paw…</span>
+  </div>
+</div>
+{% end %}
+{% end %}
+
+{#- Order book — a depth-bar ladder. Each row's proportional background bar is
+    sized to its size relative to the largest level in view (--lc-depth, set
+    inline per row), so the bars read as honest liquidity depth. Bids fill from
+    the right inward (jade), asks from the left (red), mirroring a centered book.
+    The CSS carries a descending-ladder fallback for --lc-depth, but the inline
+    value below is the real proportional size. -#}
+{% def book_body(book) %}
+{% if (book ?? none) is not none %}
+{% set _bid_max = (book.bids | map(attribute="size") | max) if (book.bids | length) > 0 else 1 %}
+{% set _ask_max = (book.asks | map(attribute="size") | max) if (book.asks | length) > 0 else 1 %}
+<div class="luckycat-orderbook">
+  <div class="luckycat-orderbook__head luckycat-orderbook__row chirpui-text-muted chirpui-font-sm">
+    <span>Bids (size)</span>
+    <span>Asks (size)</span>
+  </div>
+  {% for i in range(book.bids | length) %}
+  {% set bid = book.bids[i] %}
+  {% set ask = book.asks[i] if i < (book.asks | length) else none %}
+  <div class="luckycat-orderbook__rowpair">
+    <div class="luckycat-orderbook__row luckycat-orderbook__row--bid"
+         style="--lc-depth: {{ ((bid.size / _bid_max) * 100) | round(1) }}%;">
+      <span class="luckycat-orderbook__price">{{ bid.price }}</span>
+      <span class="luckycat-orderbook__size">{{ bid.size }}</span>
+    </div>
+    {% if (ask ?? none) is not none %}
+    <div class="luckycat-orderbook__row luckycat-orderbook__row--ask"
+         style="--lc-depth: {{ ((ask.size / _ask_max) * 100) | round(1) }}%;">
+      <span class="luckycat-orderbook__price">{{ ask.price }}</span>
+      <span class="luckycat-orderbook__size">{{ ask.size }}</span>
+    </div>
+    {% end %}
+  </div>
+  {% end %}
+</div>
+{% else %}
+<div class="luckycat-orderbook">
+  <p class="chirpui-text-muted luckycat-orderbook__empty">No book yet. 🐾</p>
+</div>
+{% end %}
+{% end %}
+
+{#- Trade tape — newest first. The top (newest) row carries a directional flash
+    so the freshest print pulses jade/red on each SSE swap (the innerHTML replace
+    re-fires the one-shot animation), while older rows stay calm. -#}
+{% def tape_body(trades) %}
+{% if (trades ?? none) is not none and (trades | length) > 0 %}
+<div class="luckycat-tape">
+  {% for trade in trades %}
+  <div class="luckycat-tape__row luckycat-tape__row--{{ trade.side }}{{ ' luckycat-tape__row--fresh' if loop.first else '' }}">
+    <span class="luckycat-tape__price">{{ trade.price }}</span>
+    <span class="luckycat-tape__size chirpui-text-muted">{{ trade.size }}</span>
+    <span class="luckycat-tape__side chirpui-font-sm">{{ trade.side | upper }}</span>
+  </div>
+  {% end %}
+</div>
+{% else %}
+<div class="luckycat-tape">
+  <p class="chirpui-text-muted luckycat-tape__empty">No trades yet. 🐾</p>
+</div>
+{% end %}
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-detail">
+  {#- FOOTGUN #1: the header star is a SIBLING of the back <a> and the <h1>, NOT
+      nested in any anchor. It sits in its own .luckycat-detail__star slot. -#}
+  <header class="luckycat-detail__header">
+    <a class="luckycat-detail__back chirpui-font-sm" href="/">← Markets</a>
+    <h1 class="luckycat-detail__title">
+      <span class="luckycat-detail__cat" aria-hidden="true">🐱</span>
+      {{ symbol }}
+    </h1>
+    <span class="luckycat-detail__star">
+      {{ watchlist_star(symbol, symbol in (watchlist_starred | default(()))) }}
+    </span>
+  </header>
+
+  {#- HERO — the big tabular price + signed delta over the signature gradient
+      AREA chart (the focal point). The #market-ticker wrapper is the OOB target;
+      its inner body is what market_ticker_oob re-renders on each SSE tick. The
+      hero chart is a one-shot snapshot of the warmed candles, so it lives in the
+      shell (outside the OOB region) — it does not re-stream per tick. -#}
+  <section class="luckycat-detail__hero" aria-label="Live price for {{ symbol }}">
+    {% block market_ticker %}
+    <div id="market-ticker" class="luckycat-detail__hero-head" aria-live="polite">
+      {{ ticker_body(symbol, ticker) }}
+    </div>
+    {% end %}
+    {#- #market-chart is the timeframe-toggle swap target. The toggle buttons
+        hx-get /markets/{symbol}/chart and swap THIS region (outerHTML), so the
+        region carries the canonical id; the /chart route returns the
+        chart_region fragment which re-emits the same #market-chart wrapper. The
+        chart is a one-shot snapshot (it does NOT re-stream per SSE tick), so it
+        lives in the shell outside the SSE OOB regions. -#}
+    {% block market_chart %}
+    <div id="market-chart" class="luckycat-detail__chart">
+      {{ chart_region_body(symbol, hero_chart, chart_interval | default("1H"), chart_intervals | default(())) }}
+    </div>
+    {% end %}
+  </section>
+
+  <div class="luckycat-detail__grid">
+    <section class="luckycat-detail__panel">
+      <h2 class="luckycat-detail__panel-title">Order book</h2>
+      {% block order_book %}
+      <div id="order-book" class="luckycat-detail__book" aria-live="polite"
+           aria-label="Order book for {{ symbol }}">
+        {{ book_body(book) }}
+      </div>
+      {% end %}
+    </section>
+
+    <section class="luckycat-detail__panel">
+      <h2 class="luckycat-detail__panel-title">Trade tape</h2>
+      {% block trade_tape %}
+      <div id="trade-tape" class="luckycat-detail__tape" aria-live="polite"
+           aria-label="Recent trades for {{ symbol }}">
+        {{ tape_body(trades) }}
+      </div>
+      {% end %}
+    </section>
+  </div>
+
+  {#- Market info — a static meta panel. The inner-rail "this market" lane ships
+      an Info anchor (#info); this is its real scroll target (without it the
+      anchor was a dead-end jump-to-nowhere). base/quote/display_name come from
+      the Market def threaded in by page.py. -#}
+  <section id="info" class="luckycat-detail__panel luckycat-detail__info"
+           aria-label="Market info for {{ symbol }}">
+    <h2 class="luckycat-detail__panel-title">Info</h2>
+    {% if (market ?? none) is not none %}
+    <dl class="luckycat-detail__info-grid">
+      <div class="luckycat-detail__info-row">
+        <dt>Market</dt><dd>{{ market.display_name }}</dd>
+      </div>
+      <div class="luckycat-detail__info-row">
+        <dt>Pair</dt><dd>{{ market.base }}/{{ market.quote }}</dd>
+      </div>
+      <div class="luckycat-detail__info-row">
+        <dt>Base</dt><dd>{{ market.base }}</dd>
+      </div>
+      <div class="luckycat-detail__info-row">
+        <dt>Quote</dt><dd>{{ market.quote }}</dd>
+      </div>
+    </dl>
+    <p class="luckycat-detail__info-note chirpui-text-muted chirpui-font-sm">
+      Prices are a deterministic simulation. Trades settle in $MEOW — demo only,
+      no real funds. 🐾
+    </p>
+    {% else %}
+    <p class="chirpui-text-muted chirpui-font-sm">No market info available. 🐾</p>
+    {% end %}
+  </section>
+
+  {#- Open the live SSE channel for this market. hx-disinherit keeps the OOB
+      fragments from being swapped into #main. -#}
+  {{ sse_scope("/markets/" ~ symbol ~ "/stream") }}
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}
+
+{#- ----------------------------------------------------------------------------
+    OOB fragment blocks for the SSE stream. Each bakes hx-swap-oob="innerHTML"
+    onto the SAME DOM id as its full-page twin so it can be yielded as a bare
+    Fragment (no target) and applied as an OOB swap by htmx's SSE extension.
+    ---------------------------------------------------------------------------- -#}
+
+{% fragment market_ticker_oob %}
+{% if (ticker ?? none) is not none %}
+<div id="market-ticker" hx-swap-oob="innerHTML">
+  {{ ticker_body(symbol ?? "", ticker) }}
+</div>
+{% end %}
+{% endfragment %}
+
+{% fragment order_book_oob %}
+{% if (book ?? none) is not none %}
+<div id="order-book" hx-swap-oob="innerHTML">
+  {{ book_body(book) }}
+</div>
+{% end %}
+{% endfragment %}
+
+{% fragment trade_tape_oob %}
+{% if (trades ?? none) is not none %}
+<div id="trade-tape" hx-swap-oob="innerHTML">
+  {{ tape_body(trades) }}
+</div>
+{% end %}
+{% endfragment %}
+
+{#- Chart-region fragment — returned by GET /markets/{symbol}/chart?tf=. The
+    timeframe-toggle buttons hx-select="#market-chart" out of this response and
+    swap it outerHTML in place. It re-emits the SAME #market-chart wrapper +
+    chart_region_body the full-page block renders, so the toggle and the initial
+    paint can never drift. This is a normal targeted swap (NOT hx-swap-oob): the
+    button carries the target/swap/select, so the fragment carries no OOB attr. -#}
+{% fragment chart_region %}
+<div id="market-chart" class="luckycat-detail__chart">
+  {{ chart_region_body(symbol ?? "", hero_chart, chart_interval | default("1H"), chart_intervals | default(())) }}
+</div>
+{% endfragment %}
