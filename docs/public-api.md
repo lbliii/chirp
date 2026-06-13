@@ -48,7 +48,7 @@ shape may still evolve before 1.0:
 | HTTP/request helpers | `RequestUrlScope` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
-| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals `signal` / `signal_block` / `signal_connect`; the auto-registered `/_chirp/live` merge stream; `app.check()` categories `signal_dead_binding` (ERROR) / `signal_orphan` (INFO) |
+| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals `signal()` / `signal_block()` / `signal_connect()`; the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) categories |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
