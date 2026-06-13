@@ -79,5 +79,9 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
+# Nested working checkouts (separate git repos parked inside this worktree —
+# not part of Chirp; keep them out of ruff's git-aware scan / status noise).
+ovrtx/
+
 # uv
 uv.lock

@@ -16,6 +16,18 @@ from .types import ContractIssue, Severity
 
 _SSE_SWAP_VALUE_PATTERN = re.compile(r'\bsse-swap\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 
+#: Kida ({# … #}, including {#- -#}) and HTML (<!-- … -->) comments. An
+#: sse-connect / sse-swap that appears only inside a comment is illustrative
+#: documentation, not a real element — scanning it yields false positives (e.g.
+#: an unmitigated sse-connect shown in a how-it-works comment flagged as an
+#: ERROR). Strip comments before any element scan.
+_TEMPLATE_COMMENT_PATTERN = re.compile(r"\{#.*?#\}|<!--.*?-->", re.DOTALL)
+
+
+def strip_template_comments(source: str) -> str:
+    """Remove Kida + HTML comments so element scans ignore illustrative markup."""
+    return _TEMPLATE_COMMENT_PATTERN.sub("", source)
+
 
 def normalize_sse_url(url: str) -> str:
     """Replace Kida expressions so route-pattern matching still works."""
@@ -23,8 +35,9 @@ def normalize_sse_url(url: str) -> str:
 
 
 def extract_sse_swap_values(source: str) -> set[str]:
-    """Extract all sse-swap event names from source."""
-    return {match.group(1) for match in _SSE_SWAP_VALUE_PATTERN.finditer(source)}
+    """Extract all sse-swap event names from source (comments stripped)."""
+    stripped = strip_template_comments(source)
+    return {match.group(1) for match in _SSE_SWAP_VALUE_PATTERN.finditer(stripped)}
 
 
 def _call_name(node: ast.expr) -> str | None:
@@ -87,6 +100,7 @@ def check_sse_self_swap(template_sources: dict[str, str]) -> list[ContractIssue]
     """Error when sse-swap appears on same element as sse-connect."""
     issues: list[ContractIssue] = []
     for template_name, source in template_sources.items():
+        source = strip_template_comments(source)
         for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
             attrs_lower = match.group("attrs").lower()
             if "sse-swap" not in attrs_lower:
@@ -120,6 +134,7 @@ def check_sse_connect_scope(
     for template_name, source in template_sources.items():
         if template_name.startswith("chirp/"):
             continue
+        source = strip_template_comments(source)
         for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
             attrs_lower = match.group("attrs").lower()
             if "hx-disinherit" in attrs_lower:
@@ -168,6 +183,7 @@ def check_sse_event_crossref(
     static_routes, parametric_routes = build_route_index(route_paths)
 
     for template_name, source in template_sources.items():
+        source = strip_template_comments(source)
         swap_values = extract_sse_swap_values(source)
         if not swap_values:
             continue

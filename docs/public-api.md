@@ -48,6 +48,7 @@ shape may still evolve before 1.0:
 | HTTP/request helpers | `RequestUrlScope` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
+| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals `signal` / `signal_block` / `signal_connect`; the auto-registered `/_chirp/live` merge stream; `app.check()` categories `signal_dead_binding` (ERROR) / `signal_orphan` (INFO) |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
@@ -68,6 +69,7 @@ hardens and documents that surface:
 | Suspense sentinels | Keep provisional | They expose render-pipeline internals for templates and checkers. |
 | HTMX details and `STOP_POLLING` | Keep provisional | Header parsing and polling semantics need their own public contract before stabilization. |
 | Reactive pages | Keep provisional | The free-threaded event story is tested, but the app-author API and examples are still settling. |
+| Signals (server reactive values) | Keep provisional | The single-node `signal()`/`@app.derived` surface ships, but the multi-worker `SignalBus` backplane + the pure-derived contract are still in design (see `plan/drafted/rfc-live-sse-topics.md` §12). |
 | Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
 | Tool registry/events | Keep provisional | MCP/tool integration is useful but young compared with the core hypermedia surface. |
 | Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |

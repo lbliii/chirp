@@ -509,6 +509,114 @@ class App:
 
         return decorator
 
+    def _signal_registry(self) -> Any:
+        """Return the app's signal registry, creating it on first use."""
+        from chirp.realtime.signals import SignalRegistry
+
+        registry = self._mutable_state.signal_registry
+        if registry is None:
+            registry = SignalRegistry()
+            self._mutable_state.signal_registry = registry
+        return registry
+
+    def signal(
+        self,
+        name: str,
+        *,
+        source: Callable[[], Any] | None = None,
+        initial: Callable[[], Any] | None = None,
+        render: Callable[[Any], str] | None = None,
+        coalesce: bool = True,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Declare a live ``signal`` — one server value, fanned out to many bindings.
+
+        A signal is a server-owned named value bound in templates with
+        ``{{ signal('name') }}``. Every binding stays in sync from a single shared
+        SSE connection (``/_chirp/live``, auto-registered at freeze when any
+        signal exists). The same name can live in the topbar *and* a modal — a
+        cardinality plain OOB cannot express.
+
+        Use the decorated function as the signal's async ``source`` (each yielded
+        value is rendered and emitted as ``event: name``), or pass ``source=`` for
+        a push-only signal driven by :meth:`emit`::
+
+            @app.signal("balance", initial=wallet.balance)
+            async def balance():
+                async for amount in wallet.watch():
+                    yield f"{amount:,}"
+
+        ``initial`` seeds the SSR value (no empty-then-fill flash); ``render`` maps
+        a value to its HTML/text payload (defaults to ``str``); ``coalesce``
+        (default ``True``) is latest-wins/drop-safe. Setup-only.
+        """
+        from chirp.realtime.signals import SignalSpec
+
+        self._check_not_frozen()
+        registry = self._signal_registry()
+
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            registry.register(
+                SignalSpec(
+                    name=name,
+                    source=source if source is not None else fn,
+                    initial=initial,
+                    render=render,
+                    coalesce=coalesce,
+                )
+            )
+            return fn
+
+        return decorator
+
+    def derived(
+        self,
+        name: str,
+        *,
+        on: tuple[str, ...],
+        render: Callable[[Any], str] | None = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Declare a *derived* signal recomputed from other signals.
+
+        The decorated ``compute`` function receives the current values of the
+        ``on`` dependencies (positionally, in declaration order) and returns the
+        derived value. It recomputes and re-emits on **any** dependency change::
+
+            @app.derived("net_worth", on=("balance", "holdings"))
+            def net_worth(balance, holdings):
+                return balance + holdings
+
+        Bind it like any signal: ``{{ signal('net_worth') }}``. Setup-only.
+        """
+        from chirp.realtime.signals import DerivedSpec
+
+        self._check_not_frozen()
+        registry = self._signal_registry()
+
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            registry.register_derived(
+                DerivedSpec(name=name, deps=tuple(on), compute=fn, render=render)
+            )
+            return fn
+
+        return decorator
+
+    def emit(self, name: str, value: Any) -> None:
+        """Push a new *value* for signal *name*, fanning it out to every binding.
+
+        The imperative push API: a mutation handler emits the new value and every
+        ``{{ signal(name) }}`` binding updates from the shared connection. Derived
+        signals depending on *name* recompute and re-emit automatically. Safe to
+        call from any thread. Raises ``KeyError`` if *name* is not registered.
+        """
+        registry = self._mutable_state.signal_registry
+        if registry is None:
+            msg = (
+                f"signal {name!r} is not registered; declare it with "
+                "@app.signal or @app.derived before emitting"
+            )
+            raise KeyError(msg)
+        registry.emit(name, value)
+
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.
 
@@ -871,5 +979,10 @@ class App:
             debug_wiring=self._runtime_state.debug_wiring,
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),
+            signal_names=(
+                self._mutable_state.signal_registry.names
+                if self._mutable_state.signal_registry is not None
+                else frozenset()
+            ),
             schema=schema,
         )
