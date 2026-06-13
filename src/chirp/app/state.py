@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
     from chirp.live_blocks import LiveBlockSpec
+    from chirp.realtime.signals import SignalRegistry
 
 
 @dataclass(slots=True)
@@ -166,6 +167,11 @@ class MutableAppState:
     freeze_param_providers: dict[str, Callable[..., Any]] = field(default_factory=dict)
     freeze_exclude: set[str] = field(default_factory=set)
     live_blocks: dict[tuple[str, str], LiveBlockSpec] = field(default_factory=dict)
+    #: Registry of ``@app.signal`` / ``@app.derived`` declarations. Holds the
+    #: signal + derived spec maps, the SSR value cache, and the fan-out bus.
+    #: Lazily created on first ``@app.signal``/``@app.derived`` so apps with no
+    #: signals never construct a ``ReactiveBus``.
+    signal_registry: SignalRegistry | None = None
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
     #: Set when this app has been consumed by another app's ``mount_app``.
     #: Subsequent ``freeze()``/``run()`` raise rather than produce a stale
@@ -223,6 +229,11 @@ class ContractCheckSnapshot:
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
+    #: Names of every registered ``@app.signal`` / ``@app.derived`` producer.
+    #: The signal dead-binding check validates ``sse-swap`` listeners against
+    #: this explicit producer set (AST inference is insufficient — signal names
+    #: are dynamic by nature). Empty when no signals are registered.
+    signal_names: frozenset[str] = field(default_factory=frozenset)
     #: Declared database schema parsed from migrations (or live-introspected),
     #: or ``None`` for HTML-only / db-less apps. Source for the ``data`` shape
     #: contract; keeps the typed-SQL column-mapping check no-op without a db.

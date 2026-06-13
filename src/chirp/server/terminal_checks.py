@@ -197,6 +197,8 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "sse_crossref": "OOB / Suspense / SSE",
     "live_block_unknown": "OOB / Suspense / SSE",
     "live_block_unreachable_route": "OOB / Suspense / SSE",
+    "signal_dead_binding": "OOB / Suspense / SSE",
+    "signal_orphan": "OOB / Suspense / SSE",
     # Forms / layouts / accessibility
     "form": "Forms",
     "form_contract": "Forms",
