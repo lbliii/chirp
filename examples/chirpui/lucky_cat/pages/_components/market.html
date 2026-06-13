@@ -1,0 +1,159 @@
+{#- Reusable market-card components — the single source of truth for the market
+    grid + per-card sparkline + the watchlist star, shared by the landing
+    (page.html), the /watchlist page, and the market-detail header. Lives in
+    _components/ (NOT page.html) so importing these macros never evaluates a
+    page's top-level blocks (which reference per-route context like `markets`).
+
+    The /watchlist/toggle route returns the watchlist_star_swap + watchlist_count
+    twins; the star fragment lives here so both the route and the templates share
+    one definition. -#}
+
+{#- Signature gradient sparkline — a lightweight SVG area chart drawn entirely
+    server-side. The geometry (`spark.line` polyline points + `spark.area` fill
+    path + `spark.up` direction) is precomputed in _context.py from a market's
+    candle-close series, so the template only emits markup — no JS charting lib.
+
+    A fixed 100×36 viewBox stretched to the card (preserveAspectRatio="none"); the
+    fill is a <polygon> closed to the baseline under a per-direction CSS-token
+    gradient (jade=up / red=down, so the chart agrees with the 24h delta pill). The
+    gradient id is namespaced by symbol+direction so multiple cards never collide.
+    `spark.ok` is False when there are too few points to draw — the card omits the
+    SVG so it never renders an empty/broken chart. -#}
+{% def sparkline(spark, symbol="") %}
+{% if (spark ?? none) is not none and spark.ok %}
+  {% set _grad = "lc-spark-" ~ symbol ~ "-" ~ ("up" if spark.up else "down") %}
+  <svg class="luckycat-spark luckycat-spark--{{ 'up' if spark.up else 'down' }}"
+       viewBox="0 0 100 36" preserveAspectRatio="none"
+       role="img" aria-label="{{ symbol }} recent price trend, {{ 'up' if spark.up else 'down' }}"
+       focusable="false">
+    <defs>
+      <linearGradient id="{{ _grad }}" x1="0" y1="0" x2="0" y2="1">
+        <stop class="luckycat-spark__stop-top" offset="0%"/>
+        <stop class="luckycat-spark__stop-bottom" offset="100%"/>
+      </linearGradient>
+    </defs>
+    <polygon class="luckycat-spark__fill" fill="url(#{{ _grad }})" points="{{ spark.area }}"/>
+    <polyline class="luckycat-spark__line" points="{{ spark.line }}"/>
+  </svg>
+{% end %}
+{% end %}
+
+{#- WATCHLIST STAR — the per-market star toggle. The single source of truth for
+    BOTH the initial paint (on every market card + the detail header) and the
+    /watchlist/toggle OOB twin (watchlist_star_swap below), so the markup can
+    never drift. The star (★ when starred / ☆ when not) is gold (--lc-gold) when
+    active; aria-pressed conveys the toggle state to assistive tech.
+
+    FOOTGUN #1 (nested interactive): this control MUST be a SIBLING of the card
+    <a href="/markets/{symbol}">, never a descendant — a <button> inside an <a>
+    is invalid HTML and hijacks navigation. Callers place it next to the card <a>
+    inside a position:relative wrapper (the star is absolutely positioned over a
+    corner via CSS).
+
+    FOOTGUN #2 (boosted-shell hx-select): the control lives inside the boosted
+    app-shell (#main / hx-select=#page-content / hx-target=#main inherited from
+    ancestors). A local OOB swap MUST override that on the toggling element, or
+    the toggle triggers a full page-content swap. So the button sets
+    hx-target=#main (placeholder), hx-swap="none", and hx-select="#watchlist-star-{symbol}"
+    — picking its OWN fragment out of the response so #main never churns; the two
+    baked OOB twins (star + count) apply via htmx's hx-swap-oob scan. (hx-disinherit
+    is the WRONG lever — it only affects descendants, not self-inheritance.)
+
+    `oob` is True only for the twin: it bakes id + hx-swap-oob="outerHTML" so htmx
+    replaces the whole button (flipping aria-pressed + the glyph). The initial
+    paint carries the id (the OOB target) but no hx-swap-oob attribute. -#}
+{% def watchlist_star(symbol, starred=false, oob=false) %}
+{% set _starred = starred ?? false %}
+<button type="button"
+        id="watchlist-star-{{ symbol }}"
+        {% if oob %}hx-swap-oob="outerHTML"{% end %}
+        class="luckycat-watchlist-star{{ ' is-starred' if _starred else '' }}"
+        aria-pressed="{{ 'true' if _starred else 'false' }}"
+        aria-label="{{ 'Remove ' ~ symbol ~ ' from watchlist' if _starred else 'Add ' ~ symbol ~ ' to watchlist' }}"
+        title="{{ 'Starred — in your watchlist' if _starred else 'Add to watchlist' }}"
+        hx-post="{{ url_for('watchlist.toggle') }}"
+        hx-vals='{"symbol": "{{ symbol }}"}'
+        hx-target="#main"
+        hx-swap="none"
+        hx-select="#watchlist-star-{{ symbol }}">
+  <span class="luckycat-watchlist-star__glyph" aria-hidden="true">{{ '★' if _starred else '☆' }}</span>
+</button>
+{% end %}
+
+{#- OOB twin for one star — the /watchlist/toggle route returns this (primary).
+    render_fragment emits the block verbatim with no OOB wrapping, so the button
+    bakes its own #watchlist-star-{symbol} id + hx-swap-oob="outerHTML" (oob=true)
+    so htmx replaces the whole control in place (the aria-pressed + glyph flip). -#}
+{% fragment watchlist_star_swap %}
+{{ watchlist_star(symbol ?? "", starred ?? false, oob=true) }}
+{% endfragment %}
+
+{#- OOB card-removal twin — appended by /watchlist/toggle ONLY when the toggle
+    originated on /watchlist AND resulted in unstarred, so the now-unstarred card
+    leaves the starred-only grid live (the "one-glance starred view" promise). It
+    bakes the #luckycat-card-{symbol} id + hx-swap-oob="delete": htmx removes the
+    matching cell. Fail-loud-friendly: the id only exists on the grid pages, so on
+    a detail page the delete simply finds no target (a harmless no-op), mirroring
+    the cancel route's orders_table_oob. -#}
+{% fragment watchlist_card_remove %}
+<div id="luckycat-card-{{ symbol ?? '' }}" hx-swap-oob="delete"></div>
+{% endfragment %}
+
+{#- One market card — the single source of truth for a card on BOTH the landing
+    grid and the /watchlist page, so the card markup + star can never drift. The
+    full-card <a href="/markets/{symbol}"> and the star <button> are SIBLINGS
+    inside a position:relative .luckycat-market-card-cell wrapper (FOOTGUN #1:
+    the star is NEVER a descendant of the card <a>). `starred` lights the star
+    gold + sets aria-pressed. -#}
+{% def market_card(market, t, spark, starred=false) %}
+{% set _up = (t ?? none) is not none and t.change_pct_24h >= 0 %}
+{#- The per-symbol cell id is the OOB-delete target for the unstar-on-/watchlist
+    polish: when a user unstars a market WHILE on /watchlist, the toggle route
+    appends a third OOB fragment that removes THIS cell (hx-swap-oob="delete") so
+    the now-unstarred card leaves the starred-only grid live. The id only exists
+    on the grid pages, so that delete is a harmless no-op on a detail page (the
+    OOB fail-loud delete simply finds no target there) — same pattern the cancel
+    route uses for orders_table_oob. -#}
+<div id="luckycat-card-{{ market.symbol }}" class="luckycat-market-card-cell">
+  <a class="luckycat-market-card{{ ' luckycat-market-card--up' if _up else ' luckycat-market-card--down' }}"
+     href="/markets/{{ market.symbol }}">
+    <span class="luckycat-market-card__top">
+      <span class="luckycat-market-card__id">
+        <span class="luckycat-market-card__sym">{{ market.symbol }}</span>
+        <span class="luckycat-market-card__name chirpui-text-muted">{{ market.display_name }}</span>
+      </span>
+      {% if (t ?? none) is not none %}
+      <span class="luckycat-market-card__change {{ 'is-up' if t.change_pct_24h >= 0 else 'is-down' }}">
+        <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if t.change_pct_24h >= 0 else '▼' }}</span>
+        {{ '+' if t.change_pct_24h >= 0 else '' }}{{ t.change_pct_24h }}%
+      </span>
+      {% end %}
+    </span>
+
+    {% if (t ?? none) is not none %}
+    <span class="luckycat-market-card__price">{{ t.price }}<span class="luckycat-market-card__unit chirpui-text-muted">{{ market.quote }}</span></span>
+    {% else %}
+    <span class="luckycat-market-card__pair chirpui-text-muted chirpui-font-sm">{{ market.base }}/{{ market.quote }}</span>
+    {% end %}
+
+    <span class="luckycat-market-card__spark">
+      {{ sparkline(spark, market.symbol) }}
+    </span>
+  </a>
+  {{ watchlist_star(market.symbol, starred) }}
+</div>
+{% end %}
+
+{#- The full markets grid — the single source of truth for BOTH the landing grid
+    and the /watchlist page. `markets` is the (possibly filtered) market list;
+    `tickers` / `sparklines` key off symbol; `starred` is the immutable starred
+    set the per-card star reads. The grid id defaults to #markets-grid (the
+    landing) but the watchlist page passes its own. -#}
+{% def market_grid(markets, tickers, sparklines, starred=(), grid_id="markets-grid") %}
+<div id="{{ grid_id }}" class="luckycat-markets-grid">
+  {% set _starred_set = starred ?? () %}
+  {% for market in markets %}
+  {{ market_card(market, (tickers ?? {}).get(market.symbol, none), (sparklines ?? {}).get(market.symbol, none), market.symbol in _starred_set) }}
+  {% end %}
+</div>
+{% end %}

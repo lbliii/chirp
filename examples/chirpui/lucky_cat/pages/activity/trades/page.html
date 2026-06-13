@@ -1,0 +1,39 @@
+{% imports %}
+  {% from "_components/fills_table.html" import fills_table %}
+{% end %}
+
+{#- Activity → Trades. The fill log from trade_store, newest first, framed as the
+    trade-side activity filter and rendered through the shared fills_table macro
+    (the same table the Portfolio → History view uses). Composes into the
+    chirp-ui shell content block. -#}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🔁</span>
+      Trade activity
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Buys and sells, newest first. Every paw-print is logged here.
+    </p>
+  </header>
+
+  {% set rows = fills | default(()) %}
+  <section class="luckycat-pf-card luckycat-pf-card--wide" aria-label="Trade activity">
+    <p class="luckycat-subpage-summary">
+      <span class="luckycat-subpage-summary__count">{{ rows | length }}</span>
+      <span class="chirpui-text-muted">trades logged</span>
+    </p>
+    {{ fills_table(
+        rows=rows,
+        empty_title="No trades yet",
+        empty_message="Place an order on the Trade page and your fills show up here.") }}
+  </section>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

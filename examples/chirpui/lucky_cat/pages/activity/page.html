@@ -1,0 +1,80 @@
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+{% end %}
+
+{#- Activity landing — the MERGED feed. Deposits (wallet.deposits) and fills
+    (trade_store.history) interleaved by ts, newest first, in the dense
+    .luckycat-fills table the Activity sub-pages already use: a leading mono time
+    column, a jade/red directional side pill, right-aligned Geist Mono figures.
+    A deposit row and a fill row read distinctly (DEPOSIT vs BUY/SELL pill,
+    different columns) while sharing the table chrome, so the landing and its
+    two split-out sub-pages read like one exchange. The polished maneki empty
+    state shows ONLY when both sources are empty. Composes into the chirp-ui
+    shell content block. -#}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🧾</span>
+      Activity
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Deposits and fills together, newest first. Split them out under Deposits and Trades.
+    </p>
+  </header>
+
+  {% set merged = rows | default(()) %}
+  <section class="luckycat-pf-card luckycat-pf-card--wide" aria-label="Activity feed">
+    <p class="luckycat-subpage-summary">
+      <span class="luckycat-subpage-summary__count">{{ merged | length }}</span>
+      <span class="chirpui-text-muted">events logged · deposits and fills</span>
+    </p>
+    {% if (merged | length) > 0 %}
+    <table class="luckycat-fills">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>Detail</th>
+          <th class="luckycat-fills__num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in merged %}
+        {% if r.kind == "deposit" %}
+        <tr class="luckycat-fills__row luckycat-fills__row--deposit">
+          <td class="luckycat-fills__time">{{ r.when }}</td>
+          <td>
+            <span class="luckycat-fills__side luckycat-fills__side--buy">DEPOSIT</span>
+          </td>
+          <td class="chirpui-text-muted">House-token credit · balance {{ r.balance_after }} $MEOW</td>
+          <td class="luckycat-fills__num">+{{ r.amount }} $MEOW</td>
+        </tr>
+        {% else %}
+        <tr class="luckycat-fills__row luckycat-fills__row--fill">
+          <td class="luckycat-fills__time">{{ r.when }}</td>
+          <td>
+            <span class="luckycat-fills__side luckycat-fills__side--{{ r.side }}">{{ r.side | upper }}</span>
+          </td>
+          <td class="luckycat-fills__sym">{{ r.symbol }} · {{ r.size }} @ {{ r.price }}</td>
+          <td class="luckycat-fills__num">{{ r.notional }} $MEOW</td>
+        </tr>
+        {% end %}
+        {% end %}
+      </tbody>
+    </table>
+    {% else %}
+    {% call empty_state(icon="list", title="No activity yet") %}
+    <p>Top up with the <strong>Deposit $MEOW</strong> action in the top bar, or place an order on the Trade page — deposits and fills both land here, newest first.</p>
+    <p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+    {% end %}
+    {% end %}
+  </section>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

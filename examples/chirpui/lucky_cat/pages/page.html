@@ -1,0 +1,89 @@
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/modal.html" import modal %}
+  {#- Market grid + sparkline + watchlist star — the single source of truth for
+      the card markup, shared by this landing, the /watchlist page, and the
+      market-detail header (see _components/market.html). -#}
+  {% from "_components/market.html" import market_grid %}
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🐱</span>
+      Markets
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      May the lucky paw move your charts. Trades settle in $MEOW.
+    </p>
+  </header>
+
+  {% block markets_grid %}
+  {% unless markets %}
+  <div id="markets-grid" class="luckycat-markets-grid">
+    {% call empty_state(icon="diamond", title="No markets open yet") %}
+    <p>The trading floor is being set up. Markets arrive with the SimFeed.</p>
+    <p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+    {% end %}
+  </div>
+  {% else %}
+  {{ market_grid(markets, tickers, sparklines, watchlist_starred | default(())) }}
+  {% end %}
+  {% end %}
+</div>
+{% end %}
+{% end %}
+
+{#- #230: deposit modal + click delegator live in the page-content region, NOT
+    the layout — page templates injected into `content` cannot add page_scripts
+    (composition rule), so anything inline ships inside #page-root. The topbar's
+    data-action="deposit" button (rendered by chirpui/shell_actions.html from the
+    root _context.py) opens this dialog; the form POSTs to /deposit and the route
+    app.emit('balance', …) fans the new balance out over the one /_chirp/live
+    signal connection — every {{ signal('balance') }} binding (the topbar token +
+    the Trade buying-power line) swaps together, no OOB twin. CSRF is covered
+    twice: the app-shell layout injects X-CSRF-Token on htmx:configRequest (htmx
+    path) and csrf_field() adds the hidden input (plain-POST fallback). -#}
+{% call modal("deposit-modal", title="Deposit $MEOW") %}
+<form id="deposit-form" class="chirpui-stack chirpui-stack--sm"
+      hx-post="{{ url_for('deposit') }}" hx-swap="none"
+      hx-disabled-elt="find button"
+      hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
+  {{ csrf_field() }}
+  {#- NOTE: no `{{ signal('balance') }}` binding here. A signal sink inside a
+      <dialog> that is closed at page load (then promoted to the top layer on
+      showModal()) does NOT receive htmx-ext-sse swaps — it would show a stale
+      load-time balance. The declare-once/bind-many showcase lives in normal DOM
+      flow instead: the topbar token + the Trade page "buying power" line both
+      bind {{ signal('balance') }} and update together over /_chirp/live. -#}
+  <div class="chirpui-field">
+    <label class="chirpui-field__label" for="deposit-amount">Amount ($MEOW)</label>
+    <input id="deposit-amount" class="chirpui-field__input" type="number" name="amount"
+           min="1" step="1" value="100" inputmode="numeric" required>
+  </div>
+  <p class="chirpui-text-muted chirpui-font-sm">
+    The lucky paw credits your house balance instantly. Demo only — no real funds.
+  </p>
+  <div class="chirpui-form-actions chirpui-form-actions--end">
+    <button type="button" class="chirpui-btn chirpui-btn--ghost" onclick="this.closest('dialog').close()">Cancel</button>
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Deposit</button>
+  </div>
+</form>
+{% end %}
+
+<script nonce="{{ csp_nonce() }}">
+/* #230: open the deposit dialog when the topbar's data-action="deposit" button
+   is clicked (the kanban data-action -> showModal delegator). Bound on body so
+   it survives boosted/OOB swaps that replace #page-root. */
+document.body.addEventListener("click", function (event) {
+  if (event.target.closest('[data-action="deposit"]')) {
+    document.getElementById("deposit-modal")?.showModal();
+  }
+});
+</script>
+</div>
+{% end %}

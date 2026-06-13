@@ -1,0 +1,106 @@
+{#- Trade → Convert. A simple "convert $MEOW into a market" form. To avoid a
+    second mutating route, it posts (plain, non-htmx) to the existing #225
+    trade.order route as a market BUY — a clean submit fills via the thread-safe
+    try_place_order path and gets the FormAction 303 redirect back to /trade.
+    CSRF-protected (csrf_field). Composes into the chirp-ui shell content block. -#}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">💱</span>
+      Convert
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Turn $MEOW into a market at the current price. One-tap, market-fill.
+    </p>
+  </header>
+
+  <div class="luckycat-trade-layout">
+    <section class="luckycat-trade-panel" aria-label="Convert">
+      <h2 class="luckycat-trade-panel__title">Convert $MEOW</h2>
+      {#- Self-contained convert form. Posts to its OWN trade.convert route so a
+          validation error re-renders THIS form (with errors) rather than the spot
+          order_form. htmx swaps #convert-form in place (422); a plain POST gets a
+          shell-bearing redirect back to this page. A clean fill redirects to /trade. -#}
+      {% block convert_form %}
+      {#- This form lives inside the boosted shell (#main: hx-boost, hx-target=#main,
+          hx-select=#page-content). htmx INHERITS those from ancestors, so we must
+          OVERRIDE them on the form itself: hx-select="#convert-form" picks our own
+          fragment out of the response (the inherited #page-content isn't in it, which
+          would otherwise swap EMPTY and the form vanishes — the bug app.check's htmx
+          rule warns about). hx-disinherit only affects DESCENDANTS, so it can't fix
+          self-inheritance — hx-select is the right lever. -#}
+      <form id="convert-form" class="luckycat-order-form chirpui-stack chirpui-stack--sm"
+            method="post" action="{{ url_for('trade.convert') }}"
+            hx-post="{{ url_for('trade.convert') }}" hx-target="#convert-form"
+            hx-swap="outerHTML" hx-select="#convert-form">
+        {{ csrf_field() }}
+        {% set errs = errors ?? {} %}
+        {% set f = form ?? {} %}
+        {#- A convert is a market buy; the route hardcodes side / kind. -#}
+        <div class="chirpui-field">
+          <label class="chirpui-field__label" for="convert-symbol">To market</label>
+          <select id="convert-symbol" name="symbol" class="chirpui-field__input">
+            {% for m in markets | default(()) %}
+            <option value="{{ m.symbol }}" {% if f?['symbol'] == m.symbol %}selected{% end %}>{{ m.symbol }} · {{ m.display_name }}</option>
+            {% end %}
+          </select>
+          {% if errs?["symbol"] %}
+          <ul class="luckycat-field-errors" data-field="symbol">
+            {% for msg in errs["symbol"] %}<li>{{ msg }}</li>{% end %}
+          </ul>
+          {% end %}
+        </div>
+        <div class="chirpui-field">
+          <label class="chirpui-field__label" for="convert-size">Size</label>
+          <input id="convert-size" class="chirpui-field__input" type="number" name="size"
+                 min="0" step="any" inputmode="decimal" value="{{ f?['size'] ?? '' }}" placeholder="0.0">
+          {% if errs?["size"] %}
+          <ul class="luckycat-field-errors" data-field="size">
+            {% for msg in errs["size"] %}<li>{{ msg }}</li>{% end %}
+          </ul>
+          {% end %}
+        </div>
+        {% if errs?["_form"] %}
+        <ul class="luckycat-field-errors" data-field="_form">
+          {% for msg in errs["_form"] %}<li>{{ msg }}</li>{% end %}
+        </ul>
+        {% end %}
+        <div class="chirpui-form-actions chirpui-form-actions--end">
+          <button type="submit" class="chirpui-btn chirpui-btn--primary">Convert</button>
+        </div>
+      </form>
+      {% end %}
+    </section>
+
+    <section class="luckycat-trade-panel" aria-label="Current holdings">
+      <h2 class="luckycat-trade-panel__title">Holdings</h2>
+      {% set held = positions | default(()) %}
+      {% if (held | length) > 0 %}
+      <table class="luckycat-positions">
+        <thead>
+          <tr><th>Market</th><th>Size</th><th>Avg cost</th></tr>
+        </thead>
+        <tbody>
+          {% for p in held %}
+          <tr class="luckycat-positions__row">
+            <td class="luckycat-positions__sym">{{ p.symbol }}</td>
+            <td>{{ p.size }}</td>
+            <td>{{ p.avg_price }} $MEOW</td>
+          </tr>
+          {% end %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="chirpui-text-muted luckycat-positions__empty">No holdings yet. Convert some $MEOW to get started.</p>
+      {% end %}
+    </section>
+  </div>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

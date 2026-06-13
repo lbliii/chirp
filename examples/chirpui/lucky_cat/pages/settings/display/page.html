@@ -1,0 +1,104 @@
+{% imports %}
+  {% from "chirpui/forms.html" import segmented_control_field, toggle_field, form_actions %}
+  {% from "chirpui/theme_toggle.html" import theme_toggle %}
+{% end %}
+
+{#- Settings → Display (demo stub). A real-looking display panel built from
+    chirp-ui's native controls: the LIVE theme toggle (the same Alpine control as
+    the top bar — it persists to localStorage and actually flips the theme), plus
+    a density segmented control and a couple of toggles that are UI-only here.
+    The form submits back to its own GET route (method="get"), so it is
+    non-mutating — no POST handler, no CSRF — and app.check() stays clean.
+    Composes into the chirp-ui shell content block. -#}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🎨</span>
+      Display
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Tune the look of the trading floor. The theme toggle is live; the rest is a
+      demo stub.
+    </p>
+  </header>
+
+  <form id="display-form" class="luckycat-settings"
+        method="get" action="/settings/display">
+
+    <section class="luckycat-trade-panel" aria-label="Appearance">
+      <h2 class="luckycat-settings__section-title">Appearance</h2>
+      <p class="luckycat-settings__section-hint chirpui-text-muted">
+        Lucky Cat is dark-first. The theme toggle here is the same control as the
+        top bar and persists across the app.
+      </p>
+
+      <div class="luckycat-setting-row">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__name">Theme</span>
+          <span class="luckycat-setting-row__desc">Cycle light · dark · system.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ theme_toggle() }}
+        </span>
+      </div>
+
+      <div class="luckycat-setting-row">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__name">Density</span>
+          <span class="luckycat-setting-row__desc">Row height across tables and the order book.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ segmented_control_field("density",
+              options=[
+                {"value": "comfortable", "label": "Comfortable"},
+                {"value": "compact", "label": "Compact"},
+              ],
+              selected="comfortable", label="", size="sm") }}
+        </span>
+      </div>
+    </section>
+
+    <section class="luckycat-trade-panel" aria-label="Figures">
+      <h2 class="luckycat-settings__section-title">Figures &amp; motion</h2>
+      <p class="luckycat-settings__section-hint chirpui-text-muted">
+        How prices and live updates render.
+      </p>
+
+      <div class="luckycat-setting-row">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__name">Price numerals</span>
+          <span class="luckycat-setting-row__desc">Tabular figures keep columns aligned.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ segmented_control_field("numerals",
+              options=[
+                {"value": "tabular", "label": "Tabular"},
+                {"value": "proportional", "label": "Proportional"},
+              ],
+              selected="tabular", label="", size="sm") }}
+        </span>
+      </div>
+
+      <div class="luckycat-setting-row luckycat-setting-row--toggle">
+        <span class="luckycat-setting-row__label">
+          <span class="luckycat-setting-row__desc">Pulse the tape and ticker on each tick.</span>
+        </span>
+        <span class="luckycat-setting-row__control">
+          {{ toggle_field("animate_flash", checked=true, label="Flash price changes", variant="accent") }}
+        </span>
+      </div>
+    </section>
+
+    {% call form_actions(align="end") %}
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Save display settings</button>
+    {% end %}
+  </form>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

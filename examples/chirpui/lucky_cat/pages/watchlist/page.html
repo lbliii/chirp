@@ -1,0 +1,54 @@
+{#- Watchlist — a starred-only view of the markets grid (the rail's first
+    FUNCTIONAL filter lane). Reuses the landing grid's market_grid def (single
+    source of truth for the card + star markup) over the starred markets, with a
+    polished maneki empty state when nothing is starred. Composes into the
+    chirp-ui shell content block exactly like the landing page.
+
+    The per-card star still toggles here: tapping it unstars the market and the
+    /watchlist/toggle route OOB-flips the star control + the rail count. (The
+    grid is NOT auto-pruned on unstar — the row stays until the next navigation,
+    so the toggle is reversible without a full reload; a reload / boosted nav
+    re-renders the filtered grid.) -#}
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+  {% from "_components/market.html" import market_grid %}
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">⭐</span>
+      Watchlist
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      The markets you starred. Tap a ★ on any card to add or remove one.
+    </p>
+  </header>
+
+  {% set _starred = starred_markets | default(()) %}
+  {% if (_starred | length) > 0 %}
+  {{ market_grid(_starred, tickers, sparklines, watchlist_starred | default(()), grid_id="watchlist-grid") }}
+  {% else %}
+  {#- Polished maneki empty state — never asserts data it does not render. The
+      gold star + paw match the design language; the body points the user at the
+      star control on the markets grid. -#}
+  <div id="watchlist-grid" class="luckycat-watchlist-empty">
+    {% call empty_state(icon="star", title="No starred markets yet") %}
+    <p>Tap the <span class="luckycat-watchlist-empty__star" aria-hidden="true">☆</span> on any market card (or a market's detail page) to add it to your watchlist. Starred markets gather here for a one-glance view.</p>
+    <p>
+      <a class="chirpui-btn chirpui-btn--primary" href="/"
+         hx-target="#main" hx-select="#page-content" hx-swap="innerHTML">Browse markets</a>
+    </p>
+    <p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+    {% end %}
+  </div>
+  {% end %}
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}
