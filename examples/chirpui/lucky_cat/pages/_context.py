@@ -24,6 +24,7 @@ from feed import get_feed
 from wallet import balance
 
 from chirp import ShellAction, ShellActions, ShellActionZone
+from chirp.middleware.auth import current_user
 
 # Sparkline SVG geometry — a fixed 100x36 viewBox stretched to the card with
 # preserveAspectRatio="none". y maps high→top(2)/low→bottom(34) with 2px breathing
@@ -182,16 +183,27 @@ def context() -> dict:
         "shell_actions": ShellActions(
             # Primary: the headline call to action. action="deposit" (NOT href)
             # makes shell_actions.html emit data-action="deposit" on the button;
-            # the page-content delegator opens #deposit-modal on click.
+            # the page-content delegator opens #deposit-modal on click. Deposit is
+            # a signed-in ACCOUNT action, so it appears only when authenticated —
+            # an empty zone for an anonymous visitor (whose topbar shows "Sign in"
+            # instead). This is also load-bearing: a visible Deposit for an
+            # anonymous user would open the modal whose form POSTs to a
+            # @login_required route with hx-swap="none", so the 302 → /login would
+            # be silently swallowed. current_user() is LookupError-safe (returns
+            # AnonymousUser), so this is safe at startup-check time too.
             primary=ShellActionZone(
                 items=(
-                    ShellAction(
-                        id="deposit",
-                        label="Deposit $MEOW",
-                        action="deposit",
-                        variant="primary",
-                        icon="add",
-                    ),
+                    (
+                        ShellAction(
+                            id="deposit",
+                            label="Deposit $MEOW",
+                            action="deposit",
+                            variant="primary",
+                            icon="add",
+                        ),
+                    )
+                    if current_user().is_authenticated
+                    else ()
                 )
             ),
             # No 'controls' zone: section navigation (Markets, etc.) belongs in

@@ -1,0 +1,70 @@
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-auth">
+  <div class="luckycat-auth__card">
+    <div class="luckycat-auth__brand">
+      <img class="luckycat-auth__logo" src="/static/lucky-cat-logo.svg" alt="" width="40" height="40">
+      <span class="luckycat-auth__brand-name">Lucky&nbsp;Cat</span>
+    </div>
+    <h1 class="luckycat-auth__title">Welcome back</h1>
+    <p class="luckycat-auth__lede chirpui-text-muted">
+      Sign in to the trading floor. Browsing markets is open to everyone — you
+      sign in to deposit, trade, and track your portfolio.
+    </p>
+
+    {#- The sign-in form is the one block ValidationError re-renders on bad creds.
+        FOOTGUN #2 (DESIGN.md §5): this control lives inside the boosted shell
+        (#main / hx-select=#page-content inherited), so a 422 returning ONLY this
+        block would be swapped EMPTY. It OVERRIDES the inherited outlet on itself
+        — hx-target/hx-select of its OWN #login-form id, hx-swap="outerHTML" — so
+        the re-render lands in place. A clean sign-in returns a FormAction
+        (HX-Redirect → a full page load) so the persistent topbar repaints its
+        auth state. -#}
+    {% block login_form %}
+    {% set f = form ?? {} %}
+    {% set errs = errors ?? {} %}
+    <form id="login-form" class="luckycat-auth__form chirpui-stack chirpui-stack--sm"
+          method="post" action="/login"
+          hx-post="/login"
+          hx-target="#login-form" hx-swap="outerHTML" hx-select="#login-form"
+          hx-disabled-elt="find button">
+      {{ csrf_field() }}
+      <input type="hidden" name="next" value="{{ next_url ?? '/' }}">
+
+      {% if errs?["_form"] %}
+      <div class="luckycat-auth__error" role="alert">
+        {% for msg in errs["_form"] %}<span>{{ msg }}</span>{% end %}
+      </div>
+      {% end %}
+
+      <div class="chirpui-field">
+        <label class="chirpui-field__label" for="login-username">Username</label>
+        <input id="login-username" class="chirpui-field__input" type="text" name="username"
+               value="{{ f?['username'] ?? '' }}"
+               autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required>
+      </div>
+      <div class="chirpui-field">
+        <label class="chirpui-field__label" for="login-password">Password</label>
+        <input id="login-password" class="chirpui-field__input" type="password" name="password"
+               value="{{ f?['password'] ?? '' }}"
+               autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="chirpui-btn chirpui-btn--primary luckycat-auth__submit">
+        Sign in
+      </button>
+
+      <p class="luckycat-auth__hint chirpui-text-muted chirpui-font-sm">
+        🐾 Demo account (prefilled): <code>{{ demo_creds ?? 'neko / luckycat' }}</code>.
+        No real funds — it's all $MEOW.
+      </p>
+    </form>
+    {% end %}
+  </div>
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

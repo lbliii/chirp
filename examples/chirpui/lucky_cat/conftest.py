@@ -67,6 +67,10 @@ def example_app(request: pytest.FixtureRequest):
         watch_mod = sys.modules.get("watchlist")
         if watch_mod is not None and hasattr(watch_mod, "reset"):
             watch_mod.reset()
+        # Reset the demo user store (the auth account) for test isolation.
+        users_mod = sys.modules.get("users")
+        if users_mod is not None and hasattr(users_mod, "reset"):
+            users_mod.reset()
         yield module.app
     finally:
         if module is not None and sys.modules.get("app") is module:

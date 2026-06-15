@@ -11,9 +11,10 @@ the grid renders only the starred markets (the star on each still toggles, so a
 user can unstar from here too — the OOB twin flips the control in place).
 """
 
-from chirp import Page
+from chirp import Page, login_required
 
 
+@login_required
 def get(markets, tickers, sparklines, watchlist_starred) -> Page:
     # Filter the full markets list to the starred set, preserving the canonical
     # market order (so the watchlist reads in the same order as the landing grid).

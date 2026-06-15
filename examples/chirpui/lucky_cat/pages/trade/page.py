@@ -13,9 +13,15 @@ back to ``/trade``.
 
 import trade_store
 
-from chirp import Page
+from chirp import Page, login_required
 
 
+# Full-page gating: the order ticket is account-specific (you place orders against
+# YOUR balance), so the whole page requires sign-in. An anonymous hit is a 302 to
+# /login?next=/trade (the boosted rail link redirects cleanly). Compare the
+# component-level gating on the PUBLIC markets grid (the watchlist star) and the
+# action-level gating on the mutation routes in app.py.
+@login_required
 def get() -> Page:
     return Page(
         "trade/page.html",

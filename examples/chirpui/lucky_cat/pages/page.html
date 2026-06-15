@@ -38,6 +38,11 @@
 {% end %}
 {% end %}
 
+{#- Deposit is a signed-in account action, so the modal + its click delegator
+    render only when authenticated (the Deposit trigger itself is gated in
+    _context.py). Keeping the dialog out of the anonymous DOM avoids an orphan
+    modal for an account the visitor has not signed into. -#}
+{% if current_user().is_authenticated %}
 {#- #230: deposit modal + click delegator live in the page-content region, NOT
     the layout — page templates injected into `content` cannot add page_scripts
     (composition rule), so anything inline ships inside #page-root. The topbar's
@@ -85,5 +90,6 @@ document.body.addEventListener("click", function (event) {
   }
 });
 </script>
+{% end %}{#- /if current_user().is_authenticated — deposit modal -#}
 </div>
 {% end %}

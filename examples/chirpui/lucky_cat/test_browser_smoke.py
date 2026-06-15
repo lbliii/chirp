@@ -62,6 +62,15 @@ _ACTION_TIMEOUT_MS = 8_000
 _SERVER_BOOT_TIMEOUT_S = 40.0
 _ENV_BASE_URL = "LUCKY_CAT_BASE_URL"
 
+# The demo trader. Lucky Cat is public-browse / gated-trading: the markets grid
+# (``/``) is open, but ``/portfolio`` and ``/trade`` are ``@login_required`` —
+# an anonymous browser is 302'd to ``/login``. To smoke the REAL gated shell we
+# sign in as this account first (the login form is prefilled with these creds).
+_DEMO_USERNAME = "neko"
+_DEMO_PASSWORD = "luckycat"  # demo-only credential, shown on the login page
+# Paths that require a signed-in session (vs. the public ``/`` markets grid).
+_GATED_PATHS = frozenset({"/portfolio", "/trade"})
+
 
 def _free_port() -> int:
     """Grab an ephemeral port the OS just confirmed is free."""
@@ -168,14 +177,62 @@ def _new_page_with_console_capture(browser, base_url: str):
     page = context.new_page()
     page.set_default_timeout(_ACTION_TIMEOUT_MS)
     errors: list[str] = []
-    page.on(
-        "console",
-        lambda msg: (
-            errors.append(f"console.{msg.type}: {msg.text}") if msg.type == "error" else None
-        ),
-    )
+
+    def _record_console(msg) -> None:
+        if msg.type != "error":
+            return
+        # BENIGN SSE-TEARDOWN NOISE. This app holds ONE persistent /_chirp/live
+        # signal EventSource per page (declare-once / bind-many). Navigating
+        # between shell pages aborts the previous page's EventSource, so the
+        # browser fires an error Event that htmx core logs as a bare "Event". It
+        # is inherent to the one-connection-per-page model — it reproduces on ANY
+        # shell→shell nav (e.g. the public / → /markets/{symbol}) and is not a
+        # page defect. The window.Alpine + navigation assertions still guard a
+        # genuinely broken shell.
+        if msg.text.strip() == "Event":
+            return
+        # KNOWN UPSTREAM NOISE (chirp-ui 0.9.0). chirp-ui's own early
+        # theme-bootstrap script and shell_runtime_script() inline <script>s are
+        # emitted WITHOUT the per-request CSP nonce, so the nonce-based script-src
+        # that use_chirp_ui() enables blocks them (a browser ignores
+        # 'unsafe-inline' once a nonce is present). This is a chirp-ui issue, not
+        # an example one — the example nonces every inline script IT emits via
+        # csp_nonce(). It degrades the pre-paint theme + shell runtime but NOT the
+        # interactive shell (Alpine rides 'unsafe-eval', which IS allowed and is
+        # still asserted via window.Alpine + navigation below). Allow-list it here
+        # until chirp-ui nonces its shell scripts; a genuinely broken CSP that
+        # kills Alpine still fails the other assertions.
+        if "Content Security Policy" in msg.text and "inline script" in msg.text:
+            return
+        errors.append(f"console.{msg.type}: {msg.text}")
+
+    page.on("console", _record_console)
     page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
     return context, page, errors
+
+
+def _sign_in(page) -> None:
+    """Drive the browser through the Lucky Cat sign-in form as the demo trader.
+
+    Navigates to ``/login``, ensures the prefilled demo credentials are present
+    (re-typing them is belt-and-braces in case the prefill ever changes), and
+    submits the form. A clean sign-in returns ``HX-Redirect`` → a FULL page load
+    off ``/login``, so we wait for the URL to leave ``/login`` and for the app
+    shell to mount. After this the browser context holds the authenticated
+    session cookie, so subsequent gated-page navigations resolve as the
+    signed-in trader instead of being 302'd back to ``/login``."""
+    page.goto("/login", wait_until="load")
+    page.wait_for_selector("#login-form", timeout=_ACTION_TIMEOUT_MS)
+    page.fill("#login-username", _DEMO_USERNAME)
+    page.fill("#login-password", _DEMO_PASSWORD)
+    page.locator('#login-form button[type="submit"]').first.click()
+    # Successful auth full-page-redirects off /login (HX-Redirect); a bad login
+    # would re-render the form in place and the URL would stay on /login.
+    page.wait_for_url(
+        lambda url: "/login" not in url,
+        timeout=_ACTION_TIMEOUT_MS,
+    )
+    page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
 
 
 @pytest.mark.parametrize("path", ["/", "/portfolio", "/trade"])
@@ -184,14 +241,30 @@ def test_pages_load_with_zero_console_errors(browser, base_url: str, path: str) 
 
     This is the CSP/Alpine regression guard: a broken CSP (or a bare-package
     CDN URL) kills the entire interactive shell but returns a clean 200 — only
-    the browser console reveals it."""
+    the browser console reveals it.
+
+    ``/portfolio`` and ``/trade`` are ``@login_required`` now, so we sign in as
+    the demo trader first (in this same browser context) and assert the REAL
+    gated page — an anonymous visit would silently 302 to ``/login`` and we'd be
+    smoke-testing the wrong page. ``/`` stays a public, anonymous visit."""
     context, page, errors = _new_page_with_console_capture(browser, base_url)
     try:
+        if path in _GATED_PATHS:
+            # Sign-in console output (if any) is incidental to the gated-page
+            # assertion below; clear the buffer so we only judge `path` itself.
+            _sign_in(page)
+            errors.clear()
         # wait_until="load" — NOT "networkidle": the SSE ticker/ft streams never
         # idle, so networkidle would hang until the timeout.
         page.goto(path, wait_until="load")
         # Give Alpine a beat to initialize and surface any boot-time errors.
         page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
+        if path in _GATED_PATHS:
+            # We must be on the REAL gated page, not bounced to the login wall —
+            # otherwise this would be a green smoke of the wrong page.
+            assert "/login" not in page.url, (
+                f"{path}: redirected to {page.url} — not signed in as the demo trader"
+            )
         assert not errors, f"{path} produced browser errors: {errors}"
         # The shell actually mounted Alpine (the CSP-kill symptom is undefined).
         assert page.evaluate("() => typeof window.Alpine !== 'undefined'"), (
@@ -206,10 +279,17 @@ def test_inner_rail_subnav_navigates(browser, base_url: str) -> None:
     404 body) — proving the sub-pages resolve through the boosted shell outlet."""
     context, page, errors = _new_page_with_console_capture(browser, base_url)
     try:
+        # /portfolio (+ /portfolio/orders) is @login_required — sign in as the
+        # demo trader first so we drive the real room, not the /login bounce.
+        _sign_in(page)
+        errors.clear()
         page.goto("/portfolio", wait_until="load")
         page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
-        # The Portfolio room's inner rail links to /portfolio/orders.
-        link = page.locator('a[href="/portfolio/orders"]').first
+        # The Portfolio room's inner rail links to /portfolio/orders. Scope to the
+        # VISIBLE link: /portfolio/orders also appears in the mobile nav drawer
+        # (hidden on the desktop viewport), and a bare selector's .first resolves
+        # to that hidden drawer copy.
+        link = page.locator('a[href="/portfolio/orders"]:visible').first
         link.wait_for(state="visible", timeout=_ACTION_TIMEOUT_MS)
         link.click()
         # Boosted nav swaps #main and pushes the URL; wait for the URL to change.

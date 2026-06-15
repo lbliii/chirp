@@ -38,7 +38,7 @@ import asyncio
 import trade_store
 from feed import get_feed
 
-from chirp import Suspense
+from chirp import Suspense, login_required
 
 
 async def _load_value() -> float:
@@ -125,6 +125,31 @@ def _captured_csrf() -> dict:
     return {"csrf_token": lambda t=token: t}
 
 
+def _captured_user() -> dict:
+    """Capture the request user so the streamed Suspense shell renders the
+    auth-conditional topbar chrome correctly.
+
+    Same ContextVar-reset hazard as :func:`_captured_csrf`, one tier up: the
+    chirp-ui shell + topbar call ``current_user()``, a template global backed by
+    ``AuthMiddleware``'s request-scoped user ContextVar. Suspense renders its shell
+    *lazily* — after the middleware stack unwinds and that ContextVar is reset —
+    so ``current_user()`` would read ``AnonymousUser`` and drop the signed-in
+    chrome (the $MEOW balance, the notifications bell, the Deposit action, the
+    user menu) even though this page is ``@login_required``. Capture the user in
+    the handler (ContextVar still live) and shadow the global with it for the
+    deferred render — a context value shadows the same-named global. Returns an
+    empty dict if auth is not active (keeps the page renderable without the
+    secure stack)."""
+    try:
+        from chirp.middleware.auth import current_user
+
+        user = current_user()
+    except LookupError, ImportError:
+        return {}
+    return {"current_user": lambda u=user: u}
+
+
+@login_required
 def get() -> Suspense:
     return Suspense(
         "portfolio/page.html",
@@ -161,4 +186,8 @@ def get() -> Suspense:
         # Capture the CSRF token so the streamed shell's chirp-ui csrf-meta tag
         # renders (the ContextVar is reset before the deferred render runs).
         **_captured_csrf(),
+        # Capture the signed-in user for the same reason — so the deferred shell
+        # render keeps the auth-conditional topbar chrome (balance/bell/Deposit/
+        # user menu) instead of falling back to the logged-out chrome.
+        **_captured_user(),
     )

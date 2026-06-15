@@ -13,7 +13,7 @@ import time
 
 import trade_store
 
-from chirp import Page
+from chirp import Page, login_required
 
 _TIME_FMT = "%H:%M:%S"
 
@@ -32,6 +32,7 @@ def _rows() -> tuple[dict[str, object], ...]:
     )
 
 
+@login_required
 def get() -> Page:
     return Page(
         "portfolio/history/page.html",

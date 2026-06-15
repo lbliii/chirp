@@ -2329,3 +2329,132 @@
     display: none;
   }
 }
+
+/* ============================================================================
+   AUTH — the sign-in page + the topbar identity chrome (user chip / Sign in).
+   Lucky Cat is public-browse / gated-trading: anonymous visitors see "Sign in"
+   in the topbar; the signed-in trader sees their name + a Sign-out control, and
+   the account chrome (bell, $MEOW balance, Deposit) appears. All built on the
+   --lc-* token layer so it tracks the dark/light themes for free.
+   ============================================================================ */
+
+/* --- Sign-in page: a centred card floated on the page floor --------------- */
+.luckycat-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(100%, 38rem);
+  padding: clamp(1.25rem, 4vw, 3rem) 1.25rem;
+}
+.luckycat-auth__card {
+  width: 100%;
+  max-width: 26rem;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  background: var(--lc-plane-surface);
+  border: 1px solid var(--lc-hairline);
+  border-radius: var(--lc-radius-lg);
+  box-shadow: var(--lc-elevation-3);
+}
+.luckycat-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.luckycat-auth__logo {
+  display: block;
+}
+.luckycat-auth__brand-name {
+  font-weight: 700;
+  font-size: var(--lc-text-lg);
+  letter-spacing: var(--lc-tracking-tight);
+}
+.luckycat-auth__title {
+  margin: 0 0 0.35rem;
+  font-size: var(--lc-text-xl);
+  letter-spacing: var(--lc-tracking-tight);
+}
+.luckycat-auth__lede {
+  margin: 0 0 1.5rem;
+  font-size: var(--lc-text-sm);
+  line-height: 1.5;
+}
+.luckycat-auth__error {
+  margin-bottom: 0.25rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--lc-radius-sm);
+  background: color-mix(in srgb, var(--lc-red) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lc-red) 40%, transparent);
+  color: var(--lc-ink);
+  font-size: var(--lc-text-sm);
+}
+.luckycat-auth__submit {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+.luckycat-auth__hint {
+  margin: 0.5rem 0 0;
+}
+.luckycat-auth__hint code {
+  font-family: var(--lc-font-mono);
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--lc-radius-xs);
+  background: var(--lc-plane-raised);
+}
+
+/* --- Topbar identity: user chip + Sign-out / Sign-in ---------------------- */
+.luckycat-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.luckycat-user__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.4rem;
+  border-radius: var(--lc-radius-pill);
+  background: var(--lc-plane-raised);
+  border: 1px solid var(--lc-hairline);
+  max-width: 12rem;
+}
+.luckycat-user__avatar {
+  font-size: 1rem;
+  line-height: 1;
+}
+.luckycat-user__name {
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.luckycat-user__signout {
+  margin: 0;
+}
+.luckycat-user__signout-btn,
+.luckycat-signin {
+  padding-block: 0.35rem;
+  padding-inline: 0.7rem;
+  font-size: var(--lc-text-sm);
+}
+
+/* Mobile (<48rem): the cramped topbar drops the name label to just the avatar
+   chip; the Sign-out / Sign-in control stays tappable. */
+@media (max-width: 48rem) {
+  .luckycat-user__name {
+    display: none;
+  }
+  .luckycat-user__chip {
+    padding: 0.25rem 0.4rem;
+  }
+}
+
+/* Anonymous "sign in to star" affordance — the same star glyph rendered as a
+   link to /login (component-level gating on the public markets grid). Reuses the
+   .luckycat-watchlist-star box; just strips the link underline/colour. */
+a.luckycat-watchlist-star,
+.luckycat-watchlist-star--signin {
+  text-decoration: none;
+  color: inherit;
+}

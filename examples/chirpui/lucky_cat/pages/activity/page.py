@@ -19,7 +19,7 @@ import time
 import trade_store
 import wallet
 
-from chirp import Page
+from chirp import Page, login_required
 
 _TIME_FMT = "%H:%M:%S"
 
@@ -59,6 +59,7 @@ def _merged_rows() -> tuple[dict[str, object], ...]:
     return tuple(rows)
 
 
+@login_required
 def get() -> Page:
     return Page(
         "activity/page.html",

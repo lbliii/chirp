@@ -20,7 +20,7 @@ import time
 
 import trade_store
 
-from chirp import Page
+from chirp import Page, login_required
 
 # The template only renders strings, so format the wall-clock placement time
 # here (no datetime-filter assumptions in the template), mirroring the history
@@ -42,6 +42,7 @@ def _rows() -> tuple[dict[str, object], ...]:
     )
 
 
+@login_required
 def get() -> Page:
     return Page(
         "portfolio/orders/page.html",

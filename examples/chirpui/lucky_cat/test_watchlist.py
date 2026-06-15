@@ -19,7 +19,11 @@ Coverage:
 import re
 
 from chirp.testing import TestClient
-from tests.helpers.auth import extract_csrf_token, extract_session_cookie
+from tests.helpers.auth import (
+    csrf_post,
+    extract_session_cookie,
+    login,
+)
 
 _SESSION_COOKIE = "chirp_session_lucky_cat"
 
@@ -28,17 +32,16 @@ def _session_cookie(response) -> str | None:
     return extract_session_cookie(response, cookie_name=_SESSION_COOKIE)
 
 
-async def _csrf_headers(client, *, htmx: bool = True) -> dict:
-    page = await client.get("/")
-    cookie = _session_cookie(page)
-    csrf = extract_csrf_token(page.text)
-    assert csrf is not None
-    headers = {"X-CSRF-Token": csrf}
-    if htmx:
-        headers["HX-Request"] = "true"
-    if cookie:
-        headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
-    return headers
+async def _login(client) -> str:
+    """Sign in as the demo account; return the authenticated session cookie."""
+    cookie = await login(client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE)
+    assert cookie is not None
+    return cookie
+
+
+def _cookie_header(cookie: str) -> dict:
+    """Build a Cookie header for an authed GET of a gated page."""
+    return {"Cookie": f"{_SESSION_COOKIE}={cookie}"}
 
 
 class TestWatchlistStore:
@@ -145,7 +148,8 @@ class TestWatchlistPage:
         """With nothing starred (seed state), the polished maneki empty state shows
         — and never asserts data it does not render."""
         async with TestClient(example_app) as client:
-            response = await client.get("/watchlist")
+            cookie = await _login(client)
+            response = await client.get("/watchlist", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "<html" in response.text
             assert "No starred markets yet" in response.text
@@ -161,10 +165,24 @@ class TestWatchlistPage:
         full markets list (the headline filter behaviour)."""
         import watchlist
 
-        watchlist.add("BTC-MEOW")
-        watchlist.add("SOL-MEOW")
         async with TestClient(example_app) as client:
-            response = await client.get("/watchlist")
+            cookie = await _login(client)
+            _, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "BTC-MEOW"},
+            )
+            _, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "SOL-MEOW"},
+            )
+            assert watchlist.symbols() == frozenset({"BTC-MEOW", "SOL-MEOW"})
+            response = await client.get("/watchlist", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
             assert 'id="watchlist-grid"' in html
@@ -188,9 +206,17 @@ class TestWatchlistPage:
         """A starred market's card star renders pressed (gold ★, aria-pressed)."""
         import watchlist
 
-        watchlist.add("BTC-MEOW")
         async with TestClient(example_app) as client:
-            response = await client.get("/watchlist")
+            cookie = await _login(client)
+            _, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "BTC-MEOW"},
+            )
+            assert watchlist.contains("BTC-MEOW") is True
+            response = await client.get("/watchlist", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="watchlist-star-BTC-MEOW"' in response.text
             assert 'aria-pressed="true"' in response.text
@@ -207,9 +233,13 @@ class TestWatchlistToggle:
         import watchlist
 
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            response = await client.post(
-                "/watchlist/toggle", data={"symbol": "BTC-MEOW"}, headers=headers
+            cookie = await _login(client)
+            response, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "BTC-MEOW"},
             )
             assert response.status == 200
             body = response.text
@@ -235,15 +265,23 @@ class TestWatchlistToggle:
         import watchlist
 
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            first = await client.post(
-                "/watchlist/toggle", data={"symbol": "ETH-MEOW"}, headers=headers
+            cookie = await _login(client)
+            first, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "ETH-MEOW"},
             )
             assert first.status == 200
             assert watchlist.contains("ETH-MEOW") is True
 
-            second = await client.post(
-                "/watchlist/toggle", data={"symbol": "ETH-MEOW"}, headers=headers
+            second, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "ETH-MEOW"},
             )
             assert second.status == 200
             assert 'aria-pressed="false"' in second.text
@@ -255,7 +293,8 @@ class TestWatchlistToggle:
         outlet (hx-target=#main / hx-select=#page-content) with hx-swap="none" +
         hx-select of its OWN fragment id, or the toggle churns #main."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             html = response.text
             star = re.search(r'<button[^>]*id="watchlist-star-BTC-MEOW"[^>]*>', html)
             assert star is not None, "card star not rendered"
@@ -275,10 +314,14 @@ class TestWatchlistToggle:
 
         watchlist.add("BTC-MEOW")
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            headers["HX-Current-URL"] = "http://testserver/watchlist"
-            response = await client.post(
-                "/watchlist/toggle", data={"symbol": "BTC-MEOW"}, headers=headers
+            cookie = await _login(client)
+            response, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "BTC-MEOW"},
+                extra_headers={"HX-Current-URL": "http://testserver/watchlist"},
             )
             assert response.status == 200
             body = response.text
@@ -300,10 +343,14 @@ class TestWatchlistToggle:
 
         watchlist.add("ETH-MEOW")
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            headers["HX-Current-URL"] = "http://testserver/"
-            response = await client.post(
-                "/watchlist/toggle", data={"symbol": "ETH-MEOW"}, headers=headers
+            cookie = await _login(client)
+            response, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "ETH-MEOW"},
+                extra_headers={"HX-Current-URL": "http://testserver/"},
             )
             assert response.status == 200
             body = response.text
@@ -317,10 +364,14 @@ class TestWatchlistToggle:
         import watchlist
 
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            headers["HX-Current-URL"] = "http://testserver/watchlist"
-            response = await client.post(
-                "/watchlist/toggle", data={"symbol": "DOGE-MEOW"}, headers=headers
+            cookie = await _login(client)
+            response, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "DOGE-MEOW"},
+                extra_headers={"HX-Current-URL": "http://testserver/watchlist"},
             )
             assert response.status == 200
             assert watchlist.contains("DOGE-MEOW") is True
@@ -333,9 +384,13 @@ class TestWatchlistToggle:
         import watchlist
 
         async with TestClient(example_app) as client:
-            headers = await _csrf_headers(client)
-            response = await client.post(
-                "/watchlist/toggle", data={"symbol": "NOPE-MEOW"}, headers=headers
+            cookie = await _login(client)
+            response, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "NOPE-MEOW"},
             )
             assert response.status == 200
             assert watchlist.contains("NOPE-MEOW") is False
@@ -353,14 +408,52 @@ class TestWatchlistStarMarkup:
     guard that the star is never nested inside the card <a>."""
 
     async def test_landing_cards_carry_a_star(self, example_app) -> None:
+        """Every landing card carries a star — component-gated by current_user():
+        anonymous gets a "sign in to star" <a href="/login"> (a visible
+        affordance, never a swallowed 302), signed-in gets the real toggle
+        <button id="watchlist-star-{symbol}">. Both forms are SIBLINGS of the card
+        <a href="/markets/{symbol}"> (FOOTGUN #1), never descendants."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
-            assert response.status == 200
-            html = response.text
-            assert "luckycat-watchlist-star" in html
+            # ANONYMOUS — the star is the sign-in login link, not a toggle button.
+            anon = await client.get("/")
+            assert anon.status == 200
+            anon_html = anon.text
+            assert "luckycat-watchlist-star" in anon_html
+            assert "luckycat-market-card-cell" in anon_html
+            # Anonymous gets the sign-in star (<a href="/login">), NOT the toggle.
+            assert "luckycat-watchlist-star--signin" in anon_html
+            assert 'id="watchlist-star-BTC-MEOW"' not in anon_html
+            # The sign-in star is a SIBLING of the card <a>, never nested inside it.
+            anon_anchors = re.findall(
+                r'<a class="luckycat-market-card[^"]*"\s+href="/markets/[^"]+">(.*?)</a>',
+                anon_html,
+                re.S,
+            )
+            assert len(anon_anchors) >= 4, "market card anchors not found — crawl is vacuous"
+            assert not [a for a in anon_anchors if "luckycat-watchlist-star" in a], (
+                "anonymous sign-in star is nested INSIDE a market card <a> (FOOTGUN #1)"
+            )
+
+            # SIGNED IN — the star is the real toggle button with the per-card id.
+            cookie = await _login(client)
+            authed = await client.get("/", headers=_cookie_header(cookie))
+            assert authed.status == 200
+            authed_html = authed.text
+            assert "luckycat-watchlist-star" in authed_html
             # Each card lives in a relative wrapper holding the card + sibling star.
-            assert "luckycat-market-card-cell" in html
-            assert 'id="watchlist-star-BTC-MEOW"' in html
+            assert "luckycat-market-card-cell" in authed_html
+            assert 'id="watchlist-star-BTC-MEOW"' in authed_html
+            assert "luckycat-watchlist-star--signin" not in authed_html
+            # The toggle button is a SIBLING of the card <a>, never nested inside it.
+            authed_anchors = re.findall(
+                r'<a class="luckycat-market-card[^"]*"\s+href="/markets/[^"]+">(.*?)</a>',
+                authed_html,
+                re.S,
+            )
+            assert len(authed_anchors) >= 4, "market card anchors not found — crawl is vacuous"
+            assert not [a for a in authed_anchors if "luckycat-watchlist-star" in a], (
+                "signed-in toggle star is nested INSIDE a market card <a> (FOOTGUN #1)"
+            )
 
     async def test_star_is_not_descendant_of_card_anchor(self, example_app) -> None:
         """FOOTGUN #1 regression guard: a <button> inside the full-card <a> is
@@ -384,17 +477,36 @@ class TestWatchlistStarMarkup:
             )
 
     async def test_detail_header_star_is_not_inside_back_link(self, example_app) -> None:
-        """The market-detail header also carries a star — also a sibling, never
-        nested inside the back-link <a> (the same nested-interactive footgun)."""
+        """The market-detail header also carries a star — also component-gated and
+        also a sibling, never nested inside the back-link <a> (the same nested-
+        interactive footgun). Anonymous gets the sign-in login link; signed-in gets
+        the real toggle button. Both live in the .luckycat-detail__star slot, a
+        sibling of the back <a>."""
         async with TestClient(example_app) as client:
-            response = await client.get("/markets/BTC-MEOW")
-            assert response.status == 200
-            html = response.text
-            assert "luckycat-detail__star" in html
-            assert 'id="watchlist-star-BTC-MEOW"' in html
-            back = re.search(r'<a class="luckycat-detail__back[^>]*>.*?</a>', html, re.S)
-            assert back is not None
-            assert "luckycat-watchlist-star" not in back.group(0)
+            # ANONYMOUS — the detail star is the sign-in login link.
+            anon = await client.get("/markets/BTC-MEOW")
+            assert anon.status == 200
+            anon_html = anon.text
+            assert "luckycat-detail__star" in anon_html
+            assert "luckycat-watchlist-star--signin" in anon_html
+            assert 'id="watchlist-star-BTC-MEOW"' not in anon_html
+            anon_back = re.search(r'<a class="luckycat-detail__back[^>]*>.*?</a>', anon_html, re.S)
+            assert anon_back is not None
+            assert "luckycat-watchlist-star" not in anon_back.group(0)
+
+            # SIGNED IN — the detail star is the real toggle button.
+            cookie = await _login(client)
+            authed = await client.get("/markets/BTC-MEOW", headers=_cookie_header(cookie))
+            assert authed.status == 200
+            authed_html = authed.text
+            assert "luckycat-detail__star" in authed_html
+            assert 'id="watchlist-star-BTC-MEOW"' in authed_html
+            assert "luckycat-watchlist-star--signin" not in authed_html
+            authed_back = re.search(
+                r'<a class="luckycat-detail__back[^>]*>.*?</a>', authed_html, re.S
+            )
+            assert authed_back is not None
+            assert "luckycat-watchlist-star" not in authed_back.group(0)
 
 
 class TestWatchlistRailLane:

@@ -5,8 +5,8 @@ draft: false
 weight: 15
 lang: en
 type: doc
-tags: [examples, chirp-ui, app-shell, signals, sse, suspense, oob]
-keywords: [lucky cat, crypto exchange, signals, app shell, suspense, oob, sse, chirp-ui]
+tags: [examples, chirp-ui, app-shell, signals, sse, suspense, oob, auth]
+keywords: [lucky cat, crypto exchange, signals, app shell, suspense, oob, sse, chirp-ui, authentication, login_required, current_user]
 category: examples
 ---
 
@@ -41,6 +41,33 @@ It demonstrates:
   bound to server-owned `signal()`s over one `/_chirp/live` SSE connection
   (declare-once / bind-many, with pure `derived` signals for the bell's
   unread-count pill)
+- **authentication** that exercises all three gating levels — `@login_required`
+  full-page gating of the account section (anonymous → `/login?next=`),
+  `current_user()` component gating of the topbar chrome + the watchlist star on
+  the public grid, and action gating on the mutation routes — over `AuthMiddleware`
+  with a `ValidationError` / `FormAction` login flow
+
+## Authentication
+
+Lucky Cat is **public-browse, gated-trading**: anyone can browse the markets grid
+and a coin's detail page, but the account section and every mutation require
+sign-in. It shows the full range of gating, not a blanket lock:
+
+- **Full-page gating** — `@login_required` on the account `page.py` handlers
+  (`/trade`, `/portfolio`, `/activity`, `/watchlist`, `/settings`). An anonymous
+  hit is a **302 to `/login?next=<path>`**; the prefilled card returns you there.
+- **Component gating** — `current_user()` conditionals: the topbar swaps "Sign in"
+  for the user menu (and reveals the balance, bell, and Deposit action), and the
+  watchlist star on the public grid becomes a "sign in to star" link.
+- **Action gating** — `@login_required` on the mutation routes as the backstop.
+
+The login flow is return-type-driven: bad credentials → `ValidationError` (a
+**422** in-place re-render), a clean sign-in → `login()` + `FormAction` (no
+fragments → `HX-Redirect` for htmx, a full reload so the persistent topbar
+repaints; a 303 for a plain POST). `AuthMiddleware` joins the secure stack
+as `Session → Auth → CSRF → SecurityHeaders`, and a single in-memory demo account
+keeps the example single-process (matching `workers=1`) with passwords hashed via
+`chirp.security.passwords` (scrypt fallback — no extra dependency).
 
 ## Run It
 
@@ -49,8 +76,9 @@ pip install bengal-chirp[ui]
 PYTHONPATH=src python examples/chirpui/lucky_cat/app.py
 ```
 
-Open `http://127.0.0.1:8000/`. `/health` returns `200 ok` (the Railway
-healthcheck).
+Open `http://127.0.0.1:8000/`. Browsing the markets needs no account; sign in
+(demo creds: `neko` / `luckycat`) to trade, deposit, and view your portfolio.
+`/health` returns `200 ok` (the Railway healthcheck).
 
 ## Test It
 
