@@ -227,3 +227,25 @@ For a strict **nonce-only** Content-Security-Policy (`script-src` without
 For an `eval`-**forbidding** policy, also set `AppConfig(alpine_csp=True)`: the
 `@alpinejs/csp` build evaluates `x-data` expressions without `eval`/`Function`,
 so you can keep `'unsafe-eval'` out of your `script-src`.
+
+### chirp-ui: CSP is automatic
+
+`use_chirp_ui(app)` owns the chirp-ui CSP allowance — you write **no CSP at all**.
+When it auto-enables Alpine it also flips `csp_nonce_enabled=True`, so the compiler
+wires `CSPNonceMiddleware` as the single CSP authority with everything chirp-ui's
+shell needs:
+
+- a per-request nonce `script-src` plus `'unsafe-eval'` (Alpine evaluates
+  expressions as JS), and
+- `style-src 'self' 'unsafe-inline'` — Alpine's `x-show` writes inline
+  `style="display:none"` attributes that **cannot be nonced**, so this relaxation
+  is irreducible. It is scoped to `style-src` only; `script-src` stays nonce-only.
+
+Do **not** add your own static `SecurityHeadersMiddleware(content_security_policy=...)`
+that forbids these — a static CSP header overrides the nonce header and silently
+kills the shell (collapse, dropdowns, theme toggle, modals, command palette) with no
+console error. The `chirpui_csp` contract check **fails loud** at `app.check()` time
+(ERROR in production, WARNING in staging, silent in development) if a chirp-ui app's
+effective CSP would break Alpine. If you need the other security headers, add
+`SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None))` so it
+emits the clickjacking/MIME/referrer headers without fighting the nonce CSP.

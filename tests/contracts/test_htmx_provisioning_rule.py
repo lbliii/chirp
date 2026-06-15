@@ -5,12 +5,22 @@ attributes but htmx is not provisioned via ``AppConfig(htmx=True)`` nor an htmx
 ``<script>`` marker in the scanned template sources.
 """
 
+import pytest
+
 from chirp.contracts.rules_htmx_provisioned import check_htmx_provisioned
 from chirp.contracts.types import Severity
 
 
 class TestHtmxProvisioningRule:
+    @pytest.mark.issue(185)
     def test_hx_attr_without_provisioning_is_flagged(self) -> None:
+        # #185 acceptance: a template emitting hx-* without htmx provisioning is
+        # flagged. Shipped at WARNING (not the originally-proposed ERROR): a brand-
+        # new check that newly fails app.check() on previously-passing apps would be
+        # a breaking change on upgrade, so the non-breaking default is WARNING with
+        # an opt-in promotion to ERROR (app.override_contract_severity). Promoting
+        # the default is a separate breaking-change decision, gated by the
+        # contract-severity governance rule in AGENTS.md.
         sources = {
             "page.html": '<button hx-get="/data" hx-target="#out">Load</button>',
         }
@@ -29,6 +39,7 @@ class TestHtmxProvisioningRule:
         issues = check_htmx_provisioned(sources, htmx_config_enabled=False)
         assert [i.category for i in issues] == ["htmx_provisioned"]
 
+    @pytest.mark.issue(185)
     def test_silent_when_config_enabled(self) -> None:
         # Negative control: AppConfig(htmx=True) -> Chirp injects htmx, provisioned.
         sources = {

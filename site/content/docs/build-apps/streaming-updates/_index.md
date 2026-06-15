@@ -35,6 +35,13 @@ Send the shell immediately, fill in content as data arrives. Suspense streams de
 Push kida-rendered fragments to the browser over SSE.
 :::{/card}
 
+:::{card} Signals
+:icon: radio
+:link: /chirp/docs/build-apps/streaming-updates/signals/
+:description: Server-owned reactive values
+Declare a live value once, bind it many places, update them all over one shared SSE connection.
+:::{/card}
+
 :::{card} Reactive System
 :icon: refresh-cw
 :link: /chirp/docs/build-apps/streaming-updates/reactive-system/

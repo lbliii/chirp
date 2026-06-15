@@ -1,6 +1,6 @@
 # RFC: `live()` — SSE Topic Primitive (Declare-Once, Bind-Many)
 
-**Status**: Partially implemented. The single-node primitive shipped as `signal()` (`@app.signal` / `@app.derived` / `app.emit` + `signal()` / `signal_block()` / `signal_connect()` globals + the `/_chirp/live` merge stream + `rules_signals` contract; `src/chirp/realtime/signals.py`, `signal_globals.py`, `signal_stream.py`), with Lucky Cat migrated onto one connection. The §1–11 design below predates that build and uses the pre-ship working name `live()`; the shipped surface is `signal()` (see §12 for the as-built names). **Section 12 (multi-worker backplane + the pure-derived contract) is NOT implemented** — it is the opt-in production upgrade and still touches stop-and-ask surfaces (new `SignalBus` plugin protocol, likely a new `AppConfig`/adapter seam, a new optional extra). Must route through realtime, contracts, and app/state stewards before any backplane code lands.
+**Status**: Partially implemented. The single-node primitive shipped as `signal()` (`@app.signal` / `@app.derived` / `app.emit` + `signal()` / `signal_block()` / `signal_connect()` globals + the `/_chirp/live` merge stream + `rules_signals` contract; `src/chirp/realtime/signals.py`, `signal_globals.py`, `signal_stream.py`), with Lucky Cat migrated onto one connection. The §1–11 design below predates that build and uses the pre-ship working name `live()`; the shipped surface is `signal()` (see §12 for the as-built names). **Section 12 (multi-worker `SignalBus` backplane + the pure-derived contract) is a NOT-NOW DESIGN — not implemented and not scheduled** (see the status banner at the head of §12). It is the opt-in production upgrade: a new `SignalBus` plugin protocol, a `signal_bus` `AppConfig` field + `set_signal_bus` setter (reusing the existing `chirp[redis]` extra), and a `signal_bus_single_worker` contract rule — all root `AGENTS.md` stop-and-ask surfaces. Must route through realtime, contracts, and app/state stewards before any backplane code lands. Stays in `plan/drafted/` until accepted.
 **Date**: 2026-06-12
 **Scope**: `src/chirp/realtime/`, `src/chirp/app/` (registry + state + compiler), `src/chirp/contracts/rules_sse.py` (+ a new `rules_live_topics.py`), `src/chirp/templating/macros/chirp/sse.html`, `examples/chirpui/lucky_cat/`
 **Related**: `plan/drafted/rfc-shared-store.md` (Option C — SSE-broadcast store; this RFC supersedes that phase), `plan/drafted/epic-fragment-only-sse.md`, `plan/drafted/epic-reactive-phase2.md`, `pounce-0-7-adoption.md` (HTTP/2 transport), chirp issue **#238** (dead-ticker class)
@@ -647,16 +647,30 @@ to 4 to **1**; boosted navigation always has free sockets.
 
 ## 12. Multi-Worker Backplane & the Pure-Derived Contract
 
+> ## ⚠ STATUS: NOT-NOW DESIGN — NOTHING IN §12 IS SHIPPED
+>
+> **This section is a planning artifact, not documentation for existing
+> behavior.** No `SignalBus` protocol, no adapter-selection seam, no
+> `RedisSignalBus`, and no `signal_bus` / durable-mode config exist in the tree
+> today. Do **not** cite §12 as a feature; do **not** scaffold against it.
+>
+> | | |
+> |---|---|
+> | **Section status** | Drafted design — **not implemented**, not scheduled |
+> | **Folder** | `plan/drafted/` (stays here until accepted; do **not** move to `plan/completed/`) |
+> | **Shipped today** | Only the **single-node** `signal()` primitive (§1–11 + §12.1's "shipped" rows). The backplane below is the opt-in upgrade. |
+> | **Gate** | Realtime **+** app/state **+** contracts steward sign-off, plus public-API & changelog collateral, **before any backplane code lands** (see §12.7) |
+>
 > **Status carry-over.** Section 1–11 describe the single-node `signal()`
 > primitive. That primitive **shipped** in the build session that produced this
 > RFC: `@app.signal` / `@app.derived` / `app.emit` + the `signal()` /
 > `signal_block()` / `signal_connect()` template globals
 > (`src/chirp/realtime/signals.py`, `signal_globals.py`, `signal_stream.py`,
 > `contracts/rules_signals.py`), with Lucky Cat migrated onto one
-> `/_chirp/live` connection. This section is **not implemented** — it is the
-> opt-in production upgrade. It graduates the *transport* from process-local to
-> a pluggable backplane and formalizes the contract that makes a `derived`
-> correct on any worker.
+> `/_chirp/live` connection. **Everything from §12.2 onward is not implemented** —
+> it is the opt-in production upgrade. It graduates the *transport* from
+> process-local to a pluggable backplane and formalizes the contract that makes a
+> `derived` correct on any worker.
 
 ### 12.1 The problem — the bus is per-worker, so realtime is single-process
 
@@ -728,6 +742,103 @@ data=payload)` per delivery (`signal_stream.py:53-92`); each emit publishes a
 rendered payload (`signals.py:316-328`). The `ReactiveBus` adapter wraps the
 existing `subscribe(scope)` / `emit_sync` (one `topic` ↔ one `_SCOPE_PREFIX`
 scope), so the default path is a no-op rename of today's behavior.
+
+**Where the seam plugs in (concrete, as-built).** The single integration point is
+`SignalRegistry.bus` (`signals.py:144`, today `field(default_factory=ReactiveBus)`).
+Three call sites move behind the protocol; nothing else changes:
+
+| As-built call site | Today | Behind the seam |
+|---|---|---|
+| `SignalRegistry._publish` (`signals.py:316-328`) | `self.bus.emit_sync(ChangeEvent(scope, …))` with the rendered payload recovered later from the cache | `self.bus.publish(name, rendered)` — render **eagerly** and put the payload on the wire, because a remote worker has no access to this worker's `_values` cache (see Risk R3) |
+| `signal_stream._drain_scope` (`signal_stream.py:59-62`) | `async for _change in registry.bus.subscribe(_SCOPE_PREFIX + name)` then read the local cache | `async for topic, payload in registry.bus.subscribe(frozenset(names))` — payload arrives **in-band**, no cache read |
+| `SignalRegistry.bus` default | `ReactiveBus()` | adapter chosen by the config seam (§12.2.1); default is the `ReactiveBus`-backed `InProcessSignalBus` |
+
+The current design recovers the payload from the value cache on drain
+(`signal_stream.py:87-92`) specifically to keep render off the stream hot path.
+That optimization is **process-local by construction** — it cannot survive a
+network hop. The backplane therefore inverts it: render at `publish` time and
+carry the rendered string in-band. This is the single behavioral change inside the
+shipped single-node path the backplane forces, and it is contained entirely in the
+default `InProcessSignalBus` adapter; the `@app.signal` surface is untouched.
+
+```python
+class InProcessSignalBus:
+    """Default adapter — wraps the shipped ReactiveBus. Dev / single-node / the
+    in-memory example. Behaviorally identical to today; the only difference is
+    the rendered payload travels in-band rather than via the value cache."""
+
+    def __init__(self, *, maxsize: int = 256) -> None:
+        self._bus = ReactiveBus(maxsize=maxsize)
+
+    def publish(self, topic: str, payload: str) -> None:
+        # ChangeEvent carries the rendered payload in changed_paths (same trick
+        # as signals.py today), but now it IS the payload, not a marker.
+        self._bus.emit_sync(ChangeEvent(scope=_SCOPE_PREFIX + topic,
+                                        changed_paths=frozenset({payload})))
+
+    async def subscribe(self, topics):
+        # One ReactiveBus subscription per topic, fanned into one iterator —
+        # exactly signal_stream._drain_scope's loop, lifted into the adapter.
+        ...
+```
+
+### 12.2.1 Adapter-selection seam — `AppConfig` + a typed setter
+
+Selection follows the **established `cache_backend` precedent** (`config.py:322`,
+a string selector resolved to an adapter at startup) rather than inventing a new
+mechanism. Two layers, mirroring how cache + sessions already work:
+
+```python
+# AppConfig (frozen, slotted) — new field, env-parity, stop-and-ask surface.
+signal_bus: str = "memory"   # "memory" | "redis" | "nats" | "postgres"
+# redis_url already exists (config.py:336) and is reused; nats/postgres add
+# *_url fields only if/when their adapters land (deferred — keep the field set
+# minimal for the first backplane).
+```
+
+- `"memory"` (default) → `InProcessSignalBus` — **identical to today**, zero new
+  deps, the only config that keeps the in-memory example coherent.
+- `"redis"` → `RedisSignalBus(config.redis_url)` — requires `chirp[redis]` (the
+  extra **already exists**, `pyproject.toml`; reused, not added — see §12.2.2).
+- Unknown value → startup `ValueError` naming the legal set (fail-loud, no
+  silent fallback to in-process, which would re-introduce the multi-user
+  correctness bug §12.1 describes).
+
+For apps that need a custom adapter (a bespoke broker, an outbox table), a typed
+setter escape hatch mirrors `app.set_cache_backend(...)` style:
+
+```python
+app.set_signal_bus(MyCustomBus())   # setup-only; _check_not_frozen guard
+```
+
+The setter is **setup-only** (raises `RuntimeError` after freeze, like every
+other registry mutation) and overrides the `signal_bus` string. The string field
+covers the 95% case from config/env; the setter covers the bespoke 5% without a
+new `AppConfig` field per broker.
+
+### 12.2.2 Optional-extra shape — reuse `redis`, do **not** add a `signals` extra
+
+`chirp[redis]` (`redis>=5.0.0`) **already exists** and already backs
+sessions + rate-limiting + the cache backend (`config.py`,
+`middleware/sessions.py`, `cache/backends/redis.py`). `RedisSignalBus` reuses it —
+**no new extra for Redis.** This matches the Optional-Dependencies cross-cutting
+concern: the extra exists, missing-extra import errors must stay actionable
+(`pip install chirp[redis]`), and core imports must not pull `redis`.
+
+- **Redis:** `chirp[redis]` (existing). `RedisSignalBus` imports `redis` /
+  `redis.asyncio` lazily inside the adapter (the `cache/backends/redis.py`
+  pattern — import inside `connect()`, never at module top), so
+  `from chirp import App` never imports `redis`.
+- **NATS** (deferred): would need a **new** `chirp[nats]` extra
+  (`nats-py>=2.x`). Out of scope for the first backplane; named here as a
+  same-protocol alternative, not a deliverable.
+- **Postgres `LISTEN`/`NOTIFY`** (deferred): reuses `chirp[data-pg]` (`asyncpg`,
+  existing) — no new extra. Payload-size-limited, so it carries a *notification*
+  and the consumer reads the rendered value from a shared cache (§12.4). Named as
+  an alternative, not a first-backplane deliverable.
+
+First-backplane deliverable is therefore **`memory` (default) + `redis` (reusing
+the existing extra)**. NATS and Postgres are documented seams, deferred.
 
 **Reference adapter — Redis pub/sub.** `publish` is one `PUBLISH signal:<topic>
 <payload>`; `subscribe` runs a single `PSUBSCRIBE signal:*` (or `SUBSCRIBE` of
@@ -835,6 +946,24 @@ This also keeps the pure-derived contract honest: a derived reads its inputs fro
 signal values (replicated by the bus), and a primary signal's `initial` /
 `source` read the shared store. No worker derives from its own private copy.
 
+**Contract implication (new `app.check()` rule).** The multi-worker footgun is
+*configuring `workers>1` (or the CPU-count default) with `signal_bus="memory"`* —
+exactly the Lucky Cat reproduction (§12.1). This is statically detectable at
+startup and must WARN (production: ERROR), extending `rules_signals.py` (which
+already owns `signal_dead_binding` / `signal_orphan`, `rules_signals.py:100-117`):
+
+- **`signal_bus_single_worker` (WARN, ERROR in production):** any signal
+  registered **and** (`config.workers != 1`) **and** `signal_bus == "memory"` →
+  "in-memory signal bus with multiple workers splits realtime across processes;
+  set `signal_bus='redis'` (and a shared state store) or pin `workers=1`." The
+  message names the exact fix, mirroring the secure-by-default `security_stack`
+  env-aware severity policy. This rule is the contract that turns the Lucky Cat
+  code comment into an enforced invariant.
+
+The check reads a new **`signal_bus` field on `ContractCheckSnapshot`** (a string,
+mirroring how `oob_registry` / `live_topics` snapshot fields are surfaced) — never
+reaching into half-built mutable state.
+
 ### 12.5 Delivery semantics
 
 Two modes, matching §4.7's `coalesce`:
@@ -856,8 +985,9 @@ backplane.
 | Phase | Deliverable | Status |
 |---|---|---|
 | **Now (shipped)** | `signal()` / `derived()` / `emit` + globals + `/_chirp/live` + `rules_signals` contract, in-process `ReactiveBus`, Lucky Cat on one connection, pure-derived contract enforced by the `NotifFeed` refactor + transitive `_cascade` | **Done** (single-node) |
-| **Backplane (opt-in)** | `SignalBus` Protocol; `ReactiveBus` reframed as the default adapter; a reference `RedisSignalBus` (publish + reconnecting subscribe); config seam to select the adapter | Not implemented |
-| **Durable mode (later)** | `coalesce=False` append streams over a durable adapter (Redis Streams / JetStream) + reconnect resume cursor | Not implemented |
+| **Backplane (opt-in, first deliverable)** | `SignalBus` Protocol (§12.2); `InProcessSignalBus` default (reframes today's `ReactiveBus` + the render-on-publish inversion); reference `RedisSignalBus` (reusing `chirp[redis]`); `signal_bus` `AppConfig` field + `set_signal_bus` setter (§12.2.1); `signal_bus_single_worker` contract rule (§12.4) | **Not implemented** |
+| **NATS / Postgres adapters (later)** | Same `SignalBus` Protocol, different wire; NATS needs a new `chirp[nats]` extra, Postgres reuses `chirp[data-pg]` (§12.2.2) | **Not implemented** (deferred) |
+| **Durable mode (later)** | `coalesce=False` append streams over a durable adapter (Redis Streams / JetStream) + reconnect resume cursor (§12.5) | **Not implemented** (deferred) |
 
 The sequencing is deliberate: **`signal()` is useful single-node today** (one
 connection, declare-once-bind-many, derived cascade), and the backplane is the
@@ -865,9 +995,95 @@ connection, declare-once-bind-many, derived cascade), and the backplane is the
 behind a stable seam, never a prerequisite for adoption. Same app code; swap the
 transport.
 
-> **Stop-and-ask surfaces.** A `SignalBus` Protocol is a new plugin protocol; an
-> adapter-selection mechanism is likely a new `AppConfig` field or `App` setter;
-> a `redis`/`nats` adapter is a new optional extra. All three are root
-> `AGENTS.md` stop-and-ask surfaces — this section proposes the shape; steward
-> sign-off (realtime + app/state + contracts, plus public-API/changelog
-> collateral) precedes any code.
+### 12.7 Dependencies
+
+Sequencing and upstream/downstream risks, made explicit so the backplane is not
+started before its prerequisites land.
+
+| Dependency | Direction | Why it blocks / enables |
+|---|---|---|
+| **Single-node `signal()` (§1–11) — SHIPPED** | Upstream (done) | The backplane is a transport swap *behind* `SignalRegistry.bus`. Without the shipped registry/stream/contract there is nothing to back. |
+| **The render-on-publish inversion (§12.2)** | Internal, blocks the seam | The shipped path recovers the payload from the per-process value cache (`signal_stream.py:87-92`). The protocol must render eagerly at `publish` and carry the payload in-band before any network adapter is correct. This is the one shipped-path behavior change and must land *with* the seam, not after. |
+| **`chirp[redis]` extra — EXISTS** | Upstream (done) | `RedisSignalBus` reuses it. No new dependency for the first backplane. |
+| **Shared state store (app's job, not Chirp's)** | Downstream caveat | The backplane fans out *notifications/rendered values*; it is **not** a data store (§12.4). A multi-worker app still needs shared source-of-truth (DB / Redis-as-store). The docs must say this loudly or users will expect the bus to replicate `wallet.balance`. |
+| **Pure-derived contract (§12.3) — ENFORCED single-node** | Cross-cutting | Already true in the shipped build (`NotifFeed` refactor + transitive `_cascade`). The backplane *depends on* it staying true: a derived that reads process-local state is non-deterministic across workers. Any regression here silently corrupts multi-worker output. |
+| **NATS / Postgres adapters** | Downstream (deferred) | Same protocol, different wire. Explicitly **not** first-backplane work; NATS needs a new `chirp[nats]` extra (a fresh stop-and-ask). |
+| **Durable mode (`coalesce=False`)** | Downstream (deferred) | Needs an adapter capability + resume cursor (§12.5). Out of scope for the first backplane. |
+| **HTTP/2 transport (pounce)** | Orthogonal | Connection-cap relief, unrelated to cross-worker fan-out. Neither blocks the other. |
+
+### 12.8 Risks
+
+| ID | Risk | Likelihood | Mitigation |
+|---|---|---|---|
+| **R1** | **Silent split-brain** — an app sets `workers>1` with `signal_bus="memory"` and realtime silently only reaches one worker's users (the §12.1 multi-user correctness bug). | High (it is the default `workers=0`/auto path) | The new `signal_bus_single_worker` contract check (§12.4): WARN in dev/staging, **ERROR in production**. Fail-loud, names the fix. This is the single most important guardrail. |
+| **R2** | **Adapter selection fails open** — an unknown/misconfigured `signal_bus` falls back to in-process and reintroduces R1 silently. | Medium | Startup `ValueError` on unknown value; no silent fallback. Connection failure at adapter init surfaces at startup, not first emit. |
+| **R3** | **Render-on-publish changes the hot path** — moving render from drain-time to publish-time (§12.2) could regress single-node latency or break per-event render isolation (`signal_stream.py` boundary). | Medium | Keep render-error isolation: a `publish` whose render raises caches the value and skips the wire (today's `render_for_emit` → `None` semantics), never poisoning the connection. Benchmark single-node before/after; the inversion is contained in `InProcessSignalBus`. |
+| **R4** | **Redis reconnect gap loses an append-stream message** — coalescing-latest self-heals, but `coalesce=False` topics drop data across a reconnect. | Medium (only if durable mode is used on plain pub/sub) | Durable mode is explicitly deferred (§12.5); the live-value default self-heals. The first backplane ships live-value only; `coalesce=False` over Redis pub/sub must WARN or be rejected. |
+| **R5** | **Pure-derived regression across workers** — a derived reads process-local state and emits a value that disagrees with the data it shipped (the original `notif_badge` bug). | Medium | The contract is documented (§12.3) but not yet *statically enforced*. Open question: can `app.check()` flag a derived `compute` that closes over a store reference? If not, this stays a documented discipline + review item. |
+| **R6** | **`redis` accidentally imported at core import time** — breaks the optional-extra contract. | Low | Lazy import inside the adapter (the `cache/backends/redis.py` pattern); a `test_lazy_imports.py`-style assertion that `import chirp` does not import `redis`. |
+| **R7** | **Audience / presence filtering lost in the network hop** — `ReactiveBus` does per-subscriber audience filtering (`bus.py:91-94`); a naive `PUBLISH signal:<topic>` fans out to everyone. | Medium | Per-user topics must encode audience in the channel name (`signal:<topic>:<user_id>`) or the adapter must re-apply audience after receive. Must be designed before per-user signals ride the backplane. |
+
+### 12.9 Stop-and-Ask Surfaces (root `AGENTS.md`)
+
+Per root `AGENTS.md` "Stop And Ask", **every** item below requires steward
+sign-off **before code lands**. This section proposes the shape only.
+
+| Surface | Root `AGENTS.md` trigger | Owning steward(s) | Collateral required |
+|---|---|---|---|
+| **`SignalBus` Protocol** (new plugin protocol) | "plugin protocols", "protocol shapes" | realtime | `docs/public-api.md` if exported; protocol-conformance test; changelog fragment |
+| **`signal_bus` `AppConfig` field** (new public config flag) | "Adding a … `AppConfig` field … or public config flag" + "environment-variable parity when relevant" | app/state (`src/chirp/`) | `config.py` + `from_env` parity; `docs/public-api.md`; `docs/plan-appconfig-1-0-audit.md` cross-ref; changelog |
+| **`app.set_signal_bus(...)` setter** (new public method, registry mutation) | "public API … top-level exports" | app/state | `_check_not_frozen` test; docs |
+| **`RedisSignalBus` + `redis` extra reuse** (optional dependency) | "optional extra" + Optional-Dependencies cross-cutting concern | realtime + app/state | missing-extra import-error test; lazy-import test; install-command docs |
+| **`signal_bus_single_worker` contract rule + new category** (new `app.check()` rule, env-aware severity) | "Promoting/demoting `app.check()` severities or changing default contract semantics" | contracts | `tests/contracts/` coverage (memory+multi-worker → WARN/ERROR); terminal-report category wiring; `site/content/docs/quality/contracts-debugging/categories.md` |
+| **`ContractCheckSnapshot.signal_bus` field** (snapshot surface) | "free-threaded shared state" / contract snapshot | app/state + contracts | snapshot field test |
+| **Render-on-publish inversion** (changes shipped single-node behavior) | "return-type semantics" / render pipeline near-miss; free-threaded shared state | realtime | single-node before/after behavior test; render-isolation test; changelog note (behavior-preserving but internal-contract change) |
+
+> No backplane code is written until realtime **+** app/state **+** contracts
+> stewards sign off, with the public-API and changelog collateral above moving in
+> the same PR as the behavior. The Convergence Rule applies if two stewards flag
+> the same surface.
+
+### 12.10 Acceptance Criteria
+
+What proof closes each phase (the `plan/AGENTS.md` "backlog items name proof"
+requirement). None of this is built; these are the gates.
+
+**Backplane phase (opt-in, first deliverable):**
+
+- [ ] `SignalBus` `runtime_checkable` Protocol exists; `InProcessSignalBus` and
+      `RedisSignalBus` both pass `isinstance(..., SignalBus)`.
+- [ ] `signal_bus="memory"` is byte-for-byte behavior-identical to today on a
+      single worker: the existing `signal()` / Lucky Cat tests pass unchanged.
+- [ ] A **two-worker** integration test (or a two-`SignalRegistry`/two-bus
+      simulation against one Redis) proves an `emit` on instance A reaches a
+      `/_chirp/live` subscriber on instance B — the §12.1 correctness bug is fixed.
+- [ ] Free-threading concurrency test for the adapter seam (Lock proof, root
+      `AGENTS.md` Free-Threading requirement) — the `RedisSignalBus` subscribe
+      iterator is safe under concurrent connects/disconnects.
+- [ ] `import chirp` does **not** import `redis` (lazy-import assertion, R6).
+- [ ] Missing-`redis` extra with `signal_bus="redis"` raises an actionable
+      `pip install chirp[redis]` error, not an opaque `ImportError` (R6, optional
+      -dependency contract).
+- [ ] Unknown `signal_bus` value raises a startup `ValueError` naming the legal
+      set (R2) — no silent in-process fallback.
+- [ ] `signal_bus_single_worker` contract check fires: a
+      `@pytest.mark.issue`-tagged test with a signal registered + `workers>1` +
+      `signal_bus="memory"` → WARN (dev) / ERROR (production); clean when
+      `workers=1` **or** `signal_bus="redis"`.
+- [ ] Render-on-publish keeps render-error isolation: a topic whose render raises
+      caches the value and emits nothing, never killing the shared connection (R3).
+- [ ] Redis reconnect is transparent to the SSE consumer: a dropped broker
+      connection self-heals (bounded backoff, re-subscribe) and the next publish
+      reconciles every binding (live-value mode, R4).
+- [ ] Public-API / changelog collateral lands in the same PR (towncrier fragment;
+      `docs/public-api.md`; `categories.md`).
+- [ ] A real-browser smoke (not just TestClient string-asserts — per the
+      verify-in-browser feedback) of a two-worker Redis-backed app: user A's
+      action updates user B's screen.
+
+**Durable mode (later, explicitly deferred — not part of the first backplane):**
+
+- [ ] `coalesce=False` over a durable adapter (Redis Streams / JetStream) with a
+      resume cursor; no message loss across a forced reconnect.
+- [ ] `coalesce=False` over plain pub/sub WARNs or is rejected at registration
+      (R4).

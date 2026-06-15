@@ -330,6 +330,56 @@ class TestChirpUIIntegration:
 
 
 # ===========================================================================
+# B2 — CSP under secure-by-default (#233)
+# ===========================================================================
+
+
+class TestChirpUICSP:
+    """use_chirp_ui owns the chirp-ui CSP allowance (#233).
+
+    use_chirp_ui flips csp_nonce_enabled so the compiler wires CSPNonceMiddleware
+    with 'unsafe-eval' (Alpine expressions) + style-src 'unsafe-inline' (x-show's
+    un-nonceable inline style attrs). A stock chirp-ui app therefore runs under a
+    per-request nonce CSP that keeps Alpine alive with NO hand-written policy.
+    """
+
+    @pytest.mark.issue(233)
+    def test_use_chirp_ui_flips_csp_nonce_enabled(self):
+        """The auto-enable seam: use_chirp_ui sets alpine AND csp_nonce_enabled."""
+        app = _make_chirpui_app()
+        assert app.config.alpine is True
+        assert app.config.csp_nonce_enabled is True
+
+    @pytest.mark.issue(233)
+    async def test_served_csp_permits_alpine(self):
+        """The actual response CSP carries a per-request nonce, 'unsafe-eval', and
+        style-src 'unsafe-inline' — everything chirp-ui's Alpine shell needs."""
+        import re
+
+        app = _make_chirpui_app()
+        async with TestClient(app) as client:
+            resp = await client.get("/")
+            assert resp.status == 200
+            csp = resp.header("content-security-policy") or ""
+            # script-src: per-request nonce + 'unsafe-eval' (Alpine expressions).
+            assert re.search(r"script-src[^;]*'nonce-[^']+'", csp), csp
+            assert "'unsafe-eval'" in csp, csp
+            # style-src: 'unsafe-inline' for Alpine x-show's un-nonceable styles.
+            assert re.search(r"style-src[^;]*'unsafe-inline'", csp), csp
+
+    @pytest.mark.issue(233)
+    def test_contract_check_silent_for_stock_chirpui_app(self):
+        """The stock chirp-ui app passes the chirpui_csp check in production posture
+        (the auto-wired nonce CSP satisfies it with no hand-written policy)."""
+        from chirp.contracts import check_hypermedia_surface
+
+        app = _make_chirpui_app()
+        result = check_hypermedia_surface(app, deploy=True)
+        csp_issues = [i for i in result.issues if i.category == "chirpui_csp"]
+        assert csp_issues == [], [i.message for i in csp_issues]
+
+
+# ===========================================================================
 # C — HTML contract tests (rendered output has correct interactivity attrs)
 # ===========================================================================
 

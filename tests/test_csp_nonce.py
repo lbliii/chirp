@@ -106,6 +106,30 @@ class TestNonceCSPAllowsFrameworkScripts:
         assert "https://unpkg.com" in csp
         assert "https://cdn.jsdelivr.net" in csp
 
+    @pytest.mark.asyncio
+    @pytest.mark.issue(233)
+    async def test_no_style_src_by_default(self):
+        """Default CSP emits no style-src directive (opt-in only)."""
+        mw = CSPNonceMiddleware()
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "style-src" not in csp
+
+    @pytest.mark.asyncio
+    @pytest.mark.issue(233)
+    async def test_style_unsafe_inline_when_opted_in(self):
+        """Alpine x-show writes un-nonceable inline styles; opt-in via constructor
+        appends style-src 'self' 'unsafe-inline', scoped to style-src only."""
+        mw = CSPNonceMiddleware(style_unsafe_inline=True)
+        resp = await mw(FakeRequest(), ok_next)
+        csp = _get_header(resp, "content-security-policy")
+        assert "style-src 'self' 'unsafe-inline'" in csp
+        # The relaxation is scoped to style-src — script-src stays nonce-only.
+        script_directive = next(
+            (d for d in csp.split(";") if d.strip().startswith("script-src")), ""
+        )
+        assert "'unsafe-inline'" not in script_directive
+
 
 # --- StreamingResponse carries the live nonce for the sender (#181) ---
 

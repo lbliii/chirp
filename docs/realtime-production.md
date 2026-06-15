@@ -41,6 +41,51 @@ Avoid `transition:true` and `view-transition-name` on containers that receive
 OOB descendants. Put transitions on narrow navigation links or detail elements
 that are not updated by SSE/OOB.
 
+## Signals — One Connection, Many Bindings
+
+When the same live *value* appears in more than one place — a balance in the
+topbar and in a modal, an unread badge mirrored across rooms, a status pill —
+reach for a signal instead of hand-maintaining OOB twins. Declare the producer
+once with `@app.signal(name, ...)` (or `@app.derived(name, on=(...))`), push with
+`app.emit(name, value)`, and bind it anywhere with `{{ signal('name') }}` /
+`{{ signal_block('name') }}` under one `{{ signal_connect() }}` wrapper. Every
+binding stays in sync from a single `/_chirp/live` connection, so an SSE-heavy
+shell holds **one** connection instead of N.
+
+Production rules:
+
+- **Place `signal_connect()` in the stable shell, outside boosted content.** Every
+  sink must be a descendant (htmx binds `sse-swap` via `querySelectorAll`). Keep
+  the connect element outside `#main` so a boosted swap leaves the connection
+  intact and htmx re-binds freshly-swapped sinks to the ancestor.
+- **A `derived` must be a pure function of its input signal values.** Never read a
+  process-local store, global, or clock inside a derived — a store read is
+  non-deterministic across workers and can race a concurrent mutation on another
+  thread. Pass everything the derived needs through the emitted value (a snapshot
+  that bundles, e.g., the rows and the unread count atomically), so a derived
+  badge can never disagree with the list it summarizes.
+- **Let `app.check()` enforce bindings.** The `signal_dead_binding` (ERROR) rule
+  catches a binding with no producer — the dead-binding class where an element
+  never updates; `signal_orphan` (INFO) catches a producer no template displays.
+
+### Single-process constraint
+
+The signal bus is in-process memory and the `/_chirp/live` connection is pinned to
+the worker that accepted it, so the single-node `signal()` primitive that ships
+today is **single-process only**: run `workers=1` and `worker_mode="async"`. With
+multiple OS-process workers each holds a separate copy of the bus and value cache —
+a push on one worker is invisible to bindings served by another, and the long-lived
+connection ties up a worker so page loads that land there can stall.
+
+This is correct for a single-user demo, an internal tool, or any one-process
+deployment. **Multi-worker realtime needs a shared bus backplane** (Redis /
+Postgres pub-sub) plus an external state store so every worker sees the same emits
+and current values. That pluggable multi-worker `SignalBus` is designed but not
+shipped — see `plan/drafted/rfc-live-sse-topics.md` (§12); the surface is
+classified **Provisional** in `docs/public-api.md` until it lands. If you need
+cross-worker realtime today, use an `EventStream` over a product-owned durable
+cursor (see *Event Identity And Replay* below), where your store is the backplane.
+
 ## Event Identity And Replay
 
 Production-critical streams need a replay policy before launch. Browsers send

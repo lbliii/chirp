@@ -4,6 +4,8 @@ A playful "lucky cat casino" trading-floor app shell built on ChirpUI: top-bar
 brand + cross-page ticker strip, a markets sidebar, and a markets-grid landing.
 House token is **$MEOW**; market up is jade green, market down is lucky red.
 
+Live demo: **https://luckycat-production.up.railway.app**
+
 This example is built across several issues:
 
 - **#221 (scaffold):** the ChirpUI app shell, Maneki-neko brand + palette, a
@@ -29,19 +31,15 @@ This example is built across several issues:
   driven by a server-side nav model (`navigation.py`: a frozen `RouteState` with
   path-prefix `*_active` properties → `shell_navigation()` returning typed
   `NavSection`/`NavItem`, empty sections pruned) and re-rendered through a single
-  `sidebar_oob` region on boosted navigation. The inner rail is a **genuine
-  continuous drag-resizer**: a rail-edge handle (`.luckycat-sidebar-resize`,
-  `role="separator"`, `cursor: ew-resize`) you drag to set `--luckycat-rail-width`
-  live, double-click to collapse/expand to the bare icon rail, and resize from the
-  keyboard (arrow keys nudge, `Home`/`End` jump to min/max, `Enter`/`Space`
-  collapse). Both preferences — the dragged width (`luckycat_rail_width`, a
-  clamped/validated CSS-px integer) and the collapse boolean
-  (`luckycat_rail_collapsed`) — persist to namespaced cookies and are read
-  **server-side** (`shell.py`: `rail_width()` / `rail_is_collapsed()`) so the very
-  first paint already reflects the persisted size + state (no flash, no
-  flash-of-unsized-rail). The full-viewport shell pins the rails to `100dvh` with
-  a sticky topbar and internal nav scroll; `view_transitions="htmx"` animates the
-  boosted `#main` swaps.
+  `sidebar_oob` region on boosted navigation. The inner rail **collapses** to the
+  bare icon rail via a discoverable toggle button (`data-luckycat-rail-toggle`) —
+  a click-toggle, *not* a continuous drag-resizer (a first-class resizable rail
+  belongs in the chirp-ui peer package, not hand-rolled in an example). The
+  collapse boolean (`luckycat_rail_collapsed`) persists to a namespaced cookie and
+  is read **server-side** (`shell.py`: `rail_is_collapsed()`) so the very first
+  paint already reflects the collapsed state (no flash-of-uncollapsed-rail). The
+  full-viewport shell pins the rails to `100dvh` with a sticky topbar and internal
+  nav scroll; `view_transitions="htmx"` animates the boosted `#main` swaps.
 - **Mobile chrome (`<48rem`):** below the shell's `48rem` breakpoint the inline
   two-tier rail and the topbar shell-actions (Deposit $MEOW + the "More"
   dropdown) are hidden, and a **hamburger** opens a chirp-ui **drawer**
@@ -110,6 +108,25 @@ healthcheck — see `docs/deployment/railway.md`).
 > ```bash
 > PYTHONPATH=src uv run pytest examples/chirpui/lucky_cat/test_app.py
 > ```
+
+## Deploy (Railway)
+
+This directory ships the minimal deploy artifacts so it can run as a standalone
+Railway service:
+
+- `Dockerfile` — Python 3.14 + `uv pip install "bengal-chirp[ui]"`, then
+  `python app.py`. The image is self-contained (it pulls Chirp from PyPI, not
+  the repo checkout), so the build context is *this* directory, not the repo
+  root.
+- `railway.toml` — Dockerfile builder, `startCommand = "python app.py"`,
+  `healthcheckPath = "/health"`, and a single web replica (the demo holds all
+  state in process memory — see "Configuration" below).
+
+`app.run()` reads `PORT` and the `RAILWAY_*` hints through
+`AppConfig.from_env()`, so it binds `0.0.0.0:$PORT` on Railway with no extra
+flags. Set `CHIRP_ENV=production`, `CHIRP_DEBUG=0`, `CHIRP_LOG_FORMAT=json`, and
+a generated `CHIRP_SECRET_KEY` as service variables. See
+`docs/deployment/railway.md` for the full production shape.
 
 ## Configuration
 
@@ -206,7 +223,7 @@ wallet.py                           # In-memory house $MEOW wallet (debit/deposi
 trade_store.py                      # Thread-safe trade backend: validate_order + atomic try_place_order (race-safe fills) + resting limit orders + positions/history reads
 notifications.py                    # Thread-safe bell log: NotifFeed snapshot (rows + atomic unread count) backing the `notifications` signal + its pure derived badge/announce
 watchlist.py                        # Thread-safe starred-markets set (toggle/count under one lock); backs the rail's Watchlist lane + /watchlist
-shell.py                            # Server-side rail width + collapse cookie readers (template globals; drive no-flash first paint, clamp the width cookie)
+shell.py                            # Server-side rail-collapse cookie reader (template global; drives no-flash first paint)
 feed.py                             # FeedSource protocol + deterministic SimFeed (warm-on-build; worker-pool tick fan-out for the FT proof)
 pages/
   _layout.html                      # ChirpUI app shell: brand, ticker strip, two-tier rail (icon rail + inner sidebar_oob), balance
@@ -225,5 +242,5 @@ pages/
     security/  display/             #   the inner-rail Settings lanes
   # every inner-rail link resolves to a real page (link-integrity crawl in test_links.py asserts 200)
 static/lucky-cat.css                # Maneki-neko palette + exchange chrome
-static/lucky-cat-shell.js           # genuine continuous drag-resizer: pointer-drag width + double-click collapse + keyboard; writes the namespaced width/collapse cookies
+static/lucky-cat-shell.js           # rail collapse toggle (writes the namespaced collapse cookie) + hero-chart crosshair
 ```

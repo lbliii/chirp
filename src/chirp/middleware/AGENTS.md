@@ -19,6 +19,11 @@ optional extras, and request isolation.
   exports built-ins and protocol names; avoid inheritance-only APIs.
 - **Security defaults fail closed.** Allowed hosts, CSRF, sessions, CSP, and
   security headers should reject unsafe config when knowable.
+- **CSP relaxations stay narrowly scoped.** `CSPNonceMiddleware`'s `unsafe_eval`
+  and `style_unsafe_inline` (#233) are opt-in Alpine accommodations:
+  `'unsafe-eval'` and `style-src 'unsafe-inline'` only — `script-src` stays
+  nonce-only. The compiler sets both via `config.alpine and not config.alpine_csp`;
+  do not widen them to `script-src 'unsafe-inline'`.
 - **Session extras are optional.** `pyproject.toml:47-48` keeps signed sessions
   behind `itsdangerous`.
 - **Redis remains optional.** `pyproject.toml:71-72` keeps Redis-backed behavior

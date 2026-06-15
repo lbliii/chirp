@@ -567,46 +567,30 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 </style>
 <link rel="icon" href="/static/lucky-cat-logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/lucky-cat.css">
-{#- Pre-sized / pre-collapse CSS gate (#231, part 2 + BUILD 2): the layout emits
-    this server-rendered <style> so the FIRST paint already reflects the persisted
-    drag-resize state (no FOUC / no width flash). Two cookie-backed preferences
-    feed it, read server-side (shell.py):
-
-      * `rail_width()` — the dragged inner-rail width in CSS px (clamped/validated,
-        so the echoed value is always a bounded integer — never raw cookie text).
-        Emitted as `--luckycat-rail-width: <clamped>px` so a dragged rail reloads
-        at the same width.
-      * `rail_is_collapsed()` — the double-click collapse boolean. Collapses the
-        shell column to the icon rail and hides the inner rail.
-
-    Both mirror the runtime CSS in lucky-cat.css but keyed on the cookie, not the
-    class — once lucky-cat-shell.js boots it disables this single <style> (id
-    below) and the runtime class/CSS-var take over. Desktop only (>=48rem): on
-    mobile the chirp-ui shell already overlays the sidebar so the rail is inert. -#}
-{% set _rail_px = rail_width() %}
+{#- Pre-collapse CSS gate (#231): the layout emits this server-rendered <style>
+    so the FIRST paint already reflects the persisted collapse state (no FOUC).
+    `rail_is_collapsed()` (shell.py) reads the cookie server-side; collapsing the
+    shell column to the icon rail and hiding the inner rail. This mirrors the
+    runtime CSS in lucky-cat.css but is keyed on the cookie, not the class — once
+    lucky-cat-shell.js boots it disables this single <style> (id below) and the
+    runtime class takes over. Desktop only (>=48rem): on mobile the chirp-ui shell
+    already overlays the sidebar so the rail is inert. -#}
 {% set _rail_collapsed = rail_is_collapsed() %}
-{% if (_rail_px is not none) or _rail_collapsed %}
+{% if _rail_collapsed %}
 <style id="luckycat-rail-cookie-state" nonce="{{ csp_nonce() }}">
   @media (min-width: 48rem) {
-    {% if _rail_px is not none %}
-    :root {
-      --luckycat-rail-width: {{ _rail_px }}px;
-    }
-    {% end %}
-    {% if _rail_collapsed %}
     .chirpui-app-shell {
       --chirpui-sidebar-width: var(--luckycat-icon-rail-width, 4.25rem);
     }
     .luckycat-inner-rail {
       display: none;
     }
-    {% end %}
   }
 </style>
 {% end %}
-{#- Rail drag-resize script (BUILD 2). defer so it runs after the shell DOM
-    exists; delegates pointer events off document so the handle survives OOB rail
-    swaps. Writes the width + collapsed cookies the server reads above. -#}
+{#- Rail collapse script (#231). defer so it runs after the shell DOM exists;
+    delegates the toggle click off document so the control survives OOB rail
+    swaps. Writes the collapsed cookie the server reads above. -#}
 <script defer src="/static/lucky-cat-shell.js"></script>
 {% end %}
 
@@ -766,49 +750,19 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {% end %}
 {% end %}
 
-{#- Rail-edge resize handle (#231, part 2) — elbysodic .elbysodic-sidebar-resize.
-    A genuine drag-resize affordance (cursor: ew-resize) on the inner-rail's
-    right edge, between the rail and #main. lucky-cat-shell.js (BUILD 2) wires the
-    continuous pointer-drag resize + double-click collapse + keyboard nudge; it
-    delegates pointer events off document so the handle survives OOB rail swaps.
-    role="separator" + aria-orientation is the correct ARIA for a resize splitter;
-    aria-valuemin/max/now express the inner-rail width in CSS px (the JS keeps
-    aria-valuenow in sync as you drag). The min/max match the JS clamp + shell.py
-    RAIL_WIDTH_MIN_PX/MAX_PX (176..416). aria-valuenow must stay within that range,
-    so it seeds at the min when collapsed, else the persisted dragged width, else a
-    mid default (the collapse itself is conveyed by the shell's collapsed class). -#}
-{% def sidebar_resize_handle(collapsed, width=none) %}
-<div class="luckycat-sidebar-resize"
-     data-luckycat-rail-resize
-     role="separator"
-     aria-orientation="vertical"
-     aria-label="Resize navigation"
-     aria-valuemin="176"
-     aria-valuemax="416"
-     aria-valuenow="{{ 176 if collapsed else (width ?? 256) }}"
-     tabindex="0"
-     title="Drag to resize · double-click to collapse"></div>
-{% end %}
-
 {#- Two-tier rail body (#231): a persistent outer ICON RAIL + an inner CONTEXTUAL
-    rail that changes per route, with the rail-edge resize handle between the
-    rail and #main. Single source of truth for BOTH the full-page paint
-    ({% block sidebar %} below) and the boosted-nav OOB swap (the sidebar_oob
-    region). It builds the server nav model from current_path so the active room
-    + contextual sections recompute on every navigation. markets / tickers /
-    meow_balance flow in from the root _context.py (and are present in the layout
-    context on boosted OOB re-render too). The .luckycat-shell-sidebar frame is
-    position:relative (CSS) so the absolutely-positioned handle spans the full
-    rail height. -#}
+    rail that changes per route. Single source of truth for BOTH the full-page
+    paint ({% block sidebar %} below) and the boosted-nav OOB swap (the
+    sidebar_oob region). It builds the server nav model from current_path so the
+    active room + contextual sections recompute on every navigation. markets /
+    tickers / meow_balance flow in from the root _context.py (and are present in
+    the layout context on boosted OOB re-render too). -#}
 {% def sidebar_content(current_path="/") %}
 {% set _state = route_state(current_path) %}
 {% set _nav = shell_navigation(_state, markets=markets | default(()), tickers=tickers | default(none), symbol="", watchlist_count=watchlist_count | default(0)) %}
-{% set _collapsed = rail_is_collapsed() %}
-{% set _width = rail_width() %}
 <div class="luckycat-shell-sidebar">
   {{ primary_icon_rail(_nav.primary_items) }}
   {{ inner_sidebar_shell(_nav, meow_balance | default(0)) }}
-  {{ sidebar_resize_handle(_collapsed, _width) }}
 </div>
 {% end %}
 

@@ -679,28 +679,29 @@
    Two-tier progressive rail (#231) — elbysodic full-viewport structure.
 
    A persistent outer ICON RAIL (--luckycat-icon-rail-width, ~4.25rem) + an
-   inner CONTEXTUAL rail (--luckycat-rail-width, continuous/resizable) that
-   changes per route, side-by-side inside the chirp-ui app-shell sidebar slot
+   inner CONTEXTUAL rail (--luckycat-rail-width, fixed) that changes per route,
+   side-by-side inside the chirp-ui app-shell sidebar slot
    (#chirpui-sidebar-nav). The chirp-ui grid already gives the shell its
    100dvh / sticky-topbar / 1fr-main scaffold; the full-viewport rules below
    (ported from elbysodic 20-shell.css:84-173) pin the sidebar CELL to the
    viewport height and move the scroll INTO the inner rail's nav so the rail
-   chrome (header/footer/resize handle) stays put while only the link list
-   scrolls — and #main scrolls independently via the document.
+   chrome (header/footer) stays put while only the link list scrolls — and
+   #main scrolls independently via the document.
 
-   The shell column width is icon-rail + inner-rail, so dragging the handle
-   (BUILD 2) changes ONLY --luckycat-rail-width (the inner column).
+   The shell column width is icon-rail + inner-rail; collapse narrows it to the
+   icon rail only (see the Rail collapse section below).
    --------------------------------------------------------------------------- */
 
 :root {
   /* Outer icon-rail width (elbysodic --elbysodic-primary-rail-width: 4.25rem). */
   --luckycat-icon-rail-width: 4.25rem;
-  /* Inner contextual-rail width — continuous/resizable in BUILD 2. */
+  /* Inner contextual-rail width (fixed). */
   --luckycat-rail-width: clamp(13rem, 18vw, 18rem);
 }
 
-/* The shell sidebar column = icon rail + inner rail. Dragging the handle
-   changes only --luckycat-rail-width, so the icon rail stays a fixed gutter. */
+/* The shell sidebar column = icon rail + inner rail. Collapse (the
+   .luckycat-rail--collapsed rule + the server pre-collapse <style>) narrows the
+   column to the icon-rail gutter and hides the inner rail. */
 .chirpui-app-shell {
   --chirpui-sidebar-width: calc(var(--luckycat-icon-rail-width) + var(--luckycat-rail-width));
 }
@@ -983,58 +984,14 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Rail resize handle (#231, BUILD 2) — elbysodic .elbysodic-sidebar-resize.
-   A rail-edge handle (cursor: ew-resize) sitting on the inner-rail's right edge,
-   between the rail and #main. lucky-cat-shell.js wires a GENUINE continuous
-   pointer-drag resize (sets --luckycat-rail-width live), double-click
-   collapse/expand, and arrow-key/Home/End keyboard resize. role="separator" +
-   aria-orientation="vertical" is the correct ARIA for a resize splitter (NOT a
-   button), with aria-valuemin/max/now (176..416 px) kept in sync by the JS.
-   Absolutely positioned on the frame so it spans the full rail height regardless
-   of inner-rail scroll.
-
-   Both preferences are cookie-persisted AND read server-side for a no-flash first
-   paint (shell.py rail_width()/rail_is_collapsed() → head_extra <style>): the
-   dragged width (--luckycat-rail-width) and the collapse boolean (the runtime
-   .luckycat-rail--collapsed class shrinks the shell column to the icon-rail width
-   and hides the inner rail). Desktop only (>=48rem) — on mobile the chirp-ui grid
-   stacks the sidebar, so the resize/collapse affordance is inert.
+   Rail collapse (#231) — cookie-persisted, server-side first paint.
+   The inner contextual rail collapses to the bare icon rail via a toggle button
+   (lucky-cat-shell.js). The preference is cookie-persisted AND read server-side
+   for a no-flash first paint (shell.py rail_is_collapsed() → head_extra <style>).
+   The runtime .luckycat-rail--collapsed class shrinks the shell column to the
+   icon-rail width and hides the inner rail. Desktop only (>=48rem) — on mobile
+   the chirp-ui grid stacks the sidebar, so the collapse affordance is inert.
    --------------------------------------------------------------------------- */
-
-.luckycat-sidebar-resize {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 10px;
-  cursor: ew-resize;
-  user-select: none;
-  touch-action: none;
-  z-index: calc(var(--chirpui-z-sticky, 50) + 2);
-}
-/* Accent bar (mirrors elbysodic 20-shell.css:323-351) — fades in on hover/focus
-   so the resize affordance reads as a draggable edge. */
-.luckycat-sidebar-resize::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: calc(50% - 1.2rem);
-  width: 2px;
-  height: 2.4rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--luckycat-red) 42%, transparent);
-  opacity: 0;
-  transition: background 0.12s ease, opacity 0.12s ease;
-}
-.luckycat-sidebar-resize:hover::before,
-.luckycat-sidebar-resize:focus-visible::before {
-  background: color-mix(in srgb, var(--luckycat-red) 62%, transparent);
-  opacity: 1;
-}
-.luckycat-sidebar-resize:focus-visible {
-  outline: 2px solid var(--chirpui-focus-ring, var(--luckycat-red));
-  outline-offset: -2px;
-}
 
 @media (min-width: 48rem) {
   .chirpui-app-shell.luckycat-rail--collapsed {
@@ -1048,13 +1005,6 @@
   }
 }
 
-/* On mobile the chirp-ui grid stacks the sidebar; the edge handle is meaningless. */
-@media (max-width: 48rem) {
-  .luckycat-sidebar-resize {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: no-preference) {
   .chirpui-app-shell {
     transition: grid-template-columns 0.18s ease;
@@ -1062,20 +1012,6 @@
   .luckycat-inner-rail {
     transition: opacity 0.15s ease;
   }
-}
-
-/* During an active pointer-drag the JS adds this class: kill the column
-   transition so the rail tracks the pointer 1:1 (no easing lag), and suppress
-   text selection / pointer hit-testing inside the rail so the drag is smooth. */
-.chirpui-app-shell.luckycat-rail--dragging {
-  transition: none;
-  cursor: ew-resize;
-  user-select: none;
-}
-.chirpui-app-shell.luckycat-rail--dragging .luckycat-inner-rail,
-.chirpui-app-shell.luckycat-rail--dragging .luckycat-primary-rail,
-.chirpui-app-shell.luckycat-rail--dragging .chirpui-app-shell__main {
-  user-select: none;
 }
 
 /* ---------------------------------------------------------------------------

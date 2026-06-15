@@ -48,7 +48,7 @@ from command_palette import palette_results
 from feed import DEFAULT_INTERVAL, INTERVALS, get_feed
 from navigation import active_route_path, route_state, shell_navigation
 from pages._context import hero_chart as build_chart_geometry
-from shell import rail_is_collapsed, rail_width
+from shell import rail_is_collapsed
 from wallet import balance as meow_balance
 from wallet import deposit as credit_meow
 
@@ -116,13 +116,10 @@ app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 app.template_global()(route_state)
 app.template_global()(shell_navigation)
 app.template_global()(active_route_path)
-# Server-side rail-collapse preference (#231, part 2) — read in the layout's
-# head_extra to pre-render the collapsed state (no FOUC) and cookie-persisted by
+# Server-side rail-collapse preference (#231) — read in the layout's head_extra
+# to pre-render the collapsed state (no FOUC) and cookie-persisted by
 # static/lucky-cat-shell.js.
 app.template_global()(rail_is_collapsed)
-# Server-side dragged inner-rail width (BUILD 2) — read in head_extra to pre-size
-# the rail on first paint (no flash). Validated/clamped against CSS injection.
-app.template_global()(rail_width)
 
 # ---------------------------------------------------------------------------
 # Live signals (declare-once / bind-many) — ONE /_chirp/live connection carries
@@ -381,25 +378,14 @@ app.add_middleware(
     )
 )
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
-# CSP must be chirp-ui-compatible: chirp-ui drives the shell with Alpine, which
-# evaluates its expressions as JS ('unsafe-eval') and toggles element visibility
-# via inline style attributes ('unsafe-inline' in style-src — those can't be
-# nonced). The default SecurityHeaders CSP omits both, which silently kills the
-# entire interactive shell (collapse, dropdowns, theme toggle). A production app
-# would tighten script-src to per-request nonces (AppConfig(csp_nonce_enabled=True));
-# this example keeps one explicit, working policy.
-_CHIRP_UI_CSP = (
-    "default-src 'self'; "
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data:; "
-    "connect-src 'self'; "
-    "font-src 'self'; "
-    "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
-)
-app.add_middleware(
-    SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=_CHIRP_UI_CSP))
-)
+# SecurityHeaders for the clickjacking / MIME-sniff / referrer headers only —
+# content_security_policy=None so it does NOT emit a CSP header. use_chirp_ui
+# (called above) flipped csp_nonce_enabled, so the compiler wires
+# CSPNonceMiddleware as the single CSP authority: a per-request nonce script-src
+# plus 'unsafe-eval' and style-src 'unsafe-inline' that chirp-ui's Alpine shell
+# requires. No hand-written CSP — the chirpui_csp contract check would WARN/ERROR
+# if a future edit re-broke it.
+app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None)))
 
 # ---------------------------------------------------------------------------
 # Non-page routes (registered BEFORE mount_pages, kanban idiom).

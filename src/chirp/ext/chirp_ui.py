@@ -193,8 +193,17 @@ def use_chirp_ui(
 
     from chirp.middleware.static import StaticFiles
 
-    if not app.config.alpine:
-        app.bind_config(replace(app.config, alpine=True))
+    # Auto-enable Alpine (chirp-ui components require it) AND auto-wire a
+    # per-request nonce CSP so chirp-ui's inline Alpine survives secure-by-default.
+    # chirp-ui owns the "chirp-ui needs a working CSP" fact: flipping
+    # csp_nonce_enabled makes the compiler wire CSPNonceMiddleware with
+    # 'unsafe-eval' (Alpine expressions) + style-src 'unsafe-inline' (x-show's
+    # un-nonceable inline style attrs), so no hand-written CSP is needed. This is
+    # additive/safe — an app that pins its own CSP after this call still wins, and
+    # the chirpui_csp contract check flags a later conflicting policy. Only set
+    # what is not already on (preserve an app that pre-pinned either flag).
+    if not app.config.alpine or not app.config.csp_nonce_enabled:
+        app.bind_config(replace(app.config, alpine=True, csp_nonce_enabled=True))
 
     chirp_ui.register_filters(app)
     if hasattr(app, "template_global"):

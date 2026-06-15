@@ -7,6 +7,8 @@
 
 **A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events.**
 
+> 🐱 **Live demo — [Lucky Cat](https://luckycat-production.up.railway.app):** a flagship ChirpUI crypto-exchange built entirely on server-owned signals, SSE, Suspense, and OOB swaps — no client framework. ([source](examples/chirpui/lucky_cat/))
+
 ```python
 from chirp import App
 
