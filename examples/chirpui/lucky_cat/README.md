@@ -4,6 +4,8 @@ A playful "lucky cat casino" trading-floor app shell built on ChirpUI: top-bar
 brand + cross-page ticker strip, a markets sidebar, and a markets-grid landing.
 House token is **$MEOW**; market up is jade green, market down is lucky red.
 
+Live demo: <PLACEHOLDER — fill after deploy>
+
 This example is built across several issues:
 
 - **#221 (scaffold):** the ChirpUI app shell, Maneki-neko brand + palette, a
@@ -110,6 +112,25 @@ healthcheck — see `docs/deployment/railway.md`).
 > ```bash
 > PYTHONPATH=src uv run pytest examples/chirpui/lucky_cat/test_app.py
 > ```
+
+## Deploy (Railway)
+
+This directory ships the minimal deploy artifacts so it can run as a standalone
+Railway service:
+
+- `Dockerfile` — Python 3.14 + `uv pip install "bengal-chirp[ui]"`, then
+  `python app.py`. The image is self-contained (it pulls Chirp from PyPI, not
+  the repo checkout), so the build context is *this* directory, not the repo
+  root.
+- `railway.toml` — Dockerfile builder, `startCommand = "python app.py"`,
+  `healthcheckPath = "/health"`, and a single web replica (the demo holds all
+  state in process memory — see "Configuration" below).
+
+`app.run()` reads `PORT` and the `RAILWAY_*` hints through
+`AppConfig.from_env()`, so it binds `0.0.0.0:$PORT` on Railway with no extra
+flags. Set `CHIRP_ENV=production`, `CHIRP_DEBUG=0`, `CHIRP_LOG_FORMAT=json`, and
+a generated `CHIRP_SECRET_KEY` as service variables. See
+`docs/deployment/railway.md` for the full production shape.
 
 ## Configuration
 

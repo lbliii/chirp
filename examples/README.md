@@ -5,7 +5,7 @@ Examples are now organized by runtime layer so the support matrix is obvious:
 - [`examples/standalone`](examples/standalone/README.md): baseline Chirp without `chirp_ui`
 - [`examples/chirpui`](examples/chirpui/README.md): app-shell and component-driven examples using ChirpUI
 
-> **Featured:** [`examples/standalone/shapes_workspaces`](standalone/shapes_workspaces/README.md) — the verified, multi-tenant `chirp.data` Shapes data layer: a startup-checked SQL→render contract, tenant `scope=` isolation with no hand-written `WHERE`, and bounded `nested()`/`@composite` queries (no N+1).
+> **Featured:** [`examples/chirpui/lucky_cat`](chirpui/lucky_cat/README.md) — the flagship ChirpUI demo: a Maneki-neko **$MEOW** crypto exchange. A markets grid + market-detail page (interactive chart, depth-bar order book, trades tape), a `FormAction`/`ValidationError` trade flow, a `Suspense` portfolio dashboard, a watchlist, an activity feed, and a command palette — with the cross-page ticker, balance, and notification bell all riding server-owned `signal()`s over one `/_chirp/live` SSE connection.
 
 ## Which Bucket To Use
 

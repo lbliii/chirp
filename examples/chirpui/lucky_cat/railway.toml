@@ -1,0 +1,23 @@
+# Lucky Cat — Railway service config.
+#
+# Deploy with the example directory as the service root directory:
+#     railway up   (from examples/chirpui/lucky_cat/)
+#
+# See docs/deployment/railway.md for the recommended production shape.
+# Required service variables: CHIRP_ENV=production, CHIRP_DEBUG=0,
+# CHIRP_SECRET_KEY=<generated secret>, CHIRP_LOG_FORMAT=json.
+# Keep this a SINGLE web replica — the demo holds all state in process memory
+# (wallet / trade store / SimFeed / signal bus); see README "Configuration".
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# app.py runs `app.run()`; AppConfig.from_env() binds 0.0.0.0:$PORT on Railway.
+startCommand = "python app.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+numReplicas = 1

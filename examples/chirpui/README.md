@@ -19,6 +19,15 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 
 ## Representative Examples
 
+- `lucky_cat`: the flagship ChirpUI demo — a Maneki-neko **$MEOW** crypto
+  exchange. A markets grid plus a market-detail page (interactive price chart,
+  depth-bar order book, recent-trades tape), a place/cancel-order trade flow
+  (`FormAction` multi-target OOB on a clean fill, `ValidationError` 422
+  re-render on a bad order), a `Suspense` portfolio dashboard whose six panels
+  paint as skeletons and stream in, a starred-markets watchlist, an activity
+  feed, a Cmd/Ctrl-K command palette, and a notification bell — with the
+  cross-page ticker, $MEOW balance, and bell all bound to server-owned
+  `signal()`s over one `/_chirp/live` SSE connection.
 - `contacts_shell`: ChirpUI shell companion to the standalone contacts CRUD example
 - `forum_shell`: compact product-shaped shell fixture with mounted pages, form contracts, repeated fields, JSON data islands, and OOB shell updates
 - `pages_shell`: mounted pages and shell actions
@@ -34,6 +43,7 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 - `islands_shell`
 - `kanban_shell`
 - `llm_playground`
+- `lucky_cat`
 - `pages_shell`
 - `rag_demo`
 - `shell_oob`
