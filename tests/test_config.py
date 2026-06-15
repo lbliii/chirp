@@ -17,6 +17,33 @@ def _pop_app_env() -> dict[str, str]:
     return {k: os.environ.pop(k) for k in keys}
 
 
+def _app_env_keys() -> list[str]:
+    return [
+        k for k in os.environ if k.startswith(("CHIRP_", "RAILWAY_")) or k in _ENV_KEYS_TO_CLEAR
+    ]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_app_env():
+    """Fully restore CHIRP_*/RAILWAY_* env around every test in this module.
+
+    The per-test ``finally: os.environ.update(env_backup)`` blocks restore keys
+    that pre-existed but never DELETE keys a test newly set (CHIRP_DEBUG,
+    CHIRP_ENV, ...). Those leak into later tests in the same process — most
+    visibly the Lucky Cat example, whose ``AppConfig.from_env()`` then reads
+    debug=True + env='production' and ``app.check()`` raises SystemExit (this is
+    why the full ``test`` job has been red since the example landed). Snapshot
+    here and remove-then-restore on teardown so no test in this file can leak.
+    """
+    backup = {k: os.environ[k] for k in _app_env_keys()}
+    try:
+        yield
+    finally:
+        for k in _app_env_keys():
+            del os.environ[k]
+        os.environ.update(backup)
+
+
 class TestAppConfig:
     def test_defaults(self) -> None:
         cfg = AppConfig()
