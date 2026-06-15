@@ -1,0 +1,47 @@
+name: Deploy Lucky Cat demo
+
+# Keeps the live demo (https://luckycat-production.up.railway.app) current.
+# The example's Dockerfile installs Chirp from git@main, so the demo tracks the
+# framework — but only when the image is rebuilt. This rebuilds + redeploys it
+# whenever the example OR the framework source changes on main.
+#
+# `railway up` (not `redeploy`) is intentional: it rebuilds the image, so the
+# Dockerfile re-pulls the latest main Chirp. Railway healthchecks the new
+# deployment (/health, 300s) and keeps the previous one serving if it fails —
+# a broken main can't take the live demo down.
+#
+# REQUIRED: a repo secret RAILWAY_TOKEN — a *project* token for the `lucky_cat`
+# Railway project (Railway dashboard -> project -> Settings -> Tokens). A project
+# token auto-scopes `railway up` to that project; no project linking needed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/chirpui/lucky_cat/**"
+      - "src/chirp/**"
+  workflow_dispatch: {}
+
+# Never let two demo deploys race; cancel an in-flight one when a newer push lands.
+concurrency:
+  group: deploy-lucky-cat
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Don't fork-deploy: only the canonical repo holds the token.
+    if: github.repository == 'lbliii/chirp'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: bash <(curl -fsSL https://railway.com/install.sh)
+
+      - name: Rebuild + redeploy Lucky Cat
+        working-directory: examples/chirpui/lucky_cat
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # --ci builds, streams logs, waits for the deploy, and exits non-zero on
+        # failure so a broken build surfaces as a red check.
+        run: railway up --ci --service lucky_cat
