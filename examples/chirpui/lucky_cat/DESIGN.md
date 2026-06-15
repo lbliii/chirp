@@ -137,7 +137,7 @@ right fit for the slow dashboard.)
 | **Notifications bell** | `POST /notifications/read` + the `notifications` SIGNAL (source) on `/_chirp/live` | empty 204 / live signals | chirp-ui `chirpuiDropdown()`; open-marks-read emits the signal so the **derived** `notif_badge` / `notif_announce` clear; the source generator drains the log + raises price alerts and emits the recent list (the dropdown re-renders over the **one** connection — the N→1 fold) |
 | **Command palette (Cmd-K)** | `GET /search` (`referenced=True`) | `Fragment` (`palette_results_body`) | chirp-ui `command_palette` (`<dialog>` + `chirpuiDialogTarget`); `command_palette.palette_results` filters markets + rooms |
 | **Mobile drawer nav** | (no route — shell chrome) | n/a | chirp-ui `drawer` + `chirpuiDialogTarget`; `mobile_drawer_nav` reuses the same `shell_navigation` model as the rail |
-| **Drag-resize rail** | (no route — cookie-persisted) | n/a | `shell.rail_width()` / `rail_is_collapsed()` read server-side for no-FOUC first paint; `static/lucky-cat-shell.js` drives the drag |
+| **Collapsible rail** | (no route — cookie-persisted) | n/a | `shell.rail_is_collapsed()` read server-side for no-FOUC first paint; `static/lucky-cat-shell.js` drives the collapse toggle |
 | **Suspense dashboard** | `GET /portfolio` | `Suspense` | shell-first; six deferred panels stream as OOB swaps from `trade_store` |
 | **Free-threading proof** | `GET /ft/stream` (`referenced=True`) | `EventStream` | OOB-swaps a live ticks/sec figure into `#ft-panel` |
 
@@ -379,13 +379,12 @@ floor in `static/lucky-cat.css` — any new animation must keep that floor.
 
 ### No-FOUC first paint
 
-Two cookie-backed rail preferences (`rail_width()` / `rail_is_collapsed()` in
-`shell.py`) are read server-side and emitted into a nonced
-`#luckycat-rail-cookie-state` `<style>` so the first paint already reflects the
-persisted drag-resize width and collapse state. The width cookie is untrusted
-client input reflected into CSS, so it is numerically parsed and clamped to
-`[RAIL_WIDTH_MIN_PX, RAIL_WIDTH_MAX_PX]` (176–416) — a non-numeric or
-out-of-range value is rejected, never echoed.
+The cookie-backed rail collapse preference (`rail_is_collapsed()` in `shell.py`)
+is read server-side and emitted into a nonced `#luckycat-rail-cookie-state`
+`<style>` so the first paint already reflects the persisted collapsed state — no
+flash-of-uncollapsed-rail. Collapse is a click-toggle, not a continuous
+drag-resizer: a first-class resizable rail belongs in the chirp-ui peer package
+(see #231's locked decision and `plan/completed/231-rail-collapse-resolution.md`).
 
 ---
 

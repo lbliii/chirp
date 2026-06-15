@@ -14,6 +14,8 @@ SSE twin (honest parallel-work figures, no sleeps). app.check() stays clean
 throughout (TestContracts).
 """
 
+import pytest
+
 from chirp.testing import TestClient, assert_mutation_redirect
 from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
@@ -27,6 +29,7 @@ def _session_cookie(response) -> str | None:
 class TestContracts:
     """The example should stay clean under startup contract checks."""
 
+    @pytest.mark.issue(229)
     def test_app_check_passes(self, example_app) -> None:
         example_app.check()
 
@@ -34,6 +37,7 @@ class TestContracts:
 class TestHealth:
     """Railway healthcheck."""
 
+    @pytest.mark.issue(221)
     async def test_health_ok(self, example_app) -> None:
         async with TestClient(example_app) as client:
             response = await client.get("/health")
@@ -254,6 +258,7 @@ class TestSimFeed:
 
         asyncio.run(drive())
 
+    @pytest.mark.issue(222)
     def test_same_seed_identical_tick_sequence(self) -> None:
         """The headline determinism guarantee: seed -> identical ticks."""
         import asyncio
@@ -497,6 +502,7 @@ class TestMarketStream:
         assert result.headers.get("content-type") == "text/event-stream"
         assert len(result.events) >= 4
 
+    @pytest.mark.issue(223)
     async def test_stream_events_are_oob_fragments(self, example_app) -> None:
         """Every HTML event is an OOB swap with no raw template tags."""
         async with TestClient(example_app) as client:
@@ -712,6 +718,7 @@ class TestTopbar:
     """#230: the topbar chrome is real — Deposit opens a modal that POSTs, and
     the bar uses more than one shell-action zone."""
 
+    @pytest.mark.issue(230)
     async def test_deposit_action_is_not_inert(self, example_app) -> None:
         """The Deposit button carries data-action="deposit" (the kanban modal
         pattern), NOT an inert href="#"."""
@@ -1083,6 +1090,7 @@ class TestTradeOrder:
             headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
         return headers
 
+    @pytest.mark.issue(225)
     async def test_invalid_order_returns_422_with_field_error(self, example_app) -> None:
         """Insufficient balance -> 422 + re-rendered form with the field error,
         no full-page nav (the order_form block, not the whole page)."""
@@ -1642,37 +1650,31 @@ class TestMobileShell:
 
 
 class TestRailCollapse:
-    """#231 part 2 (BUILD 1): the rail-edge resize handle + the cookie-persisted,
-    server-side-first collapse state.
+    """#231: the cookie-persisted, server-side-first rail COLLAPSE.
 
-    The rail-edge handle (``.luckycat-sidebar-resize``, ``role="separator"``,
-    ``cursor: ew-resize``) replaces the old click-toggle button — BUILD 1 ships
-    the handle ELEMENT + ARIA; BUILD 2 wires the genuine continuous pointer-drag
-    resize + double-click collapse. The collapse preference is preserved: it
-    rides a namespaced cookie (``luckycat_rail_collapsed``) read server-side so
-    the first paint is already collapsed (no FOUC). The layout pre-renders a
-    cookie-gated ``<style>`` the shell JS then disables.
+    The inner contextual rail collapses to the bare icon rail via a discoverable
+    toggle button (``data-luckycat-rail-toggle``) — a click-toggle, NOT a
+    continuous drag-resizer (a first-class resizable rail belongs in the chirp-ui
+    peer package; see #231's locked decision). The collapse preference rides a
+    namespaced cookie (``luckycat_rail_collapsed``) read server-side so the first
+    paint is already collapsed (no FOUC): the layout pre-renders a cookie-gated
+    ``<style>`` the shell JS then disables.
     """
 
     _COOKIE = "luckycat_rail_collapsed"
 
-    async def test_resize_handle_renders_in_rail(self, example_app) -> None:
-        """The resize handle ships INSIDE the rail (so it survives OOB swaps),
-        carries the separator ARIA + drag hook, and the shell script is wired.
-        The discoverability follow-up ALSO ships a visible collapse-toggle button
-        (the drag handle is kept too — they coexist)."""
+    async def test_collapse_toggle_renders_in_rail(self, example_app) -> None:
+        """The collapse toggle ships INSIDE the rail (so it survives OOB swaps)
+        and the shell script is wired. There is NO drag-resize handle (reverted
+        per #231's locked cookie-collapse decision)."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
-            # The genuine drag-resize handle.
-            assert "luckycat-sidebar-resize" in response.text
-            assert "data-luckycat-rail-resize" in response.text
-            assert 'role="separator"' in response.text
-            assert 'aria-orientation="vertical"' in response.text
-            # The visible, discoverable collapse-toggle button is now present.
             assert "data-luckycat-rail-toggle" in response.text
-            # The shell script is wired (defer, from /static).
             assert 'src="/static/lucky-cat-shell.js"' in response.text
+            # The reverted drag-resizer is gone.
+            assert "luckycat-sidebar-resize" not in response.text
+            assert "data-luckycat-rail-resize" not in response.text
 
     async def test_visible_collapse_toggle_is_accessible(self, example_app) -> None:
         """The discoverable collapse control is a real, accessible <button>:
@@ -1708,17 +1710,18 @@ class TestRailCollapse:
 
     async def test_default_is_expanded_no_precollapse_style(self, example_app) -> None:
         """With no cookie the rail renders expanded — the pre-collapse <style>
-        gate is absent and the handle seeds the expanded width on aria-valuenow."""
+        gate is absent and the toggle reports aria-expanded="true"."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
             assert 'id="luckycat-rail-cookie-state"' not in response.text
-            # Expanded → the handle seeds the mid (expanded) width.
-            assert 'aria-valuenow="256"' in response.text
+            assert 'aria-expanded="true"' in response.text
 
+    @pytest.mark.issue(231)
     async def test_collapsed_cookie_pre_renders_collapsed_state(self, example_app) -> None:
-        """The headline no-FOUC guarantee: a collapsed cookie makes the SERVER
-        emit the pre-collapse <style> + seed the collapsed width on first paint."""
+        """The headline no-FOUC guarantee (#231's locked decision): a collapsed
+        cookie makes the SERVER emit the pre-collapse <style> on first paint, so
+        the rail is already collapsed before any JS runs."""
         async with TestClient(example_app) as client:
             response = await client.get("/", headers={"Cookie": f"{self._COOKIE}=true"})
             assert response.status == 200
@@ -1726,10 +1729,6 @@ class TestRailCollapse:
             assert 'id="luckycat-rail-cookie-state"' in response.text
             # It collapses the shell sidebar column to the icon-rail width.
             assert "--chirpui-sidebar-width: var(--luckycat-icon-rail-width" in response.text
-            # Collapsed → aria-valuenow seeds at the min (it must stay within
-            # valuemin/valuemax; collapse is conveyed by the shell class, not a
-            # sub-min value).
-            assert 'aria-valuenow="176"' in response.text
 
     async def test_expanded_cookie_renders_expanded(self, example_app) -> None:
         """An explicit ``false`` cookie is treated as expanded (round-trip)."""
@@ -1737,11 +1736,10 @@ class TestRailCollapse:
             response = await client.get("/", headers={"Cookie": f"{self._COOKIE}=false"})
             assert response.status == 200
             assert 'id="luckycat-rail-cookie-state"' not in response.text
-            assert 'aria-valuenow="256"' in response.text
 
     async def test_collapse_state_survives_boosted_oob_swap(self, example_app) -> None:
-        """The resize handle re-ships in the boosted sidebar OOB chunk so it is
-        never lost across navigation."""
+        """A collapsed rail stays usable across boosted navigation: the toggle
+        re-ships in the sidebar OOB chunk so the user can always re-expand."""
         async with TestClient(example_app) as client:
             response = await client.get(
                 "/portfolio",
@@ -1754,10 +1752,7 @@ class TestRailCollapse:
             )
             assert response.status == 200
             oob = response.text[response.text.find('id="chirpui-sidebar-nav"') :]
-            assert "data-luckycat-rail-resize" in oob
-            # The OOB rail re-render reflects the collapsed preference; aria-valuenow
-            # stays clamped to the min (valuemin) rather than a sub-min value.
-            assert 'aria-valuenow="176"' in oob
+            assert "data-luckycat-rail-toggle" in oob
 
     def test_rail_is_collapsed_reads_cookie(self) -> None:
         """The server reader is pure: no request in scope → expanded default."""
@@ -1766,60 +1761,6 @@ class TestRailCollapse:
         assert RAIL_COLLAPSED_COOKIE == "luckycat_rail_collapsed"
         # No request in the ContextVar → safe default (expanded).
         assert rail_is_collapsed() is False
-
-    _WIDTH_COOKIE = "luckycat_rail_width"
-
-    async def test_dragged_width_cookie_pre_sizes_rail(self, example_app) -> None:
-        """BUILD 2 no-flash width guarantee: a persisted drag width makes the
-        SERVER emit a pre-sized `--luckycat-rail-width` <style> and seed the
-        handle's aria-valuenow on first paint (no JS-only width flash)."""
-        async with TestClient(example_app) as client:
-            response = await client.get("/", headers={"Cookie": f"{self._WIDTH_COOKIE}=240"})
-            assert response.status == 200
-            assert 'id="luckycat-rail-cookie-state"' in response.text
-            assert "--luckycat-rail-width: 240px" in response.text
-            # The handle seeds the persisted width for screen-reader resize state.
-            assert 'aria-valuenow="240"' in response.text
-
-    async def test_dragged_width_cookie_is_clamped_not_reflected_raw(self, example_app) -> None:
-        """SECURITY: the width cookie is reflected into a server <style>, so it is
-        parsed+clamped — an out-of-range value clamps and a non-numeric/injection
-        value is rejected (never echoed into CSS)."""
-        async with TestClient(example_app) as client:
-            # Out-of-range → clamped to the max (416), not the raw 99999.
-            clamped = await client.get("/", headers={"Cookie": f"{self._WIDTH_COOKIE}=99999"})
-            assert "--luckycat-rail-width: 416px" in clamped.text
-            assert "99999" not in clamped.text
-            # Non-numeric / CSS-breakout attempt → rejected: no pre-sized style, and
-            # the raw payload never reaches the response.
-            attack = "1px}</style><script>alert(1)</script>"
-            evil = await client.get("/", headers={"Cookie": f"{self._WIDTH_COOKIE}={attack}"})
-            assert "</style><script>alert(1)</script>" not in evil.text
-            assert "--luckycat-rail-width: 1px" not in evil.text
-
-    def test_rail_width_reader_clamps_and_rejects(self) -> None:
-        """The server width reader is pure + bounded: no request → None; valid →
-        clamped int; out-of-range → clamped; non-numeric → None."""
-        from shell import (
-            RAIL_WIDTH_COOKIE,
-            RAIL_WIDTH_MAX_PX,
-            RAIL_WIDTH_MIN_PX,
-            rail_width,
-        )
-
-        assert RAIL_WIDTH_COOKIE == "luckycat_rail_width"
-        # No request in the ContextVar → safe default (None → CSS default width).
-        assert rail_width() is None
-
-        class _Req:
-            def __init__(self, value):
-                self.cookies = {} if value is None else {RAIL_WIDTH_COOKIE: value}
-
-        assert rail_width(_Req("240")) == 240
-        assert rail_width(_Req("10")) == RAIL_WIDTH_MIN_PX
-        assert rail_width(_Req("9999")) == RAIL_WIDTH_MAX_PX
-        assert rail_width(_Req("not-a-number")) is None
-        assert rail_width(_Req(None)) is None
 
 
 class TestPortfolioDashboard:
@@ -1887,6 +1828,7 @@ class TestPortfolioDashboard:
             assert "PAW-MEOW" in response.text
             assert "No holdings yet" not in response.text
 
+    @pytest.mark.issue(224)
     async def test_deferred_panels_swap_to_existing_dom_ids(self, example_app) -> None:
         """HIGH-bug regression: every deferred panel must OOB-swap to a DOM id that
         EXISTS in the shell (fail-loud). On a browser GET the Suspense stream uses
