@@ -35,13 +35,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Install via npm so the `railway` binary lands on PATH (the curl installer
+      # drops it in ~/.railway/bin, which isn't on PATH in later steps -> exit 127).
       - name: Install Railway CLI
-        run: bash <(curl -fsSL https://railway.com/install.sh)
+        run: npm i -g @railway/cli
 
       - name: Rebuild + redeploy Lucky Cat
         working-directory: examples/chirpui/lucky_cat
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # --ci builds, streams logs, waits for the deploy, and exits non-zero on
-        # failure so a broken build surfaces as a red check.
-        run: railway up --ci --service lucky_cat
+        # Pin CHIRP_REF to this commit so the Dockerfile's git-install layer busts
+        # (Railway injects the service var as the matching build ARG); without it a
+        # cached `git+...@main` layer would redeploy stale framework code.
+        # --skip-deploys: set the var without a redeploy; `up` does the one deploy.
+        # --ci: build, stream logs, wait, and exit non-zero on failure (red check).
+        run: |
+          railway variables --set "CHIRP_REF=${{ github.sha }}" --service lucky_cat --skip-deploys
+          railway up --ci --service lucky_cat

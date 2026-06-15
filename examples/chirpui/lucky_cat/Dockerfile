@@ -31,8 +31,15 @@ WORKDIR /app
 # Bleeding-edge Chirp from main with ALL extras (the example needs sessions
 # [itsdangerous] + forms [python-multipart] beyond ui), plus chirp-ui explicitly
 # so the component library is present regardless of the [all] extra's contents.
+#
+# CHIRP_REF busts Docker's layer cache: `git+...@main` is cached by instruction
+# text, so a plain rebuild would never re-pull a newer main (the deployed demo
+# would silently lag the framework). The deploy sets CHIRP_REF to the commit SHA
+# (a Railway service variable, which Railway injects as the matching build ARG),
+# so each deploy invalidates this layer and re-pulls Chirp at that exact commit.
+ARG CHIRP_REF=main
 RUN uv pip install --system \
-    "bengal-chirp[all] @ git+https://github.com/lbliii/chirp.git@main" \
+    "bengal-chirp[all] @ git+https://github.com/lbliii/chirp.git@${CHIRP_REF}" \
     "chirp-ui>=0.9.0"
 
 # The example is a flat package of sibling modules + a pages/ tree + static/.
