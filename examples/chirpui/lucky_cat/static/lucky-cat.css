@@ -735,11 +735,13 @@
     flex: 1 1 auto;
     position: relative;
   }
-  /* Outer icon rail: full height, internal scroll if the rooms overflow. */
+  /* Outer icon rail: full height. overflow:visible (not auto) so the icon-rail
+     hover tooltip (::after at left:100%+) escapes the rail instead of being
+     clipped. Only 5 fixed rooms live here — they never scroll, so the scroll
+     container was speculative and silently established a clip box on both axes. */
   .luckycat-primary-rail {
     height: 100%;
-    overflow-y: auto;
-    scrollbar-width: thin;
+    overflow: visible;
   }
   /* Inner contextual rail: flex column. The NAV scrolls; header/footer pinned. */
   .luckycat-inner-rail {
@@ -773,6 +775,12 @@
   padding-block: 0.75rem;
   background: var(--lc-plane-base);
   box-shadow: inset -1px 0 0 var(--lc-hairline);
+  /* Stack above the inner rail (z-index:1 below) so the hover tooltip, which
+     renders into the inner rail's column, is not painted over by its opaque
+     background. The two rails are flex siblings; without an explicit stacking
+     context the tooltip's own z-index can't lift it above a later sibling. */
+  position: relative;
+  z-index: 2;
 }
 .luckycat-primary-rail__link {
   position: relative;
@@ -822,6 +830,15 @@
   font-size: 1.15rem;
   line-height: 1;
 }
+/* Bespoke SVG room icons (rail_svg_icon) — size them explicitly (the font-size
+   above only drives the glyph fallback). currentColor stroke inherits the link's
+   color, so jade hover/active styling applies for free. */
+.luckycat-primary-rail__icon svg,
+.luckycat-nav-drawer__icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  display: block;
+}
 .luckycat-primary-rail__count {
   position: absolute;
   top: -0.15rem;
@@ -867,6 +884,10 @@
   min-width: 0;
   background: var(--lc-plane-surface);
   box-shadow: inset -1px 0 0 var(--lc-hairline);
+  /* Sits below the primary rail (z-index:2) so the icon-rail hover tooltip that
+     overhangs into this column renders above this rail's opaque background. */
+  position: relative;
+  z-index: 1;
 }
 .luckycat-inner-rail__brand {
   display: inline-flex;
