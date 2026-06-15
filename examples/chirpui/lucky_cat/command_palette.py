@@ -20,11 +20,17 @@ narrows the list. An empty query returns everything (the resting palette shows
 the full directory). Results are returned as typed :class:`PaletteGroup` /
 :class:`PaletteItem` trees with empty groups pruned, so the results template
 never renders a bare group header.
+
+The substring rule itself lives in :mod:`search` (#277) — the *one* matcher the
+Research power surface shares, so Cmd-K and the full catalog never disagree on
+what counts as a match.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from search import matches
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,16 +75,6 @@ _ROOMS: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
-def _matches(query: str, *haystacks: str) -> bool:
-    """True when every whitespace-separated query token is a substring of at
-    least one haystack (case-insensitive). An empty query matches everything."""
-    q = query.strip().lower()
-    if not q:
-        return True
-    hay = " ".join(haystacks).lower()
-    return all(token in hay for token in q.split())
-
-
 def palette_results(markets: tuple, query: str = "") -> tuple[PaletteGroup, ...]:
     """Filter the markets + rooms directories by ``query``.
 
@@ -93,12 +89,12 @@ def palette_results(markets: tuple, query: str = "") -> tuple[PaletteGroup, ...]
             hint=m.base,
         )
         for m in markets
-        if _matches(query, m.symbol, m.display_name)
+        if matches(query, m.symbol, m.display_name)
     )
     room_items = tuple(
         PaletteItem(label=label, href=href, hint=hint)
         for key, label, href, hint in _ROOMS
-        if _matches(query, key, label)
+        if matches(query, key, label)
     )
     groups = (
         PaletteGroup(label="Markets", items=market_items),
