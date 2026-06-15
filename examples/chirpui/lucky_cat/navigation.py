@@ -163,9 +163,10 @@ def route_state(current_path: object) -> RouteState:
 
 
 # ---------------------------------------------------------------------------
-# Primary (icon-rail) rooms — persistent across every route. Icon names are
-# verified against chirp-ui's | icon registry (grid/user/refresh/list/settings
-# all resolve); no SVG sprite is used.
+# Primary (icon-rail) rooms — persistent across every route. The rail renders a
+# bespoke inline SVG per room via the `rail_svg_icon` macro (keyed on `key`); the
+# `icon` name here is the chirp-ui `| icon` glyph FALLBACK for any key without a
+# custom SVG (verified to resolve: grid/user/refresh/list/settings).
 # ---------------------------------------------------------------------------
 
 _PRIMARY_ROOMS: tuple[tuple[str, str, str, str], ...] = (

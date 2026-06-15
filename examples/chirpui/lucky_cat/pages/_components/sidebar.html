@@ -14,6 +14,35 @@
 {% from "chirpui/sidebar.html" import sidebar, sidebar_section %}
 {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
 
+{#- Bespoke room icons. chirp-ui's `| icon` filter emits Unicode GLYPHS, not SVG,
+    so the custom room icons live here, keyed on the frozen NavItem.key
+    (markets/portfolio/trade/activity/settings). Unknown keys fall back to the
+    glyph filter, so any future inner-rail destination still renders an icon
+    until it gets a bespoke one. One cohesive set: 24x24, currentColor stroke (so
+    each inherits the link's jade hover/active color for free), 1.75 round.
+    aria-hidden — the enclosing <a> carries the accessible label. -#}
+{% def rail_svg_icon(item) %}
+{% set _k = item.key or "" %}
+{% if _k == "markets" %}
+{#- candlesticks -#}
+<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="4" x2="6" y2="20"/><rect x="4" y="8" width="4" height="7" rx="1"/><line x1="13" y1="3" x2="13" y2="21"/><rect x="11" y="7" width="4" height="9" rx="1"/><line x1="20" y1="6" x2="20" y2="18"/><rect x="18" y="10" width="4" height="6" rx="1"/></svg>
+{% elif _k == "portfolio" %}
+{#- allocation pie -#}
+<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 12V3.5"/><path d="M12 12l7.6 3.8"/></svg>
+{% elif _k == "trade" %}
+{#- swap arrows -#}
+<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h17"/><path d="M16 4l4 4-4 4"/><path d="M21 16H4"/><path d="M8 12l-4 4 4 4"/></svg>
+{% elif _k == "activity" %}
+{#- pulse -#}
+<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-6 4 13 2.5-7H21"/></svg>
+{% elif _k == "settings" %}
+{#- maneki-neko cat-ear gear -#}
+<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.6 6.4 6.2 3l3.5 1.6"/><path d="M16.4 6.4 17.8 3l-3.5 1.6"/><circle cx="12" cy="13.5" r="2.6"/><path d="M12 8.3V7M12 20v-1.4M6.6 13.5H5.2M18.8 13.5h-1.4M8.3 9.8l-1-1M16.7 17.2l1 1M16.7 9.8l1-1M8.3 17.2l-1 1"/></svg>
+{% else %}
+{{ (item.icon or "bullet") | icon }}
+{% end %}
+{% end %}
+
 {#- Outer icon rail: persistent trading "rooms". Icon-only with a hover/focus
     tooltip (data-rail-tooltip + aria-label for a11y). -#}
 {% def rail_icon_link(item) %}
@@ -25,7 +54,7 @@
    hx-sync="#main:replace"
    {{ shell_outlet_attrs() }}
    {% if item.active %}aria-current="page"{% end %}>
-  <span class="luckycat-primary-rail__icon" aria-hidden="true">{{ (item.icon or "bullet") | icon }}</span>
+  <span class="luckycat-primary-rail__icon" aria-hidden="true">{{ rail_svg_icon(item) }}</span>
   {% if item.count %}
   <span class="luckycat-primary-rail__count">{{ item.count }}</span>
   {% end %}
@@ -136,7 +165,7 @@
    {{ shell_outlet_attrs() }}
    @click="$el.closest('dialog')?.close()"
    {% if item.active %}aria-current="page"{% end %}>
-  {% if item.icon %}<span class="luckycat-nav-drawer__icon" aria-hidden="true">{{ item.icon | icon }}</span>{% end %}
+  {% if item.icon %}<span class="luckycat-nav-drawer__icon" aria-hidden="true">{{ rail_svg_icon(item) }}</span>{% end %}
   <span class="luckycat-nav-drawer__label">{{ item.label }}</span>
   {#- Truthiness (NOT `is not none`) on the dataclass attrs: a None field on a
       frozen-dataclass yields an undefined-but-not-none proxy in this Kida build,
