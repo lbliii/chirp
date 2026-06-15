@@ -47,7 +47,10 @@ When this domain changes, check:
 - `src/chirp/contracts/types.py`, `declarations.py`, `routes.py`,
   `template_scan.py` — public check protocol and scan utilities.
 - `src/chirp/contracts/rules_*.py` — category, severity, message, location,
-  and details fields.
+  and details fields. Env-aware security CSP rules (`rules_csp_nonce.py`,
+  `rules_chirpui_csp.py` (#233)) must read `config.env` so `--deploy` posture
+  escalates them; the chirp-ui CSP rule is built-in (not a plugin check) because
+  it needs `config` + `middleware_list`, which `ContractCheckSnapshot` omits.
 - `src/chirp/app/diagnostics.py`, `src/chirp/cli/_check.py` — output and
   warnings-as-errors behavior.
 - `README.md`, `docs/hypermedia-footguns.md`, contract-debugging site docs,

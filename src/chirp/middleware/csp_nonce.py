@@ -62,14 +62,25 @@ class CSPNonceMiddleware:
         <script nonce="{{ csp_nonce() }}">...</script>
     """
 
-    __slots__ = ("_base_csp", "_script_origins", "_unsafe_eval")
+    __slots__ = ("_base_csp", "_script_origins", "_style_unsafe_inline", "_unsafe_eval")
 
-    def __init__(self, base_csp: str | None = None, *, unsafe_eval: bool = False) -> None:
+    def __init__(
+        self,
+        base_csp: str | None = None,
+        *,
+        unsafe_eval: bool = False,
+        style_unsafe_inline: bool = False,
+    ) -> None:
         self._base_csp = base_csp or (
             "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
         )
         self._script_origins = "https://unpkg.com https://cdn.jsdelivr.net"
         self._unsafe_eval = unsafe_eval
+        # Alpine's x-show writes inline `style="display:none"` attributes that
+        # cannot be nonced; the only way to permit them is style-src
+        # 'unsafe-inline'. Scoped to style-src only — script-src stays nonce-only
+        # (+ 'unsafe-eval' when needed). Set by the compiler for Alpine apps.
+        self._style_unsafe_inline = style_unsafe_inline
 
     @property
     def template_globals(self) -> dict:
@@ -85,7 +96,14 @@ class CSPNonceMiddleware:
             # middleware stack still receive the per-request nonce CSP header.
             if isinstance(response, (Response, StreamingResponse, FileResponse)):
                 eval_token = " 'unsafe-eval'" if self._unsafe_eval else ""
-                csp = f"{self._base_csp}; script-src 'self'{eval_token} 'nonce-{nonce}' {self._script_origins}"
+                style_token = (
+                    "; style-src 'self' 'unsafe-inline'" if self._style_unsafe_inline else ""
+                )
+                csp = (
+                    f"{self._base_csp}; "
+                    f"script-src 'self'{eval_token} 'nonce-{nonce}' {self._script_origins}"
+                    f"{style_token}"
+                )
                 response = response.with_header("Content-Security-Policy", csp)
                 if isinstance(response, StreamingResponse):
                     # Carry the live nonce onto the streaming response so the

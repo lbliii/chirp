@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from chirp import App, AppConfig
 from chirp.app.state import ContractCheckSnapshot
 from chirp.contracts import CheckResult, ContractIssue, Severity, check_hypermedia_surface
@@ -220,3 +222,91 @@ class TestChirpUIContractCheck:
         import_issues = [i for i in result.issues if i.category == "chirpui_import"]
         assert len(import_issues) == 1
         assert "nonexist.html" in import_issues[0].message
+
+
+class TestChirpUICSPContractCheck:
+    """The built-in chirpui_csp check fires through the full app.check() path (#233).
+
+    It must be a built-in (not a plugin check) because it reads config +
+    middleware_list, which the plugin ContractCheckSnapshot does not expose. These
+    tests drive it via check_hypermedia_surface so the wiring in checker.py is
+    exercised, not just the rule in isolation.
+    """
+
+    @pytest.mark.issue(233)
+    def test_conflicting_static_csp_fires_in_deploy_posture(self, tmp_path: Path) -> None:
+        """chirp-ui active + a static CSP that forbids Alpine's needs -> ERROR
+        under deploy (production) posture, even with csp_nonce_enabled on."""
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        from chirp.ext.chirp_ui import use_chirp_ui
+        from chirp.middleware.security_headers import (
+            SecurityHeadersConfig,
+            SecurityHeadersMiddleware,
+        )
+
+        use_chirp_ui(app)
+        app.add_middleware(
+            SecurityHeadersMiddleware(
+                SecurityHeadersConfig(
+                    content_security_policy="default-src 'self'; script-src 'self'"
+                )
+            )
+        )
+        result = check_hypermedia_surface(app, deploy=True)
+        csp_issues = [i for i in result.issues if i.category == "chirpui_csp"]
+        assert len(csp_issues) == 1
+        assert csp_issues[0].severity == Severity.ERROR
+
+    @pytest.mark.issue(233)
+    def test_stock_chirpui_app_is_silent(self, tmp_path: Path) -> None:
+        """The auto-wired chirp-ui path passes — no chirpui_csp issue even in
+        deploy (production) posture."""
+        (tmp_path / "page.html").write_text(
+            '{% from "chirpui/card.html" import card %}<html>{{ card() }}</html>'
+        )
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        from chirp.ext.chirp_ui import use_chirp_ui
+
+        use_chirp_ui(app)
+        result = check_hypermedia_surface(app, deploy=True)
+        csp_issues = [i for i in result.issues if i.category == "chirpui_csp"]
+        assert csp_issues == []
+
+    @pytest.mark.issue(233)
+    def test_non_chirpui_app_unaffected(self, tmp_path: Path) -> None:
+        """A non-chirp-ui app never trips chirpui_csp, even with a restrictive CSP."""
+        (tmp_path / "page.html").write_text("<html><body>hi</body></html>")
+        app = App(AppConfig(template_dir=str(tmp_path)))
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        from chirp.middleware.security_headers import (
+            SecurityHeadersConfig,
+            SecurityHeadersMiddleware,
+        )
+
+        app.add_middleware(
+            SecurityHeadersMiddleware(
+                SecurityHeadersConfig(
+                    content_security_policy="default-src 'self'; script-src 'self'"
+                )
+            )
+        )
+        result = check_hypermedia_surface(app, deploy=True)
+        csp_issues = [i for i in result.issues if i.category == "chirpui_csp"]
+        assert csp_issues == []

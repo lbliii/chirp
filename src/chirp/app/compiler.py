@@ -58,8 +58,15 @@ def _collect_builtin_middleware(
     if config.csp_nonce_enabled:
         from chirp.middleware.csp_nonce import CSPNonceMiddleware
 
+        # Alpine needs 'unsafe-eval' (expressions are eval'd) AND style-src
+        # 'unsafe-inline' (x-show writes un-nonceable inline style attrs). Both
+        # are scoped narrowly: script-src stays nonce-only + 'unsafe-eval', and
+        # the inline relaxation is confined to style-src. The @alpinejs/csp build
+        # (alpine_csp) needs neither.
         needs_eval = config.alpine and not config.alpine_csp
-        middleware_list.append(CSPNonceMiddleware(unsafe_eval=needs_eval))
+        middleware_list.append(
+            CSPNonceMiddleware(unsafe_eval=needs_eval, style_unsafe_inline=needs_eval)
+        )
 
     # HSTS auto-enable in production with TLS
     if config.env == "production" and config.ssl_certfile and not config.strict_transport_security:

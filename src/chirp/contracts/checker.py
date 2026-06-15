@@ -887,6 +887,24 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             getattr(snapshot, "discovered_routes", []),
         )
     )
+
+    # chirp-ui CSP: when chirp-ui is active (extras['chirpui_components']), the
+    # effective CSP must keep Alpine alive — script-src must allow the inline
+    # bootstrap + eval (nonce mechanism, auto-wired by use_chirp_ui, or static
+    # unsafe-inline + unsafe-eval) and style-src must allow inline style (x-show
+    # is un-nonceable). No-op for non-chirp-ui apps. Env-aware like csp_nonce.
+    # Built-in (not a plugin check) because it must read config + middleware_list,
+    # which the plugin ContractCheckSnapshot does not expose. See rules_chirpui_csp.
+    from chirp.contracts.rules_chirpui_csp import check_chirpui_csp
+
+    result.issues.extend(
+        check_chirpui_csp(
+            router,
+            posture_config,
+            middleware_list,
+            snapshot.extras,
+        )
+    )
     # Static streaming: StaticFiles must keep a sane stream threshold so large
     # files stream from disk rather than buffering into memory (#178).
     from chirp.contracts.rules_static_streaming import check_static_streaming

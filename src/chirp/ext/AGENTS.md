@@ -36,7 +36,13 @@ When this domain changes, check:
 - `src/chirp/ext/chirp_ui.py`, `src/chirp/ext/__init__.py`.
 - `src/chirp/__init__.py` for public bridge exports such as `use_chirp_ui`.
 - `pyproject.toml` `ui` extra and dev dependency floors.
-- `src/chirp/contracts/rules_chirpui_runtime.py`, page-shell/OOB rules.
+- `src/chirp/contracts/rules_chirpui_runtime.py`,
+  `src/chirp/contracts/rules_chirpui_csp.py` (#233 — chirp-ui CSP allowance),
+  page-shell/OOB rules.
+- `use_chirp_ui` owns the chirp-ui CSP allowance: it flips `csp_nonce_enabled`
+  alongside `alpine` in the same `bind_config`, so the compiler auto-wires an
+  Alpine-compatible nonce CSP. Changing what `use_chirp_ui` auto-wires is a
+  security-default change for the whole extension userbase — gate it.
 - `src/chirp/cli/templates/` and ChirpUI examples.
 - README optional UI rows, public API docs, extension plans/RFCs, changelog.
 - `tests/test_chirpui_boundary.py`, ChirpUI example tests, scaffold tests.

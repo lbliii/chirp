@@ -381,25 +381,14 @@ app.add_middleware(
     )
 )
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
-# CSP must be chirp-ui-compatible: chirp-ui drives the shell with Alpine, which
-# evaluates its expressions as JS ('unsafe-eval') and toggles element visibility
-# via inline style attributes ('unsafe-inline' in style-src — those can't be
-# nonced). The default SecurityHeaders CSP omits both, which silently kills the
-# entire interactive shell (collapse, dropdowns, theme toggle). A production app
-# would tighten script-src to per-request nonces (AppConfig(csp_nonce_enabled=True));
-# this example keeps one explicit, working policy.
-_CHIRP_UI_CSP = (
-    "default-src 'self'; "
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data:; "
-    "connect-src 'self'; "
-    "font-src 'self'; "
-    "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
-)
-app.add_middleware(
-    SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=_CHIRP_UI_CSP))
-)
+# SecurityHeaders for the clickjacking / MIME-sniff / referrer headers only —
+# content_security_policy=None so it does NOT emit a CSP header. use_chirp_ui
+# (called above) flipped csp_nonce_enabled, so the compiler wires
+# CSPNonceMiddleware as the single CSP authority: a per-request nonce script-src
+# plus 'unsafe-eval' and style-src 'unsafe-inline' that chirp-ui's Alpine shell
+# requires. No hand-written CSP — the chirpui_csp contract check would WARN/ERROR
+# if a future edit re-broke it.
+app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None)))
 
 # ---------------------------------------------------------------------------
 # Non-page routes (registered BEFORE mount_pages, kanban idiom).
