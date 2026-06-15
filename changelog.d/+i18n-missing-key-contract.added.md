@@ -1,1 +1,0 @@
-**Missing-translation-key contract (`i18n_missing_key`).** When i18n is enabled and catalogs are present, `app.check()` WARNs on `t("…")` keys referenced in templates but missing from the locale JSON catalogs — a fail-loud key-coverage guarantee. ICU pluralization/formatting remains deferred to babel-alongside.
