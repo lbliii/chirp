@@ -6,6 +6,7 @@ from chirp.contracts.rules_safety import (
     check_middleware_signatures,
     check_secret_key,
     check_sse_speculation,
+    check_trusted_proxies,
 )
 from chirp.contracts.types import Severity
 
@@ -220,10 +221,12 @@ class _FakeConfig:
         secret_key: str = "",
         env: str = "development",
         allowed_hosts: tuple[str, ...] = ("*",),
+        trusted_proxies: tuple[str, ...] = (),
     ) -> None:
         self.secret_key = secret_key
         self.env = env
         self.allowed_hosts = allowed_hosts
+        self.trusted_proxies = trusted_proxies
 
 
 class TestSecretKey:
@@ -278,4 +281,36 @@ class TestAllowedHosts:
         issues = check_allowed_hosts(
             _FakeConfig(env="production", allowed_hosts=("example.com", ".example.com"))
         )
+        assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# Trusted proxy checks
+# ---------------------------------------------------------------------------
+
+
+class TestTrustedProxies:
+    def test_wildcard_in_production_warns(self) -> None:
+        issues = check_trusted_proxies(_FakeConfig(env="production", trusted_proxies=("*",)))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+        assert issues[0].category == "trusted_proxies"
+
+    def test_wildcard_in_staging_warns(self) -> None:
+        issues = check_trusted_proxies(_FakeConfig(env="staging", trusted_proxies=("*",)))
+        assert len(issues) == 1
+        assert issues[0].severity == Severity.WARNING
+
+    def test_wildcard_in_development_ok(self) -> None:
+        issues = check_trusted_proxies(_FakeConfig(env="development", trusted_proxies=("*",)))
+        assert issues == []
+
+    def test_explicit_proxies_ok(self) -> None:
+        issues = check_trusted_proxies(
+            _FakeConfig(env="production", trusted_proxies=("10.0.0.1", "10.0.0.2"))
+        )
+        assert issues == []
+
+    def test_empty_proxies_ok(self) -> None:
+        issues = check_trusted_proxies(_FakeConfig(env="production", trusted_proxies=()))
         assert issues == []

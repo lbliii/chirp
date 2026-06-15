@@ -80,6 +80,9 @@ def _run_production(app: App, args: argparse.Namespace, host: str, port: int) ->
         # Use config for other settings
         rate_limit_requests_per_second=app.config.rate_limit_requests_per_second,
         rate_limit_burst=app.config.rate_limit_burst,
+        rate_limit_max_tracked_ips=app.config.rate_limit_max_tracked_ips,
+        trusted_proxies=app.config.trusted_proxies,
+        forwarded_for_trusted_hops=app.config.forwarded_for_trusted_hops,
         request_queue_max_depth=app.config.request_queue_max_depth,
         sentry_environment=app.config.sentry_environment,
         sentry_release=app.config.sentry_release,

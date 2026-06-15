@@ -63,6 +63,18 @@ def _env_allowed_hosts(prefix: str) -> tuple[str, ...]:
     return ("*",)
 
 
+def _env_trusted_proxies(prefix: str) -> tuple[str, ...]:
+    """Read TRUSTED_PROXIES as a comma/space-separated tuple (empty default).
+
+    Unlike _env_allowed_hosts, an unset value stays () so pounce ignores
+    X-Forwarded-For entirely — there is no implicit '*' fallback.
+    """
+    raw = os.environ.get(f"{prefix}TRUSTED_PROXIES")
+    if not raw:
+        return ()
+    return tuple(part.strip() for part in raw.replace(",", " ").split() if part.strip())
+
+
 def _env_log_format(key: str, default: str) -> str:
     """Read log format from env; invalid values fall back to default."""
     val = (os.environ.get(key) or "").lower().strip()
@@ -250,6 +262,26 @@ class AppConfig:
     rate_limit_enabled: bool = False
     rate_limit_requests_per_second: float = 100.0
     rate_limit_burst: int = 200
+    # Max distinct client IPs tracked by the per-IP rate limiter before LRU
+    # eviction; caps limiter memory under a wide/spoofed source-IP fan-out.
+    rate_limit_max_tracked_ips: int = 100_000
+
+    # Proxy / forwarded headers
+    # Trusted reverse-proxy peer IPs/hostnames whose X-Forwarded-For is honored;
+    # maps to pounce ServerConfig.trusted_hosts. X-Forwarded-For is ignored
+    # entirely when this is empty (the default), so the request client IP is the
+    # raw socket peer. "*" trusts every direct peer — use only on a locked-down
+    # network (the trusted_proxies contract warns on "*" outside development).
+    trusted_proxies: tuple[str, ...] = ()
+    # Number of trailing X-Forwarded-For hops to trust when deriving the client
+    # IP behind a reverse proxy (1 = trust the single proxy in front of the
+    # app). Only takes effect when the direct peer is one of `trusted_proxies`
+    # (mapped to pounce's trusted_hosts); when `trusted_proxies` is empty,
+    # X-Forwarded-* headers are ignored entirely and this hop count is moot. The
+    # real client IP is read N positions from the RIGHT of the chain. Must be
+    # >= 1 — to ignore X-Forwarded-For entirely leave `trusted_proxies` empty
+    # (NOT this set to 0; pounce rejects < 1 and AppConfig fails fast below).
+    forwarded_for_trusted_hops: int = 1
 
     # Phase 6.3: Request Queueing
     request_queue_enabled: bool = False
@@ -354,6 +386,20 @@ class AppConfig:
                 "Set CHIRP_SECRET_KEY or pass secret_key= to AppConfig."
             )
 
+        # Guard: forwarded_for_trusted_hops < 1 is rejected by pounce at launch.
+        # Fail fast at construction instead so the misconfig surfaces here, not
+        # deep in the production launch path. To IGNORE X-Forwarded-For, leave
+        # trusted_proxies empty — do NOT set this to 0.
+        if self.forwarded_for_trusted_hops < 1:
+            from chirp.errors import ConfigurationError
+
+            raise ConfigurationError(
+                f"forwarded_for_trusted_hops ({self.forwarded_for_trusted_hops}) must be >= 1; "
+                "pounce rejects < 1. Set trusted_proxies to a non-empty tuple to actually "
+                "honor X-Forwarded-For (the hop count only takes effect when the direct peer "
+                "is a trusted proxy)."
+            )
+
         # Validate view_transitions / speculation_rules via their normalizers
         # (single source of truth for accepted values).
         from chirp.server.view_transitions import normalize_view_transitions
@@ -380,6 +426,8 @@ class AppConfig:
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
             REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
             HTTP_TIMEOUT, HTTP_RETRIES,
+            TRUSTED_PROXIES (comma/space-separated reverse-proxy peers),
+            FORWARDED_FOR_TRUSTED_HOPS (int >= 1),
             FEATURE_<NAME>=true|false (e.g. CHIRP_FEATURE_X=true)
 
         Railway compatibility:
@@ -429,6 +477,8 @@ class AppConfig:
                     "MAX_UPLOAD_SIZE",
                     "UPLOAD_SPOOL_THRESHOLD",
                     "MAX_UPLOAD_PARTS",
+                    "TRUSTED_PROXIES",
+                    "FORWARDED_FOR_TRUSTED_HOPS",
                 }
             ),
         )
@@ -446,6 +496,8 @@ class AppConfig:
             host=host,
             port=_env_int_first((f"{p}PORT", "PORT"), 8000),
             allowed_hosts=_env_allowed_hosts(p),
+            trusted_proxies=_env_trusted_proxies(p),
+            forwarded_for_trusted_hops=_env_int(f"{p}FORWARDED_FOR_TRUSTED_HOPS", 1),
             log_format=_env_log_format(f"{p}LOG_FORMAT", "auto"),
             debug=debug,
             secret_key=os.environ.get(f"{p}SECRET_KEY", ""),

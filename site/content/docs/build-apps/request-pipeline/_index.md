@@ -50,4 +50,11 @@ Functions, classes, and real-world patterns.
 Read-only access to the frozen RenderPlan for analytics, caching, and debugging.
 :::{/card}
 
+:::{card} Early Hints (103)
+:icon: zap
+:link: /chirp/docs/build-apps/request-pipeline/early-hints/
+:description: Preload assets before the body with HTTP 103
+Set Link/preload headers; Chirp promotes them to a 103 Early Hints frame.
+:::{/card}
+
 :::{/cards}

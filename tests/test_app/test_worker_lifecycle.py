@@ -315,6 +315,45 @@ class TestWorkerLifecycleProductionGuard:
         mock_server.assert_called_once()
 
 
+class TestProductionServerConfigMapping:
+    """run_production_server forwards proxy / rate-limit knobs into ServerConfig."""
+
+    @patch("pounce.server.Server")
+    def test_proxy_and_rate_limit_kwargs_reach_server_config(self, mock_server: MagicMock) -> None:
+        from chirp.server.production import run_production_server
+
+        app = App(config=AppConfig(debug=False))
+
+        run_production_server(
+            app,
+            rate_limit_max_tracked_ips=4_242,
+            forwarded_for_trusted_hops=2,
+            trusted_proxies=("10.0.0.1", "10.0.0.2"),
+        )
+
+        mock_server.assert_called_once()
+        config = mock_server.call_args[0][0]
+        assert config.rate_limit_max_tracked_ips == 4_242
+        assert config.forwarded_for_trusted_hops == 2
+        # trusted_proxies lands as pounce ServerConfig.trusted_hosts (a frozenset);
+        # pounce DERIVES trusted_hosts_wildcard from "*" membership — not set here.
+        assert config.trusted_hosts == frozenset({"10.0.0.1", "10.0.0.2"})
+        assert config.trusted_hosts_wildcard is False
+
+    @patch("pounce.server.Server")
+    def test_server_config_defaults_match_app_config(self, mock_server: MagicMock) -> None:
+        from chirp.server.production import run_production_server
+
+        app = App(config=AppConfig(debug=False))
+
+        run_production_server(app)
+
+        config = mock_server.call_args[0][0]
+        assert config.rate_limit_max_tracked_ips == 100_000
+        assert config.forwarded_for_trusted_hops == 1
+        assert config.trusted_hosts == frozenset()
+
+
 class TestPounceWorkerLifecycleIntegration:
     """Smoke tests against Pounce worker lifecycle behavior."""
 

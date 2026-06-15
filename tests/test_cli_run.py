@@ -41,6 +41,9 @@ def fake_prod_app(monkeypatch: pytest.MonkeyPatch) -> App:
             worker_mode="async",
             metrics_enabled=True,
             metrics_path="/internal/metrics",
+            rate_limit_max_tracked_ips=12_345,
+            forwarded_for_trusted_hops=3,
+            trusted_proxies=("10.0.0.1", "10.0.0.2"),
         )
     )
     mod = types.ModuleType("_run_test_app")
@@ -122,6 +125,21 @@ class TestChirpRun:
         assert kwargs["worker_mode"] == "async"
         assert kwargs["metrics_enabled"] is True
         assert kwargs["metrics_path"] == "/internal/metrics"
+
+    @patch("chirp.server.production.run_production_server")
+    def test_production_forwards_proxy_and_rate_limit_knobs(
+        self,
+        mock_server: MagicMock,
+        fake_prod_app: App,
+    ) -> None:
+        """Production CLI launch maps proxy / rate-limit AppConfig fields to kwargs."""
+        main(["run", "_run_test_app:app"])
+
+        mock_server.assert_called_once()
+        kwargs = mock_server.call_args.kwargs
+        assert kwargs["rate_limit_max_tracked_ips"] == 12_345
+        assert kwargs["forwarded_for_trusted_hops"] == 3
+        assert kwargs["trusted_proxies"] == ("10.0.0.1", "10.0.0.2")
 
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """run exits 1 with error message for bad import string."""

@@ -296,3 +296,33 @@ def check_allowed_hosts(
             ),
         )
     ]
+
+
+def check_trusted_proxies(
+    config: Any,
+) -> list[ContractIssue]:
+    """Warn when trusted_proxies trusts every reverse-proxy peer outside development.
+
+    ``trusted_proxies`` gates whether X-Forwarded-For is honored. ``"*"`` trusts
+    every direct peer's forwarded headers, which lets any client spoof its client
+    IP (defeating per-IP rate limiting and audit/access correlation). Always
+    WARNING (never promoted to ERROR) — silent in development, fires for staging
+    and production.
+    """
+    env = getattr(config, "env", "development")
+    trusted_proxies = tuple(getattr(config, "trusted_proxies", ()))
+    if "*" not in trusted_proxies or env == "development":
+        return []
+
+    return [
+        ContractIssue(
+            severity=Severity.WARNING,
+            category="trusted_proxies",
+            message=(
+                "trusted_proxies contains '*' while env is "
+                f"'{env}'. This trusts every direct peer's X-Forwarded-For, "
+                "letting any client spoof its IP (rate-limit bypass / audit "
+                "skew). Configure explicit reverse-proxy peer IPs/hostnames."
+            ),
+        )
+    ]

@@ -56,6 +56,10 @@ def run_production_server(
     rate_limit_enabled: bool = False,
     rate_limit_requests_per_second: float = 100.0,
     rate_limit_burst: int = 200,
+    rate_limit_max_tracked_ips: int = 100_000,
+    # Proxy / forwarded headers
+    trusted_proxies: tuple[str, ...] = (),
+    forwarded_for_trusted_hops: int = 1,
     # Phase 6.3: Request Queueing
     request_queue_enabled: bool = False,
     request_queue_max_depth: int = 1000,
@@ -99,6 +103,17 @@ def run_production_server(
         rate_limit_enabled: Enable per-IP rate limiting.
         rate_limit_requests_per_second: Sustained rate limit per IP.
         rate_limit_burst: Maximum burst capacity per IP.
+        rate_limit_max_tracked_ips: Max distinct client IPs the per-IP rate
+            limiter tracks before LRU eviction (limiter memory cap).
+        trusted_proxies: Reverse-proxy peer IPs/hostnames whose X-Forwarded-For
+            is honored (mapped to pounce ServerConfig.trusted_hosts). Empty (the
+            default) means X-Forwarded-For is ignored entirely; "*" trusts every
+            direct peer (spoofing risk — use only on a locked-down network).
+        forwarded_for_trusted_hops: Trailing X-Forwarded-For hops to trust
+            when deriving the client IP behind a reverse proxy. Must be >= 1
+            and only takes effect when trusted_proxies is non-empty (the direct
+            peer must be a trusted proxy); to ignore X-Forwarded-For, leave
+            trusted_proxies empty rather than setting this to 0.
 
         request_queue_enabled: Enable request queueing.
         request_queue_max_depth: Maximum queued requests (0 = unlimited).
@@ -180,6 +195,13 @@ def run_production_server(
         rate_limit_enabled=rate_limit_enabled,
         rate_limit_requests_per_second=rate_limit_requests_per_second,
         rate_limit_burst=rate_limit_burst,
+        rate_limit_max_tracked_ips=rate_limit_max_tracked_ips,
+        # Proxy / forwarded headers
+        # Pass trusted_hosts as a frozenset to match the declared field type;
+        # pounce derives trusted_hosts_wildcard from it ("*" membership) — do
+        # NOT set trusted_hosts_wildcard here.
+        trusted_hosts=frozenset(trusted_proxies),
+        forwarded_for_trusted_hops=forwarded_for_trusted_hops,
         # Phase 6.3: Request Queueing
         request_queue_enabled=request_queue_enabled,
         request_queue_max_depth=request_queue_max_depth,

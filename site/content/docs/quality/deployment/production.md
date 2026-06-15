@@ -214,9 +214,66 @@ Do not assume Pounce environment variable names are read by Chirp. If your
 platform provides deployment variables, read them in your app code and build an
 `AppConfig`, or start through `pounce serve --config pounce.toml`.
 
-Chirp intentionally does not expose Pounce trusted proxy, compression, or
-introspection settings through `AppConfig` yet. Those fields are
-security-facing and need a separate public API decision before adoption.
+Chirp does not yet expose Pounce compression or introspection settings through
+`AppConfig`; those remain security-facing decisions deferred to a later public
+API pass. Reverse-proxy trust **is** now exposed — see below.
+
+## Running Behind A Reverse Proxy
+
+When Chirp runs behind a reverse proxy (nginx, a load balancer, a CDN, a
+platform router), the socket peer is the proxy, not the end user. The real
+client IP arrives in the `X-Forwarded-For` header. Two `AppConfig` fields
+control how that header is trusted; both thread through to pounce's
+`ServerConfig`.
+
+| Field | Default | Effect |
+|-------|---------|--------|
+| `trusted_proxies` | `()` | Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored (maps to pounce `ServerConfig.trusted_hosts`). |
+| `forwarded_for_trusted_hops` | `1` | Trailing `X-Forwarded-For` hops to trust when deriving the client IP. Must be `>= 1`. |
+
+```python
+config = AppConfig(
+    env="production",
+    secret_key="...",
+    trusted_proxies=("10.0.0.1", "10.0.0.2"),  # your proxy peers
+    forwarded_for_trusted_hops=1,               # one proxy in front of the app
+)
+```
+
+**`X-Forwarded-For` is ignored unless `trusted_proxies` is set.** With the empty
+default, Chirp does not trust forwarded headers at all and the request client IP
+is the raw socket peer (the proxy). This is the safe default: it cannot be
+spoofed. Set `trusted_proxies` only once you know the IPs/hostnames of the
+proxies actually in front of your app — `forwarded_for_trusted_hops` only takes
+effect when the direct peer is one of those trusted proxies.
+
+**Do not set `forwarded_for_trusted_hops=0` to "disable" forwarding** — it must
+be `>= 1` and `AppConfig` raises `ConfigurationError` at construction otherwise
+(pounce rejects it at launch). To ignore `X-Forwarded-For`, leave
+`trusted_proxies` empty.
+
+**The `"*"` wildcard trusts every direct peer's `X-Forwarded-For`**, which lets
+any client spoof its client IP — defeating per-IP rate limiting and skewing
+audit correlation. Use it only on a fully locked-down network where the only
+reachable peers are your own proxies. The `trusted_proxies` contract check emits
+a `WARNING` whenever `trusted_proxies` contains `"*"` outside development (see
+the [category reference](/chirp/docs/quality/contracts-debugging/categories/)).
+
+Do **not** set pounce's `trusted_hosts_wildcard` directly — pounce derives it
+from `"*"` membership in `trusted_hosts`.
+
+### Access-log vs client-IP divergence
+
+Be aware these two values can disagree:
+
+- **Pounce access logs** key on the **raw socket peer IP** (the proxy).
+- **The per-IP rate limiter and the request client IP** (`request.client`) use
+  the **rewritten `X-Forwarded-For` client IP** — but only when the direct peer
+  is a trusted proxy. When `trusted_proxies` is empty, both reflect the raw peer.
+
+Do not build audit or correlation logic that assumes the access-log peer IP and
+the rate-limiter/request client IP are the same value. Behind a trusted proxy
+they intentionally differ.
 
 ## Full Guide
 
