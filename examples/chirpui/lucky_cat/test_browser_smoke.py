@@ -305,6 +305,53 @@ def test_inner_rail_subnav_navigates(browser, base_url: str) -> None:
         context.close()
 
 
+@pytest.mark.issue(298)
+def test_logo_navigates_home_without_duplicating_shell(browser, base_url: str) -> None:
+    """Regression (#298): clicking the brand/logo from a coin-detail route must
+    NOT nest the whole app shell inside ``#main``.
+
+    The boosted brand link used to render without ``hx-select="#page-content"``,
+    so the full boosted shell document was ``innerHTML``-swapped into ``#main`` —
+    the topbar + rails appeared a second time, nested in the content region.
+    This drives the exact user-reported path (``/markets/SOL-MEOW`` -> click
+    logo) and asserts there is exactly ONE shell and no shell nested in
+    ``#main``. Public route — no sign-in needed."""
+    context, page, errors = _new_page_with_console_capture(browser, base_url)
+    try:
+        page.goto("/markets/SOL-MEOW", wait_until="load")
+        page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
+        # Baseline: exactly one shell, none nested inside #main.
+        assert page.evaluate("() => document.querySelectorAll('.chirpui-app-shell').length") == 1
+        assert (
+            page.evaluate("() => document.querySelectorAll('#main .chirpui-app-shell').length") == 0
+        )
+
+        # Click the logo (the boosted brand link).
+        logo = page.locator("a.chirpui-app-shell__brand").first
+        logo.wait_for(state="visible", timeout=_ACTION_TIMEOUT_MS)
+        logo.click()
+
+        # Boosted nav swaps #page-content into #main and pushes "/" as the URL —
+        # wait until we have left the coin-detail path.
+        page.wait_for_url(lambda url: "/markets/" not in url, timeout=_ACTION_TIMEOUT_MS)
+        page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
+
+        # THE REGRESSION ASSERTION: still exactly one shell, and crucially NO
+        # shell duplicated inside the content outlet.
+        shell_count = page.evaluate("() => document.querySelectorAll('.chirpui-app-shell').length")
+        nested = page.evaluate("() => document.querySelectorAll('#main .chirpui-app-shell').length")
+        assert shell_count == 1, (
+            f"shell duplicated: {shell_count} .chirpui-app-shell on page (#298)"
+        )
+        assert nested == 0, f"shell nested inside #main ({nested}) — the dup bug is back (#298)"
+        # The landing content actually rendered into the outlet.
+        main_text = page.locator("#main").inner_text(timeout=_ACTION_TIMEOUT_MS)
+        assert "404" not in main_text
+        assert not errors, f"logo navigation produced browser errors: {errors}"
+    finally:
+        context.close()
+
+
 def test_collapse_toggle_hides_and_restores_inner_rail(browser, base_url: str) -> None:
     """The visible collapse toggle hides the inner rail (computed display:none /
     width 0) and expands it back — the discoverability fix."""

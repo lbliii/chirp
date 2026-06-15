@@ -3,7 +3,9 @@
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 {% from "chirpui/drawer.html" import drawer %}
-{% from "chirpui/sidebar.html" import shell_brand_link %}
+{#- Top-level (not inside a block) so the brand_link fragment block can reference
+    it even when rendered standalone via render_block — see #298. -#}
+{% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
 {% from "_components/sidebar.html" import primary_icon_rail, inner_sidebar_shell, mobile_drawer_nav, watchlist_count_body, drawer_actions %}
 {% from "_components/command_palette.html" import command_palette_dialog, command_palette_trigger %}
 
@@ -613,12 +615,26 @@ document.body.addEventListener("htmx:configRequest", function(event) {
         @click="open()">
   <span class="luckycat-nav-trigger__bars" aria-hidden="true"></span>
 </button>
-{% call shell_brand_link() %}
+{#- The brand/logo is a boosted shell-outlet link, EXACTLY like the rail nav
+    links (rail_icon_link) and command-palette items — it carries
+    shell_outlet_attrs() (target #main, swap innerHTML, select #page-content,
+    sync #main:replace).
+
+    We deliberately do NOT use chirp-ui's shell_brand_link() here: that macro
+    builds its <a> via route_link_attrs, whose route-aware resolver emits only
+    hx-target + hx-boost (NO hx-select). A boosted request returns the FULL shell
+    document, so an innerHTML swap into #main WITHOUT hx-select="#page-content"
+    nests the entire shell inside #main — the "shell duplicates inside itself"
+    bug seen navigating /markets/{symbol} -> click logo. Selecting #page-content
+    (like every other boosted nav element) extracts just the content region.
+    shell_outlet_attrs is imported at template top level (above) so this fragment
+    block resolves it even when rendered standalone. -#}
+<a href="/" class="chirpui-app-shell__brand" {{ shell_outlet_attrs() }}>
 <span class="luckycat-brand">
   <img class="luckycat-brand__logo" src="/static/lucky-cat-logo.svg" alt="" width="24" height="24">
   <span class="luckycat-brand__name">Lucky&nbsp;Cat</span>
 </span>
-{% end %}
+</a>
 {% end %}
 
 {% block topbar_center %}

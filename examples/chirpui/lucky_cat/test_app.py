@@ -1529,6 +1529,39 @@ class TestProgressiveRail:
             assert "luckycat-inner-rail__badge" in response.text
             assert "%" in response.text
 
+    @staticmethod
+    def _brand_link_tag(html: str) -> str:
+        import re
+
+        m = re.search(r'<a [^>]*class="chirpui-app-shell__brand"[^>]*>', html)
+        assert m is not None, "brand/logo link not found"
+        return m.group(0)
+
+    @pytest.mark.issue(298)
+    async def test_brand_logo_carries_boosted_outlet_select(self, example_app) -> None:
+        """Regression (#298): the brand/logo is a full boosted shell-outlet link.
+
+        Clicking the logo from a coin-detail route used to duplicate the whole
+        shell inside ``#main`` because chirp-ui's ``shell_brand_link`` builds its
+        anchor via ``route_link_attrs``, whose resolver emits only
+        ``hx-target`` + ``hx-boost`` (NO ``hx-select``). A boosted request returns
+        the full shell document, so an ``innerHTML`` swap into ``#main`` without a
+        select nests the shell. The brand link MUST carry the same outlet contract
+        every other boosted nav element uses (``shell_outlet_attrs()``)."""
+        async with TestClient(example_app) as client:
+            # The bug manifested specifically from a coin-detail route.
+            detail = await client.get("/markets/SOL-MEOW")
+            assert detail.status == 200
+            brand = self._brand_link_tag(detail.text)
+            assert 'hx-target="#main"' in brand
+            assert 'hx-swap="innerHTML"' in brand
+            assert 'hx-select="#page-content"' in brand, (
+                "brand/logo missing hx-select -> boosted swap nests the shell (#298)"
+            )
+            # Same on the landing itself.
+            home = await client.get("/")
+            assert 'hx-select="#page-content"' in self._brand_link_tag(home.text)
+
     async def test_sidebar_brand_present_balance_is_topbar_only(self, example_app) -> None:
         """The inner-rail header shows the brand. The $MEOW balance is GLOBAL
         state, so it is NOT duplicated in the rail footer — it renders once in
