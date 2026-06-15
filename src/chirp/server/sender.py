@@ -7,7 +7,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextvars import Token
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from chirp._internal.asgi import Send
 from chirp.context import request_var
@@ -39,6 +39,96 @@ def _body_allowed(status: int) -> bool:
     return not (100 <= status < 200 or status in {204, 304})
 
 
+# rel= tokens that make a Link header worth promoting to a 103 Early Hints
+# frame (RFC 8297). These are the asset-hint relations a browser can act on
+# before the body arrives; navigational/metadata rels (canonical, alternate,
+# stylesheet without preload, …) are intentionally excluded.
+_EARLY_HINT_RELS: frozenset[str] = frozenset(
+    {
+        "preload",
+        "modulepreload",
+        "preconnect",
+        "dns-prefetch",
+        "prefetch",
+        "prerender",
+    }
+)
+
+
+class _HasHeaders(Protocol):
+    """Structural view of the response objects the early-hint helpers read.
+
+    Both :class:`~chirp.http.response.Response` and
+    :class:`~chirp.http.response.StreamingResponse` expose ``headers`` as a
+    tuple of ``(name, value)`` pairs; the early-hint collector only needs that.
+    """
+
+    headers: tuple[tuple[str, str], ...]
+
+
+def _is_early_hint_link(value: str) -> bool:
+    """True when a ``Link`` header value carries a 103-worthy ``rel=`` token.
+
+    Parses only the ``rel`` parameter(s); a single Link header may declare more
+    than one relation (``rel="preconnect dns-prefetch"``) so each token is
+    checked. Matching is case-insensitive per RFC 8288.
+    """
+    for part in value.split(";"):
+        name, sep, rel_val = part.partition("=")
+        # Match the ``rel`` parameter exactly — not any param whose name merely
+        # starts with "rel" (e.g. a non-standard ``relation=``).
+        if not sep or name.strip().lower() != "rel":
+            continue
+        rel_val = rel_val.strip().strip('"').strip("'").lower()
+        for token in rel_val.split():
+            if token in _EARLY_HINT_RELS:
+                return True
+    return False
+
+
+def _early_hint_headers(response: _HasHeaders) -> list[tuple[bytes, bytes]]:
+    """Collect ``Link`` headers eligible for a 103 Early Hints frame.
+
+    Reads the ``Link`` headers already present on *response* (the header
+    convention — no new public surface) and returns the latin-1-encoded
+    ``(b"link", value)`` pairs whose ``rel=`` is asset-preload-class. Returns an
+    empty list when nothing is eligible, in which case no 103 frame is emitted.
+    """
+    early: list[tuple[bytes, bytes]] = []
+    for name, value in response.headers:
+        if name.lower() == "link" and _is_early_hint_link(value):
+            early.append((b"link", value.encode("latin-1")))
+    return early
+
+
+async def _maybe_send_early_hints(response: _HasHeaders, send: Send) -> None:
+    """Emit a preliminary ``103 Early Hints`` start frame, if warranted.
+
+    pounce 0.8.0 surfaces 103 purely as a status convention on
+    ``http.response.start``: it never auto-derives the hint from the final
+    response's ``Link`` headers (the H1/H2/H3 bridges only special-case
+    ``status == 103``). So Chirp must explicitly send the interim frame *before*
+    the final start. The same ``Link`` headers remain on the final response —
+    RFC 8297 treats the 103 hint as advisory and the canonical ``Link`` header
+    still belongs on the final message.
+
+    The interim frame carries no body and does not flip pounce's
+    ``response_started``, so the final response flows normally over H1/H2/H3.
+    On the buffering sync path pounce raises ``NeedsAsyncError`` for any 1xx
+    start and re-runs the request on the async worker, so this is safe there too.
+    """
+    early_headers = _early_hint_headers(response)
+    if not early_headers:
+        return
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 103,
+            "headers": early_headers,
+        }
+    )
+
+
 async def send_response(
     response: Response,
     send: Send,
@@ -64,6 +154,11 @@ async def send_response(
     body = response.body_bytes if _body_allowed(response.status) else b""
 
     raw_headers.append((b"content-length", str(len(body)).encode("latin-1")))
+
+    # 103 Early Hints (RFC 8297): if the response carries asset-preload-class
+    # Link headers, emit them as an interim frame before the final start so the
+    # browser can preconnect/preload while the body is still in flight.
+    await _maybe_send_early_hints(response, send)
 
     await send(
         {
@@ -101,6 +196,11 @@ async def send_streaming_response(
         raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
     if request_id is not None:
         raw_headers.append((b"x-request-id", request_id.encode("latin-1")))
+
+    # 103 Early Hints (RFC 8297): most valuable for slow-first-byte streaming
+    # (Suspense shells, Stream) where the body is delayed but the page's static
+    # assets are known up front. Emit the interim frame before the final start.
+    await _maybe_send_early_hints(response, send)
 
     # No content-length — chunked transfer encoding signals body boundaries
     await send(
@@ -234,6 +334,31 @@ def _etag_matches(if_none_match: str, etag: str) -> bool:
         if cand_bare == bare:
             return True
     return False
+
+
+def _if_range_matches(if_range: str, etag: str, last_modified: str) -> bool:
+    """Return True if an ``If-Range`` validator still matches the representation.
+
+    Per RFC 9110 §13.1.5 the value is *either* an entity-tag or an HTTP-date.
+    An entity-tag is compared with the **strong** comparison function (a weak
+    validator on either side never matches), and an HTTP-date matches only when
+    it is byte-for-byte the current ``Last-Modified`` value. When the validator
+    no longer matches the caller must ignore ``Range`` and serve the full 200
+    representation.
+    """
+    if_range = if_range.strip()
+    if not if_range:
+        return False
+    if if_range.startswith(('"', "W/")):
+        # Entity-tag form: strong comparison — weak tags on either side fail.
+        if if_range.startswith("W/") or etag.startswith("W/"):
+            return False
+        return if_range == etag
+    # HTTP-date form: must equal the current Last-Modified exactly.
+    parsed = _parse_http_date(if_range)
+    if parsed is None:
+        return False
+    return if_range == last_modified
 
 
 def _parse_single_range(range_header: str, size: int) -> tuple[int, int] | None | bool:
@@ -395,6 +520,16 @@ async def send_file_response(
     is_partial = False
     if response.conditional and status == 200 and request is not None:
         range_header = request.headers.get("range")
+        # If-Range (RFC 9110 §13.1.5): honor the Range only when the supplied
+        # validator still matches the current representation; otherwise ignore
+        # the Range and fall through to the full 200 response.
+        if_range = request.headers.get("if-range")
+        if (
+            range_header is not None
+            and if_range is not None
+            and not _if_range_matches(if_range, etag, last_modified)
+        ):
+            range_header = None
         if range_header is not None:
             parsed = _parse_single_range(range_header, size)
             if parsed is False:

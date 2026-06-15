@@ -36,6 +36,90 @@ class TestAppConfig:
         assert cfg.view_transitions is False
         assert cfg.static_context is None
 
+    def test_production_proxy_and_rate_limit_defaults(self) -> None:
+        cfg = AppConfig()
+
+        assert cfg.rate_limit_max_tracked_ips == 100_000
+        assert cfg.forwarded_for_trusted_hops == 1
+        assert cfg.trusted_proxies == ()
+
+    def test_production_proxy_and_rate_limit_override(self) -> None:
+        cfg = AppConfig(
+            rate_limit_max_tracked_ips=5_000,
+            forwarded_for_trusted_hops=2,
+            trusted_proxies=("10.0.0.1",),
+        )
+
+        assert cfg.rate_limit_max_tracked_ips == 5_000
+        assert cfg.forwarded_for_trusted_hops == 2
+        assert cfg.trusted_proxies == ("10.0.0.1",)
+
+    def test_forwarded_for_trusted_hops_below_one_raises(self) -> None:
+        """< 1 fails fast at construction (pounce rejects it at launch)."""
+        from chirp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="forwarded_for_trusted_hops"):
+            AppConfig(forwarded_for_trusted_hops=0)
+
+    def test_rate_limit_max_tracked_ips_has_no_env_parity(self) -> None:
+        """rate_limit_max_tracked_ips is AppConfig-kwarg-only.
+
+        ``from_env`` deliberately does not wire it (no matching CHIRP_* suffix),
+        so an env-only construction leaves it at its default. Setting the
+        unrecognized suffix also trips the unknown-env-var warning, which this
+        asserts still fires for this name.
+        """
+        saved = _pop_app_env()
+        try:
+            os.environ["CHIRP_RATE_LIMIT_MAX_TRACKED_IPS"] = "7"
+            with pytest.warns(UserWarning, match="Unknown env var"):
+                cfg = AppConfig.from_env()
+            # No env wiring → default retained.
+            assert cfg.rate_limit_max_tracked_ips == 100_000
+        finally:
+            os.environ.pop("CHIRP_RATE_LIMIT_MAX_TRACKED_IPS", None)
+            os.environ.update(saved)
+
+    def test_forwarded_for_trusted_hops_env_parity(self) -> None:
+        """CHIRP_FORWARDED_FOR_TRUSTED_HOPS is recognized and read (no warning)."""
+        saved = _pop_app_env()
+        try:
+            os.environ["CHIRP_FORWARDED_FOR_TRUSTED_HOPS"] = "9"
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                cfg = AppConfig.from_env()
+            assert cfg.forwarded_for_trusted_hops == 9
+        finally:
+            os.environ.pop("CHIRP_FORWARDED_FOR_TRUSTED_HOPS", None)
+            os.environ.update(saved)
+
+    def test_trusted_proxies_env_parity(self) -> None:
+        """CHIRP_TRUSTED_PROXIES parses comma/space-separated peers (no warning)."""
+        saved = _pop_app_env()
+        try:
+            os.environ["CHIRP_TRUSTED_PROXIES"] = "10.0.0.1, 10.0.0.2"
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                cfg = AppConfig.from_env()
+            assert cfg.trusted_proxies == ("10.0.0.1", "10.0.0.2")
+        finally:
+            os.environ.pop("CHIRP_TRUSTED_PROXIES", None)
+            os.environ.update(saved)
+
+    def test_proxy_env_unset_defaults(self) -> None:
+        """Unset proxy env vars leave trusted_proxies=() and hops=1."""
+        saved = _pop_app_env()
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.trusted_proxies == ()
+            assert cfg.forwarded_for_trusted_hops == 1
+        finally:
+            os.environ.update(saved)
+
     def test_override(self) -> None:
         cfg = AppConfig(host="0.0.0.0", port=3000, debug=True, secret_key="s3cret")
 

@@ -672,6 +672,87 @@ class TestStaticRange:
             assert response.status == 200
             assert "body { color: red; }" in response.text
 
+    async def test_if_range_matching_etag_serves_206(self, static_dir) -> None:
+        # If-Range with the current strong ETag → Range is honored (206).
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            first = await client.get("/static/style.css")
+            etag = _header(first, "ETag")
+            assert etag is not None
+
+            response = await client.get(
+                "/static/style.css",
+                headers={"Range": "bytes=0-3", "If-Range": etag},
+            )
+            assert response.status == 206
+            assert response.text == "body"
+
+    async def test_if_range_stale_etag_serves_full_200(self, static_dir) -> None:
+        # If-Range with a non-matching ETag → ignore Range, serve full 200.
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/static/style.css",
+                headers={"Range": "bytes=0-3", "If-Range": '"stale-etag"'},
+            )
+            assert response.status == 200
+            assert response.text == "body { color: red; }"
+            assert _header(response, "Content-Range") is None
+
+    async def test_if_range_matching_last_modified_serves_206(self, static_dir) -> None:
+        # If-Range with the current Last-Modified date → Range is honored (206).
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            first = await client.get("/static/style.css")
+            last_modified = _header(first, "Last-Modified")
+            assert last_modified is not None
+
+            response = await client.get(
+                "/static/style.css",
+                headers={"Range": "bytes=0-3", "If-Range": last_modified},
+            )
+            assert response.status == 206
+            assert response.text == "body"
+
+    async def test_if_range_stale_date_serves_full_200(self, static_dir) -> None:
+        # If-Range with an older HTTP-date → file changed since → full 200.
+        app = App()
+        app.add_middleware(StaticFiles(directory=static_dir, prefix="/static"))
+
+        @app.route("/")
+        def index():
+            return "home"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/static/style.css",
+                headers={
+                    "Range": "bytes=0-3",
+                    "If-Range": "Mon, 01 Jan 1990 00:00:00 GMT",
+                },
+            )
+            assert response.status == 200
+            assert response.text == "body { color: red; }"
+            assert _header(response, "Content-Range") is None
+
 
 class TestStaticHeadConditional:
     async def test_head_sends_no_body(self, static_dir) -> None:

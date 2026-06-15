@@ -126,6 +126,9 @@ provisional until those subsystems are stabilized.
 | `rate_limit_enabled` | `bool` | `False` | Enable rate limiting |
 | `rate_limit_requests_per_second` | `float` | `100.0` | Rate limit steady-state rate |
 | `rate_limit_burst` | `int` | `200` | Rate limit burst size |
+| `rate_limit_max_tracked_ips` | `int` | `100000` | Max distinct client IPs the per-IP rate limiter tracks before LRU eviction (limiter memory cap) |
+| `trusted_proxies` | `tuple[str, ...]` | `()` | Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored (maps to pounce `ServerConfig.trusted_hosts`). Empty means `X-Forwarded-For` is ignored entirely; `"*"` trusts every peer (spoofing risk — flagged by the `trusted_proxies` contract). See [Running behind a reverse proxy](/chirp/docs/quality/deployment/production/#running-behind-a-reverse-proxy). |
+| `forwarded_for_trusted_hops` | `int` | `1` | Trailing `X-Forwarded-For` hops to trust when deriving the client IP behind a reverse proxy. Must be `>= 1` (construction fails fast otherwise); only honored when `trusted_proxies` is non-empty. To ignore `X-Forwarded-For`, leave `trusted_proxies` empty rather than lowering this. |
 | `request_queue_enabled` | `bool` | `False` | Enable request queueing/load shedding |
 | `request_queue_max_depth` | `int` | `1000` | Maximum queued requests |
 | `sentry_dsn` | `str \| None` | `None` | Sentry DSN |

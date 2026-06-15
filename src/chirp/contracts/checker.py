@@ -835,6 +835,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         check_middleware_signatures,
         check_secret_key,
         check_sse_speculation,
+        check_trusted_proxies,
     )
 
     result.issues.extend(check_sse_speculation(router))
@@ -842,6 +843,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     result.issues.extend(check_middleware_signatures(middleware_list))
     result.issues.extend(check_secret_key(posture_config))
     result.issues.extend(check_allowed_hosts(posture_config))
+    result.issues.extend(check_trusted_proxies(posture_config))
 
     # Deploy-preflight: production misconfiguration (debug/metrics/sentry)
     from chirp.contracts.rules_deploy import (
