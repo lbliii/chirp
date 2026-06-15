@@ -17,7 +17,9 @@ dockerfilePath = "Dockerfile"
 # app.py runs `app.run()`; AppConfig.from_env() binds 0.0.0.0:$PORT on Railway.
 startCommand = "python app.py"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+# Generous window for a cold start (SimFeed warm + signal bus + chart geometry).
+# Mirrors the elbysodic shell deploy this example's rail was ported from.
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 numReplicas = 1
