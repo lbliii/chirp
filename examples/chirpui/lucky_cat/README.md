@@ -4,7 +4,7 @@ A playful "lucky cat casino" trading-floor app shell built on ChirpUI: top-bar
 brand + cross-page ticker strip, a markets sidebar, and a markets-grid landing.
 House token is **$MEOW**; market up is jade green, market down is lucky red.
 
-Live demo: <PLACEHOLDER — fill after deploy>
+Live demo: **https://luckycat-production.up.railway.app**
 
 This example is built across several issues:
 

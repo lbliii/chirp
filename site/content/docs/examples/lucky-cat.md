@@ -17,12 +17,14 @@ exchange built entirely on the app-shell lane. Use it to see how a real,
 multi-page product wires return types, signals, and the secure-by-default stack
 together — there is no client-side framework, only htmx and server-owned state.
 
+**Live demo:** [luckycat-production.up.railway.app](https://luckycat-production.up.railway.app)
+
 **Location:** `examples/chirpui/lucky_cat/`
 
 It demonstrates:
 
 - a full-viewport `chirpui-app-shell` with a brand topbar, a cross-page ticker
-  strip, and a two-tier (icon + route-context) resizable rail
+  strip, and a two-tier (icon + route-context) collapsible rail
 - a **markets grid** landing and a **market-detail** page (`/markets/{symbol}`)
   with an interactive price chart, a depth-bar order book, and a recent-trades
   tape, each fed by a per-market `EventStream`
