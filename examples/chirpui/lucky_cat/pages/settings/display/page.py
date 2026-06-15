@@ -7,8 +7,9 @@ navigation.py keeps Settings active and lights the inner rail's "Display" lane
 (``/settings/display`` href + ``settings_active`` prefix).
 """
 
-from chirp import Page
+from chirp import Page, login_required
 
 
+@login_required
 def get() -> Page:
     return Page("settings/display/page.html", "page_content", page_block_name="page_root")

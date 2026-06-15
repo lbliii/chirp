@@ -17,7 +17,9 @@ Lucky Cat is a playful "lucky cat casino" trading floor: a topbar with a live
 cross-page ticker strip, a $MEOW house-token balance and a notifications bell; a
 two-tier navigation rail; a markets grid; a market-detail page with a gradient
 area chart, an order book, and a trade tape; a trade flow; a Suspense portfolio
-dashboard; a watchlist; and a Cmd-K command palette.
+dashboard; a watchlist; and a Cmd-K command palette. **Browsing the market data
+is open to everyone; the account section and every mutation are gated behind
+session sign-in** — the auth showcase that exercises all three gating levels (§8).
 
 It is **not** wired to a real exchange. `feed.py` defines a source-agnostic
 `FeedSource` protocol and ships one implementation, `SimFeed` — a fully
@@ -76,6 +78,11 @@ prescriptive rule for what goes where. When you add a feature, decide its tier
     the notifications bell (`#notif-badge`, a `notif_badge` derived-signal sink).
     Global actions: Deposit $MEOW (primary), the theme toggle, the Cmd-K palette
     trigger, the "More" overflow.
+  - **Identity is auth-aware** (§8): the topbar shows a "Sign in" link when
+    anonymous and the user chip + a Sign-out form when signed in. The global state
+    + global actions that are account-specific (the `$MEOW` balance, the bell, the
+    Deposit action) render only when `current_user().is_authenticated` — the
+    public ticker, theme toggle, and Cmd-K stay for everyone.
   - **Section navigation does NOT go in the topbar.** `_context.py` makes this
     explicit: there is deliberately **no `controls` zone** — "section navigation
     (Markets, etc.) belongs in the outer icon rail, NOT the topbar." The only
@@ -140,6 +147,9 @@ right fit for the slow dashboard.)
 | **Collapsible rail** | (no route — cookie-persisted) | n/a | `shell.rail_is_collapsed()` read server-side for no-FOUC first paint; `static/lucky-cat-shell.js` drives the collapse toggle |
 | **Suspense dashboard** | `GET /portfolio` | `Suspense` | shell-first; six deferred panels stream as OOB swaps from `trade_store` |
 | **Free-threading proof** | `GET /ft/stream` (`referenced=True`) | `EventStream` | OOB-swaps a live ticks/sec figure into `#ft-panel` |
+| **Sign in** | `GET` / `POST /login` (`pages/login/`) | `Page` / `ValidationError` (422) | prefilled demo card; bad creds re-render `login_form` in place, good creds `login()` + `FormAction` (HX-Redirect → full reload) |
+| **Sign out** | `POST /logout` | `FormAction` | `logout()` (session regenerated) → HX-Redirect full reload home |
+| **Account gating** | the gated `page.py` `get()` handlers | `@login_required` | anonymous → 302 `/login?next=`; `current_user()` swaps the topbar chrome + the `watchlist_star` (§8) |
 
 `referenced=True` on the non-`<a href>` routes (search, all SSE streams, the
 chart fragment) keeps `app.check()`'s orphan-route rule quiet and the
@@ -446,6 +456,61 @@ even though this demo never runs it.
 
 ---
 
+## 8. Auth & the three gating levels
+
+Lucky Cat is **public-browse / gated-trading**, and it deliberately exercises the
+WHOLE range of Chirp's auth surface rather than one blanket lock. Decide a new
+surface's gating the way you decide its IA tier (§2): is it *market data* (public)
+or *the account* (gated), and is the gate a *page*, a *component*, or an *action*?
+
+| Level | Mechanism | Where |
+|-------|-----------|-------|
+| **Full-page** | `@login_required` on the `page.py` `get()` handler | the account rooms — `/trade`(+convert), `/portfolio`(+orders/history), `/activity`(+deposits/trades), `/watchlist`, `/settings`(+security/display). Anonymous → **302 `/login?next=<path>`** |
+| **Component** | `current_user()` conditional in the template | the topbar ("Sign in" ↔ user chip + Sign-out; the `$MEOW` balance / bell / Deposit appear only when authed) and the `watchlist_star` macro (toggle `<button>` vs. a "sign in to star" `<a>`) — both on the **public** markets grid |
+| **Action** | `@login_required` on the route | the six mutation routes (`/deposit`, `/trade/order`, `/trade/order/{id}/cancel`, `/trade/convert`, `/watchlist/toggle`, `/notifications/read`) — the security backstop |
+
+Public stays public: `GET /`, `GET /markets/{symbol}` (+ `/chart`, `/stream`),
+`GET /search`. The markets are the draw; you sign in to act on them.
+
+### The login flow (return-type-driven)
+
+`pages/login/page.py` has both `get()` (renders the prefilled card into the shell)
+and `post()`. Bad credentials return `ValidationError("login/page.html",
+"login_form", …)` → **422**, re-rendering just the form in place (the form
+self-overrides the boosted-shell outlet — footgun #2 in a new home). A clean
+sign-in calls `login(user)` (which **regenerates the session** — anti-fixation)
+and returns **`FormAction`** (no fragments): for an htmx request that emits
+`HX-Redirect` with **no `Location`**, so htmx does a *full* `window.location`
+page load. That is load-bearing — the auth chrome lives in the persistent topbar
+*outside* `#main`, so a boosted `#main`-only swap would leave it showing the
+logged-out state; a plain (no-JS) POST gets a 303. `hx_redirect`/`Redirect` are
+the wrong tools here: a 303 + `Location` is auto-followed by htmx's XHR *before*
+it can act on `HX-Redirect`, so it swaps the followed page in place and the URL
+never leaves `/login`. `/logout` is the same shape.
+`AuthMiddleware` slots into the secure stack as
+`Session → Auth → CSRF → SecurityHeaders` (the `csrf_session` contract requires
+only Session before CSRF, not adjacency).
+
+### Why a single shared demo account
+
+`users.py` holds ONE in-memory demo account (same store convention as the rest:
+frozen model, one lock, `reset()` wired into `conftest.py`). This is deliberate
+and follows directly from the `workers=1` doctrine (§7): all state is in process
+memory, so there is one account everyone signs into. Real per-user state needs an
+external store + the shared-bus backplane — the same production scaling path the
+signal layer points at, out of scope here. Passwords hash through
+`chirp.security.passwords` (argon2id under `chirp[auth]`, else the stdlib
+**scrypt** fallback), so the demo adds **no dependency** and runs on the slim
+deploy image (which drops `argon2-cffi`).
+
+> **Footnote — `RouteMeta.auth` is not enforced.** The `auth=` field on
+> `RouteMeta` (in `_meta.py`) exists but the framework does *not* act on it; only
+> `meta.section` / `meta.shell_mode` are consumed by contract rules. Protection is
+> the **`@login_required` decorator** on the handler (the idiom the `chirp new`
+> v2 scaffold uses). The example does not rely on `meta.auth`.
+
+---
+
 ## Invariants (keep these green)
 
 - `app.check()` is **ERROR-free** (security stack wired; OOB regions registered;
@@ -453,6 +518,10 @@ even though this demo never runs it.
   producer — the `signal_dead_binding` rule).
 - **`workers=1`** stays set (§7) — the in-memory state + the single `/_chirp/live`
   connection require single-process.
+- **Public market pages stay public** (`/`, `/markets/{symbol}`, `/search`) and
+  **account pages stay `@login_required`** (§8). The topbar's account chrome and
+  the `watchlist_star` key off `current_user()`; login/logout return `FormAction`
+  (HX-Redirect → full reload) so the persistent topbar repaints its auth state.
 - **Every `@app.derived` is pure** (§7) — it reads only its input signal value,
   never a process-local store. The source signal's value must carry what its
   deriveds need (the `NotifFeed` snapshot pattern).

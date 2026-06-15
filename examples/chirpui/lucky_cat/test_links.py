@@ -25,6 +25,21 @@ import re
 import pytest
 
 from chirp.testing import TestClient
+from tests.helpers.auth import login
+
+# Account rooms (/portfolio, /trade, /activity, /settings + their inner-rail
+# sub-pages) are now ``@login_required`` — an anonymous crawl gets 302s to
+# ``/login`` and never reaches the linked pages, making the link-integrity proof
+# vacuous. So the crawl signs in as the demo trader and threads the authenticated
+# session cookie through every GET, exactly as a logged-in user navigating the
+# shell would. The demo creds + per-app session cookie name come from app.py.
+_SESSION_COOKIE = "chirp_session_lucky_cat"
+
+
+def _auth_headers(cookie: str | None) -> dict[str, str]:
+    """Cookie header for an authenticated GET (empty when not signed in)."""
+    return {"Cookie": f"{_SESSION_COOKIE}={cookie}"} if cookie else {}
+
 
 # Seed pages: one per room (so every room's inner rail is exercised) plus a
 # market-detail route (whose "this market" lane links to #fragments + sibling
@@ -87,8 +102,12 @@ class TestLinkIntegrity:
     async def test_seed_pages_themselves_resolve(self, example_app) -> None:
         """Sanity floor: every seed page renders before we trust its links."""
         async with TestClient(example_app) as client:
+            cookie = await login(
+                client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE
+            )
+            headers = _auth_headers(cookie)
             for path in _SEED_PAGES:
-                response = await client.get(path)
+                response = await client.get(path, headers=headers)
                 assert response.status == 200, f"seed page {path} -> {response.status}"
 
     async def test_no_dead_links_from_seed_pages(self, example_app) -> None:
@@ -96,9 +115,13 @@ class TestLinkIntegrity:
         each one. A link the rail advertises but the server cannot serve (the
         seven-404 regression) fails here with the offending path + status."""
         async with TestClient(example_app) as client:
+            cookie = await login(
+                client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE
+            )
+            headers = _auth_headers(cookie)
             discovered: set[str] = set()
             for path in _SEED_PAGES:
-                response = await client.get(path)
+                response = await client.get(path, headers=headers)
                 assert response.status == 200, f"seed page {path} -> {response.status}"
                 discovered |= _same_origin_paths(response.text)
 
@@ -108,7 +131,7 @@ class TestLinkIntegrity:
 
             broken: dict[str, int] = {}
             for path in sorted(discovered):
-                response = await client.get(path)
+                response = await client.get(path, headers=headers)
                 if response.status != 200:
                     broken[path] = response.status
 
@@ -128,9 +151,13 @@ class TestLinkIntegrity:
             "/settings/display",
         }
         async with TestClient(example_app) as client:
+            cookie = await login(
+                client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE
+            )
+            headers = _auth_headers(cookie)
             discovered: set[str] = set()
             for path in _SEED_PAGES:
-                response = await client.get(path)
+                response = await client.get(path, headers=headers)
                 discovered |= _same_origin_paths(response.text)
         missing = previously_dead - discovered
         assert not missing, f"inner-rail links not rendered by the shell: {missing}"

@@ -17,13 +17,36 @@ throughout (TestContracts).
 import pytest
 
 from chirp.testing import TestClient, assert_mutation_redirect
-from tests.helpers.auth import extract_csrf_token, extract_session_cookie
+from tests.helpers.auth import (
+    csrf_post,
+    extract_csrf_token,
+    extract_session_cookie,
+    login,
+)
 
 _SESSION_COOKIE = "chirp_session_lucky_cat"
 
 
 def _session_cookie(response) -> str | None:
     return extract_session_cookie(response, cookie_name=_SESSION_COOKIE)
+
+
+async def _login(client) -> str:
+    """Sign in as the demo account; return the authenticated session cookie.
+
+    The account surfaces (trade / portfolio / activity / settings) and the
+    signed-in topbar chrome (balance token, notifications bell, Deposit modal)
+    only render for an authenticated user — and every mutation route is
+    ``@login_required`` — so render/mutation tests below sign in first.
+    """
+    cookie = await login(client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE)
+    assert cookie is not None
+    return cookie
+
+
+def _cookie_header(cookie: str) -> dict:
+    """Build a Cookie header for an authed GET of a gated page / signed-in chrome."""
+    return {"Cookie": f"{_SESSION_COOKIE}={cookie}"}
 
 
 class TestContracts:
@@ -721,9 +744,11 @@ class TestTopbar:
     @pytest.mark.issue(230)
     async def test_deposit_action_is_not_inert(self, example_app) -> None:
         """The Deposit button carries data-action="deposit" (the kanban modal
-        pattern), NOT an inert href="#"."""
+        pattern), NOT an inert href="#". (The Deposit shell action is signed-in
+        chrome, so authenticate first.)"""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'data-action="deposit"' in response.text
             # The old inert placeholder must be gone.
@@ -732,9 +757,11 @@ class TestTopbar:
     async def test_topbar_holds_only_global_actions(self, example_app) -> None:
         """IA doctrine: the topbar holds global actions only — Deposit (primary)
         + About (overflow). Section navigation (Markets) lives in the outer icon
-        rail, NOT the topbar, so there is no 'controls' nav zone."""
+        rail, NOT the topbar, so there is no 'controls' nav zone. (Deposit is the
+        signed-in primary action, so authenticate first.)"""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "chirpui-shell-actions__group--primary" in response.text
             # Overflow auto-wraps into a "More" dropdown.
@@ -744,9 +771,11 @@ class TestTopbar:
             assert "chirpui-shell-actions__group--controls" not in response.text
 
     async def test_deposit_modal_present(self, example_app) -> None:
-        """The deposit dialog + its CSRF-protected form ship inside the page."""
+        """The deposit dialog + its CSRF-protected form ship inside the page (for
+        a signed-in user, who owns the Deposit affordance)."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="deposit-modal"' in response.text
             assert 'id="deposit-form"' in response.text
@@ -757,9 +786,11 @@ class TestTopbar:
     async def test_balance_renders_in_topbar(self, example_app) -> None:
         """The $MEOW balance is a live `balance` SIGNAL: the topbar token carries
         an sse-swap="balance" sink (signal('balance')) SSR-seeded with the seed
-        value. No #lucky-cat-balance OOB id anymore — the signal sink owns it."""
+        value. No #lucky-cat-balance OOB id anymore — the signal sink owns it.
+        (The $MEOW balance token is signed-in chrome, so authenticate first.)"""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             # The balance signal binding (the helper emits
             # <span sse-swap="balance" hx-target="this">…</span>).
@@ -780,15 +811,15 @@ class TestTopbar:
 
         wallet.reset()
         async with TestClient(example_app) as client:
-            page = await client.get("/")
-            cookie = _session_cookie(page)
-            csrf = extract_csrf_token(page.text)
-            assert csrf is not None
-            headers = {"X-CSRF-Token": csrf, "HX-Request": "true"}
-            if cookie:
-                headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
+            cookie = await _login(client)
             before = wallet.balance()
-            response = await client.post("/deposit", data={"amount": "250"}, headers=headers)
+            response, _ = await csrf_post(
+                client,
+                "/deposit",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"amount": "250"},
+            )
             # Empty 204: the live signal carries the visible update, not the body.
             assert response.status == 204
             assert response.text == ""
@@ -803,15 +834,14 @@ class TestTopbar:
 
         wallet.reset()
         async with TestClient(example_app) as client:
-            page = await client.get("/")
-            cookie = _session_cookie(page)
-            csrf = extract_csrf_token(page.text)
-            headers = {"X-CSRF-Token": csrf, "HX-Request": "true"}
-            if cookie:
-                headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
+            cookie = await _login(client)
             before = wallet.balance()
-            response = await client.post(
-                "/deposit", data={"amount": "not-a-number"}, headers=headers
+            response, _ = await csrf_post(
+                client,
+                "/deposit",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"amount": "not-a-number"},
             )
             assert response.status == 204
             # Balance unchanged at the seed value (a clamped no-op credit).
@@ -938,7 +968,8 @@ class TestActivityFeed:
         wallet.deposit(250)
         trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
         async with TestClient(example_app) as client:
-            response = await client.get("/activity")
+            cookie = await _login(client)
+            response = await client.get("/activity", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "<html" in response.text
             # The fill row (a traded market) + the deposit row both render.
@@ -954,7 +985,8 @@ class TestActivityFeed:
         """With both sources empty (seed state), the polished maneki empty state
         shows — and the copy never asserts data it does not render."""
         async with TestClient(example_app) as client:
-            response = await client.get("/activity")
+            cookie = await _login(client)
+            response = await client.get("/activity", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "No activity yet" in response.text
             # The maneki paw accent (the polished empty state, not a bare <p>).
@@ -1062,7 +1094,8 @@ class TestTradePage:
 
     async def test_trade_page_renders_form(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.get("/trade")
+            cookie = await _login(client)
+            response = await client.get("/trade", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="order-form"' in response.text
             # CSRF protected (hidden field) and posts to the trade route.
@@ -1079,15 +1112,23 @@ class TestTradeOrder:
     """#225: POST /trade/order — validation + multi-target OOB fill."""
 
     async def _csrf_headers(self, client, *, htmx: bool = True) -> dict:
-        page = await client.get("/trade")
-        cookie = _session_cookie(page)
+        """Authed CSRF headers for the gated trade routes.
+
+        ``/trade`` is ``@login_required`` and every order route is a gated
+        mutation, so this signs in first, then pairs a CSRF token + session
+        cookie from an authed GET of ``/trade``. The returned header set carries
+        the matched (token, cookie) pair and is reusable for concurrent requests
+        within the session (the CSRF token is per-session, not per-request-nonce).
+        """
+        cookie = await _login(client)
+        page = await client.get("/trade", headers=_cookie_header(cookie))
+        cookie = _session_cookie(page) or cookie
         csrf = extract_csrf_token(page.text)
         assert csrf is not None
         headers = {"X-CSRF-Token": csrf}
         if htmx:
             headers["HX-Request"] = "true"
-        if cookie:
-            headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
+        headers["Cookie"] = f"{_SESSION_COOKIE}={cookie}"
         return headers
 
     @pytest.mark.issue(225)
@@ -1189,8 +1230,9 @@ class TestTradeOrder:
 
         order = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             # The orders page ships the #open-orders-table swap target (fail-loud).
-            orders_page = await client.get("/portfolio/orders")
+            orders_page = await client.get("/portfolio/orders", headers=_cookie_header(cookie))
             assert 'id="open-orders-table"' in orders_page.text
 
             headers = await self._csrf_headers(client)
@@ -1416,10 +1458,14 @@ class TestProgressiveRail:
             assert 'hx-sync="#main:replace"' in response.text
 
     async def test_icon_rail_persists_across_routes(self, example_app) -> None:
-        """The five rooms appear on every route (markets / detail / a new room)."""
+        """The five rooms appear on every route (markets / detail / a new room).
+
+        Some routes are gated (/portfolio, /settings), so sign in once and carry
+        the authed cookie across the loop."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path in ("/", "/markets/BTC-MEOW", "/portfolio", "/settings"):
-                response = await client.get(path)
+                response = await client.get(path, headers=_cookie_header(cookie))
                 assert response.status == 200, path
                 for label in ("Markets", "Portfolio", "Trade", "Activity", "Settings"):
                     assert f'aria-label="{label}"' in response.text, (path, label)
@@ -1439,36 +1485,38 @@ class TestProgressiveRail:
 
     async def test_icon_rail_active_state_is_per_room(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            home = await client.get("/")
+            cookie = await _login(client)
+            home = await client.get("/", headers=_cookie_header(cookie))
             # On /, exactly the Markets room (href="/") is active.
             assert self._active_room_hrefs(home.text) == {"/"}
 
-            pf = await client.get("/portfolio")
+            pf = await client.get("/portfolio", headers=_cookie_header(cookie))
             # Active marker moves to Portfolio, and only Portfolio.
             assert self._active_room_hrefs(pf.text) == {"/portfolio"}
 
-            st = await client.get("/settings")
+            st = await client.get("/settings", headers=_cookie_header(cookie))
             # The Settings room lights up, and only Settings.
             assert self._active_room_hrefs(st.text) == {"/settings"}
 
-            detail = await client.get("/markets/BTC-MEOW")
+            detail = await client.get("/markets/BTC-MEOW", headers=_cookie_header(cookie))
             # A market-detail route stays in the Markets room (path-prefix).
             assert self._active_room_hrefs(detail.text) == {"/"}
 
     async def test_inner_rail_changes_by_route(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            markets = await client.get("/")
+            cookie = await _login(client)
+            markets = await client.get("/", headers=_cookie_header(cookie))
             # Markets room → market list + filter lane (Watchlist + All markets;
             # the old cosmetic Gainers/Losers no-op lanes were removed).
             assert "Filters" in markets.text
             assert "All markets" in markets.text
 
-            detail = await client.get("/markets/BTC-MEOW")
+            detail = await client.get("/markets/BTC-MEOW", headers=_cookie_header(cookie))
             # Market-detail room → a "this market" lane (book / trades / info).
             assert "Order book" in detail.text
             assert "Overview" in detail.text
 
-            portfolio = await client.get("/portfolio")
+            portfolio = await client.get("/portfolio", headers=_cookie_header(cookie))
             # Portfolio room → holdings / open orders / history; no filter lane.
             assert "Holdings" in portfolio.text
             assert "Open orders" in portfolio.text
@@ -1498,9 +1546,15 @@ class TestProgressiveRail:
         """Boosted navigation returns a single sidebar_oob chunk targeting
         #chirpui-sidebar-nav with the new room's contextual sections (#231)."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             response = await client.get(
                 "/portfolio",
-                headers={"HX-Request": "true", "HX-Boosted": "true", "HX-Target": "main"},
+                headers={
+                    "HX-Request": "true",
+                    "HX-Boosted": "true",
+                    "HX-Target": "main",
+                    **_cookie_header(cookie),
+                },
             )
             assert response.status == 200
             # The OOB chunk wraps the rail under the chirp-ui sidebar target.
@@ -1516,13 +1570,14 @@ class TestProgressiveRail:
 
     async def test_room_stubs_render_full_page(self, example_app) -> None:
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path, heading in (
                 ("/portfolio", "Portfolio"),
                 ("/trade", "Trade"),
                 ("/activity", "Activity"),
                 ("/settings", "Settings"),
             ):
-                response = await client.get(path)
+                response = await client.get(path, headers=_cookie_header(cookie))
                 assert response.status == 200, path
                 assert "<html" in response.text
                 assert heading in response.text
@@ -1574,7 +1629,8 @@ class TestMobileShell:
         import re
 
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             match = re.search(r"luckycat-nav-drawer__nav.*?</nav>", response.text, re.S)
             assert match is not None, "nav drawer body did not render"
@@ -1622,8 +1678,9 @@ class TestMobileShell:
         exactly once. A duplicate (e.g. if the drawer reused the rail wholesale)
         would break the boosted-nav OOB swap."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path in ("/", "/markets/BTC-MEOW", "/portfolio", "/settings"):
-                response = await client.get(path)
+                response = await client.get(path, headers=_cookie_header(cookie))
                 assert response.status == 200, path
                 assert response.text.count('id="chirpui-sidebar-nav"') == 1, path
                 assert response.text.count('id="lucky-cat-nav"') == 1, path
@@ -1632,8 +1689,9 @@ class TestMobileShell:
         """The drawer ships on every route (it lives in the persistent topbar
         shell), so the hamburger works no matter where boosted nav landed."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path in ("/", "/markets/BTC-MEOW", "/portfolio", "/trade", "/settings"):
-                response = await client.get(path)
+                response = await client.get(path, headers=_cookie_header(cookie))
                 assert response.status == 200, path
                 assert "luckycat-nav-trigger" in response.text, path
                 assert 'id="lucky-cat-nav"' in response.text, path
@@ -1700,9 +1758,15 @@ class TestRailCollapse:
         """The visible toggle re-ships in the boosted sidebar OOB chunk so it is
         never lost across navigation (like the resize handle)."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             response = await client.get(
                 "/portfolio",
-                headers={"HX-Request": "true", "HX-Boosted": "true", "HX-Target": "main"},
+                headers={
+                    "HX-Request": "true",
+                    "HX-Boosted": "true",
+                    "HX-Target": "main",
+                    **_cookie_header(cookie),
+                },
             )
             assert response.status == 200
             oob = response.text[response.text.find('id="chirpui-sidebar-nav"') :]
@@ -1741,13 +1805,16 @@ class TestRailCollapse:
         """A collapsed rail stays usable across boosted navigation: the toggle
         re-ships in the sidebar OOB chunk so the user can always re-expand."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             response = await client.get(
                 "/portfolio",
                 headers={
                     "HX-Request": "true",
                     "HX-Boosted": "true",
                     "HX-Target": "main",
-                    "Cookie": f"{self._COOKIE}=true",
+                    # The rail-collapse cookie + the auth session cookie ride the
+                    # one Cookie header together (gated page, collapsed rail).
+                    "Cookie": f"{self._COOKIE}=true; {_SESSION_COOKIE}={cookie}",
                 },
             )
             assert response.status == 200
@@ -1771,7 +1838,8 @@ class TestPortfolioDashboard:
         """The shell ships every deferred panel's DOM id (the OOB swap targets
         must exist — fail-loud) plus skeleton placeholders."""
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "<html" in response.text
             for dom_id in (
@@ -1798,7 +1866,8 @@ class TestPortfolioDashboard:
         from loading; `is deferred` is what makes the empty tuple show the
         empty state.)"""
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             # Deferred blocks have streamed in: the empty holdings state shows.
             assert "No holdings yet" in response.text
@@ -1808,7 +1877,8 @@ class TestPortfolioDashboard:
     async def test_value_reflects_seed_wallet(self, example_app) -> None:
         """With no positions, portfolio value == the seed $MEOW wallet balance."""
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             # Seed wallet (INITIAL_MEOW=1000), zero P&L, all cash.
             assert "1000" in response.text
@@ -1822,7 +1892,8 @@ class TestPortfolioDashboard:
 
         trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             # The position taped into the holdings table (not the empty state).
             assert "PAW-MEOW" in response.text
@@ -1842,7 +1913,8 @@ class TestPortfolioDashboard:
         import re
 
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             text = response.text
             # The script-defer swaps: (template-id, target-id) pairs.
@@ -1879,7 +1951,11 @@ class TestPortfolioDashboard:
         import re
 
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio", headers={"HX-Request": "true"})
+            cookie = await _login(client)
+            response = await client.get(
+                "/portfolio",
+                headers={"HX-Request": "true", **_cookie_header(cookie)},
+            )
             assert response.status == 200
             text = response.text
             wrappers = {
@@ -1908,7 +1984,8 @@ class TestFreeThreadingPanel:
         import sys
 
         async with TestClient(example_app) as client:
-            response = await client.get("/portfolio")
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="ft-panel"' in response.text
             assert "Free-threading" in response.text
@@ -2142,9 +2219,11 @@ class TestNotificationsBell:
 
     async def test_bell_renders_in_shell(self, example_app) -> None:
         """The bell, its (empty) badge sink, the dropdown list sink, and the
-        single /_chirp/live signal connection ship on the landing page."""
+        single /_chirp/live signal connection ship on the landing page (the bell
+        is signed-in chrome, so authenticate first)."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
             # The bell trigger + its badge sink + the dropdown list sink.
@@ -2178,7 +2257,8 @@ class TestNotificationsBell:
         notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
         notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
         async with TestClient(example_app) as client:
-            html = (await client.get("/")).text
+            cookie = await _login(client)
+            html = (await client.get("/", headers=_cookie_header(cookie))).text
         # The list sink is SSR-seeded with the rows (inside the bound <ul>).
         ul = html[html.find('id="notif-list"') :]
         assert 'sse-swap="notifications"' in ul[: ul.find("</ul>") + 5]
@@ -2210,7 +2290,8 @@ class TestNotificationsBell:
         import re
 
         async with TestClient(example_app) as client:
-            html = (await client.get("/")).text
+            cookie = await _login(client)
+            html = (await client.get("/", headers=_cookie_header(cookie))).text
             # The bell TRIGGER advertises a dialog popover, not a menu (scope to the
             # bell — chirp-ui's shell-actions "More" overflow legitimately ships its
             # own role="menu"/aria-haspopup="menu" dropdown elsewhere in the shell).
@@ -2233,7 +2314,8 @@ class TestNotificationsBell:
         notifications.add("fill", "A")
         notifications.add("fill", "B")
         async with TestClient(example_app) as client:
-            html = (await client.get("/")).text
+            cookie = await _login(client)
+            html = (await client.get("/", headers=_cookie_header(cookie))).text
             # The sibling live region exists and carries the spoken count.
             assert 'id="notif-announce"' in html
             assert "chirpui-visually-hidden" in html
@@ -2267,9 +2349,20 @@ class TestNotificationsBell:
         route (like the command palette + nav drawer), bound to the one merged
         signal connection on each page (never a per-page /notifications/stream)."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path in ("/", "/markets/BTC-MEOW", "/portfolio", "/trade", "/settings"):
-                response = await client.get(path)
+                response = await client.get(path, headers=_cookie_header(cookie))
+                # The session cookie rotates per response — thread the latest so
+                # the next gated GET in the loop stays authenticated.
+                cookie = _session_cookie(response) or cookie
                 assert response.status == 200, path
+                # NOTE: /portfolio currently fails this assertion — see the
+                # source-side gap surfaced in the implementer report (the Suspense
+                # shell renders after AuthMiddleware's request-user ContextVar is
+                # reset, so current_user() reads anonymous and the signed-in bell
+                # chrome is dropped; the page already documents this exact issue
+                # for csrf_token() and captures it, but not the user). Kept intact
+                # (no assertion weakening, no source edit) per the task scope.
                 assert 'id="notif-bell"' in response.text, path
                 assert 'sse-connect="/_chirp/live' in response.text, path
                 # The bell's own separate notifications scope is gone everywhere.
@@ -2282,8 +2375,9 @@ class TestNotificationsBell:
         connection and are excluded: /portfolio (the /ft/stream proof panel) and
         the market-detail page (its per-market /markets/{symbol}/stream)."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
             for path in ("/", "/trade", "/settings", "/watchlist", "/activity"):
-                html = (await client.get(path)).text
+                html = (await client.get(path, headers=_cookie_header(cookie))).text
                 assert html.count("sse-connect=") == 1, path
                 assert 'sse-connect="/_chirp/live' in html, path
                 # The old separate notifications scope is gone everywhere.
@@ -2297,7 +2391,8 @@ class TestNotificationsBell:
         notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
         notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
             # Unread pill present with the count, and both rows render.
@@ -2309,13 +2404,18 @@ class TestNotificationsBell:
             assert "luckycat-notif--deposit" in html
 
     async def _csrf_headers(self, client, path: str = "/") -> dict:
-        page = await client.get(path)
-        cookie = extract_session_cookie(page, cookie_name=self._SESSION_COOKIE)
+        """Authed CSRF headers for the bell's gated mutation routes.
+
+        The bell + its mutation routes (/notifications/read, /deposit,
+        /trade/order) require a signed-in user, so sign in first, then pair a
+        CSRF token + session cookie from an authed GET of ``path``."""
+        cookie = await _login(client)
+        page = await client.get(path, headers=_cookie_header(cookie))
+        cookie = extract_session_cookie(page, cookie_name=self._SESSION_COOKIE) or cookie
         csrf = extract_csrf_token(page.text)
         assert csrf is not None
         headers = {"X-CSRF-Token": csrf, "HX-Request": "true"}
-        if cookie:
-            headers["Cookie"] = f"{self._SESSION_COOKIE}={cookie}"
+        headers["Cookie"] = f"{self._SESSION_COOKIE}={cookie}"
         return headers
 
     async def test_open_marks_read_clears_watermark(self, example_app) -> None:

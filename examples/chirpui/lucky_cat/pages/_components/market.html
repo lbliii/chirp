@@ -64,6 +64,19 @@
     paint carries the id (the OOB target) but no hx-swap-oob attribute. -#}
 {% def watchlist_star(symbol, starred=false, oob=false) %}
 {% set _starred = starred ?? false %}
+{#- COMPONENT-LEVEL GATING (the showcase): the market cards are fully PUBLIC, but
+    starring is a gated ACTION (/watchlist/toggle is @login_required and the
+    /watchlist page is account-specific). So the star renders for everyone but
+    its behaviour is gated by current_user():
+      * signed in  → the real toggle <button> (hx-post to /watchlist/toggle);
+      * anonymous  → a same-looking <a> that links to /login (a visible "sign in
+        to star" affordance) — NOT a swallowed 302 from an hx-post with
+        hx-swap="none". This is page-gating's component-level counterpart.
+    The OOB twin (oob=true) is returned only from the authenticated toggle route,
+    so it always takes the signed-in branch. FOOTGUN #1: both forms are SIBLINGS
+    of the card <a href="/markets/{symbol}"> (absolutely positioned over a
+    corner), never descendants. -#}
+{% if current_user().is_authenticated %}
 <button type="button"
         id="watchlist-star-{{ symbol }}"
         {% if oob %}hx-swap-oob="outerHTML"{% end %}
@@ -78,6 +91,14 @@
         hx-select="#watchlist-star-{{ symbol }}">
   <span class="luckycat-watchlist-star__glyph" aria-hidden="true">{{ '★' if _starred else '☆' }}</span>
 </button>
+{% else %}
+<a class="luckycat-watchlist-star luckycat-watchlist-star--signin"
+   href="/login"
+   aria-label="Sign in to add {{ symbol }} to your watchlist"
+   title="Sign in to add to watchlist">
+  <span class="luckycat-watchlist-star__glyph" aria-hidden="true">☆</span>
+</a>
+{% end %}
 {% end %}
 
 {#- OOB twin for one star — the /watchlist/toggle route returns this (primary).

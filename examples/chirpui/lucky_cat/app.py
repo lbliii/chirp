@@ -35,6 +35,7 @@ for _name in (
     "trade_store",
     "notifications",
     "watchlist",
+    "users",
 ):
     _mod = sys.modules.get(_name)
     _file = getattr(_mod, "__file__", None) if _mod is not None else None
@@ -43,6 +44,7 @@ for _name in (
 
 import notifications
 import trade_store
+import users
 import watchlist
 from command_palette import palette_results
 from feed import DEFAULT_INTERVAL, INTERVALS, get_feed
@@ -61,8 +63,11 @@ from chirp import (
     Fragment,
     Request,
     ValidationError,
+    login_required,
+    logout,
     use_chirp_ui,
 )
+from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersConfig, SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
@@ -360,11 +365,26 @@ def notif_announce(feed) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Secure-by-default stack — Session -> CSRF -> SecurityHeaders.
-# Wired now so app.check()'s security_stack rule is satisfied once the
-# trade-flow mutating routes arrive (the rule owns the mutating-route
-# definition). secure cookies off in debug so local http works.
+# Secure-by-default stack — Session -> Auth -> CSRF -> SecurityHeaders.
+#
+# Auth slots in between Session and CSRF (the order chirp's auth subsystem
+# prescribes, and the order the csrf_session contract requires: Session before
+# CSRF — adjacency is not required, so Auth in the middle is fine). Lucky Cat is
+# public-browse / gated-trading: AuthMiddleware authenticates every request
+# (anonymous when there is no session), and the gated routes/pages enforce
+# @login_required. secure cookies off in debug so local http works.
 # ---------------------------------------------------------------------------
+
+
+async def load_user(user_id: str) -> users.User | None:
+    """AuthConfig.load_user — resolve the session's user id back to a User.
+
+    Called by AuthMiddleware on every request that carries a session. The demo
+    has a single shared in-memory account (see users.py / DESIGN.md §7), so this
+    is a cheap dict read behind the store lock.
+    """
+    return users.get(user_id)
+
 
 app.add_middleware(
     SessionMiddleware(
@@ -377,6 +397,14 @@ app.add_middleware(
         )
     )
 )
+# AuthMiddleware (session-based; no token auth in this browser-only demo). It
+# auto-registers the current_user() template global, which the shell uses to
+# swap the topbar between "Sign in" and the user menu + reveal the account chrome
+# (the $MEOW balance, the bell, the Deposit action). login_url drives the
+# @login_required redirect target (an anonymous hit on a gated route → 302
+# /login?next=<there>); login()/logout() (called from the login page + /logout)
+# regenerate the session.
+app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user, login_url="/login")))
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 # SecurityHeaders for the clickjacking / MIME-sniff / referrer headers only —
 # content_security_policy=None so it does NOT emit a CSP header. use_chirp_ui
@@ -396,6 +424,24 @@ app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_secur
 def health():
     """Unauthenticated Railway healthcheck."""
     return ("ok", 200)
+
+
+@app.route("/logout", methods=["POST"], name="logout")
+def do_logout():
+    """Sign out — regenerate the session and full-page redirect home.
+
+    The user-menu Sign-out form (in _layout.html) posts here. ``logout()``
+    regenerates the session (discarding the user id + all session data) and sets
+    the request user back to anonymous. Like the login success path, this returns
+    a ``FormAction`` (no fragments) → HX-Redirect with no Location for htmx (a
+    FULL ``window.location`` page load) so the persistent topbar repaints to the
+    logged-out chrome (user menu → "Sign in", account chrome disappears), and a
+    303 for a plain POST. (A 303 + Location alone is auto-followed by htmx's XHR
+    before it acts on HX-Redirect, leaving the URL stuck.) CSRF is enforced by
+    the shared secure stack.
+    """
+    logout()
+    return FormAction("/")
 
 
 _PALETTE_TEMPLATE = "_components/command_palette.html"
@@ -427,6 +473,7 @@ def search(request: Request):
 
 
 @app.route("/deposit", methods=["POST"], name="deposit")
+@login_required
 async def deposit(request: Request):
     """Credit the house token and EMIT the balance signal (#230 + signal migration).
 
@@ -488,6 +535,7 @@ async def deposit(request: Request):
 
 
 @app.route("/watchlist/toggle", methods=["POST"], name="watchlist.toggle")
+@login_required
 async def watchlist_toggle(request: Request):
     """Flip a market's starred state and OOB-swap the star + rail count twins.
 
@@ -574,6 +622,7 @@ async def watchlist_toggle(request: Request):
 
 
 @app.route("/notifications/read", methods=["POST"], name="notifications.read")
+@login_required
 def notifications_read():
     """Mark every notification read and clear the badge over the signal connection.
 
@@ -629,6 +678,7 @@ def _fill_fragments() -> tuple[Fragment, ...]:
 
 
 @app.route("/trade/order", methods=["POST"], name="trade.order")
+@login_required
 async def place_order(request: Request):
     """Place an order. Invalid -> 422 + re-rendered form; filled -> one OOB swap.
 
@@ -744,6 +794,7 @@ _ORDERS_TEMPLATE = "portfolio/orders/page.html"
 
 
 @app.route("/trade/order/{order_id}/cancel", methods=["POST"], name="trade.cancel")
+@login_required
 def cancel_order(order_id: int):
     """Cancel a resting order and OOB-swap the open-order count + a toast.
 
@@ -782,6 +833,7 @@ def cancel_order(order_id: int):
 
 
 @app.route("/trade/convert", methods=["POST"], name="trade.convert")
+@login_required
 async def convert_order(request: Request):
     """Convert $MEOW into a market (a market buy) from Trade → Convert.
 

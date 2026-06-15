@@ -70,6 +70,8 @@
         </ul>
         {% end %}
         <div class="chirpui-form-actions chirpui-form-actions--end">
+          {#- /trade/convert is @login_required (full-page gating), so only a
+              signed-in trader renders this form. -#}
           <button type="submit" class="chirpui-btn chirpui-btn--primary">Convert</button>
         </div>
       </form>

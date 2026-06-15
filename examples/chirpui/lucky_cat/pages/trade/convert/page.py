@@ -13,9 +13,10 @@ navigation.py keeps Trade active and lights the inner rail's "Convert" lane
 
 import trade_store
 
-from chirp import Page
+from chirp import Page, login_required
 
 
+@login_required
 def get() -> Page:
     return Page(
         "trade/convert/page.html",

@@ -75,6 +75,10 @@
   {% end %}
 
   <div class="chirpui-form-actions chirpui-form-actions--end">
+    {#- The whole /trade page is @login_required (full-page gating), so only a
+        signed-in trader ever renders this form — no anonymous-submit branch
+        needed here. (Component-level gating lives on the PUBLIC markets grid: the
+        watchlist star.) -#}
     <button type="submit" class="chirpui-btn chirpui-btn--primary">Place order</button>
   </div>
 </form>

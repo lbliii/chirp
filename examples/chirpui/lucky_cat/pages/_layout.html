@@ -644,6 +644,15 @@ document.body.addEventListener("htmx:configRequest", function(event) {
     Cmd/Ctrl-K opens the same #command-palette dialog rendered below. Lives in
     the persistent topbar shell so it is reachable on every page. -#}
 {{ command_palette_trigger() }}
+{#- ACCOUNT CHROME (auth-gated). The notifications bell and the $MEOW balance
+    token (and the Deposit shell action, gated in _context.py) are the SIGNED-IN
+    trader's account state, so they render ONLY when current_user() is
+    authenticated. An anonymous visitor sees the public chrome (live ticker, ⌘K,
+    theme toggle) plus a "Sign in" affordance below. This is the current_user()
+    conditional-chrome showcase — and it is load-bearing, not cosmetic: a visible
+    Deposit/bell for an anonymous user would POST to a @login_required route with
+    hx-swap="none", so the 302 → /login would be silently swallowed. -#}
+{% if current_user().is_authenticated %}
 {#- NOTIFICATIONS BELL — a dropdown popover over the recent notifications feed,
     with a live unread badge. It lives in the persistent topbar shell so it is on
     every page and the SSE stream + Alpine controller bindings are always live.
@@ -725,7 +734,36 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 <span class="luckycat-token" title="House token balance">
   {{ meow_balance_body() }}
 </span>
+{% end %}{#- /if current_user().is_authenticated — account chrome -#}
 {{ theme_toggle() }}
+{#- IDENTITY (IA doctrine: the topbar owns identity). Anonymous → a "Sign in"
+    button (a plain full-nav link to /login — not boosted, so it leaves the shell
+    cleanly). Signed in → the account name + a Sign-out form. Sign-out POSTs
+    /logout, which returns a FormAction (HX-Redirect with no Location → a FULL
+    window.location page load) so this persistent topbar repaints to the
+    logged-out chrome (a boosted #main-only swap would leave the user menu stuck
+    here). -#}
+{% if current_user().is_authenticated %}
+<div class="luckycat-user">
+  <span class="luckycat-user__chip" title="Signed in as {{ current_user().name }}">
+    <span class="luckycat-user__avatar" aria-hidden="true">🐱</span>
+    <span class="luckycat-user__name">{{ current_user().name }}</span>
+  </span>
+  <form class="luckycat-user__signout" method="post" action="/logout" hx-post="/logout">
+    {#- Use the csrf_token() GLOBAL (a raw value) rather than csrf_field(): this
+        Sign-out form lives in the persistent topbar, which is also rendered by the
+        /portfolio Suspense SHELL — and Suspense renders the shell lazily, after the
+        CSRF request ContextVar is reset. csrf_field() reads that ContextVar
+        directly (unshadowable → K-RUN-007 on the deferred render); csrf_token() is
+        a shadowable global that portfolio/page.py's _captured_csrf() feeds the
+        captured token, so it renders on both sync and Suspense pages. -#}
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="luckycat-user__signout-btn chirpui-btn chirpui-btn--ghost">Sign out</button>
+  </form>
+</div>
+{% else %}
+<a class="luckycat-signin chirpui-btn chirpui-btn--primary" href="/login">Sign in</a>
+{% end %}
 {#- The command-palette <dialog> itself. Rendered once in the persistent topbar
     shell (NOT inside #main / #page-content), so it survives boosted navigation
     and the Cmd/Ctrl-K global key binding is always live. Populated with the full

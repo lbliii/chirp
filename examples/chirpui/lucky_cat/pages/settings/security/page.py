@@ -7,8 +7,9 @@ block; navigation.py keeps Settings active and lights the inner rail's "Security
 lane (``/settings/security`` href + ``settings_active`` prefix).
 """
 
-from chirp import Page
+from chirp import Page, login_required
 
 
+@login_required
 def get() -> Page:
     return Page("settings/security/page.html", "page_content", page_block_name="page_root")
