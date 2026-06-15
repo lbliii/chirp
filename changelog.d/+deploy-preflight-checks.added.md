@@ -1,1 +1,0 @@
-**Deploy-preflight contract checks.** `app.check()` now ERRORs on `debug=True` in production (`deploy_debug`) and on a `metrics_path` that collides with an application route (`deploy_metrics`), and WARNs when a Sentry DSN is set with `sentry_traces_sample_rate=0` (`deploy_sentry`). Check rules only — no deploy automation.

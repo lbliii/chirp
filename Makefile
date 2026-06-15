@@ -97,8 +97,8 @@ release: changelog build publish
 # Strips YAML frontmatter (--- ... ---) from notes before passing to gh
 # Filters out release note type headers (### Added, ### Changed, etc.) from the body
 gh-release:
-	@VERSION=$$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
-	PROJECT=$$(grep '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/'); \
+	@VERSION=$$(grep -m1 '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
+	PROJECT=$$(grep -m1 '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/'); \
 	NOTES="site/content/releases/$$VERSION.md"; \
 	if [ ! -f "$$NOTES" ]; then echo "Error: $$NOTES not found"; exit 1; fi; \
 	echo "Creating release v$$VERSION for $$PROJECT..."; \

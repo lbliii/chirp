@@ -1,7 +1,0 @@
-**Request-body limits split into two distinct knobs** — `AppConfig.max_upload_size` previously capped *every* request body (JSON, text, urlencoded, and multipart), conflating two concerns under one name. It is now the **multipart-total** ceiling only — the cumulative byte size of `multipart/form-data` parts, enforced by the multipart parser. A new `AppConfig.max_request_body_size` (default 16 MB) is the **general** envelope, enforced in `Request.stream()` for every content type before bytes are joined into RAM (reject-before-OOM). Both default to 16 MB, so default configs see no net behavior change; `max_upload_size` must be `<=` `max_request_body_size` (validated at construction with a `ConfigurationError`). Overridable via `CHIRP_MAX_REQUEST_BODY_SIZE`.
-
-  **Removal** — The long-dead `AppConfig.max_content_length` (documented as the body limit but never actually enforced) has been removed in favor of the now-enforced `max_request_body_size`.
-
-  **Migration** — If you relied on `max_upload_size` to cap non-multipart bodies (JSON/text), set `max_request_body_size` to the same value; otherwise such bodies revert to the 16 MB default cap.
-
-  **`UploadFile` metadata is immutable again** — `UploadFile` is once more a frozen dataclass, so `filename`/`content_type`/`size` cannot be rebound (raises `FrozenInstanceError`), matching its docstring. The disk-spool backing introduced for streaming uploads is retained as a private field.
