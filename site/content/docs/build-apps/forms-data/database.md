@@ -514,6 +514,16 @@ app = App(db=db)
 PostgreSQL requires the `data-pg` extra: `pip install bengal-chirp[data-pg]`. This installs `asyncpg`.
 :::
 
+### Free-threading (Python 3.14t) and asyncpg
+
+Chirp's `data-pg` backend is **asyncpg** today — a Cython extension, not pure Python. As of asyncpg **v0.31.0** it declares the `Py_mod_gil` slot so import no longer re-enables the GIL, but its free-threading support is **experimental**: thread safety is documented at the **C extension level only**, and a fatal Bus error in its Cython protocol path is reported under **3.14.2t**.
+
+**How this relates to Chirp:** the widely cited asyncpg free-threading crash ([polars #7342](https://github.com/pola-rs/polars/issues/7342)) enters through **SQLAlchemy's greenlet bridge** — a stack Chirp's anyio-based `Database` facade does **not** use. Chirp-on-anyio talks to asyncpg directly via its pool shim (`src/chirp/data/drivers/postgres.py`), so that particular failure mode is not on the default Chirp path. That said, asyncpg's experimental FT status and Cython edge cases remain a caveat for anyone running `bengal-chirp[data-pg]` on 3.14t.
+
+**The durable answer:** [**pelt**](https://github.com/lbliii/chirp/issues/252) — a pure-Python, free-threading-native PostgreSQL wire-protocol driver planned as the long-term `data-pg` backend. Track the saga in [#252](https://github.com/lbliii/chirp/issues/252) (epic [#253](https://github.com/lbliii/chirp/issues/253)).
+
+Until pelt lands, treat asyncpg-on-3.14t as **best-effort**: fine for development and typical OLTP workloads, but not the same "GIL-off by construction" guarantee as the rest of the Chirp stack. For production on 3.14t with heavy Postgres concurrency, prefer file-backed SQLite (WAL) for single-writer workloads or monitor asyncpg closely; see [[docs/about/thread-safety|Thread Safety]] for Chirp's broader free-threading posture.
+
 ### Parameter Style
 
 SQLite uses `?` placeholders. PostgreSQL uses `$1`, `$2`, etc:
