@@ -1,23 +1,16 @@
 """Market detail — GET /markets/{symbol}.
 
-#223: renders the live trading view for one market — ticker (price + 24h
-change), order-book depth (bids/asks), and the recent-trades tape — all from
-the :class:`~feed.FeedSource` snapshot. The SAME template blocks
+Renders the live trading view for one market — ticker (price + 24h change),
+order-book depth (bids/asks), and the recent-trades tape — all from the
+:class:`~feed.FeedSource` snapshot. The same template blocks
 (``market_ticker`` / ``order_book`` / ``trade_tape``) render here for browser
 navigation and are re-rendered as OOB fragments by the SSE stream in app.py.
 
-The hero AREA chart is the focal point of the detail page (the "fintech wow").
-Its geometry is precomputed server-side off the candle-close series for the
-active timeframe — a lightweight SVG path + gradient-fill polygon, no JS charting
-lib — reusing the landing grid's :func:`pages._context.hero_chart` helper at a
-taller hero scale. The ``hero_chart`` value is a
-:class:`~pages._context.HeroChart` (``ok`` / ``up`` / ``line`` / ``area`` /
-``interval`` / ``points``); the template skips the SVG when ``ok`` is False (too
-few candles to draw), so it never renders an empty/broken chart. The segmented
-timeframe toggle (1m / 1H / 1D / 1W) ``hx-get``s ``/markets/{symbol}/chart`` and
-swaps the ``#market-chart`` region; see :mod:`app` ``market_chart``.
+The hero area chart geometry is precomputed server-side (DOMAIN — see
+``pages._context.hero_chart``). The segmented timeframe toggle ``hx-get``s
+``/markets/{symbol}/chart`` and swaps the ``#market-chart`` region.
 
-Unknown symbols 404 (a tuple return, the kanban idiom). The page template name
+Unknown symbols return 404 as a tuple ``(message, 404)``. The page template name
 keeps the literal ``{symbol}`` segment — that is the mounted template key, not
 an f-string.
 """

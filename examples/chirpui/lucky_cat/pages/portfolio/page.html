@@ -4,7 +4,7 @@
 {% end %}
 
 {#-
-  Portfolio Suspense dashboard (#224).
+  Portfolio Suspense dashboard.
 
   The shell paints instantly with skeletons; each deferred panel below streams in
   as an OOB swap once its awaitable resolves (page.py wraps the sync trade_store
@@ -160,7 +160,7 @@
     {% end %}
 
     {#- Open orders — deferred. Also renders the #open-order-count badge so the
-        #225 trade-flow OOB count target exists on this page too. -#}
+        trade-flow OOB count target exists on this page too. -#}
     {% block open_orders %}
     <section {{ panel_id("open-orders", open_orders) }}class="luckycat-pf-card" aria-label="Open orders">
       <h2 class="luckycat-pf-card__title">
@@ -216,7 +216,7 @@
     </section>
     {% end %}
 
-    {#- Free-threading proof panel (#227 Part A). SYNC — rendered in the shell, not
+    {#- Free-threading proof panel. SYNC — rendered in the shell, not
         deferred. The #ft-panel wrapper is the OOB target; ft_panel_body is its
         single source of truth, re-rendered live by the /ft/stream SSE twin. -#}
     <section class="luckycat-pf-card luckycat-pf-card--wide luckycat-ft" aria-label="Free-threading proof">

@@ -1,6 +1,6 @@
-{#- Lucky Cat two-tier rail components (#231).
+{#- Lucky Cat two-tier rail components.
 
-    Ported from elbysodic's `_components/sidebar.html`, adapted to chirp-ui 0.9.0:
+    Adapted to chirp-ui 0.9.0:
     icons come from chirp-ui's `| icon` filter (NOT an SVG sprite — Lucky Cat
     ships none), and the inner rail composes chirp-ui's `sidebar` / `sidebar_section`
     macros. Every nav link carries the boosted shell-outlet contract
@@ -61,7 +61,7 @@
 </a>
 {% end %}
 
-{#- VISIBLE collapse/expand control (discoverability — #231 follow-up).
+{#- VISIBLE collapse/expand control (discoverability).
 
     A real <button> (Enter/Space handled natively) carrying the
     `data-luckycat-rail-toggle` hook lucky-cat-shell.js delegates a click off the
@@ -110,7 +110,7 @@
 
 {#- Inner-rail link — mirrors chirp-ui `sidebar_link` (same `.chirpui-sidebar__link`
     class + boosted shell-outlet contract) but adds `hx-sync="#main:replace"`
-    (elbysodic fidelity) and renders server-computed `active`/`badge` directly
+    and renders server-computed `active`/`badge` directly
     rather than re-deriving from `match=`.
 
     The Favorites destination (`item.key == "nav:favorites"`) is special: its count

@@ -1,6 +1,6 @@
-"""Thread-safe trading store for Lucky Cat — the M2 mutation backend (#225).
+"""Thread-safe trading store for Lucky Cat — mutation backend for orders and fills.
 
-Per-visitor state (#285): positions, orders, and fills live in :mod:`session_store`
+Per-visitor state: positions, orders, and fills live in :mod:`session_store`
 keyed by browser session. The cash side ($MEOW) is the wallet slice in the same
 bucket so buys/sells stay atomic within one session.
 
@@ -192,7 +192,7 @@ def place_order_or_raise(
     *,
     fill_price: float | None = None,
 ) -> Order:
-    """Pre-gated fill that RAISES on an unaffordable buy — NOT the route path (#292).
+    """Pre-gated fill that RAISES on an unaffordable buy — NOT the HTTP route path.
 
     The HTTP fill path is :func:`try_place_order`: it re-checks the balance and
     debits the wallet inside one lock, returning a clean 422 to the loser of a

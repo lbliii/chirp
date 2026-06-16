@@ -1,11 +1,10 @@
 """House-token wallet for Lucky Cat — the $MEOW balance behind the topbar.
 
-#230 makes the Deposit shell action real. The deposit POST credits the house
-token and the topbar balance re-renders via the live ``balance`` signal.
+The deposit POST credits the house token and the topbar balance re-renders via
+the live ``balance`` signal.
 
-Per-visitor state (#285): balances live in :mod:`session_store` keyed by the
-browser session's ``__store_key``. This module keeps the thin function API the
-example imports; mutable state sits behind :func:`account_store.get_account`
+Per-visitor state: balances live in :mod:`session_store` keyed by the browser
+session's ``__store_key``. Mutable state sits behind :func:`account_store.get_account`
 (``AccountStore`` protocol / ``SessionAccountStore`` default).
 """
 

@@ -1,4 +1,4 @@
-{#- Markets → Research (#280). The power surface for 500+ coins: search + facet
+{#- Markets → Research. The power surface for 500+ coins: search + facet
     filters (sector / price / change / volume bands) + sortable column headers +
     SERVER-SIDE pagination + a lightweight server-rendered compare tray. Backed by
     research.query_catalog over research.build_rows (the PR4 query seam, the single
@@ -21,8 +21,8 @@
     the SMALLER #research-results region, so each OVERRIDES the inherited outlet —
     hx-target="#research-results" + hx-swap="outerHTML" + hx-select="#research-results"
     picks our OWN region out of the response (the inherited #page-content isn't in the
-    fragment, which would otherwise swap EMPTY and the whole surface would vanish — the
-    convert-form footgun app.check's htmx rule warns about). The page.py handler re-emits
+    fragment, which would otherwise swap EMPTY and the whole surface would vanish).
+    Override inherited hx-target with hx-select on each control. The page.py handler re-emits
     the SAME #research-results wrapper for the swap. hx-select (NOT hx-disinherit) is the
     lever: hx-disinherit only affects DESCENDANTS, not self-inheritance. -#}
 {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
@@ -211,7 +211,7 @@
             {#- Boosted in-shell link into the coin detail — MUST carry the FULL
                 shell-outlet contract via shell_outlet_attrs() (target #main, swap
                 innerHTML, select #page-content, sync #main:replace) or a boosted
-                swap nests the whole shell inside #main (#298). The macro is imported
+                swap nests the whole shell inside #main. The macro is imported
                 at template top level so it resolves even when this research_results
                 block renders standalone as a control-swap fragment. -#}
             <a class="luckycat-research__link" href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>{{ row.symbol }}</a>

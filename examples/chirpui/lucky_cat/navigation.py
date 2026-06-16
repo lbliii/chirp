@@ -1,7 +1,6 @@
-"""Server-side route-context navigation model for the Lucky Cat shell (#231).
+"""Server-side route-context navigation model for the Lucky Cat shell.
 
-Ported (stripped of the forum domain) from the elbysodic forum's proven
-two-tier rail model on the same chirp-ui 0.9.0. Pure Python, frozen dataclasses,
+Pure Python, frozen dataclasses,
 no I/O — the layout calls :func:`route_state` + :func:`shell_navigation` to drive
 BOTH a persistent outer **icon rail** (the trading "rooms") and an inner
 **contextual rail** whose sections change with where you are.
@@ -42,7 +41,7 @@ def _path_in(path: str, prefix: str) -> bool:
 def active_route_path(current_path: object) -> str:
     """Return the queryless, fragmentless route path for active-state checks.
 
-    Lifted verbatim from elbysodic: tolerates ``None``, absolute URLs, query
+    Tolerates ``None``, absolute URLs, query
     strings, and fragments, always returning a leading-slash path (``"/"`` for
     empty input).
     """
@@ -230,8 +229,8 @@ def _markets_sections(
     #   * Favorites → /markets/favorites (the starred-only view; moved here from
     #                 the old /watchlist). It keeps the live #watchlist-count OOB
     #                 badge so a star toggle on any page still updates the tally.
-    #   * Trending  → /markets/trending  (#279 gainers/losers/volume)
-    #   * Research  → /markets/research  (#280 the full power surface)
+    #   * Trending  → /markets/trending  (gainers/losers/volume leaderboard)
+    #   * Research  → /markets/research  (full-catalog search surface)
     # The Favorites lane keeps the `nav:favorites` key the sidebar special-cases
     # to host the #watchlist-count OOB target (count value rides NavItem.count).
     return [

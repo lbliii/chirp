@@ -1,4 +1,4 @@
-"""Lucky Cat — CHIRP wiring layer for the Maneki-neko crypto-exchange demo.
+"""Lucky Cat — CHIRP wiring layer for the Maneki-neko simulated trading-floor demo.
 
 This file is the framework side of the example: ``App`` setup (``use_chirp_ui``
 + mounted filesystem pages), the secure-by-default middleware stack, live
@@ -405,7 +405,7 @@ async def load_user(user_id: str) -> users.User | None:
 
 
 class _EnsureStoreKeyMiddleware:
-    """Assign a per-browser ``__store_key`` on every session (issue #285)."""
+    """Assign a per-browser ``__store_key`` on every session for isolated demo state."""
 
     async def __call__(self, request, next):
         session_store.ensure_store_key()
@@ -590,10 +590,10 @@ async def watchlist_toggle(request: Request):
     boosted app-shell (``hx-target=#main`` / ``hx-select=#page-content`` inherited
     from ancestors), the button OVERRIDES those with ``hx-swap="none"`` +
     ``hx-select`` of its OWN star fragment id — so htmx applies only the two OOB
-    swaps and never churns ``#main`` (the convert-form / chart-toggle footgun:
-    use ``hx-select``, NOT ``hx-disinherit`` which only affects descendants).
+    swaps and never churns ``#main`` (override inherited ``hx-target`` with
+    ``hx-select`` on the trigger — ``hx-disinherit`` only affects descendants).
 
-    The response bakes BOTH OOB twins itself (the meow_balance_swap idiom): the
+    The response bakes both OOB targets itself: the
     ``#watchlist-star-{symbol}`` star control (innerHTML re-render of the toggling
     button's body, with the new ``aria-pressed`` / ★/☆) and the
     ``#watchlist-count`` rail badge (innerHTML). Unknown symbols are a no-op flip
@@ -615,7 +615,7 @@ async def watchlist_toggle(request: Request):
     # is still well-formed: never a 500, never a polluted set). A known symbol
     # flips atomically and returns the NEW starred state.
     starred = watchlist.contains(symbol) if not symbol or not known else watchlist.toggle(symbol)
-    # Two OOB twins in one response (the kanban *_oob idiom): the star control
+    # Two OOB targets in one response: the star control
     # itself (primary — emitted verbatim, its baked #watchlist-star-{symbol} id +
     # hx-swap-oob lets htmx swap it in place) and the rail count badge sibling
     # (#watchlist-count, registered wrap=False so its baked wrapper is emitted
@@ -1011,7 +1011,7 @@ def market_chart(symbol: str, request: Request):
     lives inside the boosted shell (``#main`` / ``hx-select=#page-content``
     inherited from ancestors), each button OVERRIDES those with
     ``hx-target="#market-chart"`` + ``hx-swap="outerHTML"`` +
-    ``hx-select="#market-chart"`` (the convert-form footgun pattern) — so this
+    ``hx-select="#market-chart"`` — so this
     route returns the ``chart_region`` fragment which re-emits the SAME
     ``#market-chart`` wrapper. ``referenced=True`` marks it as htmx-only (never an
     ``<a href>``) so the orphan-route check stays quiet and the link crawl skips
@@ -1125,8 +1125,8 @@ def market_stream(symbol: str):
 # Watchlist rail count badge — the layout's inner rail always renders the
 # #watchlist-count element on the Markets room, so a missing block is an honest
 # ERROR (non-optional). The /watchlist/toggle route re-renders this region as an
-# innerHTML OOB swap (same #watchlist-count id), the kanban *_oob twin idiom (now
-# the one remaining OOB region — ticker/balance/bell chrome moved to signals).
+# innerHTML OOB swap (same #watchlist-count id). Ticker/balance/bell chrome use
+# signals instead of OOB regions.
 # wrap=False: the count twin (watchlist_count_swap) bakes its OWN
 # #watchlist-count wrapper + hx-swap-oob, so the OOB framework must emit it
 # verbatim rather than double-wrapping it.
