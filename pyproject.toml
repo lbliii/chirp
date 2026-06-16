@@ -54,7 +54,7 @@ auth = ["argon2-cffi>=23.1.0"]
 testing = ["httpx>=0.27.0"]
 
 # Typed async database access (PostgreSQL)
-data-pg = ["asyncpg>=0.30.0"]
+data-pg = ["asyncpg>=0.31"]
 
 # LLM streaming (provider-agnostic via raw HTTP)
 ai = ["httpx>=0.27.0"]
@@ -77,7 +77,7 @@ all = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "asyncpg>=0.30.0",
+    "asyncpg>=0.31",
     "patitas[syntax]>=0.3.5",
 ]
 
@@ -98,7 +98,7 @@ full = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "asyncpg>=0.30.0",
+    "asyncpg>=0.31",
     "patitas[syntax]>=0.3.5",
 ]
 
