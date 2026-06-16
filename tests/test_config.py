@@ -339,3 +339,20 @@ class TestAppConfig:
             assert cfg.feature("z") is False
         finally:
             os.environ.update(env_backup)
+
+    @pytest.mark.issue(237)
+    def test_from_env_kwargs_override(self) -> None:
+        """from_env(**overrides) applies kwargs after env loading."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_DEBUG"] = "false"
+            cfg = AppConfig.from_env(
+                template_dir="pages",
+                worker_mode="async",
+                debug=True,
+            )
+            assert cfg.template_dir == "pages"
+            assert cfg.worker_mode == "async"
+            assert cfg.debug is True
+        finally:
+            os.environ.update(env_backup)

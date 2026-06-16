@@ -6,7 +6,7 @@ no string-key dict lookups.
 
 import os
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -411,11 +411,13 @@ class AppConfig:
         normalize_speculation_rules(self.speculation_rules)
 
     @classmethod
-    def from_env(cls, prefix: str = "CHIRP_") -> AppConfig:
+    def from_env(cls, prefix: str = "CHIRP_", **overrides: Any) -> AppConfig:
         """Load configuration from environment variables.
 
         Reads env vars with the given prefix (default ``CHIRP_``).
-        Unset vars use AppConfig defaults.
+        Unset vars use AppConfig defaults. Pass ``**overrides`` to set or
+        replace fields after env loading (e.g.
+        ``AppConfig.from_env(template_dir="pages", worker_mode="async")``).
 
         If ``python-dotenv`` is installed (``pip install chirp[config]``),
         loads ``.env`` from the current directory before reading env.
@@ -492,7 +494,7 @@ class AppConfig:
                 else "127.0.0.1"
             )
 
-        return cls(
+        config = cls(
             host=host,
             port=_env_int_first((f"{p}PORT", "PORT"), 8000),
             allowed_hosts=_env_allowed_hosts(p),
@@ -517,6 +519,9 @@ class AppConfig:
             upload_spool_threshold=_env_int(f"{p}UPLOAD_SPOOL_THRESHOLD", 1024 * 1024),
             max_upload_parts=_env_int(f"{p}MAX_UPLOAD_PARTS", 1000),
         )
+        if overrides:
+            config = replace(config, **overrides)
+        return config
 
     def feature(self, name: str) -> bool:
         """Return True if the named feature flag is enabled."""
