@@ -657,7 +657,7 @@ class TestDeadBindingCheck:
     def test_composed_page_raw_sse_swap_dead_binding(self) -> None:
         """Hand-written sse-swap on a page under signal_connect() is validated (#316)."""
         sources = {
-            "_layout.html": '{{ signal_connect() }}<div>{% block content %}{% endblock %}</div>',
+            "_layout.html": "{{ signal_connect() }}<div>{% block content %}{% endblock %}</div>",
             "page.html": '<span sse-swap="typo" hx-target="this">0</span>',
         }
         issues = check_signal_bindings(sources, frozenset({"balance"}))
@@ -667,7 +667,7 @@ class TestDeadBindingCheck:
 
     def test_composed_page_raw_sse_swap_nudge(self) -> None:
         sources = {
-            "_layout.html": '{{ signal_connect() }}',
+            "_layout.html": "{{ signal_connect() }}",
             "page.html": '<span sse-swap="balance" hx-target="this">0</span>',
         }
         issues = check_signal_bindings(sources, frozenset({"balance"}))
@@ -679,10 +679,9 @@ class TestDeadBindingCheck:
     def test_competing_sse_scope_not_signal_binding(self) -> None:
         """A page with its own sse_scope stream must not false-positive (#316)."""
         sources = {
-            "_layout.html": '{{ signal_connect() }}',
+            "_layout.html": "{{ signal_connect() }}",
             "detail.html": (
-                '{% from "chirp/sse.html" import sse_scope %}'
-                '{{ sse_scope("/markets/BTC/stream") }}'
+                '{% from "chirp/sse.html" import sse_scope %}{{ sse_scope("/markets/BTC/stream") }}'
             ),
         }
         issues = check_signal_bindings(sources, frozenset({"balance"}))
