@@ -11,6 +11,7 @@ from chirp.server.devtools import DEVTOOLS_BOOT_JS as HTMX_DEBUG_BOOT_JS
 from chirp.server.devtools import HIGHLIGHT_PATH
 
 
+@pytest.mark.issue(248)
 def test_htmx_debug_js_loads() -> None:
     """Chirp DevTools script loads and contains expected content."""
     assert "__chirpHtmxDebugBooted" in HTMX_DEBUG_BOOT_JS

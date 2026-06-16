@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from chirp import App, AppConfig, EventStream, Fragment
 from chirp.contracts import Severity, check_hypermedia_surface
 from chirp.contracts.rules_static_dom import (
@@ -14,6 +16,7 @@ from chirp.routing.router import Route, Router
 
 
 class TestSelectInheritanceGuidance:
+    @pytest.mark.issue(235)
     def test_recommends_hx_select_override_not_disinherit(self):
         template_sources = {
             "_layouts/base.html": (
@@ -38,12 +41,11 @@ class TestSelectInheritanceGuidance:
 
 
 class TestDuplicateStaticIds:
+    @pytest.mark.issue(238)
     def test_warns_on_repeated_static_id(self):
         issues = check_duplicate_static_ids(
             {
-                "page.html": (
-                    '<div id="panel">one</div><section id="panel">two</section>'
-                ),
+                "page.html": ('<div id="panel">one</div><section id="panel">two</section>'),
             }
         )
 
@@ -60,6 +62,7 @@ class TestDuplicateStaticIds:
 
 
 class TestOobFragmentProducers:
+    @pytest.mark.issue(238)
     def test_warns_when_oob_fragment_has_no_producer(self):
         template_sources = {
             "layout.html": (
@@ -124,9 +127,7 @@ class TestStaticDomIntegration:
         tmpl = tmp_path / "templates"
         tmpl.mkdir()
         (tmpl / "page.html").write_text(
-            "<!doctype html><html><body>"
-            '<div id="dup"></div><span id="dup"></span>'
-            "</body></html>"
+            '<!doctype html><html><body><div id="dup"></div><span id="dup"></span></body></html>'
         )
         app = App(config=AppConfig(template_dir=str(tmpl), debug=False))
 
