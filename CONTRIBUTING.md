@@ -36,6 +36,36 @@ hook in `.pre-commit-config.yaml`.
 For the full test suite, type checking details, changelog fragments, and
 release gates, see [`CLAUDE.md`](CLAUDE.md) ("Build & Test") and `ROADMAP.md`.
 
+## Linking a PR to an issue (the closure-acceptance gate)
+
+If your PR closes an issue, say so in the description with a GitHub
+[closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue):
+`Closes #123`, `Fixes #123`, or `Resolves #123`.
+
+Chirp gates this. A PR that *closes* an issue must ship proof the issue is
+actually done, so "done" is a fact the suite proves rather than a claim
+reconciled weeks later. CI runs a **`closure-acceptance`** check that requires
+**one** of:
+
+- **An acceptance test (preferred).** At least one test decorated with
+  `@pytest.mark.issue(123)` that exercises the issue's acceptance criteria.
+- **An explicit exemption.** For issues with no testable runtime behavior
+  (docs, positioning, tooling), add a line to the PR **description**:
+
+  ```
+  Acceptance: n/a (docs-only)
+  ```
+
+  The `(reason)` is required and is audited — a deliberate, visible
+  declaration, not a way to skip a test that should exist.
+
+If your PR does **not** close an issue, the gate does not apply — you can still
+reference an issue with `Refs #123` and let a maintainer close it. See
+[`docs/backlog-automation.md`](docs/backlog-automation.md) for the rationale.
+
+> New contributor? You don't have to memorize this — the pull-request template
+> walks you through it when you open a PR.
+
 ## Backlog and roadmap
 
 The **live GitHub backlog is authoritative** for open work:
