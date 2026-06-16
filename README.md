@@ -9,6 +9,16 @@
 
 > 🐱 **Live demo — [Lucky Cat](https://luckycat-production.up.railway.app):** a flagship ChirpUI crypto-exchange built entirely on server-owned signals, SSE, Suspense, and OOB swaps — no client framework. ([source](examples/chirpui/lucky_cat/))
 
+> [!NOTE]
+> **How this is verified**
+> Lucky Cat's headline claims are regression-locked in the example test suite:
+> [`test_app.py`](examples/chirpui/lucky_cat/test_app.py) proves the race-safe fill path with
+> `test_concurrent_buys_never_500` and `test_try_place_order_is_atomic_under_threads`;
+> [`test_feed_determinism.py`](examples/chirpui/lucky_cat/test_feed_determinism.py) pins the
+> warmed feed with `TestSimFeedGoldenSnapshot`;
+> [`test_auth.py`](examples/chirpui/lucky_cat/test_auth.py) covers public browse, gated routes,
+> signed-in access, and CSRF-protected mutations end to end.
+
 ```python
 from chirp import App
 
