@@ -949,6 +949,56 @@ class TestSessionScopedStores:
             assert wallet.INITIAL_MEOW + 500 in balances
             assert wallet.INITIAL_MEOW in balances
 
+    @pytest.mark.issue(285)
+    async def test_two_sessions_have_independent_positions(self, example_app) -> None:
+        """A fill in session A must not appear on session B's trade page."""
+        async with TestClient(example_app) as client_a, TestClient(example_app) as client_b:
+            cookie_a = await _login(client_a)
+            cookie_b = await _login(client_b)
+            await warm_authed_store(client_a, cookie_a, cookie_name=_SESSION_COOKIE)
+            await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
+
+            headers_a = await TestTradeOrder()._csrf_headers(client_a)
+            response = await client_a.post(
+                "/trade/order",
+                data={
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
+                headers=headers_a,
+            )
+            assert response.status == 200
+            assert 'id="position-PAW-MEOW"' in response.text
+
+            page_b = await client_b.get("/trade", headers=_cookie_header(cookie_b))
+            assert 'id="position-PAW-MEOW"' not in page_b.text
+            assert "No open positions" in page_b.text
+
+    @pytest.mark.issue(285)
+    async def test_two_sessions_have_independent_notifications(self, example_app) -> None:
+        """A deposit in session A must not appear in session B's notification list."""
+        async with TestClient(example_app) as client_a, TestClient(example_app) as client_b:
+            cookie_a = await _login(client_a)
+            cookie_b = await _login(client_b)
+            await warm_authed_store(client_a, cookie_a, cookie_name=_SESSION_COOKIE)
+            await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
+
+            response, _ = await csrf_post(
+                client_a,
+                "/deposit",
+                cookie=cookie_a,
+                cookie_name=_SESSION_COOKIE,
+                data={"amount": "250"},
+            )
+            assert response.status == 204
+
+            home_a = await client_a.get("/", headers=_cookie_header(cookie_a))
+            home_b = await client_b.get("/", headers=_cookie_header(cookie_b))
+            assert "Deposited 250 $MEOW" in home_a.text
+            assert "Deposited 250 $MEOW" not in home_b.text
+
 
 class TestCommandPalette:
     """The Cmd/Ctrl-K command palette: the dialog ships in the persistent shell
