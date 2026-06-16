@@ -412,6 +412,9 @@ class _EnsureStoreKeyMiddleware:
         return await next(request)
 
 
+# Register store-key middleware BEFORE SessionMiddleware so it runs INSIDE the
+# session context on each request (Starlette: first-added middleware is innermost).
+app.add_middleware(_EnsureStoreKeyMiddleware())
 app.add_middleware(
     SessionMiddleware(
         SessionConfig(
@@ -423,7 +426,6 @@ app.add_middleware(
         )
     )
 )
-app.add_middleware(_EnsureStoreKeyMiddleware())
 # AuthMiddleware (session-based; no token auth in this browser-only demo). It
 # auto-registers the current_user() template global, which the shell uses to
 # swap the topbar between "Sign in" and the user menu + reveal the account chrome

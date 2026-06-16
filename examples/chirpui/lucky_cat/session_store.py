@@ -92,6 +92,12 @@ def session_key() -> str:
         key = session.get("__store_key")
         if isinstance(key, str) and key:
             return key
+        # Lazy assign when handlers run inside SessionMiddleware but the store-key
+        # middleware ran before the session was loaded (Starlette stack order).
+        ensure_store_key()
+        key = session.get("__store_key")
+        if isinstance(key, str) and key:
+            return key
     override = _key_override.get()
     if override is not None:
         return override
@@ -130,6 +136,23 @@ def client_keys() -> frozenset[str]:
     """Non-default session keys currently in the registry (test helper)."""
     with _lock:
         return frozenset(k for k in _sessions if k != DEFAULT_KEY)
+
+
+def active_store_key() -> str:
+    """Resolve the store bucket tests should assert against.
+
+    Prefers the most recently touched per-browser key; falls back to
+    :data:`DEFAULT_KEY` when state landed there (e.g. before ``__store_key`` was
+    assigned on the session).
+    """
+    with _lock:
+        if not _sessions:
+            msg = "no session store exists"
+            raise LookupError(msg)
+        clients = {k: e for k, e in _sessions.items() if k != DEFAULT_KEY}
+        if clients:
+            return max(clients.items(), key=lambda item: item[1].last_access)[0]
+        return DEFAULT_KEY
 
 
 def latest_client_key() -> str:

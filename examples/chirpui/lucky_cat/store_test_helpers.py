@@ -9,7 +9,7 @@ import session_store
 @contextmanager
 def sole_client_store() -> Iterator[None]:
     """Bind store accessors to the active client session bucket."""
-    key = session_store.latest_client_key()
+    key = session_store.active_store_key()
     with session_store.bind(key):
         yield
 
