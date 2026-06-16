@@ -1,4 +1,4 @@
-{#- Markets → Trending (#279). A leaderboard of the catalog's movers across three
+{#- Markets → Trending. A leaderboard of the catalog's movers across three
     segments — Gainers / Losers / Volume — backed by ranking.top_gainers /
     top_losers / top_volume over research.build_rows (the single source of truth
     shared with Home / Research, so the numbers + order match every Markets
@@ -13,8 +13,9 @@
     OVERRIDES the inherited outlet — hx-target="#movers-region" +
     hx-swap="outerHTML" + hx-select="#movers-region" picks our OWN region out of
     the response (the inherited #page-content isn't in the fragment, which would
-    otherwise swap EMPTY and the leaderboard would vanish — the convert-form footgun
-    app.check's htmx rule warns about). The page.py handler re-emits the SAME
+    otherwise swap EMPTY and the leaderboard would vanish). Override inherited
+    hx-target with hx-select on the segment control — app.check warns when
+    hx-select is missing. The page.py handler re-emits the SAME
     #movers-region wrapper for the swap. hx-select (NOT hx-disinherit) is the lever:
     hx-disinherit only affects DESCENDANTS, not self-inheritance. -#}
 {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
@@ -75,7 +76,7 @@
             {#- Boosted in-shell link into the coin detail — MUST carry the FULL
                 shell-outlet contract via shell_outlet_attrs() (target #main, swap
                 innerHTML, select #page-content, sync #main:replace) or a boosted
-                swap nests the whole shell inside #main (#298). The macro is
+                swap nests the whole shell inside #main. The macro is
                 imported at template top level so it resolves even when this
                 movers_region block renders standalone as a segment-swap fragment. -#}
             <a class="luckycat-trending__link" href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>

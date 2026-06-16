@@ -1,10 +1,20 @@
 {# target: body #}
 {# outlet: main #}
+{#
+  TEMPLATE CONSTRUCT LEGEND (Chirp / Kida — "one template, many modes")
+
+  {% block name %}     Named region the layout or render plan fills.
+  {% fragment id %}    Standalone HTML chunk for SSE, OOB, or signal() renders.
+  {% def name(...) %}  Reusable macro — import with {% from ... import ... %}.
+  {% region id %}      DOM target for OOB swaps / Suspense deferred panels.
+
+  Full doctrine: examples/chirpui/lucky_cat/DESIGN.md §4
+#}
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 {% from "chirpui/drawer.html" import drawer %}
-{#- Top-level (not inside a block) so the brand_link fragment block can reference
-    it even when rendered standalone via render_block — see #298. -#}
+{#- Top-level import so brand_link can reference shell_outlet_attrs when rendered
+    standalone via render_block. -#}
 {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
 {% from "_components/sidebar.html" import primary_icon_rail, inner_sidebar_shell, mobile_drawer_nav, watchlist_count_body, drawer_actions %}
 {% from "_components/command_palette.html" import command_palette_dialog, command_palette_trigger %}
@@ -165,7 +175,7 @@
     target lives in the rail, not here. This region is declared top-level so
     app.check()'s oob_registry rule discovers the registered watchlist_count_oob
     block; the fragment twin is what the /watchlist/toggle route returns to keep
-    the tally honest from any page (the kanban *_oob twin idiom — this is now the
+    the tally honest from any page (registered OOB region — signals replaced most
     one remaining OOB region; the ticker/balance/bell chrome moved to signals).
     Both share the watchlist_count_body single source of truth imported from
     sidebar.html.
@@ -291,7 +301,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 </script>
 {{ shell_runtime_script() }}
 {{ toast_container() }}
-{#- First-visit coachmarks (#297, #299). Markup ships on every shell paint;
+{#- First-visit coachmarks. Markup ships on every shell paint;
     coachmarks.js hides it once the matching seen-flag is set. Public visitors get
     the SSE step (luckycat-tour-seen); signing in unlocks the trader steps —
     trade-form 422 + Suspense portfolio (luckycat-tour-seen-auth) — once, even if
@@ -326,7 +336,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {% block head_extra %}
 {#- LUCKY CAT DESIGN TOKENS — a Robinhood-grade polish LAYER over chirp-ui.
 
-    Strategy (elbysodic model): we do NOT fork chirp-ui. We declare a product
+    Strategy: we do NOT fork chirp-ui. We declare a product
     token layer (--lc-*) and then re-point chirp-ui's own --chirpui-* chrome
     vars at it, so every chirp-ui component (cards, buttons, sidebar, modals,
     fields) inherits the new look — depth instead of flat borders — for free.
@@ -598,7 +608,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 </style>
 <link rel="icon" href="/static/lucky-cat-logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/lucky-cat.css">
-{#- Pre-collapse CSS gate (#231): the layout emits this server-rendered <style>
+{#- Pre-collapse CSS gate: the layout emits this server-rendered <style>
     so the FIRST paint already reflects the persisted collapse state (no FOUC).
     `rail_is_collapsed()` (shell.py) reads the cookie server-side; collapsing the
     shell column to the icon rail and hiding the inner rail. This mirrors the
@@ -619,7 +629,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
   }
 </style>
 {% end %}
-{#- Rail collapse script (#231). defer so it runs after the shell DOM exists;
+{#- Rail collapse script. defer so it runs after the shell DOM exists;
     delegates the toggle click off document so the control survives OOB rail
     swaps. Writes the collapsed cookie the server reads above. -#}
 <script defer src="/static/lucky-cat-shell.js"></script>
@@ -669,7 +679,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 
 {% block topbar_center %}
 {#- The #lucky-cat-ticker wrapper is the OOB target; the region body inside it
-    is what the #223 SSE stream re-renders (innerHTML swap). NO aria-live: the SSE
+    is what the market-detail SSE stream re-renders (innerHTML swap). NO aria-live: the SSE
     stream re-renders this every tick, so a polite live region here would read
     price/percent on a loop — verbose-to-hostile and it would starve the queue,
     delaying genuinely-important discrete announcements (deposit success, star
@@ -834,7 +844,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 {% end %}
 {% end %}
 
-{#- Two-tier rail body (#231): a persistent outer ICON RAIL + an inner CONTEXTUAL
+{#- Two-tier rail body: a persistent outer ICON RAIL + an inner CONTEXTUAL
     rail that changes per route. Single source of truth for BOTH the full-page
     paint ({% block sidebar %} below) and the boosted-nav OOB swap (the
     sidebar_oob region). It builds the server nav model from current_path so the

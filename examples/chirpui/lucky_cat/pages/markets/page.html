@@ -1,4 +1,4 @@
-{#- Markets Home — the CURATED, BOUNDED lobby (#281, PR7). One of the five fixed
+{#- Markets Home — the curated lobby. One of the five fixed
     Markets destinations. NOT the full catalog (that lives in Research): a stat
     strip, a small top-movers preview, a watchlist preview, a featured market, and
     a CTA into Research. Rendered by BOTH GET / (pages/page.py) and GET /markets
@@ -20,7 +20,7 @@
     section "see all" links, the Research CTA) carries the FULL shell-outlet
     contract via shell_outlet_attrs() (target #main, swap innerHTML, select
     #page-content, sync #main:replace) — a bare hx-target without hx-select nests
-    the whole shell inside #main (#298). market_card's own <a href> is a plain
+    the whole shell inside #main. market_card's own <a href> is a plain
     link (the grid pages have always relied on hx-boost inheritance for those); the
     bespoke lobby links below opt into the explicit contract. -#}
 {% imports %}
@@ -50,7 +50,7 @@
 
   {% set _stats = stats ?? none %}
   {% if (_stats ?? none) is none or _stats.count == 0 %}
-  {#- Empty catalog — the trading floor is being set up (the #221 empty-state copy
+  {#- Empty catalog — the trading floor is being set up
       kept so the no-markets path still reads as a polished maneki state). -#}
   <div id="markets-lobby" class="luckycat-lobby">
     {% call empty_state(icon="diamond", title="No markets open yet") %}
@@ -245,7 +245,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 /* Open the deposit dialog when the topbar's data-action="deposit" button is
-   clicked (the kanban data-action -> showModal delegator). Bound on body so it
+   clicked (data-action opens the deposit dialog). Bound on body so it
    survives boosted/OOB swaps that replace #page-root. */
 document.body.addEventListener("click", function (event) {
   if (event.target.closest('[data-action="deposit"]')) {

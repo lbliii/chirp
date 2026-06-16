@@ -1,19 +1,18 @@
-"""Request-scoped shell preferences for the Lucky Cat app chrome (#231).
+"""Request-scoped shell preferences for the Lucky Cat app chrome.
 
 The progressive rail collapses the inner contextual rail down to the bare icon
 rail, and that preference is *cookie-persisted* and read **server-side** so the
 collapsed state is baked into the very first paint — no flash-of-uncollapsed-rail
-(FOUC). Ported (stripped of the forum domain) from elbysodic's ``shell.py``.
+(FOUC).
 
 The cookie name is namespaced (``luckycat_rail_collapsed``) so it does NOT
-collide with chirp-ui's own ``chirpui-sidebar-collapsed`` localStorage key nor
-elbysodic's ``elbysodic_sidebar_hidden_v2``. The matching client collapse toggle
-lives in ``static/lucky-cat-shell.js``; the matching pre-collapse CSS gate lives
-in the layout's ``head_extra``.
+collide with chirp-ui's own ``chirpui-sidebar-collapsed`` localStorage key.
+The matching client collapse toggle lives in ``static/lucky-cat-shell.js``; the
+pre-collapse CSS gate lives in the layout's ``head_extra``.
 
 Collapse is a click-toggle, not a continuous drag-resizer: a first-class
 resizable rail belongs in the chirp-ui peer package, not hand-rolled in an
-example (see #231's locked decision).
+example.
 """
 
 from __future__ import annotations
@@ -22,10 +21,10 @@ from chirp.context import get_request
 from chirp.http.request import Request
 
 #: Namespaced cookie name + values "true"/"false" (string). Do NOT collide with
-#: chirp-ui's ``chirpui-sidebar-collapsed`` (localStorage) or elbysodic's key.
+#: chirp-ui's ``chirpui-sidebar-collapsed`` (localStorage).
 RAIL_COLLAPSED_COOKIE = "luckycat_rail_collapsed"
 
-#: First-visit coachmarks tour (#297). Persisted client-side (localStorage with a
+#: First-visit coachmarks tour. Persisted client-side (localStorage with a
 #: cookie mirror) by static/coachmarks.js; the name is namespaced like the rail
 #: cookie so it never collides with chirp-ui keys.
 TOUR_SEEN_KEY = "luckycat-tour-seen"

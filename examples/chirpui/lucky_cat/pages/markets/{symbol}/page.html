@@ -8,7 +8,7 @@
 
 {#-
   Market detail — hero price + signature AREA chart, depth-bar order book, live
-  trade tape (#223).
+  trade tape.
 
   Each live region is defined TWICE:
     * a full-page block (market_ticker / order_book / trade_tape) whose wrapper
@@ -89,8 +89,9 @@
     button MUST OVERRIDE those — hx-target="#market-chart" + hx-swap="outerHTML"
     + hx-select="#market-chart" picks our own region out of the response (the
     inherited #page-content isn't in the fragment, which would otherwise swap
-    EMPTY and the chart would vanish — the convert-form footgun app.check's htmx
-    rule warns about). aria-pressed marks the active timeframe. -#}
+    EMPTY and the chart would vanish). Override inherited hx-target with hx-select
+    on the timeframe toggle — app.check warns when hx-select is missing.
+    aria-pressed marks the active timeframe. -#}
 {% def chart_toggle(symbol, active, intervals) %}
 <div class="luckycat-chart-toggle" role="group" aria-label="Chart timeframe">
   {% for tf in intervals %}

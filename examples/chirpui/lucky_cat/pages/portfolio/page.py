@@ -1,36 +1,27 @@
-"""Portfolio room — GET /portfolio (#224 Suspense dashboard, #227 FT panel).
+"""Portfolio room — GET /portfolio (Suspense dashboard).
 
-The portfolio is the example's Suspense surface: the shell paints instantly
-(skeletons in every panel), then six deferred panels stream in as OOB swaps as
-their awaitable context resolves from the thread-safe ``trade_store`` —
+Minimal Suspense idiom (learn this first)::
 
-* ``value``       — portfolio mark-to-market value ($MEOW cash + positions)
-* ``pnl``         — unrealized profit/loss
-* ``holdings``    — open positions table (empty tuple → empty state, NOT a stuck
-                    skeleton — the ``is deferred`` correctness proof)
-* ``allocation``  — per-symbol % of portfolio value (derived in the loader)
-* ``open_orders`` — resting limit orders + the live ``#open-order-count`` badge
-* ``activity``    — recent fills (trade history)
+    return Suspense(
+        "portfolio/page.html",
+        title="Portfolio",
+        value=_load_value(),      # awaitable → DEFERRED in shell, streamed as OOB
+        holdings=_load_holdings(),
+    )
 
-Each store read is sync and cheap, but we wrap it in ``asyncio.to_thread`` so the
-value is a genuine awaitable — that is what makes :class:`~chirp.Suspense` defer
-it (replace it with the ``DEFERRED`` sentinel in the shell) and stream the real
-markup as an OOB swap once it resolves. Mounted ``Suspense`` is upgraded to a
-``LayoutSuspense`` automatically, so the shell composes inside ``_layout.html``.
+This page is the **advanced** version: six deferred panels, explicit
+``defer_blocks`` (several keys appear only inside chirp-ui macro args where static
+discovery cannot see them), and ``defer_map`` (block names whose DOM section ids
+use hyphens or different suffixes). Auth and CSRF in the streamed shell are
+handled by the framework — no handler-side capture needed.
 
-``defer_blocks`` is passed explicitly to bypass static block discovery: several
-deferred keys are only referenced inside chirp-ui macro args (``skeleton`` /
-``metric``) where the analyzer cannot see them, so we name every deferred block
-directly. ``defer_map`` remaps every block whose DOM id differs from the block
-name — the deferred OOB swap targets the block's *section* id, so a block left
-un-remapped emits an OOB wrapper id that matches no DOM element and the swap is
-silently dropped (``portfolio_value`` → ``portfolio-value``, ``open_orders`` →
-``open-orders``, ``activity`` → ``activity-feed``).
+Deferred keys map to template blocks; each resolves from the thread-safe
+``trade_store`` via ``asyncio.to_thread`` so the value is a genuine awaitable.
+Use ``{% if key is deferred %}`` in templates for skeleton vs loaded — not bare
+``{% if key %}`` (empty tuple/list resolves falsy after load).
 
-#227 Part A: the free-threading proof panel ships in the shell with the GIL
-state + parallel-work width (sync, no defer), and a small SSE route
-(``/ft/stream``) swaps a live ticks/sec figure into ``#ft-panel`` as the engine
-fans ticks across the worker pool.
+The free-threading proof panel (sync facts in the shell + ``/ft/stream`` SSE for
+live ticks/sec) ships alongside the Suspense panels.
 """
 
 import asyncio
@@ -88,9 +79,9 @@ async def _load_allocation() -> tuple[dict, ...]:
 
 
 def _ft_panel_context() -> dict:
-    """Sync free-threading facts for the shell (#227 Part A). Honest: this build
-    reports ``GIL: enabled`` on a default 3.14; a 3.14t deploy flips it to
-    ``disabled``. The live ticks/sec figure arrives over ``/ft/stream``."""
+    """Sync free-threading facts for the shell. Honest: default 3.14 reports
+    ``GIL: enabled``; a 3.14t deploy flips it to ``disabled``. Live ticks/sec
+    arrives over ``/ft/stream``."""
     import sys
 
     feed = get_feed()
@@ -103,58 +94,10 @@ def _ft_panel_context() -> dict:
     }
 
 
-def _captured_csrf() -> dict:
-    """Capture the request's CSRF token so the streamed Suspense shell can render
-    the chirp-ui ``<meta name="csrf-token">`` tag.
-
-    The chirp-ui app-shell head calls the ``csrf_token()`` template global, which
-    reads a request-scoped ContextVar. Suspense renders its shell *after* the
-    request middleware stack unwinds (the stream body runs lazily), by which point
-    ``CSRFMiddleware`` has reset that ContextVar — so the global raises K-RUN-007.
-    The framework's prescribed fix is to capture the raw token in the handler
-    (where the ContextVar is still live) and pass it into the template context. A
-    context value shadows the same-named global, so ``csrf_token()`` resolves to
-    the captured value during the deferred render. Returns an empty dict if CSRF
-    is not active (keeps the page renderable without the secure stack)."""
-    try:
-        from chirp.middleware.csrf import get_csrf_token
-
-        token = get_csrf_token()
-    except LookupError, ImportError:
-        return {}
-    return {"csrf_token": lambda t=token: t}
-
-
-def _captured_user() -> dict:
-    """Capture the request user so the streamed Suspense shell renders the
-    auth-conditional topbar chrome correctly.
-
-    Same ContextVar-reset hazard as :func:`_captured_csrf`, one tier up: the
-    chirp-ui shell + topbar call ``current_user()``, a template global backed by
-    ``AuthMiddleware``'s request-scoped user ContextVar. Suspense renders its shell
-    *lazily* — after the middleware stack unwinds and that ContextVar is reset —
-    so ``current_user()`` would read ``AnonymousUser`` and drop the signed-in
-    chrome (the $MEOW balance, the notifications bell, the Deposit action, the
-    user menu) even though this page is ``@login_required``. Capture the user in
-    the handler (ContextVar still live) and shadow the global with it for the
-    deferred render — a context value shadows the same-named global. Returns an
-    empty dict if auth is not active (keeps the page renderable without the
-    secure stack)."""
-    try:
-        from chirp.middleware.auth import current_user
-
-        user = current_user()
-    except LookupError, ImportError:
-        return {}
-    return {"current_user": lambda u=user: u}
-
-
 @login_required
 def get() -> Suspense:
     return Suspense(
         "portfolio/page.html",
-        # Bypass static discovery — several deferred keys appear only inside
-        # chirp-ui macro args, which the analyzer cannot trace.
         defer_blocks=(
             "portfolio_value",
             "holdings",
@@ -162,32 +105,17 @@ def get() -> Suspense:
             "open_orders",
             "activity",
         ),
-        # Remap every block whose DOM id ≠ block name. The OOB swap targets the
-        # block's *section* id, so each block name must map to its section id —
-        # an un-remapped block emits an OOB wrapper id that matches no DOM element
-        # and htmx silently drops the swap (the panel stays a skeleton forever).
-        # portfolio_value→portfolio-value and open_orders→open-orders carry the
-        # underscore→hyphen rename; activity→activity-feed is a full rename.
         defer_map={
             "portfolio_value": "portfolio-value",
             "open_orders": "open-orders",
             "activity": "activity-feed",
         },
         title="Portfolio",
-        # Deferred (awaitable → DEFERRED sentinel in the shell, streamed as OOB).
         value=_load_value(),
         pnl=_load_pnl(),
         holdings=_load_holdings(),
         allocation=_load_allocation(),
         open_orders=_load_open_orders(),
         activity=_load_activity(),
-        # Sync free-threading facts live in the shell (#227 Part A).
         **_ft_panel_context(),
-        # Capture the CSRF token so the streamed shell's chirp-ui csrf-meta tag
-        # renders (the ContextVar is reset before the deferred render runs).
-        **_captured_csrf(),
-        # Capture the signed-in user for the same reason — so the deferred shell
-        # render keeps the auth-conditional topbar chrome (balance/bell/Deposit/
-        # user menu) instead of falling back to the logged-out chrome.
-        **_captured_user(),
     )

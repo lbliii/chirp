@@ -1,18 +1,12 @@
 """Root context for lucky_cat — markets list, house token, shell actions.
 
-#222: markets now come from the deterministic :class:`SimFeed` behind the
-``FeedSource`` seam (``get_feed().markets()``). The sidebar and landing grid
-iterate ``markets``; the grid also reads ``tickers`` for live (simulated)
-price + 24h change on each card. Snapshot reads are sync and cheap.
+CHIRP layer: context providers merge into mounted pages. Markets and tickers come
+from the ``FeedSource`` seam (``get_feed()``). The topbar Deposit action uses
+``action="deposit"`` so chirp-ui renders ``data-action="deposit"`` and the layout
+delegator opens the deposit dialog.
 
-#230: the topbar reads like real exchange chrome. The Deposit action is no
-longer an inert ``href="#"`` placeholder — it carries ``action="deposit"`` so
-``chirpui/shell_actions.html`` renders ``data-action="deposit"`` on the button,
-which the page-content delegator wires to the deposit ``<dialog>`` (the kanban
-``data-action`` -> ``showModal()`` pattern). The form POSTs to ``/deposit``,
-which credits the wallet and OOB-swaps the ``$MEOW`` balance in the topbar. Two
-more zones populate the bar: a ``controls`` Markets-home link and an
-``overflow`` "More" dropdown.
+DOMAIN geometry below (``Sparkline``, ``hero_chart``) is market-card SVG math —
+skip when learning Chirp; read ``feed.py`` for the data seam instead.
 """
 
 from collections.abc import Callable, Iterator, Mapping
@@ -147,7 +141,7 @@ def hero_chart(closes: tuple[float, ...], interval: str) -> HeroChart:
 
 
 class _LazySymbolMap(Mapping[str, _V]):
-    """A per-symbol map that computes + caches each value on first access (#278).
+    """A per-symbol map that computes + caches each value on first access.
 
     ``context()`` used to eagerly build ``tickers`` and ``sparklines`` for EVERY
     market on EVERY request — O(N) work that is fatal at a 500-coin catalog and
@@ -207,7 +201,7 @@ def context() -> dict:
         symbols,
         lambda sym: _sparkline(tuple(c.close for c in feed.candles(sym, limit=32))),
     )
-    # Account-scoped state (#285): only touch the per-session stores for signed-in
+    # Account-scoped state: only touch the per-session stores for signed-in
     # users. Anonymous page loads must not allocate a store bucket (login GET would
     # orphan a key before regenerate_session clears the cookie payload).
     authed = current_user().is_authenticated
