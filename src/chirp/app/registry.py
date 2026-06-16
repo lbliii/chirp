@@ -195,6 +195,7 @@ class AppRegistry:
     ) -> None:
         from chirp._internal.invoke import invoke
         from chirp.pages.actions import dispatch_action
+        from chirp.pages.auth_gate import enforce_route_meta_auth
         from chirp.pages.context import build_cascade_context
         from chirp.pages.debug import build_route_debug_info, set_route_debug_metadata
         from chirp.pages.resolve import resolve_kwargs, upgrade_result
@@ -223,6 +224,7 @@ class AppRegistry:
             meta_resolved = await resolve_meta(
                 _meta, _meta_provider, request.path_params, _service_providers
             )
+            await enforce_route_meta_auth(meta_resolved, request)
             section_ctx = resolve_section_context(meta_resolved, _sections)
             shell_ctx = build_shell_context(request, meta_resolved, section_ctx, cascade_ctx)
             route_debug = build_route_debug_info(
