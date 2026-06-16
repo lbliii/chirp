@@ -291,9 +291,11 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 </script>
 {{ shell_runtime_script() }}
 {{ toast_container() }}
-{#- First-visit coachmarks (#297). Markup ships on every shell paint; coachmarks.js
-    hides it once luckycat-tour-seen is set. Public visitors get the SSE step;
-    signed-in traders get the full three-step tour (trade form + Suspense portfolio). -#}
+{#- First-visit coachmarks (#297, #299). Markup ships on every shell paint;
+    coachmarks.js hides it once the matching seen-flag is set. Public visitors get
+    the SSE step (luckycat-tour-seen); signing in unlocks the trader steps —
+    trade-form 422 + Suspense portfolio (luckycat-tour-seen-auth) — once, even if
+    the public tour was already dismissed. data-tour-auth drives the split. -#}
 <div id="luckycat-tour" class="luckycat-tour" hidden
      data-tour-auth="{{ 'true' if current_user().is_authenticated else 'false' }}"
      data-tour-seen-key="luckycat-tour-seen">

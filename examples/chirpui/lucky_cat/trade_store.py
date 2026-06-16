@@ -183,7 +183,7 @@ def try_place_order(
     return order, {}
 
 
-def place_order(
+def place_order_or_raise(
     symbol: str,
     side: str,
     kind: str,
@@ -192,7 +192,16 @@ def place_order(
     *,
     fill_price: float | None = None,
 ) -> Order:
-    """Fill an order at the current price (M2 always-fill sim) and book it."""
+    """Pre-gated fill that RAISES on an unaffordable buy — NOT the route path (#292).
+
+    The HTTP fill path is :func:`try_place_order`: it re-checks the balance and
+    debits the wallet inside one lock, returning a clean 422 to the loser of a
+    concurrent race. This raising wrapper exists only for callers that have
+    *already* gated the buy (tests, fixtures); the explicit ``_or_raise`` suffix
+    keeps the atomic form the obvious default for any ``@app.route`` handler. A
+    route that calls this instead would reintroduce the validate-then-debit 500
+    the demo exists to prevent — see ``test_no_route_uses_raising_fill``.
+    """
     order, _errors = try_place_order(symbol, side, kind, size, limit_price, fill_price=fill_price)
     if order is None:
         raise ValueError("insufficient balance")
