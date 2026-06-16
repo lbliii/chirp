@@ -38,6 +38,8 @@ SIGNAL_STREAM_PATH = "/_chirp/live"
 #: CALL is the real signal. ``(?:_block|_attrs)?`` keeps ``signal_connect(`` /
 #: ``make_signal_globals(`` excluded.
 _SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block|_attrs)?\s*\(\s*["']([^"']+)["']""")
+#: ``sse_scope(url)`` opens a dedicated non-signal SSE stream (see chirp/sse.html).
+_SSE_SCOPE_PATTERN = re.compile(r"\bsse_scope\s*\(")
 
 
 def _signal_call_names(source: str) -> set[str]:
@@ -61,6 +63,22 @@ def _connects_to_signal_stream(source: str) -> bool:
     return False
 
 
+def _has_competing_sse_connect(source: str) -> bool:
+    """Whether *source* opens an ``sse-connect`` to a non-signal stream."""
+    if _SSE_SCOPE_PATTERN.search(source):
+        return True
+    for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+        url = normalize_sse_url(match.group("url"))
+        if url != SIGNAL_STREAM_PATH and not url.startswith(SIGNAL_STREAM_PATH + "?"):
+            return True
+    return False
+
+
+def _raw_sse_swap_names(source: str) -> set[str]:
+    """Hand-written ``sse-swap`` values, excluding ``signal*()`` helper bindings."""
+    return extract_sse_swap_values(source) - _signal_call_names(source)
+
+
 def check_signal_bindings(
     template_sources: dict[str, str],
     signal_names: frozenset[str],
@@ -78,6 +96,12 @@ def check_signal_bindings(
         # against here — the SSE crossref / route checks own that case.
         return issues
 
+    signal_stream_active = any(
+        _connects_to_signal_stream(src)
+        for name, src in template_sources.items()
+        if not name.startswith("chirp/")
+    )
+
     bound: set[str] = set()
     for template_name, source in template_sources.items():
         if template_name.startswith("chirp/"):
@@ -90,8 +114,27 @@ def check_signal_bindings(
         # binding when this template actually connects to ``/_chirp/live`` (a raw
         # sse-swap may listen on a different SSE stream).
         names = _signal_call_names(source)
-        if _connects_to_signal_stream(source):
+        connects_here = _connects_to_signal_stream(source)
+        raw_sse = _raw_sse_swap_names(source)
+        if connects_here:
             names |= extract_sse_swap_values(source)
+        elif signal_stream_active and not _has_competing_sse_connect(source) and raw_sse:
+            # Composed page under a layout's signal_connect() (#316): the layout
+            # owns the /_chirp/live connect, so validate hand-written sse-swap here.
+            names |= raw_sse
+            issues.extend(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="signal_raw_sse_swap",
+                    message=(
+                        f'Raw sse-swap="{name}" in a template composed under '
+                        "signal_connect() — prefer "
+                        f"{{{{ signal_attrs({name!r}) }}}} so the binding is validated."
+                    ),
+                    template=template_name,
+                )
+                for name in sorted(raw_sse)
+            )
         if not names:
             continue
         bound.update(names)

@@ -106,6 +106,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `live_block_unknown` | ERROR | Fix `live_block` references to unknown templates or blocks. |
 | `live_block_unreachable_route` | ERROR | Reference live blocks from reachable routes or remove stale declarations. |
 | `signal_dead_binding` | ERROR | Declare a `@app.signal('x')` / `@app.derived('x', ...)` producer for every `signal('x')` / `signal_block('x')` / `sse-swap="x"` binding under the merged `/_chirp/live` connection, or fix the name. A bound signal with no registered producer never updates (#238 — the dead-ticker class). |
+| `signal_raw_sse_swap` | INFO | Prefer `{{ signal_attrs('x') }}` over hand-written `sse-swap="x"` on pages composed under `signal_connect()` so the binding is validated (#316). |
 | `signal_orphan` | INFO | Bind the registered signal with `signal()`/`signal_block()` in a template, or remove the unused producer. An orphan signal is produced but never displayed. |
 
 ## Forms, Commands, And Safety

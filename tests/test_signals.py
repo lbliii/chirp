@@ -652,3 +652,38 @@ class TestDeadBindingCheck:
         orphans = [i for i in issues if i.category == "signal_orphan"]
         assert len(orphans) == 1
         assert orphans[0].severity is Severity.INFO
+
+    @pytest.mark.issue(316)
+    def test_composed_page_raw_sse_swap_dead_binding(self) -> None:
+        """Hand-written sse-swap on a page under signal_connect() is validated (#316)."""
+        sources = {
+            "_layout.html": "{{ signal_connect() }}<div>{% block content %}{% endblock %}</div>",
+            "page.html": '<span sse-swap="typo" hx-target="this">0</span>',
+        }
+        issues = check_signal_bindings(sources, frozenset({"balance"}))
+        dead = [i for i in issues if i.category == "signal_dead_binding"]
+        assert len(dead) == 1
+        assert "typo" in dead[0].message
+
+    def test_composed_page_raw_sse_swap_nudge(self) -> None:
+        sources = {
+            "_layout.html": "{{ signal_connect() }}",
+            "page.html": '<span sse-swap="balance" hx-target="this">0</span>',
+        }
+        issues = check_signal_bindings(sources, frozenset({"balance"}))
+        nudges = [i for i in issues if i.category == "signal_raw_sse_swap"]
+        assert len(nudges) == 1
+        assert "signal_attrs" in nudges[0].message
+
+    @pytest.mark.issue(316)
+    def test_competing_sse_scope_not_signal_binding(self) -> None:
+        """A page with its own sse_scope stream must not false-positive (#316)."""
+        sources = {
+            "_layout.html": "{{ signal_connect() }}",
+            "detail.html": (
+                '{% from "chirp/sse.html" import sse_scope %}{{ sse_scope("/markets/BTC/stream") }}'
+            ),
+        }
+        issues = check_signal_bindings(sources, frozenset({"balance"}))
+        assert not [i for i in issues if i.category == "signal_dead_binding"]
+        assert not [i for i in issues if i.category == "signal_raw_sse_swap"]
