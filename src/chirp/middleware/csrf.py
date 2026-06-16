@@ -32,7 +32,7 @@ calling ``csrf_token()`` during stream rendering.
 """
 
 import secrets
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from html import escape
 from typing import Any, ClassVar
@@ -52,6 +52,26 @@ _csrf_field_name_var: ContextVar[str] = ContextVar(
 
 # Methods that mutate state and need CSRF protection
 _UNSAFE_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _set_stream_csrf(
+    token: str, field_name: str | None = None
+) -> tuple[Token[str | None], Token[str] | None]:
+    """Re-establish CSRF ContextVars while a streaming generator drains."""
+    token_token = _csrf_token_var.set(token)
+    field_token: Token[str] | None = None
+    if field_name is not None:
+        field_token = _csrf_field_name_var.set(field_name)
+    return token_token, field_token
+
+
+def _reset_stream_csrf(
+    token_token: Token[str | None],
+    field_token: Token[str] | None,
+) -> None:
+    _csrf_token_var.reset(token_token)
+    if field_token is not None:
+        _csrf_field_name_var.reset(field_token)
 
 
 def get_csrf_token() -> str:

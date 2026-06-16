@@ -377,10 +377,16 @@ def hx_redirect(
     body: str | bytes = "",
     headers: Mapping[str, str] | None = None,
 ) -> Response:
-    """Build a redirect response that works for htmx and non-htmx clients.
+    """Build a redirect response for htmx and non-htmx clients.
 
-    Adds both ``Location`` and ``HX-Redirect`` so a normal browser follows the
-    HTTP redirect while htmx performs a full-page navigation.
+    Sets both ``Location`` and ``HX-Redirect``. The negotiation layer strips
+    the conflicting header per client: htmx requests receive ``200`` with
+    ``HX-Redirect`` only (no ``Location``, which XHR would follow first);
+    non-htmx requests receive the HTTP redirect via ``Location`` only.
+
+    For form POST success paths, prefer :class:`~chirp.templating.returns.FormAction`
+    or :class:`~chirp.templating.returns.MutationResult`, which apply the same
+    negotiation automatically.
     """
     response = (
         Response(body=body).with_status(status).with_header("Location", url).with_hx_redirect(url)
@@ -527,6 +533,11 @@ class StreamingResponse:
     #: scope) so the sender can re-establish the nonce ContextVar while the
     #: chunk generator drains. ``None`` when CSP nonces are not enabled.
     csp_nonce: str | None = None
+    #: Auth user captured at construction for deferred stream rendering.
+    auth_user: Any | None = None
+    #: CSRF token + field name captured at construction for deferred rendering.
+    csrf_token: str | None = None
+    csrf_field_name: str | None = None
 
     def with_status(self, status: int) -> StreamingResponse:
         """Return a new StreamingResponse with a different status code."""
