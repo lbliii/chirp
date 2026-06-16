@@ -1,0 +1,106 @@
+{#- Markets → Trending (#279). A leaderboard of the catalog's movers across three
+    segments — Gainers / Losers / Volume — backed by ranking.top_gainers /
+    top_losers / top_volume over research.build_rows (the single source of truth
+    shared with Home / Research, so the numbers + order match every Markets
+    surface). Composes into the chirp-ui shell content block like every other page.
+
+    Snapshot-per-swap (RFC, no live re-rank): each segment swap re-ranks a FRESH
+    catalog snapshot; there is no live SSE reorder churning star state.
+
+    FOOTGUN #2 (boosted-shell self-override): the segment toggles live inside the
+    boosted shell (#main / hx-target=#main / hx-select=#page-content inherited from
+    ancestors). A toggle does a LOCAL swap of a SMALLER region, so each button
+    OVERRIDES the inherited outlet — hx-target="#movers-region" +
+    hx-swap="outerHTML" + hx-select="#movers-region" picks our OWN region out of
+    the response (the inherited #page-content isn't in the fragment, which would
+    otherwise swap EMPTY and the leaderboard would vanish — the convert-form footgun
+    app.check's htmx rule warns about). The page.py handler re-emits the SAME
+    #movers-region wrapper for the swap. hx-select (NOT hx-disinherit) is the lever:
+    hx-disinherit only affects DESCENDANTS, not self-inheritance. -#}
+{% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🔥</span>
+      Trending
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      Today's movers — top {{ (movers | default(())) | length }} by gain, loss, and notional volume. Snapshot, not a live tape.
+    </p>
+  </header>
+
+  {#- The #movers-region wrapper — the SOLE target of every segment swap (FOOTGUN
+      #2). The segmented control lives INSIDE it so a swap re-renders the active
+      pill state too; the page.py handler re-emits THIS block (movers_region) for
+      the swap, so hx-select="#movers-region" always finds its own region. -#}
+  {% block movers_region %}
+  <div id="movers-region" class="luckycat-trending">
+    {#- Segmented control. Each toggle hx-gets /markets/trending?seg=<key> and
+        self-overrides the inherited boosted outlet to #movers-region (see the
+        header comment). aria-pressed marks the active segment. -#}
+    <div class="luckycat-chart-toggle" role="group" aria-label="Trending segment">
+      {% for seg in segments | default(()) %}
+      <button type="button"
+              class="luckycat-chart-toggle__btn{{ ' luckycat-chart-toggle__btn--active' if seg == active_segment else '' }}"
+              aria-pressed="{{ 'true' if seg == active_segment else 'false' }}"
+              hx-get="/markets/trending?seg={{ seg }}"
+              hx-target="#movers-region"
+              hx-swap="outerHTML"
+              hx-select="#movers-region">{{ (segment_labels | default({})).get(seg, seg) }}</button>
+      {% end %}
+    </div>
+
+    {% set _rows = movers | default(()) %}
+    {% if (_rows | length) > 0 %}
+    <table class="luckycat-positions luckycat-trending__table" aria-label="{{ active_label | default('Trending') }} leaderboard">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Market</th>
+          <th scope="col">Price</th>
+          <th scope="col">24h</th>
+          <th scope="col">Volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in _rows %}
+        {% set _up = row.change_pct >= 0 %}
+        <tr class="luckycat-positions__row">
+          <td class="chirpui-text-muted">{{ loop.index }}</td>
+          <td class="luckycat-positions__sym">
+            {#- Boosted in-shell link into the coin detail — MUST carry the FULL
+                shell-outlet contract via shell_outlet_attrs() (target #main, swap
+                innerHTML, select #page-content, sync #main:replace) or a boosted
+                swap nests the whole shell inside #main (#298). The macro is
+                imported at template top level so it resolves even when this
+                movers_region block renders standalone as a segment-swap fragment. -#}
+            <a class="luckycat-trending__link" href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>
+              {{ row.symbol }} <span class="chirpui-text-muted">{{ row.name }}</span>
+            </a>
+          </td>
+          <td>{{ row.price }} $MEOW</td>
+          <td>
+            <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">
+              <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if _up else '▼' }}</span>
+              {{ '+' if _up else '' }}{{ row.change_pct }}%
+            </span>
+          </td>
+          <td>{{ row.volume | round(0) }} $MEOW</td>
+        </tr>
+        {% end %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="chirpui-text-muted luckycat-positions__empty">No markets to rank yet. 🐾</p>
+    {% end %}
+  </div>
+  {% end %}
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}

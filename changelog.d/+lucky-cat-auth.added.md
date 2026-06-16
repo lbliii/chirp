@@ -3,7 +3,7 @@ demonstrates Chirp's auth subsystem end to end, exercising all three gating
 levels rather than a blanket lockdown:
 
   **Full-page gating** — `@login_required` on the account section (`/portfolio`,
-  `/activity`, `/trade`, `/settings`, `/watchlist`); an anonymous hit redirects to
+  `/activity`, `/trade`, `/settings`, `/markets/favorites`); an anonymous hit redirects to
   `/login?next=…`. **Component gating** — `current_user()` conditional chrome: the
   topbar swaps between a "Sign in" link and the user menu + Sign-out (and reveals
   the $MEOW balance, the notifications bell, and the Deposit action), and the

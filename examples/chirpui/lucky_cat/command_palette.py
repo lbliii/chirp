@@ -65,13 +65,14 @@ _ROOMS: tuple[tuple[str, str, str, str], ...] = (
     ("trade", "Trade", "/trade", "Place an order"),
     ("activity", "Activity", "/activity", "Fills & deposits"),
     ("settings", "Settings", "/settings", "Profile & display"),
-    # Watchlist is the one genuinely-functional non-room destination (a real page
-    # behind the Markets-room filter lane). The ⌘K palette is the "go anywhere"
-    # surface, so it must reach it too — without this, a user could jump to every
-    # room + market but not their starred view. Kept in the Go-to group (matching
-    # its rail placement under the Markets room); "watchlist"/"starred" feed the
-    # substring match.
-    ("watchlist starred", "Watchlist", "/watchlist", "Starred markets"),
+    # Favorites is the starred-markets view — a real page (one of the four fixed
+    # Markets destinations, moved here from /watchlist, #282). The ⌘K palette is
+    # the "go anywhere" surface, so it must reach it too — without this, a user
+    # could jump to every room + market but not their starred view. Kept in the
+    # Go-to group (matching its rail placement under the Markets room);
+    # "favorites"/"watchlist"/"starred" all feed the substring match (so the old
+    # mental-model query still finds it).
+    ("favorites watchlist starred", "Favorites", "/markets/favorites", "Starred markets"),
 )
 
 

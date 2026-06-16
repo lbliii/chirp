@@ -69,7 +69,15 @@ class TestHealth:
 
 
 class TestLanding:
-    """GET / renders the Lucky Cat shell + markets grid placeholder."""
+    """GET / renders the Lucky Cat shell + the curated Markets Home lobby.
+
+    #281 (PR7) RETIRED the old full markets grid landing for a curated, BOUNDED
+    lobby (stat strip + movers/watchlist previews + featured + a Research CTA), and
+    made ``/`` an ALIAS rendering the same ``markets/page.html`` as ``/markets``.
+    The full catalog moved to Research. These assertions were updated from the old
+    grid (``#markets-grid``) to the lobby (``#markets-lobby``); the lobby-specific
+    proofs (alias parity, de-dupe footgun, preview-link integrity) live in
+    ``test_lobby.py``."""
 
     async def test_landing_full_page(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -80,25 +88,33 @@ class TestLanding:
             assert "Lucky" in response.text
             assert "$MEOW" in response.text
 
-    async def test_landing_has_markets_grid(self, example_app) -> None:
+    @pytest.mark.issue(281)
+    async def test_landing_renders_the_lobby(self, example_app) -> None:
+        """#281: the landing is the curated lobby (#markets-lobby), NOT the old
+        full grid (#markets-grid). The topbar ticker strip is still present."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
-            assert 'id="markets-grid"' in response.text
+            assert 'id="markets-lobby"' in response.text
+            # The retired full-grid landing id is gone.
+            assert 'id="markets-grid"' not in response.text
             assert 'id="lucky-cat-ticker"' in response.text
 
+    @pytest.mark.issue(281)
     async def test_landing_renders_live_markets(self, example_app) -> None:
-        """#222: the SimFeed populates the grid and sidebar (no empty state)."""
+        """#281: the lobby is driven by the live SimFeed — the movers preview shows
+        real markets and the featured card carries live price + 24h-change chrome
+        (no empty state)."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
-            # SimFeed ships these markets; both grid card + sidebar link render.
+            # The movers preview links real markets (BTC/ETH are warmed markets).
             assert "BTC-MEOW" in response.text
             assert "ETH-MEOW" in response.text
-            # Live (simulated) price + 24h change chrome.
+            # The featured card carries live (simulated) price + 24h change chrome.
             assert "luckycat-market-card__price" in response.text
             assert "luckycat-market-card__change" in response.text
-            # The #221 empty state must be gone now that markets are live.
+            # The empty-catalog state must be gone now that markets are live.
             assert "No markets open yet" not in response.text
 
     async def test_landing_renders_no_raw_template_tags(self, example_app) -> None:
@@ -107,14 +123,15 @@ class TestLanding:
             assert "{%" not in response.text
             assert "{{" not in response.text
 
+    @pytest.mark.issue(281)
     async def test_landing_has_no_duplicate_element_ids(self, example_app) -> None:
         """No static element id may appear twice in the full-page render. A
         duplicate id is invalid HTML and silently breaks getElementById /
-        aria-controls / Alpine $id wiring. This guards a real regression: the
-        mobile drawer once rendered chirp-ui's ``shell_actions_bar`` (which bakes
-        a FIXED ``#{target}-overflow`` id) while the topbar rendered it too, so
-        the id existed twice. The drawer now renders its actions as plain rows
-        (``drawer_actions``) precisely to keep every id unique."""
+        aria-controls / Alpine $id wiring. For the lobby (#281) this also guards
+        the de-dupe footgun: a coin in BOTH the featured slot AND the watchlist
+        preview would duplicate ``#luckycat-card-{symbol}`` / ``#watchlist-star-
+        {symbol}`` (and break the unstar-prune target). The exhaustive starred-
+        featured-coin proof lives in test_lobby.py."""
         import re
 
         async with TestClient(example_app) as client:
@@ -125,32 +142,48 @@ class TestLanding:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         assert not dupes, f"duplicate element ids in GET /: {dupes}"
 
-    async def test_landing_cards_render_gradient_sparkline(self, example_app) -> None:
-        """Each warmed market card carries a server-rendered gradient-area SVG
-        sparkline — no JS chart lib, drawn from the candle-close series."""
+    @pytest.mark.issue(281)
+    async def test_landing_featured_card_renders_gradient_sparkline(self, example_app) -> None:
+        """The lobby's featured card carries a server-rendered gradient-area SVG
+        sparkline — no JS chart lib, drawn from the candle-close series. The
+        featured coin is the catalog's top gainer (computed here so the assertion
+        is robust to the deterministic ordering)."""
+        import ranking
+        import research
+        from feed import get_feed
+
+        feed = get_feed()
+        markets = feed.markets()
+        tickers = {m.symbol: feed.ticker(m.symbol) for m in markets}
+        rows = research.build_rows(tuple(markets), tickers)
+        featured = ranking.market_stats(rows).top_gainer
+        assert featured is not None
+
         async with TestClient(example_app) as client:
             response = await client.get("/")
             html = response.text
             assert response.status == 200
-            # One SVG sparkline + its gradient fill polygon + line polyline per card.
+            # One SVG sparkline + its gradient fill polygon + line polyline.
             assert "luckycat-spark " in html
             assert "luckycat-spark__line" in html
             assert "luckycat-spark__fill" in html
             # Direction is keyed off the series (up=jade / down=red) and the
             # gradient id is namespaced by symbol so multiple cards never collide.
             assert "luckycat-spark--up" in html or "luckycat-spark--down" in html
-            assert 'id="lc-spark-BTC-MEOW-' in html
+            # The featured card's namespaced gradient id is present.
+            assert f'id="lc-spark-{featured.symbol}-' in html
 
-    async def test_landing_cards_mark_direction(self, example_app) -> None:
-        """Cards carry an up/down modifier so the top-edge accent + delta pill
-        agree on direction."""
+    async def test_landing_featured_card_marks_direction(self, example_app) -> None:
+        """The featured card carries an up/down modifier so the top-edge accent +
+        delta pill agree on direction."""
         async with TestClient(example_app) as client:
             html = (await client.get("/")).text
             assert "luckycat-market-card--up" in html or "luckycat-market-card--down" in html
 
     async def test_landing_sparkline_survives_boosted_nav(self, example_app) -> None:
-        """The sparkline lives inside page_content, so a boosted (htmx) re-render
-        of the markets grid keeps the charts — not just the first full-page paint."""
+        """The lobby sparkline lives inside page_content, so a boosted (htmx)
+        re-render of the lobby keeps the featured card chart — not just the first
+        full-page paint."""
         async with TestClient(example_app) as client:
             response = await client.get("/", headers={"HX-Request": "true", "HX-Boosted": "true"})
             assert response.status == 200
@@ -942,17 +975,23 @@ class TestCommandPalette:
             # Result items are options.
             assert 'role="option"' in html
 
-    async def test_palette_can_reach_watchlist(self, example_app) -> None:
-        """IA: the ⌘K palette is the "go anywhere" surface, so it must reach the
-        Watchlist (the one functional non-room destination) — not only the rail.
-        A 'watchlist' query narrows the Go-to group to it."""
+    @pytest.mark.issue(282)
+    async def test_palette_can_reach_favorites(self, example_app) -> None:
+        """IA: the ⌘K palette is the "go anywhere" surface, so it must reach
+        Favorites (the starred-markets destination, moved from /watchlist →
+        /markets/favorites in #282) — not only the rail. The old "watchlist"
+        mental-model query still narrows the Go-to group to it (the matcher key
+        keeps the legacy term), and so does "favorites"."""
         async with TestClient(example_app) as client:
-            response = await client.get("/search", query={"q": "watchlist"})
-            assert response.status == 200
-            assert 'href="/watchlist"' in response.text
-            assert "Starred markets" in response.text
-            # Markets (no 'watchlist' substring) are filtered out.
-            assert "BTC-MEOW" not in response.text
+            for q in ("watchlist", "favorites"):
+                response = await client.get("/search", query={"q": q})
+                assert response.status == 200, q
+                # The destination now points at the moved page.
+                assert 'href="/markets/favorites"' in response.text, q
+                assert 'href="/watchlist"' not in response.text, q
+                assert "Starred markets" in response.text, q
+                # Markets (no matching substring) are filtered out.
+                assert "BTC-MEOW" not in response.text, q
 
 
 class TestActivityFeed:
@@ -1411,6 +1450,29 @@ class TestNavModel:
         # Queryless + fragmentless normalization.
         assert route_state("/markets/ETH-MEOW?tab=book#x").current_symbol == "ETH-MEOW"
 
+    @pytest.mark.issue(282)
+    def test_reserved_segments_are_not_coins(self) -> None:
+        """CRITICAL footgun guard: the fixed Markets destinations live one level
+        under /markets just like a coin, but must NOT be pinned as a coin-detail
+        route (they'd light a phantom 'Viewing' lane and read current_symbol as a
+        view name). The RESERVED_MARKET_SEGMENTS guard runs before the depth
+        check."""
+        from navigation import RESERVED_MARKET_SEGMENTS, route_state
+
+        assert frozenset({"favorites", "trending", "research"}) == RESERVED_MARKET_SEGMENTS
+        for seg in ("favorites", "trending", "research"):
+            s = route_state(f"/markets/{seg}")
+            assert s.market_detail_active is False, seg
+            assert s.current_symbol == "", seg
+            # All still belong to the Markets room.
+            assert s.active_room == "markets", seg
+        # Favorites has its own active flag (drives the rail's Favorites lane).
+        assert route_state("/markets/favorites").favorites_active is True
+        assert route_state("/markets/BTC-MEOW").favorites_active is False
+        # A genuine coin (not reserved) still reads as a detail route.
+        assert route_state("/markets/BTC-MEOW").market_detail_active is True
+
+    @pytest.mark.issue(282)
     def test_shell_navigation_prunes_empty_and_dispatches(self) -> None:
         from feed import SimFeed
         from navigation import route_state, shell_navigation
@@ -1428,16 +1490,64 @@ class TestNavModel:
             "activity",
             "settings",
         )
-        # Markets room: a market list section with signed-pct badges.
+        # Markets room: the FIXED destinations (Home / Favorites / Trending /
+        # Research), NOT an O(N) one-row-per-market list. Exactly four lanes,
+        # independent of the catalog size.
         market_section = next(s for s in nav.sidebar_sections if s.key == "markets")
-        assert len(market_section.items) == len(markets)
-        assert any(i.badge for i in market_section.items)
+        assert tuple(i.key for i in market_section.items) == (
+            "nav:home",
+            "nav:favorites",
+            "nav:trending",
+            "nav:research",
+        )
+        assert tuple(i.href for i in market_section.items) == (
+            "/",
+            "/markets/favorites",
+            "/markets/trending",
+            "/markets/research",
+        )
+        # On /, Home is the active destination.
+        home = next(i for i in market_section.items if i.key == "nav:home")
+        assert home.active is True
 
         # Portfolio room dispatches to its own sections (no markets list).
         pnav = shell_navigation(route_state("/portfolio"), markets=markets, tickers=tickers)
         assert {s.key for s in pnav.sidebar_sections} == {"portfolio"}
         # No empty sections survive pruning.
         assert all(s.items for s in pnav.sidebar_sections)
+
+    @pytest.mark.issue(282)
+    def test_coin_detail_pins_current_coin_without_dead_anchors(self) -> None:
+        """A coin-detail route PINS the current coin at the top of the rail (a
+        single active lane with its 24h badge), then the fixed destinations below.
+        The dead #order-book / #trade-tape / #info jump anchors are GONE."""
+        from feed import SimFeed
+        from navigation import route_state, shell_navigation
+
+        feed = SimFeed(seed=1)
+        markets = feed.markets()
+        tickers = {m.symbol: feed.ticker(m.symbol) for m in markets}
+
+        nav = shell_navigation(route_state("/markets/BTC-MEOW"), markets=markets, tickers=tickers)
+        pinned = next(s for s in nav.sidebar_sections if s.key == "this-market")
+        # Exactly the one pinned coin lane (no Overview/Book/Trades/Info anchors).
+        assert len(pinned.items) == 1
+        coin = pinned.items[0]
+        assert coin.key == "mkt:BTC-MEOW"
+        assert coin.href == "/markets/BTC-MEOW"
+        assert coin.active is True
+        # No section emits a dead #fragment jump anchor.
+        for section in nav.sidebar_sections:
+            for item in section.items:
+                assert "#" not in item.href, item.href
+        # The fixed destinations still render below the pinned coin.
+        market_section = next(s for s in nav.sidebar_sections if s.key == "markets")
+        assert tuple(i.key for i in market_section.items) == (
+            "nav:home",
+            "nav:favorites",
+            "nav:trending",
+            "nav:research",
+        )
 
 
 class TestProgressiveRail:
@@ -1502,32 +1612,52 @@ class TestProgressiveRail:
             # A market-detail route stays in the Markets room (path-prefix).
             assert self._active_room_hrefs(detail.text) == {"/"}
 
+    @pytest.mark.issue(282)
     async def test_inner_rail_changes_by_route(self, example_app) -> None:
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             markets = await client.get("/", headers=_cookie_header(cookie))
-            # Markets room → market list + filter lane (Watchlist + All markets;
-            # the old cosmetic Gainers/Losers no-op lanes were removed).
-            assert "Filters" in markets.text
-            assert "All markets" in markets.text
+            # Markets room → the FIXED destinations (Home / Favorites / Trending /
+            # Research). No O(N) market list, no cosmetic Filters header, no dead
+            # "All markets" lane.
+            for label in ("Home", "Favorites", "Trending", "Research"):
+                assert f">{label}</span>" in markets.text, label
+            assert 'href="/markets/favorites"' in markets.text
+            assert 'href="/markets/trending"' in markets.text
+            assert 'href="/markets/research"' in markets.text
+            assert "All markets" not in markets.text
+            assert ">Filters</" not in markets.text
 
             detail = await client.get("/markets/BTC-MEOW", headers=_cookie_header(cookie))
-            # Market-detail room → a "this market" lane (book / trades / info).
-            assert "Order book" in detail.text
-            assert "Overview" in detail.text
+            # Coin-detail route → the pinned coin at the top, then the same fixed
+            # destinations. The dead Overview/Order-book/Trades/Info rail anchors
+            # are GONE (the rail no longer emits #order-book/#trade-tape/#info hrefs).
+            assert 'href="/markets/favorites"' in detail.text
+            assert 'href="/markets/trending"' in detail.text
+            # No dead jump-anchor hrefs in the rail/drawer nav.
+            assert 'href="/markets/BTC-MEOW#order-book"' not in detail.text
+            assert 'href="/markets/BTC-MEOW#trade-tape"' not in detail.text
+            assert 'href="/markets/BTC-MEOW#info"' not in detail.text
 
             portfolio = await client.get("/portfolio", headers=_cookie_header(cookie))
-            # Portfolio room → holdings / open orders / history; no filter lane.
+            # Portfolio room → holdings / open orders / history; no Markets lanes.
             assert "Holdings" in portfolio.text
             assert "Open orders" in portfolio.text
-            assert "All markets" not in portfolio.text
+            assert 'href="/markets/trending"' not in portfolio.text
 
-    async def test_market_links_carry_change_badge(self, example_app) -> None:
+    @pytest.mark.issue(282)
+    async def test_pinned_coin_carries_change_badge(self, example_app) -> None:
+        """The rail no longer lists every market (the fixed destinations replaced
+        the O(N) list), so the signed 24h-change pill now rides the PINNED coin on
+        a coin-detail route rather than every landing-rail row."""
         async with TestClient(example_app) as client:
-            response = await client.get("/")
-            # Signed 24h-change pill on the inner-rail market links.
-            assert "luckycat-inner-rail__badge" in response.text
-            assert "%" in response.text
+            # Landing: the fixed destinations carry no per-market change badge.
+            landing = await client.get("/")
+            assert "luckycat-inner-rail__badge" not in landing.text
+            # Coin-detail: the pinned coin lane carries its signed 24h pill.
+            detail = await client.get("/markets/BTC-MEOW")
+            assert "luckycat-inner-rail__badge" in detail.text
+            assert "%" in detail.text
 
     @staticmethod
     def _brand_link_tag(html: str) -> str:
@@ -1683,10 +1813,12 @@ class TestMobileShell:
             # The drawer dismisses itself as navigation starts.
             assert "closest('dialog')" in drawer
 
-    async def test_nav_drawer_shows_watchlist_count(self, example_app) -> None:
-        """The mobile drawer's Watchlist lane shows its starred-count badge — the
+    @pytest.mark.issue(282)
+    async def test_nav_drawer_shows_favorites_count(self, example_app) -> None:
+        """The mobile drawer's Favorites lane shows its starred-count badge — the
         layout threads watchlist_count through mobile_drawer_nav so the drawer
-        does not silently drop the count the desktop rail shows."""
+        does not silently drop the count the desktop rail shows. (Moved from
+        /watchlist → /markets/favorites in #282.)"""
         import re
 
         import watchlist
@@ -1699,12 +1831,14 @@ class TestMobileShell:
             match = re.search(r"luckycat-nav-drawer__nav.*?</nav>", response.text, re.S)
             assert match is not None
             drawer = match.group(0)
-            # The Watchlist lane is present with its count badge (2 starred).
-            assert "/watchlist" in drawer
+            # The Favorites lane is present with its count badge (2 starred).
+            assert "/markets/favorites" in drawer
+            # The old /watchlist href is gone from the drawer.
+            assert 'href="/watchlist"' not in drawer
             # The drawer renders item.count via the chirp-ui sidebar badge.
-            wl = drawer[drawer.find("/watchlist") :]
+            wl = drawer[drawer.find("/markets/favorites") :]
             badge = re.search(r'class="chirpui-sidebar__badge[^"]*">\s*2\s*<', wl)
-            assert badge is not None, "drawer watchlist count badge missing"
+            assert badge is not None, "drawer favorites count badge missing"
 
     async def test_nav_drawer_does_not_duplicate_rail_oob_id(self, example_app) -> None:
         """#chirpui-sidebar-nav is the inline rail's OOB target — it must appear
@@ -2409,7 +2543,7 @@ class TestNotificationsBell:
         the market-detail page (its per-market /markets/{symbol}/stream)."""
         async with TestClient(example_app) as client:
             cookie = await _login(client)
-            for path in ("/", "/trade", "/settings", "/watchlist", "/activity"):
+            for path in ("/", "/trade", "/settings", "/markets/favorites", "/activity"):
                 html = (await client.get(path, headers=_cookie_header(cookie))).text
                 assert html.count("sse-connect=") == 1, path
                 assert 'sse-connect="/_chirp/live' in html, path

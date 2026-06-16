@@ -172,7 +172,8 @@ class FeedSource(Protocol):
 
 # Static market definitions. (symbol, base, quote, display_name, seed_price, daily_vol)
 # Everything is priced in the house token $MEOW so the sim is self-contained.
-_MARKET_DEFS: tuple[tuple[str, str, str, str, float, float], ...] = (
+_MarketDef = tuple[str, str, str, str, float, float]
+_MARKET_DEFS: tuple[_MarketDef, ...] = (
     ("BTC-MEOW", "BTC", "MEOW", "Bitcoin", 64_000.0, 0.020),
     ("ETH-MEOW", "ETH", "MEOW", "Ether", 3_400.0, 0.028),
     ("SOL-MEOW", "SOL", "MEOW", "Solana", 145.0, 0.045),
@@ -180,6 +181,63 @@ _MARKET_DEFS: tuple[tuple[str, str, str, str, float, float], ...] = (
     ("PAW-MEOW", "PAW", "MEOW", "PawCoin", 8.40, 0.080),
     ("KOBAN-MEOW", "KOBAN", "MEOW", "Koban", 21.00, 0.035),
 )
+
+# Env var that grows the catalog to N markets for scale demos (#278). Unset or
+# N <= len(_MARKET_DEFS) keeps the shipped 6 verbatim, so the determinism golden
+# (test_feed_determinism.py, seed 0xCA7) stays green by default.
+_CATALOG_ENV = "LUCKY_CAT_CATALOG"
+# Hard ceiling on the worker fan-out. The price engine is one CPU task per
+# symbol; a 500-coin catalog must NOT spawn 500 OS threads. Bound the pool so the
+# fan-out stays a sane width regardless of catalog size (default 6 -> 6 workers,
+# unchanged). See SimFeed.__init__.
+_MAX_WORKERS = 32
+
+
+def _synthetic_def(index: int) -> _MarketDef:
+    """A deterministic synthetic market def for catalog slot ``index`` (0-based).
+
+    Derived PURELY from the index — no RNG ordering dependence, no shared state —
+    so ``LUCKY_CAT_CATALOG=N`` always yields the identical extra catalog tail
+    regardless of construction order or process. The seed price and daily vol are
+    closed-form functions of the index so 500 coins span a realistic price/vol
+    range without any per-symbol tuning. ``index`` is the slot AFTER the shipped
+    defs (so the first synthetic symbol uses ``index == len(_MARKET_DEFS)``),
+    keeping symbols collision-free with the shipped six.
+    """
+    base = f"SYN{index:03d}"
+    symbol = f"{base}-MEOW"
+    # Seed price cycles across magnitudes (sub-penny .. mid-cap) deterministically
+    # so the synthetic catalog exercises every _price_dp / _size_unit band.
+    tier = index % 5
+    price0 = (0.02, 0.85, 12.5, 240.0, 5_200.0)[tier]
+    # Daily vol walks a fixed band keyed on the index (0.02 .. ~0.099), stable.
+    daily_vol = 0.02 + (index % 8) * 0.01
+    return (symbol, base, "MEOW", f"Synth {index:03d}", price0, daily_vol)
+
+
+def _resolve_market_defs() -> tuple[_MarketDef, ...]:
+    """Resolve the catalog defs from ``LUCKY_CAT_CATALOG`` at SimFeed construction.
+
+    Unset / invalid / ``N <= len(_MARKET_DEFS)`` returns the shipped defs verbatim
+    (default stays exactly the 6 symbols). For ``N > len``, append ``N - len``
+    deterministic synthetic defs. The shipped six are never reordered or
+    perturbed, so the determinism golden holds at the default.
+    """
+    raw = os.environ.get(_CATALOG_ENV)
+    if raw is None:
+        return _MARKET_DEFS
+    try:
+        n = int(raw.strip())
+    except ValueError:
+        logger.warning(
+            "%s=%r is not an int; using the default 6-market catalog.", _CATALOG_ENV, raw
+        )
+        return _MARKET_DEFS
+    if n <= len(_MARKET_DEFS):
+        return _MARKET_DEFS
+    extra = tuple(_synthetic_def(i) for i in range(len(_MARKET_DEFS), n))
+    return (*_MARKET_DEFS, *extra)
+
 
 # Timeframe contract for the chart toggle. ``1m`` is the live engine candle ring
 # (aggregated from the per-tick walk); the coarser intervals are deterministic
@@ -245,16 +303,28 @@ class SimFeed:
 
     def __init__(self, seed: int = DEFAULT_SEED, *, tick_interval: float = 1.0) -> None:
         self._seed = seed
+        # Resolve the catalog ONCE at construction from LUCKY_CAT_CATALOG (#278).
+        # Default / N <= 6 == _MARKET_DEFS verbatim, so the determinism golden
+        # stays green; N > 6 appends deterministic synthetic defs. Stored on the
+        # instance so _init_states and the volatility lookup never re-read the env.
+        self._defs: tuple[_MarketDef, ...] = _resolve_market_defs()
+        # O(1) volatility lookup by symbol, built once from the resolved defs.
+        # Replaces the old O(N) per-call linear scan over _MARKET_DEFS — at 500
+        # coins the scan ran on every _advance_symbol (the hot path).
+        self._vol_by_symbol: dict[str, float] = {d[0]: d[5] for d in self._defs}
         # Seconds between ``subscribe`` ticks (SSE cadence). This is presentation
         # pacing, *not* part of the deterministic engine — the tick *sequence* is
         # identical regardless of interval, so tests pass ``tick_interval=0`` to
         # exercise the engine at full speed.
         self._tick_interval = tick_interval
         self._lock = threading.Lock()
-        # Worker pool for the per-tick fan-out. Bounded to the symbol count so
-        # CPU-bound price work runs in parallel under free-threading.
+        # Worker pool for the per-tick fan-out. CPU-bound price work runs in
+        # parallel under free-threading. Bounded to _MAX_WORKERS so a 500-coin
+        # catalog does NOT spawn 500 OS threads — the fan-out width stays sane.
+        # pool.map preserves result order regardless of worker count, so this does
+        # NOT perturb the deterministic warmed snapshot (default 6 -> 6 workers).
         self._pool = ThreadPoolExecutor(
-            max_workers=max(2, len(_MARKET_DEFS)),
+            max_workers=min(_MAX_WORKERS, max(2, len(self._defs))),
             thread_name_prefix="luckycat-tick",
         )
         self._states: dict[str, _SymbolState] = {}
@@ -271,7 +341,7 @@ class SimFeed:
 
     def _init_states(self, seed: int) -> None:
         states: dict[str, _SymbolState] = {}
-        for symbol, base, quote, name, price0, _vol in _MARKET_DEFS:
+        for symbol, base, quote, name, price0, _vol in self._defs:
             market = Market(symbol=symbol, base=base, quote=quote, display_name=name)
             # Derive a stable per-symbol seed from the master seed + symbol so
             # streams are independent yet fully reproducible.
@@ -330,10 +400,8 @@ class SimFeed:
     # -- price engine -----------------------------------------------------
 
     def _vol_for(self, symbol: str) -> float:
-        for sym, _b, _q, _n, _p, vol in _MARKET_DEFS:
-            if sym == symbol:
-                return vol
-        return 0.03
+        # O(1) lookup against the dict built at __init__ from the resolved defs.
+        return self._vol_by_symbol.get(symbol, 0.03)
 
     def _advance_symbol(self, symbol: str) -> Tick:
         """Advance one symbol by a single step and return its update bundle.

@@ -61,6 +61,7 @@ from chirp import (
     EventStream,
     FormAction,
     Fragment,
+    Redirect,
     Request,
     ValidationError,
     login_required,
@@ -524,14 +525,31 @@ async def deposit(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Watchlist — a thread-safe starred-markets set behind the rail's first
-# FUNCTIONAL filter lane (the All/Gainers/Losers filters are cosmetic; Watchlist
-# links to a real /watchlist page). The per-card / detail-header star <button>
-# POSTs here; the route flips the star and returns TWO OOB twins: the star
-# control itself (so aria-pressed + the ★/☆ glyph flip in place) and the rail
-# count badge (so the lane tally stays honest on every page). The one mutating
-# watchlist route, covered by the secure-by-default stack (CSRF enforced).
+# Watchlist — a thread-safe starred-markets set behind the rail's Favorites
+# destination (the /markets/favorites page renders the starred-only grid). The
+# per-card / detail-header star <button> POSTs here; the route flips the star and
+# returns TWO OOB twins: the star control itself (so aria-pressed + the ★/☆ glyph
+# flip in place) and the rail count badge (so the Favorites tally stays honest on
+# every page). The one mutating watchlist route, covered by the secure-by-default
+# stack (CSRF enforced). The POST route keeps its /watchlist/toggle name (it is a
+# referenced mutation, never an <a href>), even though the VIEW moved to
+# /markets/favorites.
 # ---------------------------------------------------------------------------
+
+
+@app.route("/watchlist", name="watchlist.moved")
+def watchlist_moved():
+    """Permanent redirect for the moved Favorites page (#282).
+
+    The starred-markets VIEW moved from ``/watchlist`` to ``/markets/favorites``
+    (one of the four fixed Markets destinations). A 308 (Permanent Redirect)
+    keeps stale bookmarks / external links alive and tells crawlers the resource
+    moved for good — without it ``/watchlist`` would 404. 308 (not 301/302)
+    preserves the method, so a same-URL ``HEAD``/GET resolves cleanly. The
+    mutating ``/watchlist/toggle`` POST keeps its name (it is a referenced
+    htmx mutation, never an ``<a href>``), so only the GET page redirects.
+    """
+    return Redirect("/markets/favorites", status=308)
 
 
 @app.route("/watchlist/toggle", methods=["POST"], name="watchlist.toggle")
@@ -589,18 +607,19 @@ async def watchlist_toggle(request: Request):
             watchlist_count=watchlist.count(),
         ),
     ]
-    # Unstar-on-/watchlist polish: when the toggle originated ON /watchlist AND
-    # the result is unstarred, append a THIRD OOB twin that removes the card cell
-    # live (hx-swap-oob="delete" on #luckycat-card-{symbol}), so the starred-only
-    # grid stays a one-glance view of exactly the stars (no stale ☆ card lingering
-    # until reload). htmx sends the originating URL in HX-Current-URL; we read its
-    # path only (queryless) so a fragment/query can't fool it. On the landing /
-    # detail pages the toggle is left reversible in place — only /watchlist prunes.
-    # The #luckycat-card-{symbol} id only exists on grid pages, so the delete is a
-    # harmless no-op elsewhere (the cancel-route orders_table_oob precedent).
+    # Unstar-on-Favorites polish: when the toggle originated ON /markets/favorites
+    # AND the result is unstarred, append a THIRD OOB twin that removes the card
+    # cell live (hx-swap-oob="delete" on #luckycat-card-{symbol}), so the
+    # starred-only grid stays a one-glance view of exactly the stars (no stale ☆
+    # card lingering until reload). htmx sends the originating URL in
+    # HX-Current-URL; we read its path only (queryless) so a fragment/query can't
+    # fool it. On the landing / detail pages the toggle is left reversible in place
+    # — only /markets/favorites prunes. The #luckycat-card-{symbol} id only exists
+    # on grid pages, so the delete is a harmless no-op elsewhere (the cancel-route
+    # orders_table_oob precedent).
     if symbol and known and not starred:
         current_url = request.headers.get("HX-Current-URL", "")
-        if active_route_path(current_url) == "/watchlist":
+        if active_route_path(current_url) == "/markets/favorites":
             fragments.append(
                 Fragment(
                     "_components/market.html",

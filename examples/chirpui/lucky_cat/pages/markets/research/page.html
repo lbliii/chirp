@@ -1,0 +1,279 @@
+{#- Markets → Research (#280). The power surface for 500+ coins: search + facet
+    filters (sector / price / change / volume bands) + sortable column headers +
+    SERVER-SIDE pagination + a lightweight server-rendered compare tray. Backed by
+    research.query_catalog over research.build_rows (the PR4 query seam, the single
+    source of truth shared with Home / Trending), so the numbers + ordering match
+    every Markets surface. Search shares search.matches (query_catalog calls it), so
+    Cmd-K and Research never drift on what counts as a match. Composes into the
+    chirp-ui shell content block like every other page.
+
+    Everything is URL-param-driven (?q=&sort=&dir=&page=&sector= plus price/change/
+    vol band keys + cmp), so a control change is just a new querystring — bookmarkable
+    and back-button-correct. EVERY control's hx-get URL is built in page.py (the
+    research_url helper + the *_chips / columns view-models), so this template just
+    emits the precomputed `.url`; no querystring logic lives here. query_catalog
+    filters -> stable-sorts -> SLICES server-side, so this template renders only one
+    page of rows no matter how big the catalog.
+
+    FOOTGUN #2 (boosted-shell self-override, CRITICAL): every search / sort / filter /
+    paginate / compare control lives inside the boosted shell (#main / hx-target=#main /
+    hx-select=#page-content inherited from ancestors). Each control does a LOCAL swap of
+    the SMALLER #research-results region, so each OVERRIDES the inherited outlet —
+    hx-target="#research-results" + hx-swap="outerHTML" + hx-select="#research-results"
+    picks our OWN region out of the response (the inherited #page-content isn't in the
+    fragment, which would otherwise swap EMPTY and the whole surface would vanish — the
+    convert-form footgun app.check's htmx rule warns about). The page.py handler re-emits
+    the SAME #research-results wrapper for the swap. hx-select (NOT hx-disinherit) is the
+    lever: hx-disinherit only affects DESCENDANTS, not self-inheritance. -#}
+{% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
+
+{#- The self-override trio shared by EVERY control inside #research-results. A
+    macro so the FOOTGUN #2 contract is declared once and can never drift between
+    the search box, the sort headers, the facet chips, the pager, and the compare
+    controls. hx-get is set per-control alongside this. -#}
+{% def results_swap() %}hx-target="#research-results" hx-swap="outerHTML" hx-select="#research-results"{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🔬</span>
+      Research
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      The full catalog — search, filter, sort, and compare across every market. Server-side paginated.
+    </p>
+  </header>
+
+  {#- The #research-results wrapper — the SOLE target of every control swap
+      (FOOTGUN #2). The search box, facet filters, the compare tray, the table,
+      and the pager ALL live inside it so a swap re-renders the active control
+      state too; the page.py handler re-emits THIS block (research_results) for the
+      swap, so hx-select="#research-results" always finds its own region. -#}
+  {% block research_results %}
+  <div id="research-results" class="luckycat-research">
+
+    {#- SEARCH — a text input that swaps on input (debounced). Self-overrides the
+        boosted outlet to #research-results. name="q" so htmx serializes the value;
+        the hidden inputs carry the OTHER active params so a search doesn't drop the
+        current sort/facets/compare. The handler resets to page 1 (research_url
+        drops page on a non-page change). -#}
+    <form class="luckycat-research__search" role="search"
+          hx-get="/markets/research"
+          {{ results_swap() }}
+          hx-trigger="input changed delay:250ms, search">
+      <input type="search" name="q" value="{{ q | default('') }}"
+             class="chirpui-field__input luckycat-research__search-input"
+             placeholder="Search markets…"
+             aria-label="Search markets" autocomplete="off">
+      {% set _h = search_hidden | default({}) %}
+      <input type="hidden" name="sort" value="{{ _h.get('sort', '') }}">
+      <input type="hidden" name="dir" value="{{ _h.get('dir', '') }}">
+      <input type="hidden" name="sector" value="{{ _h.get('sector', '') }}">
+      <input type="hidden" name="price" value="{{ _h.get('price', '') }}">
+      <input type="hidden" name="change" value="{{ _h.get('change', '') }}">
+      <input type="hidden" name="vol" value="{{ _h.get('vol', '') }}">
+      <input type="hidden" name="cmp" value="{{ _h.get('cmp', '') }}">
+    </form>
+
+    {#- FACET FILTERS — sector + price / change / volume bands. Each chip is a
+        REAL <a href> (the precomputed querystring, ONE param changed + page reset)
+        so it degrades to a navigable link with NO JS (and middle-click / open-in-
+        new-tab work); the same URL drives the boosted hx-get, which self-overrides
+        the inherited outlet to #research-results. The active band carries
+        aria-current="true" (a LINK state — not aria-pressed, which is a button
+        state wrong on a link); the rest rely on the .is-active styling. -#}
+    <div class="luckycat-research__facets" aria-label="Filters">
+      {% if (sector_chips | default(())) | length > 1 %}
+      <div class="luckycat-research__facet" role="group" aria-label="Sector">
+        <span class="luckycat-research__facet-label chirpui-text-muted">Sector</span>
+        {% for chip in sector_chips | default(()) %}
+        <a class="luckycat-research__chip{{ ' is-active' if chip.active else '' }}"
+           {% if chip.active %}aria-current="true"{% end %}
+           href="{{ chip.url }}" hx-get="{{ chip.url }}" {{ results_swap() }}>{{ chip.label }}</a>
+        {% end %}
+      </div>
+      {% end %}
+
+      <div class="luckycat-research__facet" role="group" aria-label="Price">
+        <span class="luckycat-research__facet-label chirpui-text-muted">Price</span>
+        {% for chip in price_chips | default(()) %}
+        <a class="luckycat-research__chip{{ ' is-active' if chip.active else '' }}"
+           {% if chip.active %}aria-current="true"{% end %}
+           href="{{ chip.url }}" hx-get="{{ chip.url }}" {{ results_swap() }}>{{ chip.label }}</a>
+        {% end %}
+      </div>
+
+      <div class="luckycat-research__facet" role="group" aria-label="24h change">
+        <span class="luckycat-research__facet-label chirpui-text-muted">24h</span>
+        {% for chip in change_chips | default(()) %}
+        <a class="luckycat-research__chip{{ ' is-active' if chip.active else '' }}"
+           {% if chip.active %}aria-current="true"{% end %}
+           href="{{ chip.url }}" hx-get="{{ chip.url }}" {{ results_swap() }}>{{ chip.label }}</a>
+        {% end %}
+      </div>
+
+      <div class="luckycat-research__facet" role="group" aria-label="Volume">
+        <span class="luckycat-research__facet-label chirpui-text-muted">Volume</span>
+        {% for chip in vol_chips | default(()) %}
+        <a class="luckycat-research__chip{{ ' is-active' if chip.active else '' }}"
+           {% if chip.active %}aria-current="true"{% end %}
+           href="{{ chip.url }}" hx-get="{{ chip.url }}" {{ results_swap() }}>{{ chip.label }}</a>
+        {% end %}
+      </div>
+    </div>
+
+    {#- COMPARE TRAY — a lightweight server-rendered side-by-side of the pinned
+        coins (?cmp=SYM,SYM). Pin/unpin URLs are precomputed in page.py; each
+        control self-overrides to #research-results. Capped at compare_max, no
+        client JS. -#}
+    {% set _cmp = compare_rows | default(()) %}
+    {% if (_cmp | length) > 0 %}
+    <section class="luckycat-research__compare" aria-label="Compare">
+      <div class="luckycat-research__compare-head">
+        <h2 class="luckycat-research__compare-title">Compare</h2>
+        <a class="luckycat-research__chip"
+           href="{{ compare_clear_url }}" hx-get="{{ compare_clear_url }}" {{ results_swap() }}>Clear</a>
+      </div>
+      <table class="luckycat-positions luckycat-research__compare-table" aria-label="Compare markets">
+        <thead>
+          <tr>
+            <th scope="col">Market</th>
+            <th scope="col">Price</th>
+            <th scope="col">24h</th>
+            <th scope="col">Volume</th>
+            <th scope="col">Sector</th>
+            <th scope="col"><span class="luckycat-visually-hidden">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cv in _cmp %}
+          {% set row = cv.row %}
+          {% set _up = row.change_pct >= 0 %}
+          <tr class="luckycat-positions__row">
+            <td class="luckycat-positions__sym">{{ row.symbol }} <span class="chirpui-text-muted">{{ row.name }}</span></td>
+            <td>{{ row.price }} $MEOW</td>
+            <td>
+              <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">{{ '+' if _up else '' }}{{ row.change_pct }}%</span>
+            </td>
+            <td>{{ row.volume | round(0) }} $MEOW</td>
+            <td class="chirpui-text-muted">{{ row.sector }}</td>
+            <td>
+              <a class="luckycat-research__chip luckycat-research__chip--remove"
+                 aria-label="Remove {{ row.symbol }} from compare"
+                 href="{{ cv.unpin_url }}" hx-get="{{ cv.unpin_url }}" {{ results_swap() }}>✕</a>
+            </td>
+          </tr>
+          {% end %}
+        </tbody>
+      </table>
+    </section>
+    {% end %}
+
+    {#- RESULT COUNT — the match total BEFORE slicing, so the user sees "N markets"
+        even though only one page is rendered. -#}
+    <p class="luckycat-research__count chirpui-text-muted">
+      {{ result.total | default(0) }} {{ 'market' if (result.total | default(0)) == 1 else 'markets' }}
+      {% if (result.total_pages | default(1)) > 1 %} · page {{ result.page }} of {{ result.total_pages }}{% end %}
+    </p>
+
+    {% set _rows = rows | default(()) %}
+    {% if (_rows | length) > 0 %}
+    <table class="luckycat-positions luckycat-research__table" aria-label="Markets">
+      <thead>
+        <tr>
+          {#- SORTABLE COLUMN HEADERS — each is a REAL <a href> to the precomputed
+              column URL (sort=<col>, dir toggled when re-clicking the active
+              column) so a no-JS click re-sorts via navigation; the same URL drives
+              the boosted hx-get, which self-overrides the inherited outlet to
+              #research-results. aria-sort conveys the active direction to AT. -#}
+          {% for col in columns | default(()) %}
+          <th scope="col" aria-sort="{{ ('ascending' if col.dir == 'asc' else 'descending') if col.active else 'none' }}">
+            <a class="luckycat-research__sort{{ ' is-active' if col.active else '' }}"
+               href="{{ col.url }}" hx-get="{{ col.url }}" {{ results_swap() }}>
+              {{ col.label }}
+              {% if col.active %}<span class="luckycat-research__sort-arrow" aria-hidden="true">{{ '▲' if col.dir == 'asc' else '▼' }}</span>{% end %}
+            </a>
+          </th>
+          {% end %}
+          <th scope="col"><span class="luckycat-visually-hidden">Compare</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rv in _rows %}
+        {% set row = rv.row %}
+        {% set _up = row.change_pct >= 0 %}
+        <tr class="luckycat-positions__row">
+          <td class="luckycat-positions__sym">
+            {#- Boosted in-shell link into the coin detail — MUST carry the FULL
+                shell-outlet contract via shell_outlet_attrs() (target #main, swap
+                innerHTML, select #page-content, sync #main:replace) or a boosted
+                swap nests the whole shell inside #main (#298). The macro is imported
+                at template top level so it resolves even when this research_results
+                block renders standalone as a control-swap fragment. -#}
+            <a class="luckycat-research__link" href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>{{ row.symbol }}</a>
+          </td>
+          <td class="chirpui-text-muted">{{ row.name }}</td>
+          <td>{{ row.price }} $MEOW</td>
+          <td>
+            <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">
+              <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if _up else '▼' }}</span>
+              {{ '+' if _up else '' }}{{ row.change_pct }}%
+            </span>
+          </td>
+          <td>{{ row.volume | round(0) }} $MEOW</td>
+          <td>
+            {#- Pin into the compare tray. Disabled-look when already pinned or the
+                tray is full; otherwise a REAL <a href> to the precomputed pin URL
+                (so a no-JS click pins via navigation), the same URL driving the
+                boosted hx-get that self-overrides to #research-results. -#}
+            {% if rv.pinned %}
+            <span class="luckycat-research__chip is-pinned" aria-label="{{ row.symbol }} pinned to compare">Pinned</span>
+            {% elif compare_full | default(false) %}
+            <span class="luckycat-research__chip is-disabled" title="Compare is full ({{ compare_max | default(4) }} max)">Compare</span>
+            {% else %}
+            <a class="luckycat-research__chip"
+               aria-label="Add {{ row.symbol }} to compare"
+               href="{{ rv.pin_url }}" hx-get="{{ rv.pin_url }}" {{ results_swap() }}>Compare</a>
+            {% end %}
+          </td>
+        </tr>
+        {% end %}
+      </tbody>
+    </table>
+
+    {#- PAGINATION — Prev / Next are REAL <a href> to the precomputed page±1 URLs
+        (the only URLs that KEEP page rather than reset it) so a no-JS click pages
+        via navigation; the same URL drives the boosted hx-get, which self-overrides
+        the inherited outlet to #research-results. At the ends the URL is empty, so a
+        disabled <span> renders instead of a dead link. -#}
+    {% if (result.total_pages | default(1)) > 1 %}
+    <nav class="luckycat-research__pager" aria-label="Pagination">
+      {% if result.has_prev %}
+      <a class="chirpui-btn chirpui-btn--ghost"
+         href="{{ prev_url }}" hx-get="{{ prev_url }}" {{ results_swap() }}>← Prev</a>
+      {% else %}
+      <span class="chirpui-btn chirpui-btn--ghost is-disabled" aria-disabled="true">← Prev</span>
+      {% end %}
+      <span class="luckycat-research__pager-pos chirpui-text-muted">{{ result.page }} / {{ result.total_pages }}</span>
+      {% if result.has_next %}
+      <a class="chirpui-btn chirpui-btn--ghost"
+         href="{{ next_url }}" hx-get="{{ next_url }}" {{ results_swap() }}>Next →</a>
+      {% else %}
+      <span class="chirpui-btn chirpui-btn--ghost is-disabled" aria-disabled="true">Next →</span>
+      {% end %}
+    </nav>
+    {% end %}
+    {% else %}
+    <p class="chirpui-text-muted luckycat-positions__empty">No markets match these filters. 🐾</p>
+    {% end %}
+  </div>
+  {% end %}
+</div>
+{% end %}
+{% end %}
+</div>
+{% end %}
