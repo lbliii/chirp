@@ -17,6 +17,8 @@ def test_htmx_debug_js_loads() -> None:
     assert "htmx:targetError" in HTMX_DEBUG_BOOT_JS
     assert "Co-locate the target with the mutating element" in HTMX_DEBUG_BOOT_JS
     assert "htmx:beforeSwap" in HTMX_DEBUG_BOOT_JS
+    assert "requestConfig" in HTMX_DEBUG_BOOT_JS
+    assert "requestConfig.elt" in HTMX_DEBUG_BOOT_JS
     assert "chirp-debug" in HTMX_DEBUG_BOOT_JS
     assert "chirp-dbg-drawer" in HTMX_DEBUG_BOOT_JS
     assert "chirp-dbg-pill" in HTMX_DEBUG_BOOT_JS

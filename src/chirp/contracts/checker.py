@@ -90,6 +90,7 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
+from .rules_static_dom import check_duplicate_static_ids, check_oob_fragment_producers
 from .rules_suspense_defer import (
     SUSPENSE_DEFER_BLOCKS,
     check_suspense_undiscoverable,
@@ -668,6 +669,11 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
         result.issues.extend(check_oob_targets(template_sources, all_ids))
+        result.issues.extend(check_duplicate_static_ids(template_sources))
+        signal_registry = getattr(app._mutable_state, "signal_registry", None)
+        result.issues.extend(
+            check_oob_fragment_producers(template_sources, router, signal_registry)
+        )
         # OOB registry coverage: warn when registered blocks are missing from layouts
         layout_template_names: list[str] = []
         for chain in snapshot.layout_chains:

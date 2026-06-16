@@ -130,7 +130,7 @@ Check in before:
 - Adding `make_response()`, `jsonify()`, `to_json()`, or a REST-style side
   channel to solve a hypermedia return-type problem.
 - Using `{% if key %}` for Suspense deferred values. Use
-  `{% if key is not none %}` or `"key" in __chirp_defer_pending__`.
+  `{% if key is deferred %}` or `"key" in __chirp_defer_pending__`.
 - Using bare jsDelivr package URLs for Alpine/plugins. Use explicit
   `/dist/cdn.min.js` URLs or Chirp's injection helpers.
 - Setting `optional=True` on an OOB region to hide a typo.
@@ -288,7 +288,7 @@ internal scale/cost numbers. Replace them with public, source-backed framing.
   `BlockNotFoundError`, no empty `hx-swap-oob` wrapper for non-optional
   missing blocks, and `app.check()` coverage.
 - **Suspense falsy regression.** Deferred values such as `[]`, `0`, or `""`
-  render as if still pending. Verification: templates use `is not none` or
+  render as if still pending. Verification: templates use `is deferred` or
   `__chirp_defer_pending__`, and contract tests cover falsy resolved values.
 - **Full document in fragment target.** htmx requests receive a full page in a
   narrow target. Verification: `Page`/`Fragment`/`MutationResult` tests cover
