@@ -53,6 +53,8 @@ import pytest
 # Opt-in gate: no Playwright installed → skip the entire module cleanly.
 pytest.importorskip("playwright")
 
+pytestmark = pytest.mark.issue(234)
+
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 

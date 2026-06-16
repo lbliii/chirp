@@ -103,8 +103,9 @@ config = replace(
     # connection — pinned to one worker — would stall the page loads that land on a
     # tied-up worker (the "white screen" / freeze). A single-user in-memory demo is
     # inherently single-process. Real multi-worker realtime needs a shared bus
-    # backplane (Redis/Postgres pub-sub) + an external state store — see the signal
-    # RFC; that's the production scaling path, deliberately out of scope here.
+    # inherently single-process today. Scale by implementing SignalBackplane
+    # (backplane.py — InProcessBackplane default, RedisBackplane stub) plus an
+    # external state store; see DESIGN.md §7 and the signal RFC.
     workers=1,
     # view_transitions="htmx" animates the boosted #main swap on navigation.
     # Keep htmx unset (the chirp-ui shell bundles it) and do NOT add alpine=True

@@ -188,6 +188,18 @@ Run the test suite (deterministic + offline):
 PYTHONPATH=src uv run pytest examples/chirpui/lucky_cat/
 ```
 
+Opt-in browser smoke (Playwright — catches CSP-dead shells and runtime-only
+failures that `TestClient` cannot see):
+
+```bash
+uv run --with playwright python -m playwright install chromium
+uv run --with playwright pytest examples/chirpui/lucky_cat/test_browser_smoke.py -q
+```
+
+Link integrity (`test_links.py`) runs in the default suite via
+``chirp.testing.assert_link_integrity`` — every rendered same-origin href must
+resolve to 200.
+
 ## Deploy (Railway)
 
 The directory ships a `Dockerfile` and `railway.toml` so it runs as a standalone
@@ -208,14 +220,15 @@ config = replace(
 
 - `worker_mode="async"` powers the `EventStream` routes and the `/_chirp/live`
   signal stream.
-- **`workers=1` is deliberate.** The demo holds *all* state in process memory —
-  the wallet, trade store, notifications, the SimFeed, the demo account, and the
-  signal bus — and the single `/_chirp/live` connection is pinned to one worker. A
-  single-user in-memory demo is inherently single-process; real multi-worker
-  realtime needs a shared bus backplane (Redis/Postgres pub-sub) plus an external
-  state store — the production scaling path, out of scope here. It's also why each
-  `@app.derived` signal must be a *pure* function of its input signal values,
-  never a process-local read.
+- **`workers=1` is the single-process default.** The demo holds *all* state in
+  process memory — the wallet, trade store, notifications, the SimFeed, the demo
+  account, and the signal bus — and the single `/_chirp/live` connection is pinned
+  to one worker. Scaling to `workers>1` is a **one-class swap**: implement the
+  `SignalBackplane` protocol in `backplane.py` (the in-process default ships
+  today; `RedisBackplane` is stubbed with wiring notes) **and** move stores into
+  an external source-of-truth — the backplane carries fan-out, not ledger state.
+  Each `@app.derived` signal must stay a *pure* function of its input signal
+  values so deriveds stay correct once events cross process boundaries.
 - `CHIRP_SECRET_KEY` signs sessions + CSRF. A dev fallback keeps local runs
   one-command; production (`CHIRP_ENV != development`) must set it.
 - The market data source defaults to the deterministic `SimFeed`
@@ -230,6 +243,7 @@ app.py            # App setup: secure stack (Session→Auth→CSRF→SecurityHea
                   #   mutation routes (deposit / trade / cancel / convert / watchlist / notifications-read),
                   #   live signals (balance / ticker / notifications + derived badge & announce),
                   #   per-market SSE stream, /logout, mount_pages
+backplane.py      # SignalBackplane protocol + InProcessBackplane default + RedisBackplane stub
 navigation.py     # Route-context nav model: RouteState (path-prefix *_active props) → shell_navigation()
 wallet.py         # In-memory $MEOW wallet; backs /deposit + buys, fans out as the `balance` signal
 trade_store.py    # Thread-safe trade backend: validate + atomic race-safe fills + resting limit orders

@@ -1,4 +1,4 @@
-"""Deterministic link-integrity crawl for the Lucky Cat shell (TASK 3a).
+"""Deterministic link-integrity crawl for the Lucky Cat shell (#234).
 
 The two-tier rail (navigation.py) emits a fixed set of inner-rail hrefs per
 room: ``/portfolio/orders``, ``/portfolio/history``, ``/trade/convert``,
@@ -9,23 +9,23 @@ room: ``/portfolio/orders``, ``/portfolio/history``, ``/trade/convert``,
 *server* could serve them; ``test_room_stubs_render_full_page`` only hit the
 five room roots. This is the gap that let seven dead links ship.
 
-This crawl closes it the durable way: render a set of seed pages through the
-production-path ``chirp.testing.TestClient`` (no browser, fully in-process,
-deterministic), extract every same-origin ``href`` from the rendered HTML
-(stripping ``#fragments`` and external/``mailto:``/``tel:`` links), GET each
-one, and assert ``status == 200``. Any link the shell renders but cannot serve
-fails this test — which is precisely what would have caught the seven 404s.
+This crawl closes it the durable way via :func:`~chirp.testing.assert_link_integrity`:
+render seed pages through the production-path ``TestClient``, extract every
+same-origin ``href``, GET each one, and assert ``status == 200``. Any link the
+shell renders but cannot serve fails — which is precisely what would have caught
+the seven 404s.
 
 It is always-on (no browser, no opt-in) so the example's own ``pytest`` run
-covers link integrity going forward.
+covers link integrity going forward. The opt-in Playwright counterpart lives in
+``test_browser_smoke.py``.
 """
-
-import re
 
 import pytest
 
-from chirp.testing import TestClient
+from chirp.testing import TestClient, assert_link_integrity, crawl_links
 from tests.helpers.auth import login
+
+pytestmark = pytest.mark.issue(234)
 
 # Account rooms (/portfolio, /trade, /activity, /settings + their inner-rail
 # sub-pages) are now ``@login_required`` — an anonymous crawl gets 302s to
@@ -57,47 +57,17 @@ _SEED_PAGES: tuple[str, ...] = (
     "/markets/BTC-MEOW",
 )
 
-# href="..." (single or double quoted). We only care about the value.
-_HREF_RE = re.compile(r"""href\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
-
-# SSE / streaming routes are intentionally not full-page GETs — they are
-# sse-connect-only (registered ``referenced=True``). The shell never renders an
-# ``href`` to them, but guard anyway so a future template change can't drag the
-# crawl onto a never-terminating stream.
-_SKIP_SUFFIXES: tuple[str, ...] = ("/stream",)
-
-
-def _same_origin_paths(html: str) -> set[str]:
-    """Every crawlable same-origin path in ``html``.
-
-    Strips ``#fragments`` (same-page anchors), and drops external schemes
-    (``http(s)://``, ``mailto:``, ``tel:``, ``javascript:``), the bare ``#``
-    placeholder, and non-page assets (``/static/...``) + SSE streams.
-    """
-    paths: set[str] = set()
-    for raw in _HREF_RE.findall(html):
-        href = raw.strip()
-        if not href or href.startswith("#"):
-            continue
-        # External / non-navigational schemes.
-        lower = href.lower()
-        if lower.startswith(("http://", "https://", "mailto:", "tel:", "javascript:", "data:")):
-            continue
-        if not href.startswith("/"):
-            # Relative links would be ambiguous here; the shell only emits
-            # absolute paths. Skip anything that isn't root-anchored.
-            continue
-        # Strip the #fragment and any query string — we crawl the route, not the
-        # in-page anchor or filter state.
-        path = href.split("#", 1)[0].split("?", 1)[0]
-        if not path:
-            continue
-        if path.startswith("/static/"):
-            continue
-        if any(path.endswith(suffix) for suffix in _SKIP_SUFFIXES):
-            continue
-        paths.add(path)
-    return paths
+_PREVIOUSLY_DEAD = frozenset(
+    {
+        "/portfolio/orders",
+        "/portfolio/history",
+        "/trade/convert",
+        "/activity/deposits",
+        "/activity/trades",
+        "/settings/security",
+        "/settings/display",
+    }
+)
 
 
 class TestLinkIntegrity:
@@ -122,49 +92,27 @@ class TestLinkIntegrity:
             cookie = await login(
                 client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE
             )
-            headers = _auth_headers(cookie)
-            discovered: set[str] = set()
-            for path in _SEED_PAGES:
-                response = await client.get(path, headers=headers)
-                assert response.status == 200, f"seed page {path} -> {response.status}"
-                discovered |= _same_origin_paths(response.text)
-
-            # The crawl must actually find links (guards against a regex/markup
-            # change silently emptying the set and making this test vacuous).
-            assert discovered, "no same-origin links discovered — crawl is vacuous"
-
-            broken: dict[str, int] = {}
-            for path in sorted(discovered):
-                response = await client.get(path, headers=headers)
-                if response.status != 200:
-                    broken[path] = response.status
-
-            assert not broken, f"dead links (path -> status): {broken}"
+            await assert_link_integrity(
+                client,
+                _SEED_PAGES,
+                headers=_auth_headers(cookie),
+            )
 
     async def test_every_inner_rail_subpage_is_covered(self, example_app) -> None:
         """Belt-and-suspenders: the seven previously-dead sub-pages must appear in
         the discovered link set (proving the crawl exercises *these* routes, not
         just that it found *some* working links)."""
-        previously_dead = {
-            "/portfolio/orders",
-            "/portfolio/history",
-            "/trade/convert",
-            "/activity/deposits",
-            "/activity/trades",
-            "/settings/security",
-            "/settings/display",
-        }
         async with TestClient(example_app) as client:
             cookie = await login(
                 client, username="neko", password="luckycat", cookie_name=_SESSION_COOKIE
             )
-            headers = _auth_headers(cookie)
-            discovered: set[str] = set()
-            for path in _SEED_PAGES:
-                response = await client.get(path, headers=headers)
-                discovered |= _same_origin_paths(response.text)
-        missing = previously_dead - discovered
-        assert not missing, f"inner-rail links not rendered by the shell: {missing}"
+            result = await crawl_links(
+                client,
+                _SEED_PAGES,
+                headers=_auth_headers(cookie),
+            )
+            missing = _PREVIOUSLY_DEAD - result.discovered
+            assert not missing, f"inner-rail links not rendered by the shell: {missing}"
 
 
 if __name__ == "__main__":  # pragma: no cover - convenience runner

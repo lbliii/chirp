@@ -17,8 +17,11 @@ from chirp.testing import (
     assert_hx_trigger,
     assert_is_error_fragment,
     assert_is_fragment,
+    assert_link_integrity,
     assert_route_smoke,
+    crawl_links,
     hx_headers,
+    same_origin_paths,
 )
 
 
@@ -206,6 +209,57 @@ class TestAssertRouteSmoke:
                     _FakeSmokeClient(),
                     [RouteSmokeCase("/", mode=cast(Any, "fullpage"))],
                 )
+
+        asyncio.run(run())
+
+
+class TestSameOriginPaths:
+    def test_collects_root_paths_and_strips_fragments(self) -> None:
+        html = '<a href="/portfolio#orders">x</a><a href="/trade?tab=open">y</a>'
+        assert same_origin_paths(html) == {"/portfolio", "/trade"}
+
+    def test_skips_external_static_and_stream_paths(self) -> None:
+        html = (
+            '<a href="https://example.com">ext</a>'
+            '<a href="/static/app.js">asset</a>'
+            '<a href="/markets/BTC/stream">sse</a>'
+            '<a href="/markets">ok</a>'
+        )
+        assert same_origin_paths(html) == {"/markets"}
+
+
+class TestLinkCrawl:
+    def test_crawl_links_reports_broken_paths(self) -> None:
+        class _Client:
+            def __init__(self) -> None:
+                self.pages = {
+                    "/": '<a href="/good">a</a><a href="/bad">b</a>',
+                    "/good": "ok",
+                    "/bad": "missing",
+                }
+
+            async def get(self, path: str, headers=None) -> Response:
+                body = self.pages.get(path, "missing")
+                status = 200 if path in {"/", "/good"} else 404
+                return Response(body=body, status=status)
+
+        async def run() -> None:
+            result = await crawl_links(_Client(), ["/"])
+            assert result.discovered == frozenset({"/good", "/bad"})
+            assert result.broken == {"/bad": 404}
+
+        asyncio.run(run())
+
+    def test_assert_link_integrity_fails_on_dead_links(self) -> None:
+        class _Client:
+            async def get(self, path: str, headers=None) -> Response:
+                if path == "/":
+                    return Response(body='<a href="/404">x</a>', status=200)
+                return Response(body="nope", status=404)
+
+        async def run() -> None:
+            with pytest.raises(AssertionError, match="dead links"):
+                await assert_link_integrity(_Client(), ["/"])
 
         asyncio.run(run())
 
