@@ -48,9 +48,7 @@ class TestSignalBackplane:
         bp.publish("balance", 100)
         assert seen == [("balance", 100)]
 
-    def test_redis_env_without_url_falls_back_to_in_process(
-        self, monkeypatch, caplog
-    ) -> None:
+    def test_redis_env_without_url_falls_back_to_in_process(self, monkeypatch, caplog) -> None:
         import backplane
 
         backplane.reset()

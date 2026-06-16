@@ -35,7 +35,12 @@ from chirp.testing.browser_smoke import (
 )
 from chirp.testing.chunks import CapturedStream
 from chirp.testing.client import TestClient
-from chirp.testing.link_crawl import LinkCrawlResult, assert_link_integrity, crawl_links, same_origin_paths
+from chirp.testing.link_crawl import (
+    LinkCrawlResult,
+    assert_link_integrity,
+    crawl_links,
+    same_origin_paths,
+)
 from chirp.testing.route_smoke import RouteSmokeCase, assert_route_smoke
 from chirp.testing.sse import SSETestResult, assert_sse_wired, extract_sse_attrs
 
@@ -45,11 +50,10 @@ __all__ = [
     "RouteSmokeCase",
     "SSETestResult",
     "TestClient",
-    "assert_fragment_contains",
     "assert_alpine_booted",
+    "assert_fragment_contains",
     "assert_fragment_not_contains",
     "assert_has_id",
-    "assert_link_integrity",
     "assert_hx_push_url",
     "assert_hx_redirect",
     "assert_hx_reswap",
@@ -58,6 +62,7 @@ __all__ = [
     "assert_is_error_fragment",
     "assert_is_fragment",
     "assert_is_full_page",
+    "assert_link_integrity",
     "assert_mutation_fragments",
     "assert_mutation_redirect",
     "assert_no_full_document",

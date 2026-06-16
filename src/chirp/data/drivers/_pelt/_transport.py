@@ -9,6 +9,8 @@ per-connection state is single-owner on one task.
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import ssl
 import sys
 from dataclasses import dataclass, field
@@ -16,12 +18,14 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import anyio
+from anyio.streams.tls import TLSStream
 
 from chirp.data.drivers._pelt import _auth
 from chirp.data.drivers._pelt._protocol import (
     AuthRequestEvent,
     BackendKeyDataEvent,
     ParameterStatusEvent,
+    ProtocolEvent,
     ProtocolState,
     SimpleQueryProtocol,
 )
@@ -29,16 +33,11 @@ from chirp.data.drivers._pelt.errors import PeltConnectionError, PeltTimeoutErro
 from chirp.data.drivers._pelt.types import ConnectionConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from anyio.abc import ByteStream
 
-try:
-    import truststore
-except ImportError:  # pragma: no cover — optional dependency
-    truststore = None  # type: ignore[assignment, unused-ignore]
-
-_HAS_TRUSTSTORE = truststore is not None
+_HAS_TRUSTSTORE = importlib.util.find_spec("truststore") is not None
 
 # PostgreSQL SSLRequest payload: Int32(8) + Int32(80877103).
 _SSL_REQUEST = (8).to_bytes(4, "big") + (80877103).to_bytes(4, "big")
@@ -123,7 +122,8 @@ def _ssl_context_for(config: ConnectionConfig) -> ssl.SSLContext | None:
     if mode == "disable":
         return None
     if _HAS_TRUSTSTORE:
-        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)  # type: ignore[union-attr]
+        truststore = importlib.import_module("truststore")
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     else:
         ctx = ssl.create_default_context()
     if mode in ("verify-ca", "verify-full"):
@@ -133,6 +133,12 @@ def _ssl_context_for(config: ConnectionConfig) -> ssl.SSLContext | None:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
     return ctx
+
+
+async def _upgrade_to_tls(stream: ByteStream, ctx: ssl.SSLContext) -> ByteStream:
+    """Wrap a connected stream in TLS (extracted for testability)."""
+    tls = await TLSStream.wrap(stream, ssl_context=ctx)
+    return tls
 
 
 async def open_stream(config: ConnectionConfig) -> PGStream:
@@ -169,24 +175,27 @@ async def negotiate_tls(stream: PGStream, config: ConnectionConfig) -> PGStream:
         raise TLSError(msg)
 
     ctx = _ssl_context_for(config)
+    if ctx is None:  # pragma: no cover — negotiate_tls returns early for disable
+        msg = "internal error: missing SSL context for TLS negotiation"
+        raise TLSError(msg)
 
     if mode == "require":
         if not await _request_ssl():
             msg = "server refused SSL connection (sslmode=require)"
             raise TLSError(msg)
-        tls_stream = await stream.stream.start_tls(ctx)
+        tls_stream = await _upgrade_to_tls(stream.stream, ctx)
         return PGStream(stream=tls_stream, recv=stream.recv)
 
     if mode in ("verify-ca", "verify-full"):
         if not await _request_ssl():
             msg = f"server refused SSL connection (sslmode={mode})"
             raise TLSError(msg)
-        tls_stream = await stream.stream.start_tls(ctx)
+        tls_stream = await _upgrade_to_tls(stream.stream, ctx)
         return PGStream(stream=tls_stream, recv=stream.recv)
 
     if mode == "allow":
         if await _request_ssl():
-            tls_stream = await stream.stream.start_tls(ctx)
+            tls_stream = await _upgrade_to_tls(stream.stream, ctx)
             return PGStream(stream=tls_stream, recv=stream.recv)
         return stream
 
@@ -194,7 +203,7 @@ async def negotiate_tls(stream: PGStream, config: ConnectionConfig) -> PGStream:
         # libpq "prefer": try non-SSL first; Postgres expects SSLRequest before startup when
         # encryption is wanted, so attempt SSL and fall back to cleartext on refusal.
         if await _request_ssl():
-            tls_stream = await stream.stream.start_tls(ctx)
+            tls_stream = await _upgrade_to_tls(stream.stream, ctx)
             return PGStream(stream=tls_stream, recv=stream.recv)
         return stream
 
@@ -215,7 +224,7 @@ async def _drive_until_ready(
     backend_pid: int | None = None
     backend_secret: int | None = None
 
-    async def _handle(events: list[object]) -> None:
+    async def _handle(events: Sequence[ProtocolEvent]) -> None:
         nonlocal scram, server_version, backend_pid, backend_secret
         for event in events:
             if isinstance(event, AuthRequestEvent):

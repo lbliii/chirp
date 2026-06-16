@@ -28,9 +28,6 @@ class _ScriptedStream:
     async def send(self, data: bytes) -> None:
         self._sent.append(data)
 
-    async def start_tls(self, ssl_context: object) -> _ScriptedStream:
-        return self
-
     async def aclose(self) -> None:
         return None
 
@@ -64,12 +61,18 @@ async def test_pgstream_receive_into_buffer():
 
 @pytest.mark.issue(326)
 @pytest.mark.anyio
-async def test_negotiate_tls_require_accepts_ssl():
-    stream = _transport.PGStream(stream=_ScriptedStream([_transport._SSL_OK]))
+async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch):
+    raw = _ScriptedStream([_transport._SSL_OK])
+
+    async def _passthrough_tls(stream: object, ctx: object) -> object:
+        return stream
+
+    monkeypatch.setattr(_transport, "_upgrade_to_tls", _passthrough_tls)
+    stream = _transport.PGStream(stream=raw)
     config = ConnectionConfig(user="u", ssl="require")
     out = await _transport.negotiate_tls(stream, config)
-    assert isinstance(out.stream, _ScriptedStream) or out.stream is not stream.stream
-    assert stream.stream._sent[0] == _transport._SSL_REQUEST
+    assert out.stream is raw
+    assert raw._sent[0] == _transport._SSL_REQUEST
 
 
 @pytest.mark.issue(326)
