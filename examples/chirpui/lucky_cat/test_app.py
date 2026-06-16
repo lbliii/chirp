@@ -1201,6 +1201,7 @@ class TestTradeStore:
         # After a buy, value is cash + mark-to-market (>= remaining cash).
         assert trade_store.portfolio_value() >= wallet.balance()
 
+    @pytest.mark.issue(296)
     def test_market_buy_eats_ask_depth_and_prints_tape(self) -> None:
         """#296: a market buy consumes top-of-book asks and appends to the tape."""
         import trade_store
@@ -1318,6 +1319,40 @@ class TestTradeOrder:
             assert "{%" not in response.text
             # The fill debited the wallet (the value the balance signal emits).
             assert client_balance() < before
+
+    @pytest.mark.issue(296)
+    async def test_market_buy_via_http_eats_book_and_prints_tape(self, example_app) -> None:
+        """POST /trade/order market fill updates SimFeed book depth + trade tape."""
+        from feed import get_feed
+
+        feed = get_feed()
+        symbol = "PAW-MEOW"
+        book_before = feed.order_book(symbol, depth=3)
+        tape_before = feed.trades(symbol, limit=30)
+        top_ask_before = book_before.asks[0]
+        size = 1.0
+
+        async with TestClient(example_app) as client:
+            headers = await self._csrf_headers(client)
+            response = await client.post(
+                "/trade/order",
+                data={
+                    "symbol": symbol,
+                    "side": "buy",
+                    "kind": "market",
+                    "size": str(size),
+                },
+                headers=headers,
+            )
+            assert response.status == 200
+
+        book_after = feed.order_book(symbol, depth=3)
+        tape_after = feed.trades(symbol, limit=30)
+        assert book_after.asks[0].price == top_ask_before.price
+        assert book_after.asks[0].size == pytest.approx(top_ask_before.size - size, abs=1e-6)
+        assert tape_after[0].side == "buy"
+        assert tape_after[0].size == size
+        assert tape_after[0].id > tape_before[0].id
 
     async def test_order_requires_csrf(self, example_app) -> None:
         """Without a CSRF token the mutating route is rejected (secure-by-default)."""
