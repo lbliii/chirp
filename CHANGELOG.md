@@ -1,3 +1,178 @@
+## [0.8.1] — 2026-06-16
+
+### Added
+
+- ✨ **`signal_attrs()` template global — bind a signal on an existing element.**
+  A third signal binding helper alongside `signal()` / `signal_block()`: it emits the
+  binding **attributes only** (`sse-swap="name" hx-target="this"`) for placement
+  inside an element you already have — `<section class="board" {{ signal_attrs('stats') }}>` —
+  so a layout's own CSS-grid / flex container (or a `<ul>`) becomes a live sink
+  without an injected `<span>`/`<div>` wrapper breaking its layout. Unlike a
+  hand-written `sse-swap` attribute, the `signal_attrs('x')` call is recorded for
+  topic scoping and recognised by the `signal_dead_binding` contract by its call-site,
+  so the binding is validated even though the `sse-swap` is produced at render time.
+- 🔐 **Lucky Cat — authentication showcase.** The flagship ChirpUI example now
+  demonstrates Chirp's auth subsystem end to end, exercising all three gating
+  levels rather than a blanket lockdown:
+
+    **Full-page gating** — `@login_required` on the account section (`/portfolio`,
+    `/activity`, `/trade`, `/settings`, `/markets/favorites`); an anonymous hit redirects to
+    `/login?next=…`. **Component gating** — `current_user()` conditional chrome: the
+    topbar swaps between a "Sign in" link and the user menu + Sign-out (and reveals
+    the $MEOW balance, the notifications bell, and the Deposit action), and the
+    watchlist star on the *public* markets grid becomes a "sign in to star" link.
+    **Action gating** — `@login_required` on the mutation routes (deposit, place /
+    cancel order, convert, star toggle, notifications-read) as the security backstop.
+
+    The sign-in flow is return-type-driven: `ValidationError` re-renders the login
+    form in place (422) on bad credentials, and a clean sign-in returns `FormAction`
+    (HX-Redirect for htmx → a full reload) so the persistent topbar repaints its
+    auth state. Public market data (the
+    markets grid and a market's detail page) stays browsable without an account.
+    Built on `AuthMiddleware` + `login()`/`logout()` + a single in-memory demo
+    account (`users.py`), with passwords hashed via `chirp.security.passwords`
+    (stdlib scrypt fallback — no extra dependency).
+- 🔥 **Lucky Cat — Trending destination (`/markets/trending`).** A new fixed Markets
+  destination: a movers leaderboard with a segmented Gainers / Losers / Volume
+  control that swaps a `#movers-region` over htmx (snapshot-per-swap, no live
+  re-rank). It is backed by the shared `ranking` / `research` query seam, so its
+  numbers and ordering match the rest of the Markets surfaces. The segment toggles
+  self-override the boosted shell's inherited outlet (`hx-target` / `hx-select` →
+  `#movers-region`) and `page.py` re-emits that wrapper — the canonical
+  boosted-shell local-swap pattern (footgun #2).
+- 🔬 **Lucky Cat — Research destination (`/markets/research`).** A new fixed Markets
+  destination and the scalable power surface for a 500+ coin catalog: substring
+  search (sharing the same `search.matches` matcher as the Cmd-K palette), facet
+  filters (sector + price / 24h-change / volume bands), sortable column headers,
+  **server-side pagination**, and a lightweight server-rendered compare tray. It is
+  URL-param-driven (`?q=&sort=&dir=&page=&sector=` + band keys + `cmp`), so every
+  control is a bookmarkable querystring and the whole surface is back-button-correct;
+  each control's `hx-get` URL is precomputed in `page.py` (the `research_url` helper)
+  and the filter → stable-sort → slice runs entirely server-side via the shared
+  `research.query_catalog` seam, so it renders only one page of rows regardless of
+  catalog size and its numbers / ordering match the rest of the Markets surfaces.
+  Every search / sort / filter / paginate / compare control self-overrides the
+  boosted shell's inherited outlet (`hx-target` / `hx-select` → `#research-results`)
+  and `page.py` re-emits that wrapper — the canonical boosted-shell local-swap
+  pattern (footgun #2).
+
+### Changed
+
+- ### Testing
+
+  - Add ``chirp.testing`` link-integrity helpers (#234): ``same_origin_paths``, ``crawl_links``, and ``assert_link_integrity`` for deterministic href crawls, plus opt-in Playwright shell smoke helpers.
+
+  Closes #234.
+
+  ([#234](https://github.com/lbliii/chirp/issues/234))
+- ### Developer Experience
+
+  - `AppConfig.from_env()` now accepts keyword overrides (e.g. `template_dir`, `worker_mode`) applied after env loading, so Railway-style apps no longer need `dataclasses.replace(AppConfig.from_env(), ...)`.
+  - `app.check()` dead-template detection now scans route-handler modules for `Fragment(...)`/`Template(...)` string literals and module-level `*.html` constants, so templates referenced only from Python helpers are no longer false-positive orphans.
+
+  Closes #237.
+
+  ([#237](https://github.com/lbliii/chirp/issues/237))
+- ### Examples
+
+  - Lucky Cat Dockerfile now installs `bengal-chirp[ui,sessions,forms]` from PyPI (>=0.8.0) instead of git@main; the deploy workflow no longer triggers on `src/chirp/**` changes.
+
+  Closes #246.
+
+  ([#246](https://github.com/lbliii/chirp/issues/246))
+- ### Documentation
+
+  - Document asyncpg's experimental free-threading status and its relationship to Chirp's `data-pg` extra on Python 3.14t, with links to the pelt saga.
+
+  Closes #263.
+
+  ([#263](https://github.com/lbliii/chirp/issues/263))
+- ### Examples
+
+  - Lucky Cat acceptance tests (#285) prove per-session isolation for wallet balances, trade positions, and notification lists across concurrent browser sessions.
+
+  Closes #285.
+
+  ([#285](https://github.com/lbliii/chirp/issues/285))
+- ### Examples
+
+  - Lucky Cat exposes the scaling seam (#295): a ``SignalBackplane`` protocol, in-process default, and stubbed ``RedisBackplane`` with wiring notes; ``DESIGN.md`` reframes ``workers=1`` as the single-process default.
+
+  Closes #295.
+
+  ([#295](https://github.com/lbliii/chirp/issues/295))
+- ### Examples
+
+  - Lucky Cat market buys now have acceptance tests (#296) proving a fill consumes top-of-book depth and appends to the trade tape via both the store and HTTP POST paths.
+
+  Closes #296.
+
+  ([#296](https://github.com/lbliii/chirp/issues/296))
+- ### Contracts
+
+  - Signal dead-binding checks now validate hand-written `sse-swap` on pages composed under a `signal_connect()` layout (with an INFO nudge to prefer `signal_attrs()`), while pages that open their own `sse_scope()` stream are excluded.
+
+  Closes #316.
+
+  ([#316](https://github.com/lbliii/chirp/issues/316))
+- **Suspense docs** — CLAUDE.md and AGENTS.md now recommend `{% if key is deferred %}` instead of the incorrect `is not none` idiom for deferred keys (#236).
+- Bumped the `chirp-ui` floor to `>=0.10.0` across the `ui` extra, dev group, and the `chirp new` scaffold so generated projects match the framework's pinned component-library version.
+- Rewrote Lucky Cat inline docs for newcomers: template construct legend, minimal Suspense first, stripped issue-number noise from reader-facing comments, and removed redundant auth/CSRF capture now that the framework preserves streaming context.
+- ⚡ **Signals skip redundant emits.** A coalescing signal (`coalesce=True`, the
+  default) now skips the wire event **and** the derived cascade when its new value
+  equals the current one — a pure `render` maps equal values to equal payloads, so
+  the swap would be byte-identical. Derived signals dedup the same way: a derived
+  whose projection is unchanged (even when its source value changed) no longer
+  re-emits or propagates. This makes the *compute-once / broadcast-many* dashboard
+  pattern cheap — only regions that actually changed hit the wire. Append-style /
+  drop-sensitive topics opt out with `coalesce=False` (every emit fires, even a
+  repeat value).
+- ⭐ **Lucky Cat — Markets rail rework + Favorites move (`/watchlist` → `/markets/favorites`).**
+  The Markets contextual rail is now **four fixed destinations** — Home, Favorites,
+  Trending, Research — instead of an O(N) one-row-per-market list (the full catalog
+  lives in Research). On a coin-detail route the current market is pinned in the
+  rail, and the dead Overview / Order-book / Trades / Info jump anchors are gone.
+  The starred-markets view moved from `/watchlist` to `/markets/favorites` (one of
+  the fixed destinations); `/watchlist` now answers a **308 permanent redirect** so
+  existing bookmarks keep working, and a `RouteState` reserved-segment guard keeps
+  `/markets/{favorites,trending,research}` from being mistaken for a coin symbol.
+- 🐱 **Lucky Cat — Markets Home is now a curated lobby (`/markets`, with `/` as an
+  alias).** The old full markets grid landing is retired for a bounded lobby (~9
+  cards): a stat strip (`ranking.market_stats`), a top-movers preview
+  (`ranking.top_gainers/losers/volume`, a few each, as links into Trending), a
+  watchlist preview, a featured market, and a CTA into Research — the full 500+ coin
+  catalog now lives only in Research. `/` is an **alias** (no redirect) rendering the
+  SAME `markets/page.html` from one shared `lobby.lobby_context`, so the two routes
+  can never drift. The card-bearing regions (featured + watchlist preview) are
+  de-duped at render — the featured symbol is dropped from the watchlist preview so
+  `#luckycat-card-{symbol}` / `#watchlist-star-{symbol}` never duplicate (the
+  no-duplicate-id invariant + the `/watchlist/toggle` unstar-prune target). Boosted
+  in-shell links carry the full `shell_outlet_attrs()` outlet contract.
+- 🐱 **Lucky Cat — the Markets lobby is now fully reactive.** The whole board updates
+  live over the single `/_chirp/live` connection: the stat strip (24h volume /
+  advancers / decliners) ticks with directional flash, the movers grid (Gainers /
+  Losers / Volume) re-ranks live, and the featured slot is a bespoke spotlight whose
+  price + sparkline update and that re-ranks to follow the current top gainer. It is
+  the canonical *live board* recipe — one source signal (`lobby_snapshot`) samples
+  the feed on a human cadence and emits a self-contained snapshot, and three
+  `@app.derived` projections (`market_stats` / `movers` / `featured`) re-render their
+  regions in lockstep, bound with the new `signal_attrs()` on the existing grid
+  containers. The featured spotlight no longer reuses the `market_card`
+  `#luckycat-card` / `#watchlist-star` ids, so it can change symbol live without
+  colliding with the (static, per-session) watchlist preview.
+
+### Fixed
+
+- `app.check()` no longer emits a false-positive `oob_target` warning for chirp-ui's own OOB helper macros (e.g. `context_rail_oob` targeting `chirpui-context-rail`). The OOB-target check now skips vendored `chirpui/` templates, symmetric with id-collection, since chirp-ui owns its internal OOB-target consistency. ([#307](https://github.com/lbliii/chirp/issues/307))
+- **Contract diagnostics** — `select_inheritance` now recommends overriding inherited `hx-select` with an explicit selector or `hx-select="unset"` instead of `hx-disinherit` (#235). Added `duplicate_id` and `oob_fragment_orphan` startup checks for repeated static element ids and dead-wired OOB fragment blocks (#238). DevTools empty `hx-select` warnings now walk from the request trigger, not the swap target (#248).
+- Bump ``asyncpg`` to ``>=0.31`` for free-threaded safety and add a 3.14t CI gate that imports the Postgres backend with ``PYTHONWARNINGS=error``.
+
+  Closes #261, #262.
+- Fix htmx ``hx_redirect()`` negotiation, Suspense auth/CSRF stream context, and ``RouteMeta.auth`` enforcement.
+
+  Closes #272, #273, #274.
+
+
 ## [0.8.0] — 2026-06-15
 
 ### Added

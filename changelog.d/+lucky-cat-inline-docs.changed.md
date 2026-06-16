@@ -1,1 +1,0 @@
-Rewrote Lucky Cat inline docs for newcomers: template construct legend, minimal Suspense first, stripped issue-number noise from reader-facing comments, and removed redundant auth/CSRF capture now that the framework preserves streaming context.
