@@ -4,6 +4,7 @@ import copy
 import inspect
 import logging
 import re
+import sys
 from typing import TYPE_CHECKING
 
 from kida import Environment
@@ -115,7 +116,12 @@ from .types import CheckResult, ContractCoverage, ContractIssue, Severity
 
 # Page/Suspense: filesystem and imperative routes return these with a template path.
 _TEMPLATE_CALL_PATTERN = re.compile(
-    r'(?:Template|Fragment|Page|Suspense|Stream|TemplateStream)\s*\(\s*["\']([^"\']+\.html)["\']'
+    r'(?:Template|Fragment|Page|Suspense|Stream|TemplateStream|OOB)\s*\(\s*["\']([^"\']+\.html)["\']'
+)
+# Module-level template path constants (e.g. _TOAST_TEMPLATE = "foo.html").
+_MODULE_TEMPLATE_CONST_PATTERN = re.compile(
+    r'^\s*(?:_\w+|\w+)\s*=\s*["\']([^"\']+\.html)["\']',
+    re.MULTILINE,
 )
 
 if TYPE_CHECKING:
@@ -169,6 +175,49 @@ def _build_contract_schema(migrations_dir: str | None) -> SchemaSnapshot | None:
         return schema_from_migrations(migrations_dir)
     except Exception:
         return None
+
+
+def _handler_module(handler: object) -> object | None:
+    """Return the user module that owns *handler*, when discoverable."""
+    module = inspect.getmodule(handler)
+    if module is not None:
+        return module
+    mod_name = getattr(handler, "__module__", None)
+    if isinstance(mod_name, str):
+        return sys.modules.get(mod_name)
+    return None
+
+
+def _python_template_references(router: object) -> set[str]:
+    """Collect template paths referenced from Python route-handler modules.
+
+    Scans the full module source (not just the handler body) so helpers like
+    ``Fragment(_TOAST_TEMPLATE, ...)`` and module-level ``_FOO = "bar.html"``
+    constants count as references for dead-template detection.
+    """
+    referenced: set[str] = set()
+    seen_modules: set[object] = set()
+    for route in getattr(router, "routes", []):
+        handler = getattr(route, "handler", None)
+        page_src = getattr(route, "page_source_handler", None)
+        handler_for_source = page_src if page_src is not None else handler
+        if handler_for_source is None:
+            continue
+        module = _handler_module(handler_for_source)
+        if module is None or module in seen_modules:
+            continue
+        mod_name = getattr(module, "__name__", "")
+        if mod_name.startswith(("chirp.", "chirpui.", "kida.")):
+            continue
+        seen_modules.add(module)
+        try:
+            src = inspect.getsource(module)
+        except TypeError, OSError:
+            continue
+        for match in _TEMPLATE_CALL_PATTERN.finditer(src):
+            referenced.add(match.group(1))
+        referenced.update(_MODULE_TEMPLATE_CONST_PATTERN.findall(src))
+    return referenced
 
 
 def _route_prepass(
@@ -280,6 +329,7 @@ def _route_prepass(
                             template=frag.template,
                         )
                     )
+    referenced_templates.update(_python_template_references(router))
     return referenced_templates, referenced_route_paths
 
 
