@@ -2458,3 +2458,372 @@ a.luckycat-watchlist-star,
   text-decoration: none;
   color: inherit;
 }
+
+/* ---------------------------------------------------------------------------
+ * Trending (#279) — the Markets movers leaderboard. The segmented control
+ * reuses .luckycat-chart-toggle; the table reuses .luckycat-positions. Only the
+ * region spacing + the per-row symbol link need bespoke rules.
+ * ------------------------------------------------------------------------- */
+.luckycat-trending {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.luckycat-trending__table {
+  margin: 0;
+}
+.luckycat-trending__link {
+  color: var(--lc-ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.luckycat-trending__link:hover {
+  color: var(--lc-jade);
+}
+.luckycat-trending__link:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--lc-radius-sm);
+}
+
+/* ---------------------------------------------------------------------------
+ * Research (#280) — the Markets power surface. Search + facet chips + sortable
+ * column headers + server-side pagination + a lightweight compare tray. The
+ * table reuses .luckycat-positions; only the search input, the facet/chip
+ * controls, the sort headers, the compare tray, and the pager need bespoke
+ * rules. All chips share .luckycat-research__chip so the FOOTGUN #2 controls
+ * read as one consistent affordance.
+ * ------------------------------------------------------------------------- */
+.luckycat-research {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.luckycat-research__search-input {
+  width: 100%;
+  max-width: 420px;
+}
+.luckycat-research__facets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+.luckycat-research__facet {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.luckycat-research__facet-label {
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-tight);
+}
+
+/* Chip — the shared facet/compare/pin control (also an <a>, so strip the link
+   look). Active/pressed lights jade like the chart-toggle active pill. */
+.luckycat-research__chip {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--lc-radius-pill);
+  background: color-mix(in srgb, var(--lc-plane-raised) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--lc-hairline);
+  color: var(--lc-ink-muted);
+  text-decoration: none;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--lc-tracking-tight);
+  line-height: 1.2;
+  transition: color var(--lc-motion-fast), background var(--lc-motion-fast);
+}
+.luckycat-research__chip:hover {
+  color: var(--lc-ink);
+}
+.luckycat-research__chip:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+}
+.luckycat-research__chip.is-active {
+  color: var(--lc-jade);
+  background: color-mix(in srgb, var(--lc-jade) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lc-jade) 34%, transparent);
+}
+.luckycat-research__chip.is-pinned {
+  color: var(--lc-gold);
+  cursor: default;
+}
+.luckycat-research__chip.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.luckycat-research__chip--remove {
+  padding: 0.2rem 0.55rem;
+}
+
+/* Compare tray — a small framed side-by-side over the pinned coins. */
+.luckycat-research__compare {
+  border-radius: var(--lc-radius);
+  padding: 0.85rem 1rem;
+  background: color-mix(in srgb, var(--lc-plane-raised) 50%, transparent);
+  box-shadow: inset 0 0 0 1px var(--lc-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.luckycat-research__compare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.luckycat-research__compare-title {
+  margin: 0;
+  font-size: var(--lc-text-base);
+  font-weight: 700;
+}
+.luckycat-research__compare-table {
+  margin: 0;
+}
+.luckycat-research__count {
+  margin: 0;
+  font-size: var(--lc-text-sm);
+}
+.luckycat-research__table {
+  margin: 0;
+}
+
+/* Sortable column header — an <a> inside the <th>; active column shows the
+   direction arrow and lights jade. */
+.luckycat-research__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+}
+.luckycat-research__sort:hover {
+  color: var(--lc-jade);
+}
+.luckycat-research__sort:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--lc-radius-sm);
+}
+.luckycat-research__sort.is-active {
+  color: var(--lc-jade);
+}
+.luckycat-research__sort-arrow {
+  font-size: 0.7em;
+}
+
+/* Per-row coin link into the detail. */
+.luckycat-research__link {
+  color: var(--lc-ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.luckycat-research__link:hover {
+  color: var(--lc-jade);
+}
+.luckycat-research__link:focus-visible {
+  outline: 2px solid var(--chirpui-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--lc-radius-sm);
+}
+
+/* Pagination — Prev / position / Next. */
+.luckycat-research__pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.luckycat-research__pager .is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.luckycat-research__pager-pos {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-sm);
+}
+
+/* Visually-hidden label for icon-only header cells (Compare / Remove). */
+.luckycat-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Markets Home lobby (#281, PR7) — the curated, BOUNDED landing rendered by
+ * both `/` and `/markets`. A stat strip, a featured card + watchlist preview
+ * (two columns), a top-movers preview (three compact link panels), and a
+ * Research CTA. Cards reuse .luckycat-market-card / .luckycat-markets-grid; the
+ * movers links reuse .luckycat-trending__link. Only the lobby scaffolding +
+ * the stat strip + the movers panels need bespoke rules.
+ * ------------------------------------------------------------------------- */
+.luckycat-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* Stat strip — the aggregate market snapshot (ranking.market_stats). */
+.luckycat-lobby__strip {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+}
+.luckycat-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.luckycat-stat__label {
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.luckycat-stat__value {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.luckycat-stat__value.is-up {
+  color: var(--lc-up);
+}
+.luckycat-stat__value.is-down {
+  color: var(--lc-down);
+}
+
+/* Featured + watchlist preview — side by side on wide viewports, stacked below. */
+.luckycat-lobby__cols {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+@media (max-width: 52rem) {
+  .luckycat-lobby__cols {
+    grid-template-columns: 1fr;
+  }
+}
+.luckycat-lobby__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+  font-size: var(--lc-text-base);
+  font-weight: 700;
+}
+.luckycat-lobby__see-all {
+  margin-left: auto;
+  font-size: var(--lc-text-sm);
+  font-weight: 600;
+  color: var(--lc-ink-muted);
+  text-decoration: none;
+}
+.luckycat-lobby__see-all:hover,
+.luckycat-lobby__see-all:focus-visible {
+  color: var(--lc-jade);
+}
+/* The featured + watchlist grids are single-column inside their column. */
+.luckycat-lobby__featured-grid,
+.luckycat-lobby__watchlist-grid {
+  grid-template-columns: 1fr;
+}
+.luckycat-lobby__empty {
+  margin: 0;
+  font-size: var(--lc-text-sm);
+}
+
+/* Top-movers preview — three compact panels of coin-detail links. */
+.luckycat-lobby__movers-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.luckycat-lobby__movers-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+}
+.luckycat-lobby__movers-title {
+  margin: 0;
+  font-size: var(--lc-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.luckycat-lobby__movers-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.luckycat-lobby__movers-link {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+.luckycat-lobby__movers-sym {
+  font-weight: 700;
+}
+.luckycat-lobby__movers-price {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Research CTA — the lobby is bounded; the full catalog lives in Research. */
+.luckycat-lobby__cta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+}
+.luckycat-lobby__cta-body {
+  flex: 1 1 18rem;
+}
+.luckycat-lobby__cta-body .luckycat-lobby__heading {
+  margin-bottom: 0.35rem;
+}
+.luckycat-lobby__cta-body p {
+  margin: 0;
+  font-size: var(--lc-text-sm);
+}
+.luckycat-lobby__cta-btn {
+  flex: 0 0 auto;
+}

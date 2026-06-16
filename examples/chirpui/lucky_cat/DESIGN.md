@@ -15,9 +15,10 @@ in the code in this directory — file, route, macro, and store names are real.
 
 Lucky Cat is a playful "lucky cat casino" trading floor: a topbar with a live
 cross-page ticker strip, a $MEOW house-token balance and a notifications bell; a
-two-tier navigation rail; a markets grid; a market-detail page with a gradient
-area chart, an order book, and a trade tape; a trade flow; a Suspense portfolio
-dashboard; a watchlist; and a Cmd-K command palette. **Browsing the market data
+two-tier navigation rail; a curated Markets Home lobby (with Trending, Research,
+and a Favorites view as the other fixed Markets destinations); a market-detail
+page with a gradient area chart, an order book, and a trade tape; a trade flow; a
+Suspense portfolio dashboard; a watchlist; and a Cmd-K command palette. **Browsing the market data
 is open to everyone; the account section and every mutation are gated behind
 session sign-in** — the auth showcase that exercises all three gating levels (§8).
 
@@ -93,12 +94,14 @@ prescriptive rule for what goes where. When you add a feature, decide its tier
   top-level destination lives. It never changes between routes.
 - **Inner contextual rail = where you are.** `shell_navigation()` dispatches on
   `route_state.active_room` to build typed `NavSection`/`NavItem` trees; empty
-  sections are pruned so the rail never shows a bare header. A market detail
-  route adds a "this market" section (Overview / Order book / Trades / Info)
-  *above* the sibling-markets list. The Markets room carries the **Watchlist
-  filter lane** — the first *functional* filter (links to a real `/watchlist`
-  page, carries a live count badge); the All/Gainers/Losers lanes below it are
-  intentionally cosmetic.
+  sections are pruned so the rail never shows a bare header. The Markets room is
+  the **four fixed destinations** — **Home** (`/`), **Favorites**
+  (`/markets/favorites`, the starred-only view + a live count badge), **Trending**
+  (`/markets/trending`), **Research** (`/markets/research`) — *not* an O(N)
+  one-row-per-market list (the full catalog lives only in Research). A coin-detail
+  route PINS the current coin at the top of the rail (a single active lane with
+  its 24h-change badge); the dead Overview/Order-book/Trades/Info jump anchors
+  were removed (#282).
 - **Inner page = content.** Everything route-specific.
 
 ### Two corollaries that fell out of the doctrine
@@ -107,10 +110,13 @@ prescriptive rule for what goes where. When you add a feature, decide its tier
   pointed comment: "No footer balance here: the $MEOW balance is GLOBAL account
   state, so it lives once in the topbar (IA doctrine). Duplicating it in the
   rail also overflowed the column."
-- **`/watchlist` is a Markets-room destination,** not its own room.
-  `RouteState.active_room` keeps the Markets icon lit on `/watchlist` and shows
-  the markets sidebar with the Watchlist lane active — a starred-only view of
-  the same markets, not a new top-level place.
+- **Favorites (`/markets/favorites`) is a Markets-room destination,** not its own
+  room. `RouteState.active_room` keeps the Markets icon lit on the whole
+  `/markets` tree and shows the fixed Markets rail with the Favorites destination
+  active — a starred-only view of the same markets, not a new top-level place. A
+  `RESERVED_MARKET_SEGMENTS` guard in `RouteState.market_detail_active` stops the
+  fixed `/markets/{favorites,trending,research}` views from being mistaken for a
+  coin detail route.
 
 `RouteState` is the crown jewel: a frozen, queryless snapshot of the current
 path with path-prefix `*_active` properties. Server-computed active state
@@ -130,7 +136,9 @@ right fit for the slow dashboard.)
 
 | Feature | Route(s) | Return type | chirp-ui / composition |
 |---------|----------|-------------|------------------------|
-| **Markets grid** | `GET /` (`pages/page.py`) | `Page` | `market_grid` macro (`_components/market.html`), server-side SVG sparklines from `_context._sparkline` |
+| **Markets Home (lobby)** | `GET /markets` (`pages/markets/page.py`) + `GET /` alias (`pages/page.py`) | `Page` | the curated, BOUNDED lobby (#281): a stat strip (`ranking.market_stats`), a top-movers preview (`ranking.top_gainers/losers/volume`, a few each, as links into Trending), a watchlist preview + a featured market (`market_card`), and a CTA into Research. `/` is an ALIAS (no redirect) rendering the SAME `markets/page.html` from the shared `lobby.lobby_context`. The old full grid is RETIRED — the full catalog lives only in Research. **De-dupe footgun:** the featured symbol is dropped from the watchlist preview so `#luckycat-card-{symbol}` / `#watchlist-star-{symbol}` never duplicate (also the unstar-prune target). |
+| **Trending** | `GET /markets/trending` (`?seg=gainers/losers/volume`) | `Page` / `Fragment` (`movers_region`) | leaderboard of `ranking.top_gainers/losers/volume` over `research.build_rows` (PR4 seam); segmented control swaps `#movers-region`; **snapshot-per-swap**, no live re-rank; the swap is routed off `HX-Target` so a boosted full-page nav still renders the shell |
+| **Research** | `GET /markets/research` (`?q=&sort=&dir=&page=&sector=` + price/change/vol band keys + `cmp`) | `Page` / `Fragment` (`research_results`) | the power surface for 500+ coins: search (`search.matches`) + facet filters + sortable column headers + **server-side pagination** + a lightweight server-rendered compare tray, all over `research.query_catalog` (PR4 seam, filter→stable-sort→slice); URL-param-driven, so every control's `hx-get` is a precomputed `research_url` querystring; each control swaps `#research-results` (routed off `HX-Target`) |
 | **Market detail** | `GET /markets/{symbol}` | `Page` | gradient area chart (`HeroChart` geometry, no JS chart lib) + order book + trade tape; full-page blocks twinned with `*_oob` |
 | **— chart timeframe toggle** | `GET /markets/{symbol}/chart?tf=` (`referenced=True`) | `Fragment` (`chart_region`) | segmented 1m/1H/1D/1W toggle; `tf` clamped to `feed.INTERVALS` |
 | **— live ticker/book/tape** | `GET /markets/{symbol}/stream` (`referenced=True`) | `EventStream` | `sse_scope()`; yields the detail blocks `market_ticker_oob`/`order_book_oob`/`trade_tape_oob` (does **not** drive the topbar strip — that has one global owner) |
@@ -140,7 +148,7 @@ right fit for the slow dashboard.)
 | **— cancel** | `POST /trade/order/{id}/cancel` | `FormAction` | per-row `hx-swap="delete"` + count OOB; last-order empties `orders_table_oob` |
 | **— convert** | `POST /trade/convert` | `Fragment` (422, htmx) / `FormAction` | self-contained: re-renders `#convert-form`, not the spot form |
 | **Deposit** | `POST /deposit` | empty 204 | chirp-ui modal via `data-action="deposit"`; emits the `balance` signal (topbar + modal swap) and the `notifications` signal (bell reacts) |
-| **Watchlist / favorites** | `POST /watchlist/toggle` | `OOB` (star twin + count twin) | per-card / detail star `<button>`; `GET /watchlist` is a `Page` reusing `market_grid` |
+| **Favorites** | `POST /watchlist/toggle` | `OOB` (star twin + count twin) | per-card / detail star `<button>`; `GET /markets/favorites` is a `Page` reusing `market_grid` (the starred-only view; moved from `/watchlist`, #282 — the POST route keeps its `watchlist.toggle` name) |
 | **Notifications bell** | `POST /notifications/read` + the `notifications` SIGNAL (source) on `/_chirp/live` | empty 204 / live signals | chirp-ui `chirpuiDropdown()`; open-marks-read emits the signal so the **derived** `notif_badge` / `notif_announce` clear; the source generator drains the log + raises price alerts and emits the recent list (the dropdown re-renders over the **one** connection — the N→1 fold) |
 | **Command palette (Cmd-K)** | `GET /search` (`referenced=True`) | `Fragment` (`palette_results_body`) | chirp-ui `command_palette` (`<dialog>` + `chirpuiDialogTarget`); `command_palette.palette_results` filters markets + rooms |
 | **Mobile drawer nav** | (no route — shell chrome) | n/a | chirp-ui `drawer` + `chirpuiDialogTarget`; `mobile_drawer_nav` reuses the same `shell_navigation` model as the rail |
@@ -314,6 +322,19 @@ descendants.
   `brand_link` block). chirp-ui renders the brand block *inside* the `<a>`, so a
   `<button>` there would bubble its click to the anchor.
 
+#### Corollary — the Home-lobby duplicate-id de-dupe (#281)
+
+The market card bakes a per-symbol `#luckycat-card-{symbol}` cell id + a
+`#watchlist-star-{symbol}` star id (the OOB-swap / unstar-prune targets). The Home
+lobby renders cards in **two** regions — the featured slot and the watchlist
+preview — so a coin in both would render those ids **twice**: invalid HTML that
+breaks `getElementById` AND the `/watchlist/toggle` `hx-swap-oob="delete"` prune
+(it would match two `#luckycat-card-{symbol}` cells). `lobby.lobby_context`
+**de-dupes at render** — the featured symbol is dropped from the watchlist preview,
+and the movers preview is rendered as coin-detail *links* (never `market_card`), so
+it carries no card/star ids at all. Pinned by `test_lobby.py` (the
+starred-featured-coin proof) + `test_app.py::TestLanding`.
+
 ### Footgun #2 — boosted-shell `hx-select`
 
 **Symptom:** any local-swap or OOB control inside `#main` inherits the boosted
@@ -335,6 +356,17 @@ needs OOB swaps). `hx-disinherit` is the **wrong lever** — it only affects
   form in place instead of swapping empty.
 - Chart timeframe toggle (`/markets/{symbol}/chart`): each button overrides with
   `hx-target="#market-chart"` + `hx-swap="outerHTML"` + `hx-select="#market-chart"`.
+- Trending segment toggle (`pages/markets/trending/page.html`): each button
+  overrides with `hx-target="#movers-region"` + `hx-swap="outerHTML"` +
+  `hx-select="#movers-region"`, and `page.py` re-emits the `movers_region` block
+  (routed off `HX-Target`) so the swap finds its own wrapper.
+- Research controls (`pages/markets/research/page.html`): the search box, every
+  facet chip, every sortable column header, the pager, and the compare pin/unpin
+  links **all** override with `hx-target="#research-results"` +
+  `hx-swap="outerHTML"` + `hx-select="#research-results"` (via the one
+  `results_swap()` macro so the trio can't drift), and `page.py` re-emits the
+  `research_results` block (routed off `HX-Target`) so each swap finds its own
+  wrapper.
 - Notifications bell trigger (`_layout.html`): `hx-target="#notif-badge"` +
   `hx-swap="none"` + `hx-select="#notif-badge"`.
 
@@ -465,7 +497,7 @@ or *the account* (gated), and is the gate a *page*, a *component*, or an *action
 
 | Level | Mechanism | Where |
 |-------|-----------|-------|
-| **Full-page** | `@login_required` on the `page.py` `get()` handler | the account rooms — `/trade`(+convert), `/portfolio`(+orders/history), `/activity`(+deposits/trades), `/watchlist`, `/settings`(+security/display). Anonymous → **302 `/login?next=<path>`** |
+| **Full-page** | `@login_required` on the `page.py` `get()` handler | the account rooms — `/trade`(+convert), `/portfolio`(+orders/history), `/activity`(+deposits/trades), `/markets/favorites`, `/settings`(+security/display). Anonymous → **302 `/login?next=<path>`** |
 | **Component** | `current_user()` conditional in the template | the topbar ("Sign in" ↔ user chip + Sign-out; the `$MEOW` balance / bell / Deposit appear only when authed) and the `watchlist_star` macro (toggle `<button>` vs. a "sign in to star" `<a>`) — both on the **public** markets grid |
 | **Action** | `@login_required` on the route | the six mutation routes (`/deposit`, `/trade/order`, `/trade/order/{id}/cancel`, `/trade/convert`, `/watchlist/toggle`, `/notifications/read`) — the security backstop |
 

@@ -159,9 +159,9 @@
 {% endfragment %}
 
 {#- =========================================================================
-    WATCHLIST RAIL COUNT — the live tally on the Markets-room "Watchlist" filter
-    lane. The #watchlist-count element is rendered by the inner rail
-    (_components/sidebar.html inner_rail_link, the flt:watchlist lane), so the OOB
+    WATCHLIST RAIL COUNT — the live tally on the Markets-room "Favorites"
+    destination. The #watchlist-count element is rendered by the inner rail
+    (_components/sidebar.html inner_rail_link, the nav:favorites lane), so the OOB
     target lives in the rail, not here. This region is declared top-level so
     app.check()'s oob_registry rule discovers the registered watchlist_count_oob
     block; the fragment twin is what the /watchlist/toggle route returns to keep

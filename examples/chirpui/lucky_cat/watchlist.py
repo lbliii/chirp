@@ -1,9 +1,9 @@
-"""Watchlist store for Lucky Cat — the starred markets behind the rail lane.
+"""Watchlist store for Lucky Cat — the starred markets behind the Favorites rail lane.
 
-The Watchlist is the example's FIRST functional filter lane: the no-op
-"All markets / Gainers / Losers" filters in ``navigation.py`` are cosmetic, but
-the Watchlist lane links to a real ``/watchlist`` page that renders only the
-markets the user has starred, with a live count badge in the inner rail.
+The starred set backs the Markets-room **Favorites** destination: the rail's
+Favorites lane links to the real ``/markets/favorites`` page (one of the four
+fixed Markets destinations, moved here from ``/watchlist`` in #282) that renders
+only the markets the user has starred, with a live count badge in the inner rail.
 
 Like ``wallet.py`` / ``notifications.py`` / ``trade_store.py`` it is the
 example's mutable shared state, so it follows the same store convention: a single
@@ -14,8 +14,8 @@ example's mutable shared state, so it follows the same store convention: a singl
 
 Single source of truth: every star toggle goes through :func:`toggle` (or the
 idempotent :func:`add` / :func:`remove`), so the rail count badge can never drift
-from the set the ``/watchlist`` page renders. The starred set is a plain ``set``
-of symbol strings guarded by ``_lock``.
+from the set the ``/markets/favorites`` page renders. The starred set is a plain
+``set`` of symbol strings guarded by ``_lock``.
 
 Free-threading safety (this example's whole point): the set lives under one
 ``_lock``, so concurrent toggles from racing route handlers can interleave

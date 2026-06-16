@@ -22,6 +22,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+# The fixed Markets destinations that live ONE level under ``/markets`` but are
+# NOT coins. ``market_detail_active`` excludes these before its depth check so a
+# reserved view (``/markets/favorites`` etc.) never pins a coin section in the
+# rail. Keep in lock-step with the static children under ``pages/markets/`` and
+# the fixed rail destinations in :func:`_markets_sections`.
+RESERVED_MARKET_SEGMENTS: frozenset[str] = frozenset({"favorites", "trending", "research"})
+
 
 def _path_in(path: str, prefix: str) -> bool:
     """True when ``path`` is ``prefix`` or a descendant of it.
@@ -104,11 +111,27 @@ class RouteState:
 
     @property
     def market_detail_active(self) -> bool:
-        """A specific market view: ``/markets/{symbol}`` (one level deep)."""
+        """A specific market view: ``/markets/{symbol}`` (one level deep).
+
+        CRITICAL footgun guard: the fixed Markets destinations
+        (``/markets/{favorites,trending,research}``) are ALSO one level deep
+        under ``/markets``, so a naive "any one-level segment is a coin" check
+        would WRONGLY pin them as a coin in the rail. The reserved segments are
+        excluded BEFORE the depth check, so only a genuine ``/markets/{symbol}``
+        (a coin) reads as a detail route.
+        """
         if not self.path.startswith("/markets/"):
             return False
         rest = self.path.removeprefix("/markets/")
-        return bool(rest) and "/" not in rest.strip("/")
+        segment = rest.strip("/")
+        if "/" in segment:
+            return False
+        return bool(segment) and segment not in RESERVED_MARKET_SEGMENTS
+
+    @property
+    def favorites_active(self) -> bool:
+        """The Favorites view — the moved-from-``/watchlist`` starred-markets page."""
+        return _path_in(self.path, "/markets/favorites")
 
     @property
     def portfolio_active(self) -> bool:
@@ -127,17 +150,12 @@ class RouteState:
         return _path_in(self.path, "/settings")
 
     @property
-    def watchlist_active(self) -> bool:
-        """The Watchlist is part of the Markets room — the ``/watchlist`` tree."""
-        return _path_in(self.path, "/watchlist")
-
-    @property
     def active_room(self) -> str:
         """The icon-rail room this path belongs to. Markets is the default/home.
 
-        ``/watchlist`` is a Markets-room destination (a starred-only view of the
-        same markets), so it keeps the Markets icon active and shows the markets
-        sidebar with the Watchlist filter lane lit.
+        ``/markets/favorites`` (and the whole ``/markets`` tree) is a
+        Markets-room destination, so it keeps the Markets icon active and shows
+        the fixed Markets rail with the Favorites destination lit.
         """
         if self.portfolio_active:
             return "portfolio"
@@ -204,49 +222,58 @@ def _markets_sections(
     symbol: str,
     watchlist_count: int = 0,
 ) -> list[NavSection]:
-    tickers = tickers or {}
-    market_items = tuple(
-        NavItem(
-            key=f"mkt:{m.symbol}",
-            label=m.display_name,
-            href=f"/markets/{m.symbol}",
-            active=(symbol == m.symbol),
-            badge=_signed_pct(getattr(tickers.get(m.symbol), "change_pct_24h", None)) or None,
-        )
-        for m in markets
-    )
-    sections = [NavSection(key="markets", label="Markets", items=market_items)]
-    # The filter lane. Watchlist is the FIRST (and only) functional filter — it
-    # links to a real /watchlist page (starred-only markets) and carries a live
-    # count badge rendered via the {% region watchlist_count_oob %} so the OOB
-    # swap keeps it honest. "All markets" returns to the landing (a real route).
-    #
-    # The old cosmetic "Gainers"/"Losers" lanes were removed: they pointed at
-    # /#gainers and /#losers, but the landing has no #gainers/#losers anchors and
-    # no gainers/losers filtering, so they jumped to the top of / and did nothing
-    # — true dead-ends sitting directly beneath a genuinely-functional lane under
-    # a "Filters" header that implies they filter. The rail must never advertise
-    # a no-op; a real client-side filter would mean a ?filter= query that has to
-    # respect the boosted shell-outlet contract (FOOTGUN #2), so the honest fix is
-    # to ship only the lanes that work.
-    sections.append(
+    # FIXED Markets destinations — "where you are within Markets" — NOT an
+    # O(N) one-row-per-market list (that did not scale past a handful of coins;
+    # the full catalog now lives ONLY in Research, filtered/sorted/sliced
+    # server-side). Four stable lanes:
+    #   * Home      → /                  (the curated markets landing)
+    #   * Favorites → /markets/favorites (the starred-only view; moved here from
+    #                 the old /watchlist). It keeps the live #watchlist-count OOB
+    #                 badge so a star toggle on any page still updates the tally.
+    #   * Trending  → /markets/trending  (#279 gainers/losers/volume)
+    #   * Research  → /markets/research  (#280 the full power surface)
+    # The Favorites lane keeps the `nav:favorites` key the sidebar special-cases
+    # to host the #watchlist-count OOB target (count value rides NavItem.count).
+    return [
         NavSection(
-            key="filters",
-            label="Filters",
+            key="markets",
+            label="Markets",
             items=(
                 NavItem(
-                    key="flt:watchlist",
-                    label="Watchlist",
-                    href="/watchlist",
-                    active=state.watchlist_active,
+                    key="nav:home",
+                    label="Home",
+                    href="/",
+                    active=state.path == "/",
+                    icon="grid",
+                ),
+                NavItem(
+                    key="nav:favorites",
+                    label="Favorites",
+                    href="/markets/favorites",
+                    active=state.favorites_active,
                     icon="star",
                     count=watchlist_count if watchlist_count > 0 else None,
                 ),
-                NavItem(key="flt:all", label="All markets", href="/", active=state.path == "/"),
+                NavItem(
+                    key="nav:trending",
+                    label="Trending",
+                    href="/markets/trending",
+                    active=_path_in(state.path, "/markets/trending"),
+                    # `chart` (▤) is a REGISTERED chirp-ui glyph — an unregistered
+                    # name (e.g. "trending-up") passes through the `| icon` filter
+                    # verbatim and renders as literal garbage text in the rail.
+                    icon="chart",
+                ),
+                NavItem(
+                    key="nav:research",
+                    label="Research",
+                    href="/markets/research",
+                    active=_path_in(state.path, "/markets/research"),
+                    icon="search",
+                ),
             ),
         )
-    )
-    return sections
+    ]
 
 
 def _market_detail_sections(
@@ -256,19 +283,28 @@ def _market_detail_sections(
     symbol: str,
     watchlist_count: int = 0,
 ) -> list[NavSection]:
-    base = f"/markets/{symbol}"
-    this_market = NavSection(
+    # PIN the current coin at the top of the rail (a single active lane), then
+    # the fixed Markets destinations below it. The dead #order-book / #trade-tape
+    # / #info jump anchors are GONE: they jumped to sections already in view (no
+    # value, and they would have to respect the boosted-shell outlet contract to
+    # not nest the shell). The signed-24h-change badge keeps the pinned coin
+    # informative.
+    tickers = tickers or {}
+    label = next((m.display_name for m in markets if m.symbol == symbol), symbol)
+    pinned = NavSection(
         key="this-market",
-        label=symbol,
+        label="Viewing",
         items=(
-            NavItem(key="md:overview", label="Overview", href=base, active=True),
-            NavItem(key="md:book", label="Order book", href=f"{base}#order-book"),
-            NavItem(key="md:trades", label="Trades", href=f"{base}#trade-tape"),
-            NavItem(key="md:info", label="Info", href=f"{base}#info"),
+            NavItem(
+                key=f"mkt:{symbol}",
+                label=label,
+                href=f"/markets/{symbol}",
+                active=True,
+                badge=_signed_pct(getattr(tickers.get(symbol), "change_pct_24h", None)) or None,
+            ),
         ),
     )
-    # Keep the sibling markets reachable below the "this market" lane.
-    return [this_market, *_markets_sections(state, markets, tickers, symbol, watchlist_count)]
+    return [pinned, *_markets_sections(state, markets, tickers, symbol, watchlist_count)]
 
 
 def _portfolio_sections(state: RouteState) -> list[NavSection]:

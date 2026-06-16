@@ -15,13 +15,17 @@ more zones populate the bar: a ``controls`` Markets-home link and an
 ``overflow`` "More" dropdown.
 """
 
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
+from typing import TypeVar
 
 import notifications
 import watchlist
 from command_palette import palette_results
 from feed import get_feed
 from wallet import balance
+
+_V = TypeVar("_V")
 
 from chirp import ShellAction, ShellActions, ShellActionZone
 from chirp.middleware.auth import current_user
@@ -142,18 +146,67 @@ def hero_chart(closes: tuple[float, ...], interval: str) -> HeroChart:
     )
 
 
+class _LazySymbolMap(Mapping[str, _V]):
+    """A per-symbol map that computes + caches each value on first access (#278).
+
+    ``context()`` used to eagerly build ``tickers`` and ``sparklines`` for EVERY
+    market on EVERY request — O(N) work that is fatal at a 500-coin catalog and
+    pure waste on non-market routes (the topbar/rail never index by symbol). This
+    Mapping defers the per-symbol build to ``__getitem__`` and memoizes it, so a
+    template doing ``tickers.get(sym)`` / ``sparklines[sym]`` is unchanged but only
+    the symbols actually touched are built; an untouched route pays ~nothing.
+
+    It is a real ``collections.abc.Mapping`` so ``.get(key, default)``,
+    ``key in m``, ``len(m)`` and truthiness all behave like the old plain ``dict``
+    the templates and ``navigation.py`` (``tickers = tickers or {}``) expect.
+    Membership is checked against the known-symbol set WITHOUT triggering a build,
+    so ``.get(absent)`` / ``absent in m`` stay free. Request-scoped (one per
+    ``context()`` call), so the cache is never shared across threads/requests.
+    """
+
+    __slots__ = ("_build", "_cache", "_known", "_symbols")
+
+    def __init__(self, symbols: tuple[str, ...], build: Callable[[str], _V]) -> None:
+        # ``_symbols`` preserves catalog order for iteration; ``_known`` is the
+        # O(1) membership set so a lookup against a 500-coin catalog stays cheap.
+        self._symbols = symbols
+        self._known = frozenset(symbols)
+        self._build = build
+        self._cache: dict[str, _V] = {}
+
+    def __getitem__(self, symbol: str) -> _V:
+        if symbol not in self._known:
+            raise KeyError(symbol)
+        if symbol not in self._cache:
+            self._cache[symbol] = self._build(symbol)
+        return self._cache[symbol]
+
+    def __contains__(self, symbol: object) -> bool:
+        # Cheap O(1) membership — never triggers a build.
+        return symbol in self._known
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._symbols)
+
+    def __len__(self) -> int:
+        return len(self._symbols)
+
+
 def context() -> dict:
     feed = get_feed()
     markets = feed.markets()
-    # Per-symbol ticker snapshot keyed by symbol for the grid cards.
-    tickers = {m.symbol: feed.ticker(m.symbol) for m in markets}
-    # Per-symbol gradient-area sparkline geometry, computed from the closing price
-    # of each warmed candle (oldest→newest). Snapshot reads are sync and cheap; the
-    # template renders the precomputed SVG points (lightweight SVG + CSS, no JS).
-    sparklines = {
-        m.symbol: _sparkline(tuple(c.close for c in feed.candles(m.symbol, limit=32)))
-        for m in markets
-    }
+    symbols = tuple(m.symbol for m in markets)
+    # Per-symbol ticker + sparkline maps, LAZY: each value is computed and cached
+    # only when a template indexes that symbol (the grid touches every visible
+    # card; the topbar/rail touch none). At a 500-coin catalog this turns an O(N)
+    # per-request build into O(rendered cards). Snapshot reads are sync and cheap.
+    tickers = _LazySymbolMap(symbols, feed.ticker)
+    # Sparkline geometry is built from the closing price of each warmed candle
+    # (oldest→newest); the template renders the precomputed SVG points (no JS).
+    sparklines = _LazySymbolMap(
+        symbols,
+        lambda sym: _sparkline(tuple(c.close for c in feed.candles(sym, limit=32))),
+    )
     # Watchlist — the starred markets behind the rail's first FUNCTIONAL filter
     # lane. `watchlist_starred` is the immutable membership set the market cards /
     # detail header read to render each star's pressed state; `watchlist_count`

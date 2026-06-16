@@ -1,8 +1,9 @@
-{#- Watchlist — a starred-only view of the markets grid (the rail's first
-    FUNCTIONAL filter lane). Reuses the landing grid's market_grid def (single
-    source of truth for the card + star markup) over the starred markets, with a
-    polished maneki empty state when nothing is starred. Composes into the
-    chirp-ui shell content block exactly like the landing page.
+{#- Favorites — a starred-only view of the markets grid, one of the four FIXED
+    Markets destinations (moved here from /watchlist, #282). Reuses the landing
+    grid's market_grid def (single source of truth for the card + star markup)
+    over the starred markets, with a polished maneki empty state when nothing is
+    starred. Composes into the chirp-ui shell content block exactly like the
+    landing page.
 
     The per-card star still toggles here: tapping it unstars the market and the
     /watchlist/toggle route OOB-flips the star control + the rail count. (The
@@ -22,7 +23,7 @@
   <header class="luckycat-page__header">
     <h1 class="luckycat-page__title">
       <span class="luckycat-page__cat" aria-hidden="true">⭐</span>
-      Watchlist
+      Favorites
     </h1>
     <p class="luckycat-page__tagline chirpui-text-muted">
       The markets you starred. Tap a ★ on any card to add or remove one.
@@ -38,7 +39,7 @@
       star control on the markets grid. -#}
   <div id="watchlist-grid" class="luckycat-watchlist-empty">
     {% call empty_state(icon="star", title="No starred markets yet") %}
-    <p>Tap the <span class="luckycat-watchlist-empty__star" aria-hidden="true">☆</span> on any market card (or a market's detail page) to add it to your watchlist. Starred markets gather here for a one-glance view.</p>
+    <p>Tap the <span class="luckycat-watchlist-empty__star" aria-hidden="true">☆</span> on any market card (or a market's detail page) to add it to your favorites. Starred markets gather here for a one-glance view.</p>
     <p>
       <a class="chirpui-btn chirpui-btn--primary" href="/"
          hx-target="#main" hx-select="#page-content" hx-swap="innerHTML">Browse markets</a>

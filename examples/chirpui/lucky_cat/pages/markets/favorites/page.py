@@ -1,6 +1,10 @@
-"""Watchlist — GET /watchlist.
+"""Favorites — GET /markets/favorites.
 
-The rail's first FUNCTIONAL filter lane: a starred-only view of the markets grid.
+The starred-only view of the markets grid — one of the four FIXED Markets
+destinations (Home / Favorites / Trending / Research). Moved here from the old
+``/watchlist`` route (#282); the rail's Favorites lane links here and the live
+``#watchlist-count`` badge OOB still updates after a star toggle on any page.
+
 It reuses the landing grid's ``market_grid`` def (single source of truth for the
 card markup + the per-card star) over the markets the user has starred via the
 ``/watchlist/toggle`` route, with a polished empty state when nothing is starred.
@@ -17,10 +21,10 @@ from chirp import Page, login_required
 @login_required
 def get(markets, tickers, sparklines, watchlist_starred) -> Page:
     # Filter the full markets list to the starred set, preserving the canonical
-    # market order (so the watchlist reads in the same order as the landing grid).
+    # market order (so favorites read in the same order as the landing grid).
     starred_markets = tuple(m for m in markets if m.symbol in watchlist_starred)
     return Page(
-        "watchlist/page.html",
+        "markets/favorites/page.html",
         "page_content",
         page_block_name="page_root",
         starred_markets=starred_markets,

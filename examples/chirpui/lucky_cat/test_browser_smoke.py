@@ -69,7 +69,7 @@ _ENV_BASE_URL = "LUCKY_CAT_BASE_URL"
 _DEMO_USERNAME = "neko"
 _DEMO_PASSWORD = "luckycat"  # demo-only credential, shown on the login page
 # Paths that require a signed-in session (vs. the public ``/`` markets grid).
-_GATED_PATHS = frozenset({"/portfolio", "/trade"})
+_GATED_PATHS = frozenset({"/portfolio", "/trade", "/markets/favorites"})
 
 
 def _free_port() -> int:
@@ -235,7 +235,18 @@ def _sign_in(page) -> None:
     page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
 
 
-@pytest.mark.parametrize("path", ["/", "/portfolio", "/trade"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/markets",
+        "/markets/trending",
+        "/markets/research",
+        "/markets/favorites",
+        "/portfolio",
+        "/trade",
+    ],
+)
 def test_pages_load_with_zero_console_errors(browser, base_url: str, path: str) -> None:
     """Each shell page paints with no console errors and no page errors.
 
@@ -301,6 +312,39 @@ def test_inner_rail_subnav_navigates(browser, base_url: str) -> None:
         assert "404" not in body, body[:300]
         assert "Not Found" not in body, body[:300]
         assert not errors, f"sub-nav produced browser errors: {errors}"
+    finally:
+        context.close()
+
+
+@pytest.mark.issue(279)
+def test_trending_segment_swap_stays_in_region(browser, base_url: str) -> None:
+    """Markets IA (#279): a Trending segment toggle does a LOCAL boosted swap of
+    #movers-region — it must NOT navigate the whole page or nest the shell.
+
+    This is the FOOTGUN #2 guard in a real browser: the segment control inherits
+    hx-target=#main / hx-select=#page-content from the shell and self-overrides to
+    #movers-region; if the override were missing the click would swap the whole
+    page-content (or nest the shell) instead of just the movers list. Public route."""
+    context, page, errors = _new_page_with_console_capture(browser, base_url)
+    try:
+        page.goto("/markets/trending", wait_until="load")
+        page.wait_for_selector("#movers-region", timeout=_ACTION_TIMEOUT_MS)
+        # Click the Losers segment (default is Gainers) and wait for the region's
+        # own hx-get to land — scope to the visible control (the mobile drawer
+        # may carry a hidden twin).
+        losers = page.locator('#movers-region button[hx-get*="seg=losers"]:visible').first
+        losers.wait_for(state="visible", timeout=_ACTION_TIMEOUT_MS)
+        losers.click()
+        # The region now marks Losers active — proves the swap landed in-region.
+        page.wait_for_selector('#movers-region button[hx-get*="seg=losers"][aria-pressed="true"]')
+        # Still exactly one shell, none nested in #main, and the URL did NOT do a
+        # full page change away from /markets/trending.
+        assert page.evaluate("() => document.querySelectorAll('.chirpui-app-shell').length") == 1
+        assert (
+            page.evaluate("() => document.querySelectorAll('#main .chirpui-app-shell').length") == 0
+        )
+        assert "/markets/trending" in page.url
+        assert not errors, f"trending segment swap produced browser errors: {errors}"
     finally:
         context.close()
 

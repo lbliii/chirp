@@ -18,6 +18,8 @@ Coverage:
 
 import re
 
+import pytest
+
 from chirp.testing import TestClient
 from tests.helpers.auth import (
     csrf_post,
@@ -142,14 +144,19 @@ class TestWatchlistStore:
 
 
 class TestWatchlistPage:
-    """GET /watchlist renders the starred-only grid + the empty state."""
+    """GET /markets/favorites renders the starred-only grid + the empty state.
 
+    Favorites moved from /watchlist → /markets/favorites (#282); the page reuses
+    the same market_grid + empty-state markup.
+    """
+
+    @pytest.mark.issue(282)
     async def test_empty_shows_polished_empty_state(self, example_app) -> None:
         """With nothing starred (seed state), the polished maneki empty state shows
         — and never asserts data it does not render."""
         async with TestClient(example_app) as client:
             cookie = await _login(client)
-            response = await client.get("/watchlist", headers=_cookie_header(cookie))
+            response = await client.get("/markets/favorites", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "<html" in response.text
             assert "No starred markets yet" in response.text
@@ -159,6 +166,23 @@ class TestWatchlistPage:
             assert "luckycat-market-card-cell" not in response.text
             assert "{{" not in response.text
             assert "{%" not in response.text
+
+    @pytest.mark.issue(282)
+    async def test_old_watchlist_url_redirects_to_favorites(self, example_app) -> None:
+        """The starred-markets VIEW moved from /watchlist → /markets/favorites
+        (#282), so a stale bookmark / external link to /watchlist must NOT 404 —
+        it permanently redirects to the new Favorites destination. 308 (Permanent
+        Redirect) preserves the method and tells crawlers the move is for good.
+        The mutating /watchlist/toggle POST is unaffected (only the GET page moved).
+        """
+        async with TestClient(example_app) as client:
+            response = await client.get("/watchlist")
+        assert response.status == 308, "old /watchlist must permanently redirect, not 404"
+        location = next(
+            (v for k, v in response.headers if k.lower() == "location"),
+            None,
+        )
+        assert location == "/markets/favorites", location
 
     async def test_renders_only_starred_markets(self, example_app) -> None:
         """With a subset starred, the grid renders exactly those markets — not the
@@ -182,7 +206,7 @@ class TestWatchlistPage:
                 data={"symbol": "SOL-MEOW"},
             )
             assert watchlist.symbols() == frozenset({"BTC-MEOW", "SOL-MEOW"})
-            response = await client.get("/watchlist", headers=_cookie_header(cookie))
+            response = await client.get("/markets/favorites", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
             assert 'id="watchlist-grid"' in html
@@ -216,7 +240,7 @@ class TestWatchlistPage:
                 data={"symbol": "BTC-MEOW"},
             )
             assert watchlist.contains("BTC-MEOW") is True
-            response = await client.get("/watchlist", headers=_cookie_header(cookie))
+            response = await client.get("/markets/favorites", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="watchlist-star-BTC-MEOW"' in response.text
             assert 'aria-pressed="true"' in response.text
@@ -288,10 +312,18 @@ class TestWatchlistToggle:
             assert watchlist.contains("ETH-MEOW") is False
             assert watchlist.count() == 0
 
+    @pytest.mark.issue(281)
     async def test_toggle_overrides_inherited_outlet(self, example_app) -> None:
         """FOOTGUN #2: the star control must override the inherited boosted-shell
         outlet (hx-target=#main / hx-select=#page-content) with hx-swap="none" +
-        hx-select of its OWN fragment id, or the toggle churns #main."""
+        hx-select of its OWN fragment id, or the toggle churns #main.
+
+        #281 (PR7): the landing is the curated lobby, so star BTC-MEOW first to put
+        its card in the watchlist preview (the macro markup is identical wherever a
+        card renders; this exercises the real toggle control's self-override)."""
+        import watchlist
+
+        watchlist.add("BTC-MEOW")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             response = await client.get("/", headers=_cookie_header(cookie))
@@ -305,11 +337,13 @@ class TestWatchlistToggle:
             assert 'hx-select="#page-content"' not in star_tag
             assert 'hx-post="/watchlist/toggle"' in star_tag
 
-    async def test_unstar_on_watchlist_removes_card_live(self, example_app) -> None:
-        """Unstarring a market WHILE ON /watchlist appends a THIRD OOB twin that
-        removes the now-unstarred card cell live (hx-swap-oob="delete" on
+    @pytest.mark.issue(282)
+    async def test_unstar_on_favorites_removes_card_live(self, example_app) -> None:
+        """Unstarring a market WHILE ON /markets/favorites appends a THIRD OOB twin
+        that removes the now-unstarred card cell live (hx-swap-oob="delete" on
         #luckycat-card-{symbol}), so the starred-only grid stays a one-glance view
-        rather than leaving a stale ☆ card until reload."""
+        rather than leaving a stale ☆ card until reload. (The prune now keys off
+        the moved /markets/favorites path, #282.)"""
         import watchlist
 
         watchlist.add("BTC-MEOW")
@@ -321,7 +355,7 @@ class TestWatchlistToggle:
                 cookie=cookie,
                 cookie_name=_SESSION_COOKIE,
                 data={"symbol": "BTC-MEOW"},
-                extra_headers={"HX-Current-URL": "http://testserver/watchlist"},
+                extra_headers={"HX-Current-URL": "http://testserver/markets/favorites"},
             )
             assert response.status == 200
             body = response.text
@@ -336,9 +370,11 @@ class TestWatchlistToggle:
             assert "{{" not in body
             assert "{%" not in body
 
-    async def test_unstar_off_watchlist_keeps_card(self, example_app) -> None:
-        """Unstarring from the LANDING (not /watchlist) does NOT remove the card —
-        the toggle stays reversible in place everywhere except /watchlist."""
+    @pytest.mark.issue(282)
+    async def test_unstar_off_favorites_keeps_card(self, example_app) -> None:
+        """Unstarring from the LANDING (not /markets/favorites) does NOT remove the
+        card — the toggle stays reversible in place everywhere except the Favorites
+        grid (#282)."""
         import watchlist
 
         watchlist.add("ETH-MEOW")
@@ -358,9 +394,10 @@ class TestWatchlistToggle:
             # No card-removal twin off /watchlist — the card stays reversible.
             assert 'hx-swap-oob="delete"' not in body
 
-    async def test_star_on_watchlist_does_not_remove_card(self, example_app) -> None:
-        """STARRING (not unstarring) on /watchlist never emits a removal twin —
-        only the unstar transition prunes the starred-only grid."""
+    @pytest.mark.issue(282)
+    async def test_star_on_favorites_does_not_remove_card(self, example_app) -> None:
+        """STARRING (not unstarring) on /markets/favorites never emits a removal
+        twin — only the unstar transition prunes the starred-only grid."""
         import watchlist
 
         async with TestClient(example_app) as client:
@@ -371,7 +408,7 @@ class TestWatchlistToggle:
                 cookie=cookie,
                 cookie_name=_SESSION_COOKIE,
                 data={"symbol": "DOGE-MEOW"},
-                extra_headers={"HX-Current-URL": "http://testserver/watchlist"},
+                extra_headers={"HX-Current-URL": "http://testserver/markets/favorites"},
             )
             assert response.status == 200
             assert watchlist.contains("DOGE-MEOW") is True
@@ -407,12 +444,22 @@ class TestWatchlistStarMarkup:
     """The star control's markup contract — including the FOOTGUN #1 regression
     guard that the star is never nested inside the card <a>."""
 
+    @pytest.mark.issue(281)
     async def test_landing_cards_carry_a_star(self, example_app) -> None:
-        """Every landing card carries a star — component-gated by current_user():
+        """Every lobby card carries a star — component-gated by current_user():
         anonymous gets a "sign in to star" <a href="/login"> (a visible
         affordance, never a swallowed 302), signed-in gets the real toggle
         <button id="watchlist-star-{symbol}">. Both forms are SIBLINGS of the card
-        <a href="/markets/{symbol}"> (FOOTGUN #1), never descendants."""
+        <a href="/markets/{symbol}"> (FOOTGUN #1), never descendants.
+
+        #281 (PR7): the landing is now the curated lobby, NOT the full grid — the
+        card-bearing regions are the featured card + the watchlist preview, so the
+        signed-in case stars markets to populate the preview (the anonymous case
+        renders the featured card). The macro markup is shared, so the contract is
+        identical to the old grid; only the number/source of cards changed.
+        """
+        import watchlist
+
         async with TestClient(example_app) as client:
             # ANONYMOUS — the star is the sign-in login link, not a toggle button.
             anon = await client.get("/")
@@ -422,19 +469,23 @@ class TestWatchlistStarMarkup:
             assert "luckycat-market-card-cell" in anon_html
             # Anonymous gets the sign-in star (<a href="/login">), NOT the toggle.
             assert "luckycat-watchlist-star--signin" in anon_html
-            assert 'id="watchlist-star-BTC-MEOW"' not in anon_html
+            assert 'id="watchlist-star-' not in anon_html
             # The sign-in star is a SIBLING of the card <a>, never nested inside it.
             anon_anchors = re.findall(
                 r'<a class="luckycat-market-card[^"]*"\s+href="/markets/[^"]+">(.*?)</a>',
                 anon_html,
                 re.S,
             )
-            assert len(anon_anchors) >= 4, "market card anchors not found — crawl is vacuous"
+            # The lobby always renders the featured card (>= 1).
+            assert len(anon_anchors) >= 1, "lobby card anchors not found — crawl is vacuous"
             assert not [a for a in anon_anchors if "luckycat-watchlist-star" in a], (
                 "anonymous sign-in star is nested INSIDE a market card <a> (FOOTGUN #1)"
             )
 
-            # SIGNED IN — the star is the real toggle button with the per-card id.
+            # SIGNED IN — star markets so the watchlist preview populates, then the
+            # star is the real toggle button with the per-card id.
+            watchlist.add("BTC-MEOW")
+            watchlist.add("SOL-MEOW")
             cookie = await _login(client)
             authed = await client.get("/", headers=_cookie_header(cookie))
             assert authed.status == 200
@@ -442,6 +493,7 @@ class TestWatchlistStarMarkup:
             assert "luckycat-watchlist-star" in authed_html
             # Each card lives in a relative wrapper holding the card + sibling star.
             assert "luckycat-market-card-cell" in authed_html
+            # A starred market shows in the watchlist preview as a real toggle.
             assert 'id="watchlist-star-BTC-MEOW"' in authed_html
             assert "luckycat-watchlist-star--signin" not in authed_html
             # The toggle button is a SIBLING of the card <a>, never nested inside it.
@@ -450,16 +502,21 @@ class TestWatchlistStarMarkup:
                 authed_html,
                 re.S,
             )
-            assert len(authed_anchors) >= 4, "market card anchors not found — crawl is vacuous"
+            assert len(authed_anchors) >= 1, "lobby card anchors not found — crawl is vacuous"
             assert not [a for a in authed_anchors if "luckycat-watchlist-star" in a], (
                 "signed-in toggle star is nested INSIDE a market card <a> (FOOTGUN #1)"
             )
 
+    @pytest.mark.issue(281)
     async def test_star_is_not_descendant_of_card_anchor(self, example_app) -> None:
         """FOOTGUN #1 regression guard: a <button> inside the full-card <a> is
         invalid HTML and HIJACKS navigation. The star MUST be a SIBLING of the
         card <a>, not a descendant. Parse every market-card anchor's inner HTML
-        and assert no watchlist-star button lives inside it."""
+        and assert no watchlist-star button lives inside it.
+
+        #281 (PR7): the landing is the curated lobby — the featured card always
+        renders (>= 1 card anchor), so the invariant is still exercised against
+        real cards; only the card count/source changed, not the macro contract."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             html = response.text
@@ -468,7 +525,7 @@ class TestWatchlistStarMarkup:
                 html,
                 re.S,
             )
-            assert len(anchors) >= 4, "market card anchors not found — crawl is vacuous"
+            assert len(anchors) >= 1, "lobby card anchors not found — crawl is vacuous"
             offenders = [a for a in anchors if "luckycat-watchlist-star" in a]
             assert not offenders, (
                 "watchlist star <button> is nested INSIDE a market card <a> "
@@ -510,24 +567,30 @@ class TestWatchlistStarMarkup:
 
 
 class TestWatchlistRailLane:
-    """The rail's Watchlist filter lane renders with the live count badge."""
+    """The rail's Favorites destination renders with the live count badge."""
 
-    async def test_rail_renders_watchlist_lane(self, example_app) -> None:
-        """The Markets-room inner rail carries a Watchlist lane linking to the real
-        /watchlist page, with the #watchlist-count OOB target for the badge."""
+    @pytest.mark.issue(282)
+    async def test_rail_renders_favorites_lane(self, example_app) -> None:
+        """The Markets-room inner rail carries a Favorites destination linking to
+        the moved /markets/favorites page, with the #watchlist-count OOB target for
+        the badge. The other fixed destinations (Home / Trending / Research) ship
+        alongside it; the old /watchlist href is gone (#282)."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
             html = response.text
-            # The functional Watchlist lane (a real link, not a cosmetic filter).
-            assert 'href="/watchlist"' in html
-            assert ">Watchlist</span>" in html
-            # The count OOB target lives in the rail (fail-loud: a real id).
+            # The Favorites destination (a real link to the moved page).
+            assert 'href="/markets/favorites"' in html
+            assert ">Favorites</span>" in html
+            # The old /watchlist href is gone repo-wide.
+            assert 'href="/watchlist"' not in html
+            # The count OOB target still lives in the rail (fail-loud: a real id),
+            # so a star toggle's count twin lands.
             assert 'id="watchlist-count"' in html
-            # The "All markets" lane (returns to the landing) still ships below it.
-            # The old cosmetic Gainers/Losers no-op lanes were removed — the rail
-            # must never advertise a dead-end /#gainers anchor.
-            assert "All markets" in html
+            # The fixed destinations replaced the old market list + Filters lane.
+            assert 'href="/markets/trending"' in html
+            assert 'href="/markets/research"' in html
+            assert "All markets" not in html
             assert ">Gainers</span>" not in html
             assert ">Losers</span>" not in html
 
@@ -560,3 +623,38 @@ class TestWatchlistRailLane:
             assert count_el is not None
             # No badge pill when the watchlist is empty.
             assert "luckycat-watchlist-count" not in count_el.group(1)
+
+    @pytest.mark.issue(282)
+    async def test_count_badge_oob_updates_after_toggle_and_favorites_resolves(
+        self, example_app
+    ) -> None:
+        """Acceptance (#282): after the /watchlist → /markets/favorites MOVE, a star
+        toggle's live count badge OOB still updates (the detached-badge regression
+        the move risked), AND the moved Favorites page resolves and renders the
+        starred card. Proves the count twin + the page were not decoupled by the
+        move."""
+        async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            # The rail badge starts empty (nothing starred).
+            rail = await client.get("/", headers=_cookie_header(cookie))
+            assert 'id="watchlist-count"' in rail.text
+
+            # Toggle a star — the count twin must come back with the new tally.
+            toggle, cookie = await csrf_post(
+                client,
+                "/watchlist/toggle",
+                cookie=cookie,
+                cookie_name=_SESSION_COOKIE,
+                data={"symbol": "BTC-MEOW"},
+            )
+            assert toggle.status == 200
+            # The live count badge OOB twin updated (#watchlist-count, innerHTML, 1).
+            assert 'id="watchlist-count"' in toggle.text
+            assert 'hx-swap-oob="innerHTML"' in toggle.text
+            assert ">1<" in toggle.text or "1</span>" in toggle.text
+
+            # The moved Favorites page resolves and renders the starred card.
+            favorites = await client.get("/markets/favorites", headers=_cookie_header(cookie))
+            assert favorites.status == 200
+            assert 'id="watchlist-star-BTC-MEOW"' in favorites.text
+            assert "No starred markets yet" not in favorites.text

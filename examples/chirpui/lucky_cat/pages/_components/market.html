@@ -1,6 +1,6 @@
 {#- Reusable market-card components — the single source of truth for the market
     grid + per-card sparkline + the watchlist star, shared by the landing
-    (page.html), the /watchlist page, and the market-detail header. Lives in
+    (page.html), the /markets/favorites page, and the market-detail header. Lives in
     _components/ (NOT page.html) so importing these macros never evaluates a
     page's top-level blocks (which reference per-route context like `markets`).
 
@@ -110,8 +110,8 @@
 {% endfragment %}
 
 {#- OOB card-removal twin — appended by /watchlist/toggle ONLY when the toggle
-    originated on /watchlist AND resulted in unstarred, so the now-unstarred card
-    leaves the starred-only grid live (the "one-glance starred view" promise). It
+    originated on /markets/favorites AND resulted in unstarred, so the now-unstarred
+    card leaves the starred-only grid live (the "one-glance starred view" promise). It
     bakes the #luckycat-card-{symbol} id + hx-swap-oob="delete": htmx removes the
     matching cell. Fail-loud-friendly: the id only exists on the grid pages, so on
     a detail page the delete simply finds no target (a harmless no-op), mirroring
@@ -121,16 +121,16 @@
 {% endfragment %}
 
 {#- One market card — the single source of truth for a card on BOTH the landing
-    grid and the /watchlist page, so the card markup + star can never drift. The
+    grid and the /markets/favorites page, so the card markup + star can never drift. The
     full-card <a href="/markets/{symbol}"> and the star <button> are SIBLINGS
     inside a position:relative .luckycat-market-card-cell wrapper (FOOTGUN #1:
     the star is NEVER a descendant of the card <a>). `starred` lights the star
     gold + sets aria-pressed. -#}
 {% def market_card(market, t, spark, starred=false) %}
 {% set _up = (t ?? none) is not none and t.change_pct_24h >= 0 %}
-{#- The per-symbol cell id is the OOB-delete target for the unstar-on-/watchlist
-    polish: when a user unstars a market WHILE on /watchlist, the toggle route
-    appends a third OOB fragment that removes THIS cell (hx-swap-oob="delete") so
+{#- The per-symbol cell id is the OOB-delete target for the unstar-on-Favorites
+    polish: when a user unstars a market WHILE on /markets/favorites, the toggle
+    route appends a third OOB fragment that removes THIS cell (hx-swap-oob="delete") so
     the now-unstarred card leaves the starred-only grid live. The id only exists
     on the grid pages, so that delete is a harmless no-op on a detail page (the
     OOB fail-loud delete simply finds no target there) — same pattern the cancel
@@ -166,10 +166,10 @@
 {% end %}
 
 {#- The full markets grid — the single source of truth for BOTH the landing grid
-    and the /watchlist page. `markets` is the (possibly filtered) market list;
-    `tickers` / `sparklines` key off symbol; `starred` is the immutable starred
-    set the per-card star reads. The grid id defaults to #markets-grid (the
-    landing) but the watchlist page passes its own. -#}
+    and the /markets/favorites page. `markets` is the (possibly filtered) market
+    list; `tickers` / `sparklines` key off symbol; `starred` is the immutable
+    starred set the per-card star reads. The grid id defaults to #markets-grid (the
+    landing) but the Favorites page passes its own. -#}
 {% def market_grid(markets, tickers, sparklines, starred=(), grid_id="markets-grid") %}
 <div id="{{ grid_id }}" class="luckycat-markets-grid">
   {% set _starred_set = starred ?? () %}

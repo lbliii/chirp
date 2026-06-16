@@ -53,7 +53,9 @@ _GATED_PATHS = (
     "/portfolio",
     "/portfolio/orders",
     "/activity",
-    "/watchlist",
+    # Favorites is gated (moved from /watchlist → /markets/favorites, #282); the
+    # gate moved with the page, so the anon-redirect contract still holds.
+    "/markets/favorites",
     "/settings",
 )
 

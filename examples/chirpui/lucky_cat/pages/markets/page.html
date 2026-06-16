@@ -1,0 +1,260 @@
+{#- Markets Home — the CURATED, BOUNDED lobby (#281, PR7). One of the five fixed
+    Markets destinations. NOT the full catalog (that lives in Research): a stat
+    strip, a small top-movers preview, a watchlist preview, a featured market, and
+    a CTA into Research. Rendered by BOTH GET / (pages/page.py) and GET /markets
+    (pages/markets/page.py) via this SAME template — / is an ALIAS for /markets
+    (no redirect), and lobby.lobby_context is the single shared source so the two
+    routes can never drift.
+
+    Composes into the chirp-ui shell content block like every other page.
+
+    DUPLICATE-ID FOOTGUN (RFC §risks): the only regions that emit
+    #luckycat-card-{symbol} / #watchlist-star-{symbol} are the featured card and
+    the watchlist-preview cards (both via market_card). lobby.py DE-DUPES them (the
+    featured symbol is dropped from the watchlist preview), and the movers preview
+    is rendered as coin-detail LINKS (never market_card), so it carries no
+    card/star ids and can never collide. The no-duplicate-id invariant is pinned by
+    test_lobby.py + test_app.py::TestLanding.
+
+    BOOSTED LINKS: every in-shell link (movers rows, featured card CTA, the
+    section "see all" links, the Research CTA) carries the FULL shell-outlet
+    contract via shell_outlet_attrs() (target #main, swap innerHTML, select
+    #page-content, sync #main:replace) — a bare hx-target without hx-select nests
+    the whole shell inside #main (#298). market_card's own <a href> is a plain
+    link (the grid pages have always relied on hx-boost inheritance for those); the
+    bespoke lobby links below opt into the explicit contract. -#}
+{% imports %}
+  {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/modal.html" import modal %}
+  {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
+  {#- Card + sparkline + star — the single source of truth for the card markup,
+      shared with the landing grid history, /markets/favorites, and the detail
+      header (see _components/market.html). -#}
+  {% from "_components/market.html" import market_card, sparkline %}
+{% end %}
+
+{% block page_root %}
+<div id="page-root">
+{% block page_root_inner %}
+{% block page_content %}
+<div class="luckycat-page">
+  <header class="luckycat-page__header">
+    <h1 class="luckycat-page__title">
+      <span class="luckycat-page__cat" aria-hidden="true">🐱</span>
+      Markets
+    </h1>
+    <p class="luckycat-page__tagline chirpui-text-muted">
+      May the lucky paw move your charts. Trades settle in $MEOW.
+    </p>
+  </header>
+
+  {% set _stats = stats ?? none %}
+  {% if (_stats ?? none) is none or _stats.count == 0 %}
+  {#- Empty catalog — the trading floor is being set up (the #221 empty-state copy
+      kept so the no-markets path still reads as a polished maneki state). -#}
+  <div id="markets-lobby" class="luckycat-lobby">
+    {% call empty_state(icon="diamond", title="No markets open yet") %}
+    <p>The trading floor is being set up. Markets arrive with the SimFeed.</p>
+    <p class="luckycat-empty__paw" aria-hidden="true">🐾</p>
+    {% end %}
+  </div>
+  {% else %}
+  <div id="markets-lobby" class="luckycat-lobby">
+
+    {#- STAT STRIP — the aggregate market snapshot (ranking.market_stats). One
+        glance: how many markets, total notional volume, advancers vs decliners. -#}
+    <section class="luckycat-lobby__strip" aria-label="Market overview">
+      <div class="luckycat-stat">
+        <span class="luckycat-stat__label chirpui-text-muted">Markets</span>
+        <span class="luckycat-stat__value">{{ _stats.count }}</span>
+      </div>
+      <div class="luckycat-stat">
+        <span class="luckycat-stat__label chirpui-text-muted">24h volume</span>
+        <span class="luckycat-stat__value">{{ _stats.total_volume | round(0) }} $MEOW</span>
+      </div>
+      <div class="luckycat-stat">
+        <span class="luckycat-stat__label chirpui-text-muted">Advancers</span>
+        <span class="luckycat-stat__value is-up">▲ {{ _stats.advancers }}</span>
+      </div>
+      <div class="luckycat-stat">
+        <span class="luckycat-stat__label chirpui-text-muted">Decliners</span>
+        <span class="luckycat-stat__value is-down">▼ {{ _stats.decliners }}</span>
+      </div>
+    </section>
+
+    <div class="luckycat-lobby__cols">
+
+      {#- FEATURED — the headline mover (the catalog's top gainer), as a card.
+          This is one of only two regions that emit #luckycat-card-{symbol} /
+          #watchlist-star-{symbol}; lobby.py de-dupes the featured symbol out of
+          the watchlist preview so the ids never repeat. -#}
+      {% set _featured = featured_market ?? none %}
+      {% if (_featured ?? none) is not none %}
+      <section class="luckycat-lobby__featured" aria-label="Featured market">
+        <h2 class="luckycat-lobby__heading">
+          <span aria-hidden="true">⭐</span> Featured
+        </h2>
+        <div class="luckycat-markets-grid luckycat-lobby__featured-grid">
+          {{ market_card(
+               _featured,
+               (tickers ?? {}).get(_featured.symbol, none),
+               (sparklines ?? {}).get(_featured.symbol, none),
+               _featured.symbol in (watchlist_starred | default(()))
+             ) }}
+        </div>
+      </section>
+      {% end %}
+
+      {#- WATCHLIST PREVIEW — the user's starred markets (capped), as cards. The
+          second (and last) region that emits #luckycat-card / #watchlist-star ids;
+          de-duped against the featured symbol in lobby.py. Empty for a fresh /
+          anonymous user (nothing starred) — show a CTA to star markets. -#}
+      <section class="luckycat-lobby__watchlist" aria-label="Your watchlist">
+        <h2 class="luckycat-lobby__heading">
+          <span aria-hidden="true">★</span> Watchlist
+          <a class="luckycat-lobby__see-all"
+             href="{{ favorites_href ?? '/markets/favorites' }}" {{ shell_outlet_attrs() }}>See all</a>
+        </h2>
+        {% set _watch = watchlist_preview | default(()) %}
+        {% if (_watch | length) > 0 %}
+        <div class="luckycat-markets-grid luckycat-lobby__watchlist-grid">
+          {% for market in _watch %}
+          {{ market_card(
+               market,
+               (tickers ?? {}).get(market.symbol, none),
+               (sparklines ?? {}).get(market.symbol, none),
+               true
+             ) }}
+          {% end %}
+        </div>
+        {% else %}
+        <p class="chirpui-text-muted luckycat-lobby__empty">
+          No starred markets yet. Tap the ☆ on any card to add one — they gather in
+          <a class="luckycat-trending__link" href="{{ favorites_href ?? '/markets/favorites' }}"
+             {{ shell_outlet_attrs() }}>Favorites</a>.
+        </p>
+        {% end %}
+      </section>
+
+    </div>
+
+    {#- TOP-MOVERS PREVIEW — a few each of Gainers / Losers / Volume, as compact
+        coin-detail LINKS (never market_card), so this whole region carries NO
+        card/star ids and can never collide with the card regions above. Each panel
+        teases the matching Trending segment. -#}
+    <section class="luckycat-lobby__movers" aria-label="Top movers">
+      <h2 class="luckycat-lobby__heading">
+        <span aria-hidden="true">🔥</span> Movers
+        <a class="luckycat-lobby__see-all"
+           href="{{ trending_href ?? '/markets/trending' }}" {{ shell_outlet_attrs() }}>See all</a>
+      </h2>
+      <div class="luckycat-lobby__movers-grid">
+        {% for seg in movers | default(()) %}
+        <div class="luckycat-lobby__movers-panel">
+          <h3 class="luckycat-lobby__movers-title">
+            <a class="luckycat-trending__link" href="{{ seg.href }}" {{ shell_outlet_attrs() }}>{{ seg.label }}</a>
+          </h3>
+          {% set _rows = seg.rows | default(()) %}
+          {% if (_rows | length) > 0 %}
+          <ul class="luckycat-lobby__movers-list">
+            {% for row in _rows %}
+            {% set _up = row.change_pct >= 0 %}
+            <li class="luckycat-lobby__movers-row">
+              <a class="luckycat-trending__link luckycat-lobby__movers-link"
+                 href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>
+                <span class="luckycat-lobby__movers-sym">{{ row.symbol }}</span>
+                <span class="luckycat-lobby__movers-price chirpui-text-muted">{{ row.price }} $MEOW</span>
+                <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">
+                  <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if _up else '▼' }}</span>
+                  {{ '+' if _up else '' }}{{ row.change_pct }}%
+                </span>
+              </a>
+            </li>
+            {% end %}
+          </ul>
+          {% else %}
+          <p class="chirpui-text-muted luckycat-lobby__empty">No markets to rank yet.</p>
+          {% end %}
+        </div>
+        {% end %}
+      </div>
+    </section>
+
+    {#- CTA into Research — the scalable home for the full 500+ coin catalog
+        (filtered / sorted / sliced server-side). The lobby is deliberately
+        bounded; the full grid lives there now. -#}
+    <section class="luckycat-lobby__cta" aria-label="Explore all markets">
+      <div class="luckycat-lobby__cta-body">
+        <h2 class="luckycat-lobby__heading">Looking for a specific coin?</h2>
+        <p class="chirpui-text-muted">
+          Research is the full catalog — search, filter by sector / price / change /
+          volume, sort any column, and compare. Built to scale past 500 markets.
+        </p>
+      </div>
+      <a class="chirpui-btn chirpui-btn--primary luckycat-lobby__cta-btn"
+         href="{{ research_href ?? '/markets/research' }}" {{ shell_outlet_attrs() }}>
+        Open Research
+      </a>
+    </section>
+
+  </div>
+  {% end %}
+</div>
+
+{#- Deposit is a signed-in account action, so the modal + its click delegator
+    render only when authenticated (the Deposit trigger itself is gated in
+    _context.py). Keeping the dialog out of the anonymous DOM avoids an orphan
+    modal for an account the visitor has not signed into. Lives here on the Home
+    lobby (the landing both / and /markets render) — the same place it lived on
+    the retired full-grid landing — because page templates injected into the
+    shell `content` region cannot add page_scripts (the composition rule), so
+    anything inline ships inside #page-root. The topbar's data-action="deposit"
+    button (rendered by chirpui/shell_actions.html from the root _context.py)
+    opens this dialog; the form POSTs to /deposit and the route
+    app.emit('balance', …) fans the new balance out over the one /_chirp/live
+    signal connection. CSRF is covered twice: the app-shell layout injects
+    X-CSRF-Token on htmx:configRequest (htmx path) and csrf_field() adds the
+    hidden input (plain-POST fallback). -#}
+{% if current_user().is_authenticated %}
+{% call modal("deposit-modal", title="Deposit $MEOW") %}
+<form id="deposit-form" class="chirpui-stack chirpui-stack--sm"
+      hx-post="{{ url_for('deposit') }}" hx-swap="none"
+      hx-disabled-elt="find button"
+      hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
+  {{ csrf_field() }}
+  {#- NOTE: no `{{ signal('balance') }}` binding here. A signal sink inside a
+      <dialog> that is closed at page load (then promoted to the top layer on
+      showModal()) does NOT receive htmx-ext-sse swaps — it would show a stale
+      load-time balance. The declare-once/bind-many showcase lives in normal DOM
+      flow instead: the topbar token + the Trade page "buying power" line both
+      bind {{ signal('balance') }} and update together over /_chirp/live. -#}
+  <div class="chirpui-field">
+    <label class="chirpui-field__label" for="deposit-amount">Amount ($MEOW)</label>
+    <input id="deposit-amount" class="chirpui-field__input" type="number" name="amount"
+           min="1" step="1" value="100" inputmode="numeric" required>
+  </div>
+  <p class="chirpui-text-muted chirpui-font-sm">
+    The lucky paw credits your house balance instantly. Demo only — no real funds.
+  </p>
+  <div class="chirpui-form-actions chirpui-form-actions--end">
+    <button type="button" class="chirpui-btn chirpui-btn--ghost" onclick="this.closest('dialog').close()">Cancel</button>
+    <button type="submit" class="chirpui-btn chirpui-btn--primary">Deposit</button>
+  </div>
+</form>
+{% end %}
+
+<script nonce="{{ csp_nonce() }}">
+/* Open the deposit dialog when the topbar's data-action="deposit" button is
+   clicked (the kanban data-action -> showModal delegator). Bound on body so it
+   survives boosted/OOB swaps that replace #page-root. */
+document.body.addEventListener("click", function (event) {
+  if (event.target.closest('[data-action="deposit"]')) {
+    document.getElementById("deposit-modal")?.showModal();
+  }
+});
+</script>
+{% end %}{#- /if current_user().is_authenticated — deposit modal -#}
+{% end %}
+{% end %}
+</div>
+{% end %}

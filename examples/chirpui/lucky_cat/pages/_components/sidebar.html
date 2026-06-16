@@ -113,7 +113,7 @@
     (elbysodic fidelity) and renders server-computed `active`/`badge` directly
     rather than re-deriving from `match=`.
 
-    The Watchlist filter lane (`item.key == "flt:watchlist"`) is special: its count
+    The Favorites destination (`item.key == "nav:favorites"`) is special: its count
     rides the #watchlist-count OOB target so the /watchlist/toggle route can keep
     the tally honest from any page (the notif_badge / open-order-count idiom). The
     count VALUE comes from the rendered NavItem.count, but the wrapper carries the
@@ -127,7 +127,7 @@
    {% if item.active %}aria-current="page"{% end %}>
   {% if item.icon %}<span class="chirpui-sidebar__icon">{{ item.icon | icon }}</span>{% end %}
   <span class="chirpui-sidebar__label">{{ item.label }}</span>
-  {% if item.key == "flt:watchlist" %}
+  {% if item.key == "nav:favorites" %}
   {#- The #watchlist-count OOB target. Its inner body is what the toggle route's
       watchlist_count_swap twin re-renders (innerHTML). -#}
   <span id="watchlist-count" class="luckycat-watchlist-count-wrap" aria-live="polite">{{ watchlist_count_body(item.count or 0) }}</span>

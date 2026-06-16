@@ -46,6 +46,10 @@ def _auth_headers(cookie: str | None) -> dict[str, str]:
 # markets). BTC-MEOW is a guaranteed SimFeed market (feed._MARKET_DEFS).
 _SEED_PAGES: tuple[str, ...] = (
     "/",
+    "/markets",
+    "/markets/trending",
+    "/markets/research",
+    "/markets/favorites",
     "/portfolio",
     "/trade",
     "/activity",

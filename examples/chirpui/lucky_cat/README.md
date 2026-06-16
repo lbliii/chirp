@@ -22,10 +22,13 @@ rail whose sections change with where you are), and a mobile drawer. Boosted
 navigation swaps only `#main` and the rail re-renders server-side from the current
 path; `view_transitions="htmx"` animates the swaps.
 
-**Markets & detail** (`Page`, `EventStream`) — a markets grid and a per-market
-detail page with an interactive gradient price chart (server-rendered SVG, no JS
-chart library), a depth-bar order book, and a recent-trades tape. Each detail page
-opens its own `EventStream` that pushes OOB fragment swaps as ticks arrive.
+**Markets & detail** (`Page`, `EventStream`) — a curated Markets Home lobby (stat
+strip + top-movers / watchlist previews + a featured market + a Research CTA;
+`/markets`, with `/` as an alias) plus Trending, Research, and Favorites as the
+other fixed Markets destinations, and a per-market detail page with an interactive
+gradient price chart (server-rendered SVG, no JS chart library), a depth-bar order
+book, and a recent-trades tape. Each detail page opens its own `EventStream` that
+pushes OOB fragment swaps as ticks arrive.
 
 **Live cross-page chrome** (`signal()`) — the ticker, the $MEOW balance, and the
 notifications bell are server-owned reactive **signals** fanned out over **one**
@@ -66,7 +69,7 @@ coin's detail page, but the account section and every mutation require sign-in. 
 shows the full range of gating, not a blanket lock:
 
 - **Full-page gating** — `@login_required` on the account pages (`/trade`,
-  `/portfolio`, `/activity`, `/watchlist`, `/settings`). An anonymous visit
+  `/portfolio`, `/activity`, `/markets/favorites`, `/settings`). An anonymous visit
   redirects to `/login?next=…`, and the prefilled sign-in card returns you there.
 - **Component gating** — `current_user()` conditionals flip the chrome: the topbar
   shows "Sign in" or the user menu + Sign-out (and reveals the balance, bell, and
@@ -152,15 +155,19 @@ navigation.py     # Route-context nav model: RouteState (path-prefix *_active pr
 wallet.py         # In-memory $MEOW wallet; backs /deposit + buys, fans out as the `balance` signal
 trade_store.py    # Thread-safe trade backend: validate + atomic race-safe fills + resting limit orders
 notifications.py  # Thread-safe bell log backing the `notifications` signal + its pure derived badge/announce
-watchlist.py      # Thread-safe starred-markets set; backs the rail's Watchlist lane + /watchlist
+watchlist.py      # Thread-safe starred-markets set; backs the rail's Favorites lane + /markets/favorites
 users.py          # Single shared in-memory demo account; backs AuthMiddleware + the login flow
 shell.py          # Server-side rail-collapse cookie reader (no-flash first paint)
 feed.py           # FeedSource protocol + deterministic SimFeed (worker-pool tick fan-out)
 pages/
   _layout.html        # ChirpUI app shell: topbar, ticker, two-tier rail, auth-aware chrome
   _context.py         # markets, tickers, $MEOW token, shell actions, nav model
-  page.py / page.html # markets-grid landing + the deposit modal
+  page.py             # GET / — alias rendering the Markets Home lobby (markets/page.html)
   login/              # sign-in page (ValidationError 422 / FormAction redirect)
+  markets/            # GET /markets — the curated Home lobby (page.py/.html) + the deposit modal
+  markets/favorites/  # starred-only grid (the rail's Favorites destination; moved from /watchlist)
+  markets/trending/   # gainers / losers / volume leaderboard (segmented #movers-region swaps)
+  markets/research/   # the full-catalog power surface: search + facets + sort + paginate
   markets/{symbol}/   # market detail: chart + order book + trade tape (+ live SSE twins)
   trade/  + convert/  # place/cancel-order flow + $MEOW→market convert
   portfolio/          # Suspense dashboard (+ orders, history) + the free-threading panel
