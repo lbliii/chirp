@@ -1,5 +1,6 @@
 """Tests for dead template detection in check_hypermedia_surface."""
 
+import pytest
 from kida import Environment, FileSystemLoader
 
 from chirp import App, Page
@@ -169,6 +170,7 @@ class TestDeadTemplateDetection:
         dead = _user_dead(result)
         assert len(dead) == 0
 
+    @pytest.mark.issue(237)
     def test_python_module_template_constant_not_dead(self, tmp_path):
         """Module-level template constants and helper Fragment() calls count."""
         (tmp_path / "index.html").write_text("{% block content %}ok{% endblock %}")
@@ -196,7 +198,8 @@ async def home():
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("dead_template_helper_app", app_py)
-        assert spec and spec.loader
+        assert spec is not None
+        assert spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         import sys
 

@@ -340,6 +340,7 @@ class TestAppConfig:
         finally:
             os.environ.update(env_backup)
 
+    @pytest.mark.issue(237)
     def test_from_env_kwargs_override(self) -> None:
         """from_env(**overrides) applies kwargs after env loading."""
         env_backup = _pop_app_env()

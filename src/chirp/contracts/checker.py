@@ -5,6 +5,7 @@ import inspect
 import logging
 import re
 import sys
+import types
 from typing import TYPE_CHECKING
 
 from kida import Environment
@@ -177,14 +178,16 @@ def _build_contract_schema(migrations_dir: str | None) -> SchemaSnapshot | None:
         return None
 
 
-def _handler_module(handler: object) -> object | None:
+def _handler_module(handler: object) -> types.ModuleType | None:
     """Return the user module that owns *handler*, when discoverable."""
     module = inspect.getmodule(handler)
     if module is not None:
         return module
     mod_name = getattr(handler, "__module__", None)
     if isinstance(mod_name, str):
-        return sys.modules.get(mod_name)
+        found = sys.modules.get(mod_name)
+        if isinstance(found, types.ModuleType):
+            return found
     return None
 
 
@@ -196,7 +199,7 @@ def _python_template_references(router: object) -> set[str]:
     constants count as references for dead-template detection.
     """
     referenced: set[str] = set()
-    seen_modules: set[object] = set()
+    seen_modules: set[types.ModuleType] = set()
     for route in getattr(router, "routes", []):
         handler = getattr(route, "handler", None)
         page_src = getattr(route, "page_source_handler", None)
