@@ -31,10 +31,20 @@ def check_oob_targets(
 
     Only catches statically-analyzable targets. Dynamic IDs (Kida
     expressions) are excluded by design.
+
+    Vendored ``chirpui/`` component-library templates are skipped, symmetric
+    with the id-collection loop in ``checker.py`` (which also skips
+    ``chirpui/``). The checker treats chirp-ui as opaque: its element ids are
+    never added to ``all_ids``, so scanning its OOB helper macros here would
+    always report a false-positive miss (e.g. ``context_rail_oob`` targets
+    ``chirpui-context-rail``, an id defined only in the skipped
+    ``chirpui/app_shell.html``). chirp-ui owns its own OOB-target consistency.
     """
     issues: list[ContractIssue] = []
 
     for template_name, source in template_sources.items():
+        if template_name.startswith("chirpui/"):
+            continue
         oob_ids: set[str] = set()
 
         for pattern in (_OOB_WITH_ID, _ID_WITH_OOB):

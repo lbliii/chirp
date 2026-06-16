@@ -16,7 +16,7 @@ plug into Chirp without becoming mandatory dependencies or hidden core behavior.
 ## Protect
 
 - **UI is optional.** `pyproject.toml:65-66` defines the `ui` extra as
-  `chirp-ui>=0.9.0`.
+  `chirp-ui>=0.10.0`.
 - **Public bridge is provisional.** `docs/public-api.md:54` lists
   `use_chirp_ui` as optional UI bridge.
 - **Core imports stay clean.** `chirp-ui` imports should be lazy or guarded.
