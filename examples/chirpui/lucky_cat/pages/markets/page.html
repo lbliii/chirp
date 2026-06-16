@@ -33,6 +33,140 @@
   {% from "_components/market.html" import market_card, sparkline %}
 {% end %}
 
+{#- =========================================================================
+    LIVE LOBBY REGION BODIES — the SINGLE source of truth for the three
+    market-data regions that update live over /_chirp/live (the stat strip, the
+    movers grid, and the featured spotlight). Each region is a {% def %} body PLUS
+    a matching {% fragment %}; the @app.derived signals (market_stats / movers /
+    featured, app.py) render the fragment for every live re-render AND seed the SSR
+    paint (via signal_block below), so the initial paint and the live update share
+    ONE source and can never drift — the same idiom as _layout.html's
+    ticker_strip_body / ticker_signal pair, and the detail page rendering its own
+    *_oob fragments over SSE.
+
+    FLASH: each region innerHTML-swaps on its signal_block sink, re-creating every
+    value/row on each tick; a `luckycat-flash--up` / `luckycat-flash--down` class
+    (re-fired because the element is freshly inserted, exactly like the trade-tape
+    fresh row) is baked ONLY on the values that changed direction since the previous
+    snapshot. The `dirs` map (None on the first SSR seed → no flash) carries those
+    directions; it is a pure part of the emitted snapshot, so each derived stays a
+    pure function of its input value.
+    ========================================================================= -#}
+
+{#- STAT STRIP — ranking.market_stats. 24h volume / advancers / decliners tick
+    live; the market count is structural (does not flash). -#}
+{% def stat_strip_body(stats, dirs=none) %}
+{% set _d = dirs ?? {} %}
+{% set _vf = ('luckycat-flash--up' if _d.get('volume') == 'up' else ('luckycat-flash--down' if _d.get('volume') == 'down' else '')) %}
+{% set _af = ('luckycat-flash--up' if _d.get('advancers') == 'up' else ('luckycat-flash--down' if _d.get('advancers') == 'down' else '')) %}
+{% set _df = ('luckycat-flash--up' if _d.get('decliners') == 'up' else ('luckycat-flash--down' if _d.get('decliners') == 'down' else '')) %}
+<div class="luckycat-stat">
+  <span class="luckycat-stat__label chirpui-text-muted">Markets</span>
+  <span class="luckycat-stat__value">{{ stats.count }}</span>
+</div>
+<div class="luckycat-stat">
+  <span class="luckycat-stat__label chirpui-text-muted">24h volume</span>
+  <span class="luckycat-stat__value {{ _vf }}">{{ stats.total_volume | round(0) }} $MEOW</span>
+</div>
+<div class="luckycat-stat">
+  <span class="luckycat-stat__label chirpui-text-muted">Advancers</span>
+  <span class="luckycat-stat__value is-up {{ _af }}">▲ {{ stats.advancers }}</span>
+</div>
+<div class="luckycat-stat">
+  <span class="luckycat-stat__label chirpui-text-muted">Decliners</span>
+  <span class="luckycat-stat__value is-down {{ _df }}">▼ {{ stats.decliners }}</span>
+</div>
+{% end %}
+
+{% fragment stat_strip_signal %}
+{{ stat_strip_body(stats ?? none, dirs ?? none) }}
+{% endfragment %}
+
+{#- MOVERS GRID — three panels (Gainers / Losers / Volume) that RE-RANK live.
+    Coin-detail LINKS (never market_card), so this region carries NO
+    #luckycat-card / #watchlist-star ids and can never collide with the card
+    regions. The whole grid re-renders, rows re-sort, and rows whose price moved
+    flash. -#}
+{% def movers_grid_body(movers, dirs=none) %}
+{% set _d = dirs ?? {} %}
+{% for seg in movers | default(()) %}
+<div class="luckycat-lobby__movers-panel">
+  <h3 class="luckycat-lobby__movers-title">
+    <a class="luckycat-trending__link" href="{{ seg.href }}" {{ shell_outlet_attrs() }}>{{ seg.label }}</a>
+  </h3>
+  {% set _rows = seg.rows | default(()) %}
+  {% if (_rows | length) > 0 %}
+  <ul class="luckycat-lobby__movers-list">
+    {% for row in _rows %}
+    {% set _up = row.change_pct >= 0 %}
+    {% set _rd = _d.get(row.symbol) %}
+    {% set _rf = ('luckycat-flash--up' if _rd == 'up' else ('luckycat-flash--down' if _rd == 'down' else '')) %}
+    <li class="luckycat-lobby__movers-row {{ _rf }}">
+      <a class="luckycat-trending__link luckycat-lobby__movers-link"
+         href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>
+        <span class="luckycat-lobby__movers-sym">{{ row.symbol }}</span>
+        <span class="luckycat-lobby__movers-price chirpui-text-muted">{{ row.price }} $MEOW</span>
+        <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">
+          <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if _up else '▼' }}</span>
+          {{ '+' if _up else '' }}{{ row.change_pct }}%
+        </span>
+      </a>
+    </li>
+    {% end %}
+  </ul>
+  {% else %}
+  <p class="chirpui-text-muted luckycat-lobby__empty">No markets to rank yet.</p>
+  {% end %}
+</div>
+{% end %}
+{% end %}
+
+{% fragment movers_signal %}
+{{ movers_grid_body(movers ?? (), dirs ?? none) }}
+{% endfragment %}
+
+{#- FEATURED SPOTLIGHT — the current top gainer, live. It RE-RANKS (the leader can
+    change symbol), so unlike the old featured slot it does NOT reuse market_card's
+    #luckycat-card / #watchlist-star ids (a live change to a starred coin would
+    collide with the static watchlist preview). Bespoke spotlight card — a
+    card-styled <a> with a LIVE redrawing sparkline + price/change flash, no
+    card/star ids, zero collision. -#}
+{% def featured_spotlight_body(market, t, spark, dir="") %}
+{% if (market ?? none) is not none %}
+{% set _up = (t ?? none) is not none and t.change_pct_24h >= 0 %}
+{% set _ff = ('luckycat-flash--up' if dir == 'up' else ('luckycat-flash--down' if dir == 'down' else '')) %}
+<a class="luckycat-market-card luckycat-lobby__featured-card {{ 'luckycat-market-card--up' if _up else 'luckycat-market-card--down' }}"
+   href="/markets/{{ market.symbol }}" {{ shell_outlet_attrs() }}>
+  <span class="luckycat-market-card__top">
+    <span class="luckycat-market-card__id">
+      <span class="luckycat-market-card__sym">{{ market.symbol }}</span>
+      <span class="luckycat-market-card__name chirpui-text-muted">{{ market.display_name }}</span>
+    </span>
+    {% if (t ?? none) is not none %}
+    <span class="luckycat-market-card__change {{ _ff }} {{ 'is-up' if t.change_pct_24h >= 0 else 'is-down' }}">
+      <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if t.change_pct_24h >= 0 else '▼' }}</span>
+      {{ '+' if t.change_pct_24h >= 0 else '' }}{{ t.change_pct_24h }}%
+    </span>
+    {% end %}
+  </span>
+
+  {% if (t ?? none) is not none %}
+  <span class="luckycat-market-card__price {{ _ff }}">{{ t.price }}<span class="luckycat-market-card__unit chirpui-text-muted">{{ market.quote }}</span></span>
+  {% else %}
+  <span class="luckycat-market-card__pair chirpui-text-muted chirpui-font-sm">{{ market.base }}/{{ market.quote }}</span>
+  {% end %}
+
+  <span class="luckycat-market-card__spark">
+    {{ sparkline(spark, market.symbol) }}
+  </span>
+</a>
+{% end %}
+{% end %}
+
+{% fragment featured_signal %}
+{{ featured_spotlight_body(market ?? none, t ?? none, spark ?? none, dir ?? "") }}
+{% endfragment %}
+
 {% block page_root %}
 <div id="page-root">
 {% block page_root_inner %}
@@ -62,44 +196,40 @@
   <div id="markets-lobby" class="luckycat-lobby">
 
     {#- STAT STRIP — the aggregate market snapshot (ranking.market_stats). One
-        glance: how many markets, total notional volume, advancers vs decliners. -#}
-    <section class="luckycat-lobby__strip" aria-label="Market overview">
-      <div class="luckycat-stat">
-        <span class="luckycat-stat__label chirpui-text-muted">Markets</span>
-        <span class="luckycat-stat__value">{{ _stats.count }}</span>
-      </div>
-      <div class="luckycat-stat">
-        <span class="luckycat-stat__label chirpui-text-muted">24h volume</span>
-        <span class="luckycat-stat__value">{{ _stats.total_volume | round(0) }} $MEOW</span>
-      </div>
-      <div class="luckycat-stat">
-        <span class="luckycat-stat__label chirpui-text-muted">Advancers</span>
-        <span class="luckycat-stat__value is-up">▲ {{ _stats.advancers }}</span>
-      </div>
-      <div class="luckycat-stat">
-        <span class="luckycat-stat__label chirpui-text-muted">Decliners</span>
-        <span class="luckycat-stat__value is-down">▼ {{ _stats.decliners }}</span>
-      </div>
+        glance: how many markets, total notional volume, advancers vs decliners.
+        LIVE: signal_attrs('market_stats') binds the @app.derived('market_stats')
+        projection over the one /_chirp/live connection directly on THIS grid
+        <section> (no injected wrapper — the four .luckycat-stat cells stay direct
+        grid items). The cells innerHTML-swap on every `lobby_snapshot` tick and the
+        24h volume / advancers / decliners values flash on change. SSR paints the
+        same stat_strip_body def the derived re-renders, so they never drift. -#}
+    <section class="luckycat-lobby__strip" aria-label="Market overview"
+             {{ signal_attrs('market_stats') }}>
+      {{ stat_strip_body(_stats) }}
     </section>
 
     <div class="luckycat-lobby__cols">
 
-      {#- FEATURED — the headline mover (the catalog's top gainer), as a card.
-          This is one of only two regions that emit #luckycat-card-{symbol} /
-          #watchlist-star-{symbol}; lobby.py de-dupes the featured symbol out of
-          the watchlist preview so the ids never repeat. -#}
+      {#- FEATURED — the headline mover (the catalog's top gainer), LIVE. Unlike
+          the old slot it does NOT use market_card's #luckycat-card-{symbol} /
+          #watchlist-star-{symbol} ids: the spotlight RE-RANKS (sse-swap="featured"
+          swaps in whichever coin is the current top gainer), and a live symbol
+          change to a starred coin would collide with the static watchlist preview.
+          So it is a bespoke spotlight card (featured_spotlight_body) under the
+          stable #lobby-featured sink — a card-styled <a> with a live redrawing
+          sparkline + price/change flash, no card/star ids, zero collision. -#}
       {% set _featured = featured_market ?? none %}
       {% if (_featured ?? none) is not none %}
-      <section class="luckycat-lobby__featured" aria-label="Featured market">
+      <section id="lobby-featured" class="luckycat-lobby__featured" aria-label="Featured market">
         <h2 class="luckycat-lobby__heading">
           <span aria-hidden="true">⭐</span> Featured
         </h2>
-        <div class="luckycat-markets-grid luckycat-lobby__featured-grid">
-          {{ market_card(
+        <div class="luckycat-markets-grid luckycat-lobby__featured-grid"
+             {{ signal_attrs('featured') }}>
+          {{ featured_spotlight_body(
                _featured,
                (tickers ?? {}).get(_featured.symbol, none),
-               (sparklines ?? {}).get(_featured.symbol, none),
-               _featured.symbol in (watchlist_starred | default(()))
+               (sparklines ?? {}).get(_featured.symbol, none)
              ) }}
         </div>
       </section>
@@ -141,42 +271,18 @@
     {#- TOP-MOVERS PREVIEW — a few each of Gainers / Losers / Volume, as compact
         coin-detail LINKS (never market_card), so this whole region carries NO
         card/star ids and can never collide with the card regions above. Each panel
-        teases the matching Trending segment. -#}
+        teases the matching Trending segment. LIVE: sse-swap="movers" innerHTML-swaps
+        the three panels on every `lobby_snapshot` tick (the @app.derived('movers')
+        projection) — the rows RE-RANK live and the rows whose price moved flash. The
+        body is the shared movers_grid_body def (SSR + live share one source). -#}
     <section class="luckycat-lobby__movers" aria-label="Top movers">
       <h2 class="luckycat-lobby__heading">
         <span aria-hidden="true">🔥</span> Movers
         <a class="luckycat-lobby__see-all"
            href="{{ trending_href ?? '/markets/trending' }}" {{ shell_outlet_attrs() }}>See all</a>
       </h2>
-      <div class="luckycat-lobby__movers-grid">
-        {% for seg in movers | default(()) %}
-        <div class="luckycat-lobby__movers-panel">
-          <h3 class="luckycat-lobby__movers-title">
-            <a class="luckycat-trending__link" href="{{ seg.href }}" {{ shell_outlet_attrs() }}>{{ seg.label }}</a>
-          </h3>
-          {% set _rows = seg.rows | default(()) %}
-          {% if (_rows | length) > 0 %}
-          <ul class="luckycat-lobby__movers-list">
-            {% for row in _rows %}
-            {% set _up = row.change_pct >= 0 %}
-            <li class="luckycat-lobby__movers-row">
-              <a class="luckycat-trending__link luckycat-lobby__movers-link"
-                 href="/markets/{{ row.symbol }}" {{ shell_outlet_attrs() }}>
-                <span class="luckycat-lobby__movers-sym">{{ row.symbol }}</span>
-                <span class="luckycat-lobby__movers-price chirpui-text-muted">{{ row.price }} $MEOW</span>
-                <span class="luckycat-market-card__change {{ 'is-up' if _up else 'is-down' }}">
-                  <span class="luckycat-market-card__arrow" aria-hidden="true">{{ '▲' if _up else '▼' }}</span>
-                  {{ '+' if _up else '' }}{{ row.change_pct }}%
-                </span>
-              </a>
-            </li>
-            {% end %}
-          </ul>
-          {% else %}
-          <p class="chirpui-text-muted luckycat-lobby__empty">No markets to rank yet.</p>
-          {% end %}
-        </div>
-        {% end %}
+      <div class="luckycat-lobby__movers-grid" {{ signal_attrs('movers') }}>
+        {{ movers_grid_body(movers) }}
       </div>
     </section>
 

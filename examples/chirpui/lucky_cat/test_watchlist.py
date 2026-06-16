@@ -461,41 +461,33 @@ class TestWatchlistStarMarkup:
 
     @pytest.mark.issue(281)
     async def test_landing_cards_carry_a_star(self, example_app) -> None:
-        """Every lobby card carries a star — component-gated by current_user():
-        anonymous gets a "sign in to star" <a href="/login"> (a visible
-        affordance, never a swallowed 302), signed-in gets the real toggle
+        """Every market CARD carries a star — component-gated by current_user():
+        anonymous gets a "sign in to star" <a href="/login"> (a visible affordance,
+        never a swallowed 302), signed-in gets the real toggle
         <button id="watchlist-star-{symbol}">. Both forms are SIBLINGS of the card
         <a href="/markets/{symbol}"> (FOOTGUN #1), never descendants.
 
-        #281 (PR7): the landing is now the curated lobby, NOT the full grid — the
-        card-bearing regions are the featured card + the watchlist preview, so the
-        signed-in case stars markets to populate the preview (the anonymous case
-        renders the featured card). The macro markup is shared, so the contract is
-        identical to the old grid; only the number/source of cards changed.
+        #281 / live-lobby: the lobby's featured slot is now a bespoke LIVE spotlight
+        (no market_card, no star), and a fresh anonymous visitor has an empty
+        watchlist — so the lobby renders no market CARDS for an anonymous user. The
+        anonymous star-as-login-link is therefore verified on a public COIN page,
+        and the signed-in case stars markets to populate the lobby watchlist preview
+        (real cards). The market_card macro markup is unchanged.
         """
         import watchlist
 
         async with TestClient(example_app) as client:
-            # ANONYMOUS — the star is the sign-in login link, not a toggle button.
+            # ANONYMOUS — the lobby has no market cards (bespoke featured + empty
+            # watchlist) and no toggle star; the public star affordance is the
+            # sign-in login link on a coin page.
             anon = await client.get("/")
             assert anon.status == 200
-            anon_html = anon.text
-            assert "luckycat-watchlist-star" in anon_html
-            assert "luckycat-market-card-cell" in anon_html
-            # Anonymous gets the sign-in star (<a href="/login">), NOT the toggle.
-            assert "luckycat-watchlist-star--signin" in anon_html
-            assert 'id="watchlist-star-' not in anon_html
-            # The sign-in star is a SIBLING of the card <a>, never nested inside it.
-            anon_anchors = re.findall(
-                r'<a class="luckycat-market-card[^"]*"\s+href="/markets/[^"]+">(.*?)</a>',
-                anon_html,
-                re.S,
-            )
-            # The lobby always renders the featured card (>= 1).
-            assert len(anon_anchors) >= 1, "lobby card anchors not found — crawl is vacuous"
-            assert not [a for a in anon_anchors if "luckycat-watchlist-star" in a], (
-                "anonymous sign-in star is nested INSIDE a market card <a> (FOOTGUN #1)"
-            )
+            assert 'id="watchlist-star-' not in anon.text  # no authed toggle for anon
+            coin = await client.get("/markets/BTC-MEOW")
+            assert coin.status == 200
+            coin_html = coin.text
+            assert "luckycat-watchlist-star--signin" in coin_html  # the sign-in star
+            assert 'id="watchlist-star-' not in coin_html
 
             # SIGNED IN — star markets so the watchlist preview populates, then the
             # star is the real toggle button with the per-card id.
@@ -531,18 +523,25 @@ class TestWatchlistStarMarkup:
         card <a>, not a descendant. Parse every market-card anchor's inner HTML
         and assert no watchlist-star button lives inside it.
 
-        #281 (PR7): the landing is the curated lobby — the featured card always
-        renders (>= 1 card anchor), so the invariant is still exercised against
-        real cards; only the card count/source changed, not the macro contract."""
+        #281 / live-lobby: the lobby's anonymous featured slot is now a bespoke
+        spotlight with no market_card, so exercise the market_card footgun via the
+        SIGNED-IN watchlist preview, which renders real cards with sibling stars.
+        (The detail-header star carries its own guard below.)"""
+        import watchlist
+
         async with TestClient(example_app) as client:
-            response = await client.get("/")
-            html = response.text
+            cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
+                watchlist.add("SOL-MEOW")
+            html = (await client.get("/", headers=_cookie_header(cookie))).text
             anchors = re.findall(
                 r'<a class="luckycat-market-card[^"]*"\s+href="/markets/[^"]+">(.*?)</a>',
                 html,
                 re.S,
             )
-            assert len(anchors) >= 1, "lobby card anchors not found — crawl is vacuous"
+            assert len(anchors) >= 1, "watchlist-preview card anchors not found — crawl is vacuous"
             offenders = [a for a in anchors if "luckycat-watchlist-star" in a]
             assert not offenders, (
                 "watchlist star <button> is nested INSIDE a market card <a> "

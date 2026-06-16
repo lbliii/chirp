@@ -173,10 +173,12 @@ class TestComponentGating:
 
     @pytest.mark.issue(275)
     async def test_anonymous_watchlist_star_is_a_login_link(self, example_app) -> None:
-        """On a public card the watchlist star is the anonymous login-link form
-        (``--signin``), NOT the authenticated toggle button."""
+        """On a public coin page the watchlist star is the anonymous login-link form
+        (``--signin``), NOT the authenticated toggle button. (#281 / live-lobby: the
+        lobby's featured slot is now a bespoke live spotlight with no star, so the
+        public star affordance lives on the coin pages / cards.)"""
         async with TestClient(example_app) as client:
-            html = (await client.get("/")).text
+            html = (await client.get("/markets/BTC-MEOW")).text
             assert "luckycat-watchlist-star--signin" in html
             # No authenticated toggle button id for any market.
             assert 'id="watchlist-star-' not in html
@@ -184,20 +186,23 @@ class TestComponentGating:
     @pytest.mark.issue(275)
     async def test_signed_in_landing_shows_account_chrome(self, example_app) -> None:
         """A signed-in visitor sees the full account chrome: the notifications
-        bell, the Deposit action, the user name, a Sign-out form, and the live
-        toggle star button on cards."""
+        bell, the Deposit action, the user name, a Sign-out form, and (on a coin
+        page) the live toggle star button."""
         async with TestClient(example_app) as client:
             cookie = await _signed_in_cookie(client)
-            html = (await client.get("/", headers={"Cookie": f"{_SESSION_COOKIE}={cookie}"})).text
+            cookie_header = {"Cookie": f"{_SESSION_COOKIE}={cookie}"}
+            html = (await client.get("/", headers=cookie_header)).text
             # Account chrome the anonymous page omits.
             assert 'id="notif-bell"' in html
             assert 'data-action="deposit"' in html
             # Identity: the user chip name + a Sign-out form posting to /logout.
             assert "Demo Trader" in html
             assert 'action="/logout"' in html
-            # The star is now the real toggle button, not the login link.
-            assert 'id="watchlist-star-' in html
-            assert "luckycat-watchlist-star--signin" not in html
+            # The star is the real toggle button (not the login link) on a coin page.
+            # (#281 / live-lobby: the lobby's featured slot no longer carries a star.)
+            coin = (await client.get("/markets/BTC-MEOW", headers=cookie_header)).text
+            assert 'id="watchlist-star-BTC-MEOW"' in coin
+            assert "luckycat-watchlist-star--signin" not in coin
 
 
 class TestLoginFlow:

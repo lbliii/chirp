@@ -12,6 +12,7 @@ Run from the repo root (never ``app.run()`` in tests — import + ``app.check()`
     PYTHONPATH=src python examples/chirpui/lucky_cat/app.py
 """
 
+import asyncio
 import contextlib
 import sys
 import time
@@ -42,6 +43,7 @@ for _name in (
     if _file and Path(_file).resolve() != (ROOT_DIR / f"{_name}.py").resolve():
         del sys.modules[_name]
 
+import lobby
 import notifications
 import session_store
 import trade_store
@@ -217,6 +219,110 @@ async def ticker_signal():
                 symbol = symbols[idx % len(symbols)]
                 idx += 1
                 yield feed.ticker(symbol)
+
+
+# ---------------------------------------------------------------------------
+# CHIRP — live MARKETS LOBBY board (the compute-once / broadcast-many showcase)
+#
+# The Markets lobby (/ and /markets) is fully reactive: the stat strip, the movers
+# grid (which RE-RANKS live), and the featured spotlight (price + a live redrawing
+# sparkline) all update over the SAME single /_chirp/live connection — no second
+# sse-connect, no extra page weight.
+#
+# ONE source signal does the work: `lobby_snapshot` SAMPLES the feed on a human
+# cadence (read-only — the `ticker` signal above is the sole engine clock) and emits
+# a self-contained lobby.LobbySnapshot. Three @app.derived signals PROJECT that one
+# snapshot into the three regions and re-render in lockstep — the genuine derived
+# cascade (rank ONCE, fan out to N regions). The snapshot carries per-value
+# direction flags so each region flashes only the values that actually moved, and
+# the derived stay PURE functions of the snapshot value (no feed/store reads — the
+# notif_badge purity contract, applied to the board).
+#
+# `lobby_snapshot` itself has NO DOM sink (only the three derived do), so its own
+# wire event is suppressed (render returns None → the merge stream skips it); it
+# exists purely to drive the cascade.
+# ---------------------------------------------------------------------------
+
+# Lobby board refresh cadence (seconds). The sim ticks fast; re-ranking + emitting
+# on a human-readable window keeps the board legible (and the payload small)
+# instead of firehosing a swap every raw tick.
+_LOBBY_REFRESH_S = 1.5
+
+
+def _lobby_snapshot_seed():
+    """First lobby snapshot for the SSR/registry seed (no flash, read-only)."""
+    return lobby.build_live_snapshot(get_feed(), None)
+
+
+def _suppress_emit(_value):
+    """Render for `lobby_snapshot`: it has no DOM sink, so skip its own wire event
+    (the merge stream drops an event whose render returns None). The three derived
+    signals still cascade off its cached VALUE."""
+    return None
+
+
+@app.signal("lobby_snapshot", initial=_lobby_snapshot_seed, render=_suppress_emit)
+async def lobby_snapshot_signal():
+    """SOURCE: sample the feed into a fresh lobby snapshot on a human cadence.
+
+    Read-only sampling — it never advances the engine (the `ticker` signal is the
+    clock); each snapshot carries direction flags computed vs the previous one so
+    the three derived regions flash only what changed."""
+    feed = get_feed()
+    symbols = [m.symbol for m in feed.markets()]
+    if not symbols:
+        return
+    prev = None
+    while True:
+        await asyncio.sleep(_LOBBY_REFRESH_S)
+        snap = lobby.build_live_snapshot(feed, prev)
+        prev = snap
+        yield snap
+
+
+def _render_lobby_stats(value) -> str:
+    """Render the stat strip body for the derived `market_stats` signal."""
+    stats, dirs = value
+    return app.render(Fragment("markets/page.html", "stat_strip_signal", stats=stats, dirs=dirs))
+
+
+def _render_lobby_movers(value) -> str:
+    """Render the movers grid body for the derived `movers` signal."""
+    movers, dirs = value
+    return app.render(Fragment("markets/page.html", "movers_signal", movers=movers, dirs=dirs))
+
+
+def _render_lobby_featured(value) -> str:
+    """Render the featured spotlight body for the derived `featured` signal."""
+    market, ticker, spark, direction = value
+    return app.render(
+        Fragment(
+            "markets/page.html",
+            "featured_signal",
+            market=market,
+            t=ticker,
+            spark=spark,
+            dir=direction,
+        )
+    )
+
+
+@app.derived("market_stats", on=("lobby_snapshot",), render=_render_lobby_stats)
+def lobby_stats_derived(snap):
+    """PURE projection: the stat strip data + its flash directions."""
+    return (snap.stats, snap.stat_dirs)
+
+
+@app.derived("movers", on=("lobby_snapshot",), render=_render_lobby_movers)
+def lobby_movers_derived(snap):
+    """PURE projection: the ranked movers segments + per-row flash directions."""
+    return (snap.movers, snap.mover_dirs)
+
+
+@app.derived("featured", on=("lobby_snapshot",), render=_render_lobby_featured)
+def lobby_featured_derived(snap):
+    """PURE projection: the featured spotlight market / ticker / sparkline + flash."""
+    return (snap.featured_market, snap.featured_ticker, snap.featured_spark, snap.featured_dir)
 
 
 # ---------------------------------------------------------------------------
