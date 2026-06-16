@@ -217,6 +217,9 @@ async def send_streaming_response(
     request_token: Token | None = None
     request_id_token: Token | None = None
     csp_nonce_token: Token | None = None
+    auth_user_token: Token | None = None
+    csrf_token_token: Token | None = None
+    csrf_field_token: Token | None = None
     if response.request_context is not None:
         request_token = request_var.set(response.request_context)
         request_id_token = request_id_var.set(response.request_context.request_id)
@@ -227,6 +230,17 @@ async def send_streaming_response(
         from chirp.middleware.csp_nonce import _set_csp_nonce
 
         csp_nonce_token = _set_csp_nonce(response.csp_nonce)
+    if response.auth_user is not None:
+        from chirp.middleware.auth import _reset_stream_user, _set_stream_user
+
+        auth_user_token = _set_stream_user(response.auth_user)
+    if response.csrf_token is not None:
+        from chirp.middleware.csrf import _reset_stream_csrf, _set_stream_csrf
+
+        csrf_token_token, csrf_field_token = _set_stream_csrf(
+            response.csrf_token,
+            response.csrf_field_name,
+        )
 
     try:
         if isinstance(response.chunks, AsyncIterator):
@@ -290,6 +304,14 @@ async def send_streaming_response(
             from chirp.middleware.csp_nonce import _reset_csp_nonce
 
             _reset_csp_nonce(csp_nonce_token)
+        if auth_user_token is not None:
+            from chirp.middleware.auth import _reset_stream_user
+
+            _reset_stream_user(auth_user_token)
+        if csrf_token_token is not None:
+            from chirp.middleware.csrf import _reset_stream_csrf
+
+            _reset_stream_csrf(csrf_token_token, csrf_field_token)
 
     # Close the stream
     await send(

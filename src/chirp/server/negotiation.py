@@ -6,6 +6,7 @@ no magic, fully predictable.
 """
 
 import logging
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, overload
 
 from kida import Environment
@@ -29,6 +30,7 @@ from chirp.server.negotiation_oob import (
     should_append_layout_oob,
     should_append_streamed_shell_actions_oob,
 )
+from chirp.server.streaming_context import attach_streaming_render_context
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
@@ -105,6 +107,32 @@ def _context_keys(ctx: dict[str, Any]) -> tuple[str, ...]:
 
 def _is_htmx(request: Request | None) -> bool:
     return bool(request and request.is_htmx)
+
+
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+
+def _normalize_hx_redirect_response(response: Response, request: Request | None) -> Response:
+    """Strip conflicting redirect headers for htmx vs non-htmx clients (#272)."""
+    hx_url = response.header("HX-Redirect")
+    if hx_url is None:
+        return response
+
+    if _is_htmx(request):
+        headers = tuple(
+            (name, value) for name, value in response.headers if name.lower() != "location"
+        )
+        status = 200 if response.status in _REDIRECT_STATUSES else response.status
+        return replace(response, status=status, headers=headers)
+
+    headers = tuple(
+        (name, value) for name, value in response.headers if name.lower() != "hx-redirect"
+    )
+    return replace(response, headers=headers)
+
+
+def _streaming_response(**kwargs: Any) -> StreamingResponse:
+    return attach_streaming_render_context(StreamingResponse(**kwargs))
 
 
 def _trace_return(
@@ -300,7 +328,7 @@ def negotiate(
                 render_intent=value.render_intent,
                 status=value.status,
             )
-            return value
+            return _normalize_hx_redirect_response(value, request)
         case Redirect():
             _trace_return(
                 request,
@@ -555,7 +583,7 @@ def negotiate(
             # exactly what issue #179 targets. (async_context is kept only for
             # the trace note above.)
             chunks = render_stream_async(kida_env, value)
-            return StreamingResponse(
+            return _streaming_response(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,
@@ -574,7 +602,7 @@ def negotiate(
             kida_env = _require_kida_env(kida_env, "TemplateStream")
             tmpl = kida_env.get_template(value.template_name)
             chunks = tmpl.render_stream_async(**value.context)
-            return StreamingResponse(
+            return _streaming_response(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,
@@ -616,7 +644,7 @@ def negotiate(
                 chunks = append_layout_oob_stream(
                     chunks, kida_env, value.layout_chain, value.context, oob_registry
                 )
-            return StreamingResponse(
+            return _streaming_response(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=req,
@@ -646,7 +674,7 @@ def negotiate(
                 error_template=suspense_error_template,
                 error_block=suspense_error_block,
             )
-            return StreamingResponse(
+            return _streaming_response(
                 chunks=chunks,
                 content_type="text/html; charset=utf-8",
                 request_context=request,

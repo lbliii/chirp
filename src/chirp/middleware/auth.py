@@ -29,7 +29,7 @@ Usage::
 """
 
 from collections.abc import Awaitable, Callable
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
@@ -94,6 +94,15 @@ class AnonymousUser:
 _ANONYMOUS: AnonymousUser = AnonymousUser()
 
 _user_var: ContextVar[User] = ContextVar("chirp_user")
+
+
+def _set_stream_user(user: User) -> Token[User]:
+    """Re-establish the auth user while a streaming generator drains."""
+    return _user_var.set(user)
+
+
+def _reset_stream_user(token: Token[User]) -> None:
+    _user_var.reset(token)
 
 
 def get_user() -> User:
