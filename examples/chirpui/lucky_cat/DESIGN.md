@@ -486,10 +486,12 @@ forced an earlier `net_worth` derived to be dropped — it had to read the trade
 store.) When you add a derived, make its source signal's value carry everything
 the derived needs.
 
-### Why `workers=1` (and why it is load-bearing, not incidental)
+### Why `workers=1` (default today — scale via the backplane seam)
 
-The example pins `workers=1` in `app.py` (overriding the CPU-count default). This
-is **required**, for two compounding reasons:
+The example pins `workers=1` in `app.py` (overriding the CPU-count default). That
+is the **single-process default** for an in-memory demo, not a framework
+limitation. Two compounding reasons make multi-process unsafe *without* a shared
+backplane:
 
 1. **All state is in process memory** — the wallet, trade store, notifications
    log, the SimFeed, AND the signal bus (the reactive bus behind `@app.signal`).
@@ -499,12 +501,18 @@ is **required**, for two compounding reasons:
    page load that lands on a worker whose event loop is tied up serving a
    long-lived signal connection stalls — the "white screen" / freeze.
 
-A single-user in-memory demo is therefore inherently single-process. Real
-multi-worker realtime needs a shared bus backplane (Redis/Postgres pub-sub) + an
-external state store — the production scaling path, deliberately out of scope here
-(see the signal RFC). Keep this example `workers=1`. The pure-derived contract
-above is the discipline that makes the signal layer *ready* for that backplane
-even though this demo never runs it.
+Scaling is a **one-class swap**, not an out-of-scope rewrite. Lucky Cat routes
+mutations through `backplane.get_backplane().publish(name, value)` instead of
+calling `app.emit` directly. The shipped default is `InProcessBackplane` (wraps
+`App.emit` — today's behavior). For `workers>1`, implement the
+`SignalBackplane` protocol with a shared bus (`RedisBackplane` is stubbed in
+`backplane.py` with wiring notes) **and** move wallet/trade/notifications into
+an external store — the backplane carries fan-out notifications, not
+source-of-truth state. See the signal RFC for the full production path.
+
+Keep this example at `workers=1` until both pieces are configured. The pure-derived
+contract above is the discipline that keeps derived signals correct once events
+cross process boundaries.
 
 ---
 
@@ -569,7 +577,8 @@ deploy image (which drops `argon2-cffi`).
   `referenced=True` on htmx-only routes; every signal `sse-swap` has a registered
   producer — the `signal_dead_binding` rule).
 - **`workers=1`** stays set (§7) — the in-memory state + the single `/_chirp/live`
-  connection require single-process.
+  connection require single-process **until** a `SignalBackplane` impl and external
+  store are wired (see `backplane.py`).
 - **Public market pages stay public** (`/`, `/markets/{symbol}`, `/search`) and
   **account pages stay `@login_required`** (§8). The topbar's account chrome and
   the `watchlist_star` key off `current_user()`; login/logout return `FormAction`
