@@ -1137,7 +1137,7 @@ class TestTradeStore:
         price = get_feed().ticker("PAW-MEOW").price
         # Pick a size whose notional fits the seed balance.
         size = 1.0
-        order = trade_store.place_order("PAW-MEOW", "buy", "market", size)
+        order = trade_store.place_order_or_raise("PAW-MEOW", "buy", "market", size)
         assert order.status == "filled"
         # Cash debited by the rounded notional.
         assert wallet.balance() == before - round(size * price)
@@ -1151,9 +1151,9 @@ class TestTradeStore:
         import trade_store
         import wallet
 
-        trade_store.place_order("PAW-MEOW", "buy", "market", 2.0)
+        trade_store.place_order_or_raise("PAW-MEOW", "buy", "market", 2.0)
         mid = wallet.balance()
-        trade_store.place_order("PAW-MEOW", "sell", "market", 2.0)
+        trade_store.place_order_or_raise("PAW-MEOW", "sell", "market", 2.0)
         # Position fully closed (cleared), wallet credited above the mid.
         assert trade_store.position("PAW-MEOW") is None
         assert wallet.balance() >= mid
@@ -1197,7 +1197,7 @@ class TestTradeStore:
 
         assert trade_store.portfolio_value() == float(wallet.balance())
         assert trade_store.pnl() == 0.0
-        trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
+        trade_store.place_order_or_raise("PAW-MEOW", "buy", "market", 1.0)
         # After a buy, value is cash + mark-to-market (>= remaining cash).
         assert trade_store.portfolio_value() >= wallet.balance()
 
@@ -1213,7 +1213,7 @@ class TestTradeStore:
         top_ask_before = book_before.asks[0]
         size = 1.0
 
-        trade_store.place_order(symbol, "buy", "market", size)
+        trade_store.place_order_or_raise(symbol, "buy", "market", size)
 
         book_after = feed.order_book(symbol, depth=3)
         tape_after = feed.trades(symbol, limit=30)
@@ -1536,6 +1536,18 @@ class TestTradeOrder:
         assert len(fills) >= 1
         assert len(rejects) >= 1
         assert all("size" in errs for errs in rejects)
+
+    def test_no_route_uses_raising_fill(self) -> None:
+        """#292: the raising ``place_order_or_raise`` must never be the HTTP fill
+        path — every ``@app.route`` handler goes through the atomic
+        ``try_place_order``. Guard it statically: the route module's source must
+        not reference the raising form, so a future handler can't silently
+        reintroduce the validate-then-debit 500 the demo exists to prevent."""
+        import pathlib
+
+        app_source = (pathlib.Path(__file__).parent / "app.py").read_text(encoding="utf-8")
+        assert "place_order_or_raise" not in app_source
+        assert "try_place_order" in app_source
 
 
 class TestNavModel:
@@ -2176,7 +2188,7 @@ class TestPortfolioDashboard:
         branch), proving the empty-vs-loaded distinction works both ways."""
         import trade_store
 
-        trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
+        trade_store.place_order_or_raise("PAW-MEOW", "buy", "market", 1.0)
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             response = await client.get("/portfolio", headers=_cookie_header(cookie))

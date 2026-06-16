@@ -2847,18 +2847,23 @@ html.luckycat-tour--open {
   pointer-events: auto;
 }
 
+/* Transparent full-screen click-catcher (click outside to dismiss). The visible
+   dimming comes from the spotlight's box-shadow scrim below, NOT a backdrop blur
+   — a screen-wide blur would also blur the very element we're highlighting. */
 .luckycat-tour__backdrop {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--lc-plane-base) 55%, transparent);
-  backdrop-filter: blur(2px);
+  background: transparent;
 }
 
+/* The spotlight IS the scrim: a massive box-shadow spread dims everything around
+   the target rect while the rect itself stays crisp and unblurred — so the user
+   can actually read what's highlighted. The jade glow rings the focus area. */
 .luckycat-tour__spotlight {
   position: fixed;
   border-radius: var(--lc-radius-sm);
   box-shadow:
-    0 0 0 9999px color-mix(in srgb, var(--lc-plane-base) 62%, transparent),
+    0 0 0 9999px color-mix(in srgb, var(--lc-plane-base) 72%, transparent),
     var(--lc-glow-jade);
   pointer-events: none;
   transition: top 120ms var(--lc-ease), left 120ms var(--lc-ease),

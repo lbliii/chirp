@@ -1,12 +1,17 @@
 /* Lucky Cat first-visit coachmarks (#297).
-   A dismissible three-step tour highlighting SSE live regions, 422 form
-   re-render, and Suspense portfolio panels. Persists luckycat-tour-seen in
-   localStorage (with a cookie mirror for parity with shell.py conventions).
-   Cross-page steps resume via sessionStorage after boosted/full navigation. */
+   A dismissible tour highlighting SSE live regions, 422 form re-render, and
+   Suspense portfolio panels. Auth-aware (#299): logged-out visitors see the one
+   public step; signing in unlocks the trader steps. Two seen-flags persist in
+   localStorage (with cookie mirrors for parity with shell.py conventions):
+   luckycat-tour-seen (public) and luckycat-tour-seen-auth (trader). So a visitor
+   who dismisses the public tour and THEN logs in still gets the trade-form +
+   Suspense-portfolio steps once — never re-shown after that. Cross-page steps
+   resume via sessionStorage after boosted/full navigation. */
 (function () {
   "use strict";
 
   var SEEN_KEY = "luckycat-tour-seen";
+  var SEEN_AUTH_KEY = "luckycat-tour-seen-auth";
   var ACTIVE_KEY = "luckycat-tour-active";
   var STEP_KEY = "luckycat-tour-step";
   var YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -22,18 +27,32 @@
       name + "=" + value + "; Max-Age=" + YEAR_SECONDS + "; Path=/; SameSite=Lax" + secure;
   }
 
-  function tourSeen() {
+  function flagSet(key) {
     try {
-      if (localStorage.getItem(SEEN_KEY) === "1") return true;
+      if (localStorage.getItem(key) === "1") return true;
     } catch (_err) {}
-    return readCookie(SEEN_KEY) === "1";
+    return readCookie(key) === "1";
+  }
+
+  function setFlag(key) {
+    try {
+      localStorage.setItem(key, "1");
+    } catch (_err) {}
+    writeCookie(key, "1");
+  }
+
+  /* Has the relevant tour been seen for the current auth state? Authenticated
+     users gate on the trader flag (so the public flag never suppresses the
+     trader steps); anonymous users gate on the public flag. */
+  function tourSeen() {
+    return isAuthenticated() ? flagSet(SEEN_AUTH_KEY) : flagSet(SEEN_KEY);
   }
 
   function markSeen() {
-    try {
-      localStorage.setItem(SEEN_KEY, "1");
-    } catch (_err) {}
-    writeCookie(SEEN_KEY, "1");
+    setFlag(SEEN_KEY);
+    if (isAuthenticated()) {
+      setFlag(SEEN_AUTH_KEY);
+    }
     try {
       sessionStorage.removeItem(ACTIVE_KEY);
       sessionStorage.removeItem(STEP_KEY);
@@ -69,8 +88,19 @@
       },
     ];
     if (!isAuthenticated()) {
-      return all.slice(0, 1);
+      // Logged out: only the public SSE step (the trader steps live behind auth).
+      return all.filter(function (step) {
+        return !step.auth;
+      });
     }
+    if (flagSet(SEEN_KEY)) {
+      // Already saw the public step before logging in — show only the new
+      // trader steps so we never repeat the ticker walkthrough.
+      return all.filter(function (step) {
+        return step.auth;
+      });
+    }
+    // Fresh signed-in user: the full three-step tour.
     return all;
   }
 
