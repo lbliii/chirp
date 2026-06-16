@@ -29,9 +29,9 @@ flow, return-type-driven end to end:
 ``csrf_field()`` and the shell sets ``X-CSRF-Token`` on htmx requests).
 """
 
+import session_store
 import users
 
-import session_store
 from chirp import FormAction, Page, Request, ValidationError, is_safe_url, login
 from chirp.middleware.sessions import get_session
 

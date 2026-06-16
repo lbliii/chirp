@@ -44,7 +44,9 @@ def _slice(state) -> session_store.NotificationSlice:
     return notes
 
 
-def _append_locked(notes: session_store.NotificationSlice, kind: str, title: str, body: str) -> Notification:
+def _append_locked(
+    notes: session_store.NotificationSlice, kind: str, title: str, body: str
+) -> Notification:
     note = Notification(
         id=notes.next_id,
         kind=kind,
@@ -66,9 +68,7 @@ def add(kind: str, title: str, body: str = "") -> Notification:
 
 def add_broadcast(kind: str, title: str, body: str = "") -> None:
     """Append the same notification to every active session (price-move alerts)."""
-    session_store.broadcast_notifications(
-        lambda notes: _append_locked(notes, kind, title, body)
-    )
+    session_store.broadcast_notifications(lambda notes: _append_locked(notes, kind, title, body))
 
 
 def recent(limit: int = 12) -> tuple[Notification, ...]:

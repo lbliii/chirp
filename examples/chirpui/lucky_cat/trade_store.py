@@ -199,7 +199,9 @@ def place_order(
     return order
 
 
-def _apply_fill_locked(state: session_store.StoreState, symbol: str, side: str, size: float, price: float) -> None:
+def _apply_fill_locked(
+    state: session_store.StoreState, symbol: str, side: str, size: float, price: float
+) -> None:
     """Update the net position for a fill. Caller holds the registry lock."""
     positions = state.trade.positions
     pos = positions.get(symbol)

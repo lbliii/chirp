@@ -19,9 +19,9 @@ Coverage:
 import re
 
 import pytest
+from store_test_helpers import sole_client_store, warm_authed_store
 
 from chirp.testing import TestClient
-from store_test_helpers import sole_client_store, warm_authed_store
 from tests.helpers.auth import (
     csrf_post,
     extract_session_cookie,

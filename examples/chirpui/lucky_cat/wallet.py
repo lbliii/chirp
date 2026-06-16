@@ -11,7 +11,7 @@ example imports; mutable state sits behind :func:`account_store.get_account`
 
 from account_store import INITIAL_MEOW, Deposit, get_account
 
-__all__ = ("INITIAL_MEOW", "Deposit", "balance", "deposit", "debit", "deposits", "reset")
+__all__ = ("INITIAL_MEOW", "Deposit", "balance", "debit", "deposit", "deposits", "reset")
 
 
 def balance() -> int:

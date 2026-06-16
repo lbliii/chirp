@@ -593,9 +593,7 @@ class SimFeed:
             if remaining <= 1e-9:
                 break
 
-    def _append_trade_locked(
-        self, st: _SymbolState, side: str, size: float, price: float
-    ) -> None:
+    def _append_trade_locked(self, st: _SymbolState, side: str, size: float, price: float) -> None:
         """Prepend a user fill to the tape. Caller holds ``self._lock``."""
         dp = self._price_dp(price)
         trade = Trade(

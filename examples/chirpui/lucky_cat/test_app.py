@@ -15,9 +15,9 @@ throughout (TestContracts).
 """
 
 import pytest
+from store_test_helpers import client_balance, sole_client_store, warm_authed_store
 
 from chirp.testing import TestClient, assert_mutation_redirect
-from store_test_helpers import client_balance, sole_client_store, warm_authed_store
 from tests.helpers.auth import (
     csrf_post,
     extract_csrf_token,
@@ -138,9 +138,7 @@ class TestLanding:
             assert "Updated over SSE, zero JS" in response.text
 
     @pytest.mark.issue(297)
-    async def test_first_visit_tour_includes_auth_steps_when_signed_in(
-        self, example_app
-    ) -> None:
+    async def test_first_visit_tour_includes_auth_steps_when_signed_in(self, example_app) -> None:
         """#297: signed-in traders get the full three-step tour seed."""
         async with TestClient(example_app) as client:
             cookie = await _login(client)
@@ -945,7 +943,9 @@ class TestSessionScopedStores:
             )
             keys = session_store.client_keys()
             assert len(keys) == 2
-            balances = {session_store.balance_for_key(k, balance_seed=wallet.INITIAL_MEOW) for k in keys}
+            balances = {
+                session_store.balance_for_key(k, balance_seed=wallet.INITIAL_MEOW) for k in keys
+            }
             assert wallet.INITIAL_MEOW + 500 in balances
             assert wallet.INITIAL_MEOW in balances
 
@@ -1064,8 +1064,6 @@ class TestActivityFeed:
     async def test_landing_is_merged_feed_not_static_stub(self, example_app) -> None:
         """With a deposit and a fill on record, the landing renders BOTH rows in
         the shared fills table — never the old stub copy that asserted no data."""
-        import trade_store
-        import wallet
 
         async with TestClient(example_app) as client:
             cookie = await _login(client)
@@ -1073,7 +1071,11 @@ class TestActivityFeed:
             page = await client.get("/", headers=headers)
             csrf = extract_csrf_token(page.text)
             cookie = extract_session_cookie(page, cookie_name=_SESSION_COOKIE) or cookie
-            headers = {"X-CSRF-Token": csrf, "HX-Request": "true", "Cookie": f"{_SESSION_COOKIE}={cookie}"}
+            headers = {
+                "X-CSRF-Token": csrf,
+                "HX-Request": "true",
+                "Cookie": f"{_SESSION_COOKIE}={cookie}",
+            }
             await client.post("/deposit", data={"amount": "250"}, headers=headers)
             await client.post(
                 "/trade/order",

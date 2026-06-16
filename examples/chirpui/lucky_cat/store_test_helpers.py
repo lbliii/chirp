@@ -1,7 +1,7 @@
 """Test helpers for session-scoped store assertions (#285)."""
 
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 import session_store
 
