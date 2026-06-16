@@ -1,4 +1,4 @@
-"""Type codecs and the OID→codec registry.
+"""Type codecs, the OID→codec registry, and the per-column result-decoding plan.
 
 A :class:`Codec` knows how to encode a Python value to wire bytes and decode wire bytes back,
 in both binary and text formats. The :class:`CodecRegistry` maps PostgreSQL type OIDs to
@@ -7,10 +7,22 @@ codecs; it is the one genuinely shared-mutable structure in the hot path, so it 
 **fails loud** on a conflicting re-registration (never last-wins) — the chirp ``shapes``
 registry discipline.
 
-The E1 spine ships only the hottest OIDs (ints, text, bool, floats). The long tail (numeric,
-temporal, json/jsonb, arrays, composites) lands in epic E2, and per-row decode parallelism
-across free-threaded workers lands in epic E6 — both built on the immutable snapshot this
+The E1 spine shipped only the hottest OIDs (ints, text, bool, floats). The E2 long tail —
+``numeric``, the temporal family, ``uuid``/``bytea``, ``json``/``jsonb``, and the parametric
+array/composite/range/enum families — lands here, wired into :func:`build_default_registry`
+from each family's ``LEAF_CODECS`` tuple and its parametric factories. Per-row decode
+parallelism across free-threaded workers (epic E6) is built on the immutable snapshot this
 registry hands out.
+
+The other E2 deliverable is :func:`build_codec_plan`: given a :class:`~._messages.RowDescription`
+and a registry snapshot, it precomputes one ``(bytes | None) -> Any`` decoder per column — the
+right ``decode_binary``/``decode_text`` half chosen from each field's ``format_code``, ``None``
+passed straight through for SQL NULL, parametric array/range/composite columns resolved against
+the snapshot, and a UTF-8 / raw-bytes **text fallback** for any unregistered OID so an unknown
+type never crashes the row path. The plan is a plain tuple of closures, computed once per result
+set and reused for every row.
+
+This module stays sans-I/O: bytes in, Python objects out; no socket, no anyio.
 """
 
 from __future__ import annotations
@@ -23,6 +35,13 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
+
+    from chirp.data.drivers._pelt._messages import FieldDescription, RowDescription
+
+    # ``DEFAULT_REGISTRY`` is materialized lazily via module ``__getattr__`` (see below) to stay
+    # clear of the ``_codecs`` ↔ codec-family import cycle; declare it here so it is statically
+    # visible to type checkers and ``from ._codecs import DEFAULT_REGISTRY`` callers.
+    DEFAULT_REGISTRY: CodecRegistry
 
 # --- common type OIDs (from pg_type.dat) ------------------------------------
 OID_BOOL = 16
@@ -177,7 +196,8 @@ def _bool_codec() -> Codec:
     )
 
 
-def _builtin_codecs() -> tuple[Codec, ...]:
+def _e1_codecs() -> tuple[Codec, ...]:
+    """The E1 hot-path leaf codecs defined inline in this module (ints, floats, bool, text)."""
     return (
         _int_codec(OID_INT2, "int2", 2),
         _int_codec(OID_INT4, "int4", 4),
@@ -191,13 +211,206 @@ def _builtin_codecs() -> tuple[Codec, ...]:
     )
 
 
+# --- E2 leaf-family wiring --------------------------------------------------
+# The E2 families live in sibling modules that import :class:`Codec` from *this* module. That is
+# a true import cycle: ``_codecs`` cannot reference any sibling at *its own import time* (a
+# sibling-first import would run this module to completion to satisfy ``from ._codecs import
+# Codec`` while the sibling is only half-initialized — its ``LEAF_CODECS`` would not yet exist).
+# So every sibling reference here is **call-time/lazy**: the sibling modules are imported inside
+# the build/plan functions (and ``DEFAULT_REGISTRY`` is built lazily via ``__getattr__`` below),
+# never during ``_codecs`` import. They are pure-Python, sans-I/O modules.
+
+
+def _e2_leaf_codecs() -> tuple[Codec, ...]:
+    """Every non-parametric E2 codec, gathered from each family's ``LEAF_CODECS`` tuple.
+
+    Array/composite/range/enum families contribute *nothing* here — they are parametric (the
+    element/field codec is only known at plan time), so their ``LEAF_CODECS`` are empty and they
+    are wired via :func:`build_codec_plan` instead. The sibling imports are deferred to call time
+    to break the ``_codecs`` ↔ family import cycle.
+    """
+    from chirp.data.drivers._pelt import (
+        _codecs_json,
+        _codecs_numeric,
+        _codecs_temporal,
+        _codecs_uuid_bytea,
+    )
+
+    return (
+        *_codecs_numeric.LEAF_CODECS,
+        *_codecs_temporal.LEAF_CODECS,
+        *_codecs_uuid_bytea.LEAF_CODECS,
+        *_codecs_json.LEAF_CODECS,
+    )
+
+
+def _builtin_codecs() -> tuple[Codec, ...]:
+    """The full set of non-parametric codecs the default registry pre-loads (E1 + E2 leaves)."""
+    return (*_e1_codecs(), *_e2_leaf_codecs())
+
+
 def build_default_registry() -> CodecRegistry:
-    """A fresh registry pre-loaded with the E1 hot-path codecs."""
+    """A fresh registry pre-loaded with the E1 hot-path codecs plus the E2 leaf families.
+
+    Registration keeps the fail-loud conflict discipline: each OID is registered exactly once,
+    so a duplicate OID across families (a packaging bug) raises :class:`ValueError` at build
+    time rather than silently last-wins.
+    """
     registry = CodecRegistry()
     for codec in _builtin_codecs():
         registry.register(codec)
     return registry
 
 
-# Process-wide default. Treated read-only after import (additional codecs land in E2).
-DEFAULT_REGISTRY = build_default_registry()
+_DEFAULT_REGISTRY: CodecRegistry | None = None
+# Guards the lazy first-build below. Without it, two threads under PYTHON_GIL=0 could both
+# observe ``None`` and each build a *separate* registry — defeating the process-wide singleton
+# (and contradicting the free-threading correctness pelt exists to guarantee).
+_DEFAULT_REGISTRY_LOCK = threading.Lock()
+
+
+def __getattr__(name: str) -> Any:
+    """Build ``DEFAULT_REGISTRY`` lazily on first access.
+
+    ``DEFAULT_REGISTRY`` cannot be built eagerly at module import: doing so reads each E2 family's
+    ``LEAF_CODECS`` while a *family-first* import is still resolving its ``from ._codecs import
+    Codec`` — the family is only half-initialized at that point, so the read would crash with a
+    partial-init :class:`AttributeError`. Deferring the build to first attribute access keeps the
+    process-wide default a one-liner for callers while staying cycle-safe under any import order.
+
+    The build is double-checked-lock guarded so concurrent first accesses on free-threaded
+    workers materialize exactly one registry. Treated read-only after creation; apps register
+    extra codecs on a fresh :func:`build_default_registry` (e.g. per-DB enums / composites at
+    connect time).
+    """
+    if name == "DEFAULT_REGISTRY":
+        global _DEFAULT_REGISTRY
+        registry = _DEFAULT_REGISTRY
+        if registry is None:
+            with _DEFAULT_REGISTRY_LOCK:
+                registry = _DEFAULT_REGISTRY
+                if registry is None:
+                    registry = build_default_registry()
+                    _DEFAULT_REGISTRY = registry
+        return registry
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
+
+
+# --- per-column result-decoding plan ----------------------------------------
+def _array_element_oid_map() -> Mapping[int, int]:
+    """Array OID → element OID (lazy import to stay clear of the family import cycle)."""
+    from chirp.data.drivers._pelt import _codecs_array
+
+    return _codecs_array.ARRAY_OID_TO_ELEMENT
+
+
+def _range_element_oid_map() -> Mapping[int, int]:
+    """Range OID → element OID, so the planner can resolve a parametric range column's element.
+
+    Element OIDs cross-referenced from the leaf families: int4 23, int8 20, numeric 1700,
+    timestamp 1114, timestamptz 1184, date 1082 — see ``pg_type.dat``. Lazy-imported to stay
+    clear of the ``_codecs`` ↔ family import cycle.
+    """
+    from chirp.data.drivers._pelt import (
+        _codecs_composite_range_enum as crange,
+    )
+    from chirp.data.drivers._pelt import (
+        _codecs_numeric,
+        _codecs_temporal,
+    )
+
+    return {
+        crange.OID_INT4RANGE: OID_INT4,
+        crange.OID_INT8RANGE: OID_INT8,
+        crange.OID_NUMRANGE: _codecs_numeric.OID_NUMERIC,
+        crange.OID_TSRANGE: _codecs_temporal.OID_TIMESTAMP,
+        crange.OID_TSTZRANGE: _codecs_temporal.OID_TIMESTAMPTZ,
+        crange.OID_DATERANGE: _codecs_temporal.OID_DATE,
+    }
+
+
+def _binary_text_fallback(data: bytes) -> bytes:
+    """Binary-format fallback for an unregistered OID: hand back the raw column bytes verbatim.
+
+    The driver cannot know the Python shape of an unknown binary type, so it surfaces the bytes
+    unchanged rather than guessing (or crashing) — the caller can decode them out-of-band.
+    """
+    return data
+
+
+def _text_utf8_fallback(data: bytes) -> str:
+    """Text-format fallback for an unregistered OID: decode UTF-8.
+
+    PostgreSQL's text wire format is the type's ``typoutput`` string in the server encoding
+    (UTF-8 for any modern deployment), so a faithful str is the safe, non-crashing default.
+    """
+    return data.decode("utf-8")
+
+
+def _column_decoder(
+    field: FieldDescription, snapshot: Mapping[int, Codec]
+) -> Callable[[bytes], Any]:
+    """Resolve the non-NULL decoder for one column from its OID + ``format_code``.
+
+    ``format_code`` is ``1`` for binary and ``0`` for text (PostgreSQL's ``Bind``/``RowDescription``
+    convention). A registered OID uses the matching half of its :class:`Codec`; a known
+    array/range OID is resolved parametrically against ``snapshot``; an unregistered OID falls
+    back to raw-bytes (binary) or UTF-8 (text) so the row path never crashes on an unknown type.
+    """
+    # Lazy family imports (call-time only — see the import-cycle note above _e2_leaf_codecs).
+    from chirp.data.drivers._pelt import (
+        _codecs_array,
+    )
+    from chirp.data.drivers._pelt import (
+        _codecs_composite_range_enum as crange,
+    )
+
+    binary = field.format_code == 1
+    codec = snapshot.get(field.type_oid)
+    if codec is not None:
+        return codec.decode_binary if binary else codec.decode_text
+
+    # Parametric: a known array column whose element codec is in the snapshot.
+    element_oid = _array_element_oid_map().get(field.type_oid)
+    if element_oid is not None:
+        element = snapshot.get(element_oid)
+        if element is not None and binary:
+            decode_elem = element.decode_binary
+            return lambda data: _codecs_array.decode_array(data, decode_elem)
+
+    # Parametric: a known range column whose element codec is in the snapshot.
+    element_oid = _range_element_oid_map().get(field.type_oid)
+    if element_oid is not None:
+        element = snapshot.get(element_oid)
+        if element is not None and binary:
+            decode_elem = element.decode_binary
+            return lambda data: crange.decode_range(data, decode_elem)
+
+    # Unknown OID (or a parametric column we cannot resolve / a text-format parametric column):
+    # the fail-soft text/binary fallback. An unresolved type never crashes the row.
+    return _binary_text_fallback if binary else _text_utf8_fallback
+
+
+def build_codec_plan(
+    row_desc: RowDescription, registry_snapshot: Mapping[int, Codec]
+) -> tuple[Callable[[bytes | None], Any], ...]:
+    """Precompute one ``(bytes | None) -> Any`` decoder per column for a result set.
+
+    Each returned decoder maps a raw column value (from a :class:`~._messages.DataRow`) to a
+    Python object: ``None`` (SQL NULL) passes straight through as ``None``; otherwise the column
+    bytes go through the resolved per-column decoder. Computing the plan once per
+    :class:`~._messages.RowDescription` — rather than re-resolving the codec for every cell —
+    keeps the per-row loop a tuple of bound closures, which is what makes free-threaded row decode
+    cheap (epic E6). ``registry_snapshot`` is an immutable :meth:`CodecRegistry.snapshot` view, so
+    the plan is lock-free.
+    """
+    decoders: list[Callable[[bytes | None], Any]] = []
+    for field in row_desc.fields:
+        decode = _column_decoder(field, registry_snapshot)
+
+        def cell_decoder(value: bytes | None, _decode: Callable[[bytes], Any] = decode) -> Any:
+            return None if value is None else _decode(value)
+
+        decoders.append(cell_decoder)
+    return tuple(decoders)
