@@ -14,6 +14,7 @@ def _free_threaded() -> bool:
 @pytest.mark.issue(262)
 @pytest.mark.skipif(not _free_threaded(), reason="requires a free-threaded (3.14t) build")
 def test_asyncpg_import_leaves_gil_disabled() -> None:
+    pytest.importorskip("asyncpg")
     assert sys._is_gil_enabled() is False
     import asyncpg
 
@@ -25,6 +26,7 @@ def test_asyncpg_import_leaves_gil_disabled() -> None:
 @pytest.mark.issue(262)
 @pytest.mark.skipif(not _free_threaded(), reason="requires a free-threaded (3.14t) build")
 def test_postgres_backend_import_leaves_gil_disabled() -> None:
+    pytest.importorskip("asyncpg")
     assert sys._is_gil_enabled() is False
     import asyncpg
 
