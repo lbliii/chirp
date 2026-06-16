@@ -1,14 +1,11 @@
-"""Lucky Cat — a Maneki-neko crypto-exchange ChirpUI app-shell.
+"""Lucky Cat — CHIRP wiring layer for the Maneki-neko crypto-exchange demo.
 
-A playful "lucky cat casino" trading floor: top-bar ticker strip, markets
-sidebar, and a markets-grid landing. Built on the ChirpUI app shell
-(``use_chirp_ui`` + mounted filesystem pages) with the secure-by-default
-stack wired so ``app.check()`` is ERROR-free even before the trade-flow
-mutating routes land.
-
-This module is issue #221 (scaffold). The deterministic ``SimFeed`` (#222)
-and the live ticker / order-book / trade-tape ``EventStream`` (#223) extend
-it; the seams they fill are marked below.
+This file is the framework side of the example: ``App`` setup (``use_chirp_ui``
++ mounted filesystem pages), the secure-by-default middleware stack, live
+``signal()`` / ``EventStream`` routes, and the mutation endpoints that pages
+call into. Business logic lives in sibling **DOMAIN** modules (``feed``,
+``wallet``, ``trade_store``, ``notifications``, …); sections below mark where
+each seam starts.
 
 Run from the repo root (never ``app.run()`` in tests — import + ``app.check()``):
 
@@ -30,6 +27,9 @@ for _name in (
     "feed",
     "store",
     "wallet",
+    "account_store",
+    "backplane",
+    "session_store",
     "shell",
     "navigation",
     "trade_store",
@@ -43,9 +43,11 @@ for _name in (
         del sys.modules[_name]
 
 import notifications
+import session_store
 import trade_store
 import users
 import watchlist
+from backplane import bind_emit, get_backplane
 from command_palette import palette_results
 from feed import DEFAULT_INTERVAL, INTERVALS, get_feed
 from navigation import active_route_path, route_state, shell_navigation
@@ -78,10 +80,12 @@ PAGES_DIR = ROOT_DIR / "pages"
 STATIC_DIR = ROOT_DIR / "static"
 
 # ---------------------------------------------------------------------------
-# Config — from_env() takes NO template_dir/worker_mode, so layer them on with
-# dataclasses.replace. worker_mode="async" is required by the #223 EventStream.
-# A dev fallback secret keeps the example runnable without CHIRP_SECRET_KEY;
-# production deploys (env != "development") must set CHIRP_SECRET_KEY.
+# CHIRP — app config & ChirpUI shell
+#
+# from_env() takes NO template_dir/worker_mode, so layer them on with
+# dataclasses.replace. worker_mode="async" is required by EventStream routes
+# and the live signal bus. A dev fallback secret keeps the example runnable
+# without CHIRP_SECRET_KEY; production deploys (env != "development") must set it.
 # ---------------------------------------------------------------------------
 
 _base = AppConfig.from_env()
@@ -100,39 +104,52 @@ config = replace(
     # backplane (Redis/Postgres pub-sub) + an external state store — see the signal
     # RFC; that's the production scaling path, deliberately out of scope here.
     workers=1,
-    # view_transitions="htmx" animates the boosted #main swap (#231 progressive
-    # rail). Keep htmx unset (the chirp-ui shell bundles it) and do NOT add
-    # alpine=True (use_chirp_ui owns Alpine — adding it would double-inject).
+    # view_transitions="htmx" animates the boosted #main swap on navigation.
+    # Keep htmx unset (the chirp-ui shell bundles it) and do NOT add alpine=True
+    # (use_chirp_ui owns Alpine — adding it would double-inject).
     view_transitions="htmx",
     secret_key=_base.secret_key or "dev-only-not-for-production",
 )
 
 app = App(config=config)
 
+# Signal fan-out seam — routes publish through the backplane instead of calling
+# app.emit directly so a Redis adapter can wake every worker's /_chirp/live
+# connection when workers>1 (see backplane.RedisBackplane skeleton).
+bind_emit(app.emit)
+
+
+def emit_signal(name: str, value) -> None:
+    """Push a signal value through the configured backplane (default: in-process)."""
+    get_backplane().publish(name, value)
+
+
 use_chirp_ui(app)
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 
 # ---------------------------------------------------------------------------
-# Server-side navigation model (#231) — exposed to the layout as template
-# globals (elbysodic idiom). The sidebar_oob region calls route_state() +
-# shell_navigation() per render so the two-tier rail recomputes the active room
-# and contextual sections on every (boosted) navigation. Pure-Python, no I/O.
+# CHIRP — server-side navigation globals (template context)
+#
+# Exposed to the layout as template globals. route_state() + shell_navigation()
+# recompute the two-tier rail on every (boosted) navigation. Pure-Python, no I/O.
 # ---------------------------------------------------------------------------
 
 app.template_global()(route_state)
 app.template_global()(shell_navigation)
 app.template_global()(active_route_path)
-# Server-side rail-collapse preference (#231) — read in the layout's head_extra
-# to pre-render the collapsed state (no FOUC) and cookie-persisted by
+# Server-side rail-collapse preference — read in the layout's head_extra to
+# pre-render the collapsed state (no FOUC) and cookie-persisted by
 # static/lucky-cat-shell.js.
 app.template_global()(rail_is_collapsed)
 
 # ---------------------------------------------------------------------------
-# Live signals (declare-once / bind-many) — ONE /_chirp/live connection carries
-# every named topic, replacing the two persistent shell SSE scopes (notifications
-# + ticker) the old shell opened on every page. A signal is a server value fanned
-# out to N bindings: {{ signal('balance') }} in the topbar AND in the deposit
-# modal both swap from one `event: balance` — zero hand-maintained OOB twins.
+# CHIRP — live signals (declare-once / bind-many over /_chirp/live)
+# DOMAIN data: feed tickers, wallet balance, notifications log
+#
+# ONE /_chirp/live connection carries every named topic. A signal is a server
+# value fanned out to N bindings: {{ signal('balance') }} in the topbar AND in
+# the deposit modal both swap from one `event: balance` — zero hand-maintained
+# OOB twins.
 #
 # - `balance` is PUSH (no source generator): the /deposit and /trade routes call
 #   app.emit('balance', new_balance) and every binding updates. The decorated
@@ -323,7 +340,7 @@ async def notifications_signal():
                     # "PAW-MEOW ▲ +22.36%" never reads as a contradiction. The
                     # move-from-baseline (the `if` above) is the FIRING rule, not
                     # the glyph — a coin can tick down yet still be green.
-                    notifications.add(
+                    notifications.add_broadcast(
                         "price",
                         f"{symbol} {'▲' if pct >= 0 else '▼'} {pct:+.2f}%",
                         f"Now {snap.price} MEOW.",
@@ -366,7 +383,7 @@ def notif_announce(feed) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Secure-by-default stack — Session -> Auth -> CSRF -> SecurityHeaders.
+# CHIRP — secure-by-default middleware stack (Session -> Auth -> CSRF -> SecurityHeaders)
 #
 # Auth slots in between Session and CSRF (the order chirp's auth subsystem
 # prescribes, and the order the csrf_session contract requires: Session before
@@ -387,6 +404,17 @@ async def load_user(user_id: str) -> users.User | None:
     return users.get(user_id)
 
 
+class _EnsureStoreKeyMiddleware:
+    """Assign a per-browser ``__store_key`` on every session (issue #285)."""
+
+    async def __call__(self, request, next):
+        session_store.ensure_store_key()
+        return await next(request)
+
+
+# Register store-key middleware BEFORE SessionMiddleware so it runs INSIDE the
+# session context on each request (Starlette: first-added middleware is innermost).
+app.add_middleware(_EnsureStoreKeyMiddleware())
 app.add_middleware(
     SessionMiddleware(
         SessionConfig(
@@ -417,7 +445,7 @@ app.add_middleware(CSRFMiddleware(CSRFConfig()))
 app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None)))
 
 # ---------------------------------------------------------------------------
-# Non-page routes (registered BEFORE mount_pages, kanban idiom).
+# DOMAIN — mutation & fragment routes (registered BEFORE mount_pages)
 # ---------------------------------------------------------------------------
 
 
@@ -476,7 +504,7 @@ def search(request: Request):
 @app.route("/deposit", methods=["POST"], name="deposit")
 @login_required
 async def deposit(request: Request):
-    """Credit the house token and EMIT the balance signal (#230 + signal migration).
+    """Credit the house token and emit the balance signal.
 
     The first mutating route in the example — which is why the secure-by-default
     stack (Session -> CSRF -> SecurityHeaders) was pre-wired. The deposit modal's
@@ -505,7 +533,7 @@ async def deposit(request: Request):
     # Fan the new balance out to every binding (topbar + modal) over /_chirp/live.
     # Any derived signal recomputes in the same emit cascade, so its bindings stay
     # in sync too — one producer, many homes.
-    app.emit("balance", new_balance)
+    emit_signal("balance", new_balance)
     # Log a deposit notification only for a real credit (a clamped bad amount is a
     # no-op, so it never reaches the bell — mirroring wallet.deposit's ledger).
     credit = max(0, amount)
@@ -519,7 +547,7 @@ async def deposit(request: Request):
         # atomic) so the bell reacts IMMEDIATELY (the dropdown list re-renders + the
         # derived badge/announce recompute PURELY from feed.unread in the same
         # cascade) — not only on the next feed tick. One log, fanned out.
-        app.emit("notifications", notifications.snapshot())
+        emit_signal("notifications", notifications.snapshot())
     # hx-swap="none" ignores the body; the live signal carries the visible update.
     return ("", 204)
 
@@ -539,7 +567,7 @@ async def deposit(request: Request):
 
 @app.route("/watchlist", name="watchlist.moved")
 def watchlist_moved():
-    """Permanent redirect for the moved Favorites page (#282).
+    """Permanent redirect for the moved Favorites page.
 
     The starred-markets VIEW moved from ``/watchlist`` to ``/markets/favorites``
     (one of the four fixed Markets destinations). A 308 (Permanent Redirect)
@@ -657,14 +685,13 @@ def notifications_read():
     # Re-emit a fresh snapshot (same rows, unread now 0 after the watermark
     # advance) so the derived badge + announce recompute PURELY from feed.unread
     # to 0 and fan out to every binding over /_chirp/live.
-    app.emit("notifications", notifications.snapshot())
+    emit_signal("notifications", notifications.snapshot())
     return ("", 204)
 
 
 # ---------------------------------------------------------------------------
-# Trade flow (#225) — place + cancel orders against the SimFeed price and the
-# house wallet, proving FormAction + ValidationError + multi-target OOB on top
-# of the secure-by-default stack.
+# DOMAIN — trade flow (place + cancel orders against SimFeed + house wallet)
+# CHIRP return types: FormAction + ValidationError + multi-target OOB
 # ---------------------------------------------------------------------------
 
 _TRADE_TEMPLATE = "trade/page.html"
@@ -795,10 +822,10 @@ async def place_order(request: Request):
         f"Filled {order.side} {order.size:g} {order.symbol}",
         f"@ {order.size * parsed['fill_price']:g} $MEOW.",
     )
-    app.emit("notifications", notifications.snapshot())
+    emit_signal("notifications", notifications.snapshot())
     # A fill debits the wallet — fan the new balance out to every signal binding
     # (topbar + modal); any derived signal recomputes in the same cascade.
-    app.emit("balance", meow_balance())
+    emit_signal("balance", meow_balance())
     return FormAction(
         "/trade",
         # Primary swap: reset the form (no errors, empty values).
@@ -896,7 +923,7 @@ async def convert_order(request: Request):
 
     # The convert debited $MEOW into a position — fan the new balance out to every
     # signal binding (and recompute any derived signal) over /_chirp/live.
-    app.emit("balance", meow_balance())
+    emit_signal("balance", meow_balance())
     return FormAction(
         "/trade",
         # Primary swap: reset the convert form in place (hx-select="#convert-form"
@@ -909,11 +936,11 @@ async def convert_order(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Free-threading proof panel (#227 Part A) — a live ticks/sec figure streamed
-# into the portfolio dashboard's #ft-panel. The SimFeed fans every tick across
-# its worker pool (genuine CPU-bound parallelism, no sleeps); this route reads
-# the observability-only tick counter and OOB-swaps a derived ticks/sec rate.
-# Part B (the core app.check() GIL contract) is intentionally NOT built here.
+# DOMAIN + CHIRP — free-threading proof panel (live ticks/sec via EventStream)
+#
+# Streams a ticks/sec figure into the portfolio dashboard's #ft-panel. SimFeed
+# fans every tick across its worker pool; this route reads the observability-only
+# tick counter and OOB-swaps a derived rate.
 # ---------------------------------------------------------------------------
 
 _PORTFOLIO_TEMPLATE = "portfolio/page.html"
@@ -1081,11 +1108,11 @@ def market_stream(symbol: str):
 
 
 # ---------------------------------------------------------------------------
-# OOB regions. The cross-page ticker strip is NO LONGER an OOB region — it moved
-# to the `ticker` SIGNAL (declared near the top of this module), so the layout's
-# old {% region ticker_strip_oob %} / ticker_strip_sse twin and its registration
-# are gone. The market-detail stream still OOB-swaps market_ticker_oob /
-# order_book_oob / trade_tape_oob (registered by their own templates).
+# CHIRP — OOB region registration
+#
+# The cross-page ticker strip is a `ticker` signal now (not an OOB region).
+# Market-detail streams still OOB-swap market_ticker_oob / order_book_oob /
+# trade_tape_oob (registered by their own templates).
 # ---------------------------------------------------------------------------
 
 # Notifications bell — the #notif-list / #notif-badge / #notif-announce sinks are
@@ -1108,7 +1135,7 @@ app.register_oob_region(
 )
 
 # ---------------------------------------------------------------------------
-# Mount pages LAST.
+# CHIRP — mount filesystem pages LAST
 # ---------------------------------------------------------------------------
 
 app.mount_pages(str(PAGES_DIR))

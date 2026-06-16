@@ -29,9 +29,11 @@ flow, return-type-driven end to end:
 ``csrf_field()`` and the shell sets ``X-CSRF-Token`` on htmx requests).
 """
 
+import session_store
 import users
 
 from chirp import FormAction, Page, Request, ValidationError, is_safe_url, login
+from chirp.middleware.sessions import get_session
 
 
 def _safe_next(raw: str | None) -> str:
@@ -74,9 +76,13 @@ async def post(request: Request) -> Page | ValidationError:
             demo_creds=f"{users.DEMO_USERNAME} / {users.DEMO_PASSWORD}",
         )
 
-    # Regenerates the session (anti-fixation) + stores the user id. FormAction
-    # (no fragments) → HX-Redirect (no Location) for htmx so it does a FULL page
-    # load (the persistent topbar repaints its auth state), and a 303 for a plain
-    # POST. See the module docstring for why hx_redirect/Redirect are wrong here.
+    # Regenerates the session (anti-fixation) + stores the user id. Preserve the
+    # per-visitor store key (#285) so concurrent demo tabs keep separate wallets.
+    store_key = get_session().get("__store_key")
     login(user)
+    session = get_session()
+    if isinstance(store_key, str) and store_key:
+        session["__store_key"] = store_key
+    else:
+        session_store.ensure_store_key()
     return FormAction(next_url)

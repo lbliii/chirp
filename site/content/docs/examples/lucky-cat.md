@@ -1,19 +1,19 @@
 ---
 title: Lucky Cat
-description: Flagship ChirpUI crypto-exchange demo on server-owned signals
+description: Flagship ChirpUI simulated trading-floor demo on server-owned signals
 draft: false
 weight: 15
 lang: en
 type: doc
 tags: [examples, chirp-ui, app-shell, signals, sse, suspense, oob, auth]
-keywords: [lucky cat, crypto exchange, signals, app shell, suspense, oob, sse, chirp-ui, authentication, login_required, current_user]
+keywords: [lucky cat, trading floor, signals, app shell, suspense, oob, sse, chirp-ui, authentication, login_required, current_user]
 category: examples
 ---
 
 ## What It Teaches
 
-Lucky Cat is the marquee ChirpUI example: a Maneki-neko **$MEOW** crypto
-exchange built entirely on the app-shell lane. Use it to see how a real,
+Lucky Cat is the marquee ChirpUI example: a Maneki-neko **$MEOW** simulated
+trading-floor UI built entirely on the app-shell lane. Use it to see how a real,
 multi-page product wires return types, signals, and the secure-by-default stack
 together — there is no client-side framework, only htmx and server-owned state.
 
@@ -21,12 +21,16 @@ together — there is no client-side framework, only htmx and server-owned state
 
 **Location:** `examples/chirpui/lucky_cat/`
 
+Prices, fills, and balances are simulated (`SimFeed` + in-memory stores) — no
+wallet-connect, no chain, no matching engine. The example is deliberately
+offline-safe so you can clone, run, and test without external services.
+
 It demonstrates:
 
 - a full-viewport `chirpui-app-shell` with a brand topbar, a cross-page ticker
   strip, and a two-tier (icon + route-context) collapsible rail
-- a **markets grid** landing and a **market-detail** page (`/markets/{symbol}`)
-  with an interactive price chart, a depth-bar order book, and a recent-trades
+- a **Markets Home lobby** and a **market-detail** page (`/markets/{symbol}`)
+  with a server-rendered price chart, a depth-bar order book, and a recent-trades
   tape, each fed by a per-market `EventStream`
 - a place/cancel-order **trade flow**: a clean fill returns one `FormAction`
   whose multi-target OOB set swaps positions, balance, the open-order badge, and
@@ -47,6 +51,25 @@ It demonstrates:
   the public grid, and action gating on the mutation routes — over `AuthMiddleware`
   with a `ValidationError` / `FormAction` login flow
 
+## What This Replaces
+
+If you would reach for React/Next (or a separate SPA + API) for a trading-floor
+product UI, Lucky Cat shows the Chirp alternative:
+
+| Concern | Typical React / Next stack | Lucky Cat on Chirp |
+|---------|---------------------------|-------------------|
+| **Tooling** | `npm install`, bundler, build step, `node_modules` | No build step, no `node_modules` — Python + static CSS/JS only |
+| **Live chrome** | Client state + WebSocket or client-managed SSE handlers | Server-owned `signal()` values on one `/_chirp/live` SSE connection |
+| **Navigation** | Client router, hydration, layout re-fetch | Boosted htmx swaps `#main`; server re-renders the rail from the current path |
+| **Forms & validation** | Client form lib + separate API routes | Return-type-as-intent in one handler: `ValidationError` (422) or `FormAction` |
+| **Page-local live data** | WebSocket subscriptions + client reconciliation | `EventStream` pushes HTML fragments — no client state graph |
+| **Slow dashboard** | Loading spinners or client suspense boundaries | `Suspense`: shell paints with skeletons, panels stream as OOB swaps resolve |
+| **Auth** | JWT in storage, client route guards | Session cookie, `@login_required`, `AuthMiddleware` in the secure stack |
+| **Charts** | Chart.js / Recharts in the browser | Server-rendered SVG — no JS chart library |
+| **Deploy surface** | Node server (+ often a separate API tier) | Single Python process; demo pins `workers=1` for in-memory state |
+| **Tests** | Jest/RTL + mocked fetch/WebSocket | `pytest` against deterministic `SimFeed` — offline, CI-safe |
+| **Real exchange / web3** | Wallet-connect, chain RPC, matching engine | **Out of scope** — simulated prices, in-memory wallet, no chain |
+
 ## Authentication
 
 Lucky Cat is **public-browse, gated-trading**: anyone can browse the markets grid
@@ -54,7 +77,7 @@ and a coin's detail page, but the account section and every mutation require
 sign-in. It shows the full range of gating, not a blanket lock:
 
 - **Full-page gating** — `@login_required` on the account `page.py` handlers
-  (`/trade`, `/portfolio`, `/activity`, `/watchlist`, `/settings`). An anonymous
+  (`/trade`, `/portfolio`, `/activity`, `/markets/favorites`, `/settings`). An anonymous
   hit is a **302 to `/login?next=<path>`**; the prefilled card returns you there.
 - **Component gating** — `current_user()` conditionals: the topbar swaps "Sign in"
   for the user menu (and reveals the balance, bell, and Deposit action), and the
@@ -72,7 +95,7 @@ keeps the example single-process (matching `workers=1`) with passwords hashed vi
 ## Run It
 
 ```bash
-pip install bengal-chirp[ui]
+pip install "bengal-chirp[ui]"
 PYTHONPATH=src python examples/chirpui/lucky_cat/app.py
 ```
 
@@ -95,10 +118,33 @@ web replica — the demo holds all state (wallet, trade store, SimFeed, signal
 bus) in process memory. See [[docs/quality/deployment/production|Production
 Deployment]] for the full shape.
 
+## Build Your Own
+
+```bash
+pip install "bengal-chirp[ui]"
+chirp new myapp --shell
+cd myapp
+python app.py
+```
+
+The `--shell` scaffold wires `use_chirp_ui(app)`, boosted navigation, and the
+secure-by-default stack — the same foundation Lucky Cat builds on. Clone the
+example directory for the full trading-floor feature set, or read the
+[`README.md`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/README.md)
+and [`DESIGN.md`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/DESIGN.md)
+for the feature map and IA doctrine.
+
 ## Source
 
 - [`app.py`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/app.py)
 - [`README.md`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/README.md)
+
+## Build along
+
+**[[docs/tutorials/lucky-cat-trade-panel|Build a Live Trade Panel in 20 Minutes]]** — a
+from-scratch walkthrough of the markets grid (`Page` at `GET /`) and the
+`POST /trade/order` return-type pair (`ValidationError` 422 in place →
+`FormAction` multi-target OOB). Grounded in this example's real code paths.
 
 ## Next
 

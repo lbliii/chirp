@@ -2827,3 +2827,88 @@ a.luckycat-watchlist-star,
 .luckycat-lobby__cta-btn {
   flex: 0 0 auto;
 }
+
+/* ---------------------------------------------------------------------------
+   First-visit coachmarks tour (#297)
+   --------------------------------------------------------------------------- */
+
+html.luckycat-tour--open {
+  overflow: hidden;
+}
+
+.luckycat-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  pointer-events: none;
+}
+
+.luckycat-tour:not([hidden]) {
+  pointer-events: auto;
+}
+
+.luckycat-tour__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--lc-plane-base) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.luckycat-tour__spotlight {
+  position: fixed;
+  border-radius: var(--lc-radius-sm);
+  box-shadow:
+    0 0 0 9999px color-mix(in srgb, var(--lc-plane-base) 62%, transparent),
+    var(--lc-glow-jade);
+  pointer-events: none;
+  transition: top 120ms var(--lc-ease), left 120ms var(--lc-ease),
+    width 120ms var(--lc-ease), height 120ms var(--lc-ease);
+}
+
+.luckycat-tour__card {
+  position: fixed;
+  width: min(22rem, calc(100vw - 1.5rem));
+  padding: 1.1rem 1.15rem 1rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-overlay);
+  box-shadow: var(--lc-elevation-pop);
+  pointer-events: auto;
+}
+
+.luckycat-tour__counter {
+  margin: 0 0 0.35rem;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  font-size: var(--lc-text-xs);
+}
+
+.luckycat-tour__title {
+  margin: 0 0 0.45rem;
+  font-size: var(--lc-text-lg);
+  font-weight: 700;
+  letter-spacing: var(--lc-tracking-tight);
+}
+
+.luckycat-tour__body {
+  margin: 0 0 1rem;
+  font-size: var(--lc-text-sm);
+  line-height: 1.45;
+}
+
+.luckycat-tour__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.luckycat-tour__skip {
+  margin-right: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luckycat-tour__spotlight {
+    transition: none;
+  }
+}

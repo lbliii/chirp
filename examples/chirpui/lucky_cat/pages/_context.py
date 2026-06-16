@@ -23,7 +23,7 @@ import notifications
 import watchlist
 from command_palette import palette_results
 from feed import get_feed
-from wallet import balance
+from wallet import INITIAL_MEOW, balance
 
 _V = TypeVar("_V")
 
@@ -207,18 +207,17 @@ def context() -> dict:
         symbols,
         lambda sym: _sparkline(tuple(c.close for c in feed.candles(sym, limit=32))),
     )
-    # Watchlist — the starred markets behind the rail's first FUNCTIONAL filter
-    # lane. `watchlist_starred` is the immutable membership set the market cards /
-    # detail header read to render each star's pressed state; `watchlist_count`
-    # is the live rail badge figure. Both are sync, cheap reads (one lock); the
-    # /watchlist/toggle route mutates the set and re-renders the star + count twins.
-    starred = watchlist.symbols()
+    # Account-scoped state (#285): only touch the per-session stores for signed-in
+    # users. Anonymous page loads must not allocate a store bucket (login GET would
+    # orphan a key before regenerate_session clears the cookie payload).
+    authed = current_user().is_authenticated
+    starred = watchlist.symbols() if authed else frozenset()
     return {
         "markets": markets,
         "tickers": tickers,
         "sparklines": sparklines,
         "house_token": "$MEOW",
-        "meow_balance": balance(),
+        "meow_balance": balance() if authed else INITIAL_MEOW,
         "watchlist_starred": starred,
         "watchlist_count": len(starred),
         # Topbar notifications bell — the recent feed + the unread count, used to
@@ -227,8 +226,8 @@ def context() -> dict:
         # the derived `notif_badge` / `notif_announce` signals over the single
         # /_chirp/live connection (price-move alerts + fills/deposits), and opening
         # the bell POSTs /notifications/read, which emits so the badge derives to 0.
-        "notifications": notifications.recent(),
-        "notifications_unread": notifications.unread_count(),
+        "notifications": notifications.recent() if authed else (),
+        "notifications_unread": notifications.unread_count() if authed else 0,
         # The Cmd/Ctrl-K command palette directory (every market + the rooms),
         # unfiltered for the resting palette. The /search route re-filters this
         # by query; the layout renders the dialog once as a shell region.

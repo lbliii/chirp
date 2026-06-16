@@ -15,6 +15,7 @@ throughout (TestContracts).
 """
 
 import pytest
+from store_test_helpers import client_balance, sole_client_store, warm_authed_store
 
 from chirp.testing import TestClient, assert_mutation_redirect
 from tests.helpers.auth import (
@@ -122,6 +123,30 @@ class TestLanding:
             response = await client.get("/")
             assert "{%" not in response.text
             assert "{{" not in response.text
+
+    @pytest.mark.issue(297)
+    async def test_first_visit_tour_markup_on_public_shell(self, example_app) -> None:
+        """#297: the dismissible coachmarks shell ships on first visit (before
+        luckycat-tour-seen is set client-side). Public visitors get the SSE step."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert 'id="luckycat-tour"' in response.text
+            assert 'data-tour-seen-key="luckycat-tour-seen"' in response.text
+            assert 'data-tour-auth="false"' in response.text
+            assert "coachmarks.js" in response.text
+            assert "Updated over SSE, zero JS" in response.text
+
+    @pytest.mark.issue(297)
+    async def test_first_visit_tour_includes_auth_steps_when_signed_in(self, example_app) -> None:
+        """#297: signed-in traders get the full three-step tour seed."""
+        async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            response = await client.get("/portfolio", headers=_cookie_header(cookie))
+            assert response.status == 200
+            assert 'data-tour-auth="true"' in response.text
+            assert "422 re-render in place" in response.text
+            assert "Suspense: shell first, panels stream" in response.text
 
     @pytest.mark.issue(281)
     async def test_landing_has_no_duplicate_element_ids(self, example_app) -> None:
@@ -821,6 +846,8 @@ class TestTopbar:
         an sse-swap="balance" sink (signal('balance')) SSR-seeded with the seed
         value. No #lucky-cat-balance OOB id anymore — the signal sink owns it.
         (The $MEOW balance token is signed-in chrome, so authenticate first.)"""
+        import wallet
+
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             response = await client.get("/", headers=_cookie_header(cookie))
@@ -832,7 +859,7 @@ class TestTopbar:
             token = response.text[response.text.find("luckycat-token__amount") :]
             assert 'sse-swap="balance"' in token
             # SSR seed balance from wallet.INITIAL_MEOW.
-            assert "1000" in response.text
+            assert str(wallet.INITIAL_MEOW) in response.text
             assert "$MEOW" in response.text
 
     async def test_deposit_emits_balance_signal(self, example_app) -> None:
@@ -845,7 +872,7 @@ class TestTopbar:
         wallet.reset()
         async with TestClient(example_app) as client:
             cookie = await _login(client)
-            before = wallet.balance()
+            before = wallet.INITIAL_MEOW
             response, _ = await csrf_post(
                 client,
                 "/deposit",
@@ -857,7 +884,7 @@ class TestTopbar:
             assert response.status == 204
             assert response.text == ""
             # The wallet was credited (the value the signal emits to every binding).
-            assert wallet.balance() == before + 250
+            assert client_balance() == before + 250
 
     async def test_deposit_clamps_bad_amount(self, example_app) -> None:
         """A non-numeric/negative amount is a no-op credit — balance never drops.
@@ -868,7 +895,7 @@ class TestTopbar:
         wallet.reset()
         async with TestClient(example_app) as client:
             cookie = await _login(client)
-            before = wallet.balance()
+            before = wallet.INITIAL_MEOW
             response, _ = await csrf_post(
                 client,
                 "/deposit",
@@ -878,13 +905,49 @@ class TestTopbar:
             )
             assert response.status == 204
             # Balance unchanged at the seed value (a clamped no-op credit).
-            assert wallet.balance() == before
+            assert client_balance() == before
 
     async def test_deposit_requires_csrf(self, example_app) -> None:
         """Without a CSRF token the mutating route is rejected (secure-by-default)."""
         async with TestClient(example_app) as client:
             response = await client.post("/deposit", data={"amount": "100"})
             assert response.status in (400, 403)
+
+
+class TestSessionScopedStores:
+    """#285: per-visitor ephemeral wallet state keyed by session cookie."""
+
+    @pytest.mark.issue(285)
+    async def test_two_sessions_have_independent_balances(self, example_app) -> None:
+        """Two TestClient sessions with different cookies maintain separate $MEOW."""
+        import session_store
+        import wallet
+
+        wallet.reset()
+        async with TestClient(example_app) as client_a, TestClient(example_app) as client_b:
+            await client_a.get("/login")
+            await client_b.get("/login")
+            cookie_a = await _login(client_a)
+            cookie_b = await _login(client_b)
+            assert cookie_a != cookie_b
+
+            await warm_authed_store(client_a, cookie_a, cookie_name=_SESSION_COOKIE)
+            await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
+
+            _, cookie_a = await csrf_post(
+                client_a,
+                "/deposit",
+                cookie=cookie_a,
+                cookie_name=_SESSION_COOKIE,
+                data={"amount": "500"},
+            )
+            keys = session_store.client_keys()
+            assert len(keys) == 2
+            balances = {
+                session_store.balance_for_key(k, balance_seed=wallet.INITIAL_MEOW) for k in keys
+            }
+            assert wallet.INITIAL_MEOW + 500 in balances
+            assert wallet.INITIAL_MEOW in balances
 
 
 class TestCommandPalette:
@@ -1001,13 +1064,24 @@ class TestActivityFeed:
     async def test_landing_is_merged_feed_not_static_stub(self, example_app) -> None:
         """With a deposit and a fill on record, the landing renders BOTH rows in
         the shared fills table — never the old stub copy that asserted no data."""
-        import trade_store
-        import wallet
 
-        wallet.deposit(250)
-        trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            headers = {"Cookie": f"{_SESSION_COOKIE}={cookie}", "HX-Request": "true"}
+            page = await client.get("/", headers=headers)
+            csrf = extract_csrf_token(page.text)
+            cookie = extract_session_cookie(page, cookie_name=_SESSION_COOKIE) or cookie
+            headers = {
+                "X-CSRF-Token": csrf,
+                "HX-Request": "true",
+                "Cookie": f"{_SESSION_COOKIE}={cookie}",
+            }
+            await client.post("/deposit", data={"amount": "250"}, headers=headers)
+            await client.post(
+                "/trade/order",
+                data={"symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+                headers=headers,
+            )
             response = await client.get("/activity", headers=_cookie_header(cookie))
             assert response.status == 200
             assert "<html" in response.text
@@ -1087,7 +1161,7 @@ class TestTradeStore:
     def test_validate_insufficient_balance(self) -> None:
         import trade_store
 
-        # A huge BTC buy can't be covered by the 1000-$MEOW seed.
+        # A huge BTC buy can't be covered by the seed wallet.
         errors, _ = trade_store.validate_order("BTC-MEOW", "buy", "market", "10", "")
         assert "size" in errors
         assert any("Not enough $MEOW" in m for m in errors["size"])
@@ -1126,6 +1200,28 @@ class TestTradeStore:
         trade_store.place_order("PAW-MEOW", "buy", "market", 1.0)
         # After a buy, value is cash + mark-to-market (>= remaining cash).
         assert trade_store.portfolio_value() >= wallet.balance()
+
+    def test_market_buy_eats_ask_depth_and_prints_tape(self) -> None:
+        """#296: a market buy consumes top-of-book asks and appends to the tape."""
+        import trade_store
+        from feed import get_feed
+
+        feed = get_feed()
+        symbol = "PAW-MEOW"
+        book_before = feed.order_book(symbol, depth=3)
+        tape_before = feed.trades(symbol, limit=30)
+        top_ask_before = book_before.asks[0]
+        size = 1.0
+
+        trade_store.place_order(symbol, "buy", "market", size)
+
+        book_after = feed.order_book(symbol, depth=3)
+        tape_after = feed.trades(symbol, limit=30)
+        assert book_after.asks[0].price == top_ask_before.price
+        assert book_after.asks[0].size == pytest.approx(top_ask_before.size - size, abs=1e-6)
+        assert tape_after[0].side == "buy"
+        assert tape_after[0].size == size
+        assert tape_after[0].id > tape_before[0].id
 
 
 class TestTradePage:
@@ -1202,7 +1298,7 @@ class TestTradeOrder:
         wallet.reset()
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            before = wallet.balance()
+            before = wallet.INITIAL_MEOW
             response = await client.post(
                 "/trade/order",
                 data={"symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
@@ -1221,7 +1317,7 @@ class TestTradeOrder:
             assert "{{" not in response.text
             assert "{%" not in response.text
             # The fill debited the wallet (the value the balance signal emits).
-            assert wallet.balance() < before
+            assert client_balance() < before
 
     async def test_order_requires_csrf(self, example_app) -> None:
         """Without a CSRF token the mutating route is rejected (secure-by-default)."""
@@ -1247,9 +1343,10 @@ class TestTradeOrder:
         """Cancelling a resting order OOB-swaps the open-order count + a toast."""
         import trade_store
 
-        order = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
+            with sole_client_store():
+                order = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
             response = await client.post(
                 f"/trade/order/{order.id}/cancel",
                 data={},
@@ -1258,7 +1355,8 @@ class TestTradeOrder:
             assert response.status == 200
             assert 'id="open-order-count"' in response.text
             assert "cancelled" in response.text.lower()
-            assert trade_store.open_order_count() == 0
+            with sole_client_store():
+                assert trade_store.open_order_count() == 0
 
     async def test_cancel_last_order_oob_swaps_empty_state(self, example_app) -> None:
         """Cancelling the LAST resting order ALSO OOB-swaps the #open-orders-table
@@ -1267,11 +1365,22 @@ class TestTradeOrder:
         reload). Fail-loud: the swap targets a real id that the orders page ships."""
         import trade_store
 
-        order = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
         async with TestClient(example_app) as client:
-            cookie = await _login(client)
-            # The orders page ships the #open-orders-table swap target (fail-loud).
-            orders_page = await client.get("/portfolio/orders", headers=_cookie_header(cookie))
+            headers = await self._csrf_headers(client)
+            await client.post(
+                "/trade/order",
+                data={
+                    "symbol": "SOL-MEOW",
+                    "side": "buy",
+                    "kind": "limit",
+                    "size": "1",
+                    "limit_price": "100",
+                },
+                headers=headers,
+            )
+            with sole_client_store():
+                order = trade_store.open_orders()[0]
+            orders_page = await client.get("/portfolio/orders", headers=headers)
             assert 'id="open-orders-table"' in orders_page.text
 
             headers = await self._csrf_headers(client)
@@ -1284,7 +1393,8 @@ class TestTradeOrder:
             assert "hx-swap-oob" in response.text
             # It carries the empty-state, not a bare table.
             assert "No resting orders" in response.text
-            assert trade_store.open_order_count() == 0
+            with sole_client_store():
+                assert trade_store.open_order_count() == 0
             assert "{{" not in response.text
             assert "{%" not in response.text
 
@@ -1294,10 +1404,11 @@ class TestTradeOrder:
         the count badge + toast update."""
         import trade_store
 
-        first = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
-        trade_store.open_limit_order("BTC-MEOW", "sell", 0.5, 90000.0)
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
+            with sole_client_store():
+                first = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
+                trade_store.open_limit_order("BTC-MEOW", "sell", 0.5, 90000.0)
             response = await client.post(
                 f"/trade/order/{first.id}/cancel", data={}, headers=headers
             )
@@ -1305,7 +1416,8 @@ class TestTradeOrder:
             # Count badge still updates, but the table container does NOT swap.
             assert 'id="open-order-count"' in response.text
             assert 'id="open-orders-table"' not in response.text
-            assert trade_store.open_order_count() == 1
+            with sole_client_store():
+                assert trade_store.open_order_count() == 1
 
     async def test_limit_order_rests_and_bumps_count(self, example_app) -> None:
         """#225 + LOW-1: a LIMIT order rests (no fill, no debit) and bumps the live
@@ -1314,7 +1426,7 @@ class TestTradeOrder:
         import trade_store
         import wallet
 
-        before = wallet.balance()
+        before = wallet.INITIAL_MEOW
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
             response = await client.post(
@@ -1334,9 +1446,10 @@ class TestTradeOrder:
             assert "Resting" in response.text or "resting" in response.text.lower()
         # The order rested (count bumped), the wallet was NOT debited, and no
         # position was opened — a limit order does not fill in the M2 sim.
-        assert trade_store.open_order_count() == 1
-        assert wallet.balance() == before
-        assert trade_store.position("PAW-MEOW") is None
+        with sole_client_store():
+            assert trade_store.open_order_count() == 1
+            assert wallet.balance() == before
+            assert trade_store.position("PAW-MEOW") is None
 
     async def test_concurrent_buys_never_500(self, example_app) -> None:
         """MEDIUM-bug regression (the free-threading safety proof): hammer many
@@ -1353,8 +1466,8 @@ class TestTradeOrder:
             headers = await self._csrf_headers(client)
 
             async def buy() -> int:
-                # Size 80 PAW-MEOW ≈ 648 $MEOW each: every buy validates against the
-                # 1000 seed alone, but two cannot both clear — the loser hits the
+                # Size 9000 PAW-MEOW ≈ 73k $MEOW each: every buy validates against the
+                # 100k seed alone, but two cannot both clear — the loser hits the
                 # atomic re-check and gets a 422, not a 500.
                 resp = await client.post(
                     "/trade/order",
@@ -1362,7 +1475,7 @@ class TestTradeOrder:
                         "symbol": "PAW-MEOW",
                         "side": "buy",
                         "kind": "market",
-                        "size": "80",
+                        "size": "9000",
                     },
                     headers=headers,
                 )
@@ -1378,7 +1491,8 @@ class TestTradeOrder:
         assert any(s in (200, 303) for s in statuses), statuses
         assert any(s == 422 for s in statuses), statuses
         # The wallet never went negative (no double-spend).
-        assert wallet.balance() >= 0
+        with sole_client_store():
+            assert wallet.balance() >= 0
 
     def test_try_place_order_is_atomic_under_threads(self) -> None:
         """The store-level atomicity proof: fire concurrent buys from real threads
@@ -1393,9 +1507,9 @@ class TestTradeOrder:
 
         wallet.reset()
         trade_store.reset()
-        # Each buy costs ~648 $MEOW; only one of these can clear against 1000.
+        # Each buy costs ~73k $MEOW; only one of these can clear against 100k.
         price = get_feed().ticker("PAW-MEOW").price
-        size = 80.0
+        size = 9000.0
         results: list[tuple[object, dict]] = []
         results_lock = threading.Lock()
 
@@ -1823,10 +1937,13 @@ class TestMobileShell:
 
         import watchlist
 
-        watchlist.add("BTC-MEOW")
-        watchlist.add("SOL-MEOW")
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
+                watchlist.add("SOL-MEOW")
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             match = re.search(r"luckycat-nav-drawer__nav.*?</nav>", response.text, re.S)
             assert match is not None
@@ -2043,12 +2160,14 @@ class TestPortfolioDashboard:
 
     async def test_value_reflects_seed_wallet(self, example_app) -> None:
         """With no positions, portfolio value == the seed $MEOW wallet balance."""
+        import wallet
+
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             response = await client.get("/portfolio", headers=_cookie_header(cookie))
             assert response.status == 200
-            # Seed wallet (INITIAL_MEOW=1000), zero P&L, all cash.
-            assert "1000" in response.text
+            # Seed wallet (INITIAL_MEOW), zero P&L, all cash.
+            assert str(wallet.INITIAL_MEOW) in response.text
             assert "$MEOW" in response.text
             assert "unrealized" in response.text.lower()
 
@@ -2421,10 +2540,12 @@ class TestNotificationsBell:
 
         import notifications
 
-        notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
-        notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
+                notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
             html = (await client.get("/", headers=_cookie_header(cookie))).text
         # The list sink is SSR-seeded with the rows (inside the bound <ul>).
         ul = html[html.find('id="notif-list"') :]
@@ -2478,10 +2599,12 @@ class TestNotificationsBell:
 
         import notifications
 
-        notifications.add("fill", "A")
-        notifications.add("fill", "B")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                notifications.add("fill", "A")
+                notifications.add("fill", "B")
             html = (await client.get("/", headers=_cookie_header(cookie))).text
             # The sibling live region exists and carries the spoken count.
             assert 'id="notif-announce"' in html
@@ -2500,16 +2623,16 @@ class TestNotificationsBell:
         visible clear flows over the live connection, not a response body."""
         import notifications
 
-        notifications.add("fill", "A")
-        assert notifications.unread_count() == 1
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
+            with sole_client_store():
+                notifications.add("fill", "A")
+                assert notifications.unread_count() == 1
             response = await client.post("/notifications/read", data={}, headers=headers)
-            # Empty 204: the signal carries the visible clear, not the body.
             assert response.status == 204
             assert response.text == ""
-            # The watermark advanced — the derived badge/announce derive to 0.
-            assert notifications.unread_count() == 0
+            with sole_client_store():
+                assert notifications.unread_count() == 0
 
     async def test_bell_persists_across_routes(self, example_app) -> None:
         """The bell lives in the persistent topbar shell, so it ships on every
@@ -2555,10 +2678,12 @@ class TestNotificationsBell:
         the bell dropdown (the single-source notification_row body)."""
         import notifications
 
-        notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
-        notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                notifications.add("fill", "Filled buy 1 PAW-MEOW", "@ 8 MEOW.")
+                notifications.add("deposit", "Deposited 250 $MEOW", "Balance now 1250 $MEOW.")
             response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
@@ -2591,16 +2716,17 @@ class TestNotificationsBell:
         connection. The response is an empty 204 (no OOB twin body anymore)."""
         import notifications
 
-        notifications.add("fill", "A")
-        notifications.add("fill", "B")
-        assert notifications.unread_count() == 2
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
+            with sole_client_store():
+                notifications.add("fill", "A")
+                notifications.add("fill", "B")
+                assert notifications.unread_count() == 2
             response = await client.post("/notifications/read", data={}, headers=headers)
             assert response.status == 204
             assert response.text == ""
-            # Server watermark advanced — the derived badge/announce derive to 0.
-            assert notifications.unread_count() == 0
+            with sole_client_store():
+                assert notifications.unread_count() == 0
 
     async def test_read_requires_csrf(self, example_app) -> None:
         """The mutating read route is rejected without a CSRF token (secure-by-default)."""
@@ -2629,11 +2755,11 @@ class TestNotificationsBell:
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
             await client.post("/deposit", data={"amount": "250"}, headers=headers)
-            feed = notifications.recent()
-            # The log grew by one deposit entry.
-            assert len(feed) == 1
-            assert feed[0].kind == "deposit"
-            assert "250" in feed[0].title
+            with sole_client_store():
+                feed = notifications.recent()
+                assert len(feed) == 1
+                assert feed[0].kind == "deposit"
+                assert "250" in feed[0].title
             # ...AND the deposit emitted the notifications signal: the registry's
             # cache now holds a NotifFeed snapshot (one row, unread=1) and the
             # derived notif_badge recomputed PURELY from feed.unread in the same
@@ -2645,7 +2771,8 @@ class TestNotificationsBell:
             assert registry.cached_value("notif_badge") == 1
             # A clamped/no-op deposit adds nothing (no new log entry, cache stays 1).
             await client.post("/deposit", data={"amount": "not-a-number"}, headers=headers)
-            assert len(notifications.recent()) == 1
+            with sole_client_store():
+                assert len(notifications.recent()) == 1
             assert len(registry.cached_value("notifications").notes) == 1
 
     async def test_order_fill_logs_a_notification(self, example_app) -> None:
@@ -2659,9 +2786,10 @@ class TestNotificationsBell:
                 data={"symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
                 headers=headers,
             )
-            feed = notifications.recent()
-            assert len(feed) == 1
-            assert feed[0].kind == "fill"
+            with sole_client_store():
+                feed = notifications.recent()
+                assert len(feed) == 1
+                assert feed[0].kind == "fill"
             assert "PAW-MEOW" in feed[0].title
 
     async def test_notifications_signal_stream_is_event_stream(self, example_app) -> None:

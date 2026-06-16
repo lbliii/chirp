@@ -174,6 +174,12 @@ def browser():
 def _new_page_with_console_capture(browser, base_url: str):
     """Open a page and attach console-error / page-error collectors."""
     context = browser.new_context(base_url=base_url)
+    # The first-visit coachmarks overlay (#297) blocks pointer events until
+    # dismissed; mark it seen before any navigation so smoke tests exercise the
+    # real shell controls instead of timing out behind the tour backdrop.
+    context.add_init_script(
+        "try { localStorage.setItem('luckycat-tour-seen', '1'); } catch (_e) {}"
+    )
     page = context.new_page()
     page.set_default_timeout(_ACTION_TIMEOUT_MS)
     errors: list[str] = []

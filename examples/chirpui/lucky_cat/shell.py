@@ -25,6 +25,11 @@ from chirp.http.request import Request
 #: chirp-ui's ``chirpui-sidebar-collapsed`` (localStorage) or elbysodic's key.
 RAIL_COLLAPSED_COOKIE = "luckycat_rail_collapsed"
 
+#: First-visit coachmarks tour (#297). Persisted client-side (localStorage with a
+#: cookie mirror) by static/coachmarks.js; the name is namespaced like the rail
+#: cookie so it never collides with chirp-ui keys.
+TOUR_SEEN_KEY = "luckycat-tour-seen"
+
 #: The class the client JS toggles on ``.chirpui-app-shell`` to collapse the rail.
 RAIL_COLLAPSED_CLASS = "luckycat-rail--collapsed"
 
