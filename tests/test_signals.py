@@ -653,6 +653,7 @@ class TestDeadBindingCheck:
         assert len(orphans) == 1
         assert orphans[0].severity is Severity.INFO
 
+    @pytest.mark.issue(316)
     def test_composed_page_raw_sse_swap_dead_binding(self) -> None:
         """Hand-written sse-swap on a page under signal_connect() is validated (#316)."""
         sources = {
@@ -674,6 +675,7 @@ class TestDeadBindingCheck:
         assert len(nudges) == 1
         assert "signal_attrs" in nudges[0].message
 
+    @pytest.mark.issue(316)
     def test_competing_sse_scope_not_signal_binding(self) -> None:
         """A page with its own sse_scope stream must not false-positive (#316)."""
         sources = {
