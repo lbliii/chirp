@@ -326,7 +326,8 @@ def check_swap_safety(
                             "a selector from a broad container. Fragment responses that don't "
                             "include the selector target will swap in empty content silently. "
                             "Use shell.html (no global hx-select) for fragment-only apps, "
-                            'or add hx-disinherit="hx-select" on this element.'
+                            'or override with hx-select="unset" or an explicit selector '
+                            "matching this element's fragment response."
                         ),
                         template=template_name,
                         details=f"Inherited broad select(s): {selects_text}",

@@ -56,9 +56,10 @@ function getEffectiveSelect(startElt) {
 document.body.addEventListener("htmx:beforeSwap", function(evt) {
   var d = evt.detail || {};
   var xhr = d.xhr;
-  var elt = d.elt;
-  if (!xhr || !xhr.responseText || !elt) return;
-  var sel = getEffectiveSelect(elt);
+  var swapTarget = d.elt;
+  var trigger = (d.requestConfig && d.requestConfig.elt) || swapTarget;
+  if (!xhr || !xhr.responseText || !trigger) return;
+  var sel = getEffectiveSelect(trigger);
   if (!sel || typeof sel !== "string") return;
   sel = sel.trim();
   if (sel.indexOf("#") !== 0 || sel.indexOf(" ") >= 0) return;

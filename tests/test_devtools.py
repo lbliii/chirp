@@ -11,12 +11,15 @@ from chirp.server.devtools import DEVTOOLS_BOOT_JS as HTMX_DEBUG_BOOT_JS
 from chirp.server.devtools import HIGHLIGHT_PATH
 
 
+@pytest.mark.issue(248)
 def test_htmx_debug_js_loads() -> None:
     """Chirp DevTools script loads and contains expected content."""
     assert "__chirpHtmxDebugBooted" in HTMX_DEBUG_BOOT_JS
     assert "htmx:targetError" in HTMX_DEBUG_BOOT_JS
     assert "Co-locate the target with the mutating element" in HTMX_DEBUG_BOOT_JS
     assert "htmx:beforeSwap" in HTMX_DEBUG_BOOT_JS
+    assert "requestConfig" in HTMX_DEBUG_BOOT_JS
+    assert "requestConfig.elt" in HTMX_DEBUG_BOOT_JS
     assert "chirp-debug" in HTMX_DEBUG_BOOT_JS
     assert "chirp-dbg-drawer" in HTMX_DEBUG_BOOT_JS
     assert "chirp-dbg-pill" in HTMX_DEBUG_BOOT_JS

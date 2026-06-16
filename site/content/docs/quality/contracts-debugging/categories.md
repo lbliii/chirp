@@ -80,12 +80,14 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `hx-indicator` | WARNING | Fix static `hx-indicator="#id"` selectors that do not match any known template ID. |
 | `hx-boost` | WARNING | Use only `hx-boost="true"` or `hx-boost="false"` for static boost values. |
 | `selector_syntax` | ERROR | Fix invalid selector syntax in static htmx selector-bearing attributes. |
-| `select_inheritance` | WARNING | Add explicit `hx-select`, `hx-select="unset"`, or `hx-disinherit` where broad inherited selectors can empty swaps. |
+| `select_inheritance` | WARNING | Override inherited broad `hx-select` with an explicit selector or `hx-select="unset"` on the mutating element. `hx-disinherit` only affects descendants, not the element itself. |
 | `swap_safety` | INFO / WARNING | Add explicit local targets or isolate SSE swaps from broad inherited `hx-target`/`hx-swap`. |
 | `fragment_island` | INFO | Add `hx-disinherit` or a fragment-island wrapper around local mutation targets. |
 | `view_transition_scope` | WARNING | Scope View Transitions to navigation-only elements, not broad OOB/SSE live-update containers. |
 | `oob_registry` | ERROR / WARNING | Add the registered OOB block/target, fix a typo, or make the region optional only when absence is legitimate. |
 | `oob_target` | WARNING | Fix `hx-swap-oob` IDs that do not appear in any known template. |
+| `duplicate_id` | WARNING | Remove or rename repeated static `id="..."` values in the same template — duplicate ids break targeting and accessibility. |
+| `oob_fragment_orphan` | WARNING | Wire a route, EventStream, or signal render callback that yields the OOB fragment block, or remove the dead swap target. |
 | `htmx_provisioned` | WARNING | Provision htmx with `AppConfig(htmx=True)` or an htmx `<script>` in the layout chain when a template emits `hx-*`/`sse-*` attributes. |
 
 ## SSE And Reactive
