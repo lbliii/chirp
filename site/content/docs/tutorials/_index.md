@@ -18,6 +18,13 @@ cascade:
 :columns: 2
 :gap: medium
 
+:::{card} Lucky Cat Trade Panel
+:icon: trending-up
+:link: /chirp/docs/tutorials/lucky-cat-trade-panel/
+:description: 20-minute build-along — markets grid Page + ValidationError / FormAction trade flow
+Build one vertical slice of the flagship trading-floor demo from scratch.
+:::{/card}
+
 :::{card} View Transitions + OOB
 :icon: zap
 :link: /chirp/docs/tutorials/view-transitions-oob/

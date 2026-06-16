@@ -291,6 +291,33 @@ document.body.addEventListener("htmx:configRequest", function(event) {
 </script>
 {{ shell_runtime_script() }}
 {{ toast_container() }}
+{#- First-visit coachmarks (#297). Markup ships on every shell paint; coachmarks.js
+    hides it once luckycat-tour-seen is set. Public visitors get the SSE step;
+    signed-in traders get the full three-step tour (trade form + Suspense portfolio). -#}
+<div id="luckycat-tour" class="luckycat-tour" hidden
+     data-tour-auth="{{ 'true' if current_user().is_authenticated else 'false' }}"
+     data-tour-seen-key="luckycat-tour-seen">
+  <ol class="chirpui-visually-hidden" aria-hidden="true" data-luckycat-tour-steps>
+    <li>Live ticker &amp; order book — Updated over SSE, zero JS.</li>
+    {% if current_user().is_authenticated %}
+    <li>Trade form validation — 422 re-render in place.</li>
+    <li>Portfolio dashboard — Suspense: shell first, panels stream.</li>
+    {% end %}
+  </ol>
+  <div class="luckycat-tour__backdrop" aria-hidden="true"></div>
+  <div class="luckycat-tour__spotlight" aria-hidden="true"></div>
+  <div class="luckycat-tour__card" role="dialog" aria-modal="true"
+       aria-labelledby="luckycat-tour-title">
+    <p class="luckycat-tour__counter chirpui-text-muted chirpui-font-sm"></p>
+    <h2 id="luckycat-tour-title" class="luckycat-tour__title"></h2>
+    <p class="luckycat-tour__body chirpui-text-muted"></p>
+    <div class="luckycat-tour__actions">
+      <button type="button" class="luckycat-tour__skip chirpui-btn chirpui-btn--ghost">Skip tour</button>
+      <button type="button" class="luckycat-tour__back chirpui-btn chirpui-btn--ghost">Back</button>
+      <button type="button" class="luckycat-tour__next chirpui-btn chirpui-btn--primary">Next</button>
+    </div>
+  </div>
+</div>
 {% block page_scripts %}{% end %}
 {% end %}
 
@@ -594,6 +621,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
     delegates the toggle click off document so the control survives OOB rail
     swaps. Writes the collapsed cookie the server reads above. -#}
 <script defer src="/static/lucky-cat-shell.js"></script>
+<script defer src="/static/coachmarks.js"></script>
 {% end %}
 
 {#- Override brand_link (not brand): chirp-ui renders {% block brand %} INSIDE

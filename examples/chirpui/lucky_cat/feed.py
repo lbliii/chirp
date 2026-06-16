@@ -1,22 +1,22 @@
-"""Market-data boundary for Lucky Cat — ``FeedSource`` protocol + ``SimFeed``.
+"""DOMAIN — market-data boundary for Lucky Cat.
 
-The framework code never touches an exchange directly. It talks to a
-:class:`FeedSource`: a source-agnostic seam exposing a markets list, ticker /
-order-book / trade-tape / candle snapshots, a starting portfolio, and an async
-``subscribe`` stream the SSE route (#223) consumes.
+The ``FeedSource`` protocol and the shipped ``SimFeed`` implementation: a
+source-agnostic seam between the CHIRP wiring in ``app.py`` and the simulated
+exchange. Framework code never touches an exchange directly — routes and pages
+call ``get_feed()`` for snapshots or ``subscribe`` to the async tick stream that
+SSE routes consume.
 
-The shipped default is :class:`SimFeed`: a fully deterministic, dependency-free
-price simulator. Given a seed it produces an identical tick sequence, so it
-doubles as the test fixture and lets Lucky Cat clone-and-run offline / CI-safe.
-Live adapters (Kraken, Coinbase, ...) are out of scope for M1 (#6); this module
-only fixes the protocol seam and the sim default.
+The default ``SimFeed`` is fully deterministic (same seed → identical tick
+sequence), dependency-free, and doubles as the test fixture so Lucky Cat runs
+offline and CI-safe with zero external services. Live adapters (Kraken, Coinbase,
+…) are out of scope; only the protocol seam and the sim ship.
 
 Determinism + parallelism: each symbol owns an independent, seeded
 :class:`random.Random` stream, so the *advance* of one symbol never depends on
 the order in which symbols are advanced. That is what lets the per-tick price
 update fan out across worker threads (:class:`~concurrent.futures.ThreadPoolExecutor`)
-for honest CPU-bound parallel work — the free-threading proof hook for #7 —
-*without* perturbing the deterministic sequence. No sleeps are used to fake load.
+for honest CPU-bound parallel work without perturbing the deterministic
+sequence. No sleeps are used to fake load.
 
 Pure stdlib only (``random``, ``math``, ``threading``, ``concurrent.futures``,
 ``asyncio``); importing this module does not re-enable the GIL on a 3.14t build.
@@ -113,12 +113,6 @@ class Candle:
 
 
 @dataclass(frozen=True, slots=True)
-class Portfolio:
-    cash_meow: float
-    positions: tuple[tuple[str, float], ...]
-
-
-@dataclass(frozen=True, slots=True)
 class Tick:
     """One fanned-out update bundle yielded by ``subscribe`` per simulated step."""
 
@@ -157,10 +151,6 @@ class FeedSource(Protocol):
         """OHLC history for ``interval`` (``1m`` / ``1H`` / ``1D`` / ``1W``), oldest first."""
         ...
 
-    def portfolio(self) -> Portfolio:
-        """Starting balances. Reserved for the trade-flow issue."""
-        ...
-
     def subscribe(self, symbol: str) -> AsyncIterator[Tick]:
         """Async stream of :class:`Tick` bundles, one per simulated update."""
         ...
@@ -182,7 +172,7 @@ _MARKET_DEFS: tuple[_MarketDef, ...] = (
     ("KOBAN-MEOW", "KOBAN", "MEOW", "Koban", 21.00, 0.035),
 )
 
-# Env var that grows the catalog to N markets for scale demos (#278). Unset or
+# Env var that grows the catalog to N markets for scale demos. Unset or
 # N <= len(_MARKET_DEFS) keeps the shipped 6 verbatim, so the determinism golden
 # (test_feed_determinism.py, seed 0xCA7) stays green by default.
 _CATALOG_ENV = "LUCKY_CAT_CATALOG"
@@ -279,6 +269,10 @@ class _SymbolState:
     candles: list[Candle]
     next_trade_id: int
     step: int
+    # Per-level consumption overlay for the current step's synthetic ladder.
+    # Cleared on each engine advance so user fills eat the live book snapshot.
+    ask_consumed: dict[int, float]
+    bid_consumed: dict[int, float]
 
 
 class SimFeed:
@@ -303,7 +297,7 @@ class SimFeed:
 
     def __init__(self, seed: int = DEFAULT_SEED, *, tick_interval: float = 1.0) -> None:
         self._seed = seed
-        # Resolve the catalog ONCE at construction from LUCKY_CAT_CATALOG (#278).
+        # Resolve the catalog ONCE at construction from LUCKY_CAT_CATALOG.
         # Default / N <= 6 == _MARKET_DEFS verbatim, so the determinism golden
         # stays green; N > 6 appends deterministic synthetic defs. Stored on the
         # instance so _init_states and the volatility lookup never re-read the env.
@@ -328,7 +322,7 @@ class SimFeed:
             thread_name_prefix="luckycat-tick",
         )
         self._states: dict[str, _SymbolState] = {}
-        # Observability-only tick counter (#227 free-threading proof). Bumped once
+        # Observability-only tick counter for the free-threading proof panel. Bumped once
         # per *symbol-advance* inside _advance_symbol, so it counts genuine
         # parallel increments across the worker pool. It is NEVER read by the
         # price engine, so it cannot perturb the deterministic tick sequence —
@@ -364,6 +358,8 @@ class SimFeed:
                 candles=[],
                 next_trade_id=1,
                 step=0,
+                ask_consumed={},
+                bid_consumed={},
             )
         self._states = states
 
@@ -413,9 +409,11 @@ class SimFeed:
         st = self._states[symbol]
         vol = self._vol_for(symbol)
         st.step += 1
+        st.ask_consumed.clear()
+        st.bid_consumed.clear()
         ts = float(st.step)
 
-        # Free-threading proof (#227): count this symbol-advance. Multiple worker
+        # Free-threading proof: count this symbol-advance. Multiple worker
         # threads hit this concurrently under a 3.14t build, so the counter is an
         # honest measure of parallel CPU work. Its own lock keeps it off the
         # engine's self._lock and it is read only by the FT panel, never here.
@@ -535,7 +533,8 @@ class SimFeed:
             ts=float(st.step),
         )
 
-    def _book_locked(self, st: _SymbolState, depth: int) -> OrderBook:
+    def _raw_ladder_locked(self, st: _SymbolState) -> tuple[list[BookLevel], list[BookLevel]]:
+        """Full synthetic bid/ask ladder for the current step (caller holds lock)."""
         dp = self._price_dp(st.price)
         spread = max(st.price * 0.0004, 10.0**-dp)
         mid = st.price
@@ -553,19 +552,71 @@ class SimFeed:
             ask_size = round((unit * 4.0 * depth_decay) * (0.6 + ladder_rng.random()), 6)
             bids.append(BookLevel(price=round(bid_price, dp), size=bid_size))
             asks.append(BookLevel(price=round(ask_price, dp), size=ask_size))
+        return bids, asks
+
+    @staticmethod
+    def _apply_depth_consumed(
+        levels: list[BookLevel], consumed: dict[int, float]
+    ) -> tuple[BookLevel, ...]:
+        """Subtract per-level consumption and drop depleted levels."""
+        out: list[BookLevel] = []
+        for i, lvl in enumerate(levels):
+            rem = max(0.0, lvl.size - consumed.get(i, 0.0))
+            if rem > 1e-9:
+                out.append(BookLevel(price=lvl.price, size=round(rem, 6)))
+        return tuple(out)
+
+    def _book_locked(self, st: _SymbolState, depth: int) -> OrderBook:
+        bids, asks = self._raw_ladder_locked(st)
         return OrderBook(
             symbol=st.market.symbol,
-            bids=tuple(bids[:depth]),
-            asks=tuple(asks[:depth]),
+            bids=self._apply_depth_consumed(bids, st.bid_consumed)[:depth],
+            asks=self._apply_depth_consumed(asks, st.ask_consumed)[:depth],
             ts=float(st.step),
         )
+
+    def _consume_depth_locked(self, st: _SymbolState, side: str, size: float) -> None:
+        """Eat size off the top of the bid or ask ladder. Caller holds ``self._lock``."""
+        if size <= 0:
+            return
+        bids, asks = self._raw_ladder_locked(st)
+        levels = asks if side == "buy" else bids
+        consumed = st.ask_consumed if side == "buy" else st.bid_consumed
+        remaining = size
+        for i, lvl in enumerate(levels):
+            avail = max(0.0, lvl.size - consumed.get(i, 0.0))
+            if avail <= 1e-9:
+                continue
+            take = min(remaining, avail)
+            consumed[i] = consumed.get(i, 0.0) + take
+            remaining -= take
+            if remaining <= 1e-9:
+                break
+
+    def _append_trade_locked(
+        self, st: _SymbolState, side: str, size: float, price: float
+    ) -> None:
+        """Prepend a user fill to the tape. Caller holds ``self._lock``."""
+        dp = self._price_dp(price)
+        trade = Trade(
+            id=st.next_trade_id,
+            symbol=st.market.symbol,
+            price=round(price, dp),
+            size=round(size, 6),
+            side=side,
+            ts=float(st.step),
+        )
+        st.next_trade_id += 1
+        st.trades.insert(0, trade)
+        del st.trades[self._TAPE_MAX :]
+        st.volume_24h += size
 
     # -- FeedSource protocol ----------------------------------------------
 
     def markets(self) -> tuple[Market, ...]:
         return tuple(st.market for st in self._states.values())
 
-    # -- free-threading observability (#227 Part A) -----------------------
+    # -- free-threading observability -------------------------------------
 
     @property
     def worker_count(self) -> int:
@@ -602,6 +653,25 @@ class SimFeed:
     def order_book(self, symbol: str, depth: int = 12) -> OrderBook:
         with self._lock:
             return self._book_locked(self._require(symbol), depth)
+
+    def consume_depth(self, symbol: str, side: str, size: float) -> None:
+        """Remove ``size`` from the top of the ask ladder (buy) or bid ladder (sell).
+
+        Thread-safe mutation hook for the trade flow: a market buy eats the
+        best asks; a market sell eats the best bids. Consumption is keyed to the
+        current step's synthetic ladder and clears on the next engine advance.
+        """
+        if side not in ("buy", "sell"):
+            raise ValueError(side)
+        with self._lock:
+            self._consume_depth_locked(self._require(symbol), side, size)
+
+    def append_trade(self, symbol: str, side: str, size: float, price: float) -> None:
+        """Append a user-executed print to the symbol's trade tape."""
+        if side not in ("buy", "sell"):
+            raise ValueError(side)
+        with self._lock:
+            self._append_trade_locked(self._require(symbol), side, size, price)
 
     def trades(self, symbol: str, limit: int = 30) -> tuple[Trade, ...]:
         with self._lock:
@@ -699,17 +769,6 @@ class SimFeed:
             prev_close = close
         return tuple(candles)
 
-    def portfolio(self) -> Portfolio:
-        # Starting balances — reserved for the trade-flow issue.
-        return Portfolio(
-            cash_meow=1_000_000.0,
-            positions=(
-                ("BTC", 0.0),
-                ("ETH", 0.0),
-                ("SOL", 0.0),
-            ),
-        )
-
     def has_symbol(self, symbol: str) -> bool:
         return symbol in self._states
 
@@ -753,7 +812,7 @@ _feed: SimFeed | None = None
 def _build_feed() -> SimFeed:
     source = os.environ.get("LUCKY_CAT_FEED", "sim").strip().lower()
     if source != "sim":
-        # Live adapters are out of scope for M1 (#6). Anything else is unknown
+        # Live adapters are out of scope. Anything else is unknown
         # or unreachable: fall back to the deterministic sim with a logged
         # warning.
         logger.warning(

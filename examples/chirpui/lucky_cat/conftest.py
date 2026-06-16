@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+_here = Path(__file__).parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))
+
 
 @pytest.fixture(autouse=True)
 def _lucky_cat_on_path(request: pytest.FixtureRequest):
@@ -51,10 +55,19 @@ def example_app(request: pytest.FixtureRequest):
         feed_mod = sys.modules.get("feed")
         if feed_mod is not None and hasattr(feed_mod, "reset"):
             feed_mod.reset()
+        session_mod = sys.modules.get("session_store")
+        if session_mod is not None and hasattr(session_mod, "reset"):
+            session_mod.reset()
         # Reset the house wallet to its seed balance too (#230 adds reset()).
         wallet_mod = sys.modules.get("wallet")
         if wallet_mod is not None and hasattr(wallet_mod, "reset"):
             wallet_mod.reset()
+        account_mod = sys.modules.get("account_store")
+        if account_mod is not None and hasattr(account_mod, "reset"):
+            account_mod.reset()
+        backplane_mod = sys.modules.get("backplane")
+        if backplane_mod is not None and hasattr(backplane_mod, "reset"):
+            backplane_mod.reset()
         # Reset the trading store (positions / open orders / history) (#225).
         trade_mod = sys.modules.get("trade_store")
         if trade_mod is not None and hasattr(trade_mod, "reset"):

@@ -28,7 +28,7 @@ lane.
 :::{card} Lucky Cat
 :icon: rocket
 :link: /chirp/docs/examples/lucky-cat/
-:description: Maneki-neko $MEOW crypto exchange — markets, trade flow, Suspense portfolio, and a command palette
+:description: Maneki-neko $MEOW simulated trading-floor UI — markets, trade flow, Suspense portfolio, and a command palette
 The marquee ChirpUI app-shell demo: trade `FormAction`/`ValidationError`, `Suspense`, and chrome bound to server-owned `signal()`s.
 :::{/card}
 

@@ -1,8 +1,10 @@
 # Lucky Cat — Design Doctrine
 
 > The flagship ChirpUI app-shell example. A deterministic, simulated maneki-neko
-> crypto exchange — courting crypto/web3 devs — that composes *over* chirp-ui
-> instead of forking it, and runs honestly on Python 3.14 free-threading.
+> **trading-floor UI** — the kind of product surface crypto/web3 teams ship, but
+> deliberately *not* wired to chain or exchange infrastructure — that composes
+> *over* chirp-ui instead of forking it, and runs honestly on Python 3.14
+> free-threading.
 
 This is the teaching artifact for the example: what it is, the hard-won
 information-architecture doctrine, the feature map, the patterns worth stealing,
@@ -28,6 +30,24 @@ deterministic, dependency-free price engine. Same seed (`DEFAULT_SEED = 0xCA7`)
 => identical tick sequence, so the sim doubles as the test fixture and lets the
 example clone-and-run offline and CI-safe. Live adapters (Kraken/Coinbase) are
 explicitly out of scope.
+
+### Web3 non-goals (deliberately out of scope)
+
+Lucky Cat teaches ChirpUI and server-owned realtime — not blockchain plumbing.
+These are **not** on the roadmap for this example:
+
+- **No wallet-connect** — sign-in is session-based (`AuthMiddleware` + demo
+  account), not a browser wallet or SIWE flow.
+- **No on-chain settlement** — the `$MEOW` balance and fills live in in-memory
+  Python stores (`wallet.py`, `trade_store.py`), not a ledger or smart contract.
+- **No matching engine** — orders validate and fill against the sim price +
+  in-memory book logic; there is no order-matching service, mempool, or CLOB
+  adapter.
+
+The visual language (tickers, order book, tape, portfolio) mirrors a trading-floor
+product UI so prospects can evaluate Chirp on familiar chrome. The simulation
+boundary is the point: deterministic, offline, CI-safe, and free of external
+services.
 
 Three things make it the flagship:
 

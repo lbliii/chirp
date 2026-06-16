@@ -87,7 +87,47 @@ jobs:
       - name: Tests
         env:
           PYTHON_GIL: "0"
-        run: uv run pytest -q --tb=short --timeout=60 -m "not slow"
+        run: uv run pytest -q --tb=short --timeout=60 -m "not slow" --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py
+
+  # Real-browser smoke for the Lucky Cat shell (issue #286). Playwright needs
+  # Chromium system deps that we install via `playwright install --with-deps`;
+  # isolated here so the main free-threaded test job stays lean.
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-browser-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-browser-
+            uv-${{ runner.os }}-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --no-sources --group dev
+
+      - name: Install Chromium
+        run: uv run playwright install chromium --with-deps
+
+      - name: Lucky Cat browser smoke
+        run: uv run pytest examples/chirpui/lucky_cat/test_browser_smoke.py -q --tb=short --timeout=120
 
   # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded
   # 3.14t and does not ship asyncpg (a C-extension dependency), so live Postgres

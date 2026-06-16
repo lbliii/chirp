@@ -21,6 +21,7 @@ import re
 import pytest
 
 from chirp.testing import TestClient
+from store_test_helpers import sole_client_store, warm_authed_store
 from tests.helpers.auth import (
     csrf_post,
     extract_session_cookie,
@@ -205,7 +206,8 @@ class TestWatchlistPage:
                 cookie_name=_SESSION_COOKIE,
                 data={"symbol": "SOL-MEOW"},
             )
-            assert watchlist.symbols() == frozenset({"BTC-MEOW", "SOL-MEOW"})
+            with sole_client_store():
+                assert watchlist.symbols() == frozenset({"BTC-MEOW", "SOL-MEOW"})
             response = await client.get("/markets/favorites", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
@@ -239,7 +241,8 @@ class TestWatchlistPage:
                 cookie_name=_SESSION_COOKIE,
                 data={"symbol": "BTC-MEOW"},
             )
-            assert watchlist.contains("BTC-MEOW") is True
+            with sole_client_store():
+                assert watchlist.contains("BTC-MEOW") is True
             response = await client.get("/markets/favorites", headers=_cookie_header(cookie))
             assert response.status == 200
             assert 'id="watchlist-star-BTC-MEOW"' in response.text
@@ -280,8 +283,9 @@ class TestWatchlistToggle:
             assert "{{" not in body
             assert "{%" not in body
             # The store flipped.
-            assert watchlist.contains("BTC-MEOW") is True
-            assert watchlist.count() == 1
+            with sole_client_store():
+                assert watchlist.contains("BTC-MEOW") is True
+                assert watchlist.count() == 1
 
     async def test_toggle_twice_returns_to_unstarred(self, example_app) -> None:
         """Two toggles of the same symbol star then unstar it; the second response
@@ -298,7 +302,8 @@ class TestWatchlistToggle:
                 data={"symbol": "ETH-MEOW"},
             )
             assert first.status == 200
-            assert watchlist.contains("ETH-MEOW") is True
+            with sole_client_store():
+                assert watchlist.contains("ETH-MEOW") is True
 
             second, cookie = await csrf_post(
                 client,
@@ -309,8 +314,9 @@ class TestWatchlistToggle:
             )
             assert second.status == 200
             assert 'aria-pressed="false"' in second.text
-            assert watchlist.contains("ETH-MEOW") is False
-            assert watchlist.count() == 0
+            with sole_client_store():
+                assert watchlist.contains("ETH-MEOW") is False
+                assert watchlist.count() == 0
 
     @pytest.mark.issue(281)
     async def test_toggle_overrides_inherited_outlet(self, example_app) -> None:
@@ -323,9 +329,11 @@ class TestWatchlistToggle:
         card renders; this exercises the real toggle control's self-override)."""
         import watchlist
 
-        watchlist.add("BTC-MEOW")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
             response = await client.get("/", headers=_cookie_header(cookie))
             html = response.text
             star = re.search(r'<button[^>]*id="watchlist-star-BTC-MEOW"[^>]*>', html)
@@ -346,9 +354,11 @@ class TestWatchlistToggle:
         the moved /markets/favorites path, #282.)"""
         import watchlist
 
-        watchlist.add("BTC-MEOW")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
             response, cookie = await csrf_post(
                 client,
                 "/watchlist/toggle",
@@ -360,7 +370,8 @@ class TestWatchlistToggle:
             assert response.status == 200
             body = response.text
             # The unstar flipped the store.
-            assert watchlist.contains("BTC-MEOW") is False
+            with sole_client_store():
+                assert watchlist.contains("BTC-MEOW") is False
             # The card-removal OOB twin is present (delete the card cell).
             assert 'id="luckycat-card-BTC-MEOW"' in body
             assert 'hx-swap-oob="delete"' in body
@@ -377,9 +388,11 @@ class TestWatchlistToggle:
         grid (#282)."""
         import watchlist
 
-        watchlist.add("ETH-MEOW")
         async with TestClient(example_app) as client:
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("ETH-MEOW")
             response, cookie = await csrf_post(
                 client,
                 "/watchlist/toggle",
@@ -390,7 +403,8 @@ class TestWatchlistToggle:
             )
             assert response.status == 200
             body = response.text
-            assert watchlist.contains("ETH-MEOW") is False
+            with sole_client_store():
+                assert watchlist.contains("ETH-MEOW") is False
             # No card-removal twin off /watchlist — the card stays reversible.
             assert 'hx-swap-oob="delete"' not in body
 
@@ -411,7 +425,8 @@ class TestWatchlistToggle:
                 extra_headers={"HX-Current-URL": "http://testserver/markets/favorites"},
             )
             assert response.status == 200
-            assert watchlist.contains("DOGE-MEOW") is True
+            with sole_client_store():
+                assert watchlist.contains("DOGE-MEOW") is True
             # Starring (result starred=True) never removes a card.
             assert 'hx-swap-oob="delete"' not in response.text
 
@@ -484,9 +499,11 @@ class TestWatchlistStarMarkup:
 
             # SIGNED IN — star markets so the watchlist preview populates, then the
             # star is the real toggle button with the per-card id.
-            watchlist.add("BTC-MEOW")
-            watchlist.add("SOL-MEOW")
             cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
+                watchlist.add("SOL-MEOW")
             authed = await client.get("/", headers=_cookie_header(cookie))
             assert authed.status == 200
             authed_html = authed.text
@@ -598,10 +615,13 @@ class TestWatchlistRailLane:
         """With markets starred, the rail Watchlist lane shows the count badge."""
         import watchlist
 
-        watchlist.add("BTC-MEOW")
-        watchlist.add("ETH-MEOW")
         async with TestClient(example_app) as client:
-            response = await client.get("/")
+            cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            with sole_client_store():
+                watchlist.add("BTC-MEOW")
+                watchlist.add("ETH-MEOW")
+            response = await client.get("/", headers=_cookie_header(cookie))
             assert response.status == 200
             html = response.text
             # The count badge renders the tally (2) inside the #watchlist-count

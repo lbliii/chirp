@@ -1,18 +1,97 @@
-# Lucky Cat 🐱 — a Maneki-neko crypto exchange
-
-The flagship **ChirpUI** example: a complete, multi-page crypto-exchange trading
-floor built entirely on Chirp — full pages, fragments, Server-Sent Events,
-server-owned reactive signals, a Suspense dashboard, authentication, and the
-secure-by-default stack. **No client-side framework — just htmx and server-owned
-state.** The house token is **$MEOW**; market up is jade green, market down is
-lucky red.
+# Lucky Cat 🐱 — a Maneki-neko simulated trading-floor UI
 
 **▶ Live demo: <https://luckycat-production.up.railway.app>**
 
-It's the best place to see how Chirp's *return-type-as-intent* model and ChirpUI's
-app shell compose into a real product. The market data is a deterministic
-in-process simulation (`SimFeed`) — same seed, same ticks — so the example clones,
-runs offline, and is CI-safe with zero external services.
+Browse markets, open a coin detail page with a live chart and order book, place
+trades, and watch a Suspense portfolio dashboard stream in — all without a client
+framework, a build step, or external services. Sign in with the demo account
+(**`neko` / `luckycat`**) to trade; browsing is open to everyone.
+
+> **Screenshot:** _No checked-in asset yet — open the live demo or run locally
+> and capture the Markets Home lobby for docs._
+
+The flagship **ChirpUI** example: a complete, multi-page trading floor built
+entirely on Chirp — full pages, fragments, Server-Sent Events, server-owned
+reactive signals, a Suspense dashboard, authentication, and the secure-by-default
+stack. **No client-side framework — just htmx and server-owned state.** The
+house token is **$MEOW**; market up is jade green, market down is lucky red.
+
+It is a **simulated** trading floor, not a real exchange: prices come from an
+in-process `SimFeed` (deterministic, same seed every run), orders fill against
+in-memory stores, and there is no wallet-connect, no on-chain settlement, and no
+matching engine. That keeps the example clone-and-run offline, CI-safe, and
+focused on ChirpUI patterns rather than web3 plumbing.
+
+## Feature map
+
+Each feature, the Chirp **return type** it leans on, and the chirp-ui pieces it
+composes.
+
+| Feature | Route(s) | Return type | chirp-ui / composition |
+|---------|----------|-------------|------------------------|
+| **Markets Home (lobby)** | `GET /markets` + `GET /` alias | `Page` | curated lobby: stat strip, top-movers preview, watchlist preview + featured market, CTA into Research |
+| **Trending** | `GET /markets/trending` (`?seg=…`) | `Page` / `Fragment` | segmented leaderboard; snapshot-per-swap, no live re-rank |
+| **Research** | `GET /markets/research` (search/facet/sort/paginate) | `Page` / `Fragment` | power surface for 500+ coins; URL-param-driven `#research-results` swaps |
+| **Market detail** | `GET /markets/{symbol}` | `Page` | server-rendered SVG chart + order book + trade tape |
+| **— chart timeframe** | `GET /markets/{symbol}/chart?tf=` | `Fragment` | segmented 1m/1H/1D/1W toggle |
+| **— live ticker/book/tape** | `GET /markets/{symbol}/stream` | `EventStream` | per-page SSE; OOB swaps for detail blocks |
+| **Topbar live ticker** | `ticker` signal on `/_chirp/live` | live signal | rotating market spotlight on every page |
+| **Topbar $MEOW balance** | `balance` signal on `/_chirp/live` | live signal | `/deposit` + `/trade` call `app.emit('balance', …)` |
+| **Trade (spot)** | `POST /trade/order` | `ValidationError` **or** `FormAction` | multi-target OOB: positions + open-order badge + toast |
+| **— cancel** | `POST /trade/order/{id}/cancel` | `FormAction` | per-row delete + count OOB |
+| **— convert** | `POST /trade/convert` | `Fragment` / `FormAction` | self-contained `#convert-form` swap |
+| **Deposit** | `POST /deposit` | empty 204 | modal via `data-action="deposit"`; emits balance + notifications signals |
+| **Favorites** | `POST /watchlist/toggle`, `GET /markets/favorites` | `OOB` / `Page` | star toggle + starred-only grid |
+| **Notifications bell** | `POST /notifications/read` + `notifications` signal | 204 / live signals | derived `notif_badge` / `notif_announce` on one connection |
+| **Command palette (Cmd-K)** | `GET /search` | `Fragment` | chirp-ui `command_palette` dialog |
+| **Suspense dashboard** | `GET /portfolio` | `Suspense` | shell-first; six panels stream in as OOB swaps |
+| **Free-threading proof** | `GET /ft/stream` | `EventStream` | live ticks/sec panel on the portfolio page |
+| **Sign in / out** | `GET`/`POST /login`, `POST /logout` | `Page` / `ValidationError` / `FormAction` | prefilled demo card; HX-Redirect reload on success |
+| **Account gating** | gated `page.py` handlers | `@login_required` | anonymous → `/login?next=` |
+
+Full route names, footguns, and composition notes live in [`DESIGN.md`](DESIGN.md)
+§3.
+
+## What this replaces
+
+If you would reach for React/Next (or a separate SPA + API) for a trading-floor
+product UI, Lucky Cat shows the Chirp alternative — grounded in what this
+example actually does:
+
+| Concern | Typical React / Next stack | Lucky Cat on Chirp |
+|---------|---------------------------|-------------------|
+| **Tooling** | `npm install`, bundler, build step, `node_modules` | No build step, no `node_modules` — Python + static CSS/JS only |
+| **Live chrome** | Client state + WebSocket or client-managed SSE handlers | Server-owned `signal()` values on one `/_chirp/live` SSE connection |
+| **Navigation** | Client router, hydration, layout re-fetch | Boosted htmx swaps `#main`; server re-renders the rail from the current path |
+| **Forms & validation** | Client form lib + separate API routes | Return-type-as-intent in one handler: `ValidationError` (422) or `FormAction` |
+| **Page-local live data** | WebSocket subscriptions + client reconciliation | `EventStream` pushes HTML fragments (detail chart/book/tape) — no client state graph |
+| **Slow dashboard** | Loading spinners or client suspense boundaries | `Suspense`: shell paints with skeletons, panels stream as OOB swaps resolve |
+| **Auth** | JWT in storage, client route guards | Session cookie, `@login_required`, `AuthMiddleware` in the secure stack |
+| **Charts** | Chart.js / Recharts in the browser | Server-rendered SVG (`HeroChart`) — no JS chart library |
+| **Deploy surface** | Node server (+ often a separate API tier) | Single Python process; demo pins `workers=1` for in-memory state |
+| **Tests** | Jest/RTL + mocked fetch/WebSocket | `pytest` against deterministic `SimFeed` — offline, CI-safe, golden snapshots |
+| **Real exchange / web3** | Wallet-connect, chain RPC, matching engine | **Out of scope** — simulated `SimFeed`, in-memory wallet, no chain |
+
+## Start here — read in this order
+
+New to Lucky Cat? Skim these files in order — each one introduces one layer of
+the stack. Cross-check the primitive guides when a pattern is new:
+
+| # | File | Why read it |
+|---|------|-------------|
+| 1 | [`pages/_layout.html`](pages/_layout.html) | The ChirpUI app shell: topbar, live signal sinks, two-tier rail, auth-aware chrome. |
+| 2 | [`pages/page.py`](pages/page.py) | Filesystem routing entry — `GET /` aliases the Markets Home lobby (`Page` return type). |
+| 3 | [`pages/login/page.py`](pages/login/page.py) | Auth showcase: `ValidationError` (422, form in place) vs `FormAction` (full reload on success). |
+| 4 | [`app.py`](app.py) — [`/deposit`](app.py) route | First mutation on the secure stack; credits the wallet and `app.emit('balance', …)` fans the topbar + modal. See the [Signals guide](../../../site/content/docs/build-apps/streaming-updates/signals.md). |
+| 5 | [`pages/trade/page.py`](pages/trade/page.py) + [`app.py`](app.py) `/trade/order` | Trade flow: invalid order → `ValidationError`; clean fill → `FormAction` with multi-target OOB swaps. |
+| 6 | [`pages/portfolio/page.py`](pages/portfolio/page.py) | Suspense dashboard: shell paints with skeletons, six panels stream in as awaitables resolve. See [Streaming HTML & Suspense](../../../site/content/docs/build-apps/streaming-updates/html-streaming.md). |
+| 7 | [`feed.py`](feed.py) | **DOMAIN** seam — `FeedSource` protocol + deterministic `SimFeed`; everything else calls `get_feed()`. |
+
+Deeper doctrine (IA rules, footguns, design tokens) lives in [`DESIGN.md`](DESIGN.md).
+
+**Tutorial:** [Build a Live Trade Panel in 20 Minutes](../../../site/content/docs/tutorials/lucky-cat-trade-panel.md) —
+a from-scratch build-along for the markets grid (`Page` at `GET /`) and the
+`POST /trade/order` handler (`ValidationError` → `FormAction` multi-target OOB).
 
 ## What it demonstrates
 
@@ -175,4 +254,20 @@ pages/
   settings/           # account settings (+ security, display)
 static/             # Maneki-neko palette + exchange chrome (lucky-cat.css) + rail/chart JS
 ```
+
+## Build your own
+
+Start a new ChirpUI project with the scaffold, then borrow patterns from this
+example:
+
+```bash
+pip install "bengal-chirp[ui]"
+chirp new myapp --shell
+cd myapp
+python app.py
 ```
+
+The `--shell` scaffold wires `use_chirp_ui(app)`, boosted navigation, and the
+secure-by-default middleware stack — the same foundation Lucky Cat builds on.
+Clone this directory for the full trading-floor feature set, or read
+[`DESIGN.md`](DESIGN.md) for the IA doctrine and patterns worth stealing.
