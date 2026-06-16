@@ -85,3 +85,33 @@ class TestOOBTargets:
         all_ids = {"nav"}
         issues = check_oob_targets(sources, all_ids)
         assert len(issues) == 0
+
+    def test_chirpui_templates_skipped(self):
+        """Vendored chirpui/ templates are skipped, symmetric with id-collection.
+
+        Regression for #307: chirp-ui 0.10.0's ``context_rail_oob`` macro emits a
+        literal ``id="chirpui-context-rail"`` whose matching element lives in the
+        (also-skipped) ``chirpui/app_shell.html``. Since the checker never adds
+        chirp-ui ids to ``all_ids``, scanning chirp-ui's own OOB helpers here would
+        always be a false positive. chirp-ui owns its internal OOB consistency.
+        """
+        sources = {
+            "chirpui/oob.html": (
+                '<aside id="chirpui-context-rail" hx-swap-oob="innerHTML"></aside>'
+            ),
+        }
+        issues = check_oob_targets(sources, all_ids=set())
+        assert issues == []
+
+    def test_non_chirpui_still_warns_with_chirpui_present(self):
+        """The chirpui/ skip must not suppress real misses in app templates."""
+        sources = {
+            "chirpui/oob.html": (
+                '<aside id="chirpui-context-rail" hx-swap-oob="innerHTML"></aside>'
+            ),
+            "page.html": '<div hx-swap-oob="true" id="missing">x</div>',
+        }
+        issues = check_oob_targets(sources, all_ids=set())
+        assert len(issues) == 1
+        assert issues[0].template == "page.html"
+        assert "missing" in issues[0].message
