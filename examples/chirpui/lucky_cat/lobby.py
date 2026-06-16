@@ -62,6 +62,32 @@ class MoverPreview:
     rows: tuple[Row, ...]
 
 
+def _movers_for(rows: tuple[Row, ...]) -> tuple[MoverPreview, ...]:
+    """The three movers-preview segments — the SINGLE source shared by the SSR
+    lobby (:func:`lobby_context`) and the live snapshot (:func:`build_live_snapshot`),
+    so the static paint and every live re-rank can never drift."""
+    return (
+        MoverPreview(
+            key="gainers",
+            label="Gainers",
+            href="/markets/trending?seg=gainers",
+            rows=ranking.top_gainers(rows, _PREVIEW_N),
+        ),
+        MoverPreview(
+            key="losers",
+            label="Losers",
+            href="/markets/trending?seg=losers",
+            rows=ranking.top_losers(rows, _PREVIEW_N),
+        ),
+        MoverPreview(
+            key="volume",
+            label="Volume",
+            href="/markets/trending?seg=volume",
+            rows=ranking.top_volume(rows, _PREVIEW_N),
+        ),
+    )
+
+
 def lobby_context(
     markets: tuple,
     tickers: dict,
@@ -87,41 +113,24 @@ def lobby_context(
 
     stats = ranking.market_stats(rows)
 
-    movers = (
-        MoverPreview(
-            key="gainers",
-            label="Gainers",
-            href="/markets/trending?seg=gainers",
-            rows=ranking.top_gainers(rows, _PREVIEW_N),
-        ),
-        MoverPreview(
-            key="losers",
-            label="Losers",
-            href="/markets/trending?seg=losers",
-            rows=ranking.top_losers(rows, _PREVIEW_N),
-        ),
-        MoverPreview(
-            key="volume",
-            label="Volume",
-            href="/markets/trending?seg=volume",
-            rows=ranking.top_volume(rows, _PREVIEW_N),
-        ),
-    )
+    movers = _movers_for(rows)
 
-    # Featured: the catalog's top gainer (the headline mover). Rendered as a card,
-    # so its #luckycat-card-{symbol} / #watchlist-star-{symbol} ids must not repeat
-    # anywhere else on the page.
+    # Featured: the catalog's top gainer (the headline mover). Rendered as a
+    # bespoke LIVE spotlight (featured_spotlight_body), NOT market_card — it does
+    # NOT emit #luckycat-card-{symbol} / #watchlist-star-{symbol}, so it can re-rank
+    # live (the leader can change symbol) without ever colliding with the watchlist
+    # preview's card ids. That also means it no longer has to be de-duped out of the
+    # watchlist preview (see below).
     featured_row = stats.top_gainer
     featured_symbol = featured_row.symbol if featured_row is not None else None
     featured_market = by_symbol.get(featured_symbol) if featured_symbol is not None else None
 
-    # Watchlist preview: the starred markets in canonical catalog order, capped,
-    # and DE-DUPED against the featured symbol so the same card id never renders
-    # twice (the duplicate-id footgun). Markets that vanished from the catalog
-    # (stale star) are skipped — only real markets render a card.
-    starred_markets = tuple(
-        m for m in markets if m.symbol in starred and m.symbol != featured_symbol
-    )[:_WATCHLIST_PREVIEW_N]
+    # Watchlist preview: the starred markets in canonical catalog order, capped.
+    # No featured de-dupe needed anymore — the featured spotlight is bespoke (no
+    # card/star ids), so a starred coin that is ALSO the featured top gainer can
+    # appear in both regions without a duplicate id. Markets that vanished from the
+    # catalog (stale star) are skipped — only real markets render a card.
+    starred_markets = tuple(m for m in markets if m.symbol in starred)[:_WATCHLIST_PREVIEW_N]
 
     return {
         "stats": stats,
@@ -137,3 +146,113 @@ def lobby_context(
         "trending_href": "/markets/trending",
         "favorites_href": "/markets/favorites",
     }
+
+
+# ---------------------------------------------------------------------------
+# Live lobby snapshot — the value the `lobby_snapshot` SOURCE signal emits.
+#
+# The lobby's three market-data regions (stat strip / movers grid / featured
+# spotlight) update live over the ONE /_chirp/live connection. A single source
+# signal samples the feed on a human cadence and emits a LobbySnapshot; three
+# @app.derived signals PROJECT it into the three regions and re-render in lockstep
+# (compute-once / broadcast-many). See app.py + _components/lobby_live.html.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LobbySnapshot:
+    """One self-contained live snapshot of the lobby's market-data regions.
+
+    Carries everything the three region renders need — the ranked data AND the
+    per-value direction flags for the flash — so the derived signals stay PURE
+    functions of this value (no feed/store reads inside a derived; the cascade is
+    then deterministic across workers and race-free across threads).
+    """
+
+    stats: object  # ranking.MarketStats
+    movers: tuple  # tuple[MoverPreview, ...]
+    featured_market: object | None  # feed.Market | None
+    featured_row: Row | None
+    featured_ticker: object | None  # feed.Ticker | None
+    featured_spark: object | None  # pages._context.Sparkline | None
+    prices: dict  # {symbol: price} for ALL markets — the direction basis
+    stat_dirs: dict  # {"volume"|"advancers"|"decliners": "up"|"down"|""}
+    mover_dirs: dict  # {symbol: "up"|"down"|""} for the displayed mover rows
+    featured_dir: str  # "up"|"down"|"" for the featured price
+
+
+def _price_dir(cur, old) -> str:
+    """Direction of a numeric move (for the flash), '' when flat/unknown."""
+    if cur is None or old is None:
+        return ""
+    if cur > old:
+        return "up"
+    if cur < old:
+        return "down"
+    return ""
+
+
+def build_live_snapshot(feed, prev: LobbySnapshot | None = None) -> LobbySnapshot:
+    """Sample the feed (READ-ONLY) into a fresh lobby snapshot + direction flags.
+
+    READ-ONLY: only snapshot reads (``markets`` / ``ticker`` / ``candles``) — it
+    NEVER advances the SimFeed engine. Only ``feed.subscribe(...)`` advances it, and
+    the topbar ``ticker`` signal is the sole engine clock; this snapshot rides on top
+    by sampling. Direction flags are computed against ``prev`` (``None`` on the
+    first/seed snapshot → no flash on the initial paint).
+    """
+    # Lazy import: the sparkline geometry lives with the other card SVG math in the
+    # root context module; importing it here at call time avoids any import-order
+    # coupling (and matches the example's in-body import convention).
+    from pages._context import _sparkline
+
+    markets = feed.markets()
+    tickers = {m.symbol: feed.ticker(m.symbol) for m in markets}
+    rows = research.build_rows(tuple(markets), tickers)
+    by_symbol = {m.symbol: m for m in markets}
+
+    stats = ranking.market_stats(rows)
+    movers = _movers_for(rows)
+    prices = {sym: t.price for sym, t in tickers.items()}
+
+    featured_row = stats.top_gainer
+    featured_symbol = featured_row.symbol if featured_row is not None else None
+    featured_market = by_symbol.get(featured_symbol) if featured_symbol is not None else None
+    featured_ticker = tickers.get(featured_symbol) if featured_symbol is not None else None
+    featured_spark = None
+    if featured_symbol is not None:
+        closes = tuple(c.close for c in feed.candles(featured_symbol, limit=32))
+        featured_spark = _sparkline(closes)
+
+    prev_prices = prev.prices if prev is not None else {}
+    mover_dirs: dict[str, str] = {}
+    for seg in movers:
+        for row in seg.rows:
+            mover_dirs[row.symbol] = _price_dir(prices.get(row.symbol), prev_prices.get(row.symbol))
+    featured_dir = (
+        _price_dir(prices.get(featured_symbol), prev_prices.get(featured_symbol))
+        if featured_symbol is not None
+        else ""
+    )
+
+    if prev is not None:
+        stat_dirs = {
+            "volume": _price_dir(stats.total_volume, prev.stats.total_volume),
+            "advancers": _price_dir(stats.advancers, prev.stats.advancers),
+            "decliners": _price_dir(stats.decliners, prev.stats.decliners),
+        }
+    else:
+        stat_dirs = {}
+
+    return LobbySnapshot(
+        stats=stats,
+        movers=movers,
+        featured_market=featured_market,
+        featured_row=featured_row,
+        featured_ticker=featured_ticker,
+        featured_spark=featured_spark,
+        prices=prices,
+        stat_dirs=stat_dirs,
+        mover_dirs=mover_dirs,
+        featured_dir=featured_dir,
+    )

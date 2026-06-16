@@ -100,7 +100,11 @@ async def ticker():
   (defaults to `str`). Return HTML to swap a fragment, text to swap a scalar.
 - `coalesce` (default `True`) — latest-wins. A live value is idempotent, so
   dropping a stale update under back-pressure is safe; the next emit reconciles
-  every binding. Set `False` for append-style topics.
+  every binding. It also enables **emit dedup**: re-emitting a value equal to the
+  current one is skipped (no wire event, no derived cascade) — a pure `render` maps
+  equal values to equal payloads, so the swap would be byte-identical. Set `False`
+  for append-style / drop-sensitive topics (e.g. a toast log) where every emit must
+  fire even on a repeat value.
 
 For a push-only value, pass nothing to yield — `app.emit` drives it:
 
@@ -160,6 +164,17 @@ Three template globals, registered automatically when any signal exists:
 - `{{ signal_block('name') }}` — the same, for an HTML **fragment**, on a `<div>`.
   The seed is treated as already-rendered HTML (the signal's `render` produced
   markup).
+- `{{ signal_attrs('name') }}` — the binding **attributes only**
+  (`sse-swap="name" hx-target="this"`), for an **existing** element. The element
+  keeps rendering its own SSR body; live events `innerHTML`-swap it. Use this when a
+  `signal()`/`signal_block()` wrapper would break the element's own layout — e.g. a
+  CSS-grid container whose direct children must stay grid items, or a `<ul>`:
+
+  ```html
+  <section class="board" {{ signal_attrs('market_stats') }}>
+    {{ stat_strip_body(stats) }}   {# the section renders + re-renders its own body #}
+  </section>
+  ```
 - `{{ signal_connect() }}` — the **one** shared connection wrapper. Place it once
   in the shell; every signal sink must live as a **descendant**.
 
@@ -180,10 +195,12 @@ Three template globals, registered automatically when any signal exists:
 > be a descendant — htmx binds `sse-swap` via `querySelectorAll`, which excludes
 > the connect element itself. Close the wrapper yourself after the last sink.
 
-Existing shell elements can bind a signal with a **manual** `sse-swap="name"`
-attribute instead of the helper (useful when the sink is a pre-existing `<ul>` or
-`<span>` you don't want a helper to wrap). The contract check validates those
-literal `sse-swap` attrs too, as long as they sit under the signal connect.
+Prefer `{{ signal_attrs('name') }}` for binding an existing element — its call-site
+is recorded for topic scoping and recognised by the contract, so the binding is
+validated even though the `sse-swap` is produced at render time. A hand-written
+`sse-swap="name"` attribute also works, but it is only contract-validated when it
+sits in a template that *itself* opens the signal connect (a page composed into a
+connect-bearing layout is not scanned), so `signal_attrs` is the safer choice.
 
 The `/_chirp/live` merge stream is auto-registered at freeze when any signal
 exists. It subscribes to every registered signal: an event with no matching
@@ -237,6 +254,54 @@ async def deposit(request):
 One `app.emit("balance", ...)` fans `event: balance` to both balance bindings and
 cascades into `net_worth` — all over a single connection.
 
+## Recipe — a live board (one source, many derived projections)
+
+To make several regions of a page update live from **one** data source over the
+single connection, use one **source** signal as a clock-plus-snapshot and a
+**derived** projection per region. Compute the expensive part (a ranking, a query)
+**once** in the source; each derived is a cheap pure projection that re-renders its
+own region in lockstep — the *compute-once / broadcast-many* shape.
+
+```python
+# ONE source samples the data on a human cadence and emits a self-contained
+# snapshot (the data + per-value direction flags for the flash). It has no DOM
+# sink of its own, so its render returns None to skip its own wire event.
+@app.signal("board", initial=lambda: snapshot(None), render=lambda _v: None)
+async def board():
+    prev = None
+    while True:
+        await asyncio.sleep(1.5)          # the refresh cadence (throttle, don't firehose)
+        prev = snap = snapshot(prev)      # read-only; carries dirs vs the previous snap
+        yield snap
+
+# Each region is a PURE projection of the one snapshot — recomputed + re-rendered
+# in the same cascade, and skipped automatically when its projection is unchanged.
+@app.derived("stats",  on=("board",), render=render_stats)
+def stats(b):  return (b.stats, b.stat_dirs)
+
+@app.derived("movers", on=("board",), render=render_movers)
+def movers(b): return (b.movers, b.mover_dirs)
+```
+
+Bind each region with `signal_attrs` on the existing container, and render the same
+`{% def %}` body for the SSR paint and the derived re-render so they never drift:
+
+```html
+<section class="stats" {{ signal_attrs('stats') }}>{{ stats_body(stats) }}</section>
+<div class="movers" {{ signal_attrs('movers') }}>{{ movers_body(movers) }}</div>
+```
+
+Why it scales: the snapshot is built once per tick (not once per region); the
+derived stay pure (deterministic across workers); emit dedup drops any region whose
+projection didn't change; and it all rides the one `/_chirp/live` connection. The
+Lucky Cat markets lobby (`examples/chirpui/lucky_cat`) is a full worked example — a
+stat strip, a re-ranking movers grid, and a featured spotlight, all live.
+
+> **Flash on change**: each region `innerHTML`-swaps, so its values/rows are
+> re-created on every tick. Put a one-shot CSS animation class only on the values
+> that actually changed direction (carried in the snapshot's `dirs`) — the freshly
+> inserted element re-fires the animation, so only real movement flashes.
+
 ## PRODUCTION CONSTRAINT — single-process only
 
 The signal bus is **in-process memory**. The `ReactiveBus` behind `@app.signal`
@@ -273,7 +338,7 @@ replay pattern, where the backplane is your store rather than an in-process bus.
 
 | Check | Severity | What it catches |
 |---|---|---|
-| `signal_dead_binding` | ERROR | An `sse-swap="x"` / `{{ signal('x') }}` under the signal stream with **no** registered producer — the element would never update (the dead-binding class) |
+| `signal_dead_binding` | ERROR | A `{{ signal('x') }}` / `signal_block('x')` / `signal_attrs('x')` (or an `sse-swap="x"` under the signal stream) with **no** registered producer — the element would never update (the dead-binding class) |
 | `signal_orphan` | INFO | A registered signal that no template binds — produced but never displayed |
 
 Because signal names are dynamic (`signal(name)`), this rule validates against the

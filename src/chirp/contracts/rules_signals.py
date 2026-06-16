@@ -32,15 +32,16 @@ from chirp.contracts.types import ContractIssue, Severity
 #: Path of the merged signal stream (kept in sync with signal_globals).
 SIGNAL_STREAM_PATH = "/_chirp/live"
 
-#: A ``{{ signal('x') }}`` / ``{{ signal_block('x') }}`` binding — the canonical
-#: way to bind a signal. The element's ``sse-swap`` is produced at render time, so
-#: a literal-``sse-swap`` scan misses it; the helper CALL is the real signal. The
-#: ``(?:_block)?`` keeps ``signal_connect(`` / ``make_signal_globals(`` excluded.
-_SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block)?\s*\(\s*["']([^"']+)["']""")
+#: A ``{{ signal('x') }}`` / ``{{ signal_block('x') }}`` / ``{{ signal_attrs('x') }}``
+#: binding — the canonical ways to bind a signal. The element's ``sse-swap`` is
+#: produced at render time, so a literal-``sse-swap`` scan misses it; the helper
+#: CALL is the real signal. ``(?:_block|_attrs)?`` keeps ``signal_connect(`` /
+#: ``make_signal_globals(`` excluded.
+_SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block|_attrs)?\s*\(\s*["']([^"']+)["']""")
 
 
 def _signal_call_names(source: str) -> set[str]:
-    """Signal names bound via ``signal('x')`` / ``signal_block('x')`` helper calls."""
+    """Signal names bound via ``signal()`` / ``signal_block()`` / ``signal_attrs()`` calls."""
     return {m.group(1) for m in _SIGNAL_CALL_PATTERN.finditer(source)}
 
 
@@ -117,7 +118,8 @@ def check_signal_bindings(
             category="signal_orphan",
             message=(
                 f"signal {name!r} is registered but no template binds it with "
-                "signal()/signal_block(). It will be produced but never displayed."
+                "signal()/signal_block()/signal_attrs(). It will be produced but "
+                "never displayed."
             ),
         )
         for name in orphans

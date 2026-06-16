@@ -263,7 +263,19 @@ class SignalRegistry:
                     "@app.signal or @app.derived before emitting"
                 )
                 raise KeyError(msg)
+            spec = self._specs.get(name)
+            prev_present = name in self._values
+            prev = self._values.get(name)
             self._values[name] = value
+
+        # Idempotent dedup: a coalescing signal whose value is unchanged would
+        # fan out a byte-identical payload (a pure render maps equal values to
+        # equal payloads) — skip the wire event AND the derived cascade entirely;
+        # every binding already shows it. ``coalesce=False`` (append-/drop-
+        # sensitive topics, e.g. a toast log) always emits, even on a repeat value.
+        coalesce = spec.coalesce if spec is not None else True
+        if coalesce and prev_present and _values_equal(prev, value):
+            return
 
         self._publish(name, value)
         self._cascade(name)
@@ -307,7 +319,16 @@ class SignalRegistry:
                     )
                     continue
                 with self._lock:
+                    prev_present = dname in self._values
+                    prev = self._values.get(dname)
                     self._values[dname] = derived_value
+                # A derived is a PURE projection of its inputs, so an unchanged
+                # value means an unchanged DOM — skip its wire event AND stop
+                # propagating down this branch (its own dependents cannot have
+                # changed either). The redundant-cascade fix (rank/project once,
+                # emit only on real change).
+                if prev_present and _values_equal(prev, derived_value):
+                    continue
                 self._publish(dname, derived_value)
                 # Propagate transitively: this derived's value just changed, so
                 # any derived listening on IT must recompute in the same cascade.
@@ -350,3 +371,19 @@ class SignalRegistry:
 def _rendered_marker(name: str) -> str:
     """Marker path stored in a ChangeEvent for signal *name*."""
     return f"signal::{name}"
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    """Whether two cached signal values are equal for emit dedup.
+
+    A pure ``render`` maps equal values to equal payloads, so skipping the re-emit
+    of an unchanged value never drops a real DOM change. Returns ``False`` on any
+    comparison error (e.g. a value whose ``__eq__`` raises or is ambiguous), so the
+    safe default is always "treat as changed → emit".
+    """
+    if a is b:
+        return True
+    try:
+        return bool(a == b)
+    except Exception:
+        return False

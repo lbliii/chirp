@@ -100,17 +100,21 @@ class TestLobbyAlias:
 
     async def test_lobby_is_bounded_not_the_full_grid(self, example_app) -> None:
         """The lobby is BOUNDED — the old full #markets-grid landing is retired.
-        The card-bearing regions render at most (featured 1 + watchlist preview 3)
-        cards for a fresh (nothing-starred) visitor, far fewer than the 6-market
-        catalog the old grid showed."""
+        The only card-bearing region is the watchlist preview (capped at 3); the
+        featured slot is now a bespoke LIVE spotlight (#lobby-featured, no
+        #luckycat-card id). A fresh visitor sees the spotlight + an empty watchlist,
+        far fewer than the 6-market catalog the old grid showed."""
         async with TestClient(example_app) as client:
             response = await client.get("/")
-        cards = re.findall(r'id="luckycat-card-([A-Z0-9-]+)"', response.text)
-        # Fresh visitor: only the featured card (watchlist preview is empty), so
-        # strictly fewer than the full 6-market catalog.
-        assert 0 < len(cards) < 6, f"lobby is not bounded: {cards}"
+        text = response.text
+        cards = re.findall(r'id="luckycat-card-([A-Z0-9-]+)"', text)
+        # Bounded: never the full 6-market catalog (watchlist preview caps at 3; a
+        # fresh visitor has none).
+        assert len(cards) < 6, f"lobby is not bounded: {cards}"
+        # The featured spotlight renders (its live #lobby-featured sink).
+        assert 'id="lobby-featured"' in text
         # The old full-grid landing's #markets-grid id is gone (retired).
-        assert 'id="markets-grid"' not in response.text
+        assert 'id="markets-grid"' not in text
 
 
 class TestLobbySections:
@@ -138,8 +142,10 @@ class TestLobbySections:
         assert "Decliners" in html
 
     async def test_featured_is_the_top_gainer(self, example_app) -> None:
-        """The featured card is the catalog's top gainer (ranking.market_stats's
-        top_gainer) — the headline mover."""
+        """The featured spotlight is the catalog's top gainer (ranking.market_stats's
+        top_gainer) — the headline mover. It is a bespoke LIVE spotlight under the
+        #lobby-featured sink (no #luckycat-card id; it re-ranks live), so assert the
+        top-gainer symbol renders inside that region."""
         import ranking
         import research
         from feed import get_feed
@@ -153,7 +159,10 @@ class TestLobbySections:
 
         async with TestClient(example_app) as client:
             html = (await client.get("/")).text
-        assert f'id="luckycat-card-{top.symbol}"' in html
+        assert 'id="lobby-featured"' in html
+        featured = html[html.find('id="lobby-featured"') :]
+        featured = featured[: featured.find("</section>")]
+        assert top.symbol in featured
 
     async def test_movers_preview_links_into_trending(self, example_app) -> None:
         """The movers preview teases each Trending segment and links each row to
@@ -190,11 +199,12 @@ class TestLobbyDuplicateIds:
             response = await client.get("/markets")
         assert not _dupes(response.text), f"duplicate ids in GET /markets: {_dupes(response.text)}"
 
-    async def test_starred_featured_coin_renders_one_card(self, example_app) -> None:
-        """The CRITICAL de-dupe proof: star the FEATURED coin (the top gainer) +
-        others, then assert it renders exactly ONE #luckycat-card / one
-        #watchlist-star — it is dropped from the watchlist preview because it is
-        already the featured card. No duplicate id, ever."""
+    async def test_starred_featured_coin_has_no_duplicate_ids(self, example_app) -> None:
+        """The de-dupe proof, restated for the bespoke spotlight: the featured slot
+        no longer emits #luckycat-card / #watchlist-star ids, so even if the featured
+        coin is ALSO starred (and shown in the watchlist preview), the spotlight and
+        the watchlist card live in DIFFERENT id namespaces — no collision. No
+        duplicate id, ever."""
         import ranking
         import research
         import watchlist
@@ -221,12 +231,13 @@ class TestLobbyDuplicateIds:
             response = await client.get("/", headers={"Cookie": f"{_SESSION_COOKIE}={cookie}"})
         html = response.text
         assert response.status == 200
-        # No duplicate ids at all (the whole-page invariant).
+        # No duplicate ids at all (the whole-page invariant), featured coin starred.
         assert not _dupes(html), f"duplicate ids with featured coin starred: {_dupes(html)}"
-        # The featured coin renders exactly ONE card + ONE star (the featured slot;
-        # de-duped out of the watchlist preview).
-        assert html.count(f'id="luckycat-card-{featured.symbol}"') == 1
-        assert html.count(f'id="watchlist-star-{featured.symbol}"') == 1
+        # The featured spotlight renders the featured coin once, in #lobby-featured.
+        assert 'id="lobby-featured"' in html
+        featured_region = html[html.find('id="lobby-featured"') :]
+        featured_region = featured_region[: featured_region.find("</section>")]
+        assert featured.symbol in featured_region
 
 
 class TestLobbyLinkIntegrity:
@@ -260,7 +271,10 @@ class TestLobbyLinkIntegrity:
 class TestLobbyContext:
     """Unit coverage for the pure lobby.lobby_context de-dupe + bounding."""
 
-    def test_featured_dropped_from_watchlist_preview(self) -> None:
+    def test_featured_not_deduped_from_watchlist_preview(self) -> None:
+        """The featured spotlight is bespoke (no card/star ids), so it no longer has
+        to be de-duped out of the watchlist preview — a starred coin that is ALSO the
+        featured top gainer can appear in BOTH regions without an id collision."""
         import lobby
         import ranking
         import research
@@ -277,8 +291,10 @@ class TestLobbyContext:
         starred = frozenset(m.symbol for m in markets)
         ctx = lobby.lobby_context(markets, tickers, {}, starred)
         preview_syms = [m.symbol for m in ctx["watchlist_preview"]]
-        # The featured symbol is NOT in the watchlist preview (de-duped).
-        assert featured.symbol not in preview_syms
+        # The watchlist preview is the first-N starred catalog markets with NO
+        # featured exclusion (the de-dupe is gone).
+        expected = [m.symbol for m in markets if m.symbol in starred][: lobby._WATCHLIST_PREVIEW_N]
+        assert preview_syms == expected
         assert ctx["featured_market"].symbol == featured.symbol
 
     def test_watchlist_preview_is_capped(self) -> None:

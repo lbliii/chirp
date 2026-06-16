@@ -10,6 +10,7 @@ the dead-binding contract check (the #238 dead-ticker class).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 
 import pytest
@@ -276,6 +277,80 @@ class TestDerived:
 
 
 # ---------------------------------------------------------------------------
+# Emit dedup (#3): an unchanged value is idempotent — skip the redundant event
+# ---------------------------------------------------------------------------
+
+
+class TestEmitDedup:
+    """A pure render maps equal values to equal payloads, so re-emitting an
+    unchanged value would fan out a byte-identical swap. The registry skips it
+    (and the derived cascade) unless the signal opts out with ``coalesce=False``."""
+
+    async def _events_on(self, reg, scope, emits, *, gap=0.03):
+        """Subscribe to *scope*, run each thunk in *emits* with a gap between (so the
+        bus delivers each event before the next, isolating registry dedup from any
+        bus-level coalescing), and return the events received on that scope."""
+        received: list[object] = []
+
+        async def watch() -> None:
+            async for event in reg.bus.subscribe(scope):
+                received.append(event)  # noqa: PERF401 - background collector, cancelled (no comprehension)
+
+        task = asyncio.create_task(watch())
+        await asyncio.sleep(0.02)
+        for thunk in emits:
+            thunk()
+            await asyncio.sleep(gap)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        return received
+
+    async def test_repeat_value_is_deduped(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance"))
+        events = await self._events_on(
+            reg,
+            _SCOPE_PREFIX + "balance",
+            [lambda: reg.emit("balance", 5), lambda: reg.emit("balance", 5)],
+        )
+        assert len(events) == 1  # the identical second emit is skipped
+
+    async def test_changed_value_emits_each_time(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance"))
+        events = await self._events_on(
+            reg,
+            _SCOPE_PREFIX + "balance",
+            [lambda: reg.emit("balance", 5), lambda: reg.emit("balance", 6)],
+        )
+        assert len(events) == 2
+
+    async def test_coalesce_false_emits_repeats(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="log", coalesce=False))  # append/drop-sensitive
+        events = await self._events_on(
+            reg,
+            _SCOPE_PREFIX + "log",
+            [lambda: reg.emit("log", "x"), lambda: reg.emit("log", "x")],
+        )
+        assert len(events) == 2  # every emit fires, even a repeat value
+
+    async def test_derived_unchanged_projection_is_deduped(self) -> None:
+        # The source value CHANGES but the derived projection is identical → the
+        # derived emits once (rank/project once, emit only on a real change).
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="src"))
+        reg.register_derived(DerivedSpec(name="parity", deps=("src",), compute=lambda n: n % 2))
+        events = await self._events_on(
+            reg,
+            _SCOPE_PREFIX + "parity",
+            [lambda: reg.emit("src", 2), lambda: reg.emit("src", 4)],  # both even → parity 0
+        )
+        assert len(events) == 1
+
+
+# ---------------------------------------------------------------------------
 # Free-threading: concurrent emits under the Lock (AGENTS.md Lock proof)
 # ---------------------------------------------------------------------------
 
@@ -356,6 +431,35 @@ class TestGlobals:
         assert 'hx-ext="sse"' in connect
         assert 'sse-connect="/_chirp/live"' in connect
         assert "topics=" not in connect
+
+    def test_signal_attrs_emits_bare_attrs_no_wrapper(self) -> None:
+        """signal_attrs binds an EXISTING element: it emits only the attributes
+        (sse-swap + hx-target), no <span>/<div> wrapper, so a layout's own grid
+        container becomes a live sink without breaking its layout."""
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="board", initial=lambda: "x"))
+        globals_ = make_signal_globals(reg)
+        attrs = str(globals_["signal_attrs"]("board"))
+        assert attrs == 'sse-swap="board" hx-target="this"'
+        # No element is emitted (it decorates an existing tag).
+        assert "<" not in attrs
+        assert ">" not in attrs
+
+    def test_signal_attrs_is_contract_detected(self) -> None:
+        """A signal_attrs('x') call is recognised by the dead-binding contract by
+        its call-site (like signal()/signal_block()), so the binding is validated
+        even though the element's sse-swap is produced at render time."""
+        # Bound + registered → no issue; bound + unregistered → dead-binding ERROR.
+        ok = check_signal_bindings(
+            {"page.html": "{{ signal_connect() }}<section {{ signal_attrs('board') }}>"},
+            frozenset({"board"}),
+        )
+        assert not [i for i in ok if i.severity is Severity.ERROR]
+        dead = check_signal_bindings(
+            {"page.html": "{{ signal_connect() }}<section {{ signal_attrs('typo') }}>"},
+            frozenset({"board"}),
+        )
+        assert any(i.category == "signal_dead_binding" for i in dead)
 
 
 # ---------------------------------------------------------------------------
