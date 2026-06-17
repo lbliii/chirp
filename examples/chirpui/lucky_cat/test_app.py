@@ -3030,3 +3030,61 @@ class TestNotificationsBell:
         registry = lucky_app.app._mutable_state.signal_registry
         assert registry is not None
         assert registry.cached_value("notifications", audience_key=key) is not None
+
+
+class TestExampleModuleIsolation:
+    """Cross-example sys.modules collisions must not break Lucky Cat's load."""
+
+    @pytest.mark.issue(362)
+    def test_app_load_purges_foreign_pages_module(self) -> None:
+        """Loading Lucky Cat's app.py must purge a sibling example's stale
+        ``pages._context`` so ``from pages._context import hero_chart`` resolves
+        to OUR tree. Eight chirpui examples share the ``pages`` package name; a
+        sibling left in sys.modules by an earlier test on a shared xdist worker
+        used to error the whole Lucky Cat suite at collection (#362)."""
+        import importlib.util
+        import sys
+        import types
+        from pathlib import Path
+
+        here = Path(__file__).parent
+        sibling_pages = here.parent / "kanban_shell" / "pages"
+
+        # Snapshot every pages*/app entry so we can fully restore afterward.
+        saved = {
+            n: sys.modules.get(n)
+            for n in list(sys.modules)
+            if n == "pages" or n.startswith("pages.") or n == "app"
+        }
+        # Poison: a foreign ``pages._context`` with NO ``hero_chart`` — exactly the
+        # stale module a sibling example leaves behind on a shared worker.
+        fake_pkg = types.ModuleType("pages")
+        fake_pkg.__file__ = str(sibling_pages / "__init__.py")
+        fake_pkg.__path__ = [str(sibling_pages)]
+        fake_ctx = types.ModuleType("pages._context")
+        fake_ctx.__file__ = str(sibling_pages / "_context.py")
+        sys.modules["pages"] = fake_pkg
+        sys.modules["pages._context"] = fake_ctx
+
+        try:
+            if str(here) not in sys.path:
+                sys.path.insert(0, str(here))
+            spec = importlib.util.spec_from_file_location(
+                "example_lucky_cat_isolation", here / "app.py"
+            )
+            assert spec is not None
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["example_lucky_cat_isolation"] = module
+            # Must NOT raise ImportError on ``from pages._context import hero_chart``.
+            spec.loader.exec_module(module)
+            assert module.app is not None
+            # The real Lucky Cat pages._context (with hero_chart) is now resolved.
+            assert Path(sys.modules["pages._context"].__file__).parent == (here / "pages")
+        finally:
+            sys.modules.pop("example_lucky_cat_isolation", None)
+            for n in [n for n in list(sys.modules) if n == "pages" or n.startswith("pages.")]:
+                sys.modules.pop(n, None)
+            for n, mod in saved.items():
+                if mod is not None:
+                    sys.modules[n] = mod

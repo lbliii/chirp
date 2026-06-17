@@ -43,6 +43,19 @@ for _name in (
     if _file and Path(_file).resolve() != (ROOT_DIR / f"{_name}.py").resolve():
         del sys.modules[_name]
 
+# The ``pages`` package name is shared by every mounted-pages example
+# (kanban_shell, forum_shell, …). A sibling example's test can leave a stale
+# ``pages``/``pages.*`` in sys.modules (the per-example conftests do not all run
+# the shared module purge), so purge any whose file lives outside THIS example
+# before the ``from pages._context import hero_chart`` below — otherwise that
+# import resolves to a sibling's ``pages._context`` (which has no ``hero_chart``)
+# and the whole Lucky Cat suite errors at collection under the shared test run.
+for _name in [n for n in list(sys.modules) if n == "pages" or n.startswith("pages.")]:
+    _mod = sys.modules.get(_name)
+    _file = getattr(_mod, "__file__", None) if _mod is not None else None
+    if _file and ROOT_DIR.resolve() not in Path(_file).resolve().parents:
+        del sys.modules[_name]
+
 import lobby
 import notifications
 import session_store
