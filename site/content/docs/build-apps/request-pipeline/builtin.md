@@ -1,6 +1,6 @@
 ---
 title: Built-in Middleware
-description: CORS, StaticFiles, Sessions, Auth, CSRF, Security, and HTMLInject
+description: The middleware Chirp ships — CORS, static files, sessions, auth, CSRF, security headers, rate limiting, and host validation — plus the secure-by-default stack and the order to wire it.
 draft: false
 weight: 20
 lang: en
@@ -9,6 +9,124 @@ tags: [middleware, cors, static, sessions, auth, csrf, security, csp]
 keywords: [cors, static-files, sessions, auth, csrf, html-inject, middleware, allowed-hosts, csp-nonce]
 category: guide
 ---
+
+## Overview
+
+Middleware wraps every request before it reaches your handler and every response
+on the way out — for cross-origin rules, static files, sessions, authentication,
+CSRF, security headers, and host validation. You add each one with
+`app.add_middleware(...)`, and **order matters**: sessions must come before CSRF,
+and before auth.
+
+Most apps need only a few. The one rule worth memorizing: every app with a
+**mutating route** (a `POST`/`PUT`/`PATCH`/`DELETE` handler, or a page that ships
+`_actions.py`) should wire the secure-by-default stack —
+`SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware`. Chirp's
+`app.check()` flags a mutating route that's missing it.
+
+This page is the catalog. Skim the index, then jump to the row you need.
+
+:::{warning}
+A mutating app missing the `SessionMiddleware` → `CSRFMiddleware` →
+`SecurityHeadersMiddleware` stack is an **ERROR in production** (and a WARNING in
+staging) at `app.check()`. Order is part of the contract: `SessionMiddleware`
+must be registered *before* `CSRFMiddleware` and `AuthMiddleware`. See
+[[docs/quality/contracts-debugging/categories|the secure-by-default contract]] for
+the dev-vs-prod severity rules.
+:::
+
+### The secure-by-default stack
+
+`chirp new` scaffolds this wiring for you. To add it by hand, register the three
+in this order:
+
+::::{steps}
+:::{step} SessionMiddleware
+
+Signed cookie sessions. CSRF and auth both depend on it, so it goes first.
+
+```python
+app.add_middleware(SessionMiddleware(SessionConfig(secret_key=SECRET_KEY)))
+```
+
+:::{/step}
+:::{step} CSRFMiddleware
+
+Validates a token on every mutating request. Requires the session to already be active.
+
+```python
+app.add_middleware(CSRFMiddleware())
+```
+
+:::{/step}
+:::{step} SecurityHeadersMiddleware
+
+Adds clickjacking, MIME-sniffing, referrer, and CSP headers to HTML responses.
+
+```python
+app.add_middleware(SecurityHeadersMiddleware())
+```
+
+:::{/step}
+::::
+
+Add `AuthMiddleware` after `SessionMiddleware` (and before your protected routes)
+if the app has logins. Read `SECRET_KEY` from the environment — see
+[[docs/about/core-concepts/configuration|secret_key and AppConfig]].
+
+### Middleware at a glance
+
+::::{list-table}
+:header-rows: 1
+
+* - Middleware
+  - What it does
+  - Requires
+  - Import
+* - [CORS](#corsmiddleware)
+  - Cross-origin rules for API / htmx requests
+  - —
+  - `chirp.middleware`
+* - [StaticFiles](#staticfiles)
+  - Serve CSS / JS / images from a directory
+  - —
+  - `chirp.middleware`
+* - [Session](#sessionmiddleware)
+  - Signed cookie sessions
+  - `itsdangerous`
+  - `chirp.middleware.sessions`
+* - [Auth](#authmiddleware)
+  - Session + bearer-token authentication
+  - `SessionMiddleware`
+  - `chirp.middleware.auth`
+* - [CSRF](#csrfmiddleware)
+  - Token validation on mutating requests
+  - `SessionMiddleware`
+  - `chirp.middleware`
+* - [SecurityHeaders](#securityheadersmiddleware)
+  - Security headers on HTML responses
+  - —
+  - `chirp.middleware`
+* - [AuthRateLimit](#authratelimitmiddleware)
+  - Rate-limit login / signup / reset endpoints
+  - —
+  - `chirp.middleware`
+* - [AllowedHosts](#allowedhostsmiddleware)
+  - Reject spoofed `Host` headers
+  - —
+  - `chirp.middleware.allowed_hosts`
+* - [CSPNonce](#cspnoncemiddleware)
+  - Per-request nonce for inline scripts
+  - —
+  - `chirp.middleware.csp_nonce`
+* - [HTMLInject](#htmlinject)
+  - Inject a snippet before `</body>`
+  - —
+  - `chirp.middleware`
+::::
+
+Alpine.js and htmx scripts are injected by flags, not middleware you wire —
+see [Script injection](#script-injection) at the end.
 
 ## CORSMiddleware
 
@@ -28,59 +146,72 @@ cors = CORSMiddleware(CORSConfig(
 app.add_middleware(cors)
 ```
 
-Handles preflight `OPTIONS` requests automatically. Supports multiple origins, exposed headers, and credentials.
+Handles preflight `OPTIONS` requests automatically. Supports multiple origins,
+exposed headers, and credentials.
 
-:::{note}
-Credentialed CORS requires explicit origins. `CORSConfig(allow_credentials=True)` raises `ConfigurationError` when `allow_origins` includes `"*"`.
+:::{warning}
+Credentialed CORS requires explicit origins. `CORSConfig(allow_credentials=True)`
+raises `ConfigurationError` when `allow_origins` includes `"*"` — a wildcard with
+credentials is a CORS spec violation that browsers reject anyway.
 :::
 
 ## StaticFiles
 
-Serve static assets (CSS, JS, images) from a directory:
+Serve static assets (CSS, JS, images) from a directory. Use `prefix="/static"` for
+a sub-path, or `prefix="/"` to host a full static site at the root:
 
-```python
+::::{code-tabs}
+
+```python title="Static directory"
 from chirp.middleware import StaticFiles
 
+# Serve /static/* from the "static" directory
 app.add_middleware(StaticFiles(
     directory="static",
     prefix="/static",
 ))
 ```
 
-Features:
+```python title="Full static site"
+from chirp.middleware import StaticFiles
 
-- **Path traversal protection** -- uses `is_relative_to()` to prevent directory escape
-- **Index resolution** -- serves `index.html` for directory paths
-- **Trailing-slash redirects** -- redirects `/dir` to `/dir/` when a directory exists
-- **Custom 404** -- optionally serve a custom 404 page
-- **Root prefix** -- use `prefix="/"` for static site hosting
-
-```python
-# Serve a full static site from the "public" directory
+# Serve a whole site from the root with a custom 404
 app.add_middleware(StaticFiles(
     directory="public",
     prefix="/",
-    fallback="404.html",
+    not_found_page="404.html",
 ))
 ```
 
+::::
+
+Both modes share the same hardening:
+
+- **Path-traversal protection** — uses `is_relative_to()` to prevent directory escape
+- **Index resolution** — serves `index.html` for directory paths
+- **Trailing-slash redirects** — redirects `/dir` to `/dir/` when a directory exists
+- **Custom 404** — pass `not_found_page` to serve a custom not-found page
+
 ## SessionMiddleware
 
-Signed cookie sessions using itsdangerous:
+Signed cookie sessions using `itsdangerous`:
 
 ```python
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 app.add_middleware(SessionMiddleware(SessionConfig(
     secret_key="change-me-in-production",
+    secure=True,  # HTTPS-only cookie; set in production
 )))
 ```
 
 :::{note}
-Requires the `itsdangerous` package. A `ConfigurationError` is raised at startup if it's not installed or if `secret_key` is empty.
+Requires the `itsdangerous` package. A `ConfigurationError` is raised at startup
+if it is not installed or if `secret_key` is empty.
 :::
 
-Session data is JSON-serialized into a signed cookie with sliding expiration. Access the session dict via `get_session()`:
+Session data is JSON-serialized into a signed cookie with sliding expiration.
+Access the session dict via `get_session()`:
 
 ```python
 from chirp.middleware.sessions import get_session
@@ -92,9 +223,11 @@ def count():
     return f"Visits: {session['visits']}"
 ```
 
-`get_session()` returns a plain `dict[str, Any]` backed by a `ContextVar` -- safe under free-threading.
+`get_session()` returns a plain `dict[str, Any]` backed by a `ContextVar` — safe
+under free-threading.
 
-**Configuration options:**
+::::{dropdown} All SessionConfig options
+:icon: settings
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -104,16 +237,20 @@ def count():
 | `httponly` | `True` | Prevent JavaScript access |
 | `samesite` | `"lax"` | SameSite policy |
 | `secure` | `False` | HTTPS-only (set `True` in production) |
-| `idle_timeout_seconds` | `None` | Optional idle timeout before session expires |
+| `idle_timeout_seconds` | `None` | Optional idle timeout before the session expires |
 | `absolute_timeout_seconds` | `None` | Optional absolute max lifetime for a session |
+::::
 
 ## AuthMiddleware
 
-Dual-mode authentication: session cookies (browsers) and bearer tokens (API clients). The authenticated user is stored in a `ContextVar`, accessible via `get_user()` from any handler.
+Dual-mode authentication: session cookies (browsers) and bearer tokens (API
+clients). The authenticated user is stored in a `ContextVar`, accessible via
+`get_user()` from any handler.
 
 ### Setup
 
-`AuthMiddleware` requires `SessionMiddleware` for session-based auth. Register sessions first:
+`AuthMiddleware` requires `SessionMiddleware` for session-based auth. Register
+sessions first:
 
 ```python
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
@@ -121,30 +258,20 @@ from chirp.middleware.auth import AuthConfig, AuthMiddleware
 
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key="...")))
 app.add_middleware(AuthMiddleware(AuthConfig(
-    load_user=my_load_user,       # async (id: str) -> User | None
+    load_user=my_load_user,        # async (id: str) -> User | None
     verify_token=my_verify_token,  # async (token: str) -> User | None
 )))
 ```
 
-You must provide at least one of `load_user` (session auth) or `verify_token` (token auth). A `ConfigurationError` is raised if neither is set.
+You must provide at least one of `load_user` (session auth) or `verify_token`
+(token auth). A `ConfigurationError` is raised if neither is set.
 
-### User Protocol
-
-Your user model just needs `id` and `is_authenticated`:
+Your user model just needs `id` and `is_authenticated` (add a `permissions`
+attribute for `@requires()`):
 
 ```python
 from dataclasses import dataclass
 
-@dataclass(frozen=True, slots=True)
-class User:
-    id: str
-    name: str
-    is_authenticated: bool = True
-```
-
-For `@requires()`, add a `permissions` attribute:
-
-```python
 @dataclass(frozen=True, slots=True)
 class User:
     id: str
@@ -157,8 +284,10 @@ class User:
 
 Use the `login()` and `logout()` helpers in your handlers:
 
-```python
-from chirp import login, logout, Redirect
+::::{code-tabs}
+
+```python title="Login"
+from chirp import login, Redirect, Template
 
 @app.route("/login", methods=["POST"])
 async def do_login(request: Request):
@@ -168,6 +297,10 @@ async def do_login(request: Request):
         login(user)
         return Redirect("/dashboard")
     return Template("login.html", error="Invalid credentials")
+```
+
+```python title="Logout"
+from chirp import logout, Redirect
 
 @app.route("/logout", methods=["POST"])
 def do_logout():
@@ -175,13 +308,18 @@ def do_logout():
     return Redirect("/")
 ```
 
+::::
+
 :::{note}
-Both `login()` and `logout()` **regenerate the session** automatically to prevent session fixation attacks. All previous session data is discarded -- the new session starts empty (with only the user ID set on login).
+Both `login()` and `logout()` **regenerate the session** automatically to prevent
+session-fixation attacks. All previous session data is discarded — the new session
+starts empty (with only the user ID set on login).
 :::
 
 ### Route Protection
 
-Use `@login_required` and `@requires()` to protect routes. Both work with sync and async handlers:
+Use `@login_required` and `@requires()` to protect routes. Both work with sync and
+async handlers:
 
 ```python
 from chirp import login_required, requires, get_user
@@ -210,29 +348,29 @@ def edit_doc(doc_id: str):
     ...
 ```
 
-Content-negotiated responses: browser requests redirect to `login_url`, API requests get 401/403 JSON errors.
+Responses are content-negotiated: browser requests redirect to `login_url`, API
+requests get 401/403 JSON errors.
 
 ### Safe Redirects
 
-When `@login_required` redirects to `login_url`, it appends a URL-encoded
-`?next=` parameter. If middleware attached a request URL scope, that public
-scope is preserved in `next`. To safely honour this after login, use
-`is_safe_url()`:
+When `@login_required` redirects to `login_url`, it appends a URL-encoded `?next=`
+parameter. To safely honour it after login, gate it through `is_safe_url()`:
 
 ```python
 from chirp import is_safe_url, Redirect
 
 @app.route("/login", methods=["POST"])
 async def do_login(request: Request):
-    # ... verify credentials ...
-    login(user)
+    # ... verify credentials, then login(user) ...
     next_url = request.query.get("next", "/dashboard")
     if not is_safe_url(next_url):
         next_url = "/dashboard"
     return Redirect(next_url)
 ```
 
-`is_safe_url(url)` returns `True` only for relative paths on the same origin (starts with `/`, not `//`, no scheme). This prevents open redirect attacks where an attacker crafts a login link like `/login?next=//evil.com`.
+`is_safe_url(url)` returns `True` only for relative paths on the same origin (starts
+with `/`, not `//`, no scheme). This blocks open-redirect attacks where an attacker
+crafts a link like `/login?next=//evil.com`.
 
 ### Templates
 
@@ -246,22 +384,10 @@ async def do_login(request: Request):
 {% endif %}
 ```
 
-### Password Hashing
+::::{dropdown} All AuthConfig options + password hashing
+:icon: lock
 
-Hash and verify passwords with argon2id (preferred) or scrypt (stdlib fallback):
-
-```python
-from chirp.security.passwords import hash_password, verify_password
-
-hashed = hash_password("user-password")      # Store this
-ok = verify_password("user-password", hashed) # Check on login
-```
-
-:::{note}
-For argon2id, install the `auth` extra: `pip install bengal-chirp[auth]`. Without it, scrypt (always available) is used as a fallback.
-:::
-
-### Configuration
+**AuthConfig:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -275,13 +401,28 @@ For argon2id, install the `auth` extra: `pip install bengal-chirp[auth]`. Withou
 | `session_version_key` | `"_session_version"` | Session key used by `session_version` |
 | `exclude_paths` | `frozenset()` | Paths that skip auth entirely |
 
-:::{tip}
-See the [`kanban_shell` example](https://github.com/lbliii/chirp/tree/main/examples/chirpui/kanban_shell) for a complete working app with login, session-based auth, and protected routes.
-:::
+**Password hashing** — argon2id (preferred) or scrypt (stdlib fallback):
+
+```python
+from chirp.security.passwords import hash_password, verify_password
+
+hashed = hash_password("user-password")        # Store this
+ok = verify_password("user-password", hashed)   # Check on login
+```
+
+For argon2id, install the `auth` extra: `pip install bengal-chirp[auth]`. Without
+it, scrypt (always available) is used as a fallback.
+::::
+
+::::{note} See also
+- [[docs/quality/deployment/auth-hardening|Hardening auth for production]]
+- [[docs/examples/kanban-shell|Complete auth example (kanban_shell)]]
+::::
 
 ## CSRFMiddleware
 
-CSRF protection for form submissions:
+CSRF protection for form submissions. Validates a token on `POST`, `PUT`, `PATCH`,
+and `DELETE` requests:
 
 ```python
 from chirp.middleware import CSRFMiddleware
@@ -289,7 +430,7 @@ from chirp.middleware import CSRFMiddleware
 app.add_middleware(CSRFMiddleware())
 ```
 
-Validates a CSRF token on `POST`, `PUT`, `PATCH`, and `DELETE` requests. The token is available in templates:
+Emit the token with `csrf_field()` in any form:
 
 ```html
 <form method="post" action="/submit">
@@ -299,9 +440,38 @@ Validates a CSRF token on `POST`, `PUT`, `PATCH`, and `DELETE` requests. The tok
 </form>
 ```
 
-:::{note}
-Requires `SessionMiddleware` to be active before `CSRFMiddleware`.
-:::
+Register `SessionMiddleware` *before* `CSRFMiddleware` — see
+[the stack above](#the-secure-by-default-stack).
+
+## SecurityHeadersMiddleware
+
+Add security headers to HTML responses per HTML Living Standard recommendations:
+
+```python
+from chirp.middleware import SecurityHeadersMiddleware
+
+app.add_middleware(SecurityHeadersMiddleware())
+```
+
+Headers are applied **only to `text/html` responses** (skipped for JSON, SSE, and
+other non-HTML content types):
+
+- **X-Frame-Options** — prevents clickjacking (default `DENY`)
+- **X-Content-Type-Options** — prevents MIME sniffing (default `nosniff`)
+- **Referrer-Policy** — controls referrer leakage (default `strict-origin-when-cross-origin`)
+- **Content-Security-Policy** — script/style/resource policy (default: strict self-hosted baseline)
+- **Strict-Transport-Security** — optional HSTS when configured
+
+```python
+from chirp.middleware.security_headers import (
+    SecurityHeadersConfig,
+    SecurityHeadersMiddleware,
+)
+
+app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
+    x_frame_options="SAMEORIGIN",
+)))
+```
 
 ## AuthRateLimitMiddleware
 
@@ -319,45 +489,13 @@ app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
 ```
 
 Returns `429 Too Many Requests` with `Retry-After` when the threshold is exceeded.
-
-By default the limiter keys requests by the socket client address. If the app is behind a trusted proxy and the proxy strips or rewrites forwarded headers, pass `key_header="x-forwarded-for"` explicitly.
-
-## SecurityHeadersMiddleware
-
-Add security headers to HTML responses per HTML Living Standard recommendations:
-
-```python
-from chirp.middleware import SecurityHeadersMiddleware
-
-app.add_middleware(SecurityHeadersMiddleware())
-```
-
-Headers applied (only to `text/html` responses):
-
-- **X-Frame-Options** — prevents clickjacking (default: `DENY`)
-- **X-Content-Type-Options** — prevents MIME sniffing (default: `nosniff`)
-- **Referrer-Policy** — controls referrer leakage (default: `strict-origin-when-cross-origin`)
-- **Content-Security-Policy** — script/style/resource policy (default: strict self-hosted baseline)
-- **Strict-Transport-Security** — optional HSTS when configured
-
-Skipped for JSON, SSE, static files, and other non-HTML content types.
-
-Custom config::
-
-```python
-from chirp.middleware.security_headers import (
-    SecurityHeadersConfig,
-    SecurityHeadersMiddleware,
-)
-
-app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
-    x_frame_options="SAMEORIGIN",
-)))
-```
+By default it keys requests by the socket client address. If the app sits behind a
+trusted proxy, pass `key_header="x-forwarded-for"` explicitly.
 
 ## AllowedHostsMiddleware
 
-Validate the `Host` header against a whitelist, rejecting requests with spoofed or unrecognized hosts:
+Validate the `Host` header against a whitelist, rejecting requests with spoofed or
+unrecognized hosts:
 
 ```python
 from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
@@ -367,20 +505,21 @@ app.add_middleware(AllowedHostsMiddleware(
 ))
 ```
 
-Wildcard patterns:
-
-- `"*"` — allow all hosts (default, suitable for development)
+- `"*"` — allow all hosts (default; development only)
 - `".example.com"` — matches `example.com` and any subdomain (e.g. `api.example.com`)
 
-Returns `400 Bad Request` for unrecognized hosts. Pass `debug=True` to include the rejected host and allowed list in the error response (development only).
+Returns `400 Bad Request` for unrecognized hosts. Pass `debug=True` to include the
+rejected host and allowed list in the error response (development only).
 
 :::{warning}
-Always set explicit allowed hosts in production. The `"*"` default is for local development only.
+Always set explicit allowed hosts in production. The `"*"` default is for local
+development only.
 :::
 
 ## CSPNonceMiddleware
 
-Generate a per-request cryptographic nonce for `Content-Security-Policy`, allowing inline scripts without `'unsafe-inline'`:
+Generate a per-request cryptographic nonce for `Content-Security-Policy`, allowing
+inline scripts without `'unsafe-inline'`:
 
 ```python
 from chirp.middleware.csp_nonce import CSPNonceMiddleware
@@ -388,7 +527,7 @@ from chirp.middleware.csp_nonce import CSPNonceMiddleware
 app.add_middleware(CSPNonceMiddleware())
 ```
 
-The nonce is available in templates via `csp_nonce()`:
+Emit the nonce in templates via `csp_nonce()`:
 
 ```html
 <script nonce="{{ csp_nonce() }}">
@@ -396,7 +535,19 @@ The nonce is available in templates via `csp_nonce()`:
 </script>
 ```
 
-You can also access the nonce in handlers:
+::::{dropdown} Custom base CSP + handler access
+:icon: code
+
+Customize the base CSP directive — the middleware appends
+`script-src 'self' 'nonce-<value>'` to whatever base you provide:
+
+```python
+app.add_middleware(CSPNonceMiddleware(
+    base_csp="default-src 'self'; img-src 'self' https://cdn.example.com"
+))
+```
+
+Read the nonce in a handler with `get_csp_nonce()`:
 
 ```python
 from chirp.middleware.csp_nonce import get_csp_nonce
@@ -406,26 +557,7 @@ def page():
     nonce = get_csp_nonce()
     return Template("page.html", nonce=nonce)
 ```
-
-To customize the base CSP directive:
-
-```python
-app.add_middleware(CSPNonceMiddleware(
-    base_csp="default-src 'self'; img-src 'self' https://cdn.example.com"
-))
-```
-
-The middleware appends `script-src 'self' 'nonce-<value>'` to whatever base CSP you provide.
-
-## AlpineInject
-
-When `AppConfig(alpine=True)` (including via `use_chirp_ui(app)`), Chirp registers `AlpineInject`, which injects the Alpine.js CDN bundle and its inline helper block before the first `</body>` on **buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for example `Suspense`). It skips injection when the response already contains `data-chirp="alpine"` before `</body>`, and it respects fragment / render-intent gating for non-streaming bodies. The same `alpine=True` flag registers the template global `alpine_json_config` for `<script type="application/json">` server-to-client payloads. When `use_chirp_ui(app)` is active, a separate full-page HTML injector also adds `chirpui-alpine.js` for named chirp-ui controllers, including on streaming HTML. See [[docs/build-apps/ui-extensions/alpine|Alpine.js]].
-
-`HTMLInject` does not run on streaming bodies; Alpine streaming is handled only by `AlpineInject`.
-
-## htmx injection
-
-When `AppConfig(htmx=True)`, Chirp injects the htmx core `<script>` before the first `</body>` on **buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for example `Suspense`), mirroring `AlpineInject`. The tag uses the explicit jsDelivr `https://cdn.jsdelivr.net/npm/htmx.org@<version>/dist/htmx.min.js` path and carries the live per-request CSP nonce. It skips injection when the response already contains `data-chirp="htmx"` before `</body>` (dedup), and it respects the same fragment / render-intent gating as `AlpineInject`. It is **opt-in** and default off; `use_chirp_ui(app)` does not auto-enable it because the chirp-ui layouts already ship their own htmx tags (now marked `data-chirp="htmx"` so the injector dedups if you opt in anyway).
+::::
 
 ## HTMLInject
 
@@ -434,16 +566,56 @@ Inject a snippet into every HTML response before `</body>`:
 ```python
 from chirp.middleware import HTMLInject
 
-# Inject live-reload script in development
+# Inject a live-reload script in development
 app.add_middleware(HTMLInject(
     '<script src="/_dev/reload.js"></script>'
 ))
 ```
 
-Useful for development tools, analytics scripts, or debug toolbars.
+Useful for development tools, analytics scripts, or debug toolbars. `HTMLInject`
+does not run on streaming bodies.
 
-## Next Steps
+## Script injection
 
-- [[docs/build-apps/request-pipeline/custom|Custom Middleware]] -- Write your own
-- [[docs/build-apps/request-pipeline/overview|Overview]] -- How the middleware pipeline works
-- [[docs/about/core-concepts/configuration|Configuration]] -- AppConfig and secret_key
+Alpine.js and htmx scripts are injected by **config flags**, not by middleware you
+wire yourself. Set one flag and Chirp owns the script tag (CDN URL, CSP nonce, and
+deduplication) for you.
+
+- **Alpine.js** — set `AppConfig(alpine=True)` (also enabled by `use_chirp_ui(app)`).
+  Chirp injects the Alpine CDN bundle before `</body>` on buffered and streaming
+  HTML, and registers the `alpine_json_config` template global. Details:
+  [[docs/build-apps/ui-extensions/alpine|Alpine.js injection]].
+- **htmx** — set `AppConfig(htmx=True)`. **Opt-in, default off.** Chirp injects the
+  htmx core script (explicit jsDelivr `/dist/htmx.min.js` path, per-request CSP
+  nonce), dedups on `data-chirp="htmx"`, and mirrors the Alpine injector.
+  `use_chirp_ui(app)` does not auto-enable it because the chirp-ui layouts already
+  ship their own htmx tag.
+
+::::{dropdown} Injection-pipeline internals
+:icon: settings
+
+When `AppConfig(alpine=True)`, Chirp registers `AlpineInject`, which injects the
+Alpine.js CDN bundle and its inline helper block before the first `</body>` on
+**buffered** full-page HTML and on **`StreamingResponse`** HTML streams (for
+example `Suspense`). It skips injection when the response already contains
+`data-chirp="alpine"` before `</body>`, and respects fragment / render-intent
+gating for non-streaming bodies. When `use_chirp_ui(app)` is active, a separate
+full-page injector also adds `chirpui-alpine.js` for named chirp-ui controllers,
+including on streaming HTML.
+
+The htmx injector mirrors `AlpineInject` exactly: buffered + `StreamingResponse`
+HTML, the explicit jsDelivr `/dist/htmx.min.js` path, a live per-request CSP nonce,
+`data-chirp="htmx"` dedup, and the same render-intent gating.
+
+`HTMLInject` does not run on streaming bodies; Alpine and htmx streaming are handled
+only by their dedicated injectors.
+::::
+
+::::{note} See also
+- [[docs/build-apps/request-pipeline/custom|Write your own middleware]]
+- [[docs/build-apps/request-pipeline/_index|How the middleware pipeline orders requests]]
+- [[docs/about/core-concepts/configuration|secret_key and AppConfig]]
+::::
+
+:::{related}
+:::

@@ -10,9 +10,34 @@ keywords: [custom-middleware, function, class, pattern, rate-limit, timing]
 category: guide
 ---
 
-## Function Middleware
+## Overview
 
-The simplest middleware is a function:
+Middleware wraps every request and response. It runs before your handler sees
+the request and after your handler returns, so it's where cross-cutting work
+lives: logging, auth, rate limiting, timing, security headers.
+
+A middleware is any async callable matching `async def mw(request, next) ->
+Response`. Call `await next(request)` to pass control down [[docs/build-apps/request-pipeline/_index|the request pipeline]],
+then inspect or replace what comes back.
+
+Reach for custom middleware when the work applies to many routes. For one route,
+do it in the handler. Chirp already ships the common middleware — sessions, CSRF,
+security headers — so check [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]]
+before writing your own.
+
+:::{note}
+Middleware satisfies a `Middleware` Protocol — both plain functions and callable
+classes work. The framework checks the shape, not the lineage.
+:::
+
+## Define a middleware
+
+The shortest middleware is a function. Use a class when you need configuration
+or state.
+
+::::{tab-set}
+::::{tab-item} Function
+Wrap the request, measure it, add a header on the way out:
 
 ```python
 import time
@@ -26,12 +51,15 @@ async def timing(request: Request, next: Next) -> Response:
 
 app.add_middleware(timing)
 ```
-
-## Class Middleware
-
-For middleware that needs configuration or state, use a class with `__call__`:
+::::{/tab-item}
+::::{tab-item} Class
+Give the class an `async __call__`. Configuration and state live on the instance:
 
 ```python
+import threading
+import time
+from chirp import Request, Response, Next
+
 class RateLimiter:
     def __init__(self, max_requests: int, window: float) -> None:
         self.max_requests = max_requests
@@ -56,12 +84,20 @@ class RateLimiter:
 
 app.add_middleware(RateLimiter(max_requests=100, window=60.0))
 ```
+::::{/tab-item}
+::::{/tab-set}
 
-Both function and class middleware satisfy the `Middleware` protocol. The framework checks the shape, not the lineage.
+:::{danger} Shared instance state must be locked
+A class middleware is a single instance shared across every concurrent request
+under [[docs/about/thread-safety|free-threading]]. Mutable instance state —
+counters, caches, the rate-limiter dict above — **must** be guarded by a
+`threading.Lock`, or concurrent requests will corrupt it silently. For
+per-request state, use `g` (below), never instance attributes.
+:::
 
-## Common Patterns
+## Common patterns
 
-### Request Logging
+### Request logging
 
 ```python
 async def request_logger(request: Request, next: Next) -> Response:
@@ -71,7 +107,7 @@ async def request_logger(request: Request, next: Next) -> Response:
     return response
 ```
 
-### Error Handling
+### Error handling
 
 ```python
 async def error_boundary(request: Request, next: Next) -> Response:
@@ -82,9 +118,10 @@ async def error_boundary(request: Request, next: Next) -> Response:
         return Response("Internal Server Error").with_status(500)
 ```
 
-### Request Context
+### Request context
 
-Use `g` (the request-scoped namespace) to pass data between middleware and handlers:
+Use `g`, the [[docs/about/thread-safety|request-scoped]] namespace, to pass data
+between middleware and handlers:
 
 ```python
 from chirp import g
@@ -101,6 +138,8 @@ async def load_user(request: Request, next: Next) -> Response:
 Then in handlers:
 
 ```python
+from chirp import Redirect, Template, g
+
 @app.route("/profile")
 def profile():
     if not g.user:
@@ -108,9 +147,13 @@ def profile():
     return Template("profile.html", user=g.user)
 ```
 
-`g` is backed by a `ContextVar`, so each request gets its own namespace. Safe under free-threading.
+`g` is backed by a `ContextVar`, so each request gets its own namespace.
 
-### Conditional Middleware
+:::{note} See also
+- [[docs/about/thread-safety|Thread Safety]] — the free-threading model behind `g`
+:::
+
+### Conditional middleware
 
 Skip middleware for certain paths:
 
@@ -126,16 +169,23 @@ async def auth_required(request: Request, next: Next) -> Response:
     return await next(request)
 ```
 
-### Response Transformation
+### Response transformation
 
-Modify responses after the handler:
+For standard security headers, add the built-in
+[[docs/build-apps/request-pipeline/builtin|`SecurityHeadersMiddleware`]] rather
+than rolling your own:
 
 ```python
-# Prefer SecurityHeadersMiddleware for standard headers
 from chirp.middleware import SecurityHeadersMiddleware
-app.add_middleware(SecurityHeadersMiddleware())
 
-# Or add custom headers manually:
+app.add_middleware(SecurityHeadersMiddleware())
+```
+
+:::{dropdown} Advanced: setting headers by hand
+When you need headers the built-in doesn't cover, transform the response after
+the handler returns:
+
+```python
 async def add_security_headers(request: Request, next: Next) -> Response:
     response = await next(request)
     return (
@@ -145,29 +195,10 @@ async def add_security_headers(request: Request, next: Next) -> Response:
         .with_header("Referrer-Policy", "strict-origin-when-cross-origin")
     )
 ```
+:::{/dropdown}
 
-## Thread Safety
+## Next steps
 
-Under free-threading, multiple middleware instances run concurrently. If your class middleware has mutable state, protect it with a lock:
-
-```python
-class Counter:
-    def __init__(self) -> None:
-        self._count = 0
-        self._lock = threading.Lock()
-
-    async def __call__(self, request: Request, next: Next) -> Response:
-        with self._lock:
-            self._count += 1
-            count = self._count
-        response = await next(request)
-        return response.with_header("X-Request-Count", str(count))
-```
-
-For per-request state, use `g` or `ContextVar` instead of instance variables.
-
-## Next Steps
-
-- [[docs/build-apps/request-pipeline/overview|Overview]] -- Middleware pipeline mechanics
-- [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] -- What ships with Chirp
-- [[docs/about/thread-safety|Thread Safety]] -- Free-threading patterns
+- [[docs/build-apps/request-pipeline/_index|Request Pipeline]] — how the chain composes and orders
+- [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] — what ships with Chirp
+- [[docs/about/thread-safety|Thread Safety]] — free-threading patterns for shared state

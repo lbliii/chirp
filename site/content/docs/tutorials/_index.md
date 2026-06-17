@@ -14,36 +14,14 @@ cascade:
   type: doc
 ---
 
-:::{cards}
-:columns: 2
-:gap: medium
+Tutorials are guided, end-to-end builds — pick one and follow it through. They
+are for a developer mapping prior framework knowledge onto Chirp, or one who has
+the basics and wants to ship a real feature.
 
-:::{card} Lucky Cat Trade Panel
-:icon: trending-up
-:link: /chirp/docs/tutorials/lucky-cat-trade-panel/
-:description: 20-minute build-along — markets grid Page + ValidationError / FormAction trade flow
-Build one vertical slice of the flagship trading-floor demo from scratch.
-:::{/card}
+New to hypermedia? Start with **Coming from Flask** to translate what you
+already know, then build a real feature with the **Lucky Cat Trade Panel**.
+Already shipping with Chirp? **htmx Patterns**, **Alpine + htmx**, and **View
+Transitions + OOB** are recipe collections you can lift from.
 
-:::{card} View Transitions + OOB
-:icon: zap
-:link: /chirp/docs/tutorials/view-transitions-oob/
-:description: Stable pattern for htmx-boost, View Transitions, and live OOB/SSE updates
-Avoid flicker and content disappearing when mixing navigation with live updates.
-:::{/card}
-
-:::{card} Coming from Flask
-:icon: arrow-right
-:link: /chirp/docs/tutorials/coming-from-flask/
-:description: Migration guide with side-by-side examples
-Translate your Flask knowledge to Chirp.
-:::{/card}
-
-:::{card} htmx Patterns
-:icon: recycle
-:link: /chirp/docs/tutorials/htmx-patterns/
-:description: Common htmx + Chirp patterns
-Search, inline edit, infinite scroll, and more.
-:::{/card}
-
-:::{/cards}
+:::{child-cards}
+:::

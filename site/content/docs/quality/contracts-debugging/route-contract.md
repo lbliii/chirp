@@ -12,47 +12,106 @@ category: reference
 
 ## Overview
 
-The **route directory contract** defines how Chirp discovers and wires filesystem routes. It specifies reserved files, their scope (inherited vs route-local), and how metadata, context, and layouts combine. Understanding this contract helps you structure route directories correctly and avoid common mistakes.
+When you build pages with [[docs/build-apps/pages-navigation/filesystem-routing|filesystem routing]], Chirp discovers routes from files on disk — `page.py` handlers, `page.html` templates, and reserved underscore files like `_meta.py` and `_context.py`. The **route directory contract** is the set of rules for those files: which ones Chirp looks for, whether each is scoped to one route or inherited down the tree, and how their metadata, context, and layouts combine.
+
+Reach for this page when you are laying out a route directory and need to know what each reserved file does, or when `app.check()` flags a route-contract issue you want to fix.
+
+:::{note}
+This contract applies only to filesystem-routed pages. Handlers you register imperatively with `@app.route(...)` follow [[docs/build-apps/pages-navigation/routes|the route handler rules]] instead — they do not use `_meta.py`, `_context.py`, or layout chains.
+:::
 
 ## Reserved Files
 
-| File | Scope | Purpose |
-|------|-------|---------|
-| `page.py` | route-local | Primary route handler. Exports `get`, `post`, etc. or `handler`. `page.py` → directory URL; other `.py` files append their stem. |
-| `page.html` | route-local | Primary page template. Sibling of `page.py`. Defines fragment blocks. |
-| `_meta.py` | route-local | Route metadata (title, section, breadcrumb_label, shell_mode). Exports `META` or `meta()`. |
-| `_context.py` | inherited | Subtree-scoped context provider. Exports `context()` receiving path params, parent context, and services. |
-| `_layout.html` | inherited | Subtree layout wrapper. Declares `{# target: element_id #}` (and optionally `{# outlet: element_id #}`, `{# swap_scope: #}`, `{# frames: #}`) and `{% block content %}`. |
-| `_actions.py` | route-local | Mutation handlers. Exports `@action` decorated functions. |
-| `_viewmodel.py` | route-local | View assembly. Exports `viewmodel()` merging data for templates. |
+Every file Chirp recognizes in a route directory, what it does, and whether it is scoped to one route or inherited by every route below it:
 
-## RouteMeta
+:::{list-table}
+:header-rows: 1
 
-`_meta.py` provides route metadata via a static `META` constant or a `meta()` callable:
+* - File
+  - Scope
+  - Purpose
+* - `page.py`
+  - route-local
+  - Primary route handler. Exports `get`, `post`, etc. (or a `handler` fallback). `page.py` maps to the directory URL; any other `.py` file appends its stem.
+* - `page.html`
+  - route-local
+  - Primary page template, sibling of `page.py`. Defines the fragment blocks rendered into the layout.
+* - `_meta.py`
+  - route-local
+  - Route metadata — title, section, breadcrumb label, shell mode. Exports a `META` constant or a `meta()` callable.
+* - `_context.py`
+  - inherited
+  - Subtree-scoped context provider. Exports `context()`, which receives path params, parent context, and services.
+* - `_layout.html`
+  - inherited
+  - Subtree layout wrapper. Declares `{# target: element_id #}` and a `{% block content %}` the page composes into.
+* - `_actions.py`
+  - route-local
+  - Mutation handlers. Exports `@action`-decorated functions dispatched by an `_action` form field.
+* - `_viewmodel.py`
+  - route-local
+  - View assembly. Exports `viewmodel()` to merge data for the template.
+:::
+
+## Minimal working example
+
+A route directory needs only two files to serve a titled page: a `page.py` handler and a sibling `_meta.py`.
+
+:::{example}
+A `projects/` route that renders a fragment into the app shell and carries a breadcrumb:
 
 ```python
+# pages/projects/page.py
+from chirp import Page
+
+
+def get(projects: tuple[dict[str, str], ...]) -> Page:
+    return Page(
+        "projects/page.html",
+        "page_content",
+        page_block_name="page_root",
+        projects=projects,
+    )
+```
+
+```python
+# pages/projects/_meta.py
 from chirp.pages.types import RouteMeta
 
-META = RouteMeta(
-    title="Skills",
-    section="discover",
-    breadcrumb_label="Skills",
-    shell_mode="tabbed",
-)
+META = RouteMeta(title="Projects", breadcrumb_label="Projects")
 ```
 
-Or dynamically:
+The handler returns a `Page` so Chirp sends a fragment to htmx and a full page to a browser. The `RouteMeta` supplies the title and breadcrumb that the app shell renders around it.
+:::
+
+*Source: [`examples/chirpui/pages_shell/pages/projects`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/pages_shell/pages/projects/page.py).*
+
+For dynamic metadata, export a `meta()` callable instead of the `META` constant — it receives path params:
 
 ```python
-def meta(name: str) -> RouteMeta:
-    return RouteMeta(title=f"Skill: {name}", breadcrumb_label=name)
+# pages/projects/{slug}/_meta.py
+from chirp.pages.types import RouteMeta
+
+
+def meta(slug: str) -> RouteMeta:
+    return RouteMeta(title=f"Project: {slug}", breadcrumb_label=slug)
 ```
 
-**Fields:** `title`, `section`, `breadcrumb_label`, `shell_mode`, `auth`, `cache`, `tags`.
+`RouteMeta` is a frozen dataclass; every field is optional:
+
+| Field | Type | What it sets |
+|---|---|---|
+| `title` | `str` | Page title (`page_title` in shell context) |
+| `section` | `str` | Binds the route to a registered `Section` for tabs and breadcrumbs |
+| `breadcrumb_label` | `str` | This route's breadcrumb segment |
+| `shell_mode` | `str` | App-shell mode (e.g. `"tabbed"`) |
+| `auth` | `str` | Auth tag for the route |
+| `cache` | `str` | Cache policy tag |
+| `tags` | `tuple[str, ...]` | Free-form tags |
 
 ## Sections
 
-Register sections before `mount_pages()`:
+A `Section` groups routes under shared navigation — tabs and a breadcrumb prefix. Register sections before `mount_pages()`:
 
 ```python
 from chirp.pages.types import Section, TabItem
@@ -65,115 +124,118 @@ app.register_section(Section(
 ))
 ```
 
-Routes bind to sections via `RouteMeta.section`. The framework resolves `tab_items` and `breadcrumb_prefix` from the matched section. Tab rows use the same data under **`route_tabs`** (an alias of `tab_items`) for chirp-ui’s `render_route_tabs` macro. Each item is a dict shaped like `TabItem`: `label`, `href`, optional `icon`, `badge`, and optional `match` (`"exact"` or `"prefix"` for nested URLs).
+A route joins a section by setting `RouteMeta.section` to the section `id`. Chirp then resolves the section's `tab_items` and `breadcrumb_prefix` into the shell context for that route. The same tab list is exposed under **`route_tabs`** for chirp-ui's `render_route_tabs` macro. Each `TabItem` carries a `label`, `href`, optional `icon` and `badge`, and a `match` mode (`"exact"` or `"prefix"`) that controls active state for nested URLs.
 
-For delivery modes (`hx-target`, boost vs route-tab clicks) and a full checklist, see the [shell, sections, and route tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) in the chirp-ui repository.
-
-## Context Cascade
-
-`_context.py` providers run root-first. Each receives path params, accumulated parent context, and service providers. Child output overrides parent. `shell_actions` merges deeply.
-
-## Layout Chain
-
-Layouts inherit down the directory tree. Each `_layout.html` declares `{# target: element_id #}` (which DOM node the layout fills in a nested chain). Optional `{# outlet: element_id #}` declares the **primary navigation outlet** (for example `main` for chirp-ui app shells). `LayoutChain.find_start_index_for_target` matches **both** so boosted `HX-Target` headers can target `#main` while the layout’s `target` remains `body`. Render depth depends on `HX-Target`: full page renders all layouts; boosted requests start at the matching layout. See [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]] (persistent app shell pattern).
-
-## Shell Context Assembly
-
-The framework provides: `page_title`, `breadcrumb_items`, `tab_items`, `route_tabs` (same list as `tab_items` when the section defines tabs), `current_path`. Resolution order: `RouteMeta` → section → handler override.
-
-**Imperative routes:** For handlers that return `Template(...)` or `Page(...)` directly (not using filesystem routing), Chirp auto-injects `current_path = request.path` into the template context when the handler does not provide it. This ensures ChirpUI navigation macros with `match=` work for both filesystem and imperative route styles.
+:::{note} See also
+- [[docs/build-apps/pages-navigation/route-directory|Route directory layout]] — the full file-by-file walkthrough.
+- The [shell, sections, and route-tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) in the chirp-ui repo — delivery modes (`hx-target`, boost vs route-tab clicks) and the full checklist.
+:::
 
 ## Route Kinds
 
-| Kind | Files | Description |
-|------|-------|-------------|
-| page | page.py, page.html | Standard page with template |
-| detail | page.py, page.html in `{param}/` | Parametrized page |
-| action | page.py (no template) | Mutation-only route |
-| redirect | page.py returning Redirect | Redirect route |
+Chirp classifies each discovered route by the files it finds:
+
+:::{list-table}
+:header-rows: 1
+
+* - Kind
+  - Files
+  - Description
+* - `page`
+  - `page.py` + `page.html`
+  - Standard page with a template.
+* - `detail`
+  - `page.py` + `page.html` inside `{param}/`
+  - Parametrized page.
+* - `action`
+  - `page.py` (no template)
+  - Mutation-only route.
+* - `redirect`
+  - `page.py` returning a `Redirect`
+  - Redirect route.
+:::
 
 ## Actions
 
-`_actions.py` exports `@action` decorated handlers. Forms use `_action` field to dispatch. The framework discovers actions at route registration.
+`_actions.py` exports `@action`-decorated handlers. The decorator takes the name a form uses to target it:
 
-## Viewmodel
+```python
+from chirp.pages.actions import action
+from chirp import OOB, Fragment
 
-`_viewmodel.py` exports `viewmodel()` for complex view assembly. Its output merges after cascade and shell context.
 
-## Contract Validation
+@action("rename")
+def rename(name: str) -> OOB:
+    # ... update data ...
+    return OOB(Fragment("page.html", "title", title=name))
+```
 
-`app.check()` validates route contracts: section bindings, shell mode/block alignment, route file consistency, duplicate routes, section tab hrefs, and context provider signatures.
+A form selects the action with an `_action` field whose value matches the decorator name:
 
-Beyond route-level checks, `app.check()` also validates hypermedia surface
-contracts. The table below is a category reference for the checks users most
-often tune in CI:
+```html
+<form hx-post="" hx-target="#title">
+  <input type="hidden" name="_action" value="rename">
+  <input name="name">
+  <button>Save</button>
+</form>
+```
 
-For the full category list, default severity, and fix target guidance, see
-[[docs/quality/contracts-debugging/categories|Contract Category Reference]].
+Chirp discovers actions at route registration and dispatches by the `_action` value.
 
-Read each issue as a pointer to one concrete fix target. A useful diagnostic
-names the route, template, block, selector, middleware, config flag, import string,
-or registration that must change. Terminal output groups categories by concern
-(`Routing`, `HTMX`, `Forms`, `OOB / Suspense / SSE`, and so on) so the first
-header tells you which surface to inspect before you open the file.
+## Contract validation
 
-| Check | Severity | What it catches |
-|---|---|---|
-| `page_handlers` | ERROR / WARNING | `page.py` defines no recognised HTTP method handler (`get`/`post`/… or `handler` fallback). Handler-shaped typos (`def handle`, `def GET`, `def index`) emit WARNING; an entirely missing handler emits ERROR — the file would register no routes and requests 404/500 at runtime. |
-| `route_names` | ERROR | Two routes at *different* paths claim the same name — `app.url_for(name)` would ambiguously resolve. Method variants of the same URL (e.g. GET from `page.py` + POST from `_actions.py`) are *not* flagged. Fix by renaming one of the pages or setting a module-level `name = "…"` override. |
-| `mount_app_merge` | INFO | `app.mount_app(prefix, sub_app)` dropped a sub-app template global, filter, provider, error handler, or severity override because the parent had already registered one. Parent-wins is intentional; promote via `override_contract_severity("mount_app_merge", Severity.WARNING)` if you want CI to flag them. |
-| `dead` | WARNING | A template exists in the template directory but no route, include, import, or layout references it. Usually cleanup, not a deploy blocker. |
-| `component` | ERROR | Component-call validation surfaced by Kida/chirp-ui metadata. The Chirp adapter is wired; full precision depends on typed component metadata from the template package. |
-| `unreachable_block` | WARNING | A filesystem page template defines a sibling block that layout composition will never render, such as `page_scripts` outside `page_content`. Move the content inside the rendered page block or make it a real fragment target. |
-| `composition_extends` | WARNING | A page template extends a registered layout instead of composing into it. Pages should render into the layout content block via `render_with_blocks`; they should not override sibling layout blocks. |
-| `hx-target`, `hx-indicator`, `hx-boost` | ERROR / WARNING | htmx attributes reference missing selectors, invalid boosted links, or unsafe targets. Fix the selector or target element named in the issue. |
-| `fragment_target_orphan` | ERROR / WARNING | A required fragment target registry entry points at a block no template provides, or an optional entry cannot be resolved. Required entries are errors because htmx would otherwise swap nothing. |
-| `fragment_target_scan` | ERROR | Chirp could not inspect a page template while checking fragment target registrations. Fix the named template parse/load error first; otherwise orphaned target checks may be incomplete. |
-| `oob_registry` | ERROR / WARNING | A registered OOB region references a missing block or mismatched target. Required missing regions fail startup; optional regions can be warnings. |
-| `reactive_block` | ERROR | `DependencyIndex` block reference points to a non-existent template block (typo or renamed block) |
-| `reactive_cycle` | WARNING | Derivation graph contains a cycle (`index.derive()` forms a loop) |
-| `reactive_paths` | WARNING | A declared `ChangeEvent.changed_paths` value is not registered in the `DependencyIndex`; the event will not update any block. |
-| `reactive_audience` | WARNING | A scope declares audience-filtered events but no connection-aware `reactive_stream(..., connection=ConnectionInfo(...))`. |
-| `oob_target` | WARNING | `hx-swap-oob` element references an `id` not found in any template |
-| `fragment_scope` | WARNING | A nested fragment block references an import or binding defined only inside an ancestor block; direct `render_block()` or block-fetch rendering skips that ancestor scope |
-| `sse_self_swap` | ERROR | `sse-connect` and `sse-swap` appear on the same element. Put `sse-swap` on a child sink so htmx can target the update correctly. |
-| `sse_scope` | ERROR | An SSE connection sits inside a broad inherited htmx target without `hx-disinherit` or another safe scope boundary. |
-| `sse_crossref` | ERROR / INFO | `sse-swap="name"` listens for an event no route declares or infers, or a route emits an event no template listens for. |
-| `defer_falsy` | WARNING | A Suspense template checks a deferred key with bare truthiness (`{% if key %}`), which keeps skeletons visible for empty lists, empty strings, or `0`. Use `{% if key is deferred %}` or `"key" in __chirp_defer_pending__` to distinguish loading from loaded before testing resolved values. |
-| `alpine_cdn_url` | ERROR | A bare jsDelivr Alpine URL would load the package CommonJS entry instead of the browser CDN build. Use `/dist/cdn.min.js`. |
-| `form` | ERROR / WARNING | A route form contract and the template's actual `<input>`, `<select>`, or `<textarea>` names disagree. |
-| `form_contract` | INFO | `<form action="/path" method="post">` targets a route with no `FormContract` declaration |
+`app.check()` validates the route directory contract at startup. Read each issue
+as a pointer to one concrete fix target: a useful diagnostic names the route,
+template, block, selector, middleware, config flag, import string, or
+registration that must change. The route-specific categories:
+
+| Category | Severity | What it catches |
+|----------|----------|-----------------|
+| `route_contract` | ERROR / WARNING | Umbrella for section bindings, shell-mode/block alignment, route-file consistency, duplicate routes, section tab hrefs, and `_context.py` provider signatures. |
+| `page_handlers` | ERROR / WARNING | A `page.py` defines no recognized HTTP method handler. A handler-shaped typo (`def handle`, `def GET`) is a WARNING; an entirely missing handler is an ERROR, because the file would register no routes. |
+| `route_names` | ERROR | Two routes at *different* paths claim the same name, so `app.url_for(name)` would resolve ambiguously. Method variants of the same URL are not flagged. |
+| `mount_app_merge` | INFO | `app.mount_app()` dropped a sub-app global, filter, provider, handler, or severity override because the parent had already registered one. Parent-wins is intentional. |
+| `hx-target` | ERROR / WARNING | htmx attributes (`hx-target`, `hx-indicator`, `hx-boost`) reference a missing selector or an unsafe target. Fix the selector or element named in the issue. |
 | `csrf_form` | WARNING | `CSRFMiddleware` is active and a static mutating `<form>` has no `{{ csrf_field() }}`, `csrf_token()`, or `_csrf_token` field. |
-| `a11y_label`, `a11y_alt`, `a11y_heading`, `a11y_landmark` | WARNING | Accessibility checks for missing labels, missing image alt text, skipped heading levels, or missing landmarks. |
-| `csrf_session`, `secret_key`, `middleware_signature` | ERROR / WARNING | Production-safety checks for security middleware ordering, missing secret keys, and middleware call signatures. |
-| `security_stack` | ERROR / WARNING | An app with mutating routes (POST/PUT/PATCH/DELETE, including filesystem pages with `_actions.py`) is missing the secure-by-default stack. Missing `CSRFMiddleware`/`SessionMiddleware` is ERROR in production, WARNING in staging, silent in development; missing `SecurityHeadersMiddleware` always WARNs. The `chirp new` scaffolds (including `--minimal`) wire this for you — middleware is never force-injected. Canonical owner of the "mutating route" definition; see [[docs/quality/contracts-debugging/categories|Contract Category Reference]]. |
+| `dead` | WARNING | A template exists but no route, include, import, or layout references it — usually cleanup, not a deploy blocker. |
 
-These checks run automatically as part of `chirp check myapp:app`. Some
-categories only activate when the app provides the relevant metadata, such as a
-`DependencyIndex`, `FormContract`, OOB registry entries, or docs plugin
-collection.
-
-`app.check()` is not a style linter. It exists to catch wiring that can make
-the browser swap the wrong thing, silently skip an OOB update, or route a page
-into the wrong shell. For visual symptoms and browser-side diagnostics, start
-with [[docs/quality/contracts-debugging/debugging-swaps|Debugging Swaps]].
-
-Any category can be tuned with `app.override_contract_severity()` — for example,
-demote the missing-handler ERROR during a migration:
+Each category is a stable handle for CI policy; the message names the concrete fix target. Tune any category before running checks:
 
 ```python
 from chirp.contracts.types import Severity
 
+# Demote the missing-handler ERROR during a migration:
 app.override_contract_severity("page_handlers", Severity.WARNING)
 ```
 
-## Introspection
+:::{note} See also
+- [[docs/quality/contracts-debugging/categories|Contract Category Reference]] — every `app.check()` category, default severity, and fix target. The route checks above are a subset.
+- [[docs/quality/contracts-debugging/debugging-swaps|Debugging Swaps]] — when the contract passes but htmx swaps the wrong thing in the browser.
+:::
 
-When `config.debug=True`:
+## Advanced and introspection
 
-- **Debug headers**: `X-Chirp-Route-Kind`, `X-Chirp-Route-Files`, `X-Chirp-Route-Meta`, `X-Chirp-Route-Section`, `X-Chirp-Context-Chain`, `X-Chirp-Shell-Context`
-- **Route explorer**: `GET /__chirp/routes` shows the full route tree with drill-down
-- **HTMX panel**: Activity log entries show route metadata when expanded
+:::{dropdown} How layouts and context resolve
+**Context cascade.** `_context.py` providers run root-first. Each receives path params, the accumulated parent context, and service providers. Child output overrides parent values; `shell_actions` merges deeply.
 
-For htmx request records and Swap Doctor diagnostics, open Chirp DevTools with
-`Ctrl+Shift+D` in debug mode.
+**Layout chain.** Layouts inherit down the directory tree. Each `_layout.html` declares `{# target: element_id #}` — the DOM node it fills in a nested chain — and an optional `{# outlet: element_id #}` for the primary boosted-navigation outlet (for example `main` in a chirp-ui app shell). `LayoutChain.find_start_index_for_target` matches both, so a boosted `HX-Target` header can hit `#main` while the layout's own `target` stays `body`. Render depth depends on `HX-Target`: a full page renders every layout; a boosted request starts at the matching layout. See [[docs/build-apps/html-fragments/layout-patterns|Layout patterns]].
+
+**Shell context.** Chirp assembles `page_title`, `breadcrumb_items`, `tab_items`, `route_tabs`, and `current_path` from `RouteMeta`, then the section, then any handler override — in that order. For imperative handlers that return `Template(...)` or `Page(...)` directly, Chirp injects `current_path = request.path` when the handler does not provide it, so chirp-ui navigation macros with `match=` work for both routing styles.
+
+**Viewmodel.** `_viewmodel.py` exports `viewmodel()` for complex view assembly. Its output merges after the context cascade and shell context.
+:::
+
+:::{dropdown} Introspection (debug mode only)
+When `config.debug=True`, Chirp exposes route diagnostics:
+
+- **Debug headers** on every response: `X-Chirp-Route-Kind`, `X-Chirp-Route-Files`, `X-Chirp-Route-Meta`, `X-Chirp-Route-Section`, `X-Chirp-Context-Chain`, `X-Chirp-Shell-Context`.
+- **Route explorer**: `GET /__chirp/routes` renders the full route tree with drill-down into layouts, providers, actions, and metadata.
+- **HTMX panel**: activity-log entries show route metadata when expanded.
+
+For htmx request records and Swap Doctor diagnostics, open Chirp DevTools with `Ctrl+Shift+D` in debug mode.
+:::
+
+:::{note} See also
+- [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]] — how Chirp discovers and wires routes from disk.
+- [[docs/build-apps/pages-navigation/request-response|Request and response]] — what a handler receives and returns.
+:::

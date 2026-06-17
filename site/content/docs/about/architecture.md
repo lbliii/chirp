@@ -10,6 +10,14 @@ keywords: [architecture, surface, core, engine, layers, modules]
 category: explanation
 ---
 
+This page is the mental map of how Chirp is built — the three layers a request passes through, where each module lives, and how a template becomes rendered HTML. It's for contributors and anyone evaluating the design; you never need to read it to *use* Chirp.
+
+If you just want to build something, start with [[docs/get-started/quickstart|the quickstart]].
+
+:::{note}
+Everything below the Surface layer is internal machinery. You never construct Core or Engine types directly — Chirp builds them for you from your routes, templates, and config.
+:::
+
 ## Three Layers
 
 Chirp is organized into three layers, each with a clear responsibility:
@@ -40,7 +48,7 @@ flowchart TD
     subgraph Engine["Engine Layer — ASGI + integrations"]
         E1["ASGI handler"]
         E2["Kida environment"]
-        E3["Dev server"]
+        E3["bengal-pounce server"]
         E4["SSE handler"]
         E5["anyio runtime"]
     end
@@ -48,34 +56,49 @@ flowchart TD
     Surface --> Core --> Engine
 ```
 
-### Surface Layer
+:::{list-table}
+:header-rows: 1
 
-What developers interact with daily. Flask-familiar decorators, intuitive return types, and a frozen configuration dataclass. The surface is ergonomic -- you never need to understand the internals to use the framework.
+* - Layer
+  - Responsibility
+  - Do you touch it?
+* - **Surface**
+  - The API you write against: `@app.route()` decorators, return types (`Template`, `Fragment`, `Stream`), and the frozen `AppConfig`.
+  - Yes — this is the whole developer surface.
+* - **Core**
+  - Typed, immutable data: `Request` is `@dataclass(frozen=True, slots=True)`, `Response` chains `.with_*()` transforms, the router compiles to an immutable trie, middleware is a Protocol (not a base class).
+  - Rarely — you read a `Request`, return a `Response`, and write middleware to the Protocol.
+* - **Engine**
+  - The ASGI handler bridging raw scope/messages to typed abstractions, the Kida environment, and the `bengal-pounce` ASGI server.
+  - No — Chirp drives it for you.
+:::
 
-### Core Layer
-
-Typed, immutable data structures. `Request` is `@dataclass(frozen=True, slots=True)`. `Response` uses chainable `.with_*()` transformations. The router compiles to an immutable trie. Middleware follows a Protocol, not a base class.
-
-### Engine Layer
-
-The ASGI handler that translates between raw ASGI scope/messages and Chirp's typed abstractions. The kida environment for template rendering. The development server. This layer is internal -- developers rarely interact with it directly.
+The frozen/slots design and the `ContextVar` request state are what make Chirp safe under free-threading. See [[docs/about/thread-safety|free-threading and frozen state]] for why.
 
 ## Module Layout
+
+:::{dropdown} Full module map
+The tree below is the package layout as it ships in [`src/chirp/`](https://github.com/lbliii/chirp). It's reference detail — you can build anything in Chirp without it.
 
 ```
 chirp/
 ├── __init__.py          # Public API exports (lazy imports)
-├── app.py               # App class
+├── app/                 # App class and setup
 ├── config.py            # AppConfig frozen dataclass
 ├── context.py           # Request-scoped context (ContextVar, g)
-├── contracts.py         # Typed hypermedia contracts
+├── contracts/           # app.check() rule set (checker + rules_*.py)
 ├── errors.py            # Error hierarchy
 ├── sources.py           # Template source loading
+├── domains.py           # Domain/host routing
+├── freeze.py            # The freeze transition (mutable → immutable)
+├── plugin.py            # Plugin registration
+├── health.py            # Health-check endpoints
+├── resilience.py        # Timeouts, retries, circuit breaking
 │
 ├── _internal/           # ASGI type definitions (not public)
 ├── http/                # Request, Response, Headers, Cookies, Query, Forms
 ├── routing/             # Router, Route, path parameters
-├── middleware/           # Protocol, CORS, StaticFiles, Sessions, Auth, CSRF
+├── middleware/          # Protocol, CORS, StaticFiles, Sessions, Auth, CSRF
 ├── templating/          # Kida integration, return types, filters, streaming
 ├── pages/
 │   └── reactive/        # ReactiveBus, DependencyIndex, reactive_stream
@@ -83,11 +106,18 @@ chirp/
 ├── server/              # ASGI handler, dev server, content negotiation
 ├── data/                # Database access, row mapping
 ├── security/            # Decorators, password hashing
+├── validation/          # Form validation rules and results
+├── cache/               # Response and fragment caching
+├── i18n/                # Internationalization
+├── markdown/            # Markdown rendering (patitas)
+├── cli/                 # chirp CLI (new, run, check, freeze)
+├── docs/                # In-framework docs tooling
+├── ext/                 # Extensions (e.g. chirp-ui integration)
 ├── testing/             # TestClient, assertions, SSE testing
 ├── tools/               # MCP tool registry and handler
-├── validation/          # Form validation rules and results
 └── ai/                  # LLM integration (optional)
 ```
+:::{/dropdown}
 
 ## Request Flow
 
@@ -157,7 +187,10 @@ flowchart LR
     end
 ```
 
-See [[docs/build-apps/html-fragments/kida-integration|Kida Integration]] for the full flow.
+:::{note} See also
+
+[[docs/build-apps/html-fragments/kida-integration|Kida Integration]] walks the full template-to-HTML flow, and [[docs/build-apps/request-pipeline/render-plan|the RenderPlan / render pipeline]] covers how a `RenderPlan` drives OOB discovery and block validation.
+:::
 
 ## Dependencies
 
@@ -166,21 +199,25 @@ Chirp owns the developer interface and delegates commodity infrastructure:
 ```mermaid
 flowchart TD
     chirp["chirp (the framework)"]
-    chirp --> kida["kida — Template engine\n(same author, same ecosystem)"]
+    chirp --> kida["kida-templates — Template engine\n(same author, same ecosystem)"]
     chirp --> anyio["anyio — Async runtime\n(not worth rewriting)"]
+    chirp --> pounce["bengal-pounce — ASGI server\n(same ecosystem)"]
 ```
 
-Optional extras add focused capabilities without bloating the core:
+Optional extras add focused capabilities without bloating the core. SQLite needs no extra — Chirp uses the stdlib `sqlite3`.
 
 ```
 chirp[forms]      → python-multipart  (form/multipart parsing)
 chirp[sessions]   → itsdangerous      (signed session cookies)
 chirp[auth]       → argon2-cffi       (password hashing)
 chirp[testing]    → httpx             (test client)
-chirp[data]       → aiosqlite        (SQLite)
-chirp[data-pg]    → asyncpg          (PostgreSQL)
-chirp[ai]         → httpx            (LLM streaming)
+chirp[data-pg]    → asyncpg           (PostgreSQL)
+chirp[markdown]   → patitas[syntax]   (markdown rendering)
+chirp[ai]         → httpx             (LLM streaming)
+chirp[all]        → everything above
 ```
+
+See [[docs/get-started/installation|installation and extras]] for the full list and install commands.
 
 ## Next Steps
 

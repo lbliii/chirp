@@ -10,64 +10,64 @@ keywords: [return, template, fragment, stream, eventstream, response, redirect]
 category: explanation
 ---
 
-## The Type Is the Intent
+## The type is the intent
 
-Route functions return *values*. Chirp handles content negotiation based on the return type -- no `make_response()`, no `jsonify()`, no explicit content-type wiring.
+Every route handler returns a *value*, and the type of that value is the intent. `Template` means a full page, `Fragment` means one named [[docs/build-apps/html-fragments/fragment-blocks|template block]], `Page` lets Chirp choose between them based on the request, and a handful of others cover streaming, redirects, and mutations.
+
+Chirp reads the return type and does [[docs/about/core-concepts/hypermedia-model|content negotiation]] — picking full-page versus fragment, composing layouts, and adding htmx headers — for you. No `make_response()`, no `jsonify()`, no manual content-type wiring.
 
 ```python
 return "Hello"                                       # -> 200, text/html
 return {"users": [...]}                              # -> 200, application/json
-return Template("page.html", title="Home")           # -> 200, rendered via kida
-return Template.inline("<h1>{{ t }}</h1>", t="Hi")   # -> 200, from string
-return Fragment("page.html", "results", items=x)     # -> 200, rendered block
-return Stream("dashboard.html", **async_ctx)         # -> 200, streamed HTML
+return Template("page.html", title="Home")           # -> 200, full page via kida
+return Fragment("page.html", "results", items=x)     # -> 200, one rendered block
+return Page("page.html", "results", **ctx)           # -> full page or block (auto)
 return Suspense("dashboard.html", stats=get_stats()) # -> 200, shell + OOB swaps
+return Stream("dashboard.html", **async_ctx)         # -> 200, streamed HTML
 return EventStream(generator())                      # -> SSE stream
-return Response(body=b"...", status=201)              # -> explicit control
-return hx_redirect("/dashboard")                      # -> Location + HX-Redirect
+return MutationResult("/contacts", *fragments)       # -> fragments (htmx) or 303
+return ValidationError("page.html", "form", errors=e)# -> 422 + re-rendered form
 return Redirect("/login")                            # -> 302
 ```
 
-## Decision tree — which return type?
+This page is the map. Use the decision table to find your return type, then jump to that type's section.
 
-When you're about to render HTML, pick the type by answering these questions in order:
+## Pick a return type
 
-1. **Is this a full page with no htmx awareness?** → `Template("page.html", **ctx)`
-2. **Full page for browsers, fragment for htmx requests?** → `Page("page.html", "content_block", **ctx)`
-3. **Just a named block of a template?** → `Fragment("page.html", "block_name", **ctx)`
-4. **Multiple swap targets in one response?** → `OOB(main, *oob_fragments)`
-5. **Shell first, slow sections stream in?** → `Suspense("page.html", stats=get_stats())`
-6. **Stream sections as they complete (no shell-first)?** → `Stream("page.html", **async_ctx)`
-7. **Server-sent events after the page loads?** → `EventStream(async_generator())`
-8. **Validation failed, re-render the form with errors?** → `ValidationError("page.html", "form", errors=e)`
-9. **Form mutation — fragments for htmx, redirect for plain POST?** → `FormAction(redirect, *fragments)`
-10. **Just a redirect?** → `Redirect("/login")` (plain) or `hx_redirect("/dashboard")` (htmx-aware)
+:::{list-table} What do you want to return?
+:header-rows: 1
 
-:::{tip}
-**`Page` vs `Template` — the common mixup.** `Page` requires a block name because it serves *two* rendering modes: the full template for browsers, the block for htmx. If you find yourself writing `Page("page.html", **ctx)` with no second positional argument, you probably want `Template("page.html", **ctx)` — that's the plain full-page render without htmx negotiation. Chirp will raise a guided `TypeError` to nudge you toward the right type.
+* - I want to…
+  - Return type
+* - Render a full page (no htmx awareness)
+  - `Template("page.html", **ctx)`
+* - Render one named block of a template
+  - `Fragment("page.html", "block", **ctx)`
+* - Serve a full page to browsers *and* a fragment to htmx, from one handler
+  - `Page("page.html", "block", **ctx)`
+* - Update several swap targets in one response
+  - `OOB(main, *oob_fragments)`
+* - Paint a shell instantly, then stream slow sections in
+  - `Suspense("page.html", stats=get_stats())`
+* - Stream page sections as they finish (no shell-first)
+  - `Stream("page.html", **async_ctx)`
+* - Push updates after the page has loaded
+  - `EventStream(async_generator())`
+* - Re-render a form with validation errors
+  - `ValidationError("page.html", "form", errors=e)`
+* - Handle a mutation: fragments for htmx, redirect for plain POST
+  - `MutationResult(url, *fragments)`
+* - Redirect
+  - `Redirect("/login")` (plain) or `hx_redirect("/dashboard")` (htmx-aware)
 :::
 
-## InlineTemplate (Prototyping)
-
-Renders a template from a string instead of a file. Useful for prototyping and scripts where you don't want to set up a `templates/` directory:
-
-```python
-from chirp import Template
-
-@app.route("/")
-def index():
-    return Template.inline("<h1>{{ greeting }}</h1>", greeting="Hello, world!")
-```
-
-`Template.inline()` returns an `InlineTemplate` instance. It works through content negotiation without requiring a `template_dir` to be configured.
-
-:::{note}
-`InlineTemplate` is a prototyping shortcut. `app.check()` will emit a warning for routes that return it. Replace with file-based `Template` before production.
+:::{tip} `Page` vs `Template` — the common mixup
+`Page` needs a block name because it serves *two* modes: the full template for browsers, the block for htmx. If you reach for `Page("page.html", **ctx)` with no block name, you want `Template("page.html", **ctx)` — the plain full-page render. `Page` raises a guided `TypeError` to nudge you toward the right type.
 :::
 
 ## Template
 
-Renders a full template via kida:
+Renders a full template via [[docs/build-apps/html-fragments/kida-integration|Kida]]:
 
 ```python
 from chirp import Template
@@ -79,28 +79,25 @@ def index():
 
 The first argument is the template path (relative to your `template_dir`). Everything else becomes template context.
 
-**Auto-injected context:** Chirp automatically adds `current_path` (set to `request.path`) to the template context when it is not already present. This means ChirpUI navigation components like `sidebar_link(..., match="prefix")` and `navbar_link(..., match="exact")` work without manually passing `current_path` or `nav=` strings from every handler.
+Chirp auto-injects `current_path` (set to `request.path`) into the context when you haven't set it. ChirpUI navigation components like `sidebar_link(..., match="prefix")` then work without passing `current_path` from every handler.
 
 ## Fragment
 
-Renders a named block from a template, without rendering the full page:
+Renders a named block from a template without rendering the full page:
 
 ```python
 from chirp import Fragment
 
-@app.route("/search")
-def search(request: Request):
-    results = do_search(request.query.get("q", ""))
-    if request.is_fragment:
-        return Fragment("search.html", "results_list", results=results)
-    return Template("search.html", results=results)
+@app.route("/results")
+def results(request: Request):
+    return Fragment("search.html", "results_list", results=do_search(request))
 ```
 
-This is Chirp's key differentiator. Same template, same data, different scope. See [[docs/build-apps/html-fragments/fragments|Fragments]] for the full story.
+Same template, same data, narrower scope. This is Chirp's core move — one template serves both the full page and the htmx swap. See [[docs/build-apps/html-fragments/fragments|Fragments]] for the full story.
 
 ## Page
 
-Auto-detects whether to return a full page or a fragment based on the request:
+Auto-detects whether to return a full page or a fragment based on the request — full template for a browser, block for an htmx swap:
 
 ```python
 from chirp import Page
@@ -111,32 +108,243 @@ def search(request: Request):
     return Page("search.html", "results_list", results=results)
 ```
 
-`Page` is sugar over the `if request.is_fragment` pattern. If the request comes from htmx, it renders the block. Otherwise, it renders the full template.
+`Page` is the preferred way to negotiate full-page versus fragment. Reach for it instead of branching on a request flag by hand.
 
-Use `page_block_name` when boosted page navigation needs a wider, fragment-safe root than the narrow fragment block:
+:::{warning} Don't branch on `request.is_fragment`
+`request.is_fragment` is **deprecated** — it's ambiguous for boosted navigations and emits a `DeprecationWarning`. Let `Page` negotiate for you. If you must branch by hand, use `request.is_htmx` (any htmx request) or `request.is_narrow_fragment` (a narrow swap, excluding boosted navigation and history restores).
+:::
+
+::::{dropdown} Boosted navigation: a wider fragment-safe root (`page_block_name`)
+When [[docs/build-apps/ui-extensions/boosted-navigation|boosted navigation]] swaps a whole page, a narrow fragment block can be too small — it omits layout wrappers. Pass `page_block_name` to give boosted swaps a wider, self-contained root while ordinary fragment requests stay narrow:
 
 ```python
-from chirp import Page
-
 @app.route("/dashboard")
 def dashboard():
     return Page(
         "dashboard.html",
-        "results_panel",
-        page_block_name="page_root",
+        "results_panel",       # narrow block for ordinary fragment requests
+        page_block_name="page_root",  # wider root for boosted navigation
         stats=load_stats(),
     )
 ```
-
-This keeps ordinary fragment requests narrow (`results_panel`) while boosted navigation can swap a self-contained page root (`page_root`) that includes layout wrappers such as stacks, toolbars, and section spacing.
+::::{/dropdown}
 
 :::{note}
-**LayoutPage** and **LayoutSuspense** are internal types used when filesystem routing renders through layout chains. Handlers return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You typically don't construct these directly.
+`LayoutPage` and `LayoutSuspense` are internal types Chirp uses when [[docs/build-apps/pages-navigation/filesystem-routing|filesystem routing]] renders through layout chains. You return `Page` or `Suspense`; Chirp upgrades them when layouts are involved. You don't construct these directly.
 :::
 
-## PageComposition
+## Suspense
 
-Python-first composition API for explicit page structure. Use `fragment_block` and `page_block` instead of `block_name` / `page_block_name`, and add optional region updates for shell actions:
+Paints the shell instantly, then streams real content in as each slow data source resolves. The browser gets the full page with skeleton placeholders, then [[docs/build-apps/html-fragments/fragments|OOB swaps]] fill them in:
+
+```python
+from chirp import Suspense
+
+@app.route("/dashboard")
+async def dashboard():
+    return Suspense("dashboard.html",
+        stats=get_stats(),       # awaitable -> deferred, shell shows skeleton
+        orders=get_orders(),     # awaitable -> deferred, shell shows skeleton
+        title="Sales Dashboard", # plain value -> available in the shell
+    )
+```
+
+In the template, branch on **`{% if stats is deferred %}`** — not bare `{% if stats %}`, which reads an empty resolved `tuple`/`list` as "still loading":
+
+```html
+{% if stats is deferred %}
+  <div class="skeleton">Loading…</div>
+{% else %}
+  {{ render_stats(stats) }}
+{% end %}
+```
+
+Chirp resolves the awaitables concurrently, then streams each affected block as an OOB swap. Blocks are discovered automatically by static analysis. Two optional parameters override that:
+
+- **`defer_blocks`** — an explicit tuple of block names to re-render, bypassing analysis. Use it when deferred values pass through macro arguments the analyzer can't trace.
+- **`defer_map`** — maps a block name to a different DOM id for the swap target, e.g. `{"stats": "stats-panel"}`.
+
+::::{dropdown} Advanced: the deferred sentinel and pending-key set
+`is deferred` is the rule you need. Under the hood, the shell sets each unresolved awaitable key to the `DEFERRED` sentinel, and sets `__chirp_defer_pending__` to a `frozenset` of keys still awaiting resolution (empty once resolved, or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer the pending-key set. The constant `CHIRP_DEFER_PENDING_KEY` holds the string `"__chirp_defer_pending__"`. These are provisional extension surfaces; prefer `is deferred` in templates.
+::::{/dropdown}
+
+See [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] for the full mechanism.
+
+## Stream
+
+Progressive HTML rendering with no shell-first step. Pass awaitable context values unawaited — Chirp resolves them concurrently up front, then the page chunks out so the browser paints before the full HTML is ready:
+
+```python
+from chirp import Stream
+
+@app.route("/dashboard")
+async def dashboard():
+    return Stream("dashboard.html",
+        header=site_header(),     # plain value
+        stats=load_stats(),       # coroutine -> resolved concurrently
+        activity=load_activity(), # coroutine -> resolved concurrently
+    )
+```
+
+:::{note} Stream vs Suspense vs TemplateStream
+Chirp has three streaming return types. `Stream` chunks a page after data resolves; `Suspense` paints a shell first and fills slow blocks via OOB swaps; `TemplateStream` lets the template itself consume an async iterator (ideal for LLM token streaming). See [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] for the full decision.
+:::
+
+## EventStream
+
+Server-Sent Events — push updates to the browser over a persistent connection *after* the page has loaded:
+
+```python
+from chirp import EventStream, Fragment
+
+@app.route("/notifications")
+async def notifications():
+    async def stream():
+        async for event in notification_bus.subscribe():
+            yield Fragment("components/notification.html", "item", event=event)
+    return EventStream(stream())
+```
+
+The generator yields values — strings, dicts, `Fragment`s, or `SSEEvent`s. See [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] and [[docs/build-apps/streaming-updates/sse-patterns|SSE patterns]] for the wire format and recipes.
+
+## MutationResult
+
+Progressive enhancement for any mutation (POST, PUT, PATCH, DELETE). htmx requests get rendered fragments; plain requests get a redirect:
+
+```python
+from chirp import MutationResult, Fragment
+
+# ContactForm is a form shape; Chirp extracts it from the request body
+# by the typed parameter annotation. See Forms & validation.
+@app.route("/contacts", methods=["POST"])
+async def add_contact(form: ContactForm):
+    _add_contact(form.name, form.email)
+    contacts = _get_contacts()
+    return MutationResult(
+        "/contacts",
+        Fragment("contacts.html", "table", contacts=contacts),
+        Fragment("contacts.html", "count", target="count", count=len(contacts)),
+        trigger="contactAdded",
+    )
+```
+
+- **Plain request:** 303 redirect to the URL (fragments ignored)
+- **htmx + fragments:** renders the fragments, adds `HX-Trigger` if `trigger` is set
+- **htmx + no fragments:** sends an `HX-Redirect` header
+
+It works for every mutation method, not just form POST — a `DELETE` handler returning a refreshed list works the same way. For a redirect in both modes, return `MutationResult("/dashboard")` with no fragments.
+
+:::{note}
+`FormAction` is a backwards-compatible alias for `MutationResult` — same class, different name.
+:::
+
+## ValidationError
+
+Returns a 422 with a re-rendered form fragment — the standard htmx form-validation loop:
+
+```python
+from chirp import ValidationError
+
+@app.route("/submit", methods=["POST"])
+async def submit(request: Request):
+    form = await request.form()
+    errors = validate(form)
+    if errors:
+        return ValidationError("form.html", "form_errors", errors=errors)
+    # ... process valid form
+```
+
+See [[docs/build-apps/forms-data/forms-validation|Forms & validation]] for the full pattern.
+
+## OOB (out-of-band)
+
+Updates several parts of the page in one response — a main fragment plus extra out-of-band swaps:
+
+```python
+from chirp import OOB, Fragment
+
+@app.route("/update")
+def update():
+    return OOB(
+        Fragment("page.html", "main_content", data=data),
+        Fragment("page.html", "sidebar", stats=stats),
+        Fragment("page.html", "notification_count", count=count),
+    )
+```
+
+Combined with htmx's `hx-swap-oob`, this swaps multiple regions from a single request.
+
+## Redirect and hx_redirect
+
+`Redirect` is a normal HTTP redirect (302 by default):
+
+```python
+from chirp import Redirect
+
+@app.route("/old-page")
+def old_page():
+    return Redirect("/new-page")
+```
+
+`hx_redirect` handles a handler reachable by *either* plain browser navigation or htmx. It returns a `Response` carrying both `Location` (for browser redirects) and `HX-Redirect` (for htmx full-page navigation):
+
+```python
+from chirp import hx_redirect
+
+@app.route("/login", methods=["POST"])
+async def login(request: Request):
+    # ... authenticate ...
+    return hx_redirect("/dashboard")
+```
+
+## Strings, dicts, and Response
+
+Plain strings return as `text/html`; dicts serialize to JSON:
+
+```python
+@app.route("/hello")
+def hello():
+    return "Hello, World!"      # text/html, 200
+
+@app.route("/api/status")
+def status():
+    return {"status": "ok"}     # application/json, 200
+```
+
+For full control, return a `Response` with a chainable `.with_*()` API:
+
+```python
+from chirp import Response
+
+@app.route("/api/create")
+async def create():
+    return Response(body=b'{"id": 42}', status=201).with_header(
+        "Content-Type", "application/json"
+    )
+```
+
+See [[docs/build-apps/pages-navigation/request-response|Request & Response]] for the chainable API.
+
+## InlineTemplate (prototyping)
+
+`Template.inline()` renders a template from a string instead of a file — a prototyping shortcut for scripts where you don't want a `templates/` directory yet:
+
+```python
+from chirp import Template, InlineTemplate
+
+@app.route("/")
+def index() -> InlineTemplate:
+    return Template.inline("<h1>{{ greeting }}</h1>", greeting="Hello, world!")
+```
+
+:::{warning} Replace before production
+`app.check()` warns on any route annotated to return an `InlineTemplate` (it inspects the handler's `-> InlineTemplate` return annotation, not its runtime return value). Move to a file-based `Template` before you ship.
+:::
+
+## Advanced and internal
+
+::::{dropdown} Explicit page composition (`PageComposition`)
+`PageComposition` is a Python-first API for explicit page structure, with optional region updates for shell actions. `Page` is normalized to it internally — reach for it only when you want explicit region updates.
 
 ```python
 from chirp import PageComposition, RegionUpdate, ViewRef
@@ -161,236 +369,11 @@ def skills():
     )
 ```
 
-`Page` and `LayoutPage` are normalized to `PageComposition` internally; both APIs work. Use `PageComposition` when you want explicit region updates or clearer semantics.
-
-## Stream
-
-Progressive HTML rendering. The browser receives the page shell immediately and content fills in as data becomes available:
-
-```python
-from chirp import Stream
-
-@app.route("/dashboard")
-async def dashboard():
-    return Stream("dashboard.html",
-        header=site_header(),
-        stats=await load_stats(),
-        activity=await load_activity(),
-    )
-```
-
-See [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] for details.
-
-## Suspense
-
-Instant first paint with deferred data. The browser receives the full page shell immediately (with skeleton placeholders), then the actual content streams in as OOB swaps once each data source resolves:
-
-```python
-from chirp import Suspense
-
-@app.route("/dashboard")
-async def dashboard():
-    return Suspense("dashboard.html",
-        stats=get_stats(),       # awaitable — deferred, shell shows skeleton
-        orders=get_orders(),     # awaitable — deferred, shell shows skeleton
-        title="Sales Dashboard", # plain value — available in the shell
-    )
-```
-
-Use **`{% if stats is deferred %}skeleton{% else %}...{% end %}`** (not bare `{% if stats %}`) so an empty resolved `tuple`/`list` does not look like “still loading”. The shell sets awaitable keys to the `DEFERRED` sentinel until they resolve; it also sets **`__chirp_defer_pending__`** to a `frozenset` of keys still awaiting resolution (empty once resolved or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer the pending-key set. The constant **`CHIRP_DEFER_PENDING_KEY`** is the string `__chirp_defer_pending__`. Chirp resolves awaitables concurrently, then streams each block's real content as an OOB swap. Blocks are discovered via static analysis (`block_metadata().depends_on`) with ancestor pruning.
-
-Optional parameters:
-
-- **`defer_blocks`** — explicit tuple of block names to re-render, bypassing static analysis. Use when deferred values are passed through macro arguments the analyzer can't trace.
-- **`defer_map`** — maps block names to different DOM ids for OOB swap targeting (`{"stats": "stats-panel"}`).
-
-See [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] for the full story.
-
-## EventStream
-
-Server-Sent Events. Push data to the browser over a persistent connection:
-
-```python
-from chirp import EventStream, Fragment
-
-@app.route("/notifications")
-async def notifications():
-    async def stream():
-        async for event in notification_bus.subscribe():
-            yield Fragment("components/notification.html", event=event)
-    return EventStream(stream())
-```
-
-The generator yields values (strings, dicts, Fragments, or SSEEvents). See [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] for details.
-
-## Response
-
-Explicit control over the HTTP response:
-
-```python
-from chirp import Response
-
-@app.route("/api/create")
-async def create():
-    return Response(body=b'{"id": 42}', status=201).with_header(
-        "Content-Type", "application/json"
-    )
-```
-
-Response supports a chainable `.with_*()` API. See [[docs/build-apps/pages-navigation/request-response|Request & Response]].
-
-## Redirect
-
-```python
-from chirp import Redirect
-
-@app.route("/old-page")
-def old_page():
-    return Redirect("/new-page")  # 302 by default
-```
-
-Use `Redirect(...)` when you want a normal HTTP redirect and do not need to
-shape the response further.
-
-## hx_redirect
-
-`hx_redirect()` is a response helper for handlers that may be reached by either
-plain browser navigation or htmx requests:
-
-```python
-from chirp import hx_redirect
-
-@app.route("/login", methods=["POST"])
-async def login(request: Request):
-    # ... authenticate ...
-    return hx_redirect("/dashboard")
-```
-
-It returns a `Response` with both:
-
-- `Location: /dashboard` for normal browser redirects
-- `HX-Redirect: /dashboard` for htmx full-page navigation
-
-Use it when the same handler services both progressive enhancement paths and you
-want one return value that works cleanly for both.
-
-## MutationResult
-
-Progressive enhancement for any mutation (POST, PUT, PATCH, DELETE). Auto-negotiates htmx vs non-htmx: htmx requests get rendered fragments, non-htmx requests get a redirect.
-
-```python
-from chirp import MutationResult, Fragment
-
-@app.route("/contacts", methods=["POST"])
-async def add_contact(form: ContactForm):
-    _add_contact(form.name, form.email)
-    contacts = _get_contacts()
-
-    return MutationResult(
-        "/contacts",
-        Fragment("contacts.html", "table", contacts=contacts),
-        Fragment("contacts.html", "count", target="count", count=len(contacts)),
-        trigger="contactAdded",
-    )
-```
-
-- **Non-htmx**: 303 redirect to the URL (fragments are ignored)
-- **htmx + fragments**: renders the fragments, adds `HX-Trigger` if set
-- **htmx + no fragments**: sends `HX-Redirect` header
-
-Works for all mutation methods, not just form POST:
-
-```python
-@app.route("/items/{item_id}", methods=["DELETE"])
-async def delete_item(item_id: int):
-    _delete_item(item_id)
-    items = _get_items()
-    return MutationResult(
-        "/items",
-        Fragment("items.html", "list", items=items),
-        trigger="itemDeleted",
-    )
-```
-
-Simple redirect for both modes:
-
-```python
-return MutationResult("/dashboard")
-```
-
-:::{note}
-`FormAction` is a backwards-compatible alias for `MutationResult`. Both names work identically.
-:::
-
-## Strings and Dicts
-
-Plain strings are returned as `text/html`. Dicts are serialized as JSON:
-
-```python
-@app.route("/hello")
-def hello():
-    return "Hello, World!"  # text/html, 200
-
-@app.route("/api/status")
-def status():
-    return {"status": "ok"}  # application/json, 200
-```
-
-## ValidationError
-
-Returns a 422 response with a rendered fragment, designed for form validation:
-
-```python
-from chirp import ValidationError
-
-@app.route("/submit", methods=["POST"])
-async def submit(request: Request):
-    form = await request.form()
-    errors = validate(form)
-    if errors:
-        return ValidationError("form.html", "form_errors", errors=errors)
-    # ... process valid form
-```
-
-## OOB (Out-of-Band)
-
-Sends multiple fragment updates in a single response -- the main content plus additional out-of-band swaps:
-
-```python
-from chirp import OOB, Fragment
-
-@app.route("/update")
-def update():
-    return OOB(
-        Fragment("page.html", "main_content", data=data),
-        Fragment("page.html", "sidebar", stats=stats),
-        Fragment("page.html", "notification_count", count=count),
-    )
-```
-
-Combined with htmx's `hx-swap-oob`, this updates multiple parts of the page in one request.
-
-## Choosing a Streaming Type
-
-Chirp has three streaming return types. Use this decision tree:
-
-| Question | Answer | Type |
-|----------|--------|------|
-| Does your template use `{% async for %}` or `{{ await }}`? | Yes | **TemplateStream** |
-| Do you want a skeleton/shell rendered instantly, with slow data filling in later? | Yes | **Suspense** |
-| Do you just want chunked transfer of a large page? | Yes | **Stream** |
-
-**Stream** -- All data resolves upfront (concurrently), then chunks stream out. Best for large templates where you want the browser painting before the full HTML is ready.
-
-**TemplateStream** -- The template itself consumes an async iterator during rendering. One pass, O(n). Ideal for LLM token streaming and long async feeds.
-
-**Suspense** -- Shell renders instantly with skeletons, then slow blocks fill in as OOB swaps. Best for dashboards with multiple independent slow data sources.
-
-See [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] for the full story.
-
-## Introspecting Render Decisions
-
-For `Page`, `LayoutPage`, and `PageComposition` returns, Chirp builds a `RenderPlan` that captures the rendering decision before HTML is produced. Middleware can inspect it:
+`PageComposition`, `RegionUpdate`, and `ViewRef` are advanced introspection APIs (debug-stability) — not part of the everyday return surface.
+::::{/dropdown}
+
+::::{dropdown} Inspect render decisions from middleware (`get_render_plan`)
+For `Page` and `PageComposition` returns, Chirp builds a `RenderPlan` capturing the rendering decision before HTML is produced. Middleware can read it:
 
 ```python
 from chirp import get_render_plan
@@ -403,12 +386,17 @@ async def analytics_middleware(request, next):
     return response
 ```
 
-The `RenderPlan` is a frozen dataclass with fields for `intent` (`"full_page"`, `"page_fragment"`, `"local_fragment"`), layout chain depth, and region updates. See [[docs/build-apps/request-pipeline/render-plan|RenderPlan Middleware Guide]] for practical patterns.
+`RenderPlan.intent` is one of `"full_page"`, `"page_fragment"`, or `"local_fragment"`. `get_render_plan` and `RenderPlan` are advanced introspection APIs (debug-stability). See the [[docs/build-apps/request-pipeline/render-plan|RenderPlan middleware guide]] for patterns.
+::::{/dropdown}
 
-## Next Steps
+:::{note} See also
 
-- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Deep dive into fragment rendering
-- [[docs/build-apps/html-fragments/rendering|Rendering]] -- Template rendering in detail
-- [[docs/build-apps/pages-navigation/request-response|Request & Response]] -- The chainable Response API
-- [[docs/build-apps/ui-extensions/tools|Tools & MCP]] -- Register functions as MCP tools for AI agents
-- [[docs/build-apps/request-pipeline/render-plan|RenderPlan Middleware]] -- Inspect rendering decisions from middleware
+- [[docs/examples/returns-gallery|Returns gallery]] — runnable examples of every return type
+- [[docs/get-started/first-fragment-app|Build your first fragment loop]] — the smallest full-page → fragment round trip
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — deep dive into fragment rendering
+- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] — Stream vs Suspense vs TemplateStream
+- [[docs/build-apps/pages-navigation/request-response|Request & Response]] — the chainable Response API
+:::
+
+:::{related}
+:::

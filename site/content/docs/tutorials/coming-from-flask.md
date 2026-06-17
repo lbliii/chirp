@@ -12,51 +12,53 @@ category: tutorial
 
 ## Overview
 
-If you know Flask, you already know 80% of Chirp. This guide maps Flask concepts to their Chirp equivalents.
+If you know Flask, most of Chirp is a one-line rename — same routes, same templates, same filters. The one new habit: in Chirp [[docs/about/core-concepts/return-values|the return type is the intent]]. You return a value that says *what* to render (`Template(...)`, `Fragment(...)`, a dict for JSON) instead of calling `render_template()` or `jsonify()`.
+
+This page maps every Flask move you know to its Chirp equivalent, then shows the handful of things Chirp adds.
 
 ## App Setup
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 from flask import Flask
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 from chirp import App, AppConfig
 
 config = AppConfig(secret_key="secret")
 app = App(config=config)
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
-Chirp uses a frozen dataclass instead of a dict. No `app.config["SCRET_KEY"]` typos.
+Chirp uses a frozen dataclass instead of a dict. No `app.config["SECRET_KEY"]` typos.
 
 ## Routes
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 @app.route("/users/<int:id>")
 def user(id):
     return render_template("user.html", user=get_user(id))
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 @app.route("/users/{id:int}")
 def user(id: int):
     return Template("user.html", user=get_user(id))
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Differences:
 - Path parameters use `{name:type}` instead of `<type:name>`
@@ -65,9 +67,11 @@ Differences:
 
 ## Request Access
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 from flask import request
 
 @app.route("/search")
@@ -75,10 +79,9 @@ def search():
     q = request.args.get("q", "")
     return render_template("search.html", q=q)
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 from chirp import Request
 
 @app.route("/search")
@@ -86,8 +89,7 @@ def search(request: Request):
     q = request.query.get("q", "")
     return Template("search.html", q=q)
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Differences:
 - `request` is a parameter, not a global import
@@ -96,78 +98,83 @@ Differences:
 
 ## JSON Responses
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 from flask import jsonify
 
 @app.route("/api/users")
 def api_users():
     return jsonify({"users": get_all_users()})
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 @app.route("/api/users")
 def api_users():
     return {"users": get_all_users()}
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 No `jsonify()` needed. Return a dict and Chirp serializes it as JSON.
 
+:::{note}
+Chirp's primary model is HTML return types. A returned dict is a convenience for small JSON islands — typeahead data, a counter poll — not a parallel REST serialization layer.
+:::
+
 ## Error Handling
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 @app.error(404)
 def not_found(request: Request):
     return Template("404.html", path=request.path)
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Chirp's error handlers use the same return-value system. No tuple return for status codes.
 
 ## Template Filters
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 @app.template_filter()
 def currency(value):
     return f"${value:,.2f}"
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 @app.template_filter()
 def currency(value: float) -> str:
     return f"${value:,.2f}"
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Identical decorator pattern. Chirp adds type annotations.
 
 ## Middleware
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
-# Flask uses WSGI middleware or before/after_request
+# Flask — separate before/after hooks
 @app.before_request
 def before():
     g.start = time.monotonic()
@@ -178,10 +185,9 @@ def after(response):
     response.headers["X-Time"] = f"{elapsed:.3f}"
     return response
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp — one function wraps the request
 async def timing(request: Request, next: Next) -> Response:
     start = time.monotonic()
     response = await next(request)
@@ -189,16 +195,17 @@ async def timing(request: Request, next: Next) -> Response:
 
 app.add_middleware(timing)
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Chirp uses a single middleware function instead of separate before/after hooks.
 
 ## Sessions and Auth
 
-:::{tab-set}
-:::{tab-item} Flask
+::::{code-tabs}
+:sync: flask-chirp
+
 ```python
+# Flask
 from flask import session, redirect
 from flask_login import login_user, login_required
 
@@ -213,10 +220,9 @@ def do_login():
 def dashboard():
     return render_template("dashboard.html")
 ```
-:::{/tab-item}
 
-:::{tab-item} Chirp
 ```python
+# Chirp
 from chirp import login, logout, login_required, get_user, is_safe_url, Redirect, Template
 
 @app.route("/login", methods=["POST"])
@@ -237,8 +243,7 @@ def dashboard():
     user = get_user()
     return Template("dashboard.html", user=user)
 ```
-:::{/tab-item}
-:::{/tab-set}
+::::
 
 Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup.
 
@@ -246,11 +251,11 @@ Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no F
 
 Beyond Flask equivalents, Chirp offers:
 
-- **Fragment rendering** -- `Fragment("page.html", "block_name")` renders a named block
-- **Streaming HTML** -- `Stream("page.html")` for progressive rendering
-- **Server-Sent Events** -- `EventStream(generator())` for real-time updates
-- **Typed contracts** -- `app.check()` validates htmx references at startup
-- **Free-threading** -- Designed for Python 3.14t from day one
+- [[docs/build-apps/html-fragments/fragments|Fragment rendering]] — `Fragment("page.html", "block_name")` renders a named block
+- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] — `Stream("page.html")` for progressive rendering
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — `EventStream(generator())` for real-time updates
+- [[docs/quality/contracts-debugging/_index|Typed contracts]] — `app.check()` validates htmx references at startup
+- [[docs/about/thread-safety|Free-threading]] — designed for Python 3.14t from day one
 
 ## Quick Reference
 

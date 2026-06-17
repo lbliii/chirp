@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Build your first Chirp application in 5 minutes
+description: Go from an empty directory to a running Chirp app with a live search box in about five minutes.
 draft: false
 weight: 20
 lang: en
@@ -10,66 +10,40 @@ keywords: [quickstart, hello world, first app, templates, fragments]
 category: onboarding
 ---
 
-## Prerequisites
+## What you'll build
 
-:::{checklist} Before You Start
-:show-progress:
-- [ ] [[docs/get-started/installation|Chirp installed]]
-- [ ] Python 3.14+ available
-:::{/checklist}
+Chirp serves HTML over the wire — full pages for browser navigations and HTML
+fragments for [[docs/build-apps/html-fragments/fragments|htmx]] requests, both
+from one template. This page goes from an empty directory to a running app with
+a live search box in about five minutes.
 
-## Scaffold a Project
+You return values like `Template` and `Page`; the return type tells Chirp what
+to render. If you know Flask, the routing will feel familiar — the fragment loop
+is the one new idea.
 
-The fastest way to start is the `chirp new` command:
+:::{note}
+You need [[docs/get-started/installation|Chirp installed]] and Python 3.14+.
+:::
 
+## Start a project
+
+You have two ways in. Scaffold a ready-made app with `chirp new`, or build one by
+hand to see each piece. Both land on a running app at `http://127.0.0.1:8000`.
+
+:::{tab-set}
+:::{tab-item} Scaffold (chirp new)
 ```bash
 chirp new myapp
 cd myapp
 python app.py
 ```
 
-Open `http://127.0.0.1:8000` in your browser.
+The scaffold ships with auth, sessions, CSRF, and security headers already wired.
+Log in with `admin` / `password` and open `http://127.0.0.1:8000/dashboard`.
+:::{/tab-item}
 
-`chirp new myapp` now generates an auth-ready v2 layout:
-
-- `app.py` with sessions, auth, CSRF, and security headers middleware
-- `models.py` with a demo user model + password hashing
-- `pages/` filesystem routes (`/`, `/login`, `/dashboard`)
-- `static/style.css`
-- `tests/` with auth flow tests
-
-The scaffold runs in development mode by default and reads `CHIRP_SECRET_KEY`.
-Before production, set a strong secret and run with production settings.
-
-```bash
-export CHIRP_SECRET_KEY="$(python - <<'PY'
-import secrets
-print(secrets.token_urlsafe(48))
-PY
-)"
-```
-
-For an even smaller starting point:
-
-```bash
-chirp new myapp --minimal
-```
-
-This generates a single `app.py` plus `templates/index.html` — no `pages/`
-tree, models, or scaffolded auth routes. The generated `app.py` is **not** bare,
-though: it wires the secure-by-default stack (`SessionMiddleware` →
-`CSRFMiddleware` → `SecurityHeadersMiddleware`), reads the secret key from
-`CHIRP_SECRET_KEY`, and refuses to start in production with the placeholder
-secret. That means even the minimal scaffold passes the `security_stack`
-contract out of the box: its mutating routes are CSRF/session-guarded the moment
-you add them.
-
-If you want to learn the fragment loop on top of that secure baseline, use
-[[docs/get-started/first-fragment-app|First Fragment App]] after this page.
-
-## Hello World (Manual)
-
-You can also create a project by hand. Create a file called `app.py`:
+:::{tab-item} By hand
+Create a file called `app.py`:
 
 ```python
 from chirp import App
@@ -83,17 +57,42 @@ def index():
 app.run()
 ```
 
-Run it:
+Run it with `python app.py` and open `http://127.0.0.1:8000`. A handler returns
+a value; a plain string becomes an HTML response.
+:::{/tab-item}
+:::{/tab-set}
+
+:::{dropdown} What the scaffold generates (and the secret-key story)
+`chirp new myapp` writes an auth-ready layout:
+
+- `app.py` with sessions, auth, CSRF, and security-headers middleware
+- `models.py` with a demo user model and password hashing
+- `pages/` filesystem routes (`/`, `/login`, `/dashboard`)
+- `static/style.css`
+- `tests/` with auth-flow tests
+
+For a smaller starting point, `chirp new myapp --minimal` writes a single `app.py`
+plus `templates/index.html` — no `pages/` tree, models, or auth routes. The
+minimal `app.py` is still not bare: it wires the secure-by-default stack
+(`SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware`) and reads
+the secret key from `CHIRP_SECRET_KEY`, so even it passes the `security_stack`
+contract out of the box.
+
+Every scaffold reads `CHIRP_SECRET_KEY` and refuses to start in production with a
+placeholder secret. Generate one before you deploy:
 
 ```bash
-python app.py
+export CHIRP_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 ```
 
-Open `http://127.0.0.1:8000` in your browser. Five lines to hello world.
+See [[docs/quality/deployment/auth-hardening|auth-hardening]] for the
+secure-by-default rationale and [[docs/quality/deployment/production|production config]]
+for the full deployment story.
+:::
 
-## Add Templates
+## Add a template
 
-Create a `templates/` directory and add `base.html`:
+Create a `templates/` directory and add `templates/base.html`:
 
 ```html
 <!DOCTYPE html>
@@ -130,13 +129,17 @@ def index():
 app.run()
 ```
 
-Route functions return *values*. `Template` tells the framework to render `index.html` with the given context via kida.
+Handlers return values. `Template` tells Chirp to render `index.html` with the
+given context through [[docs/build-apps/html-fragments/kida-integration|kida templates]].
 
-## Fragment Rendering
+## Render a fragment
 
-This is where Chirp diverges from Flask. Add a search feature that works as both a full page and an htmx fragment.
+This is where Chirp diverges from Flask. A search route can serve a full page to
+a browser and just the results to an htmx request — from the same template, with
+no separate partials directory.
 
-Add `templates/search.html`:
+Add `templates/search.html`. Wrap the results in a named block so it can be
+rendered on its own:
 
 ```html
 {% extends "base.html" %}
@@ -156,10 +159,12 @@ Add `templates/search.html`:
 {% endblock %}
 ```
 
-Update `app.py`:
+Update `app.py`. Return [[docs/about/core-concepts/return-values|`Page`]] and
+Chirp negotiates the response: a full page for browser navigations, the named
+block for narrow htmx swaps.
 
 ```python
-from chirp import App, Template, Fragment, Request
+from chirp import App, Template, Page, Request
 
 app = App()
 
@@ -173,19 +178,39 @@ def index():
 def search(request: Request):
     q = request.query.get("q", "")
     results = [i for i in ITEMS if q.lower() in i.lower()] if q else ITEMS
-
-    if request.is_fragment:
-        return Fragment("search.html", "results", results=results)
-    return Template("search.html", title="Search", results=results)
+    return Page("search.html", "results", title="Search", results=results)
 
 app.run()
 ```
 
-Full page navigation renders everything. An htmx request renders just the `results` block. Same template, same data, different scope.
+`Page` replaces the manual `if request.is_htmx: return Fragment(...)` branch you'd
+otherwise write on every htmx-reachable route.
 
-## Add htmx
+:::{dropdown} What `Page` desugars to
+`Page("search.html", "results", ...)` is the auto-negotiation form. If you ever
+need the branch by hand — to render different blocks per request type, say — read
+the request directly:
 
-To make the fragment rendering work, include htmx in your `base.html`:
+```python
+from chirp import App, Template, Fragment, Request
+
+@app.route("/search")
+def search(request: Request):
+    q = request.query.get("q", "")
+    results = [i for i in ITEMS if q.lower() in i.lower()] if q else ITEMS
+    if request.is_htmx:
+        return Fragment("search.html", "results", results=results)
+    return Template("search.html", title="Search", results=results)
+```
+
+Use `request.is_htmx` for any htmx request, or `request.is_narrow_fragment` to
+exclude boosted navigations and history restores. Prefer `Page` — it handles all
+three cases for you.
+:::
+
+## Wire up htmx
+
+To make the fragment swap fire, include htmx in `templates/base.html`:
 
 ```html
 <!DOCTYPE html>
@@ -200,63 +225,87 @@ To make the fragment rendering work, include htmx in your `base.html`:
 </html>
 ```
 
-Now the search input sends requests to `/search` via htmx, and Chirp responds with just the `results` block -- no full page reload, no separate partials directory, no JavaScript.
+Now the search input sends `hx-get` requests to `/search`, and Chirp responds
+with only the `results` block — no full page reload, no separate partials, no
+hand-written JavaScript.
 
-## Live Updates in 5 Minutes
+## Stream live updates
 
-Add real-time updates with SSE and view transitions:
+For updates that arrive *after* the page loads — notifications, a ticker, a live
+feed — use [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]].
+A route returns an `EventStream` that yields `Fragment` swaps over a long-lived
+connection.
 
-:::{steps}
-:::{step} Install Chirp
+::::{steps}
+:::{step} Open an SSE scope in your template
 
-If not already installed: `pip install bengal-chirp`
-
-:::{/step}
-:::{step} Extend the boost layout
-
-Add the layout and SSE scope to your template:
+Add `templates/feed.html`. Extend the boost layout, wrap the live region in a
+named block, and declare where the stream connects:
 
 ```html
 {% extends "chirp/layouts/boost.html" %}
 {% block content %}
-  <ol>
-    {% for item in items %}
-    <li>{{ item.title }}</li>
-    {% endfor %}
-  </ol>
+  {% block live_block %}
+    <ol id="live_block">
+      {% for item in items %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ol>
+  {% endblock %}
 {% endblock %}
 {% block sse_scope %}
   {% from "chirp/sse.html" import sse_scope %}
-  {{ sse_scope("/events") }}
+  {{ sse_scope("/events", swap="live_block") }}
 {% endblock %}
 ```
-
 :::{/step}
-:::{step} Stream fragments from your route
+
+:::{step} Stream fragments from the route
+
+`EventStream` takes an **async** generator. Each `yield` re-renders the
+`live_block` from `feed.html` and pushes it down the connection:
 
 ```python
 from chirp import EventStream, Fragment
 
-@app.route("/events")
-def events():
-    def stream():
-        yield Fragment("my_template.html", "live_block", items=...)
-    return EventStream(stream)
+@app.route("/events", referenced=True)
+async def events():
+    async def stream():
+        yield Fragment("feed.html", "live_block", items=ITEMS)
+    return EventStream(stream())
 ```
-
 :::{/step}
+
 :::{step} Run chirp check
 
-Run `chirp check myapp:app` to catch SSE scope violations before opening the browser.
+```bash
+chirp check myapp:app
+```
 
+This catches SSE scope violations and route/template mismatches before you open
+the browser.
 :::{/step}
-:::{/steps}
+::::{/steps}
 
-See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full pattern.
+:::{danger}
+An SSE route must set `referenced=True` and pass a **called** generator —
+`EventStream(stream())`, not `EventStream(stream)`. Without `referenced=True`,
+browser speculation opens long-lived prefetch streams and `chirp check` flags it
+(`sse_speculation`). Passing the uncalled function never starts the stream.
+:::
 
-## Next Steps
+See [[docs/tutorials/view-transitions-oob|View Transitions + OOB]] for the full
+real-time pattern.
 
-- [[docs/about/core-concepts/return-values|Return Values]] -- All the types you can return
-- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Deep dive into fragment rendering
-- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] -- Progressive page rendering
-- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Real-time updates
+## Next steps
+
+You now have the fragment loop running. The natural next step is to build the
+same loop with a form, tests, and `chirp check` end to end:
+
+- [[docs/get-started/first-fragment-app|First Fragment App]] — the smallest complete app, with a form POST and tests
+- [[docs/about/core-concepts/return-values|Return Values]] — every type a handler can return and what it means
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — the fragment-rendering deep dive
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — real-time updates after the page loads
+
+:::{related}
+:::

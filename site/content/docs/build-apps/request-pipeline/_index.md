@@ -14,47 +14,16 @@ cascade:
   type: doc
 ---
 
-Use this section when behavior belongs around route handlers rather than inside
-them: security headers, sessions, CSRF, static files, CORS, auth, and custom
-pipeline logic.
+Middleware is code that runs *around* every route handler — for cross-cutting
+behavior like sessions, CSRF, security headers, static files, CORS, and auth.
+Use this section when something belongs around a handler rather than inside it.
+Chirp middleware is just a function that matches a Protocol: no base class, no
+inheritance.
 
-:::{cards}
-:columns: 2
-:gap: medium
+New here? Start with **Built-in Middleware** to wire the
+[secure-by-default stack](/chirp/docs/quality/deployment/auth-hardening/)
+(sessions, CSRF, and security headers). Reach for **Custom Middleware** when you
+need your own.
 
-:::{card} Overview
-:icon: layers
-:link: /chirp/docs/build-apps/request-pipeline/overview/
-:description: Protocol definition and pipeline execution
-How middleware works -- no base class, no inheritance.
-:::{/card}
-
-:::{card} Built-in Middleware
-:icon: package
-:link: /chirp/docs/build-apps/request-pipeline/builtin/
-:description: CORS, StaticFiles, Sessions, Auth, CSRF
-Middleware that ships with Chirp.
-:::{/card}
-
-:::{card} Custom Middleware
-:icon: code
-:link: /chirp/docs/build-apps/request-pipeline/custom/
-:description: Writing your own middleware
-Functions, classes, and real-world patterns.
-:::{/card}
-
-:::{card} RenderPlan Middleware
-:icon: eye
-:link: /chirp/docs/build-apps/request-pipeline/render-plan/
-:description: Inspect rendering decisions from middleware
-Read-only access to the frozen RenderPlan for analytics, caching, and debugging.
-:::{/card}
-
-:::{card} Early Hints (103)
-:icon: zap
-:link: /chirp/docs/build-apps/request-pipeline/early-hints/
-:description: Preload assets before the body with HTTP 103
-Set Link/preload headers; Chirp promotes them to a 103 Early Hints frame.
-:::{/card}
-
-:::{/cards}
+:::{child-cards}
+:::

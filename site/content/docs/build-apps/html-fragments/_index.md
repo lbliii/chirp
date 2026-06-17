@@ -14,53 +14,19 @@ cascade:
   type: doc
 ---
 
-:::{cards}
-:columns: 2
-:gap: medium
+HTML over the wire: one template, many modes. Chirp renders a single template
+with named blocks as a full page, an htmx fragment, a multi-target
+[[docs/build-apps/html-fragments/fragments|OOB swap]], or a streamed
+[[docs/build-apps/streaming-updates/_index|Suspense or SSE payload]] — the
+return type decides which. A *fragment* is one of those named blocks rendered on
+its own; an *OOB swap* updates several regions of the page from a single
+response. This section is for the hypermedia practitioner who wants those
+return-type mechanics in detail.
 
-Use this section when one template needs to serve full pages, htmx fragments,
-OOB updates, Suspense blocks, and SSE payloads.
+:::{note} Where to start
+New to Chirp templates? Begin with **Rendering**. Already build with htmx and
+just want the return-type mapping? Jump straight to **Fragments**.
+:::
 
-:::{card} Rendering
-:icon: monitor
-:link: /chirp/docs/build-apps/html-fragments/rendering/
-:description: Template rendering and context passing
-How Template works with kida under the hood.
-:::{/card}
-
-:::{card} Fragments
-:icon: file-code
-:link: /chirp/docs/build-apps/html-fragments/fragments/
-:description: Fragment, Page, and OOB rendering
-Render named blocks independently for htmx.
-:::{/card}
-
-:::{card} Fragment Blocks
-:icon: scan
-:link: /chirp/docs/build-apps/html-fragments/fragment-blocks/
-:description: Naming and targeting blocks
-Use template blocks as the shared unit for fragments, OOB swaps, Suspense, and SSE.
-:::{/card}
-
-:::{card} Layout Patterns
-:icon: sidebar
-:link: /chirp/docs/build-apps/html-fragments/layout-patterns/
-:description: Block-heavy layouts, boost pattern, outer vs inner
-When to use block, include, and call.
-:::{/card}
-
-:::{card} Filters
-:icon: filter
-:link: /chirp/docs/build-apps/html-fragments/filters/
-:description: Custom template filters and globals
-Register filters and globals on your app.
-:::{/card}
-
-:::{card} Kida Integration
-:icon: puzzle
-:link: /chirp/docs/build-apps/html-fragments/kida-integration/
-:description: AST-driven OOB discovery and regions
-How Chirp uses template_metadata() for block validation.
-:::{/card}
-
-:::{/cards}
+:::{child-cards}
+:::

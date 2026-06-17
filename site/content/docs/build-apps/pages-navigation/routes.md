@@ -10,6 +10,10 @@ keywords: [route, decorator, methods, get, post, path, parameters, trie]
 category: guide
 ---
 
+A route connects a URL to a handler — a function that returns a value Chirp turns into a response. You register one with the `@app.route()` decorator.
+
+Reach for explicit `@app.route()` when you want routing in code. For convention-based routing discovered from a `pages/` directory, see [[docs/build-apps/pages-navigation/filesystem-routing|filesystem routing]] instead.
+
 ## Route Registration
 
 Register routes with the `@app.route()` decorator:
@@ -24,7 +28,7 @@ def about():
     return Template("about.html")
 ```
 
-Routes are registered during the setup phase. At freeze time, the route table compiles into an immutable trie-based structure for fast matching.
+Routes are registered during the setup phase. At [[docs/about/core-concepts/app-lifecycle|freeze time]], the route table compiles into an immutable trie-based structure for fast matching.
 
 ## HTTP Methods
 
@@ -49,7 +53,9 @@ async def user(request: Request, id: int):
     return Template("user.html", user=get_user(id))
 ```
 
-If a request matches a path but not the method, Chirp returns `405 Method Not Allowed` with an `Allow` header listing the valid methods.
+:::{tip}
+If a request matches a path but not the method, Chirp returns `405 Method Not Allowed` with an `Allow` header listing the valid methods — you don't write that fallback yourself.
+:::
 
 ## Path Parameters
 
@@ -75,14 +81,27 @@ def price(amount: float):   # amount is a float
     return f"${amount:.2f}"
 ```
 
-Supported types:
+Supported converters:
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| `str` | (default) any non-`/` chars | `/users/{name}` |
-| `int` | digits only | `/users/{id:int}` |
-| `float` | digits with optional decimal | `/price/{amount:float}` |
-| `path` | any chars including `/` | `/files/{filepath:path}` |
+:::{list-table}
+:header-rows: 1
+
+* - Converter
+  - Matches
+  - Example
+* - `str`
+  - (default) any chars except `/`
+  - `/users/{name}`
+* - `int`
+  - digits only
+  - `/users/{id:int}`
+* - `float`
+  - digits with an optional decimal
+  - `/price/{amount:float}`
+* - `path`
+  - any chars, including `/`
+  - `/files/{filepath:path}`
+:::
 
 Parameter names must be valid Python identifiers, converters must be one of the supported names above, and routes use Chirp's `{param}` syntax rather than Flask-style `<param>`. Routes that differ only by parameter name, such as `/users/{id}` and `/users/{name}`, are duplicate route shapes and are rejected.
 
@@ -93,12 +112,18 @@ Parameter names must be valid Python identifiers, converters must be one of the 
 Use `{name:path}` to match the rest of the URL:
 
 ```python
+from pathlib import Path
+
 @app.route("/files/{filepath:path}")
-def serve_file(filepath: str):
-    return send_file(filepath)  # filepath can contain slashes
+def serve_file(filepath: str):          # filepath can contain slashes
+    return FileResponse(Path("uploads") / filepath)
 ```
 
-`path` converters must be the final segment because they consume the rest of the URL.
+`FileResponse` streams the file from disk with conditional-GET and `Range` support — you don't read it into memory yourself.
+
+:::{warning}
+A `path` converter must be the final segment — it consumes the rest of the URL. Putting anything after it raises `ConfigurationError` at registration.
+:::
 
 ## Handler Signature Introspection
 
@@ -131,10 +156,11 @@ def user_post(request: Request, id: int, slug: str):
 def search(form: SearchForm):
     return Template("search.html", q=form.q, page=form.page)
 
-# Dependency injection via app.provide()
-@app.provide()
+# Dependency injection — register a type-keyed factory, then declare it as a param
 def get_store() -> DocumentStore:
     return DocumentStore()
+
+app.provide(DocumentStore, get_store)
 
 @app.route("/documents/{id}")
 def document(id: str, store: DocumentStore):
@@ -143,10 +169,10 @@ def document(id: str, store: DocumentStore):
 
 Argument resolution (first match wins):
 
-- **Request** — Parameter named `request` or typed as `Request`
+- **[[docs/build-apps/pages-navigation/request-response|Request]]** — Parameter named `request` or typed as `Request`
 - **Path parameters** — From URL match, with type coercion
 - **Extractable dataclasses** — Query string (GET), form body (POST), or JSON body. Dataclass fields are populated from request data.
-- **Service providers** — Registered via `app.provide()`. When a parameter's type matches a registered factory, Chirp injects the result.
+- **Service providers** — Registered via `app.provide(annotation, factory)`. When a parameter's type matches a registered factory, Chirp injects the result.
 
 ## Async Handlers
 
@@ -178,43 +204,45 @@ def not_found(request: Request):
 def server_error(request: Request, error: Exception):
     return Template("errors/500.html", error=str(error))
 
-@app.error(ValidationError)
-def validation_error(request: Request, error: ValidationError):
-    return Response(str(error)).with_status(422)
+class PaymentRequired(HTTPError):
+    """Raised by a handler when the caller has no active subscription."""
+    def __init__(self, detail: str = "Subscription required") -> None:
+        super().__init__(status=402, detail=detail)
+
+@app.error(PaymentRequired)
+def payment_required(request: Request, error: PaymentRequired):
+    return Template("errors/payment.html", reason=error.detail)
 ```
 
-Error handlers use the same return-value system as route handlers.
+`@app.error()` takes a status code or an **exception type**. Chirp dispatches to the handler when a route raises a matching exception, or when it produces that status. The handler receives the `Request` and, for exception handlers, the raised exception. An `HTTPError` carries its own status, so the returned `Template` is sent with that code. Error handlers use the same [[docs/about/core-concepts/return-values|return-value system]] as route handlers.
 
-## Route Table Compilation
+:::{note}
+Register an exception type only if your code actually `raise`s it. Chirp's own return types — including `ValidationError`, which you *return* to send a 422 form fragment — are values, not exceptions you catch. See [[docs/about/core-concepts/return-values|return values]] for the full set.
+:::
 
-At freeze time, routes compile into a trie (prefix tree). Matching is O(path-segments), not O(total-routes). This means performance doesn't degrade as you add more routes.
+## Route Table
 
-The compiled route table is immutable. Under free-threading, all worker threads share it without synchronization.
+Every route you register lands in one table that Chirp compiles at [[docs/about/core-concepts/app-lifecycle|freeze time]].
 
-## Dynamic URLs in htmx Attributes
+:::{note}
+At freeze time, routes compile into a trie (prefix tree), so matching is O(path-segments), not O(total-routes) — performance doesn't degrade as you add routes. The compiled table is immutable and shared across worker threads without synchronization (see [[docs/about/thread-safety|thread safety]]).
+:::
 
-When `chirp check <app>` validates templates, it extracts `hx-get`, `hx-post`,
-`hx-put`, `hx-delete`, `hx-patch`, `action`, and route-bearing macro arguments
-such as `confirm_url`, then verifies method + path against the route table.
-Literal URLs are checked against route converter rules, so `/users/alice` does
-not satisfy `/users/{id:int}`. Dynamic URLs (built with Kida's `~` or `{{ }}`)
-are skipped; only literal URLs are validated. Use `~` or `{{ var }}` for path
-parameters; both work at render time and are correctly treated as dynamic by
-the checker.
+::::{dropdown} Advanced: how contract checks validate route URLs in templates
+When `chirp check <app>` [[docs/quality/contracts-debugging/route-contract|validates templates]], it extracts `hx-get`, `hx-post`, `hx-put`, `hx-delete`, `hx-patch`, `action`, and route-bearing macro arguments such as `confirm_url`, then verifies method + path against the route table.
 
-`confirm_url` defaults to `POST` unless a companion `confirm_method` is present,
-which lets dialog-style component APIs participate in the same route validation
-as raw htmx attributes.
+Literal URLs are checked against route converter rules, so `/users/alice` does not satisfy `/users/{id:int}`. Dynamic URLs (built with Kida's `~` or `{{ }}`) are skipped; only literal URLs are validated. Use `~` or `{{ var }}` for path parameters — both work at render time and are correctly treated as dynamic by the checker.
 
-Legacy component-style `action="update-thing"` values are no longer treated as
-route URLs. Chirp emits a warning instead of a false route error so you can
-migrate older macros to literal URLs or explicit htmx attributes over time.
+`confirm_url` defaults to `POST` unless a companion `confirm_method` is present, which lets dialog-style component APIs participate in the same route validation as raw htmx attributes.
 
-The checker also validates selector-bearing HTMX attributes (`hx-target`, `hx-select`, `hx-include`, etc.) for obvious syntax mistakes and unknown static `#id` targets.
+Legacy component-style `action="update-thing"` values are no longer treated as route URLs. Chirp emits a warning instead of a false route error so you can migrate older macros to literal URLs or explicit htmx attributes over time.
 
-## Next Steps
+The checker also validates selector-bearing htmx attributes (`hx-target`, `hx-select`, `hx-include`, and similar) for obvious syntax mistakes and unknown static `#id` targets.
+::::{/dropdown}
 
-- [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem Routing]] -- Discover routes from a pages/ directory
-- [[docs/build-apps/pages-navigation/request-response|Request & Response]] -- The immutable request and chainable response
-- [[docs/build-apps/request-pipeline/overview|Middleware]] -- Intercept requests before they reach handlers
-- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Return fragments from route handlers
+:::{note} See also
+- [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem Routing]] — Discover routes from a `pages/` directory
+- [[docs/build-apps/pages-navigation/request-response|Request & Response]] — The immutable request and chainable response
+- [[docs/build-apps/request-pipeline/overview|Middleware]] — Intercept requests before they reach handlers
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — Return fragments from route handlers
+:::

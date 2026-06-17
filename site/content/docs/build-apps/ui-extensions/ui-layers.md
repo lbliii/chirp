@@ -1,49 +1,141 @@
 ---
 title: UI layers & shell regions
-description: Vocabulary for app shell, page chrome, surface chrome, symbolic swap scopes, and stable OOB targets
+description: A shared vocabulary for app shell, page chrome, and surface chrome, plus swap_attrs for resolving hx-target from route geometry
 draft: false
 weight: 34
 lang: en
 type: doc
-tags: [app-shell, htmx, layout, glossary, swap-scopes]
+tags: [app-shell, htmx, layout, swap-scopes]
 keywords: [shell, chrome, page-content, OOB, fragment targets, swap scope, swap_attrs]
 category: guide
 ---
 
-## Why this page exists
+## Overview
 
-Chirp + chirp-ui use several overlapping words (**shell**, **chrome**, **fragments**, **scopes**). This guide fixes one vocabulary for docs, APIs, and templates.
+A persistent **app shell** is a fixed topbar and sidebar that stays put while the inner content swaps. The moment you have a shell, every link needs an answer to one question: *how wide does this swap go?* Does clicking it repaint the whole shell, just the page body, or only a panel inside the page?
+
+This page gives you a shared name for each of those widths — **app shell**, **page chrome**, **surface chrome** — and shows how to author links with the `swap_attrs` template global so Chirp resolves the right `hx-target` from your route layout, instead of you hard-coding DOM ids on every link.
+
+:::{note}
+If you only have a single fixed sidebar, start with [[docs/build-apps/ui-extensions/app-shell|App shells]] and [[docs/build-apps/ui-extensions/boosted-navigation|boosted navigation]] — they cover the common case without scopes. Come back here when you have more than one swap level and links are swapping too much (the whole shell flickers) or too little (an inner panel never updates).
+:::
 
 ## The four layers
 
-| Layer | Official term | Symbolic scope | Where it lives | Updates when |
-|-------|---------------|---------------|----------------|--------------|
-| **L1** | **App shell** | ``shell`` | Topbar, sidebar, wrapper ``#main`` — outside ``#page-content`` | Boosted navigation + OOB for shell regions |
-| **L2** | **Shell outlet** | ``shell`` | ``#page-content`` inside ``#main`` | Boosted navigation (``hx-select``) |
-| **L3** | **Page chrome** | ``page`` | Inside ``#page-content`` (headers, tabs, route toolbars) | Broader fragment targets (e.g. ``#page-root``) |
-| **L4** | **Surface chrome** | ``content`` | Borders/padding/scroll around **components** (cards, panels, bento cells) | Local swaps only — *not* the app shell |
+Chirp and chirp-ui use the words *shell* and *chrome* a lot. Here is the one vocabulary the docs, the APIs, and your templates all share. Read it top-down: each layer swaps a narrower slice of the page than the one above it.
 
-**Rule:** In prose and APIs, **shell** means **L1** (persistent frame). Do not call card borders "shell"; use **surface chrome**.
+:::{list-table}
+:header-rows: 1
 
-## Symbolic swap scopes
+* - Layer
+  - Name
+  - Swap scope
+  - Where it lives
+  - Updates on
+* - **L1**
+  - **App shell**
+  - `shell`
+  - Topbar, sidebar, the `#main` wrapper — everything outside `#page-content`
+  - Boosted navigation plus out-of-band swaps for shell regions
+* - **L2**
+  - **Shell outlet**
+  - `shell`
+  - `#page-content`, inside `#main`
+  - Boosted navigation (via `hx-select`)
+* - **L3**
+  - **Page chrome**
+  - `page`
+  - Headers, tabs, and toolbars inside `#page-content`
+  - Page-level fragment targets such as `#page-root`
+* - **L4**
+  - **Surface chrome**
+  - `content`
+  - The border, padding, and scroll area around a single component (a card, panel, or bento cell)
+  - Local swaps only — never the app shell
+:::
 
-Each layout level can declare a **symbolic swap scope** — a stable name for "what width of swap happens at this level." Scopes decouple link authoring from DOM id details.
+:::{warning}
+**"Shell" means L1 — the persistent frame — everywhere.** Do not call a card's border or padding "shell"; that is **surface chrome** (L4).
 
-| Scope name | Typical role | Default target id (chirp-ui) |
-|------------|-------------|------------------------------|
-| ``shell`` | L1–L2: swap inside site chrome | ``#main`` |
-| ``page`` | L3: tabbed/page chrome | ``#page-root`` |
-| ``content`` | L4: narrow in-page swap | ``#page-content-inner`` |
+One related footgun: a Kida block named `page_root` does **not** emit `id="page-root"`. The element is what `#page-root` swaps target, so if you name the block but omit the `id`, page-level swaps silently fail — even while boosted navigation still works through `#page-content`.
+:::
 
-Apps can define **custom scope names** (e.g. ``section`` for a showcase shell) beyond these three well-known defaults. Register them during setup:
+## Resolve the target with `swap_attrs`
 
-```python
-app.register_swap_scope("section", "showcase-outlet")
+Each layout level can declare a **swap scope**: a stable name for "how wide a swap happens here." Scopes let you author a link once and have Chirp pick the `hx-target`, instead of memorizing which DOM id is correct from each page.
+
+The `swap_attrs(href)` template global computes the nearest shared navigation boundary between the current path and the destination, then returns the `hx-target` (and `hx-boost`) for that link. Pipe it through `html_attrs` to render the attributes. An explicit `hx-target` on the element always wins.
+
+::::{code-tabs}
+:sync: links
+
+```html
+<!-- Hand-coded: you must know the right id for every link -->
+<a href="/dashboard/reports"
+   hx-target="#main"
+   hx-boost="true">Reports</a>
 ```
 
-### Layout comments
+```html
+<!-- swap_attrs: Chirp resolves the target from the route layout chain -->
+<a href="/dashboard/reports"
+   {{ swap_attrs("/dashboard/reports") | html_attrs }}>Reports</a>
+```
 
-Filesystem ``_layout.html`` files declare scope metadata via template comments:
+::::
+
+When chirp-ui is active, `swap_attrs` is registered for you and bound to these three well-known scopes:
+
+| Scope | Typical role | Default target id |
+|-------|--------------|-------------------|
+| `shell` | L1–L2: swap inside site chrome | `main` |
+| `page` | L3: tabbed or page chrome | `page-root` |
+| `content` | L4: narrow in-page swap | `page-content-inner` |
+
+### Register a custom scope
+
+Apps can add their own scope name beyond the three defaults. Register it during setup, mapping the scope to a concrete target id (no `#` prefix — Chirp strips it):
+
+```python
+app.register_swap_scope("section", "section-outlet")
+```
+
+### A two-domain nested shell
+
+A common layout is a marketing site that wraps a chirp-ui app: a public outer shell with its own header and footer, and an inner application shell with a sidebar. Each declares its own **navigation domain**, and `swap_attrs` reads the domains to decide where a swap lands:
+
+1. **Outer site shell** (`pages/_layout.html`, `{# domain: site #}`) — site header, footer, and a `#site-content` outlet.
+2. **Inner app shell** (`pages/app/_layout.html`, `{# domain: app #}`) — the chirp-ui `app_shell()` with sidebar, breadcrumbs, and `shell_outlet()`.
+
+Navigating from `/` to `/app` swaps at the **site** level (`#site-content`). Navigating within `/app/*` swaps at the **app** level (the inner outlet). `swap_attrs` derives both from the layout chains — you do not set `hx-target` by hand.
+
+## Shell regions (stable OOB targets)
+
+Shell **regions** are elements with fixed `id` attributes that htmx updates with [[docs/quality/contracts-debugging/oob-registry|out-of-band swaps]] *after* the primary `#main` swap — the document title, route-scoped topbar actions, breadcrumbs. Chirp ships canonical ids in the `chirp.shell_regions` module so tooling and tests agree on the spelling:
+
+| Constant | Default element id | Role |
+|----------|--------------------|------|
+| `DOCUMENT_TITLE_ELEMENT_ID` | `chirpui-document-title` | The `<title>` element |
+| `SHELL_ACTIONS_TARGET` | `chirp-shell-actions` | Route-scoped topbar actions |
+
+`SHELL_ELEMENT_IDS` is a frozenset of those documented ids. Apps may add their own OOB targets (sidebars, extra breadcrumb trails); register them with `app.register_oob_region(...)` and document the ids locally.
+
+A fragment target's `triggers_shell_update` flag controls whether swapping it reruns shell negotiation (the `shell_actions` OOB pass). It defaults to `True`; set it `False` for narrow in-page swaps — for example `#page-content-inner` — that should not refresh the topbar.
+
+When a swap targets a specific scope (say `page`), layout OOB blocks fire only for layouts at or above that scope's depth: the matched shell and its ancestors, never sibling or descendant shells. Boosted navigation with no explicit `hx-target` fires OOB at every level.
+
+## Validate at startup
+
+`app.check()` validates your scope and layout metadata at freeze time and reports duplicate swap scopes, missing outlets, frame-versus-swap conflicts, and conflicting outlets before they ship.
+
+:::{note} See also
+- [[docs/quality/contracts-debugging/categories|Contract categories]] — the full list of layout checks and their severities
+:::
+
+## Advanced
+
+::::{dropdown} Layout-comment metadata reference
+Filesystem `_layout.html` files declare their scope and outlet metadata through Kida template comments, parsed at discovery time:
 
 ```html
 {# target: body #}
@@ -55,90 +147,32 @@ Filesystem ``_layout.html`` files declare scope metadata via template comments:
 
 | Comment | Purpose |
 |---------|---------|
-| ``{# target: id #}`` | DOM element this layout renders into (required) |
-| ``{# domain: name #}`` | Explicit navigation-domain boundary for `swap_attrs()` |
-| ``{# swap_scope: name #}`` | Symbolic scope for ``resolve_navigation_swap`` |
-| ``{# outlet: id #}`` | Primary navigation outlet id for this level |
-| ``{# frames: id, id #}`` | Immutable frame ids (contract-checked: must not be swap targets) |
+| `{# target: id #}` | DOM element this layout renders into (required) |
+| `{# domain: name #}` | Explicit navigation-domain boundary for `swap_attrs` |
+| `{# swap_scope: name #}` | Symbolic scope used when resolving navigation swaps |
+| `{# outlet: id #}` | Primary navigation outlet id for this level |
+| `{# frames: id, id #}` | Immutable frame ids — contract-checked so they are never swap targets |
 
-### ``swap_attrs`` template global
+For **filesystem** apps, the root `_layout.html` should declare `{# outlet: main #}` alongside `{# target: body #}`, so Chirp resolves `HX-Target: #main` and returns the full shell including `#page-content`. See [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]].
+::::{/dropdown}
 
-Instead of hand-coding ``hx-target`` on every link, use ``swap_attrs`` to resolve the correct target from route geometry:
+::::{dropdown} hx-select wiring and swap ordering
+`#main` participates in boosted navigation; the fragment `hx-select` depends on the layout:
 
-```html
-{# Before: author must know the right id #}
-<a href="/showcase/products" hx-target="#main" hx-boost="true">Products</a>
+| Layout | `hx-select` on `#main` | Required in page HTML |
+|--------|------------------------|------------------------|
+| `chirpui/app_shell_layout.html` | `#page-content` | A `<div id="page-content">` wrapper with `#page-root` inside |
+| `chirpui/app_shell.html` custom shells | `#page-content` via `shell_outlet()` | `shell_outlet()` wrapping the routed content block |
+| `chirp/layouts/boost.html` | `#page-content` | The layout's `#page-content` wrapper |
 
-{# After: framework resolves from current path + destination layout chain #}
-<a href="/showcase/products" {{ swap_attrs("/showcase/products") | html_attrs }}>Products</a>
-```
+htmx applies the **primary** swap before any **out-of-band** fragments. chirp-ui's `app_shell_layout.html` ships a small `htmx:beforeSwap` handler that clears `#chirp-shell-actions` when the response carries a matching OOB swap, avoiding one frame of stale topbar actions.
+::::{/dropdown}
 
-``swap_attrs(href)`` computes the nearest shared navigation boundary between the current
-path and destination, then returns ``{"hx-target": "#main", "hx-boost": "true"}``
-(or broader/narrower, depending on context). When layouts declare ``{# domain: #}``,
-domain ancestry drives the decision. Otherwise Chirp falls back to legacy shell/layout
-geometry. Pipe through ``html_attrs`` to render as HTML attributes. Explicit
-``hx-target`` on the element always overrides the resolved value.
+:::{note} See also
+- [[docs/build-apps/ui-extensions/shells|Shells overview]] — when to reach for a custom shell
+- [[docs/build-apps/ui-extensions/app-shell|App shells]] — the chirp-ui navigation model and `use_chirp_ui`
+- [[docs/build-apps/ui-extensions/boosted-navigation|Boosted navigation]] — how full-page links become fragment swaps
+:::
 
-### Nested shell example (b-site)
-
-b-site uses two nested shells and two explicit navigation domains:
-
-1. **Root marketing shell / site domain** (``pages/_layout.html``, ``{# domain: site #}``) — site header, footer, ``#site-content`` outlet
-2. **Showcase app shell / showcase domain** (``pages/showcase/_layout.html``, ``{# domain: showcase #}``) — chirp-ui ``app_shell()`` with sidebar, breadcrumbs, ``shell_outlet()``
-
-Navigation from ``/`` to ``/showcase`` swaps at the **site** level (``#site-content``). Navigation within ``/showcase/*`` swaps at the **showcase** level (inner outlet). ``swap_attrs`` derives this automatically from the layout chains.
-
-## Boosted navigation and ``hx-select``
-
-``#main`` participates in boosted navigation; the fragment selector depends on the layout:
-
-| Layout | ``hx-select`` on ``#main`` | Required in page HTML |
-|--------|---------------------------|------------------------|
-| ``chirpui/app_shell_layout.html`` | ``#page-content`` | ``<div id="page-content">…`` wrapper with ``#page-root`` inside |
-| ``chirpui/app_shell.html`` custom shells | ``#page-content`` via ``shell_outlet()`` | ``shell_outlet()`` wraps the routed content block |
-| ``chirp/layouts/boost.html`` | ``#page-content`` | The layout's ``#page-content`` wrapper |
-
-For **filesystem** apps, root ``_layout.html`` should declare ``{# outlet: main #}`` (with ``{# target: body #}``) so Chirp resolves ``HX-Target: #main`` and returns full shell HTML including ``#page-content``. See [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]].
-
-``page_root`` remains the broader page-level fragment target inside the shell outlet. A block named ``page_root`` does **not** create ``id="page-root"``; omitting that element breaks ``#page-root`` swaps even when boosted navigation still works through ``#page-content``.
-
-## Shell regions (stable DOM ids)
-
-Shell **regions** are elements with fixed ``id`` attributes that htmx updates with **out-of-band** swaps after the primary ``#main`` swap. Import canonical ids from :mod:`chirp.shell_regions`:
-
-| Constant | Default element id | Role |
-|----------|-------------------|------|
-| ``DOCUMENT_TITLE_ELEMENT_ID`` | ``chirpui-document-title`` | Document title (``<title>``) |
-| ``SHELL_ACTIONS_TARGET`` | ``chirp-shell-actions`` | Route-scoped topbar actions |
-
-``SHELL_ELEMENT_IDS`` is a frozenset of documented ids for tooling and tests.
-
-Apps may add more OOB targets (breadcrumbs, sidebars); register them in the layout contract and document them locally.
-
-## Fragment targets, scopes, and OOB
-
-Registered **fragment targets** (``FragmentTargetRegistry``) map ``HX-Target`` to Kida blocks. Each target may declare a ``scope_name`` tying it to a symbolic scope level.
-
-``triggers_shell_update`` means: "this swap may change shell regions; run shell negotiation (including ``shell_actions`` OOB)." Set it ``False`` for narrow in-page swaps (e.g. ``#page-content-inner``) that should not refresh the topbar.
-
-**Scoped OOB:** When a swap targets a specific scope (e.g. ``page``), layout OOB blocks fire only for layouts at or above that scope's depth — the matched shell and its ancestors, not sibling or descendant shells. Boosted navigation (no explicit ``hx-target``) fires OOB at all levels.
-
-## Contract checks
-
-``app.check()`` validates scope metadata at freeze time:
-
-- **Duplicate swap_scope** per layout chain (two layouts claiming the same scope name)
-- **Missing outlet** — ``outlet_target_id`` declared but no ``id="..."`` found in any template
-- **Frame/swap conflict** — a ``frame_targets`` id is also registered as a fragment swap target
-- **Conflicting outlets** — two layouts at the same depth declare different ``outlet_target_id`` values
-
-## HTMX ordering note
-
-htmx applies the **primary** swap before **out-of-band** fragments. chirp-ui's ``app_shell_layout.html`` includes a small ``htmx:beforeSwap`` handler that clears ``#chirp-shell-actions`` when the response contains a matching OOB, avoiding one frame of stale actions. See chirp-ui app shell docs for details.
-
-## See also
-
-- [App shells](/chirp/docs/build-apps/ui-extensions/app-shell/) — navigation model and ``use_chirp_ui``
-- [chirp-ui App Shell](https://lbliii.github.io/chirp-ui/docs/app-shell/) — layouts and components
-- [Shell, sections, and route tabs (checklist)](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) — chirp-ui doc: sections, ``TabItem``, ``hx-target``, and OOB handoffs
+:::{related}
+:::

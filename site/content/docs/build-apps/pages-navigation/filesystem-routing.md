@@ -1,18 +1,20 @@
 ---
 title: Filesystem Routing
-description: Route discovery from the pages/ directory with layouts and context cascade
+description: Build routes from a pages/ directory — folders become URLs, page.py files become handlers, and _context.py shares data down the tree
 draft: false
 weight: 15
 lang: en
 type: doc
-tags: [routing, pages, filesystem, layouts, context]
+tags: [routing, pages, filesystem, context]
 keywords: [mount_pages, page.py, _layout.html, _context.py, discover_pages]
 category: guide
 ---
 
 ## Overview
 
-Chirp can discover routes from a **pages directory** instead of registering them with `@app.route()`. The filesystem structure defines URL paths, layout nesting, and shared context. This is ideal for content-heavy apps where routes map naturally to a directory tree.
+Filesystem routing builds your routes from a `pages/` directory instead of `@app.route()` calls. The folder structure *is* the URL structure: a `page.py` file becomes a GET handler for its directory's path, `{braces}` folders become path parameters, and `_context.py` files share data down the tree.
+
+Reach for it when your app is a content hierarchy — docs, a forum, a dashboard with nested sections — and you want handlers, templates, and shared data co-located with the URLs they serve. For API-style or action endpoints, keep using [[docs/build-apps/pages-navigation/routes|decorator routes]]. You can mix both in one app.
 
 ```python
 from chirp import App, AppConfig
@@ -22,47 +24,78 @@ app.mount_pages("pages")
 app.run()
 ```
 
-## Directory Conventions
+## Directory conventions
 
 The discovery system walks the `pages/` directory and treats specific files as route definitions:
 
-| File | Purpose |
-|------|---------|
-| `page.py` | Route handler for the directory URL (e.g. `documents/page.py` → `GET /documents`) |
-| `edit.py`, `create.py`, etc. | Route handlers that append to the path (e.g. `edit.py` → `GET /documents/edit`) |
-| `_meta.py` | Route metadata (title, section, breadcrumb_label, shell_mode). See [Route Contract](/chirp/docs/quality/contracts-debugging/route-contract/). |
-| `_layout.html` | Layout shell with `{% block content %}` and `{# target: element_id #}` |
-| `_context.py` | Context provider that cascades to child routes |
-| `_actions.py` | Mutation handlers with `@action` decorator |
-| `_viewmodel.py` | View assembly for complex context merging |
+:::{list-table}
+:header-rows: 1
 
-Directories whose names are wrapped in `{braces}` become path parameters (e.g. `{doc_id}/` → `/documents/{doc_id}`).
+* - File
+  - Purpose
+* - `page.py`
+  - GET handler for the directory's URL (`documents/page.py` → `GET /documents`).
+* - `edit.py`, `create.py`, …
+  - Handlers that append the filename to the path (`edit.py` → `GET /documents/edit`).
+* - `_context.py`
+  - Context provider that cascades to child routes.
+* - `_layout.html`
+  - Layout shell the page renders into.
+* - `_actions.py`
+  - Mutation handlers declared with the `@action` decorator.
+* - `_meta.py`
+  - Route metadata (title, section, breadcrumb label).
+* - `_viewmodel.py`
+  - View assembly for complex context merging.
+:::
 
-See the [Route Directory Contract](/chirp/docs/quality/contracts-debugging/route-contract/) for the full reserved file vocabulary and [Route Directory Golden Path](/chirp/docs/build-apps/pages-navigation/route-directory/) for recommended patterns.
+Directories whose names are wrapped in `{braces}` become path parameters (`{doc_id}/` → `/documents/{doc_id}`).
 
-## Example Structure
+:::{note} See also
+- [[docs/build-apps/pages-navigation/route-directory|Route Directory Golden Path]] — recommended patterns for laying out a `pages/` tree
+- [[docs/quality/contracts-debugging/route-contract|Route Directory Contract]] — the full reserved-file vocabulary and the startup checks that enforce it
+:::
+
+## Example structure
 
 ```text
 pages/
-  _layout.html          # Root layout (target: body)
+  _layout.html          # Root layout
   _context.py           # Root context (e.g. site config)
   documents/
     page.py             # GET /documents
     create.py           # GET /documents/create
     {doc_id}/
-      _layout.html      # Nested layout (target: app-content)
-      _context.py       # Loads doc, provides to children
+      _layout.html      # Nested layout
+      _context.py       # Loads the doc, provides it to children
       page.py           # GET /documents/{doc_id}
       page.html         # Template for page.py
       edit.py           # GET /documents/{doc_id}/edit
       edit.html         # Template for edit.py
 ```
 
-## Route Files
+A request resolves through the tree in a fixed order:
+
+::::{steps}
+:::{step} Discovery maps the URL to a route file
+`mount_pages()` walks `pages/` once at startup. The matching `page.py` (or other handler file) for the requested path is selected, along with its ancestor `_context.py` and `_layout.html` files.
+:::{/step}
+:::{step} Context cascades root to leaf
+Each `_context.py` provider runs in order. Output merges into an accumulated dict; deeper providers override parent values.
+:::{/step}
+:::{step} The handler runs with resolved kwargs
+The `get`/`post`/… function receives path params, cascade context, and services as keyword arguments, then returns a [[docs/about/core-concepts/return-values|Page]] (or any other return type).
+:::{/step}
+:::{step} The layout chain wraps the result
+Chirp composes the ancestor layouts around the page HTML. See [[docs/build-apps/html-fragments/layout-patterns|layout composition]] for how that wrapping works.
+:::{/step}
+::::{/steps}
+
+## Route files
 
 ### page.py
 
-`page.py` maps to the **directory URL**. A `get` function handles `GET`, a `post` function handles `POST`, etc.
+`page.py` maps to the **directory URL**. A `get` function handles `GET`, a `post` function handles `POST`, and so on:
 
 ```python
 # pages/documents/page.py
@@ -72,23 +105,33 @@ def get():
     return Page("documents/page.html", "content", items=load_items())
 ```
 
-You can also return `Suspense` for instant first paint with deferred blocks. The layout chain is applied automatically — the shell gets the full layout (head, CSS, sidebar), and OOB swaps target block IDs inside the page.
+You can also return `Suspense` for instant first paint with deferred blocks — see [[docs/build-apps/streaming-updates/_index|Suspense for instant first paint]]. The layout chain applies automatically.
 
-### Other .py Files
+### Other .py files
 
-Any other `.py` file (except those starting with `_`) appends its stem to the path:
+Any other `.py` file (except names starting with `_`) appends its stem to the path:
 
 - `edit.py` in `documents/{doc_id}/` → `GET /documents/{doc_id}/edit`
 - `create.py` in `documents/` → `GET /documents/create`
 
 Handler functions are named after HTTP methods: `get`, `post`, `put`, `delete`, `patch`, `head`, `options`. If no method-named function exists, a `handler` function defaults to GET.
 
-```python
-# pages/documents/{doc_id}/edit.py
-from chirp import Page, NotFound
+A file can mix methods — a sync `get` for the form and an async `post` for the mutation:
 
-def get(doc_id: str, doc):  # doc from _context.py
+::::{code-tabs}
+:sync: handler
+
+```python
+# pages/documents/{doc_id}/edit.py — GET handler
+from chirp import Page
+
+def get(doc_id: str, doc):  # doc comes from _context.py
     return Page("documents/{doc_id}/edit.html", "content", doc=doc)
+```
+
+```python
+# pages/documents/{doc_id}/edit.py — POST handler
+from chirp import Redirect
 
 async def post(doc_id: str, doc, request):
     data = await request.form()
@@ -96,252 +139,44 @@ async def post(doc_id: str, doc, request):
     return Redirect(f"/documents/{doc_id}")
 ```
 
-## Path Parameters
+::::
+
+## Path parameters
 
 Directory names wrapped in `{param}` become URL path parameters:
 
 ```text
-documents/{doc_id}/page.py   →  /documents/{doc_id}
-users/{user_id}/posts/{slug}/page.py  →  /users/{user_id}/posts/{slug}
+documents/{doc_id}/page.py             →  /documents/{doc_id}
+users/{user_id}/posts/{slug}/page.py   →  /users/{user_id}/posts/{slug}
 ```
 
-Handlers receive path parameters as keyword arguments. Type annotations are respected (e.g. `doc_id: int` for `{doc_id:int}`).
+Handlers receive path parameters as keyword arguments by name. Directory names are bare `{braces}` — the type comes from the handler's parameter annotation. Annotate `doc_id: int` and the matched segment is coerced to `int` before the handler runs.
 
-## Layouts
-
-Each `_layout.html` defines a shell with a `{% block content %}` slot. The layout declares which DOM element it owns via a target comment:
-
-```html
-{# target: app-content #}
-<div id="app-content">
-  {% block content %}{% endblock %}
-</div>
-```
-
-Layouts nest from root to leaf. The negotiation layer uses `HX-Target` to decide how deep to render:
-
-- **Full page load**: all layouts nested
-- **Boosted navigation** with `HX-Target: #app-content`: render from the layout that owns `app-content` down
-- **Fragment request**: render just the targeted block
-
-If no target is declared, it defaults to `"body"`.
-
-### Navigation domains vs shells
-
-Filesystem layouts can also declare an explicit navigation domain:
-
-```html
-{# preset: site-shell #}
-{# target: body #}
-{# domain: site #}
-{# shell: site #}
-{# outlet: site-content #}
-```
-
-Use `domain` for the author-facing answer to "which links should boost together?" Use
-`shell` for persistent UI boundaries and nested layout composition. When any layout in a
-route chain declares `domain`, `swap_attrs()` resolves navigation from the shared domain
-ancestry first and only falls back to shell ancestry for older layouts that do not opt in.
-
-This lets you model cases like:
-
-- one domain with multiple nested shells
-- sibling domains under a shared outer shell
-- incremental migration from shell-only layouts to explicit navigation intent
-
-### Layout presets
-
-Apps and extensions can register named layout presets during setup:
-
-```python
-app.register_layout_preset(
-    "site-shell",
-    target="body",
-    swap_scope_name="site",
-    outlet_target_id="site-content",
-    outlet_mode="replace",
-)
-```
-
-Then a filesystem layout can opt in with a single comment and keep only the
-route-specific intent inline:
-
-```html
-{# preset: site-shell #}
-{# domain: site #}
-{# shell: site #}
-```
-
-Explicit comments always override preset defaults. `use_chirp_ui(app)` also
-registers a built-in `chirpui-app-shell` preset for the standard `#main`
-app-shell outlet.
-
-### How `render_with_blocks` works
-
-Chirp composes layouts using `render_with_blocks({"content": page_html})`. This **replaces** `{% block content %}` with the pre-rendered page HTML. Any markup you put inside `{% block content %}` in your layout is overridden — it never renders.
-
-This means persistent UI (navbars, sidebars, topbars) must live **outside** `{% block content %}`:
-
-```html
-{# target: main #}
-{# ❌ Shell is INSIDE content — gets replaced, never renders #}
-{% extends "chirpui/app_layout.html" %}
-{% block content %}
-  <nav>...</nav>
-  {% block page_content %}{% end %}
-{% end %}
-```
-
-```html
-{# target: main #}
-{# ✅ Shell is OUTSIDE content — always renders #}
-<nav>...</nav>
-<main id="main">
-  <div id="page-content">
-    {% block content %}{% end %}
-  </div>
-</main>
-```
-
-### Layout ramp: boost → shell → nested shells
-
-Chirp offers three layout patterns, from simplest to most structured:
-
-| Layout | Use case |
-|--------|----------|
-| `chirp/layouts/boost.html` | Simple pages, no persistent shell. Uses `hx-select="#page-content"` for fragment swaps. |
-| `chirp/layouts/shell.html` | Persistent shell (topbar, sidebar). Override `{% block shell %}` to wrap main. |
-| `chirpui/app_shell_layout.html` | ChirpUI apps — extends shell.html with sidebar, toast, CSS. |
-| Nested shells | Forum > subforum > thread. Use `shell_section` macro for inner levels. |
-
-**hx-select vs hx-disinherit**: Prefer `hx-select="#page-content"` on the boosted container. When the server returns a full HTML page, htmx extracts only `#page-content` for the swap. `hx-disinherit` breaks inheritance for fragment swaps; use `hx-target="this"` on event-driven elements instead (the `safe_target` middleware auto-injects this).
-
-### Persistent app shell pattern
-
-For dashboard-style apps with a topbar, sidebar, and content area, extend `chirpui/app_shell_layout.html` (if using ChirpUI) or `chirp/layouts/shell.html`:
-
-```html
-{# target: body #}
-{% extends "chirpui/app_shell_layout.html" %}
-{% block brand %}My App{% end %}
-{% block sidebar %}
-  {% from "chirpui/sidebar.html" import sidebar, sidebar_link, sidebar_section %}
-  {% call sidebar() %}
-    {% call sidebar_section("Main") %}
-      {{ sidebar_link("/", "Home") }}
-      {{ sidebar_link("/items", "Items") }}
-    {% end %}
-  {% end %}
-{% end %}
-```
-
-Or without ChirpUI, extend `chirp/layouts/shell.html` and override `{% block shell %}`.
-
-Key elements:
-
-- **Extend shell.html or app_shell_layout.html** — Don't extend `boost.html` for app shell layouts.
-- **`hx-boost="true"`** on `<main id="main">` — Boosted links inside the content area use AJAX navigation.
-- **`hx-select="#page-content"`** — When the server returns a full HTML page, htmx parses it and extracts only `#page-content` for the swap. The shell persists client-side.
-- **No `hx-disinherit`** on the content wrapper — Boosted links must inherit `hx-target`, `hx-swap`, and `hx-select` from `#main`. Fragment requests with explicit `hx-target` override the inherited value.
-- **`{# target: body #}`** — Which DOM id this layout level renders *into* in a nested layout chain (often `body` for the root shell).
-- **`{# outlet: main #}`** — Declares the **primary boosted-navigation outlet** for this layout (the `<main id="main">` region in chirp-ui’s app shell). `LayoutChain.find_start_index_for_target` matches **both** `target` and `outlet` so `HX-Target: #main` resolves to this layout and `render_with_layouts` wraps the page with the full shell—including the `#page-content` wrapper that `hx-select` expects. Without `{# outlet: main #}`, `main` does not match any layout and the server returns **bare page HTML** (no `#page-content`), which breaks boosted swaps that rely on `hx-select`.
-
-### Nested shells with shell_section
-
-For multi-level layouts (e.g. forum > subforum > thread), use the `shell_section` macro:
-
-```html
-{# target: items-content #}
-{% from "chirp/macros/shell.html" import shell_section %}
-<div class="chirpui-shell-section">
-  <nav class="chirpui-shell-section__nav">Items</nav>
-  {% call shell_section("items-content") %}
-    {% block content %}{% end %}
-  {% end %}
-</div>
-```
-
-Inner layouts don't need `hx-select` — the renderer produces fragments for them. Use `chirp new myapp --shell` to scaffold a project with this pattern.
-
-### Composition, not inheritance
-
-Chirp layouts use **composition** via `render_with_blocks`. The layout defines `{% block content %}{% end %}`; Chirp replaces it with the rendered page HTML. This is not Kida/Jinja2 `{% extends %}` inheritance — the page template does **not** extend the layout, so it cannot override sibling blocks in the layout.
-
-```html
-{# _layout.html — layout defines these blocks #}
-<div id="page-content">
-  {% block content %}{% end %}
-</div>
-{% block page_scripts %}{% end %}
-```
-
-```html
-{# page.html — this block is IGNORED, not an override #}
-{% block page_content %}
-  <p>Page content</p>
-{% end %}
-
-{% block page_scripts %}
-  <script>/* never reaches the browser */</script>
-{% end %}
-```
-
-In the example above, the `page_scripts` block in `page.html` defines a **new local block** — it does not fill the layout's `page_scripts`. The layout's version stays empty because `render_with_blocks` only injects into the `content` block.
-
-**The rule:** page templates own the region inside `{% block content %}`. Everything outside — `<head>`, footers, script slots — belongs to the layout. If your page needs a `<script>`, put it inline within the content block:
-
-```html
-{# page.html — script inside the content region, works correctly #}
-{% block page_root %}
-<div id="page-root">
-{% block page_content %}
-  <p>Page content</p>
-{% end %}
-</div>
-
-<script>
-Alpine.safeData("myComponent", function() { /* ... */ });
-</script>
-{% end %}
-```
-
-If you come from Jinja2/Django where child templates `{% extends %}` a parent and override blocks at will, this is the key difference. Chirp's filesystem pages are **injected into** layouts, not derived from them.
-
-### Common mistakes
-
-- **`{% extends %}` in inner layouts** — Inner `_layout.html` files that use `{% extends %}` can conflict with `render_with_blocks`. The child template may wipe the shell. Prefer composing with `shell_section` instead.
-- **Overriding layout blocks from page templates** — Page templates cannot fill layout blocks like `page_scripts` or `head_extra`. These blocks are only available to templates that `{% extends %}` the layout directly (e.g. inner `_layout.html` files). Put inline `<script>` tags inside the content region instead.
-- **Missing `{# target: X #}` on inner layouts** — Non-root layouts default to `"body"` if no target is declared. Add `{# target: element_id #}` so the layout chain resolves correctly.
-- **`hx-disinherit` in shell layouts** — Prefer `hx-select` on the parent. Use `hx-target="this"` on event-driven elements (e.g. SSE) instead of `hx-disinherit`.
-- **Duplicate targets in a chain** — Two layouts with the same target cause `find_start_index_for_target` to return the first match. Use unique targets per layout.
-
-## Context Cascade
+## Context cascade
 
 `_context.py` files export a `context` function that provides shared data to handlers. Context cascades from root to leaf; child context overrides parent.
 
-### Provider Signatures
+A provider receives arguments from two sources:
 
-Context providers receive arguments from two sources:
-
-1. **Path parameters** — From the URL match (e.g. `doc_id` from `/documents/{doc_id}`)
-2. **Parent context** — Values from providers higher in the filesystem tree
+1. **Path parameters** — from the URL match (e.g. `doc_id` from `/documents/{doc_id}`).
+2. **Parent context** — values from providers higher in the tree.
 
 ```python
 # pages/_context.py — root provider, no params
 def context() -> dict:
     return {"store": get_store(), "data_dir": "..."}
 
-# pages/documents/{doc_id}/_context.py — child receives doc_id from path, store from parent
+# pages/documents/{doc_id}/_context.py — receives doc_id from the path, store from the parent
 def context(doc_id: str, store) -> dict:
     doc = store.get(doc_id)
-    if doc is None:
-        raise NotFound(f"Document '{doc_id}' not found")
     return {"doc": doc}
 ```
 
-For `/documents/abc-123`, the root provider runs first and adds `store` and `data_dir`. The child provider then receives `doc_id="abc-123"` from the path and `store` from the accumulated context.
+For `/documents/abc-123`, the root provider runs first and adds `store` and `data_dir`. The child provider then receives `doc_id="abc-123"` from the path and `store` from the accumulated context. Providers can be sync or async.
 
-**Service providers:** Context providers can also request types registered via `app.provide()`. Parameters with matching type annotations are resolved from the service provider factories:
+### Inject services by type
+
+A provider can also request types registered via `app.provide()`. A parameter whose type annotation matches a registered factory is resolved from that factory:
 
 ```python
 # pages/documents/{doc_id}/_context.py
@@ -350,40 +185,30 @@ def context(doc_id: str, store: DocumentStore) -> dict:
     return {"doc": doc}
 ```
 
-With `app.provide(DocumentStore, get_store)`, the `store` param is injected from the factory.
+With `app.provide(DocumentStore, get_store)`, the `store` parameter is injected from the factory.
 
-### Early Abort with HTTPError
+### Abort the cascade with an HTTPError
 
-Providers may raise `NotFound` (or other `HTTPError` subclasses) to abort the cascade. Chirp renders the appropriate error page automatically.
+A provider can raise `NotFound` (or any other `HTTPError` subclass) to stop the cascade. Chirp renders the matching error page automatically:
 
 ```python
 # pages/documents/{doc_id}/_context.py
 from chirp import NotFound
 
-def context(doc_id: str) -> dict:
+def context(doc_id: str, store) -> dict:
     doc = store.get(doc_id)
     if doc is None:
-        raise NotFound(f"Document {doc_id} not found")
+        raise NotFound(f"Document '{doc_id}' not found")
     return {"doc": doc}
 ```
 
-Handlers receive context as keyword arguments. Providers can be sync or async.
+:::{dropdown} Advanced: route-scoped shell actions
+:icon: layers
 
-### Route-Scoped Shell Actions
-
-`_context.py` can also return a reserved `shell_actions` value to drive persistent
-shell chrome such as a global top bar. Shell actions cascade root-to-leaf just
-like other context, but they merge by stable action `id` instead of plain dict
-overwrite:
-
-- child routes inherit parent actions by default
-- child routes can override an inherited action by `id`
-- child routes can remove inherited actions by `id`
-- a zone can `replace` its inherited actions entirely
+`_context.py` can return a reserved `shell_actions` value to drive persistent shell chrome such as a global top bar. Shell actions cascade root-to-leaf like other context, but they merge by stable action `id` rather than dict overwrite — child routes inherit parent actions, override one by `id`, remove one by `id`, or `replace` the inherited set entirely.
 
 ```python
 from chirp import ShellAction, ShellActions, ShellActionZone
-
 
 # pages/forum/_context.py
 def context() -> dict:
@@ -396,7 +221,6 @@ def context() -> dict:
             )
         )
     }
-
 
 # pages/forum/{thread_id}/_context.py
 def context(thread_id: str) -> dict:
@@ -412,21 +236,22 @@ def context(thread_id: str) -> dict:
     }
 ```
 
-The resolved `shell_actions` object is available in page and layout templates.
-For boosted shell navigations, Chirp also emits an out-of-band refresh for the
-default target `#chirp-shell-actions`, so persistent top bars stay in sync as
-the active route changes.
+The resolved `shell_actions` object is available in page and layout templates. For boosted shell navigations, Chirp emits an out-of-band refresh for the default target `#chirp-shell-actions` so persistent top bars stay in sync as the route changes.
+:::
 
-## Template Convention
+## Templates
 
-When a route file has a sibling `.html` file with the same stem, that template is used implicitly:
+When a route file has a sibling `.html` file with the same stem, you render it by passing its path to `Page()`. Template paths are relative to the pages root:
 
-- `page.py` + `page.html` → handler returns `Page("path/to/page.html", "content", ...)`
-- `edit.py` + `edit.html` → handler returns `Page("path/to/edit.html", "content", ...)`
+- `page.py` + `page.html` → `return Page("documents/page.html", "content", ...)`
+- `edit.py` + `edit.html` → `return Page("documents/edit.html", "content", ...)`
 
-Template paths are relative to the pages root. The handler must pass the correct path to `Page()`.
+The page template owns the region inside the layout's `{% block content %}`. It does **not** `{% extends %}` its sibling `_layout.html` — Chirp composes them. That distinction (and why a page can't fill a layout block like `page_scripts`) is the subject of [[docs/build-apps/html-fragments/layout-patterns|layout composition]].
 
-For layout-heavy pages, prefer a self-contained page root plus narrower inner fragments:
+:::{dropdown} Advanced: render scopes for boosted navigation
+:icon: layers
+
+For layout-heavy pages, give the page two render scopes — a narrow fragment block for explicit swaps and a wider page-level block for boosted navigation:
 
 ```html
 {# pages/_page_layout.html #}
@@ -443,20 +268,18 @@ For layout-heavy pages, prefer a self-contained page root plus narrower inner fr
 ```python
 return Page(
     "documents/page.html",
-    "page_content",
-    page_block_name="page_root",
+    "page_content",        # narrow fragment swap target
+    page_block_name="page_root",  # wider root for boosted navigation
     items=load_items(),
 )
 ```
 
-This gives Chirp two safe render scopes:
+`page_content` renders for explicit fragment swaps into a narrow target; `page_root` renders for boosted navigation, where the response must carry page-level wrappers such as toolbars and spacing.
+:::
 
-- `page_content` for explicit fragment swaps into a narrow target
-- `page_root` for boosted navigation, where the response must carry page-level wrappers such as stacks, toolbars, and spacing
+## Handler argument resolution
 
-## Handler Argument Resolution
-
-Page handlers receive arguments from multiple sources, in priority order (first match wins):
+Page handlers receive arguments from several sources, in priority order — first match wins:
 
 :::{dropdown} Request
 :icon: arrow-right
@@ -467,13 +290,13 @@ Page handlers receive arguments from multiple sources, in priority order (first 
 :::{dropdown} Path parameters
 :icon: link
 
-From the URL match, with type coercion. Parameters like `{doc_id}` in the route path are extracted and passed by name. Add `:int` or `:float` for automatic conversion.
+From the URL match, with type coercion. Parameters like `{doc_id}` are extracted and passed by name; annotate `doc_id: int` to coerce.
 :::
 
 :::{dropdown} Cascade context
 :icon: layers
 
-From `_context.py` providers. Each provider's output is merged into the accumulated context; deeper providers override parent values.
+From `_context.py` providers. Each provider's output merges into the accumulated context; deeper providers override parent values.
 :::
 
 :::{dropdown} Service providers
@@ -485,28 +308,44 @@ Registered via `app.provide()`. When a parameter's type matches a registered ann
 :::{dropdown} Extractable dataclasses
 :icon: database
 
-From query string (GET) or form/JSON body (POST). Dataclasses with appropriate annotations are populated from the request data.
+From the query string (GET) or form/JSON body (POST). Dataclasses with appropriate annotations are populated from the request data.
 :::
 
 ```python
 def get(doc_id: str, doc, store: DocumentStore):
     # doc_id from path, doc from _context.py, store from app.provide()
-    return Page("doc.html", "content", doc=doc)
+    return Page("documents/page.html", "content", doc=doc)
 ```
 
-## When to Use Filesystem vs Decorator Routes
+## Gotchas
 
-| Use filesystem routing when… | Use `@app.route()` when… |
-|------------------------------|---------------------------|
-| Routes map to a content hierarchy | Routes are API-like or action-oriented |
-| Layouts and context cascade naturally | Each route is independent |
-| You want co-located handlers and templates | You prefer explicit route registration |
+:::{warning}
+Non-root `_layout.html` files default their target to `body` when no `{# target: element_id #}` comment is declared. A missing target on an inner layout collapses the layout chain and breaks boosted navigation. Declare a unique target on each non-root layout. See [[docs/build-apps/html-fragments/layout-patterns|layout composition]] for the full target/outlet mechanics.
+:::
 
-You can mix both: `app.mount_pages("pages")` for the main app shell, and `@app.route("/api/...")` for API endpoints.
+## Filesystem vs decorator routes
 
-## Related
+:::{list-table}
+:header-rows: 1
 
-- [[docs/build-apps/pages-navigation/routes|Routes]] — Decorator-based route registration
-- [[docs/about/core-concepts/return-values|Return Values]] — `Page` and `LayoutPage`
-- [[docs/build-apps/html-fragments/fragments|Fragments]] — Block-level rendering for htmx
-- [[docs/tutorials/view-transitions-oob|View Transitions]] — Boosted navigation with layouts
+* - Use filesystem routing when…
+  - Use `@app.route()` when…
+* - Routes map to a content hierarchy
+  - Routes are API-like or action-oriented
+* - Layouts and context cascade naturally
+  - Each route is independent
+* - You want co-located handlers and templates
+  - You prefer explicit route registration
+:::
+
+You can mix both: `app.mount_pages("pages")` for the main app, and `@app.route("/api/...")` for API endpoints.
+
+## See also
+
+:::{note} See also
+- [[docs/build-apps/pages-navigation/routes|Routes]] — decorator-based route registration
+- [[docs/build-apps/html-fragments/layout-patterns|Layout Patterns]] — how page HTML composes into a `_layout.html` shell
+- [[docs/about/core-concepts/return-values|Return Values]] — what `Page` and the other return types do
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — block-level rendering for htmx
+- [[docs/tutorials/view-transitions-oob|View Transitions]] — boosted navigation with layouts
+:::

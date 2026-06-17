@@ -14,8 +14,13 @@ cascade:
   type: doc
 ---
 
-Use this section when you need confidence that the server-rendered UI is wired
-correctly and will keep working in production.
+You have an app working, and now you need to ship it and keep it correct. This
+section is for the operator and the builder mid-project: it covers the contracts
+that catch broken hypermedia wiring before users do, how to test fragment and
+SSE responses, and how to deploy to production. New here? Start with
+[[docs/quality/contracts-debugging/_index|Contracts and Debugging]] to learn how
+`app.check()` fails loud at startup, then [[docs/quality/testing/_index|Testing]],
+then [[docs/quality/deployment/_index|Deployment]] when you are ready to ship.
 
 :::{cards}
 :columns: 2

@@ -14,8 +14,11 @@ cascade:
   type: doc
 ---
 
-Use this section for UI surfaces that sit around or beyond a single route:
-shells, accessibility, client-owned islands, ChirpUI, and tool registration.
+UI surfaces that wrap or extend a single route: pick a root shell, layer in
+accessibility and client-owned interactivity, and register functions as tools
+for AI agents. If you build with htmx and Alpine, start with **Shells** (pick
+one per app) and **Islands**. New to hypermedia? Read **Accessibility** and
+**Alpine** first.
 
 :::{cards}
 :columns: 2
@@ -46,7 +49,7 @@ Pick exactly one per app. Includes the decision table, the `hx-select` distincti
 :icon: sidebar
 :link: /chirp/docs/build-apps/ui-extensions/app-shell/
 :description: chirp-ui's app_shell_layout — sidebar, topbar, OOB regions
-The opinionated shell with persistent chrome. One of three shells; see [Shells](/chirp/docs/build-apps/ui-extensions/shells/) for the others.
+The shell with persistent chrome. One of three shells.
 :::{/card}
 
 :::{card} Boosted Navigation
@@ -67,7 +70,7 @@ One vocabulary for Chirp + chirp-ui layouts and ``chirp.shell_regions``.
 :icon: palette
 :link: /chirp/docs/build-apps/ui-extensions/chirp-ui/
 :description: Component library — layout, cards, forms, badges
-Kida macros with CSS and themes. htmx-native, gorgeous by default.
+Kida macros with CSS and themes. htmx-native, themeable.
 :::{/card}
 
 :::{card} Islands Contract
