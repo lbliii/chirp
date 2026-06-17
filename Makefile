@@ -56,7 +56,7 @@ ty:
 
 # Fast invariants check before pushing: lint + format-check + ty + repo-wide
 # invariant tests (public-API snapshot, docs coverage). Does NOT run the full
-# pytest suite — completes in seconds, not the ~20-minute CI test job.
+# pytest suite — completes in seconds, not the full ~8-minute CI test job.
 preflight:
 	uv run poe preflight
 

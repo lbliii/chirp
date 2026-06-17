@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+# Keep all Lucky Cat tests on one xdist worker — they mutate sys.path and
+# sys.modules["app"] in ways that race when split across workers.
+pytestmark = pytest.mark.xdist_group("lucky_cat")
+
 _here = Path(__file__).parent
 if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
