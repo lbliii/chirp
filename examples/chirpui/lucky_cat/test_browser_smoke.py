@@ -60,7 +60,7 @@ from playwright.sync_api import sync_playwright
 
 _EXAMPLE_DIR = Path(__file__).parent
 _REPO_ROOT = _EXAMPLE_DIR.parents[2]  # examples/chirpui/lucky_cat -> repo root
-_ACTION_TIMEOUT_MS = 8_000
+_ACTION_TIMEOUT_MS = 15_000
 _SERVER_BOOT_TIMEOUT_S = 40.0
 _ENV_BASE_URL = "LUCKY_CAT_BASE_URL"
 
@@ -104,9 +104,14 @@ def _wait_until_serving(base_url: str, *, proc: subprocess.Popen | None) -> None
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def base_url() -> Iterator[str]:
     """A live Lucky Cat server URL.
+
+    Function-scoped so each test boots a fresh process. The single-worker server
+    accumulates long-lived SSE connections across a module-scoped fixture; by the
+    last smoke test ``page.goto`` can hang until timeout even though earlier
+    tests passed.
 
     If ``LUCKY_CAT_BASE_URL`` is set, point at that running server (no
     subprocess). Otherwise boot the example via ``uv run`` on a free port in a
@@ -388,8 +393,12 @@ def test_logo_navigates_home_without_duplicating_shell(browser, base_url: str) -
         logo.click()
 
         # Boosted nav swaps #page-content into #main and pushes "/" as the URL —
-        # wait until we have left the coin-detail path.
-        page.wait_for_url(lambda url: "/markets/" not in url, timeout=_ACTION_TIMEOUT_MS)
+        # poll the pathname (htmx pushState does not always emit a Playwright
+        # navigation "load" event, so wait_for_url can flake on slower CI).
+        page.wait_for_function(
+            "() => !window.location.pathname.includes('/markets/')",
+            timeout=_ACTION_TIMEOUT_MS,
+        )
         page.wait_for_selector(".chirpui-app-shell", timeout=_ACTION_TIMEOUT_MS)
 
         # THE REGRESSION ASSERTION: still exactly one shell, and crucially NO

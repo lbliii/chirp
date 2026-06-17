@@ -2861,16 +2861,19 @@ class TestNotificationsBell:
             # cache now holds a NotifFeed snapshot (one row, unread=1) and the
             # derived notif_badge recomputed PURELY from feed.unread in the same
             # emit cascade.
-            cached = registry.cached_value("notifications")
+            import session_store
+
+            aud = session_store.latest_client_key()
+            cached = registry.cached_value("notifications", audience_key=aud)
             assert isinstance(cached, notifications.NotifFeed)
             assert len(cached.notes) == 1
             assert cached.unread == 1
-            assert registry.cached_value("notif_badge") == 1
+            assert registry.cached_value("notif_badge", audience_key=aud) == 1
             # A clamped/no-op deposit adds nothing (no new log entry, cache stays 1).
             await client.post("/deposit", data={"amount": "not-a-number"}, headers=headers)
             with sole_client_store():
                 assert len(notifications.recent()) == 1
-            assert len(registry.cached_value("notifications").notes) == 1
+            assert len(registry.cached_value("notifications", audience_key=aud).notes) == 1
 
     async def test_order_fill_logs_a_notification(self, example_app) -> None:
         """A filled market order appends a fill notification to the bell."""
@@ -2908,14 +2911,18 @@ class TestNotificationsBell:
     async def test_notifications_signal_emits_price_alerts_and_derived_badge(
         self, example_app
     ) -> None:
-        """Over enough ticks the `notifications` SOURCE signal raises price-move
-        alerts (the moved hysteresis/cooldown walk) and emits `event: notifications`
-        carrying the dropdown list body; the derived `notif_badge` re-emits in the
-        same cascade as `event: notif_badge`. No OOB row prepends / no raw tags."""
+        """Over enough ticks the price-alert loop fans out scoped ``notifications``
+        events (dropdown list body) and derived ``notif_badge`` in the same cascade."""
+        import session_store
+
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
+            aud = session_store.latest_client_key()
             result = await client.sse(
-                "/_chirp/live?topics=notifications,notif_badge",
+                f"/_chirp/live?topics=notifications,notif_badge&aud={aud}",
                 max_events=40,
+                headers=_cookie_header(cookie),
             )
         notif_events = [e for e in result.events if e.event == "notifications" and e.data]
         assert notif_events, f"no event: notifications frames: {[e.event for e in result.events]}"

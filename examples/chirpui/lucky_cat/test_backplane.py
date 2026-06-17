@@ -18,7 +18,7 @@ class TestSignalBackplane:
 
         seen: list[tuple[str, object]] = []
 
-        def emit(name: str, value: object) -> None:
+        def emit(name: str, value: object, *, audience_key: str = "") -> None:
             seen.append((name, value))
 
         backplane = InProcessBackplane(emit)
@@ -38,7 +38,7 @@ class TestSignalBackplane:
         backplane.reset()
         seen: list[tuple[str, object]] = []
 
-        def emit(name: str, value: object) -> None:
+        def emit(name: str, value: object, *, audience_key: str = "") -> None:
             seen.append((name, value))
 
         backplane.bind_emit(emit)
@@ -81,9 +81,9 @@ class TestSignalBackplane:
         seen: list[tuple[str, object]] = []
 
         class _FakeBackplane:
-            def publish(self, name: str, value: object) -> None:
+            def publish(self, name: str, value: object, *, audience_key: str = "") -> None:
                 seen.append((name, value))
 
         monkeypatch.setattr(app_mod, "get_backplane", lambda: _FakeBackplane())
-        app_mod.emit_signal("balance", 7)
+        app_mod.emit_signal("balance", 7, audience_key="visitor-1")
         assert seen == [("balance", 7)]

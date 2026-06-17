@@ -2,7 +2,7 @@
 
 import threading
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
 
@@ -527,6 +527,7 @@ class App:
         initial: Callable[[], Any] | None = None,
         render: Callable[[Any], str] | None = None,
         coalesce: bool = True,
+        audience: Literal["global", "session"] = "global",
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Declare a live ``signal`` — one server value, fanned out to many bindings.
 
@@ -562,6 +563,7 @@ class App:
                     initial=initial,
                     render=render,
                     coalesce=coalesce,
+                    audience=audience,
                 )
             )
             return fn
@@ -600,13 +602,15 @@ class App:
 
         return decorator
 
-    def emit(self, name: str, value: Any) -> None:
+    def emit(self, name: str, value: Any, *, audience_key: str = "") -> None:
         """Push a new *value* for signal *name*, fanning it out to every binding.
 
         The imperative push API: a mutation handler emits the new value and every
         ``{{ signal(name) }}`` binding updates from the shared connection. Derived
-        signals depending on *name* recompute and re-emit automatically. Safe to
-        call from any thread. Raises ``KeyError`` if *name* is not registered.
+        signals depending on *name* recompute and re-emit automatically. Session-
+        scoped signals require a non-empty ``audience_key`` (the visitor's session
+        store key). Safe to call from any thread. Raises ``KeyError`` if *name* is
+        not registered.
         """
         registry = self._mutable_state.signal_registry
         if registry is None:
@@ -615,7 +619,7 @@ class App:
                 "@app.signal or @app.derived before emitting"
             )
             raise KeyError(msg)
-        registry.emit(name, value)
+        registry.emit(name, value, audience_key=audience_key)
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

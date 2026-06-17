@@ -33,7 +33,7 @@ from collections.abc import AsyncIterator
 from chirp.app.state import PendingRoute
 from chirp.http.request import Request
 from chirp.realtime.events import EventStream, SSEEvent
-from chirp.realtime.signals import _SCOPE_PREFIX, SignalRegistry
+from chirp.realtime.signals import SignalRegistry, _bus_scope
 
 logger = logging.getLogger("chirp.signals")
 
@@ -41,7 +41,9 @@ logger = logging.getLogger("chirp.signals")
 SIGNAL_STREAM_PATH = "/_chirp/live"
 
 
-def make_signal_stream(registry: SignalRegistry, names: tuple[str, ...]) -> EventStream:
+def make_signal_stream(
+    registry: SignalRegistry, names: tuple[str, ...], *, audience_key: str = ""
+) -> EventStream:
     """Build the ``/_chirp/live`` merge ``EventStream`` for *names*.
 
     Subscribes to every requested signal's bus scope, pumps each primary
@@ -57,7 +59,9 @@ def make_signal_stream(registry: SignalRegistry, names: tuple[str, ...]) -> Even
         source_tasks: list[asyncio.Task[None]] = []
 
         async def _drain_scope(name: str) -> None:
-            scope = _SCOPE_PREFIX + name
+            audience = registry.audience_of(name)
+            aud = audience_key if audience == "session" else ""
+            scope = _bus_scope(name, aud)
             async for _change in registry.bus.subscribe(scope):
                 merged.put_nowait(name)
 
@@ -85,7 +89,9 @@ def make_signal_stream(registry: SignalRegistry, names: tuple[str, ...]) -> Even
 
             while True:
                 name = await merged.get()
-                value = registry.cached_value(name)
+                audience = registry.audience_of(name)
+                aud = audience_key if audience == "session" else ""
+                value = registry.cached_value(name, audience_key=aud)
                 rendered = registry.render_for_emit(name, value)
                 if rendered is None:
                     continue
@@ -120,7 +126,8 @@ def make_signal_pending_route(registry: SignalRegistry) -> PendingRoute:
 
     def _handler(request: Request) -> EventStream:
         topics = _resolve_topics(request.query.get("topics"))
-        return make_signal_stream(registry, topics)
+        audience_key = (request.query.get("aud") or "").strip()
+        return make_signal_stream(registry, topics, audience_key=audience_key)
 
     return PendingRoute(
         SIGNAL_STREAM_PATH,

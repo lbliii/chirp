@@ -31,10 +31,12 @@ import re
 import threading
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from chirp.pages.reactive.bus import ReactiveBus
 from chirp.pages.reactive.events import ChangeEvent
+
+SignalAudience = Literal["global", "session"]
 
 logger = logging.getLogger("chirp.signals")
 
@@ -83,6 +85,9 @@ class SignalSpec:
         coalesce: Latest-wins (default). A live value is idempotent, so dropping
             a stale update under back-pressure is safe — the next emit reconciles
             every binding. Set ``False`` for append-style / drop-sensitive topics.
+        audience: ``"global"`` (default) fans to every connection; ``"session"``
+            fans only to connections whose ``/_chirp/live?aud=…`` matches the
+            emit ``audience_key`` (per-visitor state — balance, notifications).
     """
 
     name: str
@@ -90,6 +95,7 @@ class SignalSpec:
     initial: Callable[[], Any] | None = None
     render: Callable[[Any], str] | None = None
     coalesce: bool = True
+    audience: SignalAudience = "global"
 
     def render_value(self, value: Any) -> str:
         """Render *value* to its SSE/SSR string payload."""
@@ -111,12 +117,15 @@ class DerivedSpec:
         deps: Dependency signal names. A change to any of them triggers recompute.
         compute: ``(*dep_values) -> derived_value``.
         render: Optional ``value -> str`` renderer for the derived value.
+        audience: Inherited from dependencies — session when any dep is session-
+            scoped; otherwise global. Set automatically at registration.
     """
 
     name: str
     deps: tuple[str, ...]
     compute: Callable[..., Any]
     render: Callable[[Any], str] | None = None
+    audience: SignalAudience = "global"
 
     def render_value(self, value: Any) -> str:
         """Render *value* to its SSE/SSR string payload."""
@@ -138,8 +147,8 @@ class SignalRegistry:
     _derived: dict[str, DerivedSpec] = field(default_factory=dict)
     #: signal name -> dependent derived names (reverse index for recompute).
     _dependents: dict[str, set[str]] = field(default_factory=dict)
-    #: signal/derived name -> last rendered string value (SSR + derived inputs).
-    _values: dict[str, Any] = field(default_factory=dict)
+    #: (audience_key, name) -> last value. ``audience_key`` is ``""`` for global.
+    _values: dict[tuple[str, str], Any] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     bus: ReactiveBus = field(default_factory=ReactiveBus)
 
@@ -156,10 +165,10 @@ class SignalRegistry:
                 )
                 raise ValueError(msg)
             self._specs[spec.name] = spec
-            if spec.initial is not None:
-                # Seed lazily-evaluated initial into the value cache.
+            if spec.initial is not None and spec.audience == "global":
+                # Session-scoped values are per-connection; seed only global signals.
                 try:
-                    self._values[spec.name] = spec.initial()
+                    self._values[_value_key(spec.name, "")] = spec.initial()
                 except Exception:
                     logger.exception("signal %r initial() failed during registration", spec.name)
 
@@ -172,7 +181,27 @@ class SignalRegistry:
             if spec.name in self._specs or spec.name in self._derived:
                 msg = f"signal {spec.name!r} is already registered"
                 raise ValueError(msg)
-            self._derived[spec.name] = spec
+            dep_audiences: list[SignalAudience] = []
+            for dep in spec.deps:
+                dep_spec = self._specs.get(dep)
+                if dep_spec is not None:
+                    dep_audiences.append(dep_spec.audience)
+                    continue
+                dep_derived = self._derived.get(dep)
+                if dep_derived is not None:
+                    dep_audiences.append(dep_derived.audience)
+                    continue
+                msg = f"derived signal {spec.name!r} depends on unknown signal {dep!r}"
+                raise ValueError(msg)
+            audience: SignalAudience = "session" if "session" in dep_audiences else "global"
+            registered = DerivedSpec(
+                name=spec.name,
+                deps=spec.deps,
+                compute=spec.compute,
+                render=spec.render,
+                audience=audience,
+            )
+            self._derived[spec.name] = registered
             for dep in spec.deps:
                 self._dependents.setdefault(dep, set()).add(spec.name)
 
@@ -206,28 +235,47 @@ class SignalRegistry:
 
     # -- value cache / SSR seed --
 
-    def current_rendered(self, name: str) -> str | None:
-        """Return the SSR-seed string for *name*, or ``None`` if unseeded.
+    def audience_of(self, name: str) -> SignalAudience:
+        """Return whether *name* is ``global`` or ``session`` scoped."""
+        return self._audience_of(name)
 
-        Reads the value cache (populated by ``initial()`` at registration and by
-        every :meth:`emit`). A primary signal renders via its ``render``; a
-        derived signal computes from its deps' cached values if not yet cached.
-        """
+    def _audience_of(self, name: str) -> SignalAudience:
         with self._lock:
             spec = self._specs.get(name)
             if spec is not None:
-                if name not in self._values:
+                return spec.audience
+            dspec = self._derived.get(name)
+            if dspec is not None:
+                return dspec.audience
+        msg = f"signal {name!r} is not registered"
+        raise KeyError(msg)
+
+    def current_rendered(self, name: str, *, audience_key: str = "") -> str | None:
+        """Return the SSR-seed string for *name*, or ``None`` if unseeded."""
+        audience = self._audience_of(name)
+        aud = audience_key if audience == "session" else ""
+        key = _value_key(name, aud)
+        with self._lock:
+            spec = self._specs.get(name)
+            if spec is not None:
+                if key not in self._values:
                     return None
-                value = self._values[name]
+                value = self._values[key]
                 renderer = spec
             else:
                 dspec = self._derived.get(name)
                 if dspec is None:
                     return None
-                if name in self._values:
-                    value = self._values[name]
+                if key in self._values:
+                    value = self._values[key]
                 else:
-                    dep_values = [self._values.get(d) for d in dspec.deps]
+                    dep_values = []
+                    for dep in dspec.deps:
+                        dep_spec = self._specs.get(dep)
+                        dep_derived = self._derived.get(dep)
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
+                        dep_aud = aud if dep_audience == "session" else ""
+                        dep_values.append(self._values.get(_value_key(dep, dep_aud)))
                     if any(v is None for v in dep_values):
                         return None
                     try:
@@ -244,18 +292,17 @@ class SignalRegistry:
 
     # -- emit / fan-out --
 
-    def emit(self, name: str, value: Any) -> None:
-        """Publish a new *value* for signal *name* and cascade to derived signals.
-
-        Updates the value cache, fans out an ``event: <name>`` to every binding
-        via the bus, then recomputes + re-emits **every** derived signal reachable
-        from *name* — transitively, so a derived-of-a-derived also fires. Each
-        recompute is published on the derived's own scope (its ``sse-swap``
-        bindings), so a dependency change ALWAYS surfaces its deriveds on the
-        wire, via both an imperative :meth:`emit` and the source-generator pump
-        (which routes through this method). Safe to call from any thread (the bus
-        hands cross-thread delivery to the subscriber's event loop).
-        """
+    def emit(self, name: str, value: Any, *, audience_key: str = "") -> None:
+        """Publish a new *value* for signal *name* and cascade to derived signals."""
+        audience = self._audience_of(name)
+        aud = audience_key if audience == "session" else ""
+        if audience == "session" and not aud:
+            msg = (
+                f"session-scoped signal {name!r} requires a non-empty audience_key "
+                "on emit (the visitor's session store key)"
+            )
+            raise ValueError(msg)
+        key = _value_key(name, aud)
         with self._lock:
             if name not in self._specs and name not in self._derived:
                 msg = (
@@ -264,49 +311,55 @@ class SignalRegistry:
                 )
                 raise KeyError(msg)
             spec = self._specs.get(name)
-            prev_present = name in self._values
-            prev = self._values.get(name)
-            self._values[name] = value
+            prev_present = key in self._values
+            prev = self._values.get(key)
+            self._values[key] = value
 
-        # Idempotent dedup: a coalescing signal whose value is unchanged would
-        # fan out a byte-identical payload (a pure render maps equal values to
-        # equal payloads) — skip the wire event AND the derived cascade entirely;
-        # every binding already shows it. ``coalesce=False`` (append-/drop-
-        # sensitive topics, e.g. a toast log) always emits, even on a repeat value.
         coalesce = spec.coalesce if spec is not None else True
         if coalesce and prev_present and _values_equal(prev, value):
             return
 
-        self._publish(name, value)
-        self._cascade(name)
+        self._publish(name, value, aud)
+        self._cascade(name, aud)
 
-    def _cascade(self, changed: str) -> None:
-        """Recompute + re-emit every derived reachable from *changed*.
+    def seed(self, name: str, value: Any, *, audience_key: str = "") -> None:
+        """Set the cached value without fan-out (SSR paint only)."""
+        audience = self._audience_of(name)
+        aud = audience_key if audience == "session" else ""
+        if audience == "session" and not aud:
+            msg = f"session-scoped signal {name!r} requires audience_key on seed"
+            raise ValueError(msg)
+        key = _value_key(name, aud)
+        with self._lock:
+            if name not in self._specs and name not in self._derived:
+                msg = f"signal {name!r} is not registered"
+                raise KeyError(msg)
+            self._values[key] = value
+        # Derived SSR seeds may depend on this — recompute derived cache quietly.
+        self._seed_derived(name, aud)
 
-        A breadth-first walk of the reverse dependency index: each derived whose
-        deps are all cached recomputes from those cached values, caches its new
-        value, publishes it on its own scope, then enqueues ITS dependents — so a
-        multi-stage derived chain (a derived of a derived) fully propagates from a
-        single source emit. A ``visited`` guard bounds the walk and tolerates a
-        cyclic registration (each derived recomputes at most once per emit). Each
-        recompute is a pure function of the derived's INPUT SIGNAL VALUES — never
-        external state — so the cascade is deterministic across workers.
-        """
+    def _cascade(self, changed: str, audience_key: str) -> None:
+        """Recompute + re-emit every derived reachable from *changed*."""
         visited: set[str] = set()
         frontier = [changed]
         while frontier:
             source = frontier.pop(0)
             with self._lock:
                 dependents = sorted(self._dependents.get(source, ()))
-                # Snapshot each dependent's spec + current dep values under the lock.
-                pending = {
-                    dname: (
-                        self._derived[dname],
-                        [self._values.get(d) for d in self._derived[dname].deps],
-                    )
-                    for dname in dependents
-                    if dname in self._derived and dname not in visited
-                }
+                pending: dict[str, tuple[DerivedSpec, list[Any | None]]] = {}
+                for dname in dependents:
+                    if dname not in self._derived or dname in visited:
+                        continue
+                    dspec = self._derived[dname]
+                    dep_aud = audience_key if dspec.audience == "session" else ""
+                    dep_values = []
+                    for dep in dspec.deps:
+                        dep_spec = self._specs.get(dep)
+                        dep_derived = self._derived.get(dep)
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
+                        dep_key_aud = dep_aud if dep_audience == "session" else ""
+                        dep_values.append(self._values.get(_value_key(dep, dep_key_aud)))
+                    pending[dname] = (dspec, dep_values)
             for dname, (dspec, dep_values) in pending.items():
                 visited.add(dname)
                 if any(v is None for v in dep_values):
@@ -318,32 +371,58 @@ class SignalRegistry:
                         "derived signal %r compute() failed on emit of %r", dname, source
                     )
                     continue
+                dep_aud = audience_key if dspec.audience == "session" else ""
+                dkey = _value_key(dname, dep_aud)
                 with self._lock:
-                    prev_present = dname in self._values
-                    prev = self._values.get(dname)
-                    self._values[dname] = derived_value
-                # A derived is a PURE projection of its inputs, so an unchanged
-                # value means an unchanged DOM — skip its wire event AND stop
-                # propagating down this branch (its own dependents cannot have
-                # changed either). The redundant-cascade fix (rank/project once,
-                # emit only on real change).
+                    prev_present = dkey in self._values
+                    prev = self._values.get(dkey)
+                    self._values[dkey] = derived_value
                 if prev_present and _values_equal(prev, derived_value):
                     continue
-                self._publish(dname, derived_value)
-                # Propagate transitively: this derived's value just changed, so
-                # any derived listening on IT must recompute in the same cascade.
+                self._publish(dname, derived_value, dep_aud)
                 frontier.append(dname)
 
-    def _publish(self, name: str, value: Any) -> None:
-        """Render *value* and fan it out as a ``ChangeEvent`` on the bus.
+    def _seed_derived(self, changed: str, audience_key: str) -> None:
+        """Recompute derived values into the cache without publishing."""
+        visited: set[str] = set()
+        frontier = [changed]
+        while frontier:
+            source = frontier.pop(0)
+            with self._lock:
+                dependents = sorted(self._dependents.get(source, ()))
+                pending: dict[str, tuple[DerivedSpec, list[Any | None]]] = {}
+                for dname in dependents:
+                    if dname not in self._derived or dname in visited:
+                        continue
+                    dspec = self._derived[dname]
+                    dep_aud = audience_key if dspec.audience == "session" else ""
+                    dep_values = []
+                    for dep in dspec.deps:
+                        dep_spec = self._specs.get(dep)
+                        dep_derived = self._derived.get(dep)
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
+                        dep_key_aud = dep_aud if dep_audience == "session" else ""
+                        dep_values.append(self._values.get(_value_key(dep, dep_key_aud)))
+                    pending[dname] = (dspec, dep_values)
+            for dname, (dspec, dep_values) in pending.items():
+                visited.add(dname)
+                if any(v is None for v in dep_values):
+                    continue
+                try:
+                    derived_value = dspec.compute(*dep_values)
+                except Exception:
+                    logger.exception(
+                        "derived signal %r compute() failed on seed of %r", dname, source
+                    )
+                    continue
+                dep_aud = audience_key if dspec.audience == "session" else ""
+                with self._lock:
+                    self._values[_value_key(dname, dep_aud)] = derived_value
+                frontier.append(dname)
 
-        Render errors are isolated here so one bad signal never poisons the
-        shared connection: the value is cached, but no event is fanned out.
-        """
-        scope = _SCOPE_PREFIX + name
-        # ChangeEvent carries the rendered payload in ``changed_paths`` so the
-        # /_chirp/live merge generator can recover it without re-rendering
-        # (keeping per-event work off the shared stream's hot path).
+    def _publish(self, name: str, value: Any, audience_key: str) -> None:
+        """Render *value* and fan it out as a ``ChangeEvent`` on the bus."""
+        scope = _bus_scope(name, audience_key)
         self.bus.emit_sync(
             ChangeEvent(scope=scope, changed_paths=frozenset({_rendered_marker(name)}))
         )
@@ -362,15 +441,37 @@ class SignalRegistry:
             logger.exception("signal %r render failed on emit", name)
             return None
 
-    def cached_value(self, name: str) -> Any:
+    def cached_value(self, name: str, *, audience_key: str = "") -> Any:
         """Return the cached raw value for *name* (``None`` if unset)."""
+        audience = self._audience_of(name)
+        aud = audience_key if audience == "session" else ""
         with self._lock:
-            return self._values.get(name)
+            return self._values.get(_value_key(name, aud))
 
 
 def _rendered_marker(name: str) -> str:
     """Marker path stored in a ChangeEvent for signal *name*."""
     return f"signal::{name}"
+
+
+def _bus_scope(name: str, audience_key: str) -> str:
+    """ReactiveBus scope for a signal fan-out."""
+    if audience_key:
+        return f"{_SCOPE_PREFIX}aud:{audience_key}:{name}"
+    return _SCOPE_PREFIX + name
+
+
+def _value_key(name: str, audience_key: str) -> tuple[str, str]:
+    return (audience_key, name)
+
+
+def _dep_audience(spec: SignalSpec | None, derived: DerivedSpec | None) -> SignalAudience:
+    """Return the audience of a registered dependency."""
+    if spec is not None:
+        return spec.audience
+    if derived is not None:
+        return derived.audience
+    return "global"
 
 
 def _values_equal(a: Any, b: Any) -> bool:

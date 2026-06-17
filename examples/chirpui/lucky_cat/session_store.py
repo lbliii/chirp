@@ -138,6 +138,23 @@ def client_keys() -> frozenset[str]:
         return frozenset(k for k in _sessions if k != DEFAULT_KEY)
 
 
+def store_keys() -> frozenset[str]:
+    """Every session bucket key currently in the registry."""
+    with _lock:
+        return frozenset(_sessions)
+
+
+def max_notification_head_id() -> int:
+    """Newest notification id across every session bucket (0 when empty)."""
+    with _lock:
+        max_id = 0
+        for entry in _sessions.values():
+            notes = entry.state.notifications
+            if notes and notes.log:
+                max_id = max(max_id, notes.log[0].id)
+        return max_id
+
+
 def active_store_key() -> str:
     """Resolve the store bucket tests should assert against.
 
