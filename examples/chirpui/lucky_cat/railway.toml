@@ -5,7 +5,9 @@
 #
 # See docs/deployment/railway.md for the recommended production shape.
 # Required service variables: CHIRP_ENV=production, CHIRP_DEBUG=0,
-# CHIRP_SECRET_KEY=<generated secret>, CHIRP_LOG_FORMAT=json.
+# CHIRP_SECRET_KEY=<generated secret>, CHIRP_LOG_FORMAT=json,
+# CHIRP_REF=main (build arg — the git ref the Dockerfile installs Chirp from, so
+# framework tracks the demo's bleeding edge; set a branch/tag/SHA here to pin).
 # Keep this a SINGLE web replica — the demo holds all state in process memory
 # (wallet / trade store / SimFeed / signal bus); see README "Configuration".
 
