@@ -291,7 +291,9 @@ dev = [
     "itsdangerous>=2.2.0",
     "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
     "chirp-ui>=0.10.0",         # Layout macros for llm_playground example tests
-    "playwright>=1.49.0",       # Lucky Cat browser smoke (test_browser_smoke.py)
+]
+browser = [
+    "playwright>=1.49.0",       # Lucky Cat browser smoke — install with: uv sync --group dev --group browser
 ]
 
 # =============================================================================

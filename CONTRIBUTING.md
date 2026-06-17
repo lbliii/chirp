@@ -30,7 +30,7 @@ first failure:
 
 It **does not** run the full test suite, so it finishes in seconds. It catches
 the public-API-snapshot / docs-coverage / format / ty failure class locally
-instead of via a ~20-minute CI round-trip. It is also wired as a `pre-push`
+instead of via the full ~8-minute CI test round-trip. It is also wired as a `pre-push`
 hook in `.pre-commit-config.yaml`.
 
 For the full test suite, type checking details, changelog fragments, and
