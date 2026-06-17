@@ -8,7 +8,7 @@
 #     C-extensions that can silently re-enable the GIL on a 3.14t build. The
 #     example imports none of them (forms parsing is urlencoded, not multipart).
 #
-# Chirp installs from GIT @ CHIRP_REF (default: main), NOT a PyPI wheel, so the
+# Chirp installs from GIT @ GIT_REF (default: main), NOT a PyPI wheel, so the
 # framework tracks the demo's bleeding edge and the two NEVER drift. The example's
 # templates and handlers advance with main and routinely use APIs newer than the
 # last published wheel — e.g. session-scoped signals (`app.signal(..., audience=
@@ -17,9 +17,15 @@
 # lacked `audience`).
 #
 # Cache-bust: the `ADD` of GitHub's commits API below invalidates the install
-# layer whenever CHIRP_REF moves (the JSON carries the latest SHA), so a rebuild
+# layer whenever GIT_REF moves (the JSON carries the latest SHA), so a rebuild
 # re-fetches the newest code instead of serving a stale cached layer. Override
-# CHIRP_REF (service variable or `--build-arg`) to pin a branch/tag/SHA.
+# GIT_REF (service variable or `--build-arg`) to pin a branch/tag/SHA.
+#
+# Named GIT_REF, NOT CHIRP_REF: on Railway the cache-bust var must be a *service*
+# variable to reach this build ARG, and Railway also mirrors service vars into
+# the runtime container env. A `CHIRP_*` name there trips Chirp's reserved-
+# namespace guard (`_warn_unknown_env_vars`) with a UserWarning on every boot, so
+# keep this outside the framework's namespace.
 #
 # Build context is THIS directory:
 #     docker build -t lucky-cat examples/chirpui/lucky_cat
@@ -52,13 +58,13 @@ RUN apt-get update \
 # 3.14t CI runs on, .github/workflows/ci.yml).
 RUN uv venv --python 3.14t /opt/venv
 
-# Chirp + chirp-ui, built from CHIRP_REF (bleeding edge); CURATED extras only.
+# Chirp + chirp-ui, built from GIT_REF (bleeding edge); CURATED extras only.
 # The ADD fetches the ref's latest commit metadata; its body changes when the ref
 # advances, so BuildKit invalidates the install layer and uv re-fetches the code.
-ARG CHIRP_REF=main
-ADD "https://api.github.com/repos/lbliii/chirp/commits/${CHIRP_REF}" /tmp/chirp-commit.json
+ARG GIT_REF=main
+ADD "https://api.github.com/repos/lbliii/chirp/commits/${GIT_REF}" /tmp/chirp-commit.json
 RUN uv pip install --python /opt/venv/bin/python \
-    "bengal-chirp[ui,sessions,forms] @ git+https://github.com/lbliii/chirp.git@${CHIRP_REF}"
+    "bengal-chirp[ui,sessions,forms] @ git+https://github.com/lbliii/chirp.git@${GIT_REF}"
 
 # The example is a flat package of sibling modules + a pages/ tree + static/.
 # Copy the whole example directory; app.py inserts its own dir on sys.path.

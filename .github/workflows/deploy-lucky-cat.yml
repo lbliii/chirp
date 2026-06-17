@@ -1,11 +1,15 @@
 name: Deploy Lucky Cat demo
 
 # Keeps the live demo (https://luckycat-production.up.railway.app) current.
-# The example Dockerfile installs Chirp from PyPI, so redeploy when the example
-# itself changes — framework pushes no longer need to rebuild the demo image.
+# The example Dockerfile installs Chirp from git @ GIT_REF (default: main), NOT a
+# PyPI wheel, so the demo tracks main's bleeding edge and the two never drift.
+# Rebuild when EITHER the example OR the framework changes — the paths below
+# cover both, so a framework-only push to main still rebuilds the demo against
+# the new API (the drift that caused the `audience=` crash loop).
 #
 # `railway up` (not `redeploy`) is intentional: it rebuilds the image so the
-# Dockerfile re-resolves the pinned PyPI spec. Railway healthchecks the new
+# Dockerfile re-fetches Chirp at GIT_REF (the `ADD` of GitHub's commits API busts
+# the install-layer cache when main advances). Railway healthchecks the new
 # deployment (/health, 300s) and keeps the previous one serving if it fails —
 # a broken main can't take the live demo down.
 #
@@ -18,6 +22,9 @@ on:
     branches: [main]
     paths:
       - "examples/chirpui/lucky_cat/**"
+      # The Dockerfile installs Chirp from git @ main, so framework changes must
+      # rebuild the demo too — otherwise the live demo silently runs stale code.
+      - "src/chirp/**"
   workflow_dispatch: {}
 
 # Never let two demo deploys race; cancel an in-flight one when a newer push lands.

@@ -65,5 +65,5 @@ claim.
   created by this readiness pass.
 - The dependency floor for `bengal-pounce` is raised to `>=0.8.0`; `kida-templates`
   (`>=0.9.0`) and the optional `chirp-ui` (`>=0.9.0`) floors are unchanged.
-- The Lucky Cat demo `Dockerfile` installs chirp from `git@${CHIRP_REF}`; the
+- The Lucky Cat demo `Dockerfile` installs chirp from `git@${GIT_REF}`; the
   planned switch to the PyPI `bengal-chirp` package is a post-release follow-up.
