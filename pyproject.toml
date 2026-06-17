@@ -264,8 +264,9 @@ exclude_lines = [
 
 [dependency-groups]
 docs = [
-    "bengal>=0.3.2", # Static site generator for documentation
+    "bengal>=0.5.0", # Static site generator for documentation
     "lunr>=0.7.0",   # Pre-built search index
+    "chirp-ui>=0.10.0", # Bengal chirp-theme package (bengal.themes entry point)
 ]
 dev = [
     # Testing
@@ -343,6 +344,11 @@ preflight = { sequence = [
 
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build --out-dir dist/ && ls -la dist/", help = "Build distribution" }
+
+# Docs site (always uses project venv Bengal, not a global `bengal` install)
+site-build = { cwd = "site", cmd = "uv run bengal build --environment local", help = "Build docs site locally (Bengal from docs group)" }
+site-build-prod = { cwd = "site", cmd = "uv run bengal build --environment production", help = "Build docs site for production (/chirp baseurl)" }
+site-serve = { cwd = "site", cmd = "uv run bengal serve --environment local", help = "Serve docs site with hot reload (http://127.0.0.1:5173)" }
 
 # Changelog (towncrier)
 changelog = { cmd = "towncrier build --version 0.8.0 --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
