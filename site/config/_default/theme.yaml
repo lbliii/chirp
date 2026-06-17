@@ -2,11 +2,10 @@
 # ===================
 
 theme:
-  name: "default"
+  name: "chirp-theme"
 
   # Appearance
   default_appearance: "light"
-  default_palette: "charcoal-bengal"
 
   # Syntax Highlighting
   syntax_highlighting:
