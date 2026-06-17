@@ -8,12 +8,18 @@
 #     C-extensions that can silently re-enable the GIL on a 3.14t build. The
 #     example imports none of them (forms parsing is urlencoded, not multipart).
 #
-# Chirp installs from PyPI. Pin EXACTLY (==), not a floor (>=): the example
-# templates in this repo advance with main, but the framework here is the last
-# published wheel. A floor lets the two drift — the demo's reactive lobby uses
-# signal_attrs(), added after 0.8.0, so a 0.8.0 wheel 500s with UndefinedError.
-# Pinning to the release that ships every global the templates use keeps the two
-# in lockstep. Bump this pin in the SAME release that ships the templates.
+# Chirp installs from GIT @ CHIRP_REF (default: main), NOT a PyPI wheel, so the
+# framework tracks the demo's bleeding edge and the two NEVER drift. The example's
+# templates and handlers advance with main and routinely use APIs newer than the
+# last published wheel — e.g. session-scoped signals (`app.signal(..., audience=
+# "session")`) or signal_attrs(). Pinning to a wheel forced a patch release on
+# every demo change and 500s/crashes when we forgot (the wheel's App.signal()
+# lacked `audience`).
+#
+# Cache-bust: the `ADD` of GitHub's commits API below invalidates the install
+# layer whenever CHIRP_REF moves (the JSON carries the latest SHA), so a rebuild
+# re-fetches the newest code instead of serving a stale cached layer. Override
+# CHIRP_REF (service variable or `--build-arg`) to pin a branch/tag/SHA.
 #
 # Build context is THIS directory:
 #     docker build -t lucky-cat examples/chirpui/lucky_cat
@@ -37,13 +43,22 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# git: uv shells out to it to install Chirp from the git ref below (slim has none).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 # A free-threaded 3.14t virtualenv on PATH (uv fetches the interpreter — the same
 # 3.14t CI runs on, .github/workflows/ci.yml).
 RUN uv venv --python 3.14t /opt/venv
 
-# Published Chirp + chirp-ui from PyPI; CURATED extras only.
+# Chirp + chirp-ui, built from CHIRP_REF (bleeding edge); CURATED extras only.
+# The ADD fetches the ref's latest commit metadata; its body changes when the ref
+# advances, so BuildKit invalidates the install layer and uv re-fetches the code.
+ARG CHIRP_REF=main
+ADD "https://api.github.com/repos/lbliii/chirp/commits/${CHIRP_REF}" /tmp/chirp-commit.json
 RUN uv pip install --python /opt/venv/bin/python \
-    "bengal-chirp[ui,sessions,forms]==0.8.1"
+    "bengal-chirp[ui,sessions,forms] @ git+https://github.com/lbliii/chirp.git@${CHIRP_REF}"
 
 # The example is a flat package of sibling modules + a pages/ tree + static/.
 # Copy the whole example directory; app.py inserts its own dir on sys.path.
