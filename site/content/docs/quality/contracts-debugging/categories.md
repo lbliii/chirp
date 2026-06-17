@@ -108,6 +108,7 @@ temporary migration plan and a narrower test that covers the user-visible path.
 | `signal_dead_binding` | ERROR | Declare a `@app.signal('x')` / `@app.derived('x', ...)` producer for every `signal('x')` / `signal_block('x')` / `sse-swap="x"` binding under the merged `/_chirp/live` connection, or fix the name. A bound signal with no registered producer never updates (#238 — the dead-ticker class). |
 | `signal_raw_sse_swap` | INFO | Prefer `{{ signal_attrs('x') }}` over hand-written `sse-swap="x"` on pages composed under `signal_connect()` so the binding is validated (#316). |
 | `signal_orphan` | INFO | Bind the registered signal with `signal()`/`signal_block()` in a template, or remove the unused producer. An orphan signal is produced but never displayed. |
+| `signal_scope` | ERROR / WARNING | Register `SessionMiddleware` before using `audience="session"` signals so each connection can resolve its `/_chirp/live?aud=…` key (#315). WARNs when a derived signal depends on both global and session-scoped deps — verify the mixed dependency graph is intentional. |
 
 ## Forms, Commands, And Safety
 
