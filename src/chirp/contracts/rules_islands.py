@@ -31,7 +31,64 @@ _ISLAND_PRIMITIVE_REQUIRED_KEYS: dict[str, frozenset[str]] = {
     "grid_state": frozenset({"stateKey", "columns"}),
     "wizard_state": frozenset({"stateKey", "steps"}),
     "upload_state": frozenset({"stateKey", "endpoint"}),
+    "optimistic_apply": frozenset({"ops"}),
 }
+
+# The closed, reversible op vocabulary the blessed ``optimistic_apply`` runtime
+# can apply and roll back from the client's own pre-mutation DOM. Kept narrow on
+# purpose: every op is exactly invertible and carries no raw HTML (no ``setHtml``
+# in v1 — raw-HTML optimism is an XSS surface and belongs in a real island).
+OPTIMISTIC_OPS: frozenset[str] = frozenset(
+    {"addClass", "removeClass", "toggleClass", "setText", "setAttr", "removeAttr", "disable"}
+)
+
+# Prop keys that would smuggle server-correlation into an optimistic mount —
+# the exact shape that would grow per-client server view state. Statically
+# spelling any of these is an ERROR; ``optimistic_attrs(...)`` also refuses them
+# at render time so the helper can never emit one.
+OPTIMISTIC_FORBIDDEN_PROP_KEYS: frozenset[str] = frozenset(
+    {
+        "serverState",
+        "pendingId",
+        "optimisticId",
+        "clientId",
+        "connectionId",
+        "mergeUrl",
+        "mergeEndpoint",
+    }
+)
+
+
+def validate_optimistic_op(op: object) -> str | None:
+    """Return an error phrase if *op* is an invalid optimistic_apply op, else None.
+
+    The single source of truth for op validity, shared by the static contract
+    (``_check_optimistic_props``) and the render-time helper
+    (``chirp.templating.filters.optimistic_attrs``) so the two enforcement
+    points cannot drift. Phrases are suffix fragments ("op 'setAttr' needs ...")
+    each caller frames for its own context.
+    """
+    if not isinstance(op, dict) or not isinstance(op.get("op"), str):
+        return "must be an object with an 'op' name"
+    smuggled = sorted(OPTIMISTIC_FORBIDDEN_PROP_KEYS & set(op))
+    if smuggled:
+        return f"carries server-correlation keys ({', '.join(smuggled)})"
+    name = op.get("op")
+    if name not in OPTIMISTIC_OPS:
+        return f"uses an unknown op '{name}' (allowed: {', '.join(sorted(OPTIMISTIC_OPS))})"
+    if name in {"addClass", "removeClass", "toggleClass"} and not op.get("value"):
+        return f"'{name}' needs a 'value' class name"
+    if name == "setText":
+        expr = op.get("expr")
+        if expr is not None and expr not in {"+1", "-1"}:
+            return "'setText' expr must be '+1' or '-1'"
+        if expr is None and op.get("value") is None:
+            return "'setText' needs a 'value' or 'expr'"
+    if name == "setAttr" and not (op.get("name") and op.get("value") is not None):
+        return "'setAttr' needs a 'name' and 'value'"
+    if name == "removeAttr" and not op.get("name"):
+        return "'removeAttr' needs a 'name'"
+    return None
 
 
 def extract_island_mounts(source: str) -> list[dict[str, str | None]]:
@@ -59,6 +116,64 @@ def extract_island_mounts(source: str) -> list[dict[str, str | None]]:
             }
         )
     return mounts
+
+
+def _check_optimistic_props(
+    name: str, parsed: dict[str, object], template_name: str
+) -> list[ContractIssue]:
+    """Validate the ``optimistic_apply`` props schema.
+
+    Best-effort and ERGONOMIC, not the zero-server-state guarantee: it only
+    sees STATICALLY-spelled ``data-island-props`` (the canonical
+    ``{{ optimistic_attrs(...) }}`` helper form and any ``{{ }}``-bearing props
+    are invisible to ``extract_island_mounts``, which scans raw disk source).
+    The render-time guard in ``chirp.templating.filters.optimistic_attrs`` is
+    authoritative; the zero-server-state boundary itself is enforced by the
+    runtime guardrail in ``tests/test_islands.py``.
+    """
+    issues: list[ContractIssue] = []
+
+    forbidden = sorted(OPTIMISTIC_FORBIDDEN_PROP_KEYS & set(parsed))
+    if forbidden:
+        issues.append(
+            ContractIssue(
+                severity=Severity.ERROR,
+                category="islands",
+                message=(
+                    f"Island '{name}' optimistic_apply props carry server-correlation "
+                    f"keys ({', '.join(forbidden)}); optimistic state must stay client-side."
+                ),
+                template=template_name,
+            )
+        )
+
+    if "ops" not in parsed:
+        return issues  # absence is already reported by the required-keys check
+    ops = parsed.get("ops")
+    if not isinstance(ops, list) or not ops:
+        issues.append(
+            ContractIssue(
+                severity=Severity.ERROR,
+                category="islands",
+                message=f"Island '{name}' optimistic_apply requires a non-empty 'ops' list.",
+                template=template_name,
+            )
+        )
+        return issues
+
+    for index, op in enumerate(ops):
+        problem = validate_optimistic_op(op)
+        if problem:
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="islands",
+                    message=f"Island '{name}' optimistic_apply op #{index} {problem}.",
+                    template=template_name,
+                )
+            )
+
+    return issues
 
 
 def check_island_mounts(template_sources: dict[str, str], *, strict: bool) -> list[ContractIssue]:
@@ -134,6 +249,10 @@ def check_island_mounts(template_sources: dict[str, str], *, strict: bool) -> li
                                             ),
                                             template=template_name,
                                         )
+                                    )
+                                if primitive_name == "optimistic_apply":
+                                    issues.extend(
+                                        _check_optimistic_props(name, parsed, template_name)
                                     )
 
             if strict and not mount["mount_id"]:

@@ -10,6 +10,22 @@ keywords: [islands, data-island, fragment_island, hydration, remount, fallback]
 category: guide
 ---
 
+## Islands are Chirp's no-build answer for client state
+
+When a surface genuinely needs client-resident state, islands are the headlined
+answer — **no VDOM, no build step, and zero per-client server view state.** That
+last clause is the line: diff-push frameworks (LiveView, Hotwire) deliver
+optimistic UI and rich client widgets by keeping a per-client copy of the view
+*on the server*. Chirp does not. Islands own their DOM in the browser; the server
+keeps returning authoritative HTML and remembers nothing about any one client.
+
+Chirp ships **one blessed primitive that proves the model** — `optimistic_apply`
+(below). It paints a mutation locally and instantly, lets htmx do the real
+request, and reconciles by swapping the authoritative server fragment — all from
+a snapshot that lives in the browser. The zero-server-view-state guarantee is
+machine-checked, not asserted (`tests/test_islands.py`). Everything else is the
+framework-agnostic mount contract you bring your own adapter to.
+
 ## Current State
 
 Chirp ships a real V1 islands system. The following are implemented and available:
@@ -29,11 +45,13 @@ Chirp ships a real V1 islands system. The following are implemented and availabl
 - Lifecycle events (`chirp:island:*`)
 - Primitive metadata conventions and schema checks
 - `app.check()` enforcement
+- The blessed `optimistic_apply` primitive (first-party, client-only) and the
+  `optimistic_attrs(...)` helper
+- A prominent end-to-end example: `examples/standalone/optimistic_apply/`
 
 ### Not Yet Strong In-Repo
 
-- First-party adapter modules or `/static/islands/*.js` examples
-- A prominent example app using the islands runtime end-to-end
+- First-party adapter modules for the *other* (convention-only) primitives
 - Deep integration between islands and `PageComposition.regions`
 - Env-based config loading for islands flags in `AppConfig.from_env()`
 
@@ -192,6 +210,108 @@ Each event `detail` includes:
 
 - `name`, `id`, `version`, `src`, `props`, `element`
 
+The blessed `optimistic_apply` primitive emits on the action channel:
+`apply`/`optimistic` when it paints locally, `confirm`/`confirmed` when the
+authoritative fragment swaps in, and `revert`/`reverted` when it rolls back.
+
+## The blessed `optimistic_apply` primitive
+
+`optimistic_apply` is the one primitive Chirp ships the runtime behavior for, so
+mounting it Just Works with a contract guarantee — unlike the other primitives,
+which are conventions you back with your own adapter. It paints a mutation
+locally and instantly from the client's **own** pre-mutation snapshot, lets htmx
+do the real request, swaps the authoritative server fragment on success
+(last-write-wins), and reverts to the snapshot only when no authoritative
+fragment lands.
+
+Put the htmx trigger and `optimistic_attrs(...)` on the **same** element:
+
+```html
+<button
+    id="like-btn"
+    hx-post="/toggle-like"
+    hx-target="#like-btn"
+    hx-swap="outerHTML"
+    {{ optimistic_attrs([
+         {"op": "toggleClass", "value": "liked"},
+         {"op": "setText", "expr": "+1", "sel": ".like-count"},
+         {"op": "disable"},
+       ], mount_id="like-btn") }}>
+  <span class="like-count">{{ count }}</span> Like
+</button>
+```
+
+```python
+@app.route("/toggle-like", methods=["POST"])
+def toggle_like():
+    post = like(post_id)                                  # ordinary mutation
+    return Fragment("post.html", "like_btn", post=post)   # authoritative fragment
+```
+
+See `examples/standalone/optimistic_apply/` for a runnable demo (a confirmed Like
+and a reverting failure).
+
+### Why this preserves the north star
+
+**Chirp holds zero per-client server view state.** The rollback baseline is a
+tab-local JavaScript snapshot — never a server-held copy. The handler is
+byte-identical with or without the adapter; it is never told an optimistic apply
+happened and allocates nothing per client/connection. Reconciliation is the
+ordinary authoritative-fragment swap, not a server-held per-client merge. The
+shipped runtime opens no transport of its own and persists nothing across the
+client/server boundary — both halves are enforced by the
+`TestOptimisticApplyGuardrail` gates.
+
+### The op vocabulary
+
+`ops` is a non-empty list of reversible operations. Each is applied forward on
+arm and inverted on revert from the live DOM:
+
+| op | keys | effect |
+|----|------|--------|
+| `addClass` / `removeClass` / `toggleClass` | `value`, optional `sel` | class mutation |
+| `setText` | `value`, **or** `expr` (`"+1"`/`"-1"`), optional `sel` | text / numeric delta |
+| `setAttr` | `name`, `value`, optional `sel` | set attribute |
+| `removeAttr` | `name`, optional `sel` | remove attribute |
+| `disable` | — | disable the trigger (blocks double-fire) |
+
+`sel` scopes an op to a descendant of the region (default region = the mount
+element). `optimistic_attrs(...)` rejects any unknown op or any
+server-correlation key at render time, so the helper can never emit a mount that
+would grow server view state.
+
+There is deliberately **no `setHtml`/raw-HTML op** in v1: raw-HTML optimism is an
+XSS surface and risks duplicate DOM on non-replacing swaps. Reach for a real
+island when you need it.
+
+### The ~80% ceiling (by design)
+
+`optimistic_apply` closes ~80% of the optimistic-UI gap with zero server state.
+What it does **not** do:
+
+- **One in-flight optimistic mutation per region.** A re-trigger keeps the
+  original pre-mutation snapshot, so revert always returns to the true baseline.
+- **Last-write-wins** via the authoritative fragment swap. No operational
+  transforms, no CRDTs, no concurrent-edit merge.
+- **Requires a replacing swap** (`outerHTML`/`innerHTML` covering the region).
+  Non-replacing swaps (`beforeend`/`afterend`/`append`) would leave both the
+  optimistic node and the server node.
+- **A `ValidationError(422)` that swaps an authoritative fragment is the truth**
+  — the re-rendered form wins, no client revert. The snapshot is used only when
+  *no* authoritative fragment lands (network/send error, timeout, non-swapping
+  5xx).
+- **Keep the region leaf, server-owned DOM.** Do not nest another island inside
+  an `optimistic_apply` region; the coarse fallback revert would orphan it.
+
+If you need collaborative concurrent editing with convergence, this is the wrong
+tool — reach for a framework island with its own CRDT.
+
+> **Cut line:** the feature is cut (deleted), not shipped thin, if it ever needs
+> a request field correlating a client's optimistic apply with its response, a
+> server-side map keyed by client/connection of in-flight mutations, or a
+> server-held pre-mutation baseline. The `test_holds_zero_server_state` gate is
+> the trip-wire.
+
 ## Runtime Configuration
 
 ```python
@@ -201,10 +321,23 @@ app = App(
     AppConfig(
         islands=True,
         islands_version="1",
-        islands_contract_strict=True,  # optional checks in app.check()
+        islands_contract_strict=True,  # optional mount-id/version WARNINGs in app.check()
     )
 )
 ```
+
+Islands metadata **ERROR** checks (malformed props, unsafe `src`, invalid
+version, required primitive keys, `optimistic_apply` op validation, and
+server-correlation keys) run by default in `app.check()` regardless of
+`islands_contract_strict` — that flag only adds advisory mount-id/version
+warnings.
+
+`app.check()` statically validates only **literal** `data-island-props` (it
+cannot see the canonical `{{ optimistic_attrs(...) }}` helper form or any
+`{{ }}`-bearing props, which it leaves untouched). For the helper form, the
+same op vocabulary is enforced at **render time** by `optimistic_attrs(...)`
+(which raises rather than emit an invalid or server-correlated mount) — that is
+the authoritative guard. Both paths share one validator, so they cannot drift.
 
 ## Validation
 
@@ -225,6 +358,8 @@ Known primitive contracts:
 - `grid_state` -> `stateKey`, `columns`
 - `wizard_state` -> `stateKey`, `steps`
 - `upload_state` -> `stateKey`, `endpoint`
+- `optimistic_apply` -> `ops` (blessed; see above — also rejects unknown ops and
+  server-correlation keys)
 
 ## Diagnostics
 

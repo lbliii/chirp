@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Optimistic Apply Demo</title>
+  {# htmx is provisioned by AppConfig(htmx=True) — Chirp injects it before </body>. #}
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 640px; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    p { margin-bottom: 1rem; color: #374151; }
+    code { background: #e5e7eb; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.9em; }
+    .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.5rem; margin: 1rem 0; }
+    button { font: inherit; cursor: pointer; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.5rem 1rem; background: #fff; }
+    .like-btn { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .like-btn .heart { color: #9ca3af; }
+    .like-btn.liked { border-color: #ef4444; background: #fef2f2; }
+    .like-btn.liked .heart { color: #ef4444; }
+    /* Optimistic feedback: the adapter toggles these classes on the region. */
+    .is-optimistic-pending { opacity: 0.6; }
+    .is-optimistic-error { animation: shake 0.3s; border-color: #ef4444; }
+    .saving { font-style: italic; }
+    @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Optimistic Apply</h1>
+  <p>
+    The buttons below apply their change <strong>instantly</strong>, before the
+    server responds. The server holds <strong>zero per-client state</strong>:
+    the rollback baseline lives in your browser. Open DevTools → Network and
+    throttle to "Slow 3G" to see the optimistic paint precede the round trip.
+  </p>
+
+  <div class="card">
+    <p><strong>Like</strong> — confirmed by the authoritative server fragment (last-write-wins).</p>
+    {% block like_button %}
+    <button
+        id="like-btn"
+        hx-post="/toggle-like"
+        hx-target="#like-btn"
+        hx-swap="outerHTML"
+        class="like-btn{{ ' liked' if liked else '' }}"
+        aria-pressed="{{ 'true' if liked else 'false' }}"
+        {{ optimistic_attrs(ops, mount_id="like-btn") }}>
+      <span class="heart" aria-hidden="true">{{ '♥' if liked else '♡' }}</span>
+      <span class="like-count">{{ count }}</span>
+      <span class="label">{{ 'Liked' if liked else 'Like' }}</span>
+    </button>
+    {% endblock %}
+  </div>
+
+  <div class="card">
+    <p><strong>Save</strong> — the endpoint always fails (503). The optimistic
+      "Saving…" paint <strong>reverts</strong> because no authoritative fragment lands.</p>
+    <button
+        id="save-btn"
+        hx-post="/save-broken"
+        hx-target="#save-btn"
+        hx-swap="outerHTML"
+        {{ optimistic_attrs([
+             {"op": "addClass", "value": "saving"},
+             {"op": "setText", "value": "Saving…"},
+             {"op": "disable"},
+           ], mount_id="save-btn") }}>
+      Save (server will fail)
+    </button>
+  </div>
+
+  <p>
+    Each button puts its htmx trigger and <code>{{ '{{ optimistic_attrs(...) }}' }}</code>
+    on the same element. The runtime snapshots the region, applies the ops, and
+    either keeps the authoritative swap or restores the snapshot — no server view
+    state, no build step.
+  </p>
+</main>
+</body>
+</html>
