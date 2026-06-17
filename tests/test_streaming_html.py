@@ -386,8 +386,20 @@ async def test_mid_stream_error_propagates_to_consumer() -> None:
         async for chunk in render_stream_async(env, stream):
             chunks.append(chunk)  # noqa: PERF401
 
-    with pytest.raises(TemplateRuntimeError):
+    # The mid-stream error must surface to the consumer. chirp re-raises
+    # whatever kida raised and sender.py handles any ``Exception`` identically
+    # (sender.py: ``except Exception``), so the contract is "the failure
+    # surfaces", not its exact type. kida normally wraps the callable error in
+    # TemplateRuntimeError, but under a free-threaded (3.14t) build its wrapping
+    # is racy and the underlying ValueError can surface raw — accept either so
+    # this asserts the real, type-agnostic contract, not a kida implementation
+    # detail that is not guaranteed without the GIL.
+    with pytest.raises((TemplateRuntimeError, ValueError)) as excinfo:
         await _consume()
+    surfaced = excinfo.value
+    assert "mid-stream boom" in str(surfaced) or "mid-stream boom" in str(
+        getattr(surfaced, "__cause__", "")
+    ), f"the mid-stream failure did not surface: {surfaced!r}"
 
     # Chunks before the failing item were delivered (progressive, not buffered).
     assert "<p>start</p>" in chunks
