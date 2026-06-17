@@ -86,7 +86,11 @@ from .rules_route_contract import (
 )
 from .rules_route_names import check_route_names
 from .rules_shapecheck import check_shapecheck
-from .rules_signals import check_signal_bindings, check_signal_mixed_audience_derived, check_signal_scope
+from .rules_signals import (
+    check_signal_bindings,
+    check_signal_mixed_audience_derived,
+    check_signal_scope,
+)
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,

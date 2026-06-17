@@ -20,6 +20,7 @@ in that template against the registry.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from chirp.contracts.patterns import SSE_CONNECT_TAG as _SSE_CONNECT_TAG_PATTERN
 from chirp.contracts.rules_sse import (
@@ -27,8 +28,6 @@ from chirp.contracts.rules_sse import (
     normalize_sse_url,
     strip_template_comments,
 )
-from typing import Any
-
 from chirp.contracts.types import ContractIssue, Severity
 
 _SESSION_MIDDLEWARE = "SessionMiddleware"
