@@ -999,6 +999,58 @@ class TestSessionScopedStores:
             assert "Deposited 250 $MEOW" in home_a.text
             assert "Deposited 250 $MEOW" not in home_b.text
 
+    @pytest.mark.issue(315)
+    async def test_two_sessions_receive_independent_signal_sse_events(self, example_app) -> None:
+        """#315: session-scoped signals fan only to the matching /_chirp/live?aud=…
+        connection — a deposit in session A must not surface on session B's SSE."""
+        import asyncio
+
+        import session_store
+
+        async def listen_for_deposit(client, cookie: str, key: str, amount: str):
+            async def deposit_after_subscribe() -> None:
+                await asyncio.sleep(0.05)
+                await csrf_post(
+                    client,
+                    "/deposit",
+                    cookie=cookie,
+                    cookie_name=_SESSION_COOKIE,
+                    data={"amount": amount},
+                )
+
+            return await asyncio.gather(
+                client.sse(
+                    f"/_chirp/live?topics=balance&aud={key}",
+                    max_events=1,
+                    headers=_cookie_header(cookie),
+                ),
+                deposit_after_subscribe(),
+            )
+
+        async with TestClient(example_app) as client_a, TestClient(example_app) as client_b:
+            cookie_a = await _login(client_a)
+            cookie_b = await _login(client_b)
+            await warm_authed_store(client_a, cookie_a, cookie_name=_SESSION_COOKIE)
+            keys_a = session_store.client_keys()
+            assert len(keys_a) == 1
+            key_a = next(iter(keys_a))
+
+            await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
+            keys_b = session_store.client_keys()
+            assert len(keys_b) == 2
+            key_b = next(k for k in keys_b if k != key_a)
+
+            result_a, _ = await listen_for_deposit(client_a, cookie_a, key_a, "250")
+            result_b, _ = await listen_for_deposit(client_b, cookie_b, key_b, "100")
+
+        joined_a = "".join(e.data for e in result_a.events if e.data)
+        joined_b = "".join(e.data for e in result_b.events if e.data)
+        # INITIAL_MEOW (100_000) + deposit amount, rendered as str by the balance signal.
+        assert "100250" in joined_a
+        assert "100250" not in joined_b
+        assert "100100" in joined_b
+        assert "100100" not in joined_a
+
 
 class TestCommandPalette:
     """The Cmd/Ctrl-K command palette: the dialog ships in the persistent shell

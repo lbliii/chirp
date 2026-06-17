@@ -17,7 +17,11 @@ import pytest
 
 from chirp import App
 from chirp.config import AppConfig
-from chirp.contracts.rules_signals import check_signal_bindings
+from chirp.contracts.rules_signals import (
+    check_signal_bindings,
+    check_signal_mixed_audience_derived,
+    check_signal_scope,
+)
 from chirp.contracts.types import Severity
 from chirp.realtime.signal_globals import make_signal_globals
 from chirp.realtime.signal_stream import make_signal_stream
@@ -130,6 +134,28 @@ class TestRegistry:
         reg.register(SignalSpec(name="balance", audience="session"))
         with pytest.raises(ValueError, match="audience_key"):
             reg.emit("balance", 1)
+
+    def test_session_names_property(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance", audience="session"))
+        reg.register(SignalSpec(name="ticker", audience="global"))
+        reg.register(SignalSpec(name="notes", audience="session"))
+        reg.register_derived(DerivedSpec(name="badge", deps=("notes",), compute=lambda n: len(n)))
+        assert reg.session_names == frozenset({"balance", "notes", "badge"})
+
+    def test_mixed_audience_derived_names_property(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="global_a", audience="global"))
+        reg.register(SignalSpec(name="session_b", audience="session"))
+        reg.register_derived(DerivedSpec(name="pure", deps=("global_a",), compute=lambda a: a))
+        reg.register_derived(
+            DerivedSpec(
+                name="mixed",
+                deps=("global_a", "session_b"),
+                compute=lambda a, b: (a, b),
+            )
+        )
+        assert reg.mixed_audience_derived_names == frozenset({"mixed"})
 
 
 # ---------------------------------------------------------------------------
@@ -703,3 +729,66 @@ class TestDeadBindingCheck:
         issues = check_signal_bindings(sources, frozenset({"balance"}))
         assert not [i for i in issues if i.category == "signal_dead_binding"]
         assert not [i for i in issues if i.category == "signal_raw_sse_swap"]
+
+
+class TestSignalScopeCheck:
+    def test_session_scoped_signal_without_session_middleware_is_error(self) -> None:
+        issues = check_signal_scope([], frozenset({"balance"}))
+        assert len(issues) == 1
+        assert issues[0].category == "signal_scope"
+        assert issues[0].severity is Severity.ERROR
+        assert "balance" in issues[0].message
+        assert "SessionMiddleware" in issues[0].message
+
+    def test_session_scoped_signal_with_session_middleware_passes(self) -> None:
+        from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+
+        mw = SessionMiddleware(SessionConfig(secret_key="test"))
+        issues = check_signal_scope([mw], frozenset({"balance", "notifications"}))
+        assert issues == []
+
+    def test_no_session_signals_skips_check(self) -> None:
+        issues = check_signal_scope([], frozenset())
+        assert issues == []
+
+    def test_mixed_audience_derived_warns(self) -> None:
+        issues = check_signal_mixed_audience_derived(frozenset({"net_worth"}))
+        assert len(issues) == 1
+        assert issues[0].severity is Severity.WARNING
+        assert issues[0].category == "signal_scope"
+        assert "net_worth" in issues[0].message
+
+    def test_app_check_catches_missing_session_middleware(self) -> None:
+        from chirp.contracts import check_hypermedia_surface
+        from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+
+        app = App(config=AppConfig())
+
+        @app.signal("balance", audience="session", initial=lambda: 0)
+        async def balance():  # pragma: no cover
+            if False:
+                yield 0
+
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test")))
+        app.freeze()
+        assert not [
+            i
+            for i in check_hypermedia_surface(app).issues
+            if i.category == "signal_scope" and i.severity is Severity.ERROR
+        ]
+
+        bare = App(config=AppConfig())
+
+        @bare.signal("balance", audience="session", initial=lambda: 0)
+        async def balance_bare():  # pragma: no cover
+            if False:
+                yield 0
+
+        bare.freeze()
+        scope_errors = [
+            i
+            for i in check_hypermedia_surface(bare).issues
+            if i.category == "signal_scope" and i.severity is Severity.ERROR
+        ]
+        assert len(scope_errors) == 1
+        assert "balance" in scope_errors[0].message

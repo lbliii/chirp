@@ -219,6 +219,33 @@ class SignalRegistry:
             return frozenset(self._specs) | frozenset(self._derived)
 
     @property
+    def session_names(self) -> frozenset[str]:
+        """Every registered signal or derived with ``audience="session"``."""
+        with self._lock:
+            primary = frozenset(n for n, s in self._specs.items() if s.audience == "session")
+            derived = frozenset(n for n, d in self._derived.items() if d.audience == "session")
+            return primary | derived
+
+    @property
+    def mixed_audience_derived_names(self) -> frozenset[str]:
+        """Derived signals whose deps span both global and session audiences."""
+        with self._lock:
+            mixed: set[str] = set()
+            for name, dspec in self._derived.items():
+                audiences: set[SignalAudience] = set()
+                for dep in dspec.deps:
+                    dep_spec = self._specs.get(dep)
+                    if dep_spec is not None:
+                        audiences.add(dep_spec.audience)
+                        continue
+                    dep_derived = self._derived.get(dep)
+                    if dep_derived is not None:
+                        audiences.add(dep_derived.audience)
+                if "global" in audiences and "session" in audiences:
+                    mixed.add(name)
+            return frozenset(mixed)
+
+    @property
     def empty(self) -> bool:
         """Whether no signals (primary or derived) are registered."""
         with self._lock:
