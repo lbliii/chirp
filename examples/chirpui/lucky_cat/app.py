@@ -135,15 +135,18 @@ def emit_signal(name: str, value, *, audience_key: str | None = None) -> None:
 
 
 def fan_out_notifications_live() -> None:
-    """Emit each active session's bell snapshot over scoped /_chirp/live topics."""
-    keys = session_store.store_keys()
-    if not keys:
-        emit_signal("notifications", notifications.snapshot(), audience_key="")
-        return
-    for key in keys:
-        aud = "" if key == session_store.DEFAULT_KEY else key
+    """Emit each *real* session's bell snapshot over its scoped /_chirp/live topic.
+
+    ``notifications`` is session-scoped, so every emit must target a real session
+    key: the framework forbids an empty ``audience_key`` on a session signal (a
+    ``ValueError`` that would kill the source pump for the whole connection). The
+    DEFAULT_KEY/anonymous bucket has no live audience — anonymous visitors carry
+    only global signals and keep their SSR-seeded bell — so ``client_keys()``
+    (non-default keys only) skips it instead of coercing it to ``""``.
+    """
+    for key in session_store.client_keys():
         with session_store.bind(key):
-            emit_signal("notifications", notifications.snapshot(), audience_key=aud)
+            emit_signal("notifications", notifications.snapshot(), audience_key=key)
 
 
 use_chirp_ui(app)
