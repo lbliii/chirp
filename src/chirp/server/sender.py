@@ -267,34 +267,48 @@ async def send_streaming_response(
         # Mid-stream error: log with structured formatting, emit visible error
         import sys
 
-        from chirp.server.terminal_errors import _is_kida_error, _plain_error_message, log_error
-
-        log_error(exc)
-
-        if debug:
-            # Visible error div instead of invisible HTML comment
-            import traceback
-
-            error_msg = _plain_error_message(exc) if _is_kida_error(exc) else traceback.format_exc()
-            # Escape HTML in the error message
-            escaped = error_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            error_chunk = (
-                '<div class="chirp-error" data-status="500"'
-                f' style="white-space:pre-wrap;font-family:monospace;'
-                f'padding:1em;background:#1a1b26;color:#c0caf5;border:2px solid #f7768e">'
-                f"{escaped}</div>"
-            )
-        else:
-            error_chunk = "<!-- chirp: render error -->"
-        await send(
-            {
-                "type": "http.response.body",
-                "body": error_chunk.encode("utf-8"),
-                "more_body": True,
-            }
+        from chirp.server.terminal_errors import (
+            _is_kida_error,
+            _plain_error_message,
+            is_client_disconnect,
+            log_error,
         )
-        # Re-store exception info for any caller that needs it
-        sys.exc_info()
+
+        if is_client_disconnect(exc):
+            # The peer vanished mid-stream (TCP reset / broken pipe). Benign: the
+            # socket is gone, so there is nothing to send and nothing to alert on.
+            # Log at DEBUG and fall through to cleanup — do NOT log a 500-class
+            # "Server error" for a client that simply left.
+            logger.debug("streaming client disconnected mid-stream: %r", exc)
+        else:
+            log_error(exc)
+
+            if debug:
+                # Visible error div instead of invisible HTML comment
+                import traceback
+
+                error_msg = (
+                    _plain_error_message(exc) if _is_kida_error(exc) else traceback.format_exc()
+                )
+                # Escape HTML in the error message
+                escaped = error_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                error_chunk = (
+                    '<div class="chirp-error" data-status="500"'
+                    f' style="white-space:pre-wrap;font-family:monospace;'
+                    f'padding:1em;background:#1a1b26;color:#c0caf5;border:2px solid #f7768e">'
+                    f"{escaped}</div>"
+                )
+            else:
+                error_chunk = "<!-- chirp: render error -->"
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": error_chunk.encode("utf-8"),
+                    "more_body": True,
+                }
+            )
+            # Re-store exception info for any caller that needs it
+            sys.exc_info()
     finally:
         if request_token is not None:
             request_var.reset(request_token)

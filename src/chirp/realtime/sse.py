@@ -234,37 +234,51 @@ async def handle_sse(
                 trace_sink("cancelled", {})
         except Exception as exc:
             # Log with structured formatting for kida errors
-            from chirp.server.terminal_errors import _is_kida_error, _plain_error_message, log_error
+            from chirp.server.terminal_errors import (
+                _is_kida_error,
+                _plain_error_message,
+                is_client_disconnect,
+                log_error,
+            )
 
-            log_error(exc)
-            if trace_sink is not None:
-                trace_sink(
-                    "generator_error",
-                    {
-                        "error_type": type(exc).__name__,
-                        "message": str(exc),
-                    },
-                )
-
-            # Send an error event so the client can react
-            if debug:
-                if _is_kida_error(exc):
-                    detail = _plain_error_message(exc)
-                else:
-                    import traceback
-
-                    detail = traceback.format_exc()
+            if is_client_disconnect(exc):
+                # The peer vanished mid-stream (TCP reset / broken pipe). Benign:
+                # the socket is gone, so there is nothing to send and nothing to
+                # alert on. Log at DEBUG and fall through to cleanup — do NOT emit
+                # a 500-class "Server error" for a client that simply left.
+                logger.debug("SSE client disconnected mid-stream: %r", exc)
+                if trace_sink is not None:
+                    trace_sink("client_disconnect", {"error_type": type(exc).__name__})
             else:
-                detail = "Internal server error"
-            error_event = SSEEvent(data=detail, event="error")
-            with contextlib.suppress(Exception):
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": error_event.encode().encode("utf-8"),
-                        "more_body": True,
-                    }
-                )
+                log_error(exc)
+                if trace_sink is not None:
+                    trace_sink(
+                        "generator_error",
+                        {
+                            "error_type": type(exc).__name__,
+                            "message": str(exc),
+                        },
+                    )
+
+                # Send an error event so the client can react
+                if debug:
+                    if _is_kida_error(exc):
+                        detail = _plain_error_message(exc)
+                    else:
+                        import traceback
+
+                        detail = traceback.format_exc()
+                else:
+                    detail = "Internal server error"
+                error_event = SSEEvent(data=detail, event="error")
+                with contextlib.suppress(Exception):
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": error_event.encode().encode("utf-8"),
+                            "more_body": True,
+                        }
+                    )
         finally:
             # Always clean up pending __anext__ task — whether we exited
             # normally, via CancelledError (disconnect), or via exception.

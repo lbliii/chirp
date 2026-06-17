@@ -40,6 +40,15 @@ logger = logging.getLogger("chirp.signals")
 #: Path of the merged signal stream. Kept in sync with signal_globals.
 SIGNAL_STREAM_PATH = "/_chirp/live"
 
+#: Consecutive source failures before a pump abandons a signal on a connection.
+#: Bounds the restart loop so a source that raises *every* restart (a real bug,
+#: not a transient blip) cannot hot-loop the worker — it is logged and dropped.
+_MAX_SOURCE_RESTARTS = 5
+
+#: Base seconds between source restarts; scaled by the consecutive-failure count
+#: for linear backoff so a flapping source backs off instead of spinning.
+_SOURCE_RESTART_BACKOFF_S = 0.5
+
 
 def make_signal_stream(
     registry: SignalRegistry, names: tuple[str, ...], *, audience_key: str = ""
@@ -69,14 +78,46 @@ def make_signal_stream(
             spec = registry.spec(name)
             if spec is None or spec.source is None:
                 return
-            try:
-                async for value in spec.source():
-                    # Route through emit so derived cascade + cache stay coherent.
-                    registry.emit(name, value)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("signal source %r failed", name)
+            aud = audience_key if registry.audience_of(name) == "session" else ""
+            failures = 0
+            # Restart loop: one bad tick (a transient source error) must not kill
+            # the signal for the life of the connection. A fresh spec.source()
+            # call re-establishes the async generator; a healthy value resets the
+            # backoff window. A source that completes normally is done (push-only
+            # signals yield nothing and exit here once). Bounded so a source that
+            # raises every restart is dropped, not spun (see _MAX_SOURCE_RESTARTS).
+            while True:
+                try:
+                    async for value in spec.source():
+                        # Route through emit so derived cascade + cache stay coherent.
+                        registry.emit(name, value)
+                        failures = 0
+                    return
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    failures += 1
+                    if failures >= _MAX_SOURCE_RESTARTS:
+                        logger.exception(
+                            "signal source %r (audience=%s) failed %d times consecutively; "
+                            "giving up — its bindings will not update on this connection",
+                            name,
+                            aud or "global",
+                            failures,
+                        )
+                        return
+                    backoff = _SOURCE_RESTART_BACKOFF_S * failures
+                    logger.warning(
+                        "signal source %r (audience=%s) failed; restarting in %.1fs "
+                        "(attempt %d/%d)",
+                        name,
+                        aud or "global",
+                        backoff,
+                        failures,
+                        _MAX_SOURCE_RESTARTS,
+                        exc_info=exc,
+                    )
+                    await asyncio.sleep(backoff)
 
         try:
             subscriber_tasks.extend(asyncio.create_task(_drain_scope(name)) for name in names)

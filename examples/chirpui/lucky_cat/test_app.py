@@ -2989,3 +2989,44 @@ class TestNotificationsBell:
         assert badge_events, "derived notif_badge never re-emitted"
         assert "{{" not in joined
         assert "{%" not in joined
+
+    @pytest.mark.issue(356)
+    async def test_fan_out_notifications_skips_keyless_buckets(self, example_app) -> None:
+        """fan_out_notifications_live must never emit the session-scoped
+        ``notifications`` signal with an empty audience_key. The DEFAULT_KEY /
+        anonymous bucket has no live audience and the framework rejects empty-key
+        emits on session signals (a ValueError that previously propagated out of
+        the source and killed the pump — a permanently dead bell). It must be
+        skipped, not coerced to ``""``."""
+        import app as lucky_app
+        import notifications
+        import session_store
+
+        # A store holding ONLY the DEFAULT_KEY bucket (anonymous / pre-store-key
+        # state): the old code coerced this to audience_key="" and raised.
+        with session_store.bind(session_store.DEFAULT_KEY):
+            notifications.add("system", "seed", "")
+        assert session_store.DEFAULT_KEY in session_store.store_keys()
+        assert not session_store.client_keys()
+
+        # Must be a no-op, NOT a ValueError.
+        lucky_app.fan_out_notifications_live()
+
+    @pytest.mark.issue(356)
+    async def test_fan_out_notifications_emits_to_real_session(self, example_app) -> None:
+        """A real (non-default) session key fans out without the empty-key error
+        and caches that session's notifications snapshot."""
+        import app as lucky_app
+        import notifications
+        import session_store
+
+        key = "sess-regression"
+        with session_store.bind(key):
+            notifications.add("system", "hello", "")
+        assert key in session_store.client_keys()
+
+        lucky_app.fan_out_notifications_live()
+
+        registry = lucky_app.app._mutable_state.signal_registry
+        assert registry is not None
+        assert registry.cached_value("notifications", audience_key=key) is not None

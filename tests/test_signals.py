@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 
 import pytest
@@ -543,6 +544,63 @@ class TestLiveStream:
         assert first.event == "ticks"
         assert first.data in {"1", "2"}
         await gen.aclose()
+
+    @pytest.mark.issue(355)
+    async def test_source_recovers_after_transient_failure(self) -> None:
+        """A transient source error must not permanently kill the signal: the pump
+        restarts (bounded backoff) and resumes emitting on the same connection."""
+        reg = SignalRegistry()
+        calls = {"n": 0}
+
+        async def source():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("transient boom")
+            yield "ok"
+            await asyncio.sleep(1.0)  # hold the stream open past collection
+
+        reg.register(SignalSpec(name="ticks", source=source))
+        stream = make_signal_stream(reg, ("ticks",))
+        gen = stream.generator.__aiter__()
+        # First source() raised; the pump re-invokes source() and the retry yields.
+        event = await asyncio.wait_for(gen.__anext__(), timeout=3.0)
+        assert event.event == "ticks"
+        assert event.data == "ok"
+        assert calls["n"] >= 2, "source was not re-invoked after the transient failure"
+        await gen.aclose()
+
+    @pytest.mark.issue(355)
+    async def test_source_gives_up_after_repeated_failures(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A source that raises on every restart is abandoned after a bounded
+        number of attempts (no infinite hot-loop) and logs a final give-up error."""
+        from chirp.realtime import signal_stream as ss
+
+        monkeypatch.setattr(ss, "_SOURCE_RESTART_BACKOFF_S", 0.0)
+        monkeypatch.setattr(ss, "_MAX_SOURCE_RESTARTS", 3)
+        reg = SignalRegistry()
+        calls = {"n": 0}
+
+        async def source():
+            calls["n"] += 1
+            if False:  # pragma: no cover - marks this an async generator
+                yield
+            raise RuntimeError("always boom")
+
+        reg.register(SignalSpec(name="ticks", source=source))
+        stream = make_signal_stream(reg, ("ticks",))
+        gen = stream.generator.__aiter__()
+        # No event ever arrives; the pump must give up rather than spin forever.
+        with (
+            caplog.at_level(logging.WARNING, logger="chirp.signals"),
+            pytest.raises((TimeoutError, asyncio.TimeoutError)),
+        ):
+            await asyncio.wait_for(gen.__anext__(), timeout=0.5)
+        with contextlib.suppress(Exception):
+            await gen.aclose()
+        assert calls["n"] == 3, "pump did not stop at _MAX_SOURCE_RESTARTS attempts"
+        assert any("giving up" in r.getMessage() for r in caplog.records), caplog.text
 
     async def test_app_autoregisters_live_route(self) -> None:
         app = App(config=AppConfig())
