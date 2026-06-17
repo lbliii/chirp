@@ -3,6 +3,242 @@
 Injects a lightweight browser runtime that discovers ``[data-island]`` roots,
 parses serialized props, and emits lifecycle events. Frontend adapters can
 listen to these events to mount/unmount framework islands.
+
+It also ships ONE blessed, client-resident primitive: ``optimistic_apply``
+(see ``_OPTIMISTIC_ADAPTER_JS``). Mounting ``data-island-primitive``
+``optimistic_apply`` Just Works with a contract guarantee — Chirp holds zero
+per-client server view state; the rollback baseline is the client's OWN
+pre-mutation DOM snapshot, never a server-held copy.
+"""
+
+# The blessed ``optimistic_apply`` adapter. Authored as a plain string (NOT an
+# f-string) so its JavaScript braces need no escaping; it is spliced verbatim
+# into the runtime IIFE below, after ``register`` is defined and before the
+# first DOMContentLoaded scan, so the adapter is registered before any mount.
+#
+# Zero server state by construction: the snapshot/rollback baseline lives in
+# tab-local memory (``optimisticInflight`` / ``optimisticRegions``); nothing is
+# serialized, persisted, or sent. Reconciliation is the ordinary
+# authoritative-fragment swap (last-write-wins). The marker comments and the
+# absence of any client->server transport token are asserted by the
+# zero-server-state guardrail in ``tests/test_islands.py``.
+_OPTIMISTIC_ADAPTER_JS = """
+  // >>> optimistic_apply adapter (blessed; client-only; zero server state)
+  /* baseline: client-only */
+  // The rollback baseline is the client's OWN pre-mutation DOM, snapshotted
+  // into tab-local memory below. It is never serialized, never persisted, and
+  // never sent over any transport; the server is never told an optimistic
+  // apply happened. Reconciliation is the ordinary authoritative-fragment swap
+  // (last-write-wins). All logic is document-level and correlated by the htmx
+  // request object (evt.detail.xhr); arming reads the element's props FRESH on
+  // each request, so it never depends on per-mount listener state that the
+  // runtime tears down on a swap.
+  var OPTIMISTIC_ALLOWED = ["addClass", "removeClass", "toggleClass", "setText", "setAttr", "removeAttr", "disable"];
+  var optimisticInflight = new Map();    // htmx request object -> { regionEl }
+  var optimisticRegions = new WeakMap(); // regionEl -> baseline entry (tab-local)
+
+  function optimisticTargets(regionEl, op) {
+    if (op && typeof op.sel === "string" && op.sel) {
+      return Array.prototype.slice.call(regionEl.querySelectorAll(op.sel));
+    }
+    return [regionEl];
+  }
+
+  function optimisticApplyOp(regionEl, triggerEl, op) {
+    // Apply one reversible op; return a reverter capturing the client's prior
+    // state, or null to skip. Each op restores from the live DOM, not a server
+    // copy.
+    var name = op && op.op;
+    if (name === "disable") {
+      var prevDisabled = triggerEl.disabled;
+      var prevAria = triggerEl.getAttribute("aria-disabled");
+      triggerEl.disabled = true;
+      triggerEl.setAttribute("aria-disabled", "true");
+      return function() {
+        triggerEl.disabled = prevDisabled;
+        if (prevAria === null) triggerEl.removeAttribute("aria-disabled");
+        else triggerEl.setAttribute("aria-disabled", prevAria);
+      };
+    }
+    var nodes = optimisticTargets(regionEl, op);
+    var reverters = [];
+    nodes.forEach(function(node) {
+      if (name === "addClass" || name === "removeClass" || name === "toggleClass") {
+        var had = node.classList.contains(op.value);
+        if (name === "addClass") node.classList.add(op.value);
+        else if (name === "removeClass") node.classList.remove(op.value);
+        else node.classList.toggle(op.value);
+        reverters.push(function() {
+          if (had) node.classList.add(op.value);
+          else node.classList.remove(op.value);
+        });
+      } else if (name === "setText") {
+        var prevText = node.textContent;
+        if (op.expr === "+1" || op.expr === "-1") {
+          var parsed = parseFloat(node.textContent);
+          if (!isNaN(parsed)) node.textContent = String(parsed + (op.expr === "+1" ? 1 : -1));
+        } else if (typeof op.value === "string") {
+          node.textContent = op.value;
+        } else {
+          return;  // nothing to do; do NOT paint the literal "undefined"
+        }
+        reverters.push(function() { node.textContent = prevText; });
+      } else if (name === "setAttr") {
+        var hadAttr = node.hasAttribute(op.name);
+        var prevVal = node.getAttribute(op.name);
+        node.setAttribute(op.name, op.value);
+        reverters.push(function() {
+          if (hadAttr) node.setAttribute(op.name, prevVal);
+          else node.removeAttribute(op.name);
+        });
+      } else if (name === "removeAttr") {
+        var hadRemoved = node.hasAttribute(op.name);
+        var prevRemoved = node.getAttribute(op.name);
+        node.removeAttribute(op.name);
+        reverters.push(function() {
+          if (hadRemoved) node.setAttribute(op.name, prevRemoved);
+        });
+      }
+    });
+    return function() { reverters.forEach(function(fn) { fn(); }); };
+  }
+
+  function optimisticReadProps(el) {
+    var raw = el.getAttribute("data-island-props");
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (err) { return null; }
+  }
+
+  function optimisticArm(triggerEl, xhr) {
+    if (triggerEl.getAttribute("data-island-primitive") !== "optimistic_apply") return;
+    var props = optimisticReadProps(triggerEl);
+    if (!props) return;
+    var ops = props.ops;
+    if (!Array.isArray(ops) || ops.length === 0) return;
+    var regionEl = props.region ? document.querySelector(props.region) : triggerEl;
+    if (!regionEl) return;
+    var pendingClass = props.pendingClass || "is-optimistic-pending";
+    var errorClass = props.errorClass || "is-optimistic-error";
+    var info = {
+      name: triggerEl.getAttribute("data-island") || "optimistic_apply",
+      id: triggerEl.id || null,
+      version: triggerEl.getAttribute("data-island-version") || "1"
+    };
+
+    var entry = optimisticRegions.get(regionEl);
+    if (!entry) {
+      // First in-flight op for this region: capture the TRUE pre-mutation
+      // baseline. Re-triggers coalesce onto this entry so revert always
+      // returns to the original pre-mutation state.
+      entry = {
+        reverters: [],
+        outerHTML: regionEl.outerHTML,
+        inflight: new Set(),
+        swapLanded: false,
+        confirmed: false,
+        pendingClass: pendingClass,
+        errorClass: errorClass,
+        info: info
+      };
+      optimisticRegions.set(regionEl, entry);
+      regionEl.classList.remove(errorClass);
+    }
+    entry.inflight.add(xhr);
+    optimisticInflight.set(xhr, { regionEl: regionEl });
+
+    ops.forEach(function(op) {
+      if (!op || typeof op.op !== "string") return;
+      if (OPTIMISTIC_ALLOWED.indexOf(op.op) === -1) {
+        emit(ERROR_EVENT, { name: info.name, id: info.id, version: info.version, error: "unknown_op", reason: op.op });
+        return;
+      }
+      try {
+        var rev = optimisticApplyOp(regionEl, triggerEl, op);
+        if (typeof rev === "function") entry.reverters.push(rev);
+      } catch (err) {
+        emit(ERROR_EVENT, { name: info.name, id: info.id, version: info.version, error: "optimistic_apply", reason: String(err && err.message || err) });
+      }
+    });
+    regionEl.classList.add(pendingClass);
+    emitAction(info, "apply", "optimistic", {});
+  }
+
+  function optimisticConfirm(xhr) {
+    // htmx:afterSwap fires ONLY when htmx actually swapped (a 2xx, or an error
+    // response the app explicitly opted into swapping). It is the authoritative
+    // signal that the server fragment landed — NOT htmx:beforeSwap, which also
+    // fires for non-swapping error responses.
+    var record = optimisticInflight.get(xhr);
+    if (!record) return;
+    var entry = optimisticRegions.get(record.regionEl);
+    if (!entry) return;
+    entry.swapLanded = true;
+    if (entry.confirmed) return;
+    entry.confirmed = true;
+    emitAction({ name: entry.info.name, id: entry.info.id, version: entry.info.version }, "confirm", "confirmed", {});
+  }
+
+  function optimisticSettle(xhr) {
+    var record = optimisticInflight.get(xhr);
+    if (!record) return;             // idempotent: already settled
+    optimisticInflight.delete(xhr);
+    var regionEl = record.regionEl;
+    var entry = optimisticRegions.get(regionEl);
+    if (!entry) return;
+    entry.inflight.delete(xhr);
+    if (entry.inflight.size > 0) return;  // wait for the last in-flight request
+    regionEl.classList.remove(entry.pendingClass);
+    var payload = { name: entry.info.name, id: entry.info.id, version: entry.info.version };
+    if (!entry.swapLanded) {
+      // No authoritative fragment landed (network/send error, timeout, or a
+      // non-swapping 4xx/5xx): revert to the client's OWN pre-mutation
+      // snapshot.
+      try {
+        for (var i = entry.reverters.length - 1; i >= 0; i--) entry.reverters[i]();
+      } catch (err) {
+        try {
+          var tpl = document.createElement("template");
+          tpl.innerHTML = entry.outerHTML;
+          if (tpl.content.firstElementChild && regionEl.parentNode) {
+            regionEl.parentNode.replaceChild(tpl.content.firstElementChild, regionEl);
+          }
+        } catch (fallbackErr) { /* leave the DOM as-is */ }
+        emit(ERROR_EVENT, { name: payload.name, id: payload.id, version: payload.version, error: "revert_fallback", reason: String(err && err.message || err) });
+      }
+      regionEl.classList.add(entry.errorClass);
+      emitAction(payload, "revert", "reverted", { httpStatus: xhr && xhr.status });
+    }
+    optimisticRegions.delete(regionEl);
+  }
+
+  // Registered so the islands runtime mounts the primitive for lifecycle
+  // parity; arming/confirm/revert live entirely in the document-level listeners
+  // below (which read props fresh), so they never depend on this mount state.
+  register("optimistic_apply", { mount: function() {} });
+
+  document.addEventListener("htmx:beforeRequest", function(evt) {
+    var detail = evt && evt.detail;
+    if (!detail || !detail.xhr) return;
+    var el = detail.elt || evt.target;
+    if (el instanceof Element) optimisticArm(el, detail.xhr);
+  });
+  document.addEventListener("htmx:afterSwap", function(evt) {
+    var xhr = evt && evt.detail && evt.detail.xhr;
+    if (xhr) optimisticConfirm(xhr);
+  });
+  document.addEventListener("htmx:afterRequest", function(evt) {
+    var xhr = evt && evt.detail && evt.detail.xhr;
+    if (xhr) optimisticSettle(xhr);
+  });
+  document.addEventListener("htmx:sendError", function(evt) {
+    var xhr = evt && evt.detail && evt.detail.xhr;
+    if (xhr) optimisticSettle(xhr);
+  });
+  document.addEventListener("htmx:timeout", function(evt) {
+    var xhr = evt && evt.detail && evt.detail.xhr;
+    if (xhr) optimisticSettle(xhr);
+  });
+  // <<< optimistic_apply adapter
 """
 
 
@@ -14,6 +250,7 @@ def islands_snippet(version: str, *, nonce: str = "") -> str:
     ``'unsafe-inline'``.
     """
     nonce_attr = f' nonce="{nonce}"' if nonce else ""
+    optimistic_adapter = _OPTIMISTIC_ADAPTER_JS
     runtime = f"""
 <script data-chirp="islands"{nonce_attr}>
 (function() {{
@@ -278,6 +515,7 @@ def islands_snippet(version: str, *, nonce: str = "") -> str:
     scope.querySelectorAll("[data-island]").forEach((el) => unmount(el));
   }}
 
+{optimistic_adapter}
   document.addEventListener("DOMContentLoaded", function() {{
     void scan(document);
   }});

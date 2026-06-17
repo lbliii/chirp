@@ -34,7 +34,9 @@ from chirp.middleware.protocol import Next
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-DB_PATH = Path(__file__).parent / "pokedex.db"
+# Default to a local file for ``python app.py``; tests override CHIRP_POKEDEX_DB
+# with a per-test temp path so they never share or race on one DB file.
+DB_PATH = Path(os.environ.get("CHIRP_POKEDEX_DB", str(Path(__file__).parent / "pokedex.db")))
 
 _api_key = os.environ.get("API_KEY", "demo-key-change-me")
 

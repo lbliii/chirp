@@ -266,8 +266,70 @@ def primitive_attrs(
     return Markup(f'{attrs} data-island-primitive="{html.escape(primitive, quote=True)}"')
 
 
+def optimistic_attrs(
+    ops: list[dict[str, Any]] | dict[str, Any],
+    *,
+    region: str | None = None,
+    mount_id: str | None = None,
+    version: str = "1",
+    pending_class: str = "is-optimistic-pending",
+    error_class: str = "is-optimistic-error",
+    cls: str = "",
+) -> Markup:
+    """Mount the blessed ``optimistic_apply`` island primitive.
+
+    Sugar over ``primitive_attrs("optimistic_apply", ...)``. Put the htmx
+    trigger (``hx-post`` etc.) on the SAME element; this helper only adds the
+    optimistic mount metadata. The runtime applies ``ops`` locally and instantly
+    from the client's OWN pre-mutation snapshot, lets htmx do the real request,
+    swaps the authoritative server fragment on success (last-write-wins), and
+    reverts to the snapshot only when no authoritative fragment lands.
+
+        <button hx-post="/like" hx-swap="outerHTML"
+                {{ optimistic_attrs([{"op": "toggleClass", "value": "liked"}],
+                                    mount_id="like-1") }}>...</button>
+
+    Raises ``TypeError`` for a malformed op (non-object, or a non-string ``op``
+    name) and ``ValueError`` for a policy violation (unknown op, missing op
+    arguments, or any server-correlation key), so the helper — the authoritative
+    enforcement point — can never emit a mount that would grow per-client server
+    view state. Validity is decided by the shared
+    ``chirp.contracts.rules_islands.validate_optimistic_op``, so the helper and
+    the static ``app.check()`` contract never drift.
+    """
+    from chirp.contracts.rules_islands import validate_optimistic_op
+
+    if isinstance(ops, dict):
+        ops = [ops]
+    if not isinstance(ops, (list, tuple)) or not ops:
+        raise ValueError("optimistic_attrs requires a non-empty list of ops.")
+
+    normalized: list[dict[str, Any]] = []
+    for op in ops:
+        if not isinstance(op, dict) or not isinstance(op.get("op"), str):
+            raise TypeError(f"optimistic_attrs op must be an object with an 'op' name: {op!r}")
+        problem = validate_optimistic_op(op)
+        if problem:
+            raise ValueError(f"optimistic_attrs op {problem}.")
+        normalized.append(dict(op))
+
+    props: dict[str, Any] = {"ops": normalized}
+    if region is not None:
+        props["region"] = region
+    props["pendingClass"] = pending_class
+    props["errorClass"] = error_class
+    return primitive_attrs(
+        "optimistic_apply",
+        props=props,
+        mount_id=mount_id,
+        version=version,
+        cls=cls,
+    )
+
+
 BUILTIN_GLOBALS: dict[str, Any] = {
     "island_attrs": island_attrs,
+    "optimistic_attrs": optimistic_attrs,
     "primitive_attrs": primitive_attrs,
     # Always expose shell_actions so chirp-ui's ``shell_actions is defined``
     # check (kida 0.2.8 strict undefined variables) works even when no route
