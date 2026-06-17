@@ -1,228 +1,74 @@
 ---
-title: Islands Contract (V1)
-description: Framework-agnostic contract for isolated client-managed surfaces
+title: Islands
+description: Mount client-owned JavaScript surfaces with no VDOM, no build step, and zero per-client server state.
 draft: false
 weight: 30
 lang: en
 type: doc
 tags: [guides, islands, htmx, progressive-enhancement]
-keywords: [islands, data-island, fragment_island, hydration, remount, fallback]
+keywords: [islands, data-island, optimistic_apply, fragment_island, hydration, remount, fallback]
 category: guide
 ---
 
-## Islands are Chirp's no-build answer for client state
+## What islands are
 
-When a surface genuinely needs client-resident state, islands are the headlined
-answer — **no VDOM, no build step, and zero per-client server view state.** That
-last clause is the line: diff-push frameworks (LiveView, Hotwire) deliver
-optimistic UI and rich client widgets by keeping a per-client copy of the view
-*on the server*. Chirp does not. Islands own their DOM in the browser; the server
-keeps returning authoritative HTML and remembers nothing about any one client.
+An island is an explicit escape hatch for the rare surface that genuinely needs
+client-resident state — a rich text editor, a drag-to-reorder list, a toggle that
+must paint before the server answers. A `data-island` element marks where your
+JavaScript adapter mounts and owns the DOM. There is no VDOM, no build step, and
+**zero per-client server view state**: the server keeps returning authoritative
+HTML and remembers nothing about any one client.
 
-Chirp ships **one blessed primitive that proves the model** — `optimistic_apply`
-(below). It paints a mutation locally and instantly, lets htmx do the real
-request, and reconciles by swapping the authoritative server fragment — all from
-a snapshot that lives in the browser. The zero-server-view-state guarantee is
-machine-checked, not asserted (`tests/test_islands.py`). Everything else is the
-framework-agnostic mount contract you bring your own adapter to.
+For the most common case — paint a mutation instantly, let htmx do the real
+request, reconcile by swapping the server's answer — Chirp ships one blessed
+primitive that works out of the box: `optimistic_apply`. Most readers need only
+that. Everything else is a framework-agnostic mount contract you bring your own
+adapter to.
 
-## Current State
+:::{since} 0.8
+:::
 
-Chirp ships a real V1 islands system. The following are implemented and available:
+Islands are deliberately rare. Chirp stays server-first by default — routing,
+shell composition, [[docs/build-apps/html-fragments/fragments|fragments and OOB updates]],
+and most mutations stay server-owned.
 
-- **AppConfig flags** in `src/chirp/config.py`: `islands`, `islands_version`, `islands_contract_strict`
-- **Runtime injection** in `src/chirp/app/compiler.py`: bootstrap script when `islands=True`
-- **Islands bootstrap/runtime** in `src/chirp/server/islands.py`: mount/unmount lifecycle, htmx integration
-- **Template helpers** in `src/chirp/templating/filters.py`: `island_props`, `island_attrs`
-- **Static checks** in `src/chirp/contracts/rules_islands.py`: metadata validation
-- **Test coverage** in `tests/test_islands.py` and `tests/test_contracts.py`
+:::{note}
+Reach for an island only when fragments and OOB genuinely cannot express the
+interaction. If a server round trip can paint the result, keep it server-owned.
+:::
 
-### Already Shipped
+## When to reach for an island
 
-- V1 mount contract and helpers
-- Inline runtime bootstrap
-- Dynamic adapter loading via `data-island-src`
-- Lifecycle events (`chirp:island:*`)
-- Primitive metadata conventions and schema checks
-- `app.check()` enforcement
-- The blessed `optimistic_apply` primitive (first-party, client-only) and the
-  `optimistic_attrs(...)` helper
-- A prominent end-to-end example: `examples/standalone/optimistic_apply/`
+Pick the lightest tool that expresses the interaction. An island is the heaviest
+option here, so most of the time you want one of the others.
 
-### Not Yet Strong In-Repo
+:::{list-table}
+:header-rows: 1
 
-- First-party adapter modules for the *other* (convention-only) primitives
-- Deep integration between islands and `PageComposition.regions`
-- Env-based config loading for islands flags in `AppConfig.from_env()`
+* - You need
+  - Reach for
+* - Client-owned DOM (editor, drag-reorder, a widget that manages itself)
+  - A `data-island` island
+* - Instant feedback on a mutation, reconciled by the server's answer
+  - `optimistic_apply` (a blessed island primitive — see below)
+* - A region with its own `hx-target` / `hx-swap` defaults and swap safety
+  - `fragment_island` ([[docs/build-apps/ui-extensions/app-shell|app shells and OOB regions]]) — **not** an island
+* - Realtime push after the page loads
+  - [[docs/build-apps/streaming-updates/sse-patterns|EventStream / SSE]]
+:::
 
-## Philosophy
+`fragment_island` looks similar in prose but is a different thing in code: it is
+an HTMX swap-safety boundary that isolates a region from inherited `hx-*`
+behavior. It runs no client-side JavaScript and mounts no adapter. Use it for
+swap safety; use a `data-island` island for client-managed DOM.
 
-Chirp islands are the framework's answer for genuinely client-managed surfaces.
-Chirp remains HTML-over-the-wire by default: routing, shell composition,
-fragments, OOB updates, and most mutations stay server-owned. Islands provide
-an explicit, validated mount contract for the narrower class of widgets whose
-state and DOM must live in the browser.
+## Minimal working example: `optimistic_apply`
 
-Islands are:
-
-- explicit mount roots with stable metadata
-- progressive enhancement over SSR fallback HTML
-- compatible with no-build ES modules
-- validated by `app.check()`
-- deliberately separate from shell/navigation ownership
-
-Islands are not:
-
-- a replacement for `Page`, `Fragment`, `OOB`, or app-shell rendering
-- a client router
-- global hydration
-- a rebranding of Chirp as a SPA framework
-
-## Boundaries: `data-island` vs `fragment_island`
-
-Two concepts look similar in prose but are different in code. The proposal must
-clearly separate them.
-
-### `data-island` Islands
-
-These are the real islands runtime contract shipped by Chirp V1. They are
-client-runtime islands: elements where a JavaScript adapter mounts and owns the
-DOM.
-
-Relevant files:
-
-- `src/chirp/server/islands.py`
-- `src/chirp/templating/filters.py`
-- This guide
-
-### `fragment_island` / `safe_region`
-
-These are ChirpUI/HTMX safety primitives that isolate local mutation regions
-from inherited `hx-*` behavior. They use `hx-disinherit` to prevent shell-level
-`hx-target` / `hx-swap` from bleeding into form submissions and fragment swaps.
-
-Relevant files:
-
-- `src/chirp_ui/templates/chirpui/fragment_island.html`
-- [App Shells](/chirp/docs/build-apps/ui-extensions/app-shell/)
-
-**`fragment_island` is a swap-safety boundary, not the same thing as a
-client-runtime island.** Use it when you need semantic grouping or when a
-region needs its own `hx-target` / `hx-swap` defaults. It does not run any
-client-side JavaScript or mount framework adapters.
-
-## Architecture
-
-Islands complement Chirp's existing rendering pipeline; they do not replace it.
-
-### Server-Owned Pipeline Stays Primary
-
-Chirp has a coherent composition model:
-
-- semantic return types in `src/chirp/templating/returns.py`
-- composition types in `src/chirp/templating/composition.py`
-- request-aware planning in `src/chirp/templating/render_plan.py`
-- negotiation in `src/chirp/server/negotiation.py`
-
-### Ownership Model
-
-Document three ownership classes:
-
-- **Server-owned regions**: normal fragments, OOB targets, shell actions, SSE
-  display blocks
-- **Client-owned surfaces**: `data-island` roots and their internal DOM
-- **Shared boundaries**: coarse remount/invalidation boundaries where server
-  swaps may replace an island root but should not patch inside it
-
-This ownership model is implied by [SSE Patterns](/chirp/docs/build-apps/streaming-updates/sse-patterns/):
-client-managed surfaces should not be reactively re-rendered. Do not register
-client-owned blocks in the reactive dependency index. See [App Shells](/chirp/docs/build-apps/ui-extensions/app-shell/)
-for how islands fit inside shell layouts and OOB regions.
-
-## Shell Constraints
-
-ChirpUI shell contracts that islands must respect:
-
-- `#main` is the persistent page-content swap target
-- Shell OOB regions are stable server-owned containers:
-  - `#chirpui-topbar-breadcrumbs`
-  - `#chirpui-sidebar-nav`
-  - `#chirpui-document-title`
-  - `#chirp-shell-actions` or custom `ShellActions.target`
-- `sidebar_link()` and `nav_link()` assume boosted navigation targets `#main`
-
-Islands may live inside those regions, but they must not take ownership of the
-OOB target containers themselves. Custom shells may not expose every built-in
-OOB target id automatically.
-
-## Mount Root Contract
-
-An island mount root is any element with `data-island`:
-
-```html
-<div
-  id="editor-root"
-  data-island="editor"
-  data-island-version="1"
-  data-island-src="/static/editor.js"
-  data-island-props="{&quot;doc_id&quot;:42,&quot;mode&quot;:&quot;advanced&quot;}"
->
-  <p>Fallback editor UI for no-JS mode.</p>
-</div>
-```
-
-Supported attributes:
-
-- `data-island` (required): logical island name used by your client adapter.
-- `data-island-version` (recommended): contract/runtime version (default `"1"`).
-- `data-island-props` (optional): JSON payload for initial state.
-- `data-island-src` (optional): adapter/runtime hint for lazy loaders (never use `javascript:`).
-- `id` (recommended): stable mount id for deterministic remount targeting.
-- `data-island-primitive` (optional): explicit primitive type tag for contract checks.
-
-### Props Rules
-
-- Props must be JSON-serializable (`dict`, `list`, string, number, boolean, null).
-- Chirp helpers serialize and escape props for HTML attributes.
-- Avoid hand-writing JSON in templates; use helpers:
-  - `{{ state | island_props }}`
-  - `{{ island_attrs("editor", props=state, mount_id="editor-root") }}`
-
-## Lifecycle Events
-
-With `AppConfig(islands=True)`, Chirp injects a small runtime that:
-
-- scans for `[data-island]` on page load
-- unmounts islands before htmx swaps
-- mounts/remounts islands after htmx swaps
-
-Browser events emitted:
-
-- `chirp:island:mount`
-- `chirp:island:unmount`
-- `chirp:island:remount`
-- `chirp:island:error`
-- `chirp:islands:ready`
-- `chirp:island:state` (state channel)
-- `chirp:island:action` (action channel)
-
-Each event `detail` includes:
-
-- `name`, `id`, `version`, `src`, `props`, `element`
-
-The blessed `optimistic_apply` primitive emits on the action channel:
-`apply`/`optimistic` when it paints locally, `confirm`/`confirmed` when the
-authoritative fragment swaps in, and `revert`/`reverted` when it rolls back.
-
-## The blessed `optimistic_apply` primitive
-
-`optimistic_apply` is the one primitive Chirp ships the runtime behavior for, so
-mounting it Just Works with a contract guarantee — unlike the other primitives,
-which are conventions you back with your own adapter. It paints a mutation
-locally and instantly from the client's **own** pre-mutation snapshot, lets htmx
-do the real request, swaps the authoritative server fragment on success
-(last-write-wins), and reverts to the snapshot only when no authoritative
-fragment lands.
+`optimistic_apply` is the one primitive Chirp ships the runtime for, so it works
+with a contract guarantee out of the box. It paints a mutation locally from the
+client's **own** pre-mutation snapshot, lets htmx do the real request, swaps in
+the authoritative server fragment on success (last-write-wins), and reverts to
+the snapshot only when no authoritative fragment lands.
 
 Put the htmx trigger and `optimistic_attrs(...)` on the **same** element:
 
@@ -241,78 +87,72 @@ Put the htmx trigger and `optimistic_attrs(...)` on the **same** element:
 </button>
 ```
 
+The handler is an ordinary mutation that returns the authoritative fragment. It
+is never told an optimistic apply happened — [[docs/about/core-concepts/return-values|the return type is the intent]],
+nothing more:
+
 ```python
+@app.route("/")
+def index():
+    return Template("index.html", **_like_context())
+
+
 @app.route("/toggle-like", methods=["POST"])
 def toggle_like():
-    post = like(post_id)                                  # ordinary mutation
-    return Fragment("post.html", "like_btn", post=post)   # authoritative fragment
+    """Ordinary mutation. Returns ONLY the authoritative fragment; the optimistic
+    paint is confirmed when htmx swaps it in."""
+    STATE["liked"] = not STATE["liked"]
+    STATE["count"] += 1 if STATE["liked"] else -1
+    return Fragment("index.html", "like_button", **_like_context())
 ```
 
-See `examples/standalone/optimistic_apply/` for a runnable demo (a confirmed Like
-and a reverting failure).
+*Source: [`examples/standalone/optimistic_apply/app.py`](https://github.com/lbliii/chirp/blob/main/examples/standalone/optimistic_apply/app.py).*
 
-### Why this preserves the north star
+That is the whole loop. The button paints instantly; htmx posts; the
+`like_button` fragment swaps in and confirms the paint. The full runnable demo
+(a confirmed Like and a reverting failure) lives in
+`examples/standalone/optimistic_apply/`.
 
-**Chirp holds zero per-client server view state.** The rollback baseline is a
-tab-local JavaScript snapshot — never a server-held copy. The handler is
-byte-identical with or without the adapter; it is never told an optimistic apply
-happened and allocates nothing per client/connection. Reconciliation is the
-ordinary authoritative-fragment swap, not a server-held per-client merge. The
-shipped runtime opens no transport of its own and persists nothing across the
-client/server boundary — both halves are enforced by the
-`TestOptimisticApplyGuardrail` gates.
+## Common patterns
 
-### The op vocabulary
+### Mount a custom island
 
-`ops` is a non-empty list of reversible operations. Each is applied forward on
-arm and inverted on revert from the live DOM:
+Any element with `data-island` is a mount root. Use `island_attrs(...)` rather
+than hand-writing the JSON attributes:
 
-| op | keys | effect |
-|----|------|--------|
-| `addClass` / `removeClass` / `toggleClass` | `value`, optional `sel` | class mutation |
-| `setText` | `value`, **or** `expr` (`"+1"`/`"-1"`), optional `sel` | text / numeric delta |
-| `setAttr` | `name`, `value`, optional `sel` | set attribute |
-| `removeAttr` | `name`, optional `sel` | remove attribute |
-| `disable` | — | disable the trigger (blocks double-fire) |
+```html
+<div{{ island_attrs("editor", props=state, mount_id="editor-root",
+                    src="/static/editor.js") }}>
+  <p>Fallback editor UI for no-JS mode.</p>
+</div>
+```
 
-`sel` scopes an op to a descendant of the region (default region = the mount
-element). `optimistic_attrs(...)` rejects any unknown op or any
-server-correlation key at render time, so the helper can never emit a mount that
-would grow server view state.
+That renders the mount-root attributes your adapter reads:
 
-There is deliberately **no `setHtml`/raw-HTML op** in v1: raw-HTML optimism is an
-XSS surface and risks duplicate DOM on non-replacing swaps. Reach for a real
-island when you need it.
+:::{list-table}
+:header-rows: 1
 
-### The ~80% ceiling (by design)
+* - Attribute
+  - Role
+* - `data-island` (required)
+  - Logical island name your client adapter registers against.
+* - `data-island-version`
+  - Contract/runtime version (default `"1"`).
+* - `data-island-props`
+  - JSON payload for initial state. Must be JSON-serializable.
+* - `data-island-src`
+  - Adapter/runtime hint for lazy loaders. Never `javascript:`.
+* - `id`
+  - Stable mount id for deterministic remount targeting.
+:::
 
-`optimistic_apply` closes ~80% of the optimistic-UI gap with zero server state.
-What it does **not** do:
+### Always ship fallback markup
 
-- **One in-flight optimistic mutation per region.** A re-trigger keeps the
-  original pre-mutation snapshot, so revert always returns to the true baseline.
-- **Last-write-wins** via the authoritative fragment swap. No operational
-  transforms, no CRDTs, no concurrent-edit merge.
-- **Requires a replacing swap** (`outerHTML`/`innerHTML` covering the region).
-  Non-replacing swaps (`beforeend`/`afterend`/`append`) would leave both the
-  optimistic node and the server node.
-- **A `ValidationError(422)` that swaps an authoritative fragment is the truth**
-  — the re-rendered form wins, no client revert. The snapshot is used only when
-  *no* authoritative fragment lands (network/send error, timeout, non-swapping
-  5xx).
-- **Keep the region leaf, server-owned DOM.** Do not nest another island inside
-  an `optimistic_apply` region; the coarse fallback revert would orphan it.
+Place useful markup *inside* the mount root. If the island runtime fails to load
+or mount, the server-rendered fallback stays visible and functional. That
+fallback is the no-JS experience.
 
-If you need collaborative concurrent editing with convergence, this is the wrong
-tool — reach for a framework island with its own CRDT.
-
-> **Cut line:** the feature is cut (deleted), not shipped thin, if it ever needs
-> a request field correlating a client's optimistic apply with its response, a
-> server-side map keyed by client/connection of in-flight mutations, or a
-> server-held pre-mutation baseline. The `test_holds_zero_server_state` gate is
-> the trip-wire.
-
-## Runtime Configuration
+### Turn the runtime on
 
 ```python
 from chirp import App, AppConfig
@@ -321,105 +161,136 @@ app = App(
     AppConfig(
         islands=True,
         islands_version="1",
-        islands_contract_strict=True,  # optional mount-id/version WARNINGs in app.check()
     )
 )
 ```
 
-Islands metadata **ERROR** checks (malformed props, unsafe `src`, invalid
-version, required primitive keys, `optimistic_apply` op validation, and
-server-correlation keys) run by default in `app.check()` regardless of
-`islands_contract_strict` — that flag only adds advisory mount-id/version
-warnings.
+With `islands=True`, Chirp injects a small runtime that scans for `[data-island]`
+on load, unmounts islands before htmx swaps, and mounts or remounts them after.
 
-`app.check()` statically validates only **literal** `data-island-props` (it
-cannot see the canonical `{{ optimistic_attrs(...) }}` helper form or any
-`{{ }}`-bearing props, which it leaves untouched). For the helper form, the
-same op vocabulary is enforced at **render time** by `optimistic_attrs(...)`
-(which raises rather than emit an invalid or server-correlated mount) — that is
-the authoritative guard. Both paths share one validator, so they cannot drift.
+## Gotchas
 
-## Validation
+:::{warning}
+**`optimistic_apply` needs a replacing swap, and islands never overlap
+server-managed DOM.**
 
-`app.check()` / `chirp check` check islands metadata:
+- Use a replacing `hx-swap` (`outerHTML` or `innerHTML` covering the region).
+  Non-replacing swaps (`beforeend` / `afterend` / `append`) leave both the
+  optimistic node and the server node — duplicate DOM.
+- Never patch *inside* a client-owned island via SSE or OOB, and never nest an
+  island inside an `optimistic_apply` region. The server may replace an island
+  root wholesale, but it must not reach inside one. See
+  [[docs/build-apps/streaming-updates/reactive-system|reactive re-render (don't re-render client-owned DOM)]].
+:::
 
-- malformed `data-island-props` JSON -> error
-- invalid `data-island-version` format -> error
-- unsafe `data-island-src` (`javascript:`) -> error
-- optional strict mode warning when island roots omit `id`
-- optional strict mode warning when templates omit `data-island-version`
-- primitive schema checks for known no-build primitives
+## Next step
 
-Known primitive contracts:
+Copy the runnable `optimistic_apply` demo — a confirmed Like and a reverting
+failure — from `examples/standalone/optimistic_apply/`, wire it onto your own
+mutation, then read [[docs/build-apps/streaming-updates/reactive-system|the reactive system]]
+to keep server-managed regions from re-rendering over client-owned DOM.
 
-- `state_sync` -> `stateKey`
-- `action_queue` -> `actionId`
-- `draft_store` -> `draftKey`
-- `grid_state` -> `stateKey`, `columns`
-- `wizard_state` -> `stateKey`, `steps`
-- `upload_state` -> `stateKey`, `endpoint`
-- `optimistic_apply` -> `ops` (blessed; see above — also rejects unknown ops and
-  server-correlation keys)
+## Advanced
 
-## Diagnostics
+::::{dropdown} The op vocabulary (and why there is no setHtml)
+:icon: list
 
-The runtime emits `chirp:island:error` for mount-level issues:
+`ops` is a non-empty list of reversible operations. Each is applied forward when
+the button fires and inverted on revert, read from the live DOM:
 
-- malformed `data-island-props` (runtime parse failure)
-- unsafe `data-island-src`
-- mount/runtime version mismatch (warning-level event)
+| op | keys | effect |
+|----|------|--------|
+| `addClass` / `removeClass` / `toggleClass` | `value`, optional `sel` | class mutation |
+| `setText` | `value`, **or** `expr` (`"+1"` / `"-1"`), optional `sel` | text / numeric delta |
+| `setAttr` | `name`, `value`, optional `sel` | set attribute |
+| `removeAttr` | `name`, optional `sel` | remove attribute |
+| `disable` | — | disable the trigger (blocks double-fire) |
 
-The runtime also exposes a small channel API:
+`sel` scopes an op to a descendant of the region (the region defaults to the
+mount element). `optimistic_attrs(...)` rejects any unknown op — or any
+server-correlation key — at render time, raising rather than emitting a mount
+that could grow server view state.
 
-- `window.chirpIslands.register(name, adapter)`
-- `window.chirpIslands.emitState(payload, state)`
-- `window.chirpIslands.emitAction(payload, action, status, extra)`
-- `window.chirpIslands.channels` (`state`, `action`, `error`)
+There is deliberately **no `setHtml` / raw-HTML op**: raw-HTML optimism is an XSS
+surface and risks duplicate DOM on non-replacing swaps. When you need it, mount a
+real custom island instead.
+::::{/dropdown}
 
-## Graceful Degradation
+::::{dropdown} What optimistic_apply does not do (the ~80% ceiling)
+:icon: info
 
-Always place useful fallback markup inside the mount root. If island runtime
-fails, the SSR fallback remains visible and functional.
+`optimistic_apply` closes roughly the common 80% of optimistic-UI cases with
+zero server state. The boundaries:
 
-## Risks
+- **One in-flight optimistic mutation per region.** A re-trigger keeps the
+  original pre-mutation snapshot, so revert always returns to the true baseline.
+- **Last-write-wins** via the authoritative fragment swap. No operational
+  transforms, no CRDTs, no concurrent-edit merge.
+- **A `ValidationError(422)` that swaps a fragment is the truth.** The
+  re-rendered form wins, with no client revert. The snapshot is used only when
+  *no* authoritative fragment lands (network error, timeout, non-swapping 5xx).
+- **The region stays leaf, server-owned DOM.** Do not nest another island inside
+  it; the coarse fallback revert would orphan it.
 
-- **Conflating HTMX-safe region boundaries with client-runtime islands** — use
-  `fragment_island` for swap safety; use `data-island` for client-managed DOM.
-- **Letting islands become a second default rendering model** — Chirp stays
-  server-first; islands are an escape hatch.
-- **Allowing server swaps to patch inside client-owned DOM** — establish
-  explicit ownership; do not re-render client-managed surfaces via SSE or OOB.
-- **Assuming all ChirpUI shells expose every built-in OOB target id** — custom
-  shells may omit or rename targets; document your shell's contract.
+If you need collaborative concurrent editing with convergence, this is the wrong
+tool — reach for a custom island with its own CRDT.
 
-## Roadmap
+**Zero per-client server state is guaranteed, not asserted.** The rollback
+baseline is a tab-local JavaScript snapshot, never a server-held copy. The
+handler is byte-identical with or without the adapter and allocates nothing per
+client. The runtime opens no transport of its own and persists nothing across
+the client/server boundary. A build guardrail enforces both halves — it fails
+the build if a server-held optimistic store or a per-client branch ever appears.
+::::{/dropdown}
 
-### V1.5: Positioning and Documentation Cleanup
+::::{dropdown} Channel API & diagnostics
+:icon: code
 
-- Clarify the distinction between `data-island` and `fragment_island`
-- Add ownership-language docs for server-owned vs client-owned surfaces
-- Connect islands guidance directly to app-shell and SSE docs
-- Add one end-to-end no-build example using `island_attrs(...)` — see `examples/chirpui/islands_shell/`
-- Islands + app shell: `examples/chirpui/islands_shell/`
-- Islands + htmx fragment swap: `examples/chirpui/islands_shell/` (pages with client-managed state)
+With `islands=True`, the runtime exposes a small channel API on `window`:
 
-### V2: Render-Pipeline Alignment
+```js
+window.chirpIslands.register(name, adapter);
+window.chirpIslands.emitState(payload, state);
+window.chirpIslands.emitAction(payload, action, status, extra);
+window.chirpIslands.channels; // { state, action, error }
+```
 
-- Explore how islands can participate more explicitly in `PageComposition` and
-  `RegionUpdate`
-- Define coarse invalidation/remount semantics around HTMX swaps
-- Document how server-owned OOB regions can host remount-safe islands without
-  excessive churn
+It emits browser events you can listen for: `chirp:island:mount`,
+`chirp:island:unmount`, `chirp:island:remount`, `chirp:island:error`,
+`chirp:islands:ready`, plus `chirp:island:state` and `chirp:island:action`.
+Each event `detail` carries `name`, `id`, `version`, `src`, `props`, and
+`element`.
 
-### V3: Optional Higher-Level Ergonomics
+`optimistic_apply` emits on the action channel: `apply`/`optimistic` when it
+paints locally, `confirm`/`confirmed` when the authoritative fragment swaps in,
+and `revert`/`reverted` when it rolls back. `chirp:island:error` fires for
+malformed `data-island-props`, an unsafe `data-island-src`, or a mount/runtime
+version mismatch.
+::::{/dropdown}
 
-- Stronger action/state conventions over the existing runtime channels
-- Optional adapter packages or reference implementations
-- Clearer realtime guidance for client-owned surfaces receiving JSON/operation
-  streams rather than HTML patches
+::::{dropdown} Validation & strict mode
+:icon: shield
 
-## Non-goals (V1)
+Islands metadata is [[docs/quality/contracts-debugging/categories|validated at startup by app.check()]].
+These are **ERROR** checks regardless of any flag:
 
-- no built-in framework adapter (React/Svelte/Vue are user-land)
-- no global hydration framework
-- no client router replacement
+- malformed `data-island-props` JSON
+- invalid `data-island-version` format
+- unsafe `data-island-src` (`javascript:`)
+- `optimistic_apply` op validation and rejected server-correlation keys
+
+`islands_contract_strict=True` adds advisory **WARNING** checks: island roots
+that omit `id`, and templates that omit `data-island-version`.
+
+`app.check()` can statically validate only **literal** `data-island-props`; it
+leaves any `{{ }}`-bearing props (including the canonical `optimistic_attrs(...)`
+form) untouched. For the helper form, `optimistic_attrs(...)` enforces the same
+op vocabulary at render time and raises on an invalid or server-correlated
+mount. Both paths share one validator, so they cannot drift.
+::::{/dropdown}
+
+:::{note} See also
+- [[docs/build-apps/ui-extensions/app-shell|App shells and OOB regions]] — where islands fit inside shell layouts
+- [[docs/build-apps/streaming-updates/reactive-system|Reactive system]] — why client-owned DOM must not be re-rendered
+- [[docs/about/core-concepts/return-values|Return values]] — the return-type-is-intent model the handler relies on
+:::

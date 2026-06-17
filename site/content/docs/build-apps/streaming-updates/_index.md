@@ -14,8 +14,19 @@ cascade:
   type: doc
 ---
 
-Use this section when content should arrive over time: initial page rendering
-with `Stream` or `Suspense`, or post-load updates with `EventStream`.
+Stream HTML to the browser as it becomes ready, or push updates after the page
+has loaded. This section covers the three return types that move content over
+time: `Stream` and `Suspense` for the initial render, and `EventStream`
+(Server-Sent Events) for post-load updates. Signals and the reactive system
+build on `EventStream` to fan one server value out to many bound elements
+automatically.
+
+:::{note} Which one do I reach for?
+A slow first paint that should appear section-by-section is `Stream`. A
+dashboard whose shell should appear instantly while slow panels fill in is
+`Suspense`. A feed that updates after the page is live is `EventStream`. For the
+full picture, see [[docs/about/core-concepts/return-values|the return-type decision tree]].
+:::
 
 :::{cards}
 :columns: 2
@@ -36,7 +47,7 @@ Push kida-rendered fragments to the browser over SSE.
 :::{/card}
 
 :::{card} Signals
-:icon: radio
+:icon: network
 :link: /chirp/docs/build-apps/streaming-updates/signals/
 :description: Server-owned reactive values
 Declare a live value once, bind it many places, update them all over one shared SSE connection.
@@ -46,7 +57,7 @@ Declare a live value once, bind it many places, update them all over one shared 
 :icon: refresh-cw
 :link: /chirp/docs/build-apps/streaming-updates/reactive-system/
 :description: Automatic SSE from data changes
-ReactiveBus, DependencyIndex, derived paths, and observability counters.
+Mutate your data; Chirp finds the affected blocks and pushes re-rendered fragments to connected browsers.
 :::{/card}
 
 :::{card} SSE Patterns

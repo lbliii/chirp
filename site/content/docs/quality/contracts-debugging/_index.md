@@ -14,9 +14,13 @@ cascade:
   type: doc
 ---
 
-Use this section when Chirp needs to prove the server-rendered UI is wired
-correctly before users see it: route contracts, htmx targets, OOB regions,
-Suspense blocks, SSE payloads, and debug tooling.
+Shipping a Chirp app to production, or staring at a swap that won't fire? This
+section is the safety net. Chirp validates your hypermedia wiring — routes,
+[[docs/build-apps/html-fragments/fragments|fragments]], OOB regions,
+[[docs/build-apps/streaming-updates/server-sent-events|SSE]] payloads — at
+startup, so broken UI fails loudly in CI instead of silently in front of users.
+Start with **Debugging Swaps** if something is already broken; start with the
+**Route Directory Contract** to see what `app.check()` enforces before you ship.
 
 :::{cards}
 :columns: 2
@@ -26,28 +30,28 @@ Suspense blocks, SSE payloads, and debug tooling.
 :icon: shield
 :link: /chirp/docs/quality/contracts-debugging/debugging-swaps/
 :description: chirp check, DevTools, debug headers, and swap failure modes
-Diagnose broken htmx, OOB, Suspense, SSE, and boosted navigation updates.
+Fix htmx, OOB, Suspense, SSE, and boosted navigation updates that won't fire.
 :::{/card}
 
 :::{card} Route Directory Contract
 :icon: file-text
 :link: /chirp/docs/quality/contracts-debugging/route-contract/
 :description: Reserved files, route metadata, sections, and shell contracts
-Understand what `app.check()` validates for filesystem routes and app shells.
+See exactly what fails CI before you ship filesystem routes and app shells.
 :::{/card}
 
 :::{card} Contract Category Reference
-:icon: list-checks
+:icon: check-circle
 :link: /chirp/docs/quality/contracts-debugging/categories/
 :description: Categories, default severity, and fix targets
-Tune `chirp check` policy with source-backed category names.
+Look up any contract failure by name and dial its severity up or down.
 :::{/card}
 
 :::{card} OOB Registry
-:icon: target
+:icon: starburst
 :link: /chirp/docs/quality/contracts-debugging/oob-registry/
 :description: Fail-loud region validation
-Register shell regions and catch missing OOB blocks before users see empty swaps.
+Catch empty OOB swaps that would silently wipe live DOM before users hit them.
 :::{/card}
 
 :::{/cards}

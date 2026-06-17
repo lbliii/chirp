@@ -10,13 +10,18 @@ keywords: [fragment, block, fragment-only, swap target, OOB, SSE payload, kida]
 category: guide
 ---
 
-## TL;DR
+## Overview
 
-Use `{% block name %}...{% endblock %}` when the region renders **both** inline (as part of a full page) **and** as a swap target.
+Some template regions only ever appear as the answer to an htmx swap — a success banner after a form submit, an [[docs/build-apps/streaming-updates/server-sent-events|SSE event payload]], a counter that pops in on the first mutation. They are never visible when the page first loads. The `{% fragment %}` directive marks exactly these swap-only regions: their body is suppressed during a full-page render and only emits content when the region is addressed directly as a [[docs/build-apps/html-fragments/fragments|Fragment]].
 
-Use `{% fragment name %}...{% end %}` when the region renders **only** as a swap target — success banners after a form submit, SSE event payloads, OOB-only counters. The body is **suppressed during full-template renders** and only emits content when addressed by `Fragment("page.html", "name", ...)`, the `/_frag{path}?_b=name` dispatcher, or a page shell contract.
+## When to reach for it
 
-Both directives produce the same AST node in kida; chirp's block metadata, OOB registry, page shell contracts, and `Fragment(...)` dispatch all treat them identically. The only difference is **what gets rendered at root**.
+The choice is between two kida directives, and one question decides it: **does the region exist on the page when it first loads?**
+
+- `{% block name %}...{% endblock %}` — the region renders **both** inline (as part of a full page) **and** as a [[docs/build-apps/html-fragments/_index|swap target]].
+- `{% fragment name %}...{% end %}` — the region renders **only** as a swap target. The body is suppressed during full-template renders and emits content only when addressed by `Fragment("page.html", "name", ...)`, the `/_frag{path}?_b=name` dispatcher, or a page shell contract.
+
+Both directives produce the same AST node in kida — `{% fragment %}` is a `{% block %}` with a `fragment` flag set. Chirp's block metadata, OOB registry, page shell contracts, and `Fragment(...)` dispatch all treat them identically. The only difference is **what gets rendered at root**.
 
 ## The problem `{% fragment %}` solves
 
@@ -65,23 +70,27 @@ During `Template("gallery.html", ...)` the body is suppressed — zero character
 | An OOB swap target where the initial state is empty (e.g. a counter that appears on first mutation) | `{% fragment %}` |
 | A deferred `Suspense` slot (placeholder → resolved) | `{% block %}` — the shell still renders the placeholder. See [Suspense caveat](#suspense-deferred-blocks) below. |
 
-Rule of thumb: **ask whether the region exists on page load.** If yes → `{% block %}`. If no → `{% fragment %}`.
+:::{tip} Rule of thumb
+Ask whether the region exists on page load. If yes, use `{% block %}`. If no, use `{% fragment %}`.
+:::
 
 ## Full example: returns gallery
 
-[`examples/standalone/returns_gallery/templates/gallery.html`](https://github.com/lbliii/chirp/blob/main/examples/standalone/returns_gallery/templates/gallery.html) is the reference consumer. It mixes both directives:
+[`examples/standalone/returns_gallery/templates/gallery.html`](https://github.com/lbliii/chirp/blob/main/examples/standalone/returns_gallery/templates/gallery.html) is the reference consumer. It addresses several kinds of region:
 
-- `demo_fragment`, `demo_page`, `demo_oob_primary` — inline-rendered and swap-addressable (`{% block %}`)
-- `demo_form` — inline-rendered, also the re-render target on 422 (`{% block %}`)
-- `demo_form_ok`, `demo_sse_item`, `demo_mutation_counter` — swap-only (`{% fragment %}`)
+- `demo_fragment`, `demo_page`, `demo_oob_primary` — inline-rendered and swap-addressable.
+- `demo_form` — inline-rendered, also the re-render target on 422.
+- `demo_form_ok`, `demo_sse_item`, `demo_mutation_counter` — swap-only regions that today still use a `{% block %}` plus a `{% if ... is defined %}` / `| default(...)` guard.
 
-Read `app.py` alongside the template to see which routes target which blocks.
+The swap-only blocks in that template are exactly the candidates for `{% fragment %}`: each one ships a guard whose only job is to suppress its body on first paint. Read `app.py` alongside the template to see which routes target which blocks, then apply the [migration recipe](#migration-recipe) below.
 
 ## Suspense deferred blocks
 
-**Do not** convert `Suspense` deferred slots to `{% fragment %}`. Suspense works by rendering the **shell** first (with deferred keys set to the `DEFERRED` sentinel), then streaming each deferred block as an OOB swap after its awaitable resolves. If the slot were `{% fragment %}`, the shell would render an empty div instead of a skeleton — defeating the "shell-first" UX.
+:::{warning} Do not convert Suspense slots to `{% fragment %}`
+[[docs/build-apps/streaming-updates/_index|Suspense]] renders the shell first, then streams each deferred block as an OOB swap once its awaitable resolves. A deferred slot **is** on the page at load — it shows a skeleton. Mark it `{% fragment %}` and the shell renders an empty div instead, silently defeating the shell-first UX.
+:::
 
-Use a regular `{% block %}` with a loading check:
+Use a regular `{% block %}` with a loading check. The shell sets each deferred key to a sentinel value, so test it with `{% if key is deferred %}` rather than a bare truthiness check:
 
 ```kida
 {% block stats %}
@@ -93,14 +102,14 @@ Use a regular `{% block %}` with a loading check:
 {% endblock %}
 ```
 
-See the [Suspense documentation](/chirp/docs/build-apps/streaming-updates/) for the full pattern.
+See [[docs/build-apps/streaming-updates/_index|Streaming & updates]] for the full deferred-block pattern.
 
 ## Migration recipe
 
-Converting a `{% block %}` + `is defined` workaround to `{% fragment %}`:
+Convert a `{% block %}` + `is defined` workaround to `{% fragment %}`. The guard stanza disappears:
 
-**Before**
-
+::::{tab-set}
+:::{tab-item} Before
 ```kida
 {% block notification %}
 {% if msg is defined %}
@@ -108,21 +117,31 @@ Converting a `{% block %}` + `is defined` workaround to `{% fragment %}`:
 {% endif %}
 {% endblock %}
 ```
+:::{/tab-item}
 
-**After**
-
+:::{tab-item} After
 ```kida
 {% fragment notification %}
 <div class="toast">{{ msg }}</div>
 {% end %}
 ```
+:::{/tab-item}
+::::{/tab-set}
 
-**Steps**
-
-1. Rename `{% block foo %}` → `{% fragment foo %}` and `{% endblock %}` → `{% end %}`.
-2. Drop the `{% if ... is defined %}` or `{% if ... %}` truthiness guard that was protecting the block body from full-render exposure.
-3. Drop `| default(...)` filters on variables that only exist in the fragment's context.
-4. If the block previously rendered a placeholder inline (e.g. `"Counter: 0"`), decide: is an empty swap target acceptable on page load? If yes, convert to `{% fragment %}`. If no, keep `{% block %}` and leave the default filter in place.
+::::{steps}
+:::{step} Rename the tags
+Change `{% block foo %}` to `{% fragment foo %}` and `{% endblock %}` to `{% end %}`.
+:::{/step}
+:::{step} Drop the guard
+Remove the `{% if ... is defined %}` or `{% if ... %}` truthiness guard that was protecting the block body from full-render exposure.
+:::{/step}
+:::{step} Drop default filters
+Remove `| default(...)` filters on variables that only exist in the fragment's context.
+:::{/step}
+:::{step} Decide on the placeholder
+If the block previously rendered a placeholder inline (e.g. `"Counter: 0"`), ask whether an empty swap target is acceptable on page load. If yes, convert to `{% fragment %}`. If no, keep `{% block %}` and leave the default filter in place.
+:::{/step}
+::::{/steps}
 
 Run `rg '{% if .* is defined %}'` afterwards — any remaining hits are either legitimate conditionals (e.g. error display) or missed workarounds. The error-display case is cleaner with `.get(...)`:
 
@@ -132,16 +151,25 @@ Run `rg '{% if .* is defined %}'` afterwards — any remaining hits are either l
 
 ## What chirp does for you
 
+Chirp treats fragment blocks identically to regular blocks everywhere — block metadata, dispatch, OOB swaps, and [[docs/quality/contracts-debugging/categories|contract checks]]. You wire a fragment block exactly as you would a regular one, and typos in fragment names still get caught at `app.check()` time.
+
+:::{dropdown} Advanced: what the framework does with fragment blocks
 - **Block metadata** (`template.block_metadata()`) surfaces fragment blocks identically to regular blocks — no consumer needs to know the difference.
 - **`/_frag{path}?_b=name`** dispatcher resolves fragment blocks.
 - **Page shell contracts** (`PageShellContract.targets`) accept fragment blocks as required or optional targets.
-- **OOB registry** (`app.register_oob_region(...)`) accepts fragment block names.
-- **Contract checks**:
+- **[[docs/quality/contracts-debugging/oob-registry|OOB registry]]** (`app.register_oob_region(...)`) accepts fragment block names.
+- **Contract checks:**
   - `check_unreachable_blocks` does **not** flag fragment blocks — they are unreachable from composition roots *by design*.
   - `check_fragment_target_orphans` and `check_page_shell_contracts` walk `block_metadata()` and catch typos in fragment block names the same way.
   - `check_sse_event_crossref` infers targets from literal `Fragment(target=...)` calls and reports mismatches with `sse-swap=...` attributes.
+:::{/dropdown}
 
-## Reference
+## See also
 
-- Directive: [kida `{% fragment %}` docs](https://lbliii.github.io/kida/docs/directives/fragment/)
-- Related: [OOB Registry & Fail-Loud Rendering](/chirp/docs/quality/contracts-debugging/oob-registry/), [App Shells](/chirp/docs/build-apps/ui-extensions/app-shell/), [Streaming: Suspense](/chirp/docs/build-apps/streaming-updates/)
+:::{note} See also
+- [[docs/build-apps/html-fragments/fragments|Fragment]] — the return type that addresses a swap-only block
+- [[docs/quality/contracts-debugging/oob-registry|OOB Registry & Fail-Loud Rendering]]
+- [[docs/build-apps/ui-extensions/app-shell|App Shells]]
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — each yielded `Fragment` targets a swap-only block
+- [kida `{% fragment %}` directive docs](https://lbliii.github.io/kida/docs/directives/fragment/)
+:::

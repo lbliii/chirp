@@ -12,27 +12,39 @@ category: tutorial
 
 ## What you'll build
 
-One vertical slice of the [Lucky Cat](/chirp/docs/examples/lucky-cat/) trading-floor demo:
+One vertical slice of the [[docs/examples/lucky-cat|Lucky Cat]] trading-floor demo. By the end you have two routes that show how Chirp's return type expresses intent — the type you return decides what the browser sees:
 
-1. **`GET /`** — a markets grid rendered as a full **`Page`** inside the ChirpUI app shell.
-2. **`POST /trade/order`** — the return-type-as-intent pair that makes the trade panel feel live:
-   - invalid input → **`ValidationError`** (**422**, form re-rendered in place with field errors);
-   - a clean fill → **`FormAction`** with **multi-target OOB** fragments (positions table, open-order badge, toast).
+1. **`GET /`** — a markets grid rendered as a full [[docs/about/core-concepts/return-values|`Page`]] inside the [[docs/build-apps/ui-extensions/chirp-ui|ChirpUI app shell]]. A `Page` paints the full app shell (topbar, rail, and your content block).
+2. **`POST /trade/order`** — the return-type pair that makes the trade panel feel live:
+   - invalid input → a [[docs/build-apps/forms-data/forms-validation|`ValidationError`]], which re-renders one block at **422** with field errors preserved;
+   - a clean fill → a `FormAction`, which swaps fragments for htmx and **303**-redirects for plain POST, plus **multi-target [[docs/quality/contracts-debugging/oob-registry|OOB fragments]]** (positions table, open-order badge, toast).
 
 You will *not* wire SSE, Suspense, or auth in this walkthrough — those layers ship in the full example. The patterns here are the same ones Lucky Cat uses in production; this tutorial strips them down so you can build the slice in about twenty minutes.
 
-**Prerequisites:** Python 3.12+, `pip install "bengal-chirp[ui]"`, basic htmx familiarity.
+**Prerequisites:** Python 3.14+, `pip install "bengal-chirp[ui]"`, basic htmx familiarity.
 
 **Reference implementation:** [`examples/chirpui/lucky_cat/`](https://github.com/lbliii/chirp/tree/main/examples/chirpui/lucky_cat) — compare your work against `pages/page.py`, `pages/trade/page.html`, and the `/trade/order` handler in `app.py`.
 
-## 0. Scaffold (~2 min)
+::::{steps}
+
+:::{step} Scaffold (~2 min)
 
 ```bash
 chirp new trade-slice --shell
 cd trade-slice
 ```
 
-The `--shell` flag gives you `use_chirp_ui(app)`, boosted navigation (`#main` swaps), CSRF, and the secure middleware stack — the same foundation Lucky Cat builds on.
+The `--shell` flag scaffolds an `app.py` with [[docs/build-apps/ui-extensions/boosted-navigation|boosted navigation]] (`#main` swaps), CSRF, and the secure middleware stack (Session → CSRF → SecurityHeaders) — the same foundation Lucky Cat builds on. It also scaffolds a layout that extends the [[docs/build-apps/ui-extensions/chirp-ui|ChirpUI app shell]].
+
+Wire the ChirpUI runtime so the app serves `chirpui.css`, the ChirpUI filters, and the ChirpUI contract checks. Add this to the scaffolded `app.py`, after `app = App(config=config)`:
+
+```python
+from chirp import use_chirp_ui
+
+use_chirp_ui(app)
+```
+
+The scaffold does not call `use_chirp_ui(app)` for you. Skip it and an app whose layout extends a ChirpUI layout serves unstyled chrome and trips the `chirpui_runtime` contract check.
 
 Add a tiny simulated market list (Lucky Cat's real feed lives in `feed.py`; we inline the shape for speed):
 
@@ -53,19 +65,20 @@ MARKETS = (
 )
 ```
 
-Register it once so every mounted page can depend on `markets_list` from `_context.py` (see step 1).
+Register it once so every mounted page can depend on `markets_list` from `_context.py`. A `_context.py` provider must export a function named **`context`** that returns a dict; Chirp merges that dict into the cascade context. A function with any other name is ignored.
 
 ```python
 # pages/_context.py
 import markets
 
-def markets_list():
-    return markets.MARKETS
+def context() -> dict:
+    return {"markets_list": markets.MARKETS}
 ```
+:::{/step}
 
-## 1. Markets grid — `GET /` as `Page` (~6 min)
+:::{step} Markets grid — `GET /` as `Page` (~6 min)
 
-Filesystem routing maps `pages/page.py` → `GET /`. Return a **`Page`** when the response should paint the full app shell (topbar + rail + your content block).
+[[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]] maps `pages/page.py` → `GET /`. Return a **`Page`** when the response should paint the full app shell (topbar + rail + your content block).
 
 **Handler** (`pages/page.py`):
 
@@ -128,8 +141,9 @@ Run `python app.py` and open `http://127.0.0.1:8000/`. You should see a grid ins
 :::{note}
 In the shipping Lucky Cat example, `GET /` is an **alias** for the curated Markets Home lobby (`pages/page.py` and `pages/markets/page.py` share `lobby.lobby_context` so the two routes never drift). The **`Page` return type and `#markets-grid` id** are the same idea — a bounded card grid as your landing surface. See [`pages/_components/market.html`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/pages/_components/market.html) for the production `market_grid` macro.
 :::
+:::{/step}
 
-## 2. Trade room — the order form (~4 min)
+:::{step} Trade room — the order form (~4 min)
 
 Add `pages/trade/page.py` → `GET /trade`. Still a **`Page`**, but now the template owns the form markup the mutation route will re-render.
 
@@ -208,8 +222,9 @@ Register the mutation route in **`app.py` before `mount_pages`** (Lucky Cat regi
 async def place_order(request: Request):
     ...
 ```
+:::{/step}
 
-## 3. Invalid order → `ValidationError` (422 in place) (~4 min)
+:::{step} Invalid order → `ValidationError` (422 in place) (~4 min)
 
 When validation fails, return **`ValidationError(template, block, …)`**. Chirp responds with **422** and re-renders *only* the named block — field errors and submitted values preserved, no navigation.
 
@@ -245,8 +260,9 @@ The form uses `hx-swap="none"` because **`ValidationError` targets the block dir
 :::{tip}
 The login flow in [`pages/login/page.py`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/lucky_cat/pages/login/page.py) uses the same **`ValidationError` → 422** pattern. If form swaps land in the wrong place inside a boosted shell, add an explicit `hx-select="#order-form"` on the form — see [[docs/build-apps/ui-extensions/app-shell|App Shells]].
 :::
+:::{/step}
 
-## 4. Clean fill → `FormAction` + multi-target OOB (~4 min)
+:::{step} Clean fill → `FormAction` + multi-target OOB (~4 min)
 
 On success, return **`FormAction(redirect, primary_fragment, *oob_fragments)`**:
 
@@ -292,7 +308,22 @@ Add the OOB fragment blocks at the bottom of `trade/page.html` (Lucky Cat keeps 
 
 **Try it:** place a small market buy. The form clears, the positions table updates, the open-order badge changes, and a toast appears — one round trip, zero client-side state.
 
-In Lucky Cat, a fill also **`emit_signal("balance", …)`** so the topbar $MEOW balance updates over `/_chirp/live` instead of an OOB twin. That is the declare-once / bind-many signal pattern — out of scope here, but the OOB set in `_fill_fragments()` in `app.py` is the piece this tutorial reproduces.
+:::{dropdown} Advanced: pushing a live balance signal on fill
+
+A fill in the full example also pushes the new $MEOW balance through a [[docs/build-apps/streaming-updates/signals|live signal]] so the topbar updates over `/_chirp/live` instead of an OOB twin. That is the declare-once / bind-many signal pattern — out of scope for this slice.
+
+The framework primitive is `app.emit(name, value, *, audience_key="")`. Lucky Cat wraps it in a small local `emit_signal(...)` helper (in `examples/chirpui/lucky_cat/app.py`, not importable from `chirp`) that resolves the per-session audience key for you:
+
+```python
+# Lucky Cat fan-out: a fill emits the new balance to the visitor's session.
+app.emit("balance", new_balance, audience_key=session_key)
+```
+
+The OOB set this tutorial reproduces lives in `_fill_fragments()` in that same `app.py`.
+:::{/dropdown}
+:::{/step}
+
+::::{/steps}
 
 ## Return-type cheat sheet
 

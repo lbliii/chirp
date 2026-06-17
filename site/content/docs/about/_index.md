@@ -14,12 +14,14 @@ cascade:
   type: doc
 ---
 
+New to Chirp? This section is the *why* and the *how it works*. Skim it to decide
+whether Chirp fits your project, then jump to [[docs/get-started/_index|Get Started]]
+when you're ready to build. Evaluators want **Philosophy**, **When to Use Chirp**, and
+**Non-Goals**; deep-divers want **Architecture** and **Thread Safety**.
+
 :::{cards}
 :columns: 2
 :gap: medium
-
-Chirp focuses on server-rendered UI, HTML fragments, and browser-native interaction.
-This section explains the framework's structure, fit, and core model.
 
 :::{card} Philosophy
 :icon: compass
@@ -29,7 +31,7 @@ The instincts that shape every decision.
 :::{/card}
 
 :::{card} Non-Goals
-:icon: ban
+:icon: x
 :link: /chirp/docs/about/non-goals/
 :description: The bright lines
 What the core won't do — and the honest alternative for each.
@@ -60,7 +62,7 @@ How Chirp makes data races structurally impossible.
 :icon: layers
 :link: /chirp/docs/about/ecosystem/
 :description: The Bengal stack
-All seven projects in the reactive Python stack.
+The seven projects in the Bengal stack Chirp builds on.
 :::{/card}
 
 :::{card} Core Concepts

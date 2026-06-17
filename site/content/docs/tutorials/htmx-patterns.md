@@ -1,24 +1,46 @@
 ---
 title: htmx Patterns
-description: Common htmx + Chirp patterns for building interactive apps
+description: The fast mapping from raw hx-* attributes to Chirp's return types — live search, click-to-edit, infinite scroll, delete, and reorder, each a copy-paste template-plus-handler pair.
 draft: false
 weight: 20
 lang: en
 type: doc
 tags: [tutorial, htmx, patterns, fragments]
-keywords: [htmx, patterns, search, inline-edit, infinite-scroll, modal, fragments]
+keywords: [htmx, patterns, search, inline-edit, infinite-scroll, delete, reorder, fragments]
 category: tutorial
 ---
 
 ## Overview
 
-Chirp's fragment rendering makes htmx integration seamless. These patterns demonstrate common interactive UI features with zero client-side JavaScript.
+If you already know htmx, this page is the fast mapping from raw `hx-*` attributes
+to Chirp's return types. Each pattern is a self-contained template-plus-handler
+pair you can copy: live search, click-to-edit, infinite scroll, delete, reorder,
+and inline validation.
 
-## Live Search
+The recurring move is the one Chirp is built around: your handler returns a
+[[docs/build-apps/html-fragments/fragments|Fragment]] (one named template block)
+and htmx swaps it into place. No client JavaScript, no JSON.
 
-Search that updates results as you type:
+When a route serves both a full page (browser navigation) **and** a fragment
+(htmx swap), return a [[docs/about/core-concepts/return-values|Page]] and let
+Chirp negotiate from the request headers, rather than branching on request flags
+by hand. `Page("search.html", "results", ...)` renders the full template for a
+browser and just the `results` block for an htmx request — one return, no
+boilerplate.
 
-**Template** (`templates/search.html`):
+:::{note} See also
+- [[docs/about/core-concepts/return-values|Return values]] — the decision tree for `Template` vs `Fragment` vs `Page`
+- [[docs/examples/returns-gallery|Returns gallery]] — every return type, runnable
+:::
+
+## Live search
+
+Search that updates results as you type. The page loads as a full document; each
+keystroke fetches just the `results` block.
+
+:::{tab-set}
+:::{tab-item} Template
+`templates/search.html`:
 
 ```html
 {% extends "base.html" %}
@@ -44,27 +66,32 @@ Search that updates results as you type:
   {% endblock %}
 {% endblock %}
 ```
-
-**Handler**:
-
+:::{/tab-item}
+:::{tab-item} Handler
 ```python
+from chirp import Page, Request
+
 @app.route("/search")
 def search(request: Request):
     q = request.query.get("q", "")
     results = do_search(q) if q else []
-
-    if request.is_fragment:
-        return Fragment("search.html", "results", results=results)
-    return Template("search.html", results=results)
+    return Page("search.html", "results", results=results)
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-The browser renders the full page on first load. As the user types, htmx sends requests and Chirp responds with just the `results` block.
+`Page` inspects the request: a browser navigation gets the full `search.html`
+page, while htmx's keystroke requests get only the `results` block swapped into
+`#results`.
 
-## Click to Edit
+## Click to edit
 
-Inline editing that swaps between display and edit views:
+Inline editing that swaps between a display view and an edit form. The display
+block and the edit block live in one template; three handlers swap between them.
 
-**Template** (`templates/contact.html`):
+:::{tab-set}
+:::{tab-item} Template
+`templates/contact.html`:
 
 ```html
 {% block contact_display %}
@@ -94,10 +121,11 @@ Inline editing that swaps between display and edit views:
   </form>
 {% endblock %}
 ```
-
-**Handlers**:
-
+:::{/tab-item}
+:::{tab-item} Handlers
 ```python
+from chirp import Fragment, Request
+
 @app.route("/contacts/{id:int}")
 def show_contact(id: int):
     contact = get_contact(id)
@@ -114,14 +142,22 @@ async def update_contact(request: Request, id: int):
     contact = save_contact(id, name=form["name"], email=form["email"])
     return Fragment("contact.html", "contact_display", contact=contact)
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-Three handlers, zero JavaScript. Each returns a fragment that htmx swaps into place.
+These three routes return a bare `Fragment` because they are reached only by
+htmx swaps, never by direct browser navigation. If a route is also a landing URL
+someone could type or bookmark, return `Page` instead so the full document
+renders for a cold load.
 
-## Infinite Scroll
+## Infinite scroll
 
-Load more content as the user scrolls:
+Load more content as the user scrolls. A sentinel element fires `revealed` when
+it enters the viewport, fetches the next page, and appends it.
 
-**Template** (`templates/feed.html`):
+:::{tab-set}
+:::{tab-item} Template
+`templates/feed.html`:
 
 ```html
 {% block feed_items %}
@@ -144,10 +180,11 @@ Load more content as the user scrolls:
   </div>
 {% endblock %}
 ```
-
-**Handler**:
-
+:::{/tab-item}
+:::{tab-item} Handler
 ```python
+from chirp import Page, Request
+
 PAGE_SIZE = 20
 
 @app.route("/feed")
@@ -155,19 +192,22 @@ def feed(request: Request):
     page = int(request.query.get("page", "1"))
     items = get_items(page=page, size=PAGE_SIZE)
     has_more = len(items) == PAGE_SIZE
-
-    ctx = dict(items=items, has_more=has_more, next_page=page + 1)
-
-    if request.is_fragment:
-        return Fragment("feed.html", "feed_items", **ctx)
-    return Template("feed.html", **ctx)
+    return Page(
+        "feed.html", "feed_items",
+        items=items, has_more=has_more, next_page=page + 1,
+    )
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-The `hx-trigger="revealed"` attribute fires when the element scrolls into view. htmx fetches the next page and appends it with `hx-swap="beforeend"`.
+`hx-trigger="revealed"` fires when the sentinel scrolls into view; `Page`
+serves the full feed to a browser and just the `feed_items` block to the
+scroll-triggered htmx request.
 
-## Delete with Confirmation
+## Delete with confirmation
 
-Delete an item with a confirmation step:
+Delete an item after a confirmation prompt. `hx-confirm` shows the browser
+dialog; the handler removes the row by returning nothing.
 
 ```html
 <button hx-delete="/items/{{ item.id }}"
@@ -182,53 +222,85 @@ Delete an item with a confirmation step:
 @app.route("/items/{id:int}", methods=["DELETE"])
 def delete_item(id: int):
     remove_item(id)
-    return ""  # Empty response removes the element
+    return ""
 ```
 
-## Reorder List (Drag-and-Drop)
+:::{note}
+Returning an empty string swaps the target's `outerHTML` with nothing — htmx
+removes the element. This is the idiomatic way to delete a row: there is no
+"delete" return type, the empty body *is* the deletion.
+:::
 
-Reorder items in a list with native HTML5 drag-and-drop. Use a **hidden form** for reliable form submission — populate it on drop and trigger `htmx.trigger(form, 'submit')`. The server returns a `Fragment` with the updated list; use `hx-select` to extract the target element when the response is a full page.
+## Reorder list (drag and drop)
 
-**Template** (with chirp-ui `sortable_list`):
+Reorder items with native HTML5 drag and drop — no Sortable.js. A hidden form
+carries the source and target indices; on drop, Alpine populates it and calls
+`htmx.trigger(form, 'submit')`. The handler returns a `Fragment` with the
+reordered list, and `hx-select` extracts the target element from the response.
 
+This pattern uses the [chirp-ui](https://github.com/lbliii/chirp-ui)
+`sortable_list` / `sortable_item` macros (`pip install chirp[ui]`).
+
+:::{tab-set}
+:::{tab-item} Template
 ```html
-<div id="step-list">
-<form id="reorder-form" method="post" action="/steps/reorder"
-      hx-post="/steps/reorder" hx-target="#step-list" hx-select="#step-list" hx-swap="outerHTML"
-      style="display:none">
-  <input type="hidden" name="from_idx" value="">
-  <input type="hidden" name="to_idx" value="">
-</form>
-{% call sortable_list() %}
-  {% for step in steps %}
-  {% call sortable_item(attrs='draggable="true" @dragstart="..." @drop="..."') %}
-    {{ step.name }}
-  {% end %}
-  {% end %}
+{% imports %}
+  {% from "chirpui/sortable_list.html" import sortable_list, sortable_item %}
 {% end %}
+
+<div id="recipe-content">
+  <form id="reorder-form" method="post" action="/reorder"
+        hx-post="/reorder" hx-target="#recipe-content"
+        hx-select="#recipe-content" hx-swap="outerHTML"
+        style="display:none">
+    {{ csrf_field() }}
+    <input type="hidden" name="from_idx" value="">
+    <input type="hidden" name="to_idx" value="">
+  </form>
+
+  {% call sortable_list() %}
+    {% for step in steps %}
+    {% call sortable_item(attrs_unsafe='draggable="true"') %}
+      {{ step.instruction }}
+    {% end %}
+    {% end %}
+  {% end %}
 </div>
 ```
-
-**Handler**:
-
+:::{/tab-item}
+:::{tab-item} Handler
 ```python
-@app.route("/steps/reorder", methods=["POST"])
-async def reorder_steps(request: Request):
+from chirp import Fragment, Request
+
+@app.route("/reorder", methods=["POST"])
+async def reorder_route(request: Request):
     form = await request.form()
     from_idx = int(form.get("from_idx", 0))
     to_idx = int(form.get("to_idx", 0))
-    updated = reorder(steps, from_idx, to_idx)
-    return Fragment("steps.html", "step_list", steps=updated)
+    reorder_steps(from_idx, to_idx)
+    return Fragment("page.html", "recipe_content", steps=get_steps())
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-See chirp-ui's [DND-FRAGMENT-ISLAND](https://github.com/lbliii/chirp-ui/blob/main/docs/DND-FRAGMENT-ISLAND.md) for the full Alpine wiring (dataset for source index, per-item overCount for flicker-free drop indicator, form trigger on drop).
+*Source: [`examples/chirpui/sortable_reorder/app.py`](https://github.com/lbliii/chirp/blob/main/examples/chirpui/sortable_reorder/app.py).*
 
-## Form Validation
+:::{dropdown} Advanced: the drag-and-drop Alpine wiring
+The drop handler tracks a source index in the list's `dataset`, uses a per-item
+`overCount` to keep the drop indicator flicker-free, and triggers the hidden
+form on drop. The full wiring lives in chirp-ui's
+[DND-FRAGMENT-ISLAND](https://github.com/lbliii/chirp-ui/blob/main/docs/DND-FRAGMENT-ISLAND.md)
+guide; the `sortable_reorder` example above ships the complete, runnable version.
+:::{/dropdown}
 
-Submit a form and show inline errors:
+## Form validation
+
+Submit a form and re-render it with inline errors on failure, or redirect on
+success.
 
 ```html
 <form hx-post="/register" hx-target="#form-errors" hx-swap="innerHTML">
+  {{ csrf_field() }}
   <input name="name" placeholder="Name">
   <input name="email" placeholder="Email">
   <input name="password" type="password" placeholder="Password">
@@ -238,7 +310,7 @@ Submit a form and show inline errors:
 ```
 
 ```python
-from chirp import ValidationError, hx_redirect
+from chirp import ValidationError, hx_redirect, Request
 
 @app.route("/register", methods=["POST"])
 async def register(request: Request):
@@ -250,12 +322,20 @@ async def register(request: Request):
     return hx_redirect("/welcome")
 ```
 
-`hx_redirect()` is the safer default here because the same form can be
-submitted either normally or via htmx.
+:::{tip}
+`hx_redirect("/welcome")` is the safer default for redirects. The same form
+works whether it posts normally or via htmx — `hx_redirect` issues an
+`HX-Redirect` header for htmx requests and a standard `303` HTTP redirect
+otherwise, so you never lose the no-JavaScript fallback.
+:::
 
-## Real-Time Notifications
+For validation rules, error shapes, and the full re-render flow, see
+[[docs/build-apps/forms-data/forms-validation|forms and validation]].
 
-Push notifications via SSE:
+## Real-time notifications
+
+Push updates to the page after it loads with Server-Sent Events. The browser
+subscribes once; the handler streams `Fragment`s as events arrive.
 
 ```html
 <div hx-ext="sse" sse-connect="/notifications" sse-swap="message">
@@ -266,38 +346,60 @@ Push notifications via SSE:
 ```
 
 ```python
+from chirp import EventStream, Fragment
+
 @app.route("/notifications")
 async def notifications():
     async def stream():
         async for event in notification_bus.subscribe():
-            yield Fragment("components/notification.html",
+            yield Fragment("components/notification.html", "notification",
                 message=event.message,
                 time=event.timestamp,
             )
     return EventStream(stream())
 ```
 
-## OOB Multi-Update
+:::{note} See also
+SSE is its own surface with backpressure, reconnection, and scoping concerns
+this page does not cover.
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — the full SSE guide
+- [[docs/examples/sse|SSE example]] — a runnable notifications feed
+:::
 
-Update multiple page sections in one request:
+## OOB multi-update
+
+Update several page sections in one response. The first `Fragment` is the main
+swap target; each additional `Fragment` carries `hx-swap-oob` to patch a
+different element.
 
 ```python
+from chirp import OOB, Fragment, Request
+
 @app.route("/cart/add", methods=["POST"])
 async def add_to_cart(request: Request):
-    item = await add_item(request)
+    await add_item(request)
     return OOB(
         Fragment("cart.html", "cart_items", items=get_cart()),
         Fragment("layout.html", "cart_badge", count=cart_count()),
     )
 ```
 
-The first fragment is the main swap target. Additional fragments use `hx-swap-oob` to update other parts of the page.
+:::{note} See also
+Registering OOB regions makes their targets contract-checked at startup, so a
+missing block fails loudly instead of silently wiping live DOM.
+- [[docs/quality/contracts-debugging/oob-registry|OOB registry]] — register and validate OOB swap targets
+:::
 
-## Event Delegation for Dynamic Content
+## Event delegation for dynamic content
 
-`hx-on::click` and similar attributes are bound when the DOM is parsed. Content that arrives later via htmx swaps (SSE, OOB, fragments) does **not** get new handlers. Clicks on swapped-in elements will not trigger `hx-on` handlers.
+:::{warning}
+`hx-on::click` and similar inline handlers bind once, when the DOM is parsed.
+Content that arrives later via htmx swaps (SSE, OOB, fragments) gets **no**
+handlers — clicks on swapped-in elements silently do nothing.
+:::
 
-**Use event delegation** instead: attach a single listener to `document` or a stable parent, and check whether the event target matches your selector:
+Use event delegation: attach one listener to `document` or a stable parent, and
+check whether the event target matches your selector.
 
 ```html
 <script>
@@ -315,10 +417,16 @@ document.addEventListener('click', function(e) {
 </script>
 ```
 
-The same pattern works for toggles, compare switches, and any interactive element inside SSE or fragment-swapped content. The RAG demo uses `AppConfig(delegation=True)` for copy-btn and compare-switch; see [[docs/examples/rag-demo|RAG demo]].
+The same pattern works for toggles, compare switches, and any interactive
+element inside SSE- or fragment-swapped content. Chirp ships this for you:
+`AppConfig(delegation=True)` wires delegated copy-button and compare-switch
+handlers for swapped content. See the [[docs/examples/rag-demo|RAG demo]].
 
-## Next Steps
+## Next steps
 
-- [[docs/build-apps/html-fragments/fragments|Fragments]] -- Fragment rendering in depth
-- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Real-time patterns
-- [[docs/tutorials/coming-from-flask|Coming from Flask]] -- Migration guide
+- [[docs/build-apps/html-fragments/fragments|Fragments]] — fragment rendering in depth
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — real-time patterns
+- [[docs/tutorials/coming-from-flask|Coming from Flask]] — migration guide
+
+:::{related}
+:::

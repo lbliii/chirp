@@ -16,10 +16,15 @@ cascade:
 
 ## Canonical Examples
 
-Run examples from the repository root with `PYTHONPATH=src` so they use the
-checkout you are reading. Each example has a focused job: learn return types,
-practice htmx fragments, validate Suspense, exercise SSE, or see the app-shell
-lane.
+Every example here is a runnable Chirp app you can copy from. Each one isolates
+one part of the framework surface — [[docs/about/core-concepts/return-values|return types]],
+htmx fragments, Suspense, SSE, or the chirp-ui app shell — so you can see the
+idiomatic pattern in working code.
+
+New to Chirp? [[docs/get-started/_index|Start with the basics]], then read the
+**Contacts** or **Returns Gallery** apps below. Already fluent in hypermedia?
+Jump straight to **RAG Demo** or **Lucky Cat** for the full app-shell and
+[[docs/build-apps/streaming-updates/_index|streaming and realtime patterns]].
 
 :::{cards}
 :columns: 2
@@ -33,7 +38,7 @@ The marquee ChirpUI app-shell demo: trade `FormAction`/`ValidationError`, `Suspe
 :::{/card}
 
 :::{card} RAG Demo
-:icon: ai-chatgpt
+:icon: sparkle
 :link: /chirp/docs/examples/rag-demo/
 :description: Streaming AI Q&A with cited sources, dual-model comparison, and zero client JS
 The flagship Chirp example: fragments, SSE, event delegation, and free-threading.
@@ -82,3 +87,8 @@ Real-time board with multi-fragment updates and SSE live sync.
 :::{/card}
 
 :::{/cards}
+
+:::{tip} Running an example
+Run examples from the repository root with `PYTHONPATH=src` so they use the
+checkout you are reading — for example `PYTHONPATH=src python examples/chirpui/pages_shell/app.py`.
+:::

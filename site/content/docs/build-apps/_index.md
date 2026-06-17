@@ -14,9 +14,12 @@ cascade:
   type: doc
 ---
 
-Use this section when you are shaping the application surface: URLs, page
-directories, named template blocks, form mutations, streaming updates, shell
-UI, and middleware around requests.
+Build Apps is the working surface of Chirp: how to do each thing you build
+with — pages and routing, HTML fragments and OOB swaps, forms, streaming, shell
+UI, and the request pipeline. It is written for someone who already has an app
+running and knows the basics. If you are starting from zero, begin with
+[[docs/get-started/_index|Get Started]] first. Pick the area you are working in
+below.
 
 :::{cards}
 :columns: 2
@@ -35,7 +38,7 @@ Templates, named blocks, `Page`, `Fragment`, OOB swaps, and Kida integration.
 :::{/card}
 
 :::{card} Forms and Data
-:icon: check-square
+:icon: check-circle
 :link: /chirp/docs/build-apps/forms-data/
 Form parsing, validation, query helpers, migrations, and optional data extras.
 :::{/card}

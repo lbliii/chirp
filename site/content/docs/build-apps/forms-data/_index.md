@@ -1,6 +1,6 @@
 ---
 title: Forms and Data
-description: Form parsing, validation, database access, query helpers, and migrations
+description: Form parsing, validation, database access, and verified SQL-to-render data contracts
 draft: false
 weight: 30
 lang: en
@@ -15,39 +15,13 @@ cascade:
 ---
 
 Use this section when request data becomes application data: parse forms,
-validate mutations, query storage, paginate results, and keep optional data
-extras explicit.
+validate mutations, query SQLite or Postgres, and define verified
+SQL-to-render data contracts. Each topic below is its own page — start with
+[[docs/build-apps/forms-data/forms-validation|Forms & Validation]] to handle a
+POST, reach for the [[docs/build-apps/forms-data/database|Database]] when you
+need storage, and define [[docs/build-apps/forms-data/shapes|Shapes]] when you
+want `app.check()` to verify your SQL against your templates before you serve a
+byte.
 
-:::{cards}
-:columns: 3
-:gap: medium
-
-:::{card} Database
-:icon: database
-:link: /chirp/docs/build-apps/forms-data/database/
-:description: SQLite and PostgreSQL access
-Typed async queries, row mapping, transactions, streaming, and LISTEN/NOTIFY.
-:::{/card}
-
-:::{card} Query Builder
-:icon: search
-:link: /chirp/docs/build-apps/forms-data/database/#query-builder
-:description: Immutable chainable queries
-Dynamic filters with `where_if()`, transparent SQL, typed results.
-:::{/card}
-
-:::{card} Migrations
-:icon: upload
-:link: /chirp/docs/build-apps/forms-data/database/#migrations
-:description: Forward-only SQL migrations
-Numbered SQL files, automatic tracking, runs at startup.
-:::{/card}
-
-:::{card} Forms & Validation
-:icon: check-circle
-:link: /chirp/docs/build-apps/forms-data/forms-validation/
-:description: Form parsing and validation rules
-Multipart forms, validation results, and error rendering.
-:::{/card}
-
-:::{/cards}
+:::{child-cards}
+:::

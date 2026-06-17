@@ -10,29 +10,18 @@ keywords: [app-shell, sidebar, navigation, fragment, page, boost, htmx]
 category: guide
 ---
 
-This guide is about chirp-ui's **`app_shell_layout.html`** — one of three
-shells you can extend. For the trifecta and the decision table, see
-**[Shells](/chirp/docs/build-apps/ui-extensions/shells/)**. Also read **[UI layers & shell regions](/chirp/docs/build-apps/ui-extensions/ui-layers/)**
-for the glossary (app shell vs page chrome vs surface chrome) and stable OOB
-element ids, and **[Boosted Navigation](/chirp/docs/build-apps/ui-extensions/boosted-navigation/)** for the
-swap contract, cross-shell redirects, and debug warnings.
+An **app shell** is a layout that stays on screen — topbar, sidebar, footer —
+while the main content area swaps between pages. Think Gmail or GitHub: the
+chrome never reloads, only the content inside `#main` changes. It works with
+zero client-side JavaScript framework: the server renders the right HTML for
+each request and htmx swaps it in.
 
-## What Is an App Shell?
+Reach for an app shell when you want SPA-style navigation around persistent
+chrome. This page is the how-to for chirp-ui's `app_shell_layout.html`. For the
+three shell options and when to pick each, see
+[[docs/build-apps/ui-extensions/shells|the three shells and when to pick each]].
 
-An app shell is a persistent layout — topbar, sidebar, footer — that stays on
-screen while the main content area swaps between pages.  Think Gmail, GitHub, or
-any dashboard.  The shell never reloads; only `#main` changes.
-
-Chirp + chirp-ui give you this pattern with zero client-side JavaScript
-frameworks.  The server renders exactly the right HTML for each request, and
-htmx swaps it in.
-
-> **Not a shell:** Feature modules like `chirp.docs` ship templates that look
-> shell-like (sidebar, search, content area) but render *inside* whichever
-> shell you choose. They don't establish the document root or the boost
-> contract. See [Shells > What is *not* a shell](/chirp/docs/build-apps/ui-extensions/shells/#what-is-not-a-shell).
-
-## How It Works
+## How it works
 
 ```
 Full page load     → server renders everything (shell + page)
@@ -40,74 +29,29 @@ Sidebar navigation → server renders the page block, htmx swaps #main
 Fragment request   → server renders just the targeted block
 ```
 
-### The Navigation Model
+The shell layout puts the [[docs/build-apps/ui-extensions/boosted-navigation|boost and swap contract]]
+(`hx-boost`, `hx-target="#main"`, `hx-swap="innerHTML"`, `hx-select="#page-content"`)
+on `<main id="main">`. Plain `<a href="...">` links inside `#main` inherit those
+attributes, so they get SPA navigation with no extra markup. Because `#main`
+swaps `innerHTML` (not `outerHTML`), the element persists in the DOM across
+swaps.
 
-`app_shell_layout.html` puts `hx-boost="true"`, `hx-target="#main"`,
-`hx-swap="innerHTML"`, and `hx-select="#page-content"` directly on `<main id="main">`.
-Content is wrapped in `<div id="page-content">` inside `#main`. All links inside
-`#main` inherit these attributes automatically — plain `<a href="...">` tags get
-SPA navigation with no extra markup. Because `#main` uses `innerHTML` (not
-`outerHTML`), it persists in the DOM and its `view-transition-name` is never
-duplicated during swaps.
+:::{note} See also
+The htmx boost/select/disinherit contract and cross-shell redirects are owned by
+[[docs/build-apps/ui-extensions/boosted-navigation|Boosted Navigation]]. The
+glossary (app shell vs page chrome vs surface chrome) and the stable OOB element
+ids live in [[docs/build-apps/ui-extensions/ui-layers|shell regions and OOB element ids]].
+:::
 
-Sidebar links (outside `#main`) carry their own htmx attributes via
-`sidebar_link()`, which emits `hx-boost`, `hx-target`, and `hx-select`.
+## Build a shell
 
-When a boosted link fires, the `HX-Boosted` header tells Chirp to render
-the `page_block` (the wider, self-contained root). The response is swapped
-into `#main`.
+The happy path is three steps: extend the layout, give your page a `page_root`
+and a `page_content` block, and return [[docs/about/core-concepts/return-values|`Page`]]
+with both block names.
 
-Forms and fragment targets with explicit `hx-target` (e.g.
-`hx-target="#contacts-list"`) override the inherited value naturally.
-Use `fragment_island` or `hx-disinherit` only when a region needs to
-opt out of the inherited shell attributes entirely.
+::::{steps}
 
-### Active State
-
-ChirpUI sidebar and navbar links support a `match=` parameter for automatic
-path-based highlighting:
-
-```html
-{{ sidebar_link("/", "Home", icon="◉", match="exact") }}
-{{ sidebar_link("/contacts", "Contacts", icon="◎", match="prefix") }}
-```
-
-`match="exact"` activates on exact URL match; `match="prefix"` activates when the
-URL starts with the href.  Chirp auto-injects `current_path` into template context
-for `Template(...)` and `Page(...)` returns, so `match=` works without manually
-passing `nav=` or `current_path=` from every handler.
-
-After htmx navigation, `app_shell_layout.html` runs a client-side sync that
-updates active classes and `aria-current="page"` based on `location.pathname`.
-This covers the gap where `hx-boost` swaps `#main` but the sidebar DOM is
-not re-rendered.
-
-### The Rendering Rule
-
-Handlers return `Page` and Chirp auto-detects rendering scope:
-
-```python
-def get(request: Request) -> Page:
-    return Page(
-        "contacts/page.html",
-        "page_content",
-        page_block_name="page_root",
-        **context,
-    )
-```
-
-| Request type | What renders | Block used |
-|---|---|---|
-| Full page load | Shell + layouts + page | `page_root` (full template) |
-| Sidebar navigation (`HX-Boosted`) | Page block only | `page_root` |
-| Fragment request (form, search) | Narrow block only | `page_content` |
-
-The developer doesn't think about `is_fragment` or `is_boosted`.  Return
-`Page` with both block names and Chirp does the right thing.
-
-## Building a Shell
-
-### 1. Extend `app_shell_layout.html`
+:::{step} Extend `app_shell_layout.html`
 
 ```html
 {% extends "chirpui/app_shell_layout.html" %}
@@ -118,8 +62,8 @@ The developer doesn't think about `is_fragment` or `is_boosted`.  Return
 {% block sidebar %}
 {% call sidebar() %}
   {% call sidebar_section("Main") %}
-    {{ sidebar_link("/", "Home", icon="home") }}
-    {{ sidebar_link("/contacts", "Contacts", icon="grid") }}
+    {{ sidebar_link("/", "Home", icon="house") }}
+    {{ sidebar_link("/contacts", "Contacts", icon="users") }}
   {% end %}
 {% end %}
 {% end %}
@@ -130,10 +74,11 @@ The developer doesn't think about `is_fragment` or `is_boosted`.  Return
 ```
 
 `app_shell_layout.html` provides the topbar, sidebar slot, and `<main id="main">`
-with built-in `hx-boost`, `hx-target`, `hx-swap`, and `hx-select`. Links inside
-`#main` inherit SPA navigation automatically.
+with the boost/target/swap/select contract already wired. Links inside `#main`
+inherit SPA navigation automatically.
+:::{/step}
 
-### 2. Structure Your Page Template
+:::{step} Give your page a `page_root` and a `page_content` block
 
 ```html
 {% block page_root %}
@@ -151,12 +96,13 @@ with built-in `hx-boost`, `hx-target`, `hx-swap`, and `hx-select`. Links inside
 {% endblock %}
 ```
 
-- `page_root` — the wide block for sidebar navigation.  Contains layout
-  wrappers, headings, spacing.
-- `page_content` — the narrow block for fragment requests.  Contains just the
+- `page_root` — the wide block for sidebar navigation. Contains layout wrappers,
+  headings, spacing.
+- `page_content` — the narrow block for fragment requests. Contains just the
   data-driven content.
+:::{/step}
 
-### 3. Return Page from Your Handler
+:::{step} Return `Page` with both block names
 
 ```python
 def get(request: Request) -> Page:
@@ -168,11 +114,64 @@ def get(request: Request) -> Page:
         contacts=contacts,
     )
 ```
+:::{/step}
 
-### Regions (recommended for OOB)
+::::{/steps}
 
-When you need both full-page slots and OOB swaps (breadcrumbs, sidebar, title),
-use `{% region %}` instead of blocks. One definition serves both — no duplication:
+## The rendering rule
+
+Return `Page` with both block names and Chirp picks the right scope for each
+request — the return type *is* the intent. You never branch on `is_htmx` or
+`is_boosted` yourself.
+
+:::{list-table}
+:header-rows: 1
+
+- - Request type
+  - What renders
+  - Block used
+- - Full page load
+  - Shell + layouts + page
+  - `page_root` (full template)
+- - Sidebar navigation (`HX-Boosted`)
+  - Page block only
+  - `page_root`
+- - Fragment request (form, search)
+  - Narrow block only
+  - `page_content`
+:::
+
+:::{note}
+If you ever need to inspect the request kind directly, use `request.is_htmx`
+(any htmx request) or `request.is_narrow_fragment` (a narrow swap, excluding
+boosted navigation and history restore). The older `request.is_fragment` is
+deprecated — it is ambiguous for boosted navigations and emits a warning.
+:::
+
+### Active state
+
+ChirpUI sidebar and navbar links take a `match=` parameter for automatic
+path-based highlighting:
+
+```html
+{{ sidebar_link("/", "Home", icon="house", match="exact") }}
+{{ sidebar_link("/contacts", "Contacts", icon="users", match="prefix") }}
+```
+
+`match="exact"` activates on an exact URL match; `match="prefix"` activates when
+the URL starts with the href.
+
+:::{tip}
+Chirp auto-injects `current_path` into the template context for `Template(...)`
+and `Page(...)` returns, so `match=` works without manually passing `nav=` or
+`current_path=` from every handler.
+:::
+
+## OOB regions
+
+When you need both full-page slots and out-of-band swaps (breadcrumbs, sidebar,
+title), use `{% region %}` instead of plain blocks. One definition serves both —
+no duplication:
 
 ```html
 {% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
@@ -197,14 +196,10 @@ use `{% region %}` instead of blocks. One definition serves both — no duplicat
 See `examples/chirpui/shell_oob` for the reference implementation. The block-based
 extend pattern above remains valid for apps that don't need OOB.
 
-## Route Contract and Sections
+## Forms inside the shell
 
-With the [route directory contract](/chirp/docs/quality/contracts-debugging/route-contract/), sections, `_meta.py`, and shell context assembly replace manual `build_page_context` patterns. Register sections with `app.register_section()` before `mount_pages()`. Use `_meta.py` to declare `title`, `section`, `breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`, `breadcrumb_items`, `tab_items`, and `current_path` automatically. See the [Route Directory Golden Path](/chirp/docs/build-apps/pages-navigation/route-directory/) for recommended patterns.
-
-## Forms Inside the Shell
-
-Forms with explicit `hx-target` override the inherited shell attributes
-naturally. No defensive wrappers needed:
+Forms with an explicit `hx-target` override the inherited shell attributes
+naturally — no defensive wrappers needed:
 
 ```html
 <form hx-post="/contacts/create"
@@ -215,12 +210,12 @@ naturally. No defensive wrappers needed:
 </form>
 ```
 
-Use `fragment_island` or `hx-disinherit` only when a region needs to fully
-opt out of the inherited boost/target/swap/select chain.
+Use `fragment_island` or `hx-disinherit` only when a region needs to fully opt
+out of the inherited boost/target/swap/select chain.
 
-### Validation Errors
-
-Return `ValidationError` to re-render a form block with 422 status:
+To re-render a form block on a validation failure, return
+[[docs/build-apps/forms-data/forms-validation|`ValidationError`]] with the form
+block name and a 422 status:
 
 ```python
 async def post(request: Request):
@@ -237,13 +232,11 @@ async def post(request: Request):
     # ... success path
 ```
 
-## Shell Actions
+## Shell actions
 
-Routes contribute actions to the topbar (buttons, links, menus) via
-`_context.py` files. The correct pattern is to return a `context()` dict with
-a `shell_actions` key — not a standalone `shell_actions()` function.
-
-### Declaration
+Routes contribute actions to the topbar (buttons, links, menus) by returning a
+`context()` dict with a `shell_actions` key from a `_context.py` file — not a
+standalone `shell_actions()` function.
 
 ```python
 # pages/contacts/_context.py
@@ -259,27 +252,45 @@ def context() -> dict:
     }
 ```
 
-### Three Zones
+There are three zones:
 
-- **primary** — Main buttons/links (e.g. "New project", "Deploy")
-- **controls** — Secondary actions (e.g. "Metrics", filters)
-- **overflow** — Dropdown menu (e.g. "More" with Archive, Export, Docs)
+- **primary** — main buttons/links (e.g. "New project", "Deploy").
+- **controls** — secondary actions (e.g. "Metrics", filters).
+- **overflow** — dropdown menu (e.g. "More" with Archive, Export, Docs).
 
-### Form actions (`kind="form"`)
+When you extend `chirpui/app_shell_layout.html`, `shell_actions` is passed
+through the layout chain from the merged `_context.py` results — no extra wiring.
+When you use the `app_shell()` macro (regions-based layouts), pass it explicitly:
 
-Use **`kind="form"`** for POST actions that need CSRF, hidden fields, and optional HTMX
-attributes on the `<form>`. Chirp-ui renders the form in the shell target; OOB updates
-refresh it on navigation like other shell actions.
+```html
+{% call app_shell(brand="My App", shell_actions=shell_actions | default(none)) %}
+  ...
+{% end %}
+```
+
+:::{note}
+`ShellAction`, `ShellActions`, and `ShellActionZone` are **provisional** — the
+shape of these APIs may change in a future release. The cascade and form-action
+behavior below is stable in practice; see `examples/chirpui/pages_shell` for a
+working reference.
+:::
+
+:::{dropdown} Advanced: form actions (`kind="form"`)
+Use `kind="form"` for POST actions that need CSRF, hidden fields, and optional
+htmx attributes on the rendered `<form>`. Chirp-ui renders the form in the shell
+target; OOB updates refresh it on navigation like other shell actions.
 
 - Put form actions in **primary** or **controls** only (not **overflow**).
-- Set **`form_action`**, **`label`** (submit button), and optional **`hidden_fields`** as
-  `tuple[tuple[str, str], ...]`.
-- **`include_csrf`** (default `True`) renders `{{ csrf_field() }}` inside the form.
-- HTMX: set **`hx_post`**, **`hx_target`**, **`hx_swap`**, **`hx_disinherit`** as needed.
-- **`submit_surface`**: `"btn"` | `"shimmer"` | `"pulsing"` (ChirpUI submit control).
+- Set `form_action`, `label` (the submit button text), and optional
+  `hidden_fields` as `tuple[tuple[str, str], ...]`.
+- `include_csrf` (default `True`) renders `{{ csrf_field() }}` inside the form.
+- htmx: set `hx_post`, `hx_target`, `hx_swap`, `hx_disinherit` as needed.
+- `submit_surface`: `"btn"` | `"shimmer"` | `"pulsing"` (the ChirpUI submit
+  control).
 
-For link/button actions that need extra attributes (e.g. `hx-boost` on a shell link),
-set **`attrs`** on `ShellAction` (string passed through to `btn`).
+For link/button actions that need extra attributes (e.g. `hx-boost` on a shell
+link), set `attrs` on `ShellAction` (a string passed through to the `btn`
+macro).
 
 ```python
 ShellAction(
@@ -296,26 +307,12 @@ ShellAction(
     submit_surface="shimmer",
 )
 ```
+:::
 
-```python
-ShellActions(
-    primary=ShellActionZone(items=(ShellAction(id="new", label="New", href="/new"),)),
-    controls=ShellActionZone(items=(ShellAction(id="metrics", label="Metrics", href="#stats"),)),
-    overflow=ShellActionZone(
-        items=(
-            ShellAction(id="archive", label="Archive", href="/archive"),
-            ShellAction(id="export", label="Export", href="/export"),
-        ),
-    ),
-)
-```
-
-### Cascade Inheritance
-
-Parent `_context.py` defines section defaults; child routes inherit them.
-Child `_context.py` can add actions, override by `id`, or replace entire zones.
-
-### Override Patterns
+:::{dropdown} Advanced: cascade and override patterns
+A parent `_context.py` defines section defaults; child routes inherit them. A
+child `_context.py` can add actions, override an action by `id`, or replace an
+entire zone.
 
 **Remove specific parent actions:**
 
@@ -334,93 +331,109 @@ ShellActions(
 )
 ```
 
-Use `mode="replace"` when a subroute (e.g. settings, wizard, install) should
-completely replace parent navigation actions. Cannot combine with `remove=`.
+Use `mode="replace"` when a subroute (settings, wizard, install) should
+completely replace the parent's navigation actions. It cannot be combined with
+`remove=`.
+:::
 
-### Layout Wiring
+:::{dropdown} Advanced: how shell actions reach the topbar (OOB)
+Chirp's render plan adds shell actions as an OOB fragment when serving a boosted
+navigation request, or when the htmx target was registered with
+`triggers_shell_update=True` (e.g. tab clicks targeting `#page-root`). The
+topbar updates on each page change with no client-side logic.
 
-When using `chirpui/app_shell_layout.html`, `shell_actions` is passed via the
-layout chain from merged `_context.py` results. No extra wiring needed.
+`use_chirp_ui()` registers `main` and `page-root` with
+`triggers_shell_update=True`, and `page-content-inner` with
+`triggers_shell_update=False` so narrow swaps don't update the shell. Register
+your own targets with:
 
-When using the `app_shell()` macro (regions-based layouts), pass it explicitly:
-
-```html
-{% call app_shell(brand="My App", shell_actions=shell_actions | default(none)) %}
-  ...
-{% end %}
+```python
+app.register_fragment_target(
+    "my-target",
+    fragment_block="my_block",
+    triggers_shell_update=True,
+)
 ```
+:::
 
-### OOB Mechanism
+## Route contract and sections
 
-Chirp's render plan adds shell actions as an OOB fragment when serving boosted
-navigation requests or when the HTMX target has `triggers_shell_update=True`
-(e.g. tab clicks targeting `#page-root`). The topbar updates automatically on
-each page change — no client-side logic required.
+With the [[docs/quality/contracts-debugging/route-contract|route directory contract]],
+sections, `_meta.py`, and shell-context assembly replace manual
+`build_page_context` patterns. Register sections with `app.register_section()`
+before `mount_pages()`, and use `_meta.py` to declare `title`, `section`,
+`breadcrumb_label`, and `shell_mode`. The framework assembles `page_title`,
+`breadcrumb_items`, `tab_items`, and `current_path` automatically. See the
+[[docs/build-apps/pages-navigation/route-directory|Route Directory Golden Path]]
+for the recommended patterns.
 
-`use_chirp_ui()` registers `main` and `page-root` with `triggers_shell_update=True`,
-and `page-content-inner` with `triggers_shell_update=False` so narrow swaps
-don't update the shell. Custom targets: `app.register_fragment_target("id",
-fragment_block="...", triggers_shell_update=True)`.
-
-### Reference
-
-See `examples/chirpui/pages_shell` for a working cascade with `remove=` and
-`mode="replace"`.
-
-## Debugging and Introspection
+## Debugging a shell
 
 The most useful way to debug a shell app is to follow the contract chain:
 
-1. Which HTMX target fired? (`#main`, `#page-root`, or a narrow target)
+1. Which htmx target fired? (`#main`, `#page-root`, or a narrow target.)
 2. Which fragment block does Chirp map that target to?
 3. Does the leaf page template actually define that block?
 
-With `use_chirp_ui(app)`, the default mapping is:
+With `use_chirp_ui(app)`, the default target → block mapping is:
 
-| Target | Block | Typical trigger |
-|---|---|---|
-| `#main` | `page_root` | Sidebar navigation |
-| `#page-root` | `page_root_inner` | Section tabs |
-| `#page-content-inner` | `page_content` | Narrow content mutations |
+:::{list-table}
+:header-rows: 1
 
-If the wrong amount of HTML swaps, the target/block pair is usually the bug. If the right block is chosen but the shell does not update, check whether the target was registered with `triggers_shell_update=True`.
+- - Target
+  - Block
+  - Typical trigger
+- - `#main`
+  - `page_root`
+  - Sidebar navigation
+- - `#page-root`
+  - `page_root_inner`
+  - Section tabs
+- - `#page-content-inner`
+  - `page_content`
+  - Narrow content mutations
+:::
+
+If the wrong amount of HTML swaps, the target/block pair is usually the bug. If
+the right block is chosen but the shell doesn't update, check whether the target
+was registered with `triggers_shell_update=True`.
 
 For day-to-day debugging:
 
-- Run `app.check()` in tests or startup to catch missing shell blocks early.
-- When `config.debug=True`, response headers include `X-Chirp-Route-Kind`, `X-Chirp-Route-Meta`, `X-Chirp-Context-Chain`, and `X-Chirp-Shell-Context` for route introspection.
-- Visit `/__chirp/routes` (debug only) for a visual route explorer with per-route drill-down.
-- The HTMX debug panel's activity log shows route metadata when you expand a request entry.
-- Prefer `render_route_tabs(tab_items, current_path)` over the legacy `route_tabs(...)` alias so template names do not collide with context variables.
-- Keep one Python source of truth for tab families, breadcrumb prefixes, and sidebar state instead of recomputing them across templates and handlers.
-- When a target is unregistered, Chirp's render-plan diagnostics list the known targets; use that output to spot typos quickly.
+- Run `app.check()` in tests or at startup to catch missing shell blocks early.
+- When `config.debug=True`, response headers include `X-Chirp-Route-Kind`,
+  `X-Chirp-Route-Meta`, `X-Chirp-Context-Chain`, and `X-Chirp-Shell-Context` for
+  route introspection.
+- Visit `/__chirp/routes` (debug only) for a visual route explorer with per-route
+  drill-down.
+- Prefer `render_route_tabs(tab_items, current_path)` over the legacy
+  `route_tabs(...)` alias so template names don't collide with context variables.
+- Keep one Python source of truth for tab families, breadcrumb prefixes, and
+  sidebar state instead of recomputing them across templates and handlers.
 
-## Content Navigation Links
+## Content links and fragment regions
 
-Since `<main id="main">` carries `hx-boost="true"`, all `<a>` tags inside
-page content get SPA navigation automatically — no special attributes needed.
+Since `<main id="main">` carries the boost contract, all `<a>` tags inside page
+content get SPA navigation automatically — no special attributes needed:
 
 ```html
 <a href="/page-2">Next page</a>
 <a href="/details">View details</a>
 ```
 
-For links that need extra htmx attributes (e.g. `hx-push-url`), use the
-`nav_link` macro:
+For a smooth SPA transition effect on a specific content link, use the
+`nav_link` macro (it puts `hx-boost` on the link itself):
 
 ```html
 {% from "chirpui/nav_link.html" import nav_link %}
-{{ nav_link("/page-2", "Next page", push_url=true) }}
+{{ nav_link("/page-2", "Next page") }}
 ```
 
 To opt a link out of SPA navigation, add `hx-boost="false"`.
 
-## Fragment Regions (Optional)
-
-The `fragment_island` / `safe_region` macros are ChirpUI/HTMX swap-safety
-primitives. They isolate local mutation regions from inherited `hx-*` behavior
-using `hx-disinherit`. Use them when you want semantic grouping or when a
-region needs its own `hx-target` / `hx-swap` defaults:
+The `fragment_island` / `safe_region` macros isolate a local mutation region
+from inherited `hx-*` behavior using `hx-disinherit`. Use them when a region
+needs its own `hx-target` / `hx-swap` defaults:
 
 ```html
 {% from "chirpui/fragment_island.html" import fragment_island %}
@@ -430,15 +443,16 @@ region needs its own `hx-target` / `hx-swap` defaults:
 {% end %}
 ```
 
-**Important:** `fragment_island` is not the same as Chirp's `data-island` islands.
-`fragment_island` is a swap-safety boundary (no client runtime). Chirp islands
-(`data-island`) are client-managed surfaces with mount/unmount lifecycle. See
-[Islands Contract](/chirp/docs/build-apps/ui-extensions/islands/) for the distinction.
+:::{warning}
+`fragment_island` is **not** the same as Chirp's `data-island` islands.
+`fragment_island` is a swap-safety boundary with no client runtime; `data-island`
+marks a client-managed surface with a mount/unmount lifecycle. See the
+[[docs/build-apps/ui-extensions/islands|Islands Contract]] for the distinction.
+:::
 
-## Custom Shells
-
-If you need a custom shell instead of `app_shell_layout.html`, replicate
-the built-in defaults on your `<main>` element:
+:::{dropdown} Building a shell without chirp-ui
+If you need a custom shell instead of `app_shell_layout.html`, replicate the
+boost contract on your own `<main>` element:
 
 ```html
 <main id="main" class="my-shell__main" tabindex="-1"
@@ -449,137 +463,38 @@ the built-in defaults on your `<main>` element:
 </main>
 ```
 
-Sidebar links (outside `#main`) need their own `hx-target="#main"` and
-`hx-select="#page-content"` since they don't inherit from the `<main>` element.
+Sidebar links live *outside* `#main`, so they don't inherit from it — give them
+their own `hx-target="#main"` and `hx-select="#page-content"`. See
+`examples/chirpui/kanban_shell` for a working custom shell and
+`examples/chirpui/shell_oob` for the regions-based OOB variant.
+:::
 
-See `examples/chirpui/kanban_shell` for a working custom shell and `examples/chirpui/shell_oob` for
-regions-based OOB.
+## Interactive shells
 
-## Gotchas for Interactive Shells
+Boards, dashboards, and real-time feeds combine OOB swaps, SSE, and action-style
+routes. Those patterns have sharp edges around how the *main* response and SSE
+event names interact with htmx — but they are streaming concerns, not app-shell
+concerns, and they apply to any layout.
 
-Interactive shells — boards, dashboards, real-time feeds — combine OOB swaps,
-SSE, and action-style routes. These patterns have sharp edges worth knowing.
+:::{note} See also
+- [[docs/build-apps/streaming-updates/sse-patterns|SSE patterns]] — the
+  `OOB(main, *oob_fragments)` "lost main" footgun (an `hx-swap="none"` button
+  discards the main response) and SSE event-name matching.
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] —
+  how `EventStream` yields fragments and how the SSE event name is chosen.
+- [[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]] —
+  capturing `ContextVar`-backed request state (auth, CSRF, session) *before*
+  returning a stream, since middleware-scoped helpers can raise `LookupError`
+  during deferred or streamed rendering.
+:::
 
-### OOB with `hx-swap="none"` — the Lost Main
+:::{note} Next steps
+- [[docs/build-apps/ui-extensions/shells|Shells]] — pick the right shell for your app.
+- [[docs/build-apps/ui-extensions/ui-layers|UI layers & shell regions]] — the layout vocabulary and stable OOB ids.
+- [[docs/build-apps/ui-extensions/boosted-navigation|Boosted Navigation]] — the swap contract and debug warnings.
+- [[docs/build-apps/ui-extensions/islands|Islands]] — client-managed surfaces vs swap-safety regions.
+- [[docs/build-apps/pages-navigation/route-directory|Route Directory]] — sections, `_meta.py`, and shell-context assembly.
+:::
 
-Chirp's `OOB(main, *oob_fragments)` renders the first argument as the **main**
-response (no `hx-swap-oob` wrapping). The rest get wrapped. When a button uses
-`hx-swap="none"` (delete, move, toggle), the main is **discarded** — htmx only
-processes the OOB elements.
-
-If you put important content as the main, it vanishes silently:
-
-```python
-# BAD — old_column is the main, discarded by hx-swap="none"
-return OOB(
-    _column_fragment(old_status, tasks),
-    _column_fragment(new_status, tasks),
-    _stats_fragment(tasks),
-)
-
-# GOOD — empty main, all real content is OOB
-return OOB(
-    Fragment("page.html", "empty"),
-    _column_fragment(old_status, tasks),
-    _column_fragment(new_status, tasks),
-    _stats_fragment(tasks),
-)
-```
-
-**Rule of thumb:** if the route uses `hx-swap="none"`, make the OOB main an
-empty fragment and put everything else in the OOB positions.
-
-### SSE Event Naming — the Silent Mismatch
-
-When you yield a `Fragment` with a `target` in an SSE generator,
-`_format_event` uses the target as the SSE event name (e.g.,
-`"column-backlog"`). But `sse-swap="message"` only listens for events
-literally named `"fragment"`. Everything else is silently ignored.
-
-**Fix:** Create template blocks with `hx-swap-oob` baked into the HTML, and
-yield `Fragment` objects without `target`. The event name defaults to
-`"fragment"` and htmx processes the OOB attributes from the content:
-
-```html
-{%- fragment column_block_oob -%}
-{% call column(column_id, column_name, tasks | length, oob=true) %}
-  ...
-{% end %}
-{%- endfragment -%}
-```
-
-```python
-# No target → event name is "fragment" → client receives it
-yield Fragment("page.html", "column_block_oob",
-               column_id="backlog", tasks=filtered, ...)
-```
-
-### ContextVar Loss in Streamed Rendering
-
-Middleware-provided helpers backed by `ContextVar` only exist while the request
-is inside the middleware pipeline. Calling `get_user()`, `csrf_token()`, or
-similar middleware-backed helpers during streamed or deferred rendering can
-raise `LookupError`.
-
-The request object itself is restored for stream iteration, so this warning is
-about middleware-scoped values such as auth/session/CSRF state, not `get_request()`.
-
-This applies to:
-
-- SSE async generators
-- `Stream` / `TemplateStream` body rendering
-- `Suspense` shell or deferred block rendering
-
-**Fix:** Capture request-scoped values **before** returning the stream or
-entering the generator:
-
-```python
-def events_route():
-    user = get_user()  # captured in handler scope
-
-    async def generate():
-        # user is available via closure; get_user() would fail here
-        yield _fragment(..., current_user=user)
-
-    return EventStream(generate())
-```
-
-The same pattern applies to `Suspense` and other streaming responses:
-
-```python
-@app.route("/dashboard")
-def dashboard():
-    token = csrf_token()
-    return Suspense("dashboard.html", csrf_token_value=token, stats=load_stats())
-```
-
-Then the template uses `{{ csrf_token_value }}` instead of calling
-`{{ csrf_token() }}` while the stream is rendering.
-
-For the broader streaming model (`Stream`, `TemplateStream`, `Suspense`), see
-[[docs/build-apps/streaming-updates/html-streaming|Streaming HTML]].
-
-### Dual Template Blocks for HTTP vs SSE
-
-HTTP OOB routes rely on Chirp's negotiation layer to wrap fragments with
-`hx-swap-oob`. SSE fragments are rendered by `_format_event`, which only adds
-OOB wrapping when `target` is set — but setting `target` breaks event naming
-(see above).
-
-The result: you need separate template blocks for the same content. One for
-HTTP (no inline OOB, the framework adds it) and one for SSE (OOB baked into
-the HTML):
-
-```html
-{%- fragment column_block -%}
-{# HTTP — negotiate() adds hx-swap-oob externally #}
-{% call column(col_id, col_name, count, oob=false) %}...{% end %}
-{%- endfragment -%}
-
-{%- fragment column_block_oob -%}
-{# SSE — OOB is inline so _format_event doesn't need target #}
-{% call column(col_id, col_name, count, oob=true) %}...{% end %}
-{%- endfragment -%}
-```
-
-See `examples/chirpui/kanban_shell` for a working example of all four patterns.
+:::{related}
+:::

@@ -1,79 +1,203 @@
 ---
 title: Configuration
-description: AppConfig frozen dataclass and all configuration options
+description: How AppConfig works — set fields in code for dev, load from the environment for prod, both produce the same frozen config.
 draft: false
 weight: 90
 lang: en
 type: doc
 tags: [configuration, appconfig, settings]
-keywords: [config, appconfig, settings, debug, host, port, secret-key, template-dir]
+keywords: [config, appconfig, settings, debug, host, port, secret-key, from_env, env-vars]
 category: explanation
 ---
 
-## AppConfig
+## Overview
 
-Chirp uses a frozen dataclass for configuration. Every field has IDE autocomplete, type checking, and no runtime `KeyError` surprises.
+Chirp reads all configuration from one immutable object: `AppConfig`. You set
+fields in code for local development, or load them from environment variables
+for production — both produce the same frozen config that the app runs against.
 
-```python
+For most apps, start here:
+
+::::{code-tabs}
+
+```python title="Local development"
+# Set fields in code
 from chirp import App, AppConfig
 
-config = AppConfig(
-    debug=True,
-    host="0.0.0.0",
-    port=8000,
-    secret_key="change-me-in-production",
-    template_dir="templates/",
-)
-
-app = App(config=config)
+app = App(config=AppConfig(debug=True, secret_key="dev-only"))
 ```
 
-`AppConfig` is `@dataclass(frozen=True, slots=True)`. Once created, it cannot be mutated. This is intentional -- config should not change after the app starts.
+```python title="Production"
+# Load from the environment
+from chirp import App, AppConfig
 
-## Field Stability
+app = App(config=AppConfig.from_env())  # reads CHIRP_SECRET_KEY, CHIRP_ENV, CHIRP_PORT, ...
+```
 
-`AppConfig` is a stable top-level API. Most fields are part of the 1.0
-compatibility promise. A few fields expose younger subsystems and remain
-provisional until those subsystems are stabilized.
+::::
 
-## Stable Configuration Fields
+Pass no config and you get the defaults:
 
-### Server
+```python
+app = App()  # same as App(config=AppConfig())
+```
+
+Every field has IDE autocomplete and type checking, so there are no runtime
+`KeyError` surprises. The fields you reach for most often are below; the full
+catalog and exact signatures live in the
+[[docs/reference/api|complete field and signature reference]].
+
+:::{note}
+`AppConfig` is `@dataclass(frozen=True, slots=True)` — it cannot be mutated after
+it is created. The app freezes this config when it starts; see
+[[docs/about/core-concepts/app-lifecycle|how the app freezes configuration at startup]].
+:::
+
+## Load configuration from the environment
+
+`AppConfig.from_env()` builds a config from environment variables — the 12-factor
+path you want in production. Unset variables fall back to the `AppConfig`
+defaults, and any keyword you pass overrides the result:
+
+```python
+app = App(config=AppConfig.from_env(template_dir="pages", worker_mode="async"))
+```
+
+Variables use the `CHIRP_` prefix (override with `from_env(prefix="MYAPP_")`).
+The commonly-set ones:
+
+:::{list-table}
+:header-rows: 1
+
+* - Variable
+  - Sets
+* - `CHIRP_SECRET_KEY`
+  - `secret_key`
+* - `CHIRP_ENV`
+  - `env` (`development` / `staging` / `production`)
+* - `CHIRP_DEBUG`
+  - `debug`
+* - `CHIRP_HOST`, `CHIRP_PORT`
+  - `host`, `port`
+* - `CHIRP_ALLOWED_HOSTS`
+  - `allowed_hosts` (comma/space-separated)
+* - `CHIRP_TRUSTED_PROXIES`
+  - `trusted_proxies` (comma/space-separated)
+* - `CHIRP_FEATURE_<NAME>`
+  - a `feature_flags` entry (`CHIRP_FEATURE_BETA=true`)
+:::
+
+If `python-dotenv` is installed (`pip install chirp[config]`), `from_env()` loads
+a `.env` file from the current directory first. On Railway, it falls back to
+the platform's `PORT`, binds `0.0.0.0`, and — when `CHIRP_ALLOWED_HOSTS` is
+unset — sets `allowed_hosts` to your `RAILWAY_PUBLIC_DOMAIN` plus
+`healthcheck.railway.app`.
+
+:::{note} See also
+
+For the full env-var list, reverse-proxy headers, and a copy-pasteable prod
+config, see [[docs/quality/deployment/production|Running behind a reverse proxy]].
+:::
+
+## Fields you set by hand
+
+These are the knobs most apps touch directly. Everything else has a default that
+works out of the box.
+
+:::{list-table}
+:header-rows: 1
+
+* - Field
+  - Type
+  - Default
+  - What it does
+* - `debug`
+  - `bool`
+  - `False`
+  - Rich error pages, DevTools, template auto-reload
+* - `secret_key`
+  - `str`
+  - `""`
+  - Signing key for sessions, CSRF, and signed state
+* - `host`
+  - `str`
+  - `"127.0.0.1"`
+  - Bind address for `app.run()` / `chirp run`
+* - `port`
+  - `int`
+  - `8000`
+  - Bind port for `app.run()` / `chirp run`
+* - `env`
+  - `str`
+  - `"development"`
+  - Environment label; a non-development value requires a `secret_key`
+* - `template_dir`
+  - `str | Path`
+  - `"templates"`
+  - Directory for Kida templates
+* - `static_dir`
+  - `str | Path | None`
+  - `"static"`
+  - Static-file directory; `None` disables default static serving
+* - `allowed_hosts`
+  - `tuple[str, ...]`
+  - `("*",)`
+  - Host allowlist for production host validation
+* - `worker_mode`
+  - `str`
+  - `"auto"`
+  - Pounce worker execution: `"auto"`, `"sync"`, `"async"`, or `"subinterpreter"`
+:::
+
+The remaining fields group by concern below — open the one you need.
+
+## Debug mode
+
+When `debug=True`:
+
+- Detailed error pages with tracebacks are shown in the browser.
+- Templates auto-reload when modified (no server restart).
+- Stricter validation warnings are surfaced.
+
+```python
+app = App(config=AppConfig(debug=True, secret_key="dev-only"))
+```
+
+:::{danger}
+Never enable `debug` in production. It exposes internal details — source code
+and full tracebacks — in the browser.
+:::
+
+## Secret key
+
+`secret_key` signs sessions, CSRF tokens, and signed state. Use a strong random
+value in production, and read it from the environment rather than hard-coding it:
+
+```python
+import os
+
+app = App(config=AppConfig(secret_key=os.environ["CHIRP_SECRET_KEY"]))
+```
+
+:::{note}
+Constructing `AppConfig` with `env` set to anything other than `"development"`
+and an empty `secret_key` raises `ConfigurationError`. Adding `SessionMiddleware`
+or `CSRFMiddleware` without a `secret_key` also raises `ConfigurationError`. To
+wire the secure-by-default stack, see
+[[docs/quality/deployment/auth-hardening|wire the secure-by-default stack]].
+:::
+
+## Reference field groups
+
+::::{dropdown} Server, reload & templates
+:icon: server
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `host` | `str` | `"127.0.0.1"` | Bind address for `app.run()` and `chirp run` |
-| `port` | `int` | `8000` | Bind port for `app.run()` and `chirp run` |
-| `debug` | `bool` | `False` | Enable debug mode, rich errors, DevTools, and template auto-reload |
-| `env` | `str` | `"development"` | Environment label; non-development requires a non-empty `secret_key` |
-
-### Development Reload
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `reload_include` | `tuple[str, ...]` | `(".html", ".css", ".md")` | File suffixes watched by browser reload; use `()` to disable browser reload |
-| `reload_dirs` | `tuple[str, ...]` | `()` | Extra directories watched alongside the current working directory |
+| `reload_include` | `tuple[str, ...]` | `(".html", ".css", ".md")` | File suffixes watched by browser reload; use `()` to disable |
+| `reload_dirs` | `tuple[str, ...]` | `()` | Extra directories watched alongside the working directory |
 | `dev_browser_reload` | `bool \| None` | `None` | Browser refresh injection; `None` follows `debug` |
 | `reload_timeout` | `float` | `30.0` | Pounce hot-reload drain timeout |
-
-### Security
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `secret_key` | `str` | `""` | Secret key for sessions, CSRF, and signed state |
-| `allowed_hosts` | `tuple[str, ...]` | `("*",)` | Host allowlist for production host validation |
-| `csp_nonce_enabled` | `bool` | `False` | Enable nonce-aware CSP helpers |
-| `strict_transport_security` | `str \| None` | `None` | Strict-Transport-Security header value |
-| `max_request_body_size` | `int` | `16777216` | General request-body ceiling for **every** content type (JSON, text, urlencoded, multipart), 16 MB; oversize bodies are rejected with 413 *before* buffering into RAM |
-| `max_upload_size` | `int` | `16777216` | Multipart-specific ceiling on the **total** size of `multipart/form-data` parts (16 MB); the inner envelope, must be `<=` `max_request_body_size` |
-| `upload_spool_threshold` | `int` | `1048576` | Bytes an `UploadFile` keeps in RAM before spilling to a temp file (1 MB) |
-| `max_upload_parts` | `int` | `1000` | Maximum number of multipart parts; rejects multipart bombs |
-
-### Templates
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `template_dir` | `str \| Path` | `"templates"` | Directory for Kida templates |
 | `component_dirs` | `tuple[str \| Path, ...]` | `()` | Additional component/template directories |
 | `extra_loaders` | `tuple[Any, ...]` | `()` | Kida loaders tried before filesystem loaders |
 | `autoescape` | `bool` | `True` | Enable HTML autoescaping |
@@ -81,54 +205,36 @@ provisional until those subsystems are stabilized.
 | `lstrip_blocks` | `bool` | `True` | Kida leading-whitespace trimming |
 | `strict_undefined` | `bool` | `True` | Raise on missing template variables |
 | `static_context` | `Mapping \| dict \| None` | `None` | Compile-time constants, frozen to `MappingProxyType` when passed as a dict |
-
-### Static Files
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `static_dir` | `str \| Path \| None` | `"static"` | Directory for static files; `None` disables default static serving |
 | `static_url` | `str` | `"/static"` | URL prefix for static files |
-| `static_stream_threshold` | `int` | `1048576` | File size (bytes) at/above which static files stream from disk in chunks instead of buffering into memory (1 MiB) |
+| `static_stream_threshold` | `int` | `1048576` | File size (bytes) at/above which static files stream from disk instead of buffering (1 MiB) |
+::::{/dropdown}
 
-### SSE And Suspense
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `sse_heartbeat_interval` | `float` | `15.0` | Seconds between SSE heartbeat comments |
-| `sse_retry_ms` | `int \| None` | `None` | SSE reconnection interval sent to the client |
-| `sse_close_event` | `str \| None` | `None` | Optional close event name emitted before stream shutdown |
-| `suspense_error_template` | `str \| None` | `None` | Template containing a global Suspense fallback block |
-| `suspense_error_block` | `str` | `"fallback"` | Block name for the global Suspense fallback |
-
-### Browser Runtime Helpers
+::::{dropdown} Security & request limits
+:icon: shield
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `safe_target` | `bool` | `True` | Auto-add `hx-target="this"` to event-driven elements |
-| `sse_lifecycle` | `bool` | `True` | Inject SSE connection state and lifecycle events |
-| `view_transitions` | `bool \| str` | `False` | View Transitions tier: `False`/`"off"`, `True`/`"htmx"`, or `"full"` |
-| `speculation_rules` | `bool \| str` | `False` | Speculation Rules tier: `False`/`"off"`, `True`/`"conservative"`, `"moderate"`, or `"eager"` |
-| `delegation` | `bool` | `False` | Inject delegated handlers for swapped copy/compare controls |
-| `alpine` | `bool` | `False` | Enable Alpine.js script injection |
-| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine.js CDN version |
-| `alpine_csp` | `bool` | `False` | Use the CSP-safe Alpine build |
-| `htmx` | `bool` | `False` | Enable opt-in htmx core script injection |
-| `htmx_version` | `str` | `"2.0.4"` | Pinned htmx CDN version |
+| `csp_nonce_enabled` | `bool` | `False` | Enable nonce-aware CSP helpers |
+| `strict_transport_security` | `str \| None` | `None` | Strict-Transport-Security header value |
+| `max_request_body_size` | `int` | `16777216` | General request-body ceiling for **every** content type (16 MiB); oversize bodies are rejected with 413 *before* buffering into RAM |
+| `max_upload_size` | `int` | `16777216` | Multipart-specific ceiling on total `multipart/form-data` part size (16 MiB); must be `<=` `max_request_body_size` |
+| `upload_spool_threshold` | `int` | `1048576` | Bytes an `UploadFile` keeps in RAM before spilling to a temp file (1 MiB) |
+| `max_upload_parts` | `int` | `1000` | Maximum number of multipart parts; rejects multipart bombs |
+::::{/dropdown}
 
-### Production Server
-
+::::{dropdown} Production server & observability
+:icon: network
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `workers` | `int` | `0` | Pounce worker count; `0` lets pounce auto-detect |
-| `worker_mode` | `str` | `"auto"` | Pounce worker execution mode; use `"async"` when registering worker lifecycle hooks |
 | `metrics_enabled` | `bool` | `False` | Enable Prometheus metrics |
 | `metrics_path` | `str` | `"/metrics"` | Metrics endpoint path |
 | `rate_limit_enabled` | `bool` | `False` | Enable rate limiting |
 | `rate_limit_requests_per_second` | `float` | `100.0` | Rate limit steady-state rate |
 | `rate_limit_burst` | `int` | `200` | Rate limit burst size |
-| `rate_limit_max_tracked_ips` | `int` | `100000` | Max distinct client IPs the per-IP rate limiter tracks before LRU eviction (limiter memory cap) |
-| `trusted_proxies` | `tuple[str, ...]` | `()` | Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored (maps to pounce `ServerConfig.trusted_hosts`). Empty means `X-Forwarded-For` is ignored entirely; `"*"` trusts every peer (spoofing risk — flagged by the `trusted_proxies` contract). See [Running behind a reverse proxy](/chirp/docs/quality/deployment/production/#running-behind-a-reverse-proxy). |
-| `forwarded_for_trusted_hops` | `int` | `1` | Trailing `X-Forwarded-For` hops to trust when deriving the client IP behind a reverse proxy. Must be `>= 1` (construction fails fast otherwise); only honored when `trusted_proxies` is non-empty. To ignore `X-Forwarded-For`, leave `trusted_proxies` empty rather than lowering this. |
+| `rate_limit_max_tracked_ips` | `int` | `100000` | Max distinct client IPs the per-IP rate limiter tracks before LRU eviction |
+| `trusted_proxies` | `tuple[str, ...]` | `()` | Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored. Empty ignores `X-Forwarded-For`; `"*"` trusts every peer (spoofing risk). See [[docs/quality/deployment/production|Running behind a reverse proxy]]. |
+| `forwarded_for_trusted_hops` | `int` | `1` | Trailing `X-Forwarded-For` hops to trust. Must be `>= 1` (construction fails fast otherwise); only honored when `trusted_proxies` is non-empty |
 | `request_queue_enabled` | `bool` | `False` | Enable request queueing/load shedding |
 | `request_queue_max_depth` | `int` | `1000` | Maximum queued requests |
 | `sentry_dsn` | `str \| None` | `None` | Sentry DSN |
@@ -146,8 +252,32 @@ provisional until those subsystems are stabilized.
 | `request_timeout` | `float` | `30.0` | Request timeout |
 | `ssl_certfile` | `str \| None` | `None` | TLS certificate path |
 | `ssl_keyfile` | `str \| None` | `None` | TLS key path |
+::::{/dropdown}
 
-### Cache And Environment
+::::{dropdown} SSE, Suspense & browser runtime
+:icon: zap
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `sse_heartbeat_interval` | `float` | `15.0` | Seconds between SSE heartbeat comments |
+| `sse_retry_ms` | `int \| None` | `None` | SSE reconnection interval sent to the client |
+| `sse_close_event` | `str \| None` | `None` | Optional close event name emitted before stream shutdown |
+| `suspense_error_template` | `str \| None` | `None` | Template containing a global Suspense fallback block |
+| `suspense_error_block` | `str` | `"fallback"` | Block name for the global Suspense fallback |
+| `safe_target` | `bool` | `True` | Auto-add `hx-target="this"` to event-driven elements |
+| `sse_lifecycle` | `bool` | `True` | Inject SSE connection state and lifecycle events |
+| `view_transitions` | `bool \| str` | `False` | View Transitions tier: `False`/`"off"`, `True`/`"htmx"`, or `"full"` |
+| `speculation_rules` | `bool \| str` | `False` | Speculation Rules tier: `False`/`"off"`, `True`/`"conservative"`, `"moderate"`, or `"eager"` |
+| `delegation` | `bool` | `False` | Inject delegated handlers for swapped copy/compare controls |
+| `alpine` | `bool` | `False` | Enable Alpine.js script injection |
+| `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine.js CDN version |
+| `alpine_csp` | `bool` | `False` | Use the CSP-safe Alpine build |
+| `htmx` | `bool` | `False` | Enable opt-in htmx core script injection |
+| `htmx_version` | `str` | `"2.0.4"` | Pinned htmx CDN version |
+::::{/dropdown}
+
+::::{dropdown} Cache & environment
+:icon: database
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -162,13 +292,18 @@ provisional until those subsystems are stabilized.
 | `skip_contract_checks` | `bool` | `False` | Disable debug-mode startup contract checks |
 | `lazy_pages` | `bool` | `False` | Lazily load filesystem page modules |
 | `debug_fragment_validator` | `bool` | `True` | Enable debug-only fragment response validation |
+::::{/dropdown}
 
-## Provisional Configuration Fields
+## Provisional fields
 
-These fields are public but tied to subsystems that are still settling before
-1.0. Use them when needed, but expect minor-release refinements with changelog
+:::{since} 0.8
+These fields are public but tied to subsystems still settling before 1.0. Use
+them when you need them, but expect minor-release refinements with changelog
 coverage.
+:::
 
+::::{dropdown} Provisional subsystem fields
+:icon: flask
 | Field | Type | Default | Reason |
 |-------|------|---------|--------|
 | `mcp_path` | `str` | `"/mcp"` | MCP/tool integration is younger than the core hypermedia surface |
@@ -183,55 +318,25 @@ coverage.
 | `i18n_directory` | `str \| Path` | `"locales"` | Provisional i18n option |
 | `i18n_cookie_name` | `str` | `"chirp_locale"` | Provisional i18n option |
 | `i18n_url_prefix` | `bool` | `False` | Provisional i18n option |
+::::{/dropdown}
 
-## Debug Mode
+## Construction-time validation
 
-When `debug=True`:
+`AppConfig.__post_init__` enforces a few invariants when you construct the config,
+so misconfigurations fail loud immediately instead of deep in the launch path:
 
-- Detailed error pages with tracebacks are shown in the browser
-- Templates auto-reload when modified (no server restart needed)
-- Stricter validation warnings are surfaced
+- **Secret key** — empty `secret_key` with `env` not `"development"` raises `ConfigurationError`.
+- **Upload caps** — if `max_upload_size` exceeds `max_request_body_size`, Chirp clamps it to the body cap when the upload cap is still at its default, and otherwise raises `ConfigurationError`.
+- **Forwarded hops** — `forwarded_for_trusted_hops` below `1` raises `ConfigurationError`. To ignore `X-Forwarded-For`, leave `trusted_proxies` empty rather than lowering this.
 
-```python
-config = AppConfig(debug=True)
-```
+## See also
 
-:::{warning}
-Never enable debug mode in production. It exposes internal details including source code and tracebacks.
+:::{related}
+:limit: 3
+:section_title: Next Steps
 :::
 
-## Secret Key
-
-Required for session middleware and CSRF protection. Use a strong random value in production:
-
-```python
-import secrets
-
-config = AppConfig(
-    secret_key=secrets.token_hex(32),
-)
-```
-
-:::{note}
-If you use `SessionMiddleware` or `CSRFMiddleware` without setting a `secret_key`, Chirp raises a `ConfigurationError` at startup.
-:::
-
-## Default Configuration
-
-If you don't pass a config, sensible defaults are used:
-
-```python
-app = App()  # Uses default AppConfig
-```
-
-This is equivalent to:
-
-```python
-app = App(config=AppConfig())
-```
-
-## Next Steps
-
-- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- How the app freezes
-- [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] -- Middleware that uses config
-- [[docs/reference/api|API Reference]] -- Complete API surface
+- [[docs/about/core-concepts/app-lifecycle|App lifecycle]] — how the app freezes config at startup
+- [[docs/build-apps/request-pipeline/builtin|Built-in middleware]] — middleware that reads config
+- [[docs/quality/deployment/production|Production deployment]] — env config behind a reverse proxy
+- [[docs/reference/api|API reference]] — the complete field and signature catalog

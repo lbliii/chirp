@@ -10,44 +10,129 @@ keywords: [sse, server sent events, eventstream, fragments]
 category: examples
 ---
 
-## What It Teaches
+## Live feed over SSE
 
-Use this example when updates happen after the page is loaded. `EventStream`
-opens a long-lived SSE response and the generator yields values over time:
-plain strings, structured `SSEEvent` payloads, or rendered `Fragment(...)`
-payloads.
+This example streams HTML to the browser *after* the page loads — a feed of
+notifications that appear one by one, with no client-side JavaScript. You return
+an `EventStream` from a route, and an async generator yields events over a
+long-lived connection. Each yielded value can be a plain string, a structured
+`SSEEvent` (custom event name and id), or a rendered `Fragment(...)` that htmx
+swaps into the page.
 
-This is intentionally not a Suspense example. Suspense is for initial render;
-SSE is for post-load updates.
+:::{tip} Updates after load, or slow data on first paint?
+Reach for SSE when updates arrive *after* the initial render — notifications, a
+ticker, a chat tail. For slow data on the *first* paint, use Suspense instead.
+See [[docs/build-apps/streaming-updates/_index|the streaming decision table]].
+:::
 
-## Run It
+## Minimal example
 
+Two routes: one renders the page shell, the other returns an `EventStream` whose
+generator yields a mix of `SSEEvent` and `Fragment` values.
+
+```python
+import asyncio
+from pathlib import Path
+
+from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Template
+
+config = AppConfig(
+    template_dir=Path(__file__).parent / "templates",
+    worker_mode="async",
+    sse_close_event="close",
+)
+app = App(config=config)
+
+_NOTIFICATIONS = [
+    {"title": "Welcome", "message": "You are now connected to the live feed."},
+    {"title": "Update", "message": "New deployment started."},
+    {"title": "Alert", "message": "CPU usage above 90% on worker-3."},
+    {"title": "Resolved", "message": "CPU usage back to normal."},
+]
+
+
+@app.route("/")
+def index():
+    return Template("feed.html")
+
+
+@app.route("/events", referenced=True)
+def events():
+    async def generate():
+        # Structured SSEEvent — custom event name, kept off the htmx message channel.
+        yield SSEEvent(data="connected", event="status")
+
+        # Fragment events — rendered HTML pushed to the browser and swapped by htmx.
+        for notification in _NOTIFICATIONS:
+            await asyncio.sleep(1.5)
+            yield Fragment(
+                "feed.html",
+                "notification",
+                title=notification["title"],
+                message=notification["message"],
+            )
+
+    return EventStream(generate())
+
+
+if __name__ == "__main__":
+    app.run()
+```
+
+*Source: [`examples/standalone/sse/app.py`](https://github.com/lbliii/chirp/blob/main/examples/standalone/sse/app.py).*
+
+Set `worker_mode="async"` — the stream holds a connection open and awaits between
+events. The `/events` route is marked `referenced=True` because htmx reaches it
+through an `sse-connect` attribute, not a link the contract checker can see, so
+the flag keeps it out of the orphan-route report. A `Fragment`'s target becomes
+the SSE event name, so an `sse-swap="notification"` element receives only those
+updates.
+
+## Run it
+
+::::{steps}
+:::{step} Start the app
 ```bash
 PYTHONPATH=src python examples/standalone/sse/app.py
 ```
-
-Open `http://127.0.0.1:8000/`.
-
-## Test It
-
+Open `http://127.0.0.1:8000/` and watch notifications stream in.
+:::{/step}
+:::{step} Run the test
 ```bash
 pytest examples/standalone/sse/
 ```
+:::{/step}
+::::{/steps}
 
-## Contract Surface
+:::{note}
+A failing `Fragment` render does not kill the open stream. The event boundary is
+per-event: one bad block logs an error and emits an error event, and the
+connection stays alive for the next one.
+:::
 
-SSE examples exercise the per-event boundary: a bad fragment should not casually
-kill a stream intended to stay open. They also exercise template block
-cross-references between yielded `Fragment(...)` values and htmx `sse-swap`
-targets.
+:::{dropdown} What the contract checks cover here
+These checks run at startup via `app.check()` — they are static analysis of your
+routes and templates, separate from the per-event runtime boundary described
+above.
 
-## Source
+- **Event cross-references (`sse_crossref`).** Each `sse-swap` target in the markup
+  is matched against the event names the connected route emits — the `target` on a
+  `Fragment(...)`, the `event` on an `SSEEvent(...)`, and any declared
+  `SSEContract.event_types`. A target that no event produces is flagged as a likely
+  typo.
+- **Self-swap (`sse_self_swap`).** An `sse-swap` on the *same* element as
+  `sse-connect` never matches (htmx excludes the root element), so it errors.
+- **Connect scope (`sse_scope`).** An `sse-connect` inside a broad `hx-target`
+  scope without mitigation errors, since inherited swaps would clobber the wrong
+  region.
 
-- [`app.py`](https://github.com/lbliii/chirp/blob/main/examples/standalone/sse/app.py)
-- [`README.md`](https://github.com/lbliii/chirp/blob/main/examples/standalone/sse/README.md)
+See [[docs/about/core-concepts/contracts|how contract checks work]].
+:::{/dropdown}
 
-## Next
-
-- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]]
-- [[docs/build-apps/streaming-updates/sse-patterns|SSE Patterns]]
-- [[docs/quality/testing/assertions|Testing Assertions]]
+:::{note} See also
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events guide]] — the full `EventStream` and `SSEEvent` API.
+- [[docs/build-apps/streaming-updates/sse-patterns|SSE patterns]] — reconnects, channels, and reactive templates.
+- [[docs/build-apps/streaming-updates/_index|Streaming overview]] — Suspense vs SSE vs Stream.
+- [[docs/about/core-concepts/return-values|Return values]] — how each return type maps to an intent.
+- [[docs/quality/testing/assertions|Testing assertions]] — assert against streamed HTML.
+:::

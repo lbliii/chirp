@@ -1,58 +1,46 @@
 ---
 title: Fragments
-description: Render named template blocks independently for htmx
+description: Render a single named template block on its own, so htmx can swap just the piece of the DOM it asked for.
 draft: false
 weight: 20
 lang: en
 type: doc
 tags: [fragments, htmx, blocks, page, oob]
-keywords: [fragment, page, oob, htmx, block, partial, render-block]
+keywords: [fragment, page, oob, htmx, block, partial, render-block, content negotiation]
 category: guide
 ---
 
-## The Key Innovation
+## What a fragment is
 
-Most Python frameworks treat templates as "render a full page, return a string." Chirp can render a *named block* from a template independently, without rendering the rest of the page.
+A fragment is a single named block from a template, rendered on its own — without the surrounding page. That is what lets an htmx request swap just the piece of the DOM it asked for: the browser requests a target, Chirp returns only that block.
 
-This is what makes htmx integration seamless. The browser requests a fragment, the server returns just the block it needs.
+This page covers the return types that produce fragments:
+
+- `Fragment` — render one named block.
+- `Page` — auto-pick fragment vs. full page based on the request.
+- `OOB` — one response, several out-of-band swaps.
+- `ValidationError` — a 422 form fragment for a failed validation.
+
+If you already know htmx fragments and just want the Chirp mapping, jump to the [example](#fragment) below. The return type is the intent — for the full picture of every return type, see [[docs/about/core-concepts/return-values|the return-type decision tree]].
 
 ## Fragment
 
-`Fragment` renders a specific block from a template:
+`Fragment` renders one named block from a template. The handler decides whether the request wants a fragment; the template stays the same single file that also serves the full page.
 
+:::{tab-set}
+:::{tab-item} Handler (page.py)
 ```python
-from chirp import Fragment
+from chirp import Fragment, Request, Template
 
 @app.route("/search")
 def search(request: Request):
     results = do_search(request.query.get("q", ""))
-    if request.is_fragment:
+    if request.is_narrow_fragment:
         return Fragment("search.html", "results_list", results=results)
     return Template("search.html", results=results)
 ```
-
-Arguments:
-
-:::{dropdown} Template path
-:icon: file
-
-Path to the template file (relative to `template_dir`).
-:::
-
-:::{dropdown} Block name
-:icon: layers
-
-The named block to render. Must exist in the template.
-:::
-
-:::{dropdown} Keyword arguments
-:icon: database
-
-Become the rendering context passed to the template.
-:::
-
-The template:
-
+:::{/tab-item}
+:::{tab-item} Template (search.html)
 ```html
 {% extends "base.html" %}
 
@@ -68,26 +56,46 @@ The template:
   {% endblock %}
 {% endblock %}
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-Full page request renders everything (base layout + content + results). Fragment request renders only `results_list` -- the `<div id="results">` and its contents.
+A full-page request renders everything (base layout + content + results). A narrow htmx request renders only `results_list` — the `<div id="results">` and its contents.
 
-## request.is_fragment
+`Fragment(template, block, **context)` takes the template path (relative to `template_dir`), the named block to render, and keyword arguments that become the rendering context. Pass `target="dom-id"` to override the swap target for an OOB or SSE delivery.
 
-The `Request` object detects htmx requests automatically:
+## Detecting htmx requests
 
-```python
-request.is_fragment      # True if HX-Request header present
-request.htmx_target      # Value of HX-Target header (e.g., "#results")
-request.htmx_trigger     # Value of HX-Trigger header
-request.is_history_restore  # True if htmx history restore
-```
+The `Request` object exposes typed properties for reacting to htmx requests. Use `is_narrow_fragment` for "should I return just the block?" — it is `True` only for a narrow fragment swap, and `False` for boosted navigations and history restores, which need full page content.
+
+:::{warning}
+`request.is_fragment` is deprecated and emits a `DeprecationWarning` on every access. It is `True` for *any* htmx request, including boosted navigations and history restores that actually need the full page — that ambiguity is the bug. Use `request.is_htmx` (any htmx request) or `request.is_narrow_fragment` (narrow swap only) instead. The old name still appears in older codebases; do not copy it forward.
+:::
+
+:::{list-table}
+:header-rows: 1
+
+* - Property
+  - `True` when
+* - `request.is_htmx`
+  - Any htmx request (`HX-Request` header present).
+* - `request.is_narrow_fragment`
+  - A narrow htmx swap — excludes boosted navigations and history restores.
+* - `request.htmx_target_id`
+  - Returns the target element id (no leading `#`), or `None`.
+* - `request.is_history_restore`
+  - htmx is restoring from history (cache miss on back/forward).
+:::
+
+:::{note} See also
+- [[docs/build-apps/pages-navigation/request-response|request detection in detail]] — the full set of `request.htmx.*` properties.
+:::
 
 ## Page
 
-`Page` is syntactic sugar that auto-detects whether to return a full page or a fragment:
+Most htmx-reachable routes do not need the `if/else`. `Page` is the auto-negotiated form: it inspects the request and renders the right thing.
 
 ```python
-from chirp import Page
+from chirp import Page, Request
 
 @app.route("/search")
 def search(request: Request):
@@ -95,9 +103,14 @@ def search(request: Request):
     return Page("search.html", "results_list", results=results)
 ```
 
-If `request.is_fragment` is `True`, it renders the block. Otherwise, it renders the full template. This eliminates the `if/else` pattern.
+`Page` does not collapse to a simple "fragment or full page" boolean. It renders:
 
-When a route needs two fragment scopes, pass `page_block_name`:
+- the **full template** for normal browser navigations and htmx history restores;
+- the **named fragment block** for narrow htmx requests;
+- a wider **page block** for boosted navigations, when you supply one (below).
+
+::::{dropdown} Boosted navigation: a wider fragment root
+When a route is reachable by both narrow swaps and `hx-boost` navigation, the narrow block is often too small to stand alone as a page body. Pass `page_block_name` so boosted navigations get a fragment-safe root while explicit swaps still target the narrow block:
 
 ```python
 return Page(
@@ -108,15 +121,18 @@ return Page(
 )
 ```
 
-- `results_list` stays the narrow fragment target for explicit swaps
-- `page_root` becomes the fragment-safe root for boosted navigation
+- `results_list` stays the narrow fragment target for explicit swaps.
+- `page_root` becomes the fragment-safe root for boosted navigation.
 
-## OOB (Out-of-Band Swaps)
+For mounted page-directory templates that follow Chirp's conventional `page_root` / `page_content` blocks, `Page.mounted("dashboard/page.html", **ctx)` wires both names for you.
+::::{/dropdown}
 
-Sometimes a single action needs to update multiple parts of the page. `OOB` sends a primary fragment plus additional out-of-band fragments in one response:
+## OOB (out-of-band swaps)
+
+Sometimes one action updates several parts of the page. `OOB` sends a primary fragment plus additional out-of-band fragments in a single response.
 
 ```python
-from chirp import OOB, Fragment
+from chirp import OOB, Fragment, Request
 
 @app.route("/cart/add", methods=["POST"])
 async def add_to_cart(request: Request):
@@ -128,142 +144,65 @@ async def add_to_cart(request: Request):
     )
 ```
 
-The first fragment is the main response. Additional fragments are appended with `hx-swap-oob="true"`, so htmx swaps them into the correct locations on the page.
+The first fragment is the primary swap target. Each additional fragment is rendered with `hx-swap-oob="true"` and an `id` matching its target (the block name by default, or `Fragment(..., target="id")`), so htmx swaps them into the right places.
+
+:::{warning}
+OOB region updates must resolve to a block that exists in the target template, or Chirp raises `BlockNotFoundError` rather than emitting an empty swap that silently wipes live DOM content. `app.check()` enforces this at startup. See [[docs/quality/contracts-debugging/oob-registry|the OOB region registry]] for registering and validating shell regions.
+:::
 
 ## ValidationError
 
-A specialized fragment for form validation errors. Returns a 422 status:
+`ValidationError` bundles the common htmx form pattern: validate server-side, re-render the form fragment with errors, and return a **422** status so htmx knows to swap the error content.
 
 ```python
-from chirp import ValidationError
+from chirp import ValidationError, Request
+from chirp.validation import validate, required, email
+
+RULES = {"email": [required, email]}
 
 @app.route("/register", methods=["POST"])
 async def register(request: Request):
     form = await request.form()
-    errors = validate_registration(form)
-    if errors:
-        return ValidationError("register.html", "form_errors", errors=errors)
-    # ... create user
+    result = validate(form, RULES)
+    if not result:
+        return ValidationError(
+            "register.html", "form_errors",
+            errors=result.errors, form=form,
+        )
+    # ... create the user
 ```
 
-This renders the `form_errors` block with a 422 status code, which htmx can handle with `hx-target-422` or a custom error handler.
+The `form_errors` block re-renders with a 422 status. On the client, hook it with `hx-target-422` (or a custom htmx error handler). Pass `retarget="#error-banner"` to add an `HX-Retarget` header so errors land in a different element than the trigger.
 
-## Block Availability
+:::{note} See also
+- [[docs/build-apps/forms-data/forms-validation|Forms & validation]] — the full `validate()` API, validator functions, and form patterns.
+:::
 
-`render_block()` resolves inherited blocks. You can render a parent-defined page root from a child template, and child overrides still win inside that parent block.
+## Where fragments come from
 
-```html
-{# child.html #}
-{% extends "base.html" %}
+Chirp discovers block names, regions, and dependencies from the template at build time — it never hard-codes which blocks exist. That is what backs fragment validation in `app.check()` and automatic OOB region discovery. You render blocks; you do not register them.
 
-{% block search_results %}
-  <div id="results">...</div>
-{% endblock %}
-```
+::::{dropdown} How Chirp finds blocks
+Chirp uses Kida's `template_metadata()` to introspect each template's AST at build time. Block names, regions, and dependencies come from the AST, which enables:
 
-```html
-{# base.html #}
-{% block page_root %}
-  <section class="page-shell">
-    {% block search_results %}{% endblock %}
-  </section>
-{% endblock %}
-```
+- **Validation** — `Fragment`/`Page` block names are checked before render.
+- **OOB discovery** — blocks named `*_oob` are discovered automatically for app shells.
+- **Layout contracts** — each block's `depends_on` and `cache_scope` drive when OOB regions re-render.
 
-In this shape:
+This is build-time machinery you do not call directly. See [[docs/build-apps/html-fragments/kida-integration|Kida integration]] for the full flow.
+::::{/dropdown}
 
-- `render_block("search_results")` returns only the inner results fragment
-- `render_block("page_root")` returns the full page shell with the child's `search_results` block injected
+:::{note} See also
+Fragments live inside layouts and reusable blocks — those topics have their own homes:
 
-## How Chirp Finds Blocks
+- [[docs/build-apps/html-fragments/layout-patterns|Layout patterns]] — block inheritance, boosted-root layouts, extension blocks, and shell OOB regions.
+- [[docs/build-apps/html-fragments/fragment-blocks|Fragment blocks]] — the `{% fragment %}` block directive.
+- [[docs/build-apps/html-fragments/kida-integration|Kida integration]] — how Chirp reads templates and maps shell regions to DOM ids.
+:::
 
-Chirp uses Kida's `template_metadata()` to introspect templates at build time.
-Block names, regions, and dependencies come from the AST — Chirp never hard-codes
-which blocks exist. That enables:
+## Next step
 
-- **Validation** — `fragment_block` and `page_block` are checked before render
-- **OOB discovery** — Blocks named `*_oob` are discovered automatically for app shells
-- **Layout contracts** — `depends_on` and `cache_scope` from each block drive
-  when OOB regions are rendered
+Push fragments to the browser in real time with [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — the same named blocks, streamed instead of swapped on request.
 
-See [[docs/build-apps/html-fragments/kida-integration|Kida Integration]] for the full flow.
-
-## Regions for Shell OOB
-
-`{% region %}` is the preferred pattern for app shell updates (breadcrumbs, sidebar, title). One definition serves both full-page slots and OOB swaps — no duplication.
-
-Minimal layout example:
-
-```html
-{% region breadcrumbs_oob(breadcrumb_items=[{"label":"Home","href":"/"}]) %}
-{{ breadcrumbs(breadcrumb_items) }}
-{% end %}
-
-{% region title_oob(page_title="My App") %}
-<title id="chirpui-document-title" hx-swap-oob="true">{{ page_title }}</title>
-{% end %}
-
-{% region sidebar_oob(current_path="/") %}
-{{ sidebar(current_path=current_path) }}
-{% end %}
-
-{% call app_shell(brand="My App") %}
-  {% slot topbar %}
-  {{ breadcrumbs_oob(breadcrumb_items=breadcrumb_items | default([{"label":"Home","href":"/"}])) }}
-  {% end %}
-  {% slot sidebar %}
-  {{ sidebar_oob(current_path=current_path | default("/")) }}
-  {% end %}
-  {% block content %}{% end %}
-{% end %}
-```
-
-ChirpUI's `breadcrumbs_oob`, `sidebar_oob`, and `title_oob` map to `chirpui-topbar-breadcrumbs`, `chirpui-sidebar-nav`, and `chirpui-document-title` automatically. See [[docs/build-apps/html-fragments/kida-integration|Kida Integration]] for the full flow and `examples/chirpui/shell_oob` for a complete reference.
-
-## Block-Heavy Layouts
-
-Templates with many blocks (extends, nested blocks, fragments) benefit from a clear structure. Use the **extension block pattern** so child templates can add content without replacing parent layout.
-
-### Boost Layout Pattern
-
-Extend `chirp/layouts/boost.html` for htmx-boost + SSE apps. The layout defines stable blocks:
-
-| Block | Purpose |
-|-------|---------|
-| `title` | Page title |
-| `head` | Extra head content (styles, meta) |
-| `head_style` | Inline CSS (e.g. view-transition overrides) |
-| `body_before` | Content before `#main` |
-| `content` | Main content (inside `#main`, swapped on navigation) |
-| `sse_scope` | SSE connection (outside `#main` so it persists) |
-| `body_after` | Scripts (event delegation, theme toggle) |
-
-`content` is swapped on navigation; `sse_scope` and `body_after` stay in place. Put event delegation and other scripts in `body_after` so they run once and work for dynamically swapped content.
-
-### Extension Blocks
-
-Since Kida doesn't support `super()`, use explicit extension blocks in your base template:
-
-```html
-{% block head %}
-<link rel="stylesheet" href="/css/base.css">
-{% block extra_head %}{% end %}
-{% end %}
-
-{% block body_after %}
-<script src="/js/main.js"></script>
-{% block extra_scripts %}{% end %}
-{% end %}
-```
-
-Child templates override `extra_head` or `extra_scripts` to add content without replacing the base.
-
-### Nesting for Fragments
-
-Define fragment blocks inside the block that gets swapped. For example, if `page_root` is the page-level swap target, put `results_list` inside it so the fragment target (`#results`) exists in the DOM.
-
-## Next Steps
-
-- [[docs/about/core-concepts/return-values|Return Values]] -- All return types
-- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- Push fragments in real-time
-- [[docs/tutorials/htmx-patterns|htmx Patterns]] -- Common fragment patterns
+:::{related}
+:::

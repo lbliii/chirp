@@ -12,19 +12,26 @@ category: onboarding
 
 ## What You Will Build
 
-This guide builds a tiny notes app with one Python file and one template. It
-shows Chirp's core loop:
+Build a tiny notes app — one Python file, one template — that shows Chirp's whole
+hypermedia loop. A browser visit gets a full page. An htmx request gets back only
+the named [[docs/build-apps/html-fragments/fragments|fragment]] (a template block)
+it asked to swap. A form POST returns the updated fragment, not JSON. The
+[[docs/about/core-concepts/return-values|return type]] you choose — `Page` vs
+`Fragment` — is the only thing that decides which one a request gets.
 
-1. A normal browser visit gets a full page.
-2. An htmx request gets only the named block it asked to swap.
-3. A form POST returns the updated fragment, not JSON.
-4. `chirp check` validates the route and template wiring before a user sees it.
+You have a choice for the starting point:
 
-Use the generated scaffold when you want auth, sessions, CSRF, static files, and
-tests already wired. Use this guide when you want the smallest complete example
-of Chirp's fragment model.
+- Run `chirp new` when you want auth, sessions, CSRF, static files, and tests
+  already wired (a batteries-included scaffold).
+- Follow this guide when you want the smallest complete example of the fragment
+  model, with nothing you didn't type yourself.
 
-## Create The Files
+## Build And Run
+
+::::{steps}
+:::{step} Create the project files
+
+Make the project directory and its template/test folders:
 
 ```bash
 mkdir notes-app
@@ -32,7 +39,9 @@ cd notes-app
 mkdir templates tests
 ```
 
-Create `app.py`:
+Create `app.py`. The `/` handler returns `Page`, which auto-negotiates: a browser
+gets the full document, an htmx request gets just the `notes_list` block. The POST
+handler always returns that block as a `Fragment`.
 
 ```python
 from dataclasses import dataclass
@@ -89,7 +98,8 @@ if __name__ == "__main__":
     app.run()
 ```
 
-Create `templates/notes.html`:
+Create `templates/notes.html`. The `notes_list` block is the unit both handlers
+render — once inside the full page, once on its own for the swap.
 
 ```html
 <!doctype html>
@@ -124,7 +134,10 @@ Create `templates/notes.html`:
 </html>
 ```
 
-## Run It
+:::{/step}
+:::{step} Run it
+
+Start the dev server:
 
 ```bash
 python app.py
@@ -132,19 +145,32 @@ python app.py
 
 Open `http://127.0.0.1:8000`. The first request renders the full document. When
 the form submits, htmx sends `POST /notes` and Chirp returns only the
-`notes_list` block.
+`notes_list` block — the same block, served as a fragment because the handler
+returned `Fragment`.
+
+:::{/step}
+::::{/steps}
 
 ## Check The Contract
+
+`chirp check` validates that your routes and template blocks actually line up —
+it is the static side of Chirp's [[docs/quality/contracts-debugging/categories|contract]]
+model. Run it against the import string for your app object:
 
 ```bash
 chirp check app:app
 ```
 
-The check should be clean. If you rename the `notes_list` block but forget to
-update `Page("notes.html", "notes_list", ...)`, Chirp reports the missing block
-at startup instead of letting htmx swap an empty or wrong response.
+The check should be clean.
 
-For CI, promote warnings to failures:
+:::{warning}
+Rename the `notes_list` block but forget to update the matching
+`Page("notes.html", "notes_list", ...)` call and `chirp check` reports the
+missing block at startup — before a request ever runs — instead of letting htmx
+swap an empty or wrong response into the page.
+:::
+
+For CI, promote warnings to failures so a broken swap can't merge:
 
 ```bash
 chirp check app:app --warnings-as-errors
@@ -158,20 +184,20 @@ Install the testing extra if you did not already:
 uv add "bengal-chirp[testing]"
 ```
 
-Create `tests/test_notes.py`:
+Create `tests/test_notes.py`. Chirp's
+[[docs/quality/testing/test-client|TestClient]] is an async context manager;
+sending the `HX-Request` header makes Chirp treat the call like an htmx request,
+so you can assert the page-vs-fragment behavior directly:
 
 ```python
-import pytest
-
 from app import app
 from chirp.testing import TestClient
 
 
-@pytest.mark.anyio
 async def test_notes_page_and_fragment() -> None:
     async with TestClient(app) as client:
         page = await client.get("/")
-        assert page.status_code == 200
+        assert page.status == 200
         assert "<html" in page.text
         assert "Return types carry rendering intent." in page.text
 
@@ -180,11 +206,15 @@ async def test_notes_page_and_fragment() -> None:
             data={"body": "Fragments keep swaps narrow."},
             headers={"HX-Request": "true"},
         )
-        assert fragment.status_code == 200
+        assert fragment.status == 200
         assert "<html" not in fragment.text
         assert 'id="notes-list"' in fragment.text
         assert "Fragments keep swaps narrow." in fragment.text
 ```
+
+These are plain `async def` tests, so they need `pytest-asyncio` with
+`asyncio_mode = "auto"` set under `[tool.pytest.ini_options]` in your
+`pyproject.toml` — then `pytest` awaits the coroutines with no per-test marker.
 
 Run it:
 
@@ -196,4 +226,7 @@ pytest
 
 - [[docs/about/core-concepts/return-values|Return Values]] explains when to choose `Template`, `Page`, `Fragment`, `OOB`, `Suspense`, `Stream`, and `EventStream`.
 - [[docs/build-apps/html-fragments/fragments|Fragments]] covers named block rendering and htmx targeting in more detail.
-- [[docs/examples|Examples]] points to larger runnable apps with validation, OOB updates, SSE, and app shells.
+- [[docs/examples/_index|Examples]] points to larger runnable apps with validation, OOB updates, SSE, and app shells.
+
+:::{related}
+:::

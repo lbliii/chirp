@@ -1,41 +1,51 @@
 ---
 title: Overview
-description: How Chirp's protocol-based middleware works
+description: How Chirp's protocol-based middleware works — the function shape, the pipeline order, and how to short-circuit
 draft: false
 weight: 10
 lang: en
 type: doc
 tags: [middleware, protocol, pipeline]
-keywords: [middleware, protocol, pipeline, next, request, response]
+keywords: [middleware, protocol, pipeline, next, request, response, short-circuit]
 category: guide
 ---
 
-## No Base Class
+## Overview
 
-Chirp middleware uses a Protocol, not inheritance. A middleware is anything that matches this shape:
+Middleware is code that runs *around* your route handlers — before the request
+reaches them and after they return a response. Reach for it when behavior
+belongs to every route (logging, auth gates, response headers) rather than to
+one handler.
+
+In Chirp a middleware is an async function. There's no base class to subclass and
+no decorator to apply — you write a function matching one shape and register it:
 
 ```python
-async def my_middleware(request: Request, next: Next) -> Response:
-    # Before the handler
+from chirp import Next, Request, AnyResponse
+
+async def my_middleware(request: Request, next: Next) -> AnyResponse:
+    # before the handler runs
     response = await next(request)
-    # After the handler
+    # after the handler returns
     return response
 ```
 
-That is the entire contract. A function that takes a `Request` and a `Next` callable, returns a `Response`.
+That is the entire contract: a callable that takes a `Request` and a `Next`, and
+returns a response. `next` invokes the rest of the pipeline — the next middleware,
+or the handler itself. Whatever a handler returns flows back through as a
+response, because in Chirp [[docs/about/core-concepts/return-values|the return type is the intent]].
 
-## The Pipeline
+## The pipeline
 
-Middleware forms a pipeline. Each middleware wraps the next:
+Each middleware wraps the next, so a request passes through them on the way in and
+back out on the way out:
 
 ```
 Request → Middleware A → Middleware B → Route Handler → Response
                                    ↩ Middleware B ↩ Middleware A → Client
 ```
 
-Middleware registered first runs first on the way in and last on the way out.
-
-## Registration
+You register middleware in setup order:
 
 ```python
 app.add_middleware(timing_middleware)
@@ -43,56 +53,76 @@ app.add_middleware(cors_middleware)
 app.add_middleware(auth_middleware)
 ```
 
-Order matters. In this example, `timing_middleware` wraps everything -- it sees the total time including CORS and auth processing.
+:::{note}
+The first middleware you register runs **first** on the way in and **last** on
+the way out. Here `timing_middleware` is the outermost layer — it sees the total
+time including CORS and auth processing.
+:::
 
-## The Next Callable
+## What you can do in a middleware
 
-`Next` is a callable that invokes the rest of the pipeline:
+Inside the function you control both halves of the round trip:
 
 ```python
-from chirp import Next
+from chirp import Next, Request, AnyResponse
 
-async def my_middleware(request: Request, next: Next) -> Response:
-    # Runs before the handler
+async def logging_middleware(request: Request, next: Next) -> AnyResponse:
+    # runs before the handler
     print(f"Incoming: {request.method} {request.path}")
 
-    # Call the next middleware (or the handler)
     response = await next(request)
 
-    # Runs after the handler
+    # runs after the handler
     print(f"Response: {response.status}")
     return response
 ```
 
-You can:
-- Modify the request before passing it to `next`
-- Short-circuit by returning a response without calling `next`
-- Modify the response after `next` returns
-- Catch exceptions from `next`
+From here you can:
 
-## Short-Circuiting
+- Modify the request before passing it to `next`.
+- Short-circuit by returning a response without calling `next`.
+- Modify the response after `next` returns.
+- Catch exceptions raised from `next`.
 
-Return early without calling `next` to block the request:
+A class with an `async def __call__(self, request, next)` method matches the same
+shape, so stateful middleware (rate limiters, counters) is a callable object
+rather than a function.
+
+### Short-circuiting
+
+Return a response without calling `next` to block the request before it reaches
+any handler:
 
 ```python
-async def auth_guard(request: Request, next: Next) -> Response:
+from chirp import Next, Request, AnyResponse, Response
+
+async def auth_guard(request: Request, next: Next) -> AnyResponse:
     if not request.headers.get("Authorization"):
         return Response("Unauthorized").with_status(401)
     return await next(request)
 ```
 
-## Response Types
+`.with_status()` and `.with_header()` are chainable and return a new response, so
+you can adjust status and headers inline.
 
-Middleware handles all response types through the `AnyResponse` union:
+:::{dropdown} Advanced: streaming, SSE, and file responses
+A middleware's `Next` returns `AnyResponse` — the union of every response type the
+pipeline can produce: `Response`, `StreamingResponse`, `SSEResponse`, and
+`FileResponse`. All four share the chainable `.with_status()` / `.with_header()`
+API, so a middleware can set status and headers uniformly across them.
 
-```python
-from chirp import AnyResponse  # Response | StreamingResponse | SSEResponse
-```
+For most middleware you only touch `Response`. Streaming, SSE, and file responses
+pass through middleware, but their bodies are produced lazily and cannot be
+inspected synchronously — you can wrap or annotate them, not read their content
+in the middleware. If you need to reason about *what* a handler is rendering
+rather than the raw response, you can
+[[docs/build-apps/request-pipeline/render-plan|inspect the RenderPlan from middleware]]
+instead.
+:::
 
-For most middleware, you only need to work with `Response`. Streaming and SSE responses pass through middleware but their bodies cannot be inspected synchronously.
-
-## Next Steps
-
-- [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] -- CORS, StaticFiles, Sessions, and more
-- [[docs/build-apps/request-pipeline/custom|Custom Middleware]] -- Writing your own middleware
-- [[docs/build-apps/pages-navigation/routes|Routes]] -- What middleware wraps
+:::{note} See also
+- [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] — CORS, static files, sessions, CSRF, security headers, and more
+- [[docs/build-apps/request-pipeline/custom|Custom Middleware]] — writing and testing your own
+- [[docs/build-apps/pages-navigation/routes|Routes]] — what middleware wraps
+- [[docs/about/core-concepts/return-values|Return values]] — why handlers return types, not response objects
+:::

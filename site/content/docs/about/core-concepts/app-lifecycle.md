@@ -10,19 +10,28 @@ keywords: [app, lifecycle, freeze, mutable, immutable, startup, shutdown]
 category: explanation
 ---
 
-## Two Phases
+# App Lifecycle
 
-A Chirp `App` has two distinct phases:
+A Chirp `App` lives in two phases. During **setup** you register everything —
+routes, middleware, filters, lifecycle hooks. Then the app **freezes**: it
+compiles its route table, builds the [[docs/build-apps/html-fragments/kida-integration|kida]]
+template environment, and becomes immutable so concurrent requests need no locks
+on the hot path. Freeze happens automatically the first time you call `app.run()`
+(or on the first request). After it, registering a new route raises an error.
+
+## Two Phases
 
 :::{steps}
 :::{step} Setup (mutable)
 
-Register routes, middleware, filters, error handlers. The app is mutable during this phase.
+Register routes, middleware, filters, error handlers, and lifecycle hooks. The
+app is mutable during this phase.
 
 :::{/step}
 :::{step} Runtime (frozen)
 
-The app compiles its route table, creates the kida environment, and becomes effectively immutable. All shared state is read-only.
+The app compiles its route table, creates the kida environment, and becomes
+immutable. All shared state is read-only.
 
 :::{/step}
 :::{/steps}
@@ -47,15 +56,29 @@ app.add_middleware(my_middleware)
 app.run()  # Compiles routes, freezes config, starts serving
 ```
 
-The transition happens when `app.run()` is called, or on the first ASGI `__call__()`. After freeze, attempting to register new routes raises an error.
+Freeze triggers when you call `app.run()`, or on the first ASGI request if you
+serve the app through an external server. After freeze, registering a new route
+raises an error.
 
-During setup, register sections with `app.register_section()` before `mount_pages()`. At freeze, the framework validates the route directory contract (section bindings, shell mode/block alignment, tab hrefs) and runs `app.check()` when `config.debug=True`.
+If your app uses filesystem pages, register sections with `app.register_section()`
+before `app.mount_pages()`. At freeze, the framework validates the route directory
+contract, and in debug mode it runs `app.check()`.
+
+:::{note} See also
+
+[[docs/quality/contracts-debugging/route-contract|Route directory contract]] covers
+what gets validated at freeze (section bindings, shell-mode block alignment, tab
+hrefs) and how to fix each issue.
+:::
 
 ## Why Freeze?
 
-Free-threading (Python 3.14t) means multiple threads handle requests concurrently. If the route table, middleware stack, or template environment could be mutated during request handling, you would need locks everywhere.
+[[docs/about/thread-safety|Free-threading]] (Python 3.14t) lets multiple threads
+handle requests at once. If the route table, middleware stack, or template
+environment could change mid-request, you would need locks everywhere.
 
-Instead, Chirp freezes the app once. All shared state becomes immutable. No locks needed for the hot path.
+Instead, Chirp freezes the app once. All shared state becomes immutable, so the
+request hot path needs no locks.
 
 ```
 Setup Phase          Freeze          Runtime Phase
@@ -67,21 +90,63 @@ app.on_startup()     │  create env    shared state)
 ─────────────────────┴──────────────────────────────
 ```
 
-## Lifecycle Hooks
+Freeze is guarded by double-check locking: the first request or `app.run()`
+triggers it, concurrent requests block briefly on the lock, then proceed against
+the frozen state.
 
-Register callbacks for startup and shutdown:
+:::{dropdown} Advanced: how freeze stays thread-safe
+The freeze operation uses double-check locking so it is safe under free-threading.
+This is internal mechanism — you never call it directly.
 
 ```python
-@app.on_startup
-async def connect_db():
-    app.db = await Database.connect("sqlite:///app.db")
-
-@app.on_shutdown
-async def close_db():
-    await app.db.close()
+# Simplified — actual implementation is App._ensure_frozen / App._freeze
+if not self._frozen:
+    with self._freeze_lock:
+        if not self._frozen:
+            self._compile_routes()
+            self._create_kida_env()
+            self._frozen = True
 ```
 
-For per-worker initialization (useful with multi-threaded serving):
+The first request (or `app.run()`) triggers the freeze. Concurrent requests block
+briefly on the lock, then proceed with the frozen state. After that, no
+synchronization is needed on the hot path. The deep "why no locks" model lives in
+[[docs/about/thread-safety|Thread Safety]].
+:::{/dropdown}
+
+## Lifecycle Hooks
+
+Register callbacks for startup and shutdown. Use them to open and close a
+resource you own — an HTTP client, a cache, a background queue — stashed somewhere
+your handlers can reach it:
+
+```python
+import httpx
+
+client: httpx.AsyncClient | None = None
+
+@app.on_startup
+async def open_client():
+    global client
+    client = httpx.AsyncClient(base_url="https://api.example.com")
+
+@app.on_shutdown
+async def close_client():
+    if client is not None:
+        await client.aclose()
+```
+
+:::{tip}
+You do **not** need a hook for the database. Pass a connection URL to the app —
+`app = App(db="sqlite:///app.db")` — and Chirp connects it on startup and
+disconnects it on shutdown for you. Access it read-only via `app.db`. See
+[[docs/build-apps/forms-data/database|Database]] for the full setup, including
+passing a configured `Database` instance.
+:::
+
+For per-worker initialization — resources that must live on a worker's event
+loop, such as async HTTP clients, async database pools, or per-worker caches —
+use worker hooks:
 
 ```python
 @app.on_worker_startup
@@ -95,46 +160,51 @@ async def cleanup_worker():
     pass
 ```
 
-Worker hooks are a production worker contract, not a general app startup
-replacement. Use them for resources that must live on the worker's event loop
-or worker thread, such as async HTTP clients, async database pools, or
-per-worker caches.
+:::{warning}
+In production, worker hooks require `worker_mode="async"`. If you register worker
+hooks while the effective worker mode is sync, Chirp rejects launch. See
+[[docs/about/core-concepts/configuration|Configuration]] for how `worker_mode`
+resolves.
+:::
 
-In production, worker hooks require `worker_mode="async"`:
+:::{dropdown} Advanced: worker hooks under sync vs async workers
+Worker hooks are a production worker contract, not a general app-startup
+replacement. Use `@app.on_startup` for everything that should run once when the
+app boots.
+
+On free-threaded Python, the `worker_mode="auto"` default resolves to sync
+workers. Sync workers do not emit `pounce.worker.startup` or
+`pounce.worker.shutdown` scopes, so Chirp rejects production launch when worker
+hooks are registered and the effective worker mode is sync:
 
 ```python
 app = App(AppConfig(debug=False, worker_mode="async"))
 ```
 
-Pounce 0.7 sync workers do not emit `pounce.worker.startup` or
-`pounce.worker.shutdown` scopes. On free-threaded Python, Pounce resolves
-`worker_mode="auto"` to sync workers, so Chirp rejects production launch when
-worker hooks are registered and the effective worker mode is sync. If you need
-worker hooks, set `worker_mode="async"` explicitly.
+If a worker startup hook can fail in a way that must abort boot, put the
+must-succeed check in `@app.on_startup` (which runs before workers spin up) or
+expose a health check, rather than relying on worker-startup failure to stop the
+server.
+:::{/dropdown}
 
-If a worker startup hook raises under Pounce 0.7 async workers, Pounce logs the
-failure and continues serving. Put must-succeed global checks in
-`@app.on_startup` or expose a health check until fail-loud worker startup is
-available upstream ([pounce#65](https://github.com/lbliii/pounce/issues/65)).
+## Debug Checks at Freeze
 
-## Thread-Safe Freeze
+In debug mode, freeze runs the same hypermedia contract checks as `app.check()`
+and exits on ERROR. Opt out with `AppConfig(skip_contract_checks=True)` or the
+`CHIRP_SKIP_CONTRACT_CHECKS` environment variable.
 
-The freeze operation uses double-check locking to be safe under free-threading:
+:::{note} See also
 
-```python
-# Simplified -- actual implementation in app.py
-if not self._frozen:
-    with self._freeze_lock:
-        if not self._frozen:
-            self._compile_routes()
-            self._create_kida_env()
-            self._frozen = True
-```
-
-The first request (or `app.run()`) triggers the freeze. Concurrent requests block briefly on the lock, then proceed with the frozen state. After that, no synchronization is needed.
+[[docs/quality/contracts-debugging/categories|Contract check categories]] lists
+every rule the checker runs and its severity.
+:::
 
 ## Next Steps
 
-- [[docs/about/core-concepts/return-values|Return Values]] -- What route handlers can return
-- [[docs/about/core-concepts/configuration|Configuration]] -- All AppConfig fields
-- [[docs/build-apps/pages-navigation/routes|Routes]] -- Route registration in detail
+- [[docs/about/core-concepts/return-values|Return Values]] — what route handlers can return
+- [[docs/about/core-concepts/configuration|Configuration]] — all `AppConfig` fields
+- [[docs/build-apps/pages-navigation/routes|Routes]] — route registration in detail
+- [[docs/about/thread-safety|Thread Safety]] — why frozen state needs no locks
+
+:::{related}
+:::

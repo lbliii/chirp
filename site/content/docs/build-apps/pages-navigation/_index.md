@@ -14,12 +14,17 @@ cascade:
   type: doc
 ---
 
+How requests reach your handlers and how URLs map to code. Coming from Flask or
+Django? Start with [[docs/build-apps/pages-navigation/routes|Routes]] for
+decorator-based registration, or
+[[docs/build-apps/pages-navigation/filesystem-routing|Filesystem Routing]] to map
+a `pages/` directory straight onto URLs. Already building? Jump to
+[[docs/build-apps/pages-navigation/request-response|Request & Response]] for the
+immutable request and chainable response API.
+
 :::{cards}
 :columns: 2
 :gap: medium
-
-Build the paths users can visit, the page directories that serve them, and the
-navigation helpers that keep URLs and route metadata aligned.
 
 :::{card} Routes
 :icon: map
@@ -36,7 +41,7 @@ Layout nesting, context cascade, and co-located handlers.
 :::{/card}
 
 :::{card} Route Directory
-:icon: file-tree
+:icon: tree-structure
 :link: /chirp/docs/build-apps/pages-navigation/route-directory/
 :description: `_meta.py`, `_context.py`, `_actions.py`
 Sections, shell context, route validation, and filesystem app conventions.
@@ -50,7 +55,7 @@ The frozen request object and the .with_*() response API.
 :::{/card}
 
 :::{card} Mounting
-:icon: combine
+:icon: layers
 :link: /chirp/docs/build-apps/pages-navigation/mounting/
 :description: Compose sub-apps into one route tree
 Mount reusable Chirp apps without leaving orphan registries behind.

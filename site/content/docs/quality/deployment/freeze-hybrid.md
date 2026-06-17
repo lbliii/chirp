@@ -12,25 +12,46 @@ category: guide
 
 ## Overview
 
-`chirp freeze` normally renders every route to static HTML. **Live blocks** let
-you keep 99 % of a page static while declaring named blocks that should render
-dynamically at request time.
+:::{since} 0.5.0
+Live blocks and hybrid freeze shipped in 0.5.0.
+:::
 
-At freeze time the declared block's HTML is replaced with an htmx placeholder
-pointing at the block-fetch dispatcher (`/_frag{path}?_b={block}`). The frozen
-page deploys to any static host; the placeholder fetches the block from an
-origin when the visitor loads the page.
+`chirp freeze` renders your whole app to static HTML you can deploy to any CDN
+or static host — no running server required. But some content can't be frozen:
+a "recent updates" panel, a live count, anything that changes between deploys.
+
+**Live blocks** let you keep a page static while marking individual
+[[docs/build-apps/html-fragments/fragment-blocks|template blocks]] to render
+dynamically at request time. The frozen page ships everywhere; each live block
+fetches itself from a small *origin* process — any running Chirp worker — when
+a visitor loads the page.
+
+If the origin is down, the rest of the page still works. The skeleton stays
+visible, no JavaScript error is raised, and search engines still index the
+static content. That graceful-degradation guarantee is the reason to reach for
+hybrid freeze instead of going fully dynamic.
 
 ## Declaring a live block
 
+You declare a live block with `@app.live_block`, pointing it at a registered
+route and a named block in that route's template. The decorator marks the block
+for freeze-time rewriting and validation — it does **not** add a separate
+data-fetch hook. At request time the block-fetch dispatcher invokes the
+**route's own handler** and extracts the named block from whatever
+[[docs/build-apps/html-fragments/fragments|Fragment]] or
+[[docs/about/core-concepts/return-values|return value]] it produces. So the data
+the live block needs comes from the route handler's context, the same context
+the full page renders from.
+
 ```python
-from chirp import App, Fragment, Request
+from chirp import App, Page
 
 app = App()
 
 @app.route("/docs/{slug:path}")
-def docs(slug: str):
-    return Page("docs/page.html", slug=slug)
+async def docs(slug: str):
+    # The route handler supplies the context for every block, live or static.
+    return Page("docs/page.html", slug=slug, updates=await fetch_updates(slug))
 
 @app.live_block(
     "/docs/{slug:path}",
@@ -38,19 +59,40 @@ def docs(slug: str):
     trigger="load delay:100ms",
     skeleton="<div class='skel'>Loading…</div>",
 )
-async def recent_updates(request: Request) -> Fragment:
-    slug = request.path_params["slug"]
-    updates = await fetch_updates(slug)
-    return Fragment("docs/page.html", "recent_updates", updates=updates)
+def recent_updates():
+    """Marks `recent_updates` as live. Never invoked — see the note below."""
 ```
 
-Both arguments are validated at `app.check()`:
+Both arguments are validated at [[docs/quality/contracts-debugging/categories|`app.check()`]]:
 
 - `live_block_unreachable_route` — the route isn't registered.
 - `live_block_unknown` — the template has no block with that name.
 
-## Frozen output
+:::{warning}
+The function you decorate with `@app.live_block` is never called at request
+time. The block-fetch dispatcher runs the **route handler** and re-renders the
+named block from its context — it does not look up the decorated function. Put
+the data the live block needs in the route handler's context (as `updates=`
+above); a `fetch` placed in the decorated function's body will never run.
+:::
 
+## What an origin must serve
+
+The origin is any Chirp process mounted at the same URL space as the frozen
+site. It handles exactly one concern: **`GET /_frag{path}?_b={block}`**, the
+block-fetch dispatcher. Chirp registers this route automatically; it matches the
+underlying route for `{path}`, invokes its handler, and returns only the named
+block.
+
+To let your CDN hold onto dispatcher responses, set `Cache-Control: public,
+s-maxage=…` on them at the CDN or origin layer.
+
+If the origin is unreachable, the placeholder stays visible — htmx shows the
+skeleton content. No JavaScript error is raised, the page still functions, and
+the live block just never resolves. This is the **graceful-degradation
+guarantee**: frozen pages never become unusable because the origin is down.
+
+:::{dropdown} What the frozen placeholder looks like
 After `chirp freeze`, the `recent_updates` block is emitted as:
 
 ```html
@@ -61,53 +103,54 @@ After `chirp freeze`, the `recent_updates` block is emitted as:
      data-chirp-live="recent_updates"><div class='skel'>Loading…</div></div>
 ```
 
-Everything outside that block remains static — no JS is required to read the
-rest of the page, and search engines index the surrounding content.
-
-## What an origin must serve
-
-The origin is any Chirp process mounted at the same URL space as the frozen
-site. It handles exactly two concerns:
-
-1. **`GET /_frag{path}?_b={block}`** — the block-fetch dispatcher. Registered
-   automatically by Chirp; returns only the named block.
-2. **Cache headers** — set `Cache-Control: public, s-maxage=…` on
-   dispatcher responses you want your CDN to hold onto. Use `cache_seconds=`
-   on the decorator to set the value from the declaration site.
-
-If the origin is unreachable, the placeholder stays visible (htmx shows the
-skeleton content). No JavaScript error is raised — the page still functions,
-the live block just never resolves. This is the **graceful-degradation
-guarantee**: frozen pages never become unusable because the origin is down.
+Everything outside that block stays static — no JS is required to read the
+rest of the page, and search engines index the surrounding content. You rarely
+hand-edit this output; the dispatcher and your `skeleton=` argument produce it.
+:::
 
 ## Deployment shapes
 
-### Full hybrid (static + live origin)
+Pick the shape that matches whether you freeze, run live, or both.
 
+::::{steps}
+:::{step} Full hybrid (static + live origin)
 - CDN / S3 / GitHub Pages serves `/dist` as usual.
 - A small Chirp worker serves `/_frag/**` behind the CDN.
 - Route `/_frag/*` requests to the worker via CDN path rules.
-
-### Static-only (no origin)
-
-- Just run `chirp freeze` without declaring any live blocks.
-- Output is byte-identical to pre-live-blocks Chirp (**Invariant 1**).
-
-### Origin-only (no freeze)
-
+:::{/step}
+:::{step} Static-only (no origin)
+- Run `chirp freeze` without declaring any live blocks.
+- A pure-static freeze with no live blocks produces byte-identical output to
+  pre-live-blocks Chirp.
+:::{/step}
+:::{step} Origin-only (no freeze)
 - Normal `chirp run` — every block resolves server-side.
 - `@app.live_block` declarations are still valid; they just add no placeholders.
+:::{/step}
+::::{/steps}
 
 ## Caveats
 
-- Live blocks are matched against the rendered HTML by **string equality**.
-  If the block renders to an empty string (no content), freeze emits a warning
-  and skips rewriting that block.
-- The leaf template's rendered context is used to render the block in
-  isolation during freeze. Side-effectful template context (e.g. a generator
-  that can only be iterated once) is not supported.
-- The block-fetch URL scheme is reserved: user routes starting with `/_frag/`
-  raise `ConfigurationError` at freeze time.
-- `freeze_params` values must expand to normal URL path segments. Values that
-  introduce `.` or `..` path segments are reported as freeze errors and are not
+:::{warning}
+Two declarations fail the freeze if you get them wrong:
+
+- **The `/_frag/` prefix is reserved.** A user route starting with `/_frag/`
+  raises `ConfigurationError` at freeze time — the block-fetch dispatcher owns
+  that namespace.
+- **`freeze_params` values must be normal path segments.** Values that
+  introduce `.` or `..` segments are reported as freeze errors and never
   written to disk.
+:::
+
+:::{note}
+Live blocks are matched against the rendered HTML by **string equality**. If a
+block renders to an empty string, freeze records an error and skips rewriting
+that block. The leaf template's rendered context is reused to render the block
+in isolation during freeze, so side-effectful context (e.g. a generator that
+can only be iterated once) is not supported.
+:::
+
+:::{note} See also
+- [[docs/quality/deployment/production|Production deployment]] — the rest of the deploy checklist.
+- [[docs/quality/deployment/_index|The freeze deployment section]] — sibling deploy guides.
+:::

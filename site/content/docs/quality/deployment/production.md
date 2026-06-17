@@ -1,38 +1,30 @@
 ---
 title: Production Deployment
-description: Deploy Chirp apps with Pounce Phase 5 & 6 features
+description: Ship a Chirp app to production on Pounce — prod AppConfig, the deploy preflight, workers, metrics, rate limiting, and reverse-proxy trust.
 draft: false
 weight: 10
 lang: en
 type: doc
 tags: [production, pounce, docker, metrics, rate-limit]
-keywords: [deploy, production, pounce, workers, metrics, rate-limit, docker, port, SO_REUSEADDR, TIME_WAIT, CLI]
+keywords: [deploy, production, pounce, workers, metrics, rate-limit, docker, reverse-proxy, trusted_proxies, CLI]
 category: guide
 ---
 
-## Overview
+## What this page is
 
-Chirp apps run on [Pounce](https://github.com/lbliii/pounce), a production-grade ASGI server with enterprise features built-in.
+A Chirp app deploys as a single [ASGI](https://asgi.readthedocs.io/) app served by [Pounce](https://github.com/lbliii/pounce), Chirp's production server. There is one server and one app — no separate API tier, no worker queue to stand up.
 
-### Phase 5 (Automatic)
+In development you run one auto-reloading worker. In production you turn on multiple workers, metrics, and rate limiting, wire the secure-by-default stack, and gate the deploy on a contract preflight. This page is the operator's path from a working app to a hardened launch.
 
-- **HTTP response and WebSocket compression** — ordinary responses and WebSocket messages can be compressed; Pounce intentionally avoids compressing `text/event-stream`
-- **HTTP/2 support** — Multiplexed streams, server push
-- **Graceful shutdown** — Finishes active requests on SIGTERM
-- **Zero-downtime reload** — `kill -SIGUSR1` for hot code updates
-- **OpenTelemetry** — Distributed tracing (configurable)
+Reach for it when you are shipping. For what the contract checks actually enforce, see the [[docs/quality/contracts-debugging/categories|contract category reference]]; for the full server-flag and freeze map, see the [[docs/quality/deployment/_index|deployment overview]].
 
-### Phase 6 (Configurable)
+## Configure the app
 
-- **Prometheus metrics** — `/metrics` endpoint for monitoring
-- **Per-IP rate limiting** — Token bucket algorithm
-- **Request queueing** — Load shedding during traffic spikes
-- **Sentry integration** — Error tracking and reporting
-- **Hot reload** — Zero-downtime worker replacement
+The only difference between dev and prod is `AppConfig`. Pick the form you run with — all three start the same app.
 
-## Quick Start
-
-### Development Mode
+:::{tab-set}
+:::{tab-item} Development
+Single worker, auto-reload, debug error pages. No secret needed while `env="development"`.
 
 ```python
 from chirp import App, AppConfig
@@ -43,17 +35,20 @@ app = App(AppConfig(debug=True))
 def index():
     return "Hello!"
 
-app.run()  # Single worker, auto-reload
+app.run()  # single worker, auto-reload
 ```
-
-### Production Mode
+:::{/tab-item}
+:::{tab-item} Production (Python)
+Multiple workers, metrics, and rate limiting. `env="production"` turns on the env-aware safety severities, and the secret is read from the environment — never hard-coded.
 
 ```python
+import os
 from chirp import App, AppConfig
 
 config = AppConfig(
+    env="production",
     debug=False,
-    secret_key="your-secret-key-here",
+    secret_key=os.environ["CHIRP_SECRET_KEY"],
     workers=4,
     metrics_enabled=True,
     rate_limit_enabled=True,
@@ -63,113 +58,222 @@ app = App(config=config)
 
 @app.route("/")
 def index():
-    return "Hello, Production!"
+    return "Hello, production!"
 
-app.run()  # Multi-worker, Phase 5 & 6 features
+app.run()  # multi-worker
 ```
-
-### CLI Production Mode
+:::{/tab-item}
+:::{tab-item} CLI
+Skip the Python wiring and pass production flags on the command line. The CLI reads `CHIRP_SECRET_KEY` from the environment.
 
 ```bash
 chirp run myapp:app --production --workers 4 --metrics --rate-limit
 ```
+:::{/tab-item}
+:::{/tab-set}
 
-## Operator Preflight
+`AppConfig.from_env()` reads `CHIRP_*` environment variables for you, so you can keep config out of code entirely:
 
-Run Chirp and Pounce checks before deployment because they validate different
-contracts:
+```python
+config = AppConfig.from_env(env="production", worker_mode="async")
+```
+
+:::{danger}
+Never ship a literal secret in your source. `secret_key` signs sessions and CSRF tokens; a committed value is a published key.
+
+Read it from the environment (`os.environ["CHIRP_SECRET_KEY"]` or `AppConfig.from_env()`). `AppConfig` raises `ConfigurationError` at construction when `secret_key` is empty and `env` is not `"development"`, so a misconfigured prod app fails fast instead of running with no signing key.
+:::
+
+## Deploy
+
+::::{steps}
+:::{step} Set the secret and a production config
+
+Export `CHIRP_SECRET_KEY` in the deploy environment and build a production `AppConfig` with `env="production"` (see the tabs above). The `env` value drives the deploy severities in the next step.
+:::{/step}
+
+:::{step} Run the preflight
+
+Run both checks before every deploy — they validate different contracts:
 
 ```bash
 chirp check myapp:app --deploy
 pounce check --app myapp:app --config pounce.toml
 ```
 
-`chirp check` validates Chirp's hypermedia contracts: routes, templates,
-blocks, OOB targets, forms, SSE wiring, and app-level checks.
+`chirp check --deploy` answers "would this app pass `app.check()` with `env="production"`?" without mutating your config — it builds a throwaway production-posture view and re-runs the env-aware safety rules (`secret_key`, `allowed_hosts`, `security_stack`, `csp_nonce`, and the `debug`/`metrics`/`sentry` posture). `--deploy` implies `--warnings-as-errors`, so warnings fail the build. A deploy-ready app still passes — the check is tighten-only. Wire it as your CI deploy gate.
 
-The `--deploy` flag runs the env-aware safety rules (`secret_key`,
-`allowed_hosts`, `debug`/`metrics`/`sentry`, `security_stack`, `csp_nonce`) with
-**production posture** and treats warnings as errors. It answers "would this app
-pass `app.check()` if `env="production"`?" without changing your config — it
-builds a throwaway production-posture *view* and never mutates the running app.
-It is tighten-only: a genuinely deploy-ready app still passes. Use it in CI as a
-deploy gate; use `--warnings-as-errors` alone when you only want strict warnings
-without escalating production-only severities.
-
-`pounce check` validates Pounce's server-facing inputs: import path, config
-file, bind address, TLS files, worker settings, and related server options. If
-you do not use `pounce.toml`, pass the same server flags you use at runtime:
+`pounce check` validates Pounce's server-facing inputs: import path, bind address, TLS files, and worker settings. If you do not use `pounce.toml`, pass the same flags you run with:
 
 ```bash
 pounce check --app myapp:app --host 0.0.0.0 --port 8000 --workers 4
 ```
+:::{/step}
 
-## Pounce-Native Config
+:::{step} Launch
 
-`pounce.toml` is Pounce-native today. It is read by `pounce serve` and
-`pounce check`; it is not read by `app.run()` or `chirp run`, which use
-`AppConfig` plus Chirp CLI flags.
+Start the production server — multi-worker, with the features you enabled:
 
 ```bash
-pounce config schema --output-format toml-template
-pounce config schema --output-format json
-pounce config show --config pounce.toml --output-format toml
-pounce serve --app myapp:app --config pounce.toml
+chirp run myapp:app --production --workers 4 --metrics --rate-limit
 ```
 
-Use `toml-template` to generate a starting `pounce.toml`, `json` for tooling,
-and `config show` to inspect the resolved Pounce config after file and CLI
-overrides are merged.
+Or build the image and let the container run it:
 
-## Worker Lifecycle Hooks
+```dockerfile
+FROM python:3.14-slim
+WORKDIR /app
+COPY . .
+RUN pip install bengal-chirp
+CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
+```
+:::{/step}
+::::{/steps}
 
-Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that
-must be created inside each production worker, such as async HTTP clients or
-event-loop-bound database pools.
+:::{note}
+Use `chirp check --warnings-as-errors` (without `--deploy`) when you want strict warnings but do not want to escalate the production-only severities — for example, on a staging gate.
+:::
 
-Worker lifecycle hooks require async workers in production:
+## What the server gives you
+
+Pounce handles these for every Chirp app, no configuration required:
+
+- HTTP and WebSocket compression — ordinary responses are compressed; `text/event-stream` is left uncompressed so [[docs/build-apps/streaming-updates/server-sent-events|SSE]] events are not buffered behind a compression window.
+- HTTP/2 with multiplexed streams (enabled when you set `ssl_certfile`/`ssl_keyfile`).
+- Graceful shutdown — active requests finish on `SIGTERM`.
+- Zero-downtime reload — `kill -SIGUSR1` swaps in new code.
+- OpenTelemetry distributed tracing (configurable).
+
+These you opt into through `AppConfig` or CLI flags:
+
+:::{list-table}
+:header-rows: 1
+
+* - Field
+  - Default
+  - What it does
+* - `workers`
+  - `0` (auto)
+  - Worker count; `0` resolves to the CPU count.
+* - `worker_mode`
+  - `"auto"`
+  - Pounce worker execution mode; use `"async"` when you register worker lifecycle hooks.
+* - `metrics_enabled`
+  - `False`
+  - Prometheus endpoint at `/metrics`.
+* - `rate_limit_enabled`
+  - `False`
+  - Per-IP rate limiting (token bucket).
+* - `request_queue_enabled`
+  - `False`
+  - Request queueing and load shedding under traffic spikes.
+* - `sentry_dsn`
+  - `None`
+  - Sentry error tracking.
+* - `ssl_certfile` / `ssl_keyfile`
+  - `None`
+  - TLS certificate and key (enables HTTP/2).
+:::
+
+For every `AppConfig` field, see [[docs/about/core-concepts/configuration|Configuration]].
+
+:::{note}
+Chirp does not read Pounce's own environment variable names. If your platform injects deploy variables, read them in your app code and build an `AppConfig`, or start through `pounce serve --config pounce.toml`.
+:::
+
+## Wire the secure-by-default stack
+
+A production app with any mutating route must wire `SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware`. Chirp does not inject these for you; `chirp check --deploy` fails when they are missing in production. Every `chirp new` scaffold wires them out of the box.
+
+The full stack, ordering rules, and CSRF form patterns live on [[docs/quality/deployment/auth-hardening|Auth Hardening]] — wire it before you go live.
+
+## Run behind a reverse proxy
+
+When Chirp runs behind a proxy (nginx, a load balancer, a CDN, a platform router), the socket peer is the proxy, not the end user. The real client IP arrives in the `X-Forwarded-For` header. Two `AppConfig` fields control how that header is trusted:
+
+:::{list-table}
+:header-rows: 1
+
+* - Field
+  - Default
+  - Effect
+* - `trusted_proxies`
+  - `()`
+  - Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored. Maps to Pounce's `ServerConfig.trusted_hosts`.
+* - `forwarded_for_trusted_hops`
+  - `1`
+  - Trailing `X-Forwarded-For` hops to trust when deriving the client IP. Must be `>= 1`.
+:::
+
+```python
+config = AppConfig(
+    env="production",
+    secret_key=os.environ["CHIRP_SECRET_KEY"],
+    trusted_proxies=("10.0.0.1", "10.0.0.2"),  # your proxy peers
+    forwarded_for_trusted_hops=1,               # one proxy in front of the app
+)
+```
+
+:::{warning}
+`X-Forwarded-For` is ignored entirely until you set `trusted_proxies`. The empty default is the safe one: the request client IP is the raw socket peer, which cannot be spoofed.
+
+The `"*"` wildcard trusts every direct peer's `X-Forwarded-For`, which lets any client spoof its client IP — defeating per-IP rate limiting and skewing audit correlation. Use it only on a locked-down network where the only reachable peers are your own proxies. The `trusted_proxies` contract check emits a `WARNING` for `"*"` outside development.
+:::
+
+`forwarded_for_trusted_hops` only takes effect when the direct peer is one of your `trusted_proxies`. To ignore `X-Forwarded-For`, leave `trusted_proxies` empty — do not set the hop count to `0`. It must be `>= 1`, and `AppConfig` raises `ConfigurationError` at construction otherwise.
+
+## Realtime workloads
+
+[[docs/build-apps/streaming-updates/server-sent-events|SSE]] is Chirp's realtime contract. Pounce intentionally avoids compressing `text/event-stream` responses so event delivery is not buffered behind a compression window. Use `worker_mode="async"` for apps with long-lived SSE connections.
+
+## Advanced
+
+:::{dropdown} Worker lifecycle hooks and async workers
+Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that must be created inside each production worker — async HTTP clients or event-loop-bound database pools.
 
 ```python
 config = AppConfig(debug=False, workers=4, worker_mode="async")
 ```
 
-Pounce 0.7 sync workers do not emit worker lifecycle scopes. On free-threaded
-Python, Pounce resolves `worker_mode="auto"` to sync workers, so Chirp rejects
-production launch when worker hooks are registered and the effective worker
-mode is sync. If you do not register worker hooks, `worker_mode="auto"` remains
-valid.
+Worker lifecycle hooks require async workers in production. On free-threaded Python, `worker_mode="auto"` resolves to sync workers, which do not emit worker lifecycle scopes — so Chirp rejects production launch when worker hooks are registered and the effective mode is sync. If you do not register worker hooks, `worker_mode="auto"` stays valid.
+:::{/dropdown}
 
-Worker startup failures are best-effort in Pounce 0.7 async workers: Pounce
-logs the exception and continues serving. Put must-succeed application-wide
-checks in `@app.on_startup`, and use a health check for dependencies that can
-fail after startup. Fail-loud worker startup is tracked upstream in
-[pounce#65](https://github.com/lbliii/pounce/issues/65).
+::::{dropdown} Worker startup failure semantics
+A worker-startup exception is logged and the worker keeps serving — startup failures do not currently abort the launch. Put must-succeed, application-wide checks in `@app.on_startup`, and use a health check for dependencies that can fail after startup.
 
-## Realtime And Compression
+:::{changed} Pounce 0.7
+Worker startup is best-effort in Pounce 0.7 async workers (logged, not fatal). Fail-loud worker startup is tracked upstream.
+:::
+::::{/dropdown}
 
-SSE is Chirp's realtime contract. Pounce intentionally avoids compressing
-`text/event-stream` responses so event delivery is not buffered behind
-compression windows. Use `worker_mode="async"` for apps with long-lived SSE
-connections.
+:::{dropdown} pounce.toml — server-native config
+`pounce.toml` is read by `pounce serve` and `pounce check`. It is not read by `app.run()` or `chirp run`, which use `AppConfig` plus Chirp CLI flags.
 
-## Pounce Introspection
+```bash
+pounce config schema --output-format toml-template   # generate a starting file
+pounce config schema --output-format json            # for tooling
+pounce config show --config pounce.toml               # inspect the resolved config
+pounce serve --app myapp:app --config pounce.toml
+```
+:::{/dropdown}
 
-Pounce 0.7 includes a server-level introspection endpoint at `/_pounce/info`,
-but it is disabled by default and remains Pounce-native in Chirp today. Chirp
-does not expose `AppConfig` fields for Pounce introspection yet.
+:::{dropdown} Pounce introspection endpoint
+Pounce ships a server-level introspection endpoint at `/_pounce/info`, disabled by default and Pounce-native — Chirp does not expose an `AppConfig` field for it.
 
-If you enable Pounce introspection through `pounce.toml` or `pounce serve`
-flags, treat it as an operations endpoint. Pounce handles it before the Chirp
-app and before Chirp middleware, so do not rely on Chirp auth, CSRF, sessions,
-or allowed-host middleware to protect it.
+If you enable it through `pounce.toml` or `pounce serve` flags, treat it as an operations endpoint. Pounce serves it before the Chirp app and before Chirp middleware, so Chirp auth, CSRF, sessions, and allowed-host middleware do not protect it. Bind it to loopback or a private admin network and reach it through a VPN, SSH tunnel, or port-forward. Do not expose it on a public internet interface.
+:::{/dropdown}
 
-Bind introspection to loopback or a private admin network, and access it
-through a VPN, SSH tunnel, or port-forward. Do not expose it on a public
-internet interface.
+:::{dropdown} Access logs vs. client IP can disagree
+Two values can disagree behind a proxy, by design:
 
-## Custom Port Checks
+- **Pounce access logs** key on the raw socket peer IP (the proxy).
+- **The per-IP rate limiter and `request.client`** use the rewritten `X-Forwarded-For` client IP — but only when the direct peer is a trusted proxy. With `trusted_proxies` empty, both reflect the raw peer.
 
-If your CLI checks whether a port is free before calling `app.run()` (e.g. to avoid split-brain or show a clearer error), use `SO_REUSEADDR` in that check. Otherwise you'll block restarts when the port is in **TIME_WAIT** (30–120 seconds after shutdown). The server already uses `SO_REUSEADDR`; your check should match.
+Do not build audit or correlation logic that assumes the access-log peer IP and the rate-limiter/request client IP are the same value.
+:::{/dropdown}
+
+:::{dropdown} Free a port without blocking on TIME_WAIT
+If your own CLI checks whether a port is free before calling `app.run()`, use `SO_REUSEADDR` in that check. Otherwise the check fails while the port sits in `TIME_WAIT` (30–120s after shutdown) even though the server would bind successfully. The server already sets `SO_REUSEADDR`; match it.
 
 ```python
 import socket
@@ -184,99 +288,11 @@ def is_port_in_use(host: str, port: int) -> bool:
     except OSError:
         return True
 ```
+:::{/dropdown}
 
-Without `SO_REUSEADDR`, the check fails when the port is in TIME_WAIT even though the server would bind successfully. When you can't identify the process holding the port, include a TIME_WAIT hint in your error message (e.g. "wait 30–60s or use a different port").
-
-## Docker
-
-```dockerfile
-FROM python:3.14-slim
-WORKDIR /app
-COPY . .
-RUN pip install bengal-chirp
-CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
-```
-
-## Configuration
-
-| Config | Default | Description |
-|--------|---------|-------------|
-| `workers` | `0` (auto) | Worker count (0 = CPU count) |
-| `worker_mode` | `"auto"` | Pounce worker execution mode; use `"async"` when registering worker lifecycle hooks |
-| `metrics_enabled` | `False` | Prometheus `/metrics` endpoint |
-| `rate_limit_enabled` | `False` | Per-IP rate limiting |
-| `request_queue_enabled` | `False` | Request queueing and load shedding |
-| `sentry_dsn` | `None` | Sentry error tracking |
-| `ssl_certfile` | `None` | TLS certificate (enables HTTP/2) |
-| `ssl_keyfile` | `None` | TLS private key |
-
-Do not assume Pounce environment variable names are read by Chirp. If your
-platform provides deployment variables, read them in your app code and build an
-`AppConfig`, or start through `pounce serve --config pounce.toml`.
-
-Chirp does not yet expose Pounce compression or introspection settings through
-`AppConfig`; those remain security-facing decisions deferred to a later public
-API pass. Reverse-proxy trust **is** now exposed — see below.
-
-## Running Behind A Reverse Proxy
-
-When Chirp runs behind a reverse proxy (nginx, a load balancer, a CDN, a
-platform router), the socket peer is the proxy, not the end user. The real
-client IP arrives in the `X-Forwarded-For` header. Two `AppConfig` fields
-control how that header is trusted; both thread through to pounce's
-`ServerConfig`.
-
-| Field | Default | Effect |
-|-------|---------|--------|
-| `trusted_proxies` | `()` | Reverse-proxy peer IPs/hostnames whose `X-Forwarded-For` is honored (maps to pounce `ServerConfig.trusted_hosts`). |
-| `forwarded_for_trusted_hops` | `1` | Trailing `X-Forwarded-For` hops to trust when deriving the client IP. Must be `>= 1`. |
-
-```python
-config = AppConfig(
-    env="production",
-    secret_key="...",
-    trusted_proxies=("10.0.0.1", "10.0.0.2"),  # your proxy peers
-    forwarded_for_trusted_hops=1,               # one proxy in front of the app
-)
-```
-
-**`X-Forwarded-For` is ignored unless `trusted_proxies` is set.** With the empty
-default, Chirp does not trust forwarded headers at all and the request client IP
-is the raw socket peer (the proxy). This is the safe default: it cannot be
-spoofed. Set `trusted_proxies` only once you know the IPs/hostnames of the
-proxies actually in front of your app — `forwarded_for_trusted_hops` only takes
-effect when the direct peer is one of those trusted proxies.
-
-**Do not set `forwarded_for_trusted_hops=0` to "disable" forwarding** — it must
-be `>= 1` and `AppConfig` raises `ConfigurationError` at construction otherwise
-(pounce rejects it at launch). To ignore `X-Forwarded-For`, leave
-`trusted_proxies` empty.
-
-**The `"*"` wildcard trusts every direct peer's `X-Forwarded-For`**, which lets
-any client spoof its client IP — defeating per-IP rate limiting and skewing
-audit correlation. Use it only on a fully locked-down network where the only
-reachable peers are your own proxies. The `trusted_proxies` contract check emits
-a `WARNING` whenever `trusted_proxies` contains `"*"` outside development (see
-the [category reference](/chirp/docs/quality/contracts-debugging/categories/)).
-
-Do **not** set pounce's `trusted_hosts_wildcard` directly — pounce derives it
-from `"*"` membership in `trusted_hosts`.
-
-### Access-log vs client-IP divergence
-
-Be aware these two values can disagree:
-
-- **Pounce access logs** key on the **raw socket peer IP** (the proxy).
-- **The per-IP rate limiter and the request client IP** (`request.client`) use
-  the **rewritten `X-Forwarded-For` client IP** — but only when the direct peer
-  is a trusted proxy. When `trusted_proxies` is empty, both reflect the raw peer.
-
-Do not build audit or correlation logic that assumes the access-log peer IP and
-the rate-limiter/request client IP are the same value. Behind a trusted proxy
-they intentionally differ.
-
-## Full Guide
-
-For detailed deployment instructions, TLS setup, Kubernetes, and advanced configuration, see the source for this published guide in the repository:
-
-**[site/content/docs/quality/deployment/production.md](https://github.com/lbliii/chirp/blob/main/site/content/docs/quality/deployment/production.md)**
+:::{note} See also
+- [[docs/quality/deployment/auth-hardening|Auth Hardening]] — wire the secure-by-default stack before launch
+- [[docs/quality/contracts-debugging/categories|Contract categories]] — what each `chirp check` rule enforces
+- [[docs/about/core-concepts/configuration|Configuration]] — every `AppConfig` field
+- [[docs/quality/deployment/_index|Deployment overview]] — server flags and freeze-vs-serve map
+:::

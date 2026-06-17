@@ -1,6 +1,6 @@
 ---
 title: Auth Hardening
-description: Production checklist for authentication and authorization safety
+description: The wiring checklist for exposing an app with logins or user data to the internet
 draft: false
 weight: 20
 lang: en
@@ -10,72 +10,40 @@ keywords: [auth hardening, csrf, sessions, csp, hsts, rate limit]
 category: guide
 ---
 
-## Production Checklist
+## Overview
 
-Use this checklist before shipping paid or user-data-heavy applications.
+This is the checklist you run before exposing an app with logins or user data to
+the internet. Chirp ships the secure-by-default building blocks — sessions, CSRF,
+rate limiting, security headers, password hashing — but you wire and configure
+them for production yourself. This page is that wiring.
 
-### 1) Session and Cookies
+:::{note}
+Most of these items are also enforced by `app.check()`, the contracts you run in
+CI. The severity is environment-aware: missing CSRF or session protection on a
+mutating route is an **ERROR in production**, a **WARNING in staging**, and
+**silent in development**. This checklist and the contract categories cover the
+same ground from two angles — see [[docs/quality/contracts-debugging/categories|the contract categories]].
+:::
 
-- Set a strong `CHIRP_SECRET_KEY` from environment.
-- Use `SessionConfig(secure=True, httponly=True, samesite="lax")` in production.
-- Enable `idle_timeout_seconds` and `absolute_timeout_seconds` for session lifecycle control.
-- Use `AuthConfig(session_version=...)` to invalidate stale sessions after password reset/account events.
+## Minimal hardened setup
 
-### 2) CSRF and Forms
-
-- Register middleware in order:
-  1. `SessionMiddleware`
-  2. `AuthMiddleware`
-  3. `CSRFMiddleware`
-- Include `{{ csrf_field() }}` in all unsafe forms.
-- Keep `CSRFMiddleware` enabled for cookie-authenticated routes.
-
-### 3) Authorization
-
-- Use `@login_required` and `@requires(...)` for route-level checks.
-- Add `policy=` callbacks for object-level ownership checks.
-- Return 403 for unauthorized resources without leaking policy details.
-
-### 4) Abuse Protection
-
-- Add `AuthRateLimitMiddleware` for login/reset endpoints.
-- Add lockout/backoff with `LoginLockout` in login handlers.
-- Monitor repeated failures and blocked attempts with audit events.
-
-### 5) Browser Security Headers
-
-- Enable `SecurityHeadersMiddleware`.
-- Configure a strict `Content-Security-Policy`.
-- Configure `Strict-Transport-Security` when serving over HTTPS.
-- Keep `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` defaults unless you have a reason to change them.
-
-### 6) Password and Secrets
-
-- Prefer argon2 (`pip install bengal-chirp[auth]`) in production.
-- Use password reset and session version rotation on credential changes.
-- Never commit secrets; rotate periodically.
-
-### 7) Audit and Operations
-
-- Register a sink via `set_security_event_sink(...)`.
-- Alert on spikes in:
-  - `auth.token.invalid`
-  - `csrf.reject.*`
-  - `authz.permission.denied`
-- Keep backups and incident runbooks for account takeover response.
-
-## Minimal Hardened Setup
+Copy this stack, then read the per-item rationale below. The registration order
+matters: `SessionMiddleware` runs first so a session exists, then
+`AuthRateLimitMiddleware` and `CSRFMiddleware` (which depends on the session),
+then `SecurityHeadersMiddleware`.
 
 ```python
-from chirp.middleware import (
-    AuthRateLimitConfig,
-    AuthRateLimitMiddleware,
-    CSRFMiddleware,
+import os
+
+from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
+from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.security_headers import (
     SecurityHeadersConfig,
     SecurityHeadersMiddleware,
-    SessionConfig,
-    SessionMiddleware,
 )
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+
+secret = os.environ["CHIRP_SECRET_KEY"]
 
 app.add_middleware(
     SessionMiddleware(
@@ -89,7 +57,9 @@ app.add_middleware(
         )
     )
 )
-app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(paths=("/login", "/password-reset"))))
+app.add_middleware(
+    AuthRateLimitMiddleware(AuthRateLimitConfig(paths=("/login", "/password-reset")))
+)
 app.add_middleware(CSRFMiddleware())
 app.add_middleware(
     SecurityHeadersMiddleware(
@@ -101,20 +71,112 @@ app.add_middleware(
 )
 ```
 
-`AuthRateLimitMiddleware` uses the socket client address by default. When deploying behind a trusted proxy that rewrites forwarded headers, pass `key_header="x-forwarded-for"` explicitly.
+:::{warning}
+`AuthRateLimitMiddleware` keys its rate-limit buckets off the socket client
+address by default. Behind a trusted proxy that rewrites forwarded headers, every
+request arrives from the proxy IP — so all clients share one bucket and the limit
+is meaningless. Pass `key_header="x-forwarded-for"` so the middleware reads the
+real client address from the proxy chain. Only set this when you control the proxy
+and it strips inbound `X-Forwarded-For`, or an attacker can spoof the header.
+:::
 
-## Boundary Contract for Account Flows
+## What each item does
 
-Chirp ships session auth, CSRF, rate limiting, and password hashing — but it does **not** own account-recovery flows like password reset or email verification. If such flows land in core later, they must respect these boundaries. This is a deliberate scope decision, consistent with Chirp's [[docs/about/philosophy|Non-Goals]]: no bundled ORM, no bundled email.
+Each row maps a hardening area to the field you set in the stack above.
 
-### Tokens are stateless or app-owned — never framework-owned
+:::{list-table}
+:header-rows: 1
 
-A future password-reset or email-verification flow **must** carry state in a stateless signed token (via `itsdangerous`, the same primitive Chirp already uses for session signing) **or** in a token store the app provides. Chirp will **never** create a framework-owned, per-user token table.
+* - Area
+  - What to set
+  - Symbol / value
+* - Session cookies
+  - Sign cookies, mark them secure and HTTP-only, and bound their lifetime
+  - `SessionConfig(secure=True, httponly=True, samesite="lax", idle_timeout_seconds=..., absolute_timeout_seconds=...)`
+* - Session invalidation
+  - Invalidate stale sessions after a password change or account event
+  - `AuthConfig(session_version=...)`
+* - CSRF
+  - Validate unsafe requests; emit a token in every mutating form
+  - `CSRFMiddleware()` + `{{ csrf_field() }}`
+* - Authorization
+  - Gate routes; add an ownership check; return 403 without leaking policy detail
+  - `@login_required`, `@requires("role", policy=...)`
+* - Abuse protection
+  - Rate-limit auth endpoints; add lockout/backoff on repeated failures
+  - `AuthRateLimitMiddleware(...)`, `LoginLockout(...)`
+* - Browser headers
+  - Strict Content-Security-Policy; HSTS over HTTPS; keep the safe defaults
+  - `SecurityHeadersConfig(content_security_policy=..., strict_transport_security=...)`
+* - Password hashing
+  - Use argon2 in production
+  - `pip install bengal-chirp[auth]`
+* - Audit
+  - Register a sink and alert on auth/CSRF/authz event spikes
+  - `set_security_event_sink(...)`
+:::
 
-A framework-owned token table would force a schema, a migration, and a storage backend on every app — exactly the ORM-shaped coupling Chirp declines. Signed tokens require no storage; an app-provided store keeps the schema decision with the app that owns its database.
+The authorization decorators and lockout helpers live in `chirp.security`, not
+`chirp.middleware`:
 
-### Email is a BYO callback rendering a Kida body — never a bundled mailer
+```python
+from chirp.security import LockoutConfig, LoginLockout, login_required, requires
+```
 
-A future flow **must** render its message body as a Kida template and hand the rendered body to an app-provided mailer callback. Chirp will **never** bundle an SMTP client or mailer dependency.
+`policy=` is a keyword parameter of `@requires(...)`, not a separate API. It takes
+a callback that receives the user and request and returns a bool for object-level
+ownership checks.
 
-The callback is shaped like the auth middleware's existing extension seams. `AuthConfig` already takes `load_user` and `verify_token` as app-supplied async callbacks (see `AuthConfig` in `src/chirp/middleware/auth.py`); a delivery hook for account flows would follow the same pattern — Chirp renders the HTML, the app decides how to send it. This keeps Chirp an HTML-over-the-wire framework and leaves transport (SMTP, a provider API, a queue) to the app, matching the [[docs/about/philosophy|Non-Goals]] stance against bundling email.
+### Audit events to alert on
+
+Register a sink with `set_security_event_sink(...)`, then alert on spikes in these
+event names:
+
+:::{list-table}
+:header-rows: 1
+
+* - Event
+  - Fires when
+* - `auth.token.invalid`
+  - A bearer token fails verification
+* - `csrf.reject.missing` / `csrf.reject.invalid`
+  - A mutating request has no CSRF token or a bad one
+* - `authz.permission.denied`
+  - A `@requires(role)` check fails
+* - `authz.policy.denied`
+  - A `@requires(..., policy=...)` ownership check fails
+:::
+
+## Account-recovery flows
+
+Chirp does not ship password-reset or email-verification flows. If you are
+wondering where they are, expand the boundary statement below.
+
+:::{dropdown} Why Chirp has no built-in password-reset or email flow
+Chirp ships session auth, CSRF, rate limiting, and password hashing — but it does
+not own account-recovery flows like password reset or email verification. This is
+a deliberate scope decision: no bundled ORM, no bundled email. See
+[[docs/about/non-goals|Non-Goals]] and [[docs/about/philosophy|the philosophy behind these scope decisions]].
+
+**Tokens stay stateless or app-owned.** A password-reset or email-verification
+flow must carry its state in a stateless signed token (via `itsdangerous`, the
+same primitive Chirp uses for session signing) or in a token store the app
+provides. Chirp will not create a framework-owned, per-user token table — that
+would force a schema, a migration, and a storage backend on every app. Signed
+tokens need no storage; an app-provided store keeps the schema decision with the
+app that owns its database.
+
+**Email is a bring-your-own callback, never a bundled mailer.** A flow renders its
+message body as a Kida template and hands the rendered HTML to an app-provided
+mailer callback. Chirp will not bundle an SMTP client. This mirrors the existing
+auth extension seams: `AuthConfig` already takes `load_user` and `verify_token` as
+app-supplied async callbacks. Chirp renders the HTML; the app decides how to send
+it — SMTP, a provider API, or a queue.
+:::
+
+:::{note} See also
+- [[docs/quality/deployment/production|Production deployment]] — the rest of the ship-to-prod checklist
+- [[docs/quality/contracts-debugging/categories|Contract categories]] — the env-aware severity model these items map to
+- [[docs/quality/contracts-debugging/route-contract|The route and security-stack contract]] — how `app.check()` enforces the secure-by-default stack
+- [[docs/quality/testing/_index|Testing]] — verify your hardened stack before you ship
+:::

@@ -10,6 +10,8 @@ keywords: [philosophy, design, principles, ergonomic, honest, transparent]
 category: explanation
 ---
 
+Chirp's API didn't fall out of one big decision -- it falls out of a handful of consistent instincts about what a web framework should and shouldn't do for you. This page names those instincts so you can judge whether Chirp's bets match yours. If you'd rather see the code, jump to [[docs/about/architecture|Architecture]]; if you want the hard lines on what Chirp won't do, see [[docs/about/non-goals|Non-Goals]].
+
 ## Design Principles
 
 These are distilled from building bengal, kida, patitas, and rosettes -- not as rigid rules, but as consistent instincts that shape every decision.
@@ -29,7 +31,7 @@ app.run()
 
 You never make someone understand the system to use the system. The simple call works. The architecture reveals itself only when you need it.
 
-Five lines to hello world. Return a string, get a response. Return a `Template`, get rendered HTML. Return a `Fragment`, get a block. The type *is* the intent.
+Five lines to hello world. Return a string, get a response. Return a `Template`, get rendered HTML. Return a `Fragment`, get a block. [[docs/about/core-concepts/return-values|The type *is* the intent]].
 
 :::{/step}
 :::{step} Data should be honest about what it is
@@ -77,7 +79,7 @@ If someone reads the code, the flow is traceable from entry to exit:
 - Return value is negotiated into a response
 - Response is sent back through the middleware stack
 
-No hidden context, no implicit behavior, no action-at-a-distance.
+No hidden context, no implicit behavior, no action-at-a-distance. The full path -- from trie match to [[docs/about/architecture|the negotiated response]] -- is laid out in Architecture.
 
 :::{/step}
 :::{step} Own what matters, delegate what doesn't
@@ -100,7 +102,7 @@ headlines:
 
 - **No stateful ORM.** "SQL in, frozen dataclasses out" — database access is your choice.
 - **No WebSocket return type.** SSE over WebSockets, always.
-- **No WSGI, no Python floor below 3.14.** The free-threading identity bet.
+- **No WSGI, no Python floor below 3.14.** [[docs/about/thread-safety|The free-threading identity bet]].
 
 For the full list — including in-core admin/CRUD, email, background jobs,
 general rate limiting, and telemetry — and the honest alternative for each, see

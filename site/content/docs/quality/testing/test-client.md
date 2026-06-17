@@ -5,17 +5,19 @@ draft: false
 weight: 10
 lang: en
 type: doc
-tags: [testing, test-client, httpx]
-keywords: [test-client, testing, httpx, async, requests, pytest]
+tags: [testing, test-client, pytest]
+keywords: [test-client, testing, asgi, async, requests, pytest, fragment]
 category: guide
 ---
 
 ## Overview
 
-`TestClient` sends requests through your app's ASGI handler directly -- no network, no running server. It uses the same `Request` and `Response` types as production, so there is no translation layer to introduce bugs.
+`TestClient` runs requests straight through your app's ASGI handler in-process -- no socket, no running server, no test HTTP layer. It builds the same `Request` and returns the same `Response` your app uses in production, so a passing test exercises the real code path.
 
-:::{note}
-Requires the `testing` extra: `pip install bengal-chirp[testing]`.
+Reach for it in pytest to assert status, body, and fragment-vs-full-page rendering. It also runs your startup and per-worker hooks, so apps that open a DB connection or HTTP client in `on_worker_startup` behave exactly as they do in production.
+
+:::{tip}
+`TestClient` itself has no extra dependencies -- it drives ASGI directly. The `testing` extra (`pip install bengal-chirp[testing]`) adds only `httpx`; install it when your *app* uses an `httpx` client (e.g. in `on_worker_startup`). The link-crawl helper needs nothing extra, and the browser-smoke helper needs Playwright (`uv sync --group dev --group browser`), not the `testing` extra.
 :::
 
 ## Basic Usage
@@ -34,11 +36,16 @@ The `TestClient` is an async context manager. It handles app startup/shutdown li
 
 ## HTTP Methods
 
+Every method accepts a `headers=` dict. `post()` also takes `data=` (form-encoded), `json=` (JSON body), or raw `body=` bytes; `put()` and `delete()` take only `headers=` and (for `put`) `body=`.
+
 ```python
 async def test_methods():
     async with TestClient(app) as client:
-        # GET
-        response = await client.get("/users")
+        # GET with custom headers
+        response = await client.get("/api/data", headers={
+            "Authorization": "Bearer token123",
+            "Accept": "application/json",
+        })
         assert response.status == 200
 
         # POST with JSON
@@ -48,96 +55,70 @@ async def test_methods():
         # POST with form data
         response = await client.post("/login", data={"username": "alice", "password": "secret"})
 
-        # PUT
-        response = await client.put("/users/1", json={"name": "Alice Updated"})
+        # PUT with a raw body (put() has no json= / data= shortcut)
+        import json
+        response = await client.put(
+            "/users/1",
+            body=json.dumps({"name": "Alice Updated"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
 
         # DELETE
         response = await client.delete("/users/1")
         assert response.status == 200
 ```
 
-## Custom Headers
-
-```python
-async def test_with_headers():
-    async with TestClient(app) as client:
-        response = await client.get("/api/data", headers={
-            "Authorization": "Bearer token123",
-            "Accept": "application/json",
-        })
-```
-
 ## Fragment Requests
 
-Simulate htmx fragment requests:
+To simulate an htmx request, send the `HX-Request` header so your handler renders a [[docs/build-apps/html-fragments/fragments|fragment]] instead of a full page. The `fragment()` convenience method sets that header for you and exposes `target=`, `trigger=`, and `history_restore=`:
 
 ```python
 async def test_fragment():
     async with TestClient(app) as client:
-        # Send with HX-Request header to trigger fragment rendering
-        response = await client.get("/search?q=test", headers={
-            "HX-Request": "true",
-            "HX-Target": "#results",
-        })
-        assert response.status == 200
-        assert "<div id=\"results\">" in response.text
-        # Fragment response -- no full page wrapper
-        assert "<html>" not in response.text
-```
-
-The `TestClient` also provides a convenience method:
-
-```python
-async def test_fragment_convenience():
-    async with TestClient(app) as client:
         response = await client.fragment("/search?q=test", target="#results")
         assert response.status == 200
+        assert '<div id="results">' in response.text
 ```
 
-## Route Smoke Tests
+Use the [[docs/quality/testing/assertions|fragment and SSE assertions]] (`assert_is_fragment`, `assert_is_full_page`, ...) to check fragment-vs-full-page rendering without hand-writing `<html>` string checks.
 
-Use `assert_route_smoke` when a route set should stay renderable as full pages,
-fragments, or both:
+## Cookies and sessions
 
-```python
-from chirp.testing import RouteSmokeCase, TestClient, assert_route_smoke
-
-async def test_showcase_routes(app):
-    async with TestClient(app) as client:
-        await assert_route_smoke(client, [
-            RouteSmokeCase("/", mode="full_page", name="home"),
-            RouteSmokeCase("/islands/remount", mode="both",
-                           template="islands/remount.html", block="island_mount"),
-            RouteSmokeCase("/health", mode="status"),
-        ])
-```
-
-Failures include the path, render intent, and any supplied route name, template,
-or block so template render errors point back to the broken route contract.
-
-## Cookies
+:::{warning}
+`TestClient` does **not** keep a cookie jar. A `Set-Cookie` on one response is not automatically sent back on the next request. To test a session flow, read the cookie off the login response and pass it forward yourself:
 
 ```python
 async def test_session():
     async with TestClient(app) as client:
-        # Login sets a cookie
-        await client.post("/login", data={"user": "alice", "pass": "secret"})
+        login = await client.post("/login", data={"user": "alice", "pass": "secret"})
+        cookie = login.cookies[0]  # SetCookie
 
-        # Subsequent requests include the cookie
-        response = await client.get("/dashboard")
+        response = await client.get(
+            "/dashboard",
+            headers={"Cookie": f"{cookie.name}={cookie.value}"},
+        )
         assert response.status == 200
-        assert "alice" in response.text
 ```
+:::
 
 ## Response Properties
+
+The returned object is the same `Response` your handlers produce. The fields you assert on most:
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `status` | `int` | HTTP status code |
-| `text` | `str` | Response body as string |
-| `json` | `dict` | Parsed JSON body |
-| `headers` | `dict` | Response headers |
-| `cookies` | `dict` | Response cookies |
+| `text` | `str` | Response body as a string |
+| `json` | property | Body parsed as JSON; raises `ValueError` on non-JSON |
+| `header(name, default=None)` | method | First matching header value (case-insensitive) |
+| `headers` | `tuple[tuple[str, str], ...]` | Raw header pairs |
+| `cookies` | `tuple[SetCookie, ...]` | `Set-Cookie` values on the response |
+
+Read a single header with the `header()` method rather than indexing `headers`:
+
+```python
+assert response.header("Content-Type") == "application/json"
+```
 
 ## Using with pytest
 
@@ -155,8 +136,31 @@ async def test_homepage(client):
     assert response.status == 200
 ```
 
-## Next Steps
+:::{dropdown} Smoke-test a whole route set
+When you want one test to prove a set of routes still renders (in CI, after a
+refactor), `assert_route_smoke` runs each route through the client and checks its
+render mode -- full page, fragment, status-only, or `both`:
 
-- [[docs/quality/testing/assertions|Assertions]] -- Fragment and SSE assertion helpers
-- [[docs/build-apps/html-fragments/fragments|Fragments]] -- How fragments work
-- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- SSE testing
+```python
+from chirp.testing import RouteSmokeCase, TestClient, assert_route_smoke
+
+async def test_showcase_routes(app):
+    async with TestClient(app) as client:
+        await assert_route_smoke(client, [
+            RouteSmokeCase("/", mode="full_page", name="home"),
+            RouteSmokeCase("/islands/remount", mode="both",
+                           template="islands/remount.html", block="island_mount"),
+            RouteSmokeCase("/health", mode="status"),
+        ])
+```
+
+Failures include the path, render intent, and any supplied route name, template,
+or block, so a template render error points straight back to the broken route.
+:::
+
+:::{note} See also
+- [[docs/quality/testing/assertions|Assertions]] -- fragment, OOB, and SSE assertion helpers
+- [[docs/build-apps/html-fragments/fragments|Fragments]] -- how fragment rendering works
+- [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] -- testing SSE endpoints with `client.sse()`
+- [[docs/quality/testing/_index|Testing overview]] -- the full testing toolkit
+:::

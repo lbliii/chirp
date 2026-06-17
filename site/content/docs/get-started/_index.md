@@ -14,6 +14,16 @@ cascade:
   type: doc
 ---
 
+New to Chirp? Start here. This section takes you from zero to a running,
+server-rendered app that swaps HTML fragments over the wire — no SPA, no JSON
+API. Coming from Flask or Django, you already know routes and templates; the new
+idea is that the [[docs/about/core-concepts/return-values|return type is the intent]]
+(return a `Fragment`, a `Page`, a stream), and Chirp handles content negotiation
+and htmx awareness for you.
+
+Read the cards below in order: install, build a hello-world in five minutes,
+wire your first fragment loop, then learn the recommended project layout.
+
 :::{cards}
 :columns: 2
 :gap: medium

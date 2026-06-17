@@ -14,9 +14,12 @@ cascade:
 
 ## Get Oriented
 
-Chirp's docs are organized around a few durable dimensions: why the framework
-exists, how to start, how to build server-rendered apps, how to keep those apps
-correct in production, and where to look up exact APIs or examples.
+Chirp is a Python framework for hypermedia-native apps: you return HTML — pages,
+fragments, streams, and Server-Sent Events — and
+[[docs/about/core-concepts/return-values|the return type expresses the intent]].
+
+New here? Start with **Get Started**. Sizing it up? Read **About**. Already
+building? Jump to **Build Apps** or the **Reference**.
 
 :::{cards}
 :columns: 2
@@ -25,7 +28,7 @@ correct in production, and where to look up exact APIs or examples.
 :::{card} About
 :icon: info
 :link: /chirp/docs/about/
-Philosophy, architecture, framework fit, thread safety, ecosystem, and the core return-type model.
+What Chirp is, why it is different, and how the return-type model works.
 :::{/card}
 
 :::{card} Get Started

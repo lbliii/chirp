@@ -1,6 +1,6 @@
 ---
-title: Filters
-description: Register custom template filters and globals
+title: Filters & Globals
+description: Register custom template filters and globals, and use Chirp's web-specific built-ins
 draft: false
 weight: 30
 lang: en
@@ -10,182 +10,88 @@ keywords: [filter, global, template-filter, template-global, kida, template-engi
 category: guide
 ---
 
-## Built-in Filters
+A **filter** transforms a value inside a template with the pipe syntax — `{{ value | filter }}`. A **global** is a function or value available in every template without passing it through the route's context. Chirp ships a handful of web-specific built-in filters and globals, and lets you register your own with `@app.template_filter()` and `@app.template_global()`.
 
-Chirp ships with built-in filters that are automatically available in every template. These complement Kida's core filters with web-specific utilities.
+## Register a custom filter
 
-### field_errors
-
-Extract validation errors for a single form field from an errors dict. Returns a list of error messages.
-
-```html
-{% for msg in errors | field_errors("email") %}
-    <p class="error">{{ msg }}</p>
-{% end %}
-```
-
-If the field has no errors, or `errors` is `None`, an empty list is returned — so the loop simply produces nothing.
-
-Typical usage with `form_or_errors()`:
+Decorate a function with `@app.template_filter()`. The function name becomes the filter name, and the piped value is the first argument:
 
 ```python
-@app.route("/signup", methods=["POST"])
-async def signup(request: Request):
-    result = await form_or_errors(request, SignupForm, "signup.html", "form")
-    if isinstance(result, ValidationError):
-        return result  # errors and form values are included
-    # ... process valid data
-```
+from chirp import App
 
-```html
-<label>Email</label>
-<input name="email" value="{{ form.email ?? "" }}">
-{% for msg in errors | field_errors("email") %}
-    <span class="field-error">{{ msg }}</span>
-{% end %}
-```
+app = App()
 
-### qs
-
-Build a URL with query-string parameters. Falsy values are automatically omitted.
-
-```html
-<a href="{{ '/search' | qs(q=query, page=page) }}">Search</a>
-{# Output: /search?q=hello&page=2 #}
-```
-
-Falsy values (`None`, `""`, `0`, `False`) are dropped:
-
-```html
-{{ '/items' | qs(q=query, category=category, page=none) }}
-{# If category is "", outputs: /items?q=hello #}
-```
-
-Appends to existing query strings:
-
-```html
-{{ '/search?q=hello' | qs(page=2) }}
-{# Output: /search?q=hello&page=2 #}
-```
-
-Special characters are URL-encoded:
-
-```html
-{{ '/search' | qs(q="hello world") }}
-{# Output: /search?q=hello%20world #}
-```
-
-### attr
-
-Output an HTML attribute when the value is truthy, else nothing. Shorthand for optional attributes without `{% if %}` blocks.
-
-```html
-<a href="{{ href }}"{{ class | attr("class") }}>{{ text }}</a>
-{# When class is "active": <a href="/foo" class="active">Foo</a> #}
-{# When class is "" or None: <a href="/foo">Foo</a> #}
-```
-
-Useful for optional `class`, `data-*`, `hx-*`, and other attributes. Values are HTML-escaped.
-
-### url
-
-Safelist a URL for `href` attributes. Validates the scheme (blocks `javascript:`, `data:` etc.) and returns the URL or a fallback if unsafe. Use when building links from user or external data.
-
-```html
-<a href="{{ user_link | url }}">User link</a>
-<a href="{{ external_url | url(fallback='/') }}">External</a>
-```
-
-### island_props
-
-Serialize JSON props safely for island mount attributes:
-
-```html
-<div data-island="editor"
-     data-island-props="{{ state | island_props }}">
-  Fallback editor UI.
-</div>
-```
-
-Use with the `island_attrs(...)` global for convenience:
-
-```html
-<div{{ island_attrs("editor", props=state, mount_id="editor-root") }}>
-  Fallback editor UI.
-</div>
-```
-
-Use `primitive_attrs(...)` when you want stricter primitive metadata:
-
-```html
-<div{{ primitive_attrs("grid_state", props={"stateKey": "team", "columns": ["name", "role"]}) }}>
-  ...
-</div>
-```
-
-### Security Filters (from Kida)
-
-Chirp uses Kida's template engine, which provides escape and safe filters. These are critical for preventing XSS.
-
-**`e` / `escape`** — HTML-escape a value. When `AppConfig(autoescape=True)` (the default), `{{ x }}` is escaped automatically. Use `| e` explicitly when chaining filters that might strip escaping (e.g. `{{ user_input | upper | e }}`).
-
-**`safe(reason="...")`** — Mark output as trusted HTML so it is not escaped. **Only use for content that is sanitized or from trusted sources** (e.g. sanitized markdown output, CMS blocks, server-generated HTML). Never use on raw user input — that enables XSS.
-
-```html
-{{ content | markdown }}
-{{ cms_block | safe(reason="admin-only CMS") }}
-```
-
-Chirp's markdown filter sanitizes unsafe HTML and URLs by default and returns template-safe markup. Pass `sanitize=False` to `register_markdown_filter()` only for trusted markdown where raw HTML is intentional.
-
-The `reason` argument is for code review and audit; it is not used at runtime.
-
-**URL attributes** — When building `href` from user data, use the `url` filter or Kida's `url_is_safe()` / `safe_url()` in a custom filter. See [Kida security docs](https://lbliii.github.io/kida/docs/advanced/security/) for context-specific escaping (JavaScript, CSS).
-
-**HTML validation** — Validate markup with [whatwg.org/validator](https://whatwg.org/validator/) to catch conformance errors. Chirp's `chirp check <app>` (and `app.check()`) validates hypermedia contracts: `hx-get`/`hx-post`/`hx-put`/`hx-delete`/`hx-patch` and `action` URLs must resolve to registered routes with compatible methods. Query params (e.g. `?page=1`) are stripped before matching. Use both for full coverage.
-
----
-
-## Custom Filters
-
-Filters transform values in templates. Register them with `@app.template_filter()`:
-
-```python
 @app.template_filter()
 def currency(value: float) -> str:
     return f"${value:,.2f}"
-
-@app.template_filter()
-def pluralize(count: int, singular: str, plural: str) -> str:
-    return singular if count == 1 else plural
 ```
 
-Use them in templates with the pipe syntax:
+Use it in a template with the pipe:
 
 ```html
 <span class="price">{{ product.price | currency }}</span>
-<span>{{ count }} {{ count | pluralize("item", "items") }}</span>
+{# → <span class="price">$1,299.00</span> #}
 ```
 
-## Named Filters
-
-By default, the function name becomes the filter name. Override it with an argument:
+Extra arguments after the piped value are passed in the parentheses:
 
 ```python
-@app.template_filter("fmt_date")
-def format_date(dt: datetime) -> str:
-    return dt.strftime("%B %d, %Y")
+@app.template_filter()
+def excerpt(value: str, length: int = 50, suffix: str = "...") -> str:
+    if len(value) <= length:
+        return value
+    return value[:length].rsplit(" ", 1)[0] + suffix
 ```
 
 ```html
-<time>{{ post.created_at | fmt_date }}</time>
+<p>{{ post.body | excerpt(120) }}</p>
 ```
 
-## Template Globals
+Filters are ordinary Python functions, so your type annotations give your IDE autocomplete and type-checking on the arguments.
 
-Globals are functions or values available in every template without being passed in the context:
+:::{note}
+Register filters and globals during setup, before `app.run()` (or `app.freeze()`). They become part of the template environment when the app freezes; registering after that raises `RuntimeError`.
+:::
+
+## Common patterns
+
+### Named filters
+
+By default the function name is the filter name. Pass a string to override it — useful when the Python name and the template name should differ:
 
 ```python
+@app.template_filter("type_color")
+def type_color(type_name: str) -> str:
+    """Return the CSS color for a Pokemon type."""
+    return TYPE_COLORS.get(type_name.lower(), "#777")
+
+
+@app.template_filter("sprite")
+def sprite_url(pokemon_id: int, variant: str = "default") -> str:
+    """Return the PokeAPI sprite URL for a Pokemon ID."""
+    if variant == "artwork":
+        return f"{SPRITE_BASE}/other/official-artwork/{pokemon_id}.png"
+    return f"{SPRITE_BASE}/{pokemon_id}.png"
+```
+
+*Source: [`examples/standalone/pokedex/app.py`](https://github.com/lbliii/chirp/blob/main/examples/standalone/pokedex/app.py).*
+
+```html
+<span style="color: {{ pokemon.type | type_color }}">{{ pokemon.type }}</span>
+<img src="{{ pokemon.id | sprite('artwork') }}" alt="{{ pokemon.name }}">
+```
+
+:::{warning}
+A custom filter that reuses a built-in name (such as `pluralize`) overrides the built-in for your whole app. Pick a distinct name unless you mean to replace it.
+:::
+
+### Template globals
+
+Globals are functions or values callable from any template without being passed in the route context:
+
+```python
+from datetime import datetime
+
 @app.template_global()
 def site_name() -> str:
     return "My App"
@@ -199,38 +105,103 @@ def current_year() -> int:
 <footer>&copy; {{ current_year() }} {{ site_name() }}</footer>
 ```
 
-## Registration Timing
+Like filters, globals take an optional name argument: `@app.template_global("year")`.
 
-Filters and globals must be registered during the setup phase (before `app.run()` or the first request). They become part of the kida environment at freeze time.
+## Built-in filters
 
-```python
-app = App()
+Chirp registers these web-specific filters on every template environment — no import or registration needed. They complement the filters that come from [[docs/build-apps/html-fragments/kida-integration|Kida, the template engine]].
 
-# Register during setup
-@app.template_filter()
-def upper(value: str) -> str:
-    return value.upper()
+:::{list-table} Built-in filters
+:header-rows: 1
 
-# This works
-app.run()
+* - Filter
+  - Does
+  - Example
+* - `field_errors`
+  - Returns the list of validation messages for one form field, or an empty list when there are none.
+  - `{% for m in errors | field_errors("email") %}…{% end %}`
+* - `qs`
+  - Builds a query string on a URL path. Falsy values (`None`, `""`, `0`, `False`) are dropped.
+  - `{{ '/search' | qs(q=query, page=page) }}` → `/search?q=hello&page=2`
+* - `attr`
+  - Emits an HTML attribute only when the value is truthy, else nothing. The value is HTML-escaped.
+  - `<a href="/x"{{ cls | attr("class") }}>` → ` class="active"` when `cls` is truthy
+* - `url`
+  - Safelists a URL for an `href`: returns it when the scheme is safe (`http`, `https`, relative), else a fallback (default `#`). Use on user or external data.
+  - `<a href="{{ link | url(fallback='/') }}">`
+:::
 
-# Registering after freeze would raise an error
+`field_errors` pairs with the errors dict returned by [[docs/build-apps/forms-data/forms-validation|form validation]]:
+
+```html
+<label>Email</label>
+<input name="email" value="{{ form.email ?? "" }}">
+{% for msg in errors | field_errors("email") %}
+    <span class="field-error">{{ msg }}</span>
+{% end %}
 ```
 
-## Type Safety
+:::{dropdown} Island filters (advanced)
+For [[docs/build-apps/ui-extensions/islands|island mount attributes]], Chirp also ships the `island_props` filter plus the `island_attrs` and `primitive_attrs` globals. Reach for these only when mounting a client-side island.
 
-Filters are regular Python functions with full type annotations. Your IDE provides autocomplete and type checking for filter arguments.
+`island_props` serializes a value to HTML-escaped JSON for a `data-island-props` attribute:
 
-```python
-@app.template_filter()
-def truncate(value: str, length: int = 50, suffix: str = "...") -> str:
-    if len(value) <= length:
-        return value
-    return value[:length].rsplit(" ", 1)[0] + suffix
+```html
+<div data-island="editor" data-island-props="{{ state | island_props }}">
+  Fallback editor UI.
+</div>
 ```
 
-## Next Steps
+The `island_attrs` global builds the full mount attribute string in one call:
 
-- [[docs/build-apps/html-fragments/rendering|Rendering]] -- How templates are rendered
-- [[docs/about/core-concepts/app-lifecycle|App Lifecycle]] -- When filters are registered
-- [[docs/reference/api|API Reference]] -- Complete API surface
+```html
+<div{{ island_attrs("editor", props=state, mount_id="editor-root") }}>
+  Fallback editor UI.
+</div>
+```
+
+Use `primitive_attrs` when the mount needs stricter primitive metadata:
+
+```html
+<div{{ primitive_attrs("grid_state", props={"stateKey": "team", "columns": ["name", "role"]}) }}>
+  ...
+</div>
+```
+:::{/dropdown}
+
+## Escaping and the `safe` filter
+
+When `AppConfig(autoescape=True)` (the default), `{{ x }}` is HTML-escaped automatically — the main defense against XSS. The escaping filters come from Kida: use `| e` (or `| escape`) to escape explicitly when chaining filters that might drop escaping, and `| safe(reason="...")` to mark output as trusted HTML so it is *not* escaped.
+
+:::{danger}
+Never pipe raw user input through `safe`. Marking unescaped, user-controlled HTML as safe is a direct XSS vulnerability. Use `safe` only on content you have sanitized or that comes from a trusted source (sanitized markdown, server-generated HTML).
+
+```html
+{{ cms_block | safe(reason="admin-only CMS") }}   {# OK: trusted source #}
+```
+
+The `reason` argument is for code review and audit only — it has no runtime effect.
+:::
+
+To render markdown, register the `markdown` filter once during setup. It sanitizes unsafe HTML and URLs by default; pass `sanitize=False` only for fully trusted markdown:
+
+```python
+from chirp.markdown import register_markdown_filter
+
+register_markdown_filter(app)   # adds the `markdown` filter
+```
+
+```html
+{{ post.body | markdown }}
+```
+
+:::{note} See also
+- [[docs/build-apps/html-fragments/kida-integration|Kida template integration]] — escaping rules and context-specific escaping (JavaScript, CSS) for `href`, scripts, and styles.
+- [[docs/quality/contracts-debugging/route-contract|The route contract checks]] — how `chirp check` validates that `hx-*` and `action` URLs resolve to registered routes.
+:::
+
+## Next steps
+
+- [[docs/build-apps/html-fragments/rendering|Rendering]] — how a template is rendered into a response
+- [[docs/about/core-concepts/app-lifecycle|App lifecycle]] — when filters and globals are frozen into the environment
+- [[docs/reference/api|API reference]] — the complete API surface

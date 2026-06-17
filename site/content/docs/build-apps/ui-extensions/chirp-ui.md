@@ -1,34 +1,44 @@
 ---
 title: chirp-ui
-description: Component library — layout, cards, forms, badges. Kida macros with CSS and themes
+description: The official Chirp component library — Kida macros for cards, forms, modals, and an app shell that render to styled HTML with no build step
 draft: false
 weight: 25
 lang: en
 type: doc
 tags: [guides, chirp-ui, components, kida, htmx]
-keywords: [chirp-ui, components, layout, cards, forms, badges, theming, route_tabs, shell tabs]
+keywords: [chirp-ui, components, layout, cards, forms, badges, theming, app shell, route tabs]
 category: guide
 ---
 
 ## Overview
 
-chirp-ui is a component library for Chirp. It provides [Kida](https://lbliii.github.io/kida) template macros — cards, modals, forms, layouts — that render as HTML. Use them with htmx for swaps, SSE for streaming, and View Transitions for polish. Zero JavaScript for layout.
+chirp-ui is the official component library for Chirp: a set of
+[Kida](https://lbliii.github.io/kida) template macros — cards, forms, modals,
+layouts, an app shell — that render to styled HTML with no build step and no
+client framework. Reach for it when you want a good-looking app out of the box
+and want interactivity to come from [[docs/build-apps/html-fragments/fragments|htmx swaps]]
+and native HTML (`<dialog>`, `<details>`) rather than a JavaScript framework.
 
-**What's good about it:**
+Install the `chirp[ui]` extra, call `use_chirp_ui(app)`, and import the macros
+you need — the framework wires up the CSS, themes, and template filters for you.
 
-- **Gorgeous by default** — Full visual design out of the box. Override `--chirpui-*` CSS variables to customize.
-- **htmx-native** — Interactive components use htmx or native HTML (`<dialog>`, `<details>`). No client-side framework.
-- **Composable** — `{% slot %}` for content injection. Components nest freely.
-- **Modern CSS** — `:has()`, container queries, fluid typography, `prefers-color-scheme` dark mode.
+It gives you:
+
+- **A full visual design out of the box.** Override `--chirpui-*` CSS variables to customize.
+- **htmx-native interactivity.** Components use htmx or native HTML (`<dialog>`, `<details>`) — no client-side framework.
+- **Composable macros.** `{% slot %}` for content injection; components nest freely.
+- **Modern CSS.** `:has()`, container queries, fluid typography, and `prefers-color-scheme` dark mode.
 
 ## Installation
 
-Requires Python 3.14+.
+:::{since} 0.10.0
+The `chirp[ui]` extra pulls in `chirp-ui>=0.10.0`. Requires Python 3.14+.
+:::
 
 :::{tab-set}
 :::{tab-item} chirp extra
 ```bash
-pip install bengal-chirp[ui]
+pip install "bengal-chirp[ui]"
 # or
 uv add "bengal-chirp[ui]"
 ```
@@ -45,11 +55,11 @@ uv add chirp-ui
 
 ## Setup
 
-Two steps to wire chirp-ui into your app:
-
-### 1. Wire chirp-ui into your app
-
-Use Chirp's integration helper to serve chirpui.css, themes, transitions, and register required filters:
+::::{steps}
+:::{step} Wire chirp-ui into your app
+Call `use_chirp_ui(app)` after creating the app. It serves `chirpui.css`,
+themes, and transitions, and registers the filters chirp-ui components need
+(`bem`, `field_errors`, `html_attrs`, `validate_variant`).
 
 ```python
 from chirp import App, AppConfig, use_chirp_ui
@@ -58,27 +68,44 @@ app = App(AppConfig(template_dir="templates"))
 use_chirp_ui(app)
 ```
 
-**Import:** `use_chirp_ui` is provided by Chirp. Use `from chirp import use_chirp_ui` when the `chirp[ui]` extra is installed. If that fails (e.g. older Chirp), use `from chirp.ext.chirp_ui import use_chirp_ui`.
+`use_chirp_ui` ships with the `chirp[ui]` extra. If `from chirp import
+use_chirp_ui` fails on an older Chirp, import it from `chirp.ext.chirp_ui`
+instead.
+:::{/step}
 
-`use_chirp_ui(app)` adds `StaticFiles` middleware for the chirp-ui package directory (default `/static`) and registers filters (`bem`, `field_errors`, `html_attrs`, `validate_variant`) so chirp-ui components render correctly.
-
-### 2. Include CSS in your base template
-
+:::{step} Include the CSS in your base template
 ```html
 <link rel="stylesheet" href="/static/chirpui.css">
 ```
 
-For View Transitions support, add:
+For View Transitions, also add:
 
 ```html
 <link rel="stylesheet" href="/static/chirpui-transitions.css">
 ```
+:::{/step}
+::::{/steps}
 
-## Auto-detection
+:::{warning} use_chirp_ui changes your app config
+`use_chirp_ui` auto-enables Alpine.js (chirp-ui components require it) and wires
+a per-request nonce CSP so the inline Alpine survives secure-by-default headers.
+It does **not** auto-enable htmx — the chirp-ui shell layouts already ship their
+own htmx `<script>`. If you also set `AppConfig(htmx=True)`, the injector's dedup
+skips re-adding the core script, so you will not double-load. See
+[[docs/build-apps/ui-extensions/alpine|Alpine.js integration]] for how Chirp owns
+Alpine injection.
+:::
 
-When chirp-ui is installed, Chirp's template loader adds the chirp-ui package automatically. No configuration needed for `{% from "chirpui/..." %}` imports. Templates resolve `chirpui/layout.html`, `chirpui/card.html`, etc. from the package.
+### Template auto-detection
+
+When chirp-ui is installed, Chirp's template loader adds the chirp-ui package
+automatically. No configuration is needed for `{% from "chirpui/..." %}`
+imports — `chirpui/layout.html`, `chirpui/card.html`, and the rest resolve from
+the package.
 
 ## Quick example
+
+A two-card grid in a centered container:
 
 ```html
 {% from "chirpui/layout.html" import container, grid, block %}
@@ -92,9 +119,11 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 {% end %}
 ```
 
-## App Shell
+## App shell
 
-**Quick start:** Extend `chirpui/app_shell_layout.html` and fill the blocks. No manual HTML boilerplate:
+The fastest way to a sidebar-and-topbar app is to extend chirp-ui's
+`app_shell_layout.html` and fill its blocks. No manual HTML boilerplate, and the
+htmx-boost navigation contract is already wired:
 
 ```html
 {# target: body #}
@@ -111,24 +140,25 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 {% end %}
 ```
 
-**Adding an inner shell:** For nested layouts (e.g. forum > subforum), use the `shell_section` macro from Chirp:
+:::{warning} Put shell chrome outside `{% block content %}`
+Chirp's `render_with_blocks` replaces `{% block content %}` on every render. Any
+sidebar, topbar, or breadcrumbs you place *inside* the content block get wiped on
+the next navigation. `app_shell_layout.html` already puts the chrome outside the
+content outlet — if you build a shell by hand, keep it that way.
+:::
 
-```html
-{% from "chirp/macros/shell.html" import shell_section %}
-{% call shell_section("forum-content") %}
-  {% block content %}{% end %}
-{% end %}
-```
+:::{note} See also
+- [[docs/build-apps/ui-extensions/shells|Shells decision guide]] — pick between `boost.html`, `shell.html`, and `app_shell_layout.html`.
+- [[docs/build-apps/ui-extensions/app-shell|App Shell guide]] — the full guide to `app_shell_layout.html`, regions, and OOB blocks.
+- [[docs/build-apps/ui-extensions/boosted-navigation|Boosted navigation]] — the `hx-select` swap contract and debug warnings.
+- [[docs/build-apps/html-fragments/layout-patterns|Layout Patterns]] — how page content composes into a shell.
+:::
 
-**Migrating from boost.html:** Replace `{% extends "chirp/layouts/boost.html" %}` with `{% extends "chirpui/app_shell_layout.html" %}`. Add `{% block brand %}`, `{% block sidebar %}`, etc. The `hx-select="#page-content"` and `id="page-content"` are already in place.
-
-**Fragment-only apps (no sidebar nav):** If your app uses forms or SSE but no sidebar navigation, extend `chirp/layouts/shell.html` instead. Unlike `boost.html`, `shell.html` sets no global `hx-select`, so fragment responses flow directly to their `hx-target` with no risk of silent empty swaps. See [[docs/build-apps/html-fragments/layout-patterns|Layout Patterns]] for the decision guide.
-
-**Page spacing contract:** Let the page-level wrapper own vertical rhythm. A good pattern is a parent layout with a `page_root` block that contains `container()` + `stack(gap="lg")`, while inner blocks such as `page_content` hold the page-specific sections. Pair that with `Page(..., "page_content", page_block_name="page_root", ...)` or `PageComposition(..., fragment_block="page_content", page_block="page_root", ...)` so boosted navigation swaps the full page shell instead of a too-narrow inner fragment.
-
-**Route tabs:** Register `Section.tab_items` in Python and set `RouteMeta.section` on each route file’s `_meta.py`. Chirp injects `tab_items` / `route_tabs` into template context; `use_chirp_ui(app)` registers `render_route_tabs` and `tab_is_active`. See the [shell, sections, and route tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md) for targets, boost behavior, and `app.check()` expectations.
-
-**Manual shell:** For full control, chirp-ui provides components for building persistent dashboard shells: `sidebar`, `breadcrumbs`, and `command_palette`. Combine them in a standalone `_layout.html`:
+:::{dropdown} Build the shell by hand
+For full control, compose the shell from individual chirp-ui macros —
+`sidebar`, `breadcrumbs`, and `command_palette` — in a standalone `_layout.html`.
+The boost attributes on `<main>` are what make plain `<a href>` links navigate
+without a full reload.
 
 ```html
 {# target: main #}
@@ -181,29 +211,93 @@ When chirp-ui is installed, Chirp's template loader adds the chirp-ui package au
 </html>
 ```
 
-**Why standalone?** Chirp's `render_with_blocks({"content": ...})` replaces `{% block content %}` entirely. If you extend `boost.html` and put the shell inside `{% block content %}`, it gets overwritten. A standalone layout puts the shell outside the content block so it always renders. See [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem Routing]] for the full explanation.
+The boost contract here — `hx-target="#main"`, `hx-swap="innerHTML"`,
+`hx-select="#page-content"` — keeps the shell chrome untouched while only the
+inner fragment swaps. The reasoning behind each attribute lives in
+[[docs/build-apps/ui-extensions/boosted-navigation|Boosted navigation]].
+:::
 
-**Why `hx-select="#page-content"`?** On htmx-boosted navigation, Chirp returns a full HTML page (it renders the matched layout). Without `hx-select`, htmx would swap the entire response into `#main`, replacing the shell. `hx-target="#main"` with `hx-swap="innerHTML"` and `hx-select="#page-content"` parses the response, extracts the inner fragment, and swaps it into `<main>` — the shell chrome stays untouched and avoids duplicate `view-transition-name` on the outer `<main>` node.
+:::{dropdown} Nested (inner) shells
+For layouts within layouts — e.g. a forum that frames each subforum — wrap a
+region with the `shell_section` macro:
 
-**Why `hx-boost` on `<main>`?** All links inside `#main` inherit `hx-boost`, `hx-target`, `hx-swap`, and `hx-select` — plain `<a href="...">` tags get SPA navigation automatically. No per-link attributes needed. Fragment requests with explicit `hx-target` (e.g. `hx-target="#compare-result"`) override the inherited value naturally. Use `hx-disinherit` or `fragment_island` only when a region needs to fully opt out.
+```html
+{% from "chirp/macros/shell.html" import shell_section %}
+{% call shell_section("forum-content") %}
+  {% block content %}{% end %}
+{% end %}
+```
+:::
+
+:::{dropdown} Page spacing for boosted navigation
+Let the page-level wrapper own vertical rhythm: a parent layout with a
+`page_root` block holding `container()` + `stack(gap="lg")`, and inner blocks
+like `page_content` for the page-specific sections. Pair that with a wide page
+block so boosted navigation swaps the full page shell, not a too-narrow inner
+fragment:
+
+```python
+return Page("dashboard.html", "page_content", page_block_name="page_root", **ctx)
+```
+
+For explicit fragment/page/region composition, `PageComposition` exposes the
+same idea via `fragment_block=` and `page_block=`. See
+[[docs/about/core-concepts/return-values|return types]] for when each applies.
+:::
+
+:::{dropdown} Migrating from boost.html
+Replace `{% extends "chirp/layouts/boost.html" %}` with
+`{% extends "chirpui/app_shell_layout.html" %}`, then add `{% block brand %}`,
+`{% block sidebar %}`, and the other shell blocks. The `hx-select="#page-content"`
+and `id="page-content"` are already in place.
+
+If your app uses forms or SSE but no sidebar navigation, extend
+`chirp/layouts/shell.html` instead. Unlike `boost.html`, `shell.html` sets no
+global `hx-select`, so fragment responses flow directly to their `hx-target`
+with no risk of silent empty swaps — see
+[[docs/build-apps/ui-extensions/shells|Shells]].
+:::
+
+### Route tabs
+
+To drive a tab bar from your route structure, register `Section.tab_items` in
+Python and set `RouteMeta.section` in each route's `_meta.py`. Chirp injects
+`tab_items` / `route_tabs` into the template context and registers the
+`tab_is_active` helper. The `render_route_tabs` macro is provided by the
+chirp-ui package. See the
+[shell, sections, and route-tabs contract](https://github.com/lbliii/chirp-ui/blob/main/docs/SHELL-TABS-CONTRACT.md)
+for targets, boost behavior, and `app.check()` expectations.
 
 ## Component categories
 
-| Category | Examples |
-|----------|----------|
-| **Layout** | container, grid, stack, block, page_header, section_header, divider, breadcrumbs, navbar, sidebar, hero, surface, callout |
-| **UI** | card, card_header, modal, drawer, tabs, accordion, dropdown, popover, toast, table, pagination, alert, button_group |
-| **Forms** | text_field, password_field, textarea_field, select_field, checkbox_field, toggle_field, radio_field, file_field, date_field, csrf_hidden, form_actions, login_form, signup_form |
-| **Data display** | badge, spinner, skeleton, progress, description_list, timeline, tree_view, calendar |
-| **Streaming** | streaming_block, copy_btn, model_card — for htmx SSE and LLM UIs |
+:::{list-table}
+:header-rows: 1
 
-See the [chirp-ui repository](https://github.com/lbliii/chirp-ui) for the full component reference and API.
+* - Category
+  - Macros
+* - **Layout**
+  - container, grid, stack, block, page_header, section_header, divider, breadcrumbs, navbar, sidebar, hero, surface, callout
+* - **UI**
+  - card, card_header, modal, drawer, tabs, accordion, dropdown, popover, toast, table, pagination, alert, button_group
+* - **Forms**
+  - text_field, password_field, textarea_field, select_field, checkbox_field, toggle_field, radio_field, file_field, date_field, csrf_hidden, form_actions, login_form, signup_form
+* - **Data display**
+  - badge, spinner, skeleton, progress, description_list, timeline, tree_view, calendar
+* - **Streaming**
+  - streaming_block, copy_btn, model_card — for htmx SSE and LLM UIs
+:::
+
+See the [chirp-ui repository](https://github.com/lbliii/chirp-ui) for the full
+component reference and API.
 
 ## Data layout patterns
 
-For dashboard and settings pages, use these patterns for consistent structure:
+For dashboard and settings pages, these patterns give consistent structure.
 
-**Section with header actions** — Put section-level buttons (Refresh, Auto-detect, Run validation) in the `section` actions slot, not beneath the content:
+### Section with header actions
+
+Put section-level buttons (Refresh, Auto-detect, Run validation) in the
+`section` actions slot, not beneath the content:
 
 ```html
 {% from "chirpui/layout.html" import section %}
@@ -214,7 +308,10 @@ For dashboard and settings pages, use these patterns for consistent structure:
 {% end %}
 ```
 
-**Settings rows** — For label + status + value (e.g. setup targets, health checks), use `settings_row_list` and `settings_row`:
+### Settings rows
+
+For label + status + value (e.g. setup targets, health checks), use
+`settings_row_list` and `settings_row`:
 
 ```html
 {% from "chirpui/settings_row.html" import settings_row_list, settings_row %}
@@ -224,11 +321,13 @@ For dashboard and settings pages, use these patterns for consistent structure:
 {% end %}
 ```
 
-**When to use what** — Use `description_list` for term + detail only (no status badge). Use `settings_row_list` when you have label + status + detail.
+Use `description_list` for term + detail only (no status badge); use
+`settings_row_list` when you have label + status + detail.
 
 ## Theming
 
-chirp-ui uses `prefers-color-scheme` for dark mode. Override any `--chirpui-*` variable:
+chirp-ui uses `prefers-color-scheme` for dark mode. Override any `--chirpui-*`
+variable:
 
 ```css
 :root {
@@ -237,16 +336,25 @@ chirp-ui uses `prefers-color-scheme` for dark mode. Override any `--chirpui-*` v
 }
 ```
 
-For manual light/dark toggle, set `data-theme="light"` or `data-theme="dark"` on `<html>`.
+For a manual light/dark toggle, set `data-theme="light"` or `data-theme="dark"`
+on `<html>`. To load an alternate theme, add its stylesheet:
 
-Optional theme: `<link rel="stylesheet" href="/static/themes/holy-light.css">`
+```html
+<link rel="stylesheet" href="/static/themes/holy-light.css">
+```
 
-## chirp new
+## Scaffolding
 
-When chirp-ui is installed, `chirp new <name>` scaffolds a project with `use_chirp_ui(app)` wired in the app module. The base template includes chirpui.css.
+When chirp-ui is installed, `chirp new <name>` scaffolds a project with
+`use_chirp_ui(app)` already wired into the app module and `chirpui.css` linked
+in the base template.
 
 ## Next steps
 
-- [chirp-ui on GitHub](https://github.com/lbliii/chirp-ui) — Full component reference, showcase app, and development docs
-- [[docs/examples/rag-demo|RAG Demo]] — Uses chirp-ui for layout, cards, badges, and alert
-- [[docs/build-apps/ui-extensions/islands|Islands Contract]] — chirp-ui provides `island_root` and state primitives for high-state widgets
+- [[docs/examples/rag-demo|RAG Demo]] — uses chirp-ui for layout, cards, badges, and alerts.
+- [[docs/build-apps/ui-extensions/app-shell|App Shell guide]] — build a persistent sidebar/topbar app.
+- [[docs/build-apps/ui-extensions/islands|Islands]] — chirp-ui's `island_root` and state primitives for high-state widgets.
+- [chirp-ui on GitHub](https://github.com/lbliii/chirp-ui) — full component reference, showcase app, and development docs.
+
+:::{related}
+:::

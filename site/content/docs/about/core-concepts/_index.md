@@ -11,9 +11,11 @@ category: explanation
 icon: book-open
 ---
 
-Chirp's core model is type-driven: route handlers return values that carry
-rendering intent, the app freezes before serving, and configuration is explicit.
-Start here when you need the mental model behind the task-oriented sections.
+Chirp's mental model comes in three pieces: handlers return values that carry
+rendering intent — [[docs/about/core-concepts/return-values|the return type *is*
+the intent]] — the app freezes from a mutable setup phase into an immutable
+runtime, and configuration is one explicit frozen object. Start here when a
+task-oriented guide assumes that model and you want the why behind it.
 
 :::{cards}
 :columns: 2
