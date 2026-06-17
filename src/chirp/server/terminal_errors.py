@@ -159,6 +159,37 @@ def format_minimal_error(exc: BaseException) -> str:
     return f"{type(exc).__name__}{location}: {exc}"
 
 
+#: errno values that mean "the client went away mid-response" on a bare OSError.
+_CLIENT_DISCONNECT_ERRNOS = frozenset({errno.ECONNRESET, errno.EPIPE, errno.ECONNABORTED})
+
+
+def is_client_disconnect(exc: BaseException) -> bool:
+    """True when *exc* signals the client closed the connection mid-response.
+
+    Long-lived streaming/SSE responses routinely end with the peer vanishing — a
+    browser tab closes, a proxy times the idle connection out — which surfaces in
+    the server's send/drain path as a TCP reset or broken pipe. These are not
+    server faults: there is nothing left to send and nothing to alert on. Callers
+    log them at ``DEBUG`` and skip the 500 error path (see
+    :func:`chirp.realtime.sse.handle_sse` and
+    :func:`chirp.server.sender.send_streaming_response`).
+
+    Covers the peer-gone classes (``ConnectionResetError`` / ``BrokenPipeError`` /
+    ``ConnectionAbortedError``) plus a bare :class:`OSError` carrying a disconnect
+    ``errno`` (``ECONNRESET`` / ``EPIPE`` / ``ECONNABORTED``).
+
+    Deliberately narrower than ``ConnectionError``: the broad ``except`` blocks
+    that call this also wrap the *user's* stream generator body, so a generic
+    ``ConnectionError`` — most notably ``ConnectionRefusedError`` (``ECONNREFUSED``,
+    an *outbound* failure when the generator's own upstream DB/cache/HTTP target
+    refuses) — is a genuine server error that must stay loud, not be swallowed as
+    a benign client disconnect.
+    """
+    if isinstance(exc, ConnectionResetError | BrokenPipeError | ConnectionAbortedError):
+        return True
+    return isinstance(exc, OSError) and exc.errno in _CLIENT_DISCONNECT_ERRNOS
+
+
 def log_error(exc: BaseException, request: Request | None = None) -> None:
     """Log an internal error with appropriate formatting.
 
