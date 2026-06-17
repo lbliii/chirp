@@ -27,7 +27,11 @@ from chirp.contracts.rules_sse import (
     normalize_sse_url,
     strip_template_comments,
 )
+from typing import Any
+
 from chirp.contracts.types import ContractIssue, Severity
+
+_SESSION_MIDDLEWARE = "SessionMiddleware"
 
 #: Path of the merged signal stream (kept in sync with signal_globals).
 SIGNAL_STREAM_PATH = "/_chirp/live"
@@ -168,3 +172,52 @@ def check_signal_bindings(
         for name in orphans
     )
     return issues
+
+
+def check_signal_scope(
+    middleware_list: list[Any],
+    session_signal_names: frozenset[str],
+) -> list[ContractIssue]:
+    """Error when session-scoped signals exist without ``SessionMiddleware``.
+
+    Session-scoped signals resolve their audience key from the session; without
+    ``SessionMiddleware`` the key is never available and per-visitor fan-out is
+    silently broken.
+    """
+    if not session_signal_names:
+        return []
+    has_session = any(type(mw).__name__ == _SESSION_MIDDLEWARE for mw in middleware_list)
+    if has_session:
+        return []
+    names = ", ".join(sorted(session_signal_names))
+    return [
+        ContractIssue(
+            severity=Severity.ERROR,
+            category="signal_scope",
+            message=(
+                f"Session-scoped signal(s) ({names}) require SessionMiddleware "
+                "so each connection can resolve its audience key for "
+                "/_chirp/live?aud=…. Register SessionMiddleware before using "
+                "audience='session' signals."
+            ),
+        )
+    ]
+
+
+def check_signal_mixed_audience_derived(
+    mixed_audience_derived_names: frozenset[str],
+) -> list[ContractIssue]:
+    """Warn when a derived signal depends on both global and session signals."""
+    return [
+        ContractIssue(
+            severity=Severity.WARNING,
+            category="signal_scope",
+            message=(
+                f"Derived signal {name!r} depends on both global and session-scoped "
+                "signals. The derived inherits session scope, but mixing audiences "
+                "often means the compute() reads a global dep that will not vary "
+                "per visitor — verify the dependency graph is intentional."
+            ),
+        )
+        for name in sorted(mixed_audience_derived_names)
+    ]

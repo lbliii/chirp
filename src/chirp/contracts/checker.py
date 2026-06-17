@@ -86,7 +86,7 @@ from .rules_route_contract import (
 )
 from .rules_route_names import check_route_names
 from .rules_shapecheck import check_shapecheck
-from .rules_signals import check_signal_bindings
+from .rules_signals import check_signal_bindings, check_signal_mixed_audience_derived, check_signal_scope
 from .rules_sse import (
     check_sse_connect_scope,
     check_sse_event_crossref,
@@ -413,6 +413,22 @@ def _signal_names(app: App) -> frozenset[str]:
     return registry.names
 
 
+def _session_signal_names(app: App) -> frozenset[str]:
+    """Return every session-scoped signal/derived name for contract checks."""
+    registry = getattr(app._mutable_state, "signal_registry", None)
+    if registry is None:
+        return frozenset()
+    return registry.session_names
+
+
+def _mixed_audience_derived_names(app: App) -> frozenset[str]:
+    """Return derived signals whose deps span global and session audiences."""
+    registry = getattr(app._mutable_state, "signal_registry", None)
+    if registry is None:
+        return frozenset()
+    return registry.mixed_audience_derived_names
+
+
 def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     """Validate app route/template contract consistency.
 
@@ -614,6 +630,10 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
         result.issues.extend(check_signal_bindings(template_sources, snapshot.signal_names))
+        result.issues.extend(check_signal_scope(middleware_list, _session_signal_names(app)))
+        result.issues.extend(
+            check_signal_mixed_audience_derived(_mixed_audience_derived_names(app))
+        )
         result.issues.extend(
             check_layout_chains(
                 snapshot.layout_chains,
