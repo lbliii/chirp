@@ -33,7 +33,7 @@ from collections.abc import AsyncIterator
 from chirp.app.state import PendingRoute
 from chirp.http.request import Request
 from chirp.realtime.events import EventStream, SSEEvent
-from chirp.realtime.signals import _SCOPE_PREFIX, SignalRegistry, _bus_scope
+from chirp.realtime.signals import SignalRegistry, _bus_scope
 
 logger = logging.getLogger("chirp.signals")
 

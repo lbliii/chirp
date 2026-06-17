@@ -18,8 +18,11 @@ Pure stdlib for the in-process path; ``RedisBackplane`` would reuse
 
 import os
 import threading
-from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
+
+
+class _EmitFn(Protocol):
+    def __call__(self, name: str, value: Any, *, audience_key: str = "") -> None: ...
 
 
 @runtime_checkable
@@ -39,7 +42,7 @@ class SignalBackplane(Protocol):
 class InProcessBackplane:
     """Single-process backplane — wraps ``App.emit`` (default)."""
 
-    def __init__(self, emit: Callable[[str, Any], None]) -> None:
+    def __init__(self, emit: _EmitFn) -> None:
         self._emit = emit
 
     def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
@@ -61,7 +64,7 @@ class RedisBackplane:
     Reuses the ``chirp[redis]`` extra when implemented.
     """
 
-    def __init__(self, *, redis_url: str, emit: Callable[[str, Any], None]) -> None:
+    def __init__(self, *, redis_url: str, emit: _EmitFn) -> None:
         self._redis_url = redis_url
         self._emit = emit
         # self._client = redis.from_url(redis_url)
@@ -82,10 +85,10 @@ class RedisBackplane:
 
 _backplane_lock = threading.Lock()
 _backplane: SignalBackplane | None = None
-_emit_fn: Callable[[str, Any], None] | None = None
+_emit_fn: _EmitFn | None = None
 
 
-def bind_emit(emit: Callable[[str, Any], None]) -> None:
+def bind_emit(emit: _EmitFn) -> None:
     """Bind ``App.emit`` once at startup — must run before the first ``publish``."""
     global _emit_fn, _backplane
     with _backplane_lock:
@@ -93,7 +96,7 @@ def bind_emit(emit: Callable[[str, Any], None]) -> None:
         _backplane = None
 
 
-def _build_backplane(emit: Callable[[str, Any], None]) -> SignalBackplane:
+def _build_backplane(emit: _EmitFn) -> SignalBackplane:
     source = os.environ.get("LUCKY_CAT_BACKPLANE", "memory").strip().lower()
     if source == "redis":
         redis_url = os.environ.get("REDIS_URL", "").strip()

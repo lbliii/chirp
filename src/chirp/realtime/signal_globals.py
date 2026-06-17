@@ -47,7 +47,9 @@ _referenced: contextvars.ContextVar[set[str]] = contextvars.ContextVar("chirp_si
 #: Per-request audience key for session-scoped signals (the visitor's store key).
 #: ``signal_connect()`` appends ``?aud=…`` so ``/_chirp/live`` fans session signals
 #: only to the matching connection. Empty means global-only bindings on this page.
-_signal_audience: contextvars.ContextVar[str] = contextvars.ContextVar("chirp_signal_audience", default="")
+_signal_audience: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "chirp_signal_audience", default=""
+)
 
 
 def _record(name: str) -> None:

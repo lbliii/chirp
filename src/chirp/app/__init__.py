@@ -2,7 +2,7 @@
 
 import threading
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
 
@@ -527,7 +527,7 @@ class App:
         initial: Callable[[], Any] | None = None,
         render: Callable[[Any], str] | None = None,
         coalesce: bool = True,
-        audience: str = "global",
+        audience: Literal["global", "session"] = "global",
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Declare a live ``signal`` — one server value, fanned out to many bindings.
 
@@ -563,7 +563,7 @@ class App:
                     initial=initial,
                     render=render,
                     coalesce=coalesce,
-                    audience=audience,  # type: ignore[arg-type]
+                    audience=audience,
                 )
             )
             return fn

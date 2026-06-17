@@ -33,10 +33,10 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-SignalAudience = Literal["global", "session"]
-
 from chirp.pages.reactive.bus import ReactiveBus
 from chirp.pages.reactive.events import ChangeEvent
+
+SignalAudience = Literal["global", "session"]
 
 logger = logging.getLogger("chirp.signals")
 
@@ -273,9 +273,7 @@ class SignalRegistry:
                     for dep in dspec.deps:
                         dep_spec = self._specs.get(dep)
                         dep_derived = self._derived.get(dep)
-                        dep_audience = (
-                            (dep_spec or dep_derived).audience  # type: ignore[union-attr]
-                        )
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
                         dep_aud = aud if dep_audience == "session" else ""
                         dep_values.append(self._values.get(_value_key(dep, dep_aud)))
                     if any(v is None for v in dep_values):
@@ -358,9 +356,7 @@ class SignalRegistry:
                     for dep in dspec.deps:
                         dep_spec = self._specs.get(dep)
                         dep_derived = self._derived.get(dep)
-                        dep_audience = (
-                            (dep_spec or dep_derived).audience  # type: ignore[union-attr]
-                        )
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
                         dep_key_aud = dep_aud if dep_audience == "session" else ""
                         dep_values.append(self._values.get(_value_key(dep, dep_key_aud)))
                     pending[dname] = (dspec, dep_values)
@@ -404,9 +400,7 @@ class SignalRegistry:
                     for dep in dspec.deps:
                         dep_spec = self._specs.get(dep)
                         dep_derived = self._derived.get(dep)
-                        dep_audience = (
-                            (dep_spec or dep_derived).audience  # type: ignore[union-attr]
-                        )
+                        dep_audience = _dep_audience(dep_spec, dep_derived)
                         dep_key_aud = dep_aud if dep_audience == "session" else ""
                         dep_values.append(self._values.get(_value_key(dep, dep_key_aud)))
                     pending[dname] = (dspec, dep_values)
@@ -417,6 +411,9 @@ class SignalRegistry:
                 try:
                     derived_value = dspec.compute(*dep_values)
                 except Exception:
+                    logger.exception(
+                        "derived signal %r compute() failed on seed of %r", dname, source
+                    )
                     continue
                 dep_aud = audience_key if dspec.audience == "session" else ""
                 with self._lock:
@@ -466,6 +463,15 @@ def _bus_scope(name: str, audience_key: str) -> str:
 
 def _value_key(name: str, audience_key: str) -> tuple[str, str]:
     return (audience_key, name)
+
+
+def _dep_audience(spec: SignalSpec | None, derived: DerivedSpec | None) -> SignalAudience:
+    """Return the audience of a registered dependency."""
+    if spec is not None:
+        return spec.audience
+    if derived is not None:
+        return derived.audience
+    return "global"
 
 
 def _values_equal(a: Any, b: Any) -> bool:
