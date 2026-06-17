@@ -115,6 +115,22 @@ class TestRegistry:
         assert spec is not None
         assert spec.coalesce is False
 
+    def test_session_scoped_emit_isolates_cache_and_bus(self) -> None:
+        """Session-scoped signals fan out on aud-scoped bus topics (#315)."""
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance", audience="session", initial=lambda: 0))
+        reg.emit("balance", 10, audience_key="alice")
+        reg.emit("balance", 20, audience_key="bob")
+        assert reg.cached_value("balance", audience_key="alice") == 10
+        assert reg.cached_value("balance", audience_key="bob") == 20
+        assert reg.cached_value("balance", audience_key="") is None
+
+    def test_session_scoped_emit_requires_audience_key(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance", audience="session"))
+        with pytest.raises(ValueError, match="audience_key"):
+            reg.emit("balance", 1)
+
 
 # ---------------------------------------------------------------------------
 # Derived recompute on dependency change

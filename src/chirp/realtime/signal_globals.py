@@ -44,6 +44,11 @@ SIGNAL_STREAM_PATH = "/_chirp/live"
 #: renders (free-threading) never leak topics across each other.
 _referenced: contextvars.ContextVar[set[str]] = contextvars.ContextVar("chirp_signals_referenced")
 
+#: Per-request audience key for session-scoped signals (the visitor's store key).
+#: ``signal_connect()`` appends ``?aud=…`` so ``/_chirp/live`` fans session signals
+#: only to the matching connection. Empty means global-only bindings on this page.
+_signal_audience: contextvars.ContextVar[str] = contextvars.ContextVar("chirp_signal_audience", default="")
+
 
 def _record(name: str) -> None:
     try:
@@ -59,6 +64,19 @@ def reset_referenced() -> contextvars.Token[set[str]]:
     return _referenced.set(set())
 
 
+def set_signal_audience(audience_key: str) -> contextvars.Token[str]:
+    """Bind the session audience key for session-scoped signal SSR + SSE."""
+    return _signal_audience.set(audience_key)
+
+
+def reset_signal_audience(token: contextvars.Token[str]) -> None:
+    _signal_audience.reset(token)
+
+
+def current_signal_audience() -> str:
+    return _signal_audience.get()
+
+
 def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
     """Build the ``signal`` / ``signal_block`` / ``signal_connect`` globals."""
 
@@ -72,7 +90,7 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         """
         validate_signal_name(name)
         _record(name)
-        seed = registry.current_rendered(name)
+        seed = registry.current_rendered(name, audience_key=current_signal_audience())
         inner = escape(seed) if seed is not None else ""
         return Markup(f'<span sse-swap="{escape(name)}" hx-target="this">{inner}</span>')
 
@@ -84,7 +102,7 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         """
         validate_signal_name(name)
         _record(name)
-        seed = registry.current_rendered(name)
+        seed = registry.current_rendered(name, audience_key=current_signal_audience())
         inner = seed if seed is not None else ""
         return Markup(f'<div sse-swap="{escape(name)}" hx-target="this">{inner}</div>')
 
@@ -130,8 +148,15 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         element itself.
         """
         return Markup(
-            f'<div hx-ext="sse" sse-connect="{SIGNAL_STREAM_PATH}" hx-disinherit="hx-target hx-swap">'
+            f'<div hx-ext="sse" sse-connect="{SIGNAL_STREAM_PATH}{_audience_query()}" '
+            'hx-disinherit="hx-target hx-swap">'
         )
+
+    def _audience_query() -> str:
+        aud = current_signal_audience()
+        if not aud:
+            return ""
+        return f"?aud={escape(aud, quote=True)}"
 
     return {
         "signal": signal,

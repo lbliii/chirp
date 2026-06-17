@@ -31,7 +31,7 @@ class SignalBackplane(Protocol):
     ``PUBLISH`` to a shared channel so every worker's SSE connection wakes.
     """
 
-    def publish(self, name: str, value: Any) -> None:
+    def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
         """Fan ``value`` out to every binding of signal ``name``."""
         ...
 
@@ -42,8 +42,8 @@ class InProcessBackplane:
     def __init__(self, emit: Callable[[str, Any], None]) -> None:
         self._emit = emit
 
-    def publish(self, name: str, value: Any) -> None:
-        self._emit(name, value)
+    def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
+        self._emit(name, value, audience_key=audience_key)
 
 
 class RedisBackplane:
@@ -68,7 +68,7 @@ class RedisBackplane:
         # self._pubsub = self._client.pubsub()
         # wire subscribe loop -> self._emit(name, value) on each worker
 
-    def publish(self, name: str, value: Any) -> None:
+    def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
         """Publish to Redis AND the local bus (leader/worker topology TBD)."""
         raise NotImplementedError(
             "RedisBackplane is a skeleton only — set LUCKY_CAT_BACKPLANE=memory "

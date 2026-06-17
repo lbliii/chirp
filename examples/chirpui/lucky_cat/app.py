@@ -122,9 +122,28 @@ app = App(config=config)
 bind_emit(app.emit)
 
 
-def emit_signal(name: str, value) -> None:
+def _signal_audience_key() -> str:
+    """The store key for session-scoped signal fan-out (empty for the test default)."""
+    key = session_store.session_key()
+    return "" if key == session_store.DEFAULT_KEY else key
+
+
+def emit_signal(name: str, value, *, audience_key: str | None = None) -> None:
     """Push a signal value through the configured backplane (default: in-process)."""
-    get_backplane().publish(name, value)
+    aud = _signal_audience_key() if audience_key is None else audience_key
+    get_backplane().publish(name, value, audience_key=aud)
+
+
+def fan_out_notifications_live() -> None:
+    """Emit each active session's bell snapshot over scoped /_chirp/live topics."""
+    keys = session_store.store_keys()
+    if not keys:
+        emit_signal("notifications", notifications.snapshot(), audience_key="")
+        return
+    for key in keys:
+        aud = "" if key == session_store.DEFAULT_KEY else key
+        with session_store.bind(key):
+            emit_signal("notifications", notifications.snapshot(), audience_key=aud)
 
 
 use_chirp_ui(app)
@@ -192,7 +211,7 @@ def _ticker_spotlight():
     return feed.ticker(markets[0].symbol) if markets else None
 
 
-@app.signal("balance", initial=meow_balance)
+@app.signal("balance", audience="session")
 async def balance_signal():  # pragma: no cover - push-only; driven by app.emit
     """PUSH signal for the topbar/modal $MEOW balance. No source — /deposit and
     /trade call app.emit('balance', ...) and every binding swaps in lockstep."""
@@ -396,7 +415,7 @@ def _render_notif_announce(unread: int) -> str:
 
 @app.signal(
     "notifications",
-    initial=notifications.snapshot,
+    audience="session",
     render=_render_notification_list,
 )
 async def notifications_signal():
@@ -407,23 +426,23 @@ async def notifications_signal():
     simulated tick it scans every market's 24h change and, when one crosses
     another whole step from the last alerted level (hysteresis) AND its
     per-symbol cooldown has elapsed, appends a "price" notification via
-    ``notifications.add`` — so price alerts flow through the SAME log as fills
+    ``notifications.add_broadcast`` — so price alerts flow through the SAME log as fills
     and deposits (one source of truth, one badge count). Whenever the log
-    changes it yields a ``notifications.snapshot()`` (the rows AND the unread
-    count, atomic; coalescing-latest), which renders the dropdown body and
-    re-derives the badge + the spoken count PURELY from ``feed.unread`` in the
-    same emit cascade.
+    changes it calls :func:`fan_out_notifications_live` (scoped per session).
 
-    Cancellation-safe: a client disconnect cancels the iterator and
-    ``subscribe``'s CancelledError unwinds cleanly.
+    Push-only on the wire: the ``yield`` below exists only so this function is
+    an async *generator* (the pump keeps it alive on a background task); live
+    updates fan out imperatively via ``emit_signal``, not by yielding snapshots.
     """
+    if False:  # pragma: no cover - type marker for the signal pump
+        yield notifications.snapshot()
     feed = get_feed()
     symbols = [m.symbol for m in feed.markets()]
     if not symbols:
         return
     # Track the head id so we only re-emit when the log actually grows (fills /
-    # deposits push via app.emit; the price alerts below push from this loop).
-    last_id = notifications.latest_id()
+    # deposits push via emit_signal; price alerts below push via add_broadcast).
+    last_id = session_store.max_notification_head_id()
     # Per-symbol last-ALERTED 24h pct. Alert only when a market moves a full step
     # FROM that level (hysteresis) — a pct jittering across a fixed bucket
     # boundary must NOT re-fire every tick. Seeded from the current pct so a
@@ -454,14 +473,11 @@ async def notifications_signal():
                     )
                     alerted[symbol] = pct
                     last_alert_t[symbol] = now
-            # Emit a fresh snapshot whenever the log grew (price alerts above,
-            # plus fills/deposits the routes pushed). Coalescing-latest: the
-            # derived badge + announce recompute PURELY from feed.unread in the
-            # same cascade (the rows + count travel together, atomically).
-            head = notifications.latest_id()
+            # Emit a fresh snapshot per session whenever ANY bucket's log grew.
+            head = session_store.max_notification_head_id()
             if head != last_id:
                 last_id = head
-                yield notifications.snapshot()
+                fan_out_notifications_live()
 
 
 @app.derived("notif_badge", on=("notifications",), render=_render_notif_badge)
@@ -519,9 +535,37 @@ class _EnsureStoreKeyMiddleware:
         return await next(request)
 
 
-# Register store-key middleware BEFORE SessionMiddleware so it runs INSIDE the
-# session context on each request (Starlette: first-added middleware is innermost).
-app.add_middleware(_EnsureStoreKeyMiddleware())
+class _SessionSignalsMiddleware:
+    """Seed session-scoped signal SSR + bind the SSE audience for this visitor."""
+
+    async def __call__(self, request, next):
+        from chirp.realtime.signal_globals import reset_signal_audience, set_signal_audience
+
+        session_store.ensure_store_key()
+        key = session_store.session_key()
+        aud = _signal_audience_key()
+        token = set_signal_audience(aud)
+        registry = app._mutable_state.signal_registry
+        try:
+            from chirp.middleware.auth import current_user
+
+            if registry is not None and aud and current_user().is_authenticated:
+                with session_store.bind(key):
+                    registry.seed("balance", meow_balance(), audience_key=aud)
+                    registry.seed("notifications", notifications.snapshot(), audience_key=aud)
+            elif not current_user().is_authenticated:
+                # Anonymous pages carry only global signals (ticker, lobby) — no
+                # per-visitor audience on the SSE connection.
+                reset_signal_audience(token)
+                token = set_signal_audience("")
+            return await next(request)
+        finally:
+            reset_signal_audience(token)
+
+
+# Starlette/chirp wrap order: last-added middleware is innermost and runs closest
+# to the app on the way IN — so Session must be registered before EnsureStoreKey
+# and SessionSignals (both need get_session() / __store_key on the request).
 app.add_middleware(
     SessionMiddleware(
         SessionConfig(
@@ -533,14 +577,11 @@ app.add_middleware(
         )
     )
 )
-# AuthMiddleware (session-based; no token auth in this browser-only demo). It
-# auto-registers the current_user() template global, which the shell uses to
-# swap the topbar between "Sign in" and the user menu + reveal the account chrome
-# (the $MEOW balance, the bell, the Deposit action). login_url drives the
-# @login_required redirect target (an anonymous hit on a gated route → 302
-# /login?next=<there>); login()/logout() (called from the login page + /logout)
-# regenerate the session.
+app.add_middleware(_EnsureStoreKeyMiddleware())
+# Auth before SessionSignals so seeding can gate on current_user().is_authenticated
+# (anonymous /login must not allocate a store bucket via balance/notifications seed).
 app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user, login_url="/login")))
+app.add_middleware(_SessionSignalsMiddleware())
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 # SecurityHeaders for the clickjacking / MIME-sniff / referrer headers only —
 # content_security_policy=None so it does NOT emit a CSP header. use_chirp_ui

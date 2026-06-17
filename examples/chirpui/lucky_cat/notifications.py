@@ -14,8 +14,11 @@ from dataclasses import dataclass
 import session_store
 from wallet import INITIAL_MEOW
 
-# Bounded ring — the bell shows the most recent few; older entries fall off so a
-# long-running process never grows the log without bound. Newest first.
+# Bounded ring — the bell shows the most recent few; older entries fall off the
+# store after _MAX_LOG (50) so a long-running process never grows without bound.
+# The dropdown renders the newest 12 (``snapshot``/``recent`` default); read
+# notifications stay in the list until they age out of the ring — opening the
+# bell clears the unread badge, not the history rows.
 _MAX_LOG = 50
 
 
