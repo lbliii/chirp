@@ -104,7 +104,7 @@ def _wait_until_serving(base_url: str, *, proc: subprocess.Popen | None) -> None
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def base_url() -> Iterator[str]:
     """A live Lucky Cat server URL.
 
