@@ -140,18 +140,14 @@ class TestRegistry:
         reg.register(SignalSpec(name="balance", audience="session"))
         reg.register(SignalSpec(name="ticker", audience="global"))
         reg.register(SignalSpec(name="notes", audience="session"))
-        reg.register_derived(
-            DerivedSpec(name="badge", deps=("notes",), compute=lambda n: len(n))
-        )
+        reg.register_derived(DerivedSpec(name="badge", deps=("notes",), compute=lambda n: len(n)))
         assert reg.session_names == frozenset({"balance", "notes", "badge"})
 
     def test_mixed_audience_derived_names_property(self) -> None:
         reg = SignalRegistry()
         reg.register(SignalSpec(name="global_a", audience="global"))
         reg.register(SignalSpec(name="session_b", audience="session"))
-        reg.register_derived(
-            DerivedSpec(name="pure", deps=("global_a",), compute=lambda a: a)
-        )
+        reg.register_derived(DerivedSpec(name="pure", deps=("global_a",), compute=lambda a: a))
         reg.register_derived(
             DerivedSpec(
                 name="mixed",
