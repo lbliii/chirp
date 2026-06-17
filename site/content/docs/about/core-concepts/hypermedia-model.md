@@ -1,6 +1,6 @@
 ---
 title: Hypermedia Model
-description: The mental model: HTML over the wire, content negotiation, and why the return type is the intent.
+description: "The mental model: HTML over the wire, content negotiation, and why the return type is the intent."
 draft: false
 weight: 10
 lang: en
