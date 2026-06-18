@@ -149,6 +149,60 @@ The mental model pays off because the parts that usually drift cannot drift here
   as a plain HTML form without JavaScript; htmx upgrades it to a partial swap
   when present.
 
+### No client-config blob to keep in sync
+
+The clearest cost of the JSON/SPA model is the hand-maintained client-config
+contract. A SPA cannot render until it knows what the server enabled, so the
+server hand-builds a config blob the client fetches on boot — and then re-states
+every one of those flags again on the admin side so they can be read and written
+over the wire.
+
+[open-webui](https://github.com/open-webui/open-webui) is a representative
+example. Its `GET /api/config` handler returns a role-gated dictionary of server
+flags the SPA fetches before it can render
+(`backend/open_webui/main.py:2367`, returning a ~140-line dict through
+`main.py:2539`). Editing those same flags needs a second surface:
+`backend/open_webui/routers/configs.py` declares Pydantic `*ConfigForm` models
+and paired `GET`/`POST` admin handlers — ~20 route handlers restating the same
+field names (`configs.py:71` onward). A single flag like `enable_channels` is
+typed in the Pydantic model, read in the GET handler, written in the POST
+handler, and emitted in the boot blob — four hand-aligned restatements that must
+not drift.
+
+In Chirp the server-known flag is a value in the render context, consumed
+directly in the template at render time. There is no boot blob and no
+client-config contract — the flag and the markup that depends on it live in the
+same place:
+
+```python
+import os
+
+from chirp import App
+
+app = App()
+
+# Your own server-side flag — env var, settings object, feature service, etc.
+FEATURE_CHANNELS = os.environ.get("FEATURE_CHANNELS") == "1"
+
+# Make it available to every template (or pass it per-route as render context,
+# or via a pages `_context.py` provider).
+@app.template_global("enable_channels")
+def enable_channels() -> bool:
+    return FEATURE_CHANNELS
+```
+
+```html
+{% if enable_channels %}
+  <a href="/channels" class="nav-link">Channels</a>
+{% endif %}
+```
+
+The flag is read where it is used. There is no `/api/config` endpoint to write,
+no Pydantic form to keep aligned with it, and no client store to reconcile — the
+contract the SPA had to maintain by hand simply does not exist. This is the
+concrete shape of "no serialization layer." For the trade-offs of the JSON bet
+as a whole, see [[docs/about/comparison|Comparison]].
+
 For the design reasoning behind these choices, see
 [[docs/about/philosophy|Philosophy]]; for the trade-offs versus a JSON/SPA stack,
 see [[docs/about/comparison|Comparison]].

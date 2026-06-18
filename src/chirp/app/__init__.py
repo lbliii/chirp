@@ -773,15 +773,61 @@ class App:
         return resolve_url(self._runtime_state.routes_by_name or {}, name, **params)
 
     def on_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once at ASGI lifespan startup.
+
+        The hook is invoked with **no arguments** — sync or async, your choice.
+        Open resources you own (HTTP client, cache, queue) and stash them where
+        handlers can reach them; pass any inputs the hook needs in explicitly
+        via closures or module-level state. (Chirp connects ``db=`` for you, so
+        a hook is not needed for the database.)
+
+        Do **not** fabricate a ``Request`` to pre-warm caches at startup. There
+        is no request at boot: ``chirp.context.get_request()`` raises
+        ``LookupError`` here, and the ContextVar capture/re-establish machinery
+        in ``chirp.server.streaming_context`` only **re-pins an already-live
+        request** for a ``Suspense`` / ``Stream`` / ``EventStream`` drain — it
+        never synthesizes one. Building a mock ASGI scope to call request-shaped
+        code couples startup to request internals and skips middleware, auth,
+        and CSRF. Refactor the warm-up into a plain function that takes its
+        inputs as parameters and call it from the hook instead.
+
+        Example::
+
+            import httpx
+
+            client: httpx.AsyncClient | None = None
+
+            @app.on_startup
+            async def open_client():
+                global client
+                client = httpx.AsyncClient(base_url="https://api.example.com")
+
+        See ``docs/about/core-concepts/app-lifecycle.md`` for the full pattern.
+        """
         return self._registry.on_startup(func)
 
     def on_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once at ASGI lifespan shutdown.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_shutdown(func)
 
     def on_worker_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once per worker at worker startup.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_worker_startup(func)
 
     def on_worker_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once per worker at worker shutdown.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_worker_shutdown(func)
 
     def run(
