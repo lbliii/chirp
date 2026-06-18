@@ -292,6 +292,7 @@ wire the secure-by-default stack, see
 | `http_timeout` | `float` | `30.0` | Default outbound HTTP timeout for Chirp helpers |
 | `http_retries` | `int` | `0` | Default outbound HTTP retry count |
 | `skip_contract_checks` | `bool` | `False` | Disable debug-mode startup contract checks |
+| `skip_migrations` | `bool` | `False` | Skip the on-boot migration run (`CHIRP_SKIP_MIGRATIONS`); pair with a `chirp migrate` deploy job |
 | `lazy_pages` | `bool` | `False` | Lazily load filesystem page modules |
 | `debug_fragment_validator` | `bool` | `True` | Enable debug-only fragment response validation |
 ::::{/dropdown}

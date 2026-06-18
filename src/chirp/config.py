@@ -354,6 +354,7 @@ class AppConfig:
     http_timeout: float = 30.0
     http_retries: int = 0
     skip_contract_checks: bool = False
+    skip_migrations: bool = False
     lazy_pages: bool = False
 
     # Debug fragment validator (debug mode only) — warns when fragment
@@ -441,7 +442,7 @@ class AppConfig:
             SECRET_KEY, DEBUG, ENV, HOST, PORT, ALLOWED_HOSTS,
             LOG_FORMAT (auto|text|json — forwarded to Pounce),
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
-            REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
+            REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, SKIP_MIGRATIONS, LAZY_PAGES,
             HTTP_TIMEOUT, HTTP_RETRIES,
             TRUSTED_PROXIES (comma/space-separated reverse-proxy peers),
             FORWARDED_FOR_TRUSTED_HOPS (int >= 1),
@@ -488,6 +489,7 @@ class AppConfig:
                     "HTTP_TIMEOUT",
                     "HTTP_RETRIES",
                     "SKIP_CONTRACT_CHECKS",
+                    "SKIP_MIGRATIONS",
                     "LAZY_PAGES",
                     "SENTRY_DSN",
                     "SENTRY_ENVIRONMENT",
@@ -530,6 +532,7 @@ class AppConfig:
             http_timeout=_env_float(f"{p}HTTP_TIMEOUT", 30.0),
             http_retries=_env_int(f"{p}HTTP_RETRIES", 0),
             skip_contract_checks=_env_bool(f"{p}SKIP_CONTRACT_CHECKS", False),
+            skip_migrations=_env_bool(f"{p}SKIP_MIGRATIONS", False),
             lazy_pages=_env_bool(f"{p}LAZY_PAGES", False),
             sentry_dsn=os.environ.get(f"{p}SENTRY_DSN") or None,
             sentry_environment=os.environ.get(f"{p}SENTRY_ENVIRONMENT") or None,

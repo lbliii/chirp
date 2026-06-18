@@ -1,6 +1,7 @@
 """Tests for chirp.config — AppConfig frozen dataclass."""
 
 import os
+import warnings
 from pathlib import Path
 
 import pytest
@@ -298,6 +299,41 @@ class TestAppConfig:
             assert cfg.http_retries == 3
             assert cfg.log_format == "json"
             assert cfg.allowed_hosts == ("example.com", ".example.com")
+        finally:
+            os.environ.update(env_backup)
+
+    def test_skip_migrations_default_false(self) -> None:
+        """skip_migrations defaults False, mirroring skip_contract_checks."""
+        cfg = AppConfig()
+        assert cfg.skip_migrations is False
+
+    def test_skip_migrations_env_parity(self) -> None:
+        """CHIRP_SKIP_MIGRATIONS=1 sets skip_migrations via from_env()."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_SKIP_MIGRATIONS"] = "1"
+            cfg = AppConfig.from_env()
+            assert cfg.skip_migrations is True
+        finally:
+            os.environ.update(env_backup)
+
+    def test_skip_migrations_env_unset_defaults_false(self) -> None:
+        """from_env() leaves skip_migrations False when the env var is unset."""
+        env_backup = _pop_app_env()
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.skip_migrations is False
+        finally:
+            os.environ.update(env_backup)
+
+    def test_skip_migrations_no_unknown_env_warning(self) -> None:
+        """CHIRP_SKIP_MIGRATIONS is on the known-suffix allowlist (no warning)."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_SKIP_MIGRATIONS"] = "1"
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                AppConfig.from_env()
         finally:
             os.environ.update(env_backup)
 

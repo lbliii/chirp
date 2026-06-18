@@ -75,6 +75,26 @@ after build and before the new deployment goes live, have access to service
 environment variables and private networking, and should fail non-zero when the
 migration fails.
 
+Use the `chirp migrate` one-shot command as the pre-deploy command, and set
+`CHIRP_SKIP_MIGRATIONS=1` on the web service so replicas do not also run
+migrations on boot (which would race when you scale past one replica):
+
+```bash
+# Pre-deploy command (one-shot, fails the deploy on a migration error)
+chirp migrate --db "$DATABASE_URL" --migrations-dir migrations
+```
+
+```text
+# Web service variable — the pre-deploy job owns migration application
+CHIRP_SKIP_MIGRATIONS=1
+```
+
+`chirp migrate` does not boot the app (no freeze, no contract checks) — it just
+connects, applies pending migrations, and exits `1` on failure (including a
+checksum-drift edit of an already-applied migration). When the app boots with
+`CHIRP_SKIP_MIGRATIONS=1` it logs a `lifecycle:migrations-skipped` warning so a
+missing pre-deploy job (and the resulting stale schema) is visible in logs.
+
 Do not put volume-dependent work in the pre-deploy command. Railway runs
 pre-deploy commands in a separate container and volumes are not mounted there.
 

@@ -209,6 +209,22 @@ def main(argv: list[str] | None = None) -> None:
         help="Output directory for migration files (default: migrations)",
     )
 
+    # -- chirp migrate ----------------------------------------------------
+    migrate_parser = subparsers.add_parser(
+        "migrate",
+        help="Apply pending schema migrations (one-shot deploy job)",
+    )
+    migrate_parser.add_argument(
+        "--db",
+        required=True,
+        help="Database URL (e.g. sqlite:///app.db)",
+    )
+    migrate_parser.add_argument(
+        "--migrations-dir",
+        default="migrations",
+        help="Directory containing migration files (default: migrations)",
+    )
+
     # -- chirp shapes-codegen ---------------------------------------------
     shapes_parser = subparsers.add_parser(
         "shapes-codegen",
@@ -279,6 +295,10 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._makemigrations import run_makemigrations
 
         run_makemigrations(args)
+    elif args.command == "migrate":
+        from chirp.cli._migrate import run_migrate
+
+        run_migrate(args)
     elif args.command == "shapes-codegen":
         from chirp.cli._shapes_codegen import run_shapes_codegen
 

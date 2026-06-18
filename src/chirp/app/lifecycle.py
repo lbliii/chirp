@@ -92,9 +92,23 @@ class LifecycleCoordinator:
 
                 _db_var.set(self._state.db)
                 if self._state.migrations_dir is not None:
-                    from chirp.data.migrate import migrate
+                    if self._config.skip_migrations:
+                        # Operator opted out of the on-boot run (CHIRP_SKIP_MIGRATIONS
+                        # / AppConfig(skip_migrations=True)) so a one-shot deploy job
+                        # (`chirp migrate`) can own migration application instead of
+                        # every replica racing on startup. Log loudly so a missing
+                        # deploy job (= app serving a stale schema) is visible.
+                        from chirp.logging import structured_log
 
-                    await migrate(self._state.db, self._state.migrations_dir)
+                        structured_log(
+                            30,  # WARNING
+                            "lifecycle:migrations-skipped",
+                            migrations_dir=str(self._state.migrations_dir),
+                        )
+                    else:
+                        from chirp.data.migrate import migrate
+
+                        await migrate(self._state.db, self._state.migrations_dir)
 
             for hook in self._state.startup_hooks:
                 await _run_hook(hook)
