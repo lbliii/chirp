@@ -310,6 +310,8 @@ coverage.
 | `islands` | `bool` | `False` | Islands runtime API is still settling |
 | `islands_version` | `str` | `"1"` | Version tag for the provisional islands runtime |
 | `islands_contract_strict` | `bool` | `False` | Contract strictness will stabilize with the islands API |
+| `passkeys` | `bool` | `False` | Inject the `window.chirp.passkeys` WebAuthn JS bridge (needs `chirp[passkeys]` for the server verbs) |
+| `passkeys_version` | `str` | `"1"` | Version tag / cache-bust marker for the provisional passkeys bridge |
 | `websocket_compression` | `bool` | `True` | Pounce-facing pass-through; Chirp's first-class realtime story is SSE |
 | `websocket_max_message_size` | `int` | `10485760` | Pounce-facing pass-through; no Chirp WebSocket return type exists |
 | `i18n_enabled` | `bool` | `False` | i18n needs published examples and contract coverage before stabilization |

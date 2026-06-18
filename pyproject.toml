@@ -50,6 +50,12 @@ sessions = ["itsdangerous>=2.2.0"]
 # Authentication (password hashing with argon2)
 auth = ["argon2-cffi>=23.1.0"]
 
+# Passkeys / WebAuthn (py_webauthn — pins cryptography). 2.x ships stdlib
+# @dataclass structs; 1.x was pydantic with a different construction/serialization
+# API, hence the <3 cap. Deliberately NOT in `all`/`full`: it is the heaviest
+# extra (transitive cryptography/Rust build) and is never a default path.
+passkeys = ["webauthn>=2.8,<3"]
+
 # Test client transport
 testing = ["httpx>=0.27.0"]
 
@@ -196,6 +202,10 @@ allowed-unresolved-imports = [
     "patitas",
     "argon2",
     "argon2.exceptions",
+    "webauthn",
+    "webauthn.helpers",
+    "webauthn.helpers.structs",
+    "webauthn.helpers.exceptions",
     "dotenv",
     "redis.asyncio",
 ]
