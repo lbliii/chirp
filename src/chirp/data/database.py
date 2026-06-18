@@ -502,6 +502,33 @@ class Database:
             finally:
                 self._log_query(sql, params, time.perf_counter() - t0)
 
+    # -- Readiness probe --
+
+    async def probe(self) -> bool:
+        """Readiness probe — can the pool serve a trivial query?
+
+        Runs ``SELECT 1`` on a **fresh pooled connection** (acquired via
+        ``self._connection()``, released on exit), never the request session or
+        a live ``transaction()`` connection. A probe must never reuse a possibly
+        poisoned request-scoped connection — it asks "is the database reachable
+        right now?", independent of any in-flight request's transaction state.
+
+        Returns ``True`` when the query succeeds, ``False`` on any error
+        (connection refused, pool exhausted, driver error). Never raises — it is
+        wired into the ``/ready`` probe via ``app.add_health_check`` and a raise
+        would surface as the check's failure message either way, but returning a
+        plain bool keeps the probe's contract simple.
+
+        Auto-wired into ``/ready`` when a db is attached to the app; db-less apps
+        never call it.
+        """
+        try:
+            async with self._connection() as conn:
+                await _execute_fetch_one(self._driver, conn, "SELECT 1", ())
+            return True
+        except Exception:
+            return False
+
     # -- JSON path helper --
 
     def json_path(self, column: str, /, *keys: str) -> str:

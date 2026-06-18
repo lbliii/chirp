@@ -65,6 +65,7 @@ shape may still evolve before 1.0:
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
+| Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
 | Secure-by-default stack | `secure_stack` |
 | Optional UI bridge | `use_chirp_ui` |
 

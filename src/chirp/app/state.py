@@ -20,6 +20,7 @@ from chirp.tools.registry import ToolRegistry
 if TYPE_CHECKING:
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
+    from chirp.health import HealthCheck
     from chirp.live_blocks import LiveBlockSpec
     from chirp.realtime.signals import SignalRegistry
 
@@ -185,6 +186,20 @@ class MutableAppState:
     #: Subsequent ``freeze()``/``run()`` raise rather than produce a stale
     #: standalone runtime. Carries the prefix for the error message.
     consumed_by_mount_app_prefix: str | None = None
+    #: Readiness checks for the auto-mounted ``/ready`` probe
+    #: (``app.add_health_check``). Before-freeze registration; a
+    #: ``Database.probe()``-backed check is auto-appended at freeze when a db is
+    #: wired. The per-request ``/ready`` read iterates this list directly.
+    health_checks: list[HealthCheck] = field(default_factory=list)
+    #: Startup-complete gate for the ``/ready`` probe. This is a
+    #: lifecycle-bounded flag, NOT a freeze violation: it has a single writer
+    #: (``LifecycleCoordinator._on_startup`` sets it ``True`` after all startup
+    #: hooks run; ``_on_shutdown`` resets it), is monotonic within a process
+    #: life, and is never late-registered. The request handler reads this bool
+    #: lock-free — acceptable for a monotonic flag set once at startup. See
+    #: ``app/AGENTS.md`` "Setup then freeze" — this is setup-then-runtime
+    #: mutation crossing the lifecycle boundary by design.
+    ready: bool = False
 
 
 @dataclass(slots=True)

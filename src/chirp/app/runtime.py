@@ -56,6 +56,9 @@ class ASGIRuntime:
                 debug_wiring=self._runtime.debug_wiring,
                 suspense_error_template=self._config.suspense_error_template,
                 suspense_error_block=self._config.suspense_error_block,
+                health_path=self._config.health_path,
+                ready_path=self._config.ready_path,
+                probe_state=self._mutable,
             )
         return self._compiled_handler
 

@@ -98,6 +98,12 @@ class LifecycleCoordinator:
 
             for hook in self._state.startup_hooks:
                 await _run_hook(hook)
+            # Startup complete: flip the readiness gate True AFTER all startup
+            # hooks (and the db connect/migrate) succeed. If startup raised above
+            # this point, the except re-raises before we get here, so the flag
+            # stays False and /ready keeps returning 503. Single writer,
+            # monotonic for a process life (reset only on shutdown).
+            self._state.ready = True
         except Exception:
             if db_connected and self._state.db is not None:
                 with contextlib.suppress(Exception):
@@ -107,6 +113,9 @@ class LifecycleCoordinator:
             raise
 
     async def _on_shutdown(self) -> None:
+        # Drop out of the load balancer rotation first: /ready returns 503 while
+        # shutdown hooks drain.
+        self._state.ready = False
         for hook in self._state.shutdown_hooks:
             await _run_hook(hook)
         if self._state.db is not None:

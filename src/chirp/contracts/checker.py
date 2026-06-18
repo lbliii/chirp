@@ -933,12 +933,14 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     # Deploy-preflight: production misconfiguration (debug/metrics/sentry)
     from chirp.contracts.rules_deploy import (
         check_debug_in_production,
+        check_health_path_collision,
         check_metrics_path_collision,
         check_sentry_sample_rate,
     )
 
     result.issues.extend(check_debug_in_production(posture_config))
     result.issues.extend(check_metrics_path_collision(posture_config, router))
+    result.issues.extend(check_health_path_collision(posture_config, router))
     result.issues.extend(check_sentry_sample_rate(posture_config))
 
     # Security stack: mutating routes need CSRF/Session/SecurityHeaders.

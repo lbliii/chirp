@@ -33,6 +33,7 @@ EXPECTED_PUBLIC_API = [
     "FormBindingError",
     "Fragment",
     "HTTPError",
+    "HealthCheck",
     "HtmxDetails",
     "InlineTemplate",
     "JSONResponse",

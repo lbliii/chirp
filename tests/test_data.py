@@ -175,6 +175,31 @@ class TestLifecycle:
         await db.disconnect()
         await db.disconnect()  # should not raise
 
+    async def test_probe_returns_true_on_healthy_db(self, tmp_path) -> None:
+        """probe() runs SELECT 1 on a fresh pooled connection and returns True."""
+        db = Database(f"sqlite:///{tmp_path / 'probe.db'}")
+        await db.connect()
+        try:
+            assert await db.probe() is True
+        finally:
+            await db.disconnect()
+
+    async def test_probe_returns_false_on_failure(self, tmp_path, monkeypatch) -> None:
+        """probe() never raises — a query/connection failure returns False."""
+        import chirp.data.database as db_mod
+
+        db = Database(f"sqlite:///{tmp_path / 'probe_fail.db'}")
+        await db.connect()
+        try:
+
+            async def _boom(*args, **kwargs):
+                raise RuntimeError("connection refused")
+
+            monkeypatch.setattr(db_mod, "_execute_fetch_one", _boom)
+            assert await db.probe() is False
+        finally:
+            await db.disconnect()
+
 
 # =============================================================================
 # Fetch

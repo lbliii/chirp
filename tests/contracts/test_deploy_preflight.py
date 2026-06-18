@@ -5,6 +5,7 @@ import pytest
 from chirp.config import AppConfig
 from chirp.contracts.rules_deploy import (
     check_debug_in_production,
+    check_health_path_collision,
     check_metrics_path_collision,
     check_sentry_sample_rate,
 )
@@ -51,6 +52,24 @@ def test_metrics_path_no_collision_ok() -> None:
 def test_metrics_disabled_noop() -> None:
     cfg = AppConfig(metrics_enabled=False, metrics_path="/metrics")
     assert check_metrics_path_collision(cfg, _Router(["/metrics"])) == []
+
+
+def test_health_path_collision_errors() -> None:
+    cfg = AppConfig(health_path="/health", ready_path="/ready")
+    issues = check_health_path_collision(cfg, _Router(["/health", "/"]))
+    assert [i.category for i in issues] == ["deploy_health"]
+    assert issues[0].severity.name == "ERROR"
+
+
+def test_ready_path_collision_errors() -> None:
+    cfg = AppConfig(health_path="/health", ready_path="/ready")
+    issues = check_health_path_collision(cfg, _Router(["/ready"]))
+    assert [i.category for i in issues] == ["deploy_health"]
+
+
+def test_health_paths_no_collision_ok() -> None:
+    cfg = AppConfig(health_path="/health", ready_path="/ready")
+    assert check_health_path_collision(cfg, _Router(["/", "/about"])) == []
 
 
 def test_sentry_zero_sample_rate_warns() -> None:

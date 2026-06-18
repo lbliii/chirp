@@ -110,6 +110,24 @@ class AppRegistry:
             raise TypeError(msg)
         self._state.policy_registry[name] = fn
 
+    def add_health_check(self, check: Any) -> None:
+        """Register a readiness check for the auto-mounted ``/ready`` probe.
+
+        Setup-only (raises ``RuntimeError`` after freeze via ``_ensure_mutable``).
+        ``check`` must be a :class:`~chirp.health.HealthCheck`; its ``check``
+        callable (sync or async, returning truthy when healthy) runs on every
+        ``/ready`` request once startup has completed. A ``Database.probe()``-backed
+        check is auto-included at freeze when a db is wired, so DB connectivity is
+        reflected with no hand-wiring.
+        """
+        self._ensure_mutable()
+        from chirp.health import HealthCheck
+
+        if not isinstance(check, HealthCheck):
+            msg = f"add_health_check expects a chirp.HealthCheck, got {type(check).__name__}"
+            raise TypeError(msg)
+        self._state.health_checks.append(check)
+
     def template_filter(
         self, name: str | None
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:

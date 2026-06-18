@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
+    from chirp.health import HealthCheck
 
 
 # Backwards-compatible symbol aliases (historically imported from chirp.app).
@@ -705,6 +706,25 @@ class App:
         request time. Call during setup; raises ``RuntimeError`` after freeze.
         """
         self._registry.register_policy(name, fn)
+
+    def add_health_check(self, check: HealthCheck) -> None:
+        """Register a readiness check for the auto-mounted ``/ready`` probe.
+
+        Chirp auto-mounts ``/health`` (liveness, plain 200) and ``/ready``
+        (readiness) at ``AppConfig.health_path`` / ``ready_path`` — no
+        hand-wiring needed. ``/ready`` runs every registered ``HealthCheck`` and
+        gates on the startup-complete flag, returning 503 plus the failure list
+        until the app has finished startup and all checks pass::
+
+            from chirp import HealthCheck
+
+            app.add_health_check(HealthCheck("cache", check=ping_cache))
+
+        The ``check`` callable may be sync or async. When a database is wired, a
+        ``Database.probe()``-backed check is auto-included at freeze. Call during
+        setup; raises ``RuntimeError`` after freeze.
+        """
+        self._registry.add_health_check(check)
 
     def register_contract_check(self, check: Callable[..., Any]) -> None:
         """Register a custom contract check that runs during ``app.check()``.

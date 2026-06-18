@@ -157,6 +157,7 @@ app would fare in production without changing your config, use `chirp check
 | `nojs_floor` | INFO | Return `FormAction` (303 for plain POST, fragments for htmx) from mutating routes instead of an htmx-only `Fragment`/`OOB`. INFO by default; promote with `override_contract_severity("nojs_floor", Severity.ERROR)` to enforce the no-JS floor. |
 | `deploy_debug` | ERROR | Set `debug=False` (or `CHIRP_DEBUG=0`) when `env="production"`. |
 | `deploy_metrics` | ERROR | Change `metrics_path` or move the colliding application route so the Prometheus endpoint does not shadow a route. |
+| `deploy_health` | ERROR | Rename the colliding application route or change `health_path` / `ready_path` so the auto-mounted `/health` + `/ready` probes are not shadowed by an app route. |
 | `deploy_sentry` | WARNING | Set a non-zero `sentry_traces_sample_rate` when a Sentry DSN is configured, or clear the DSN. |
 
 ::::{dropdown} `trusted_proxies` — why `"*"` trusts every peer
@@ -217,7 +218,7 @@ The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
 `cookie_secure`, `hsts`, `password_extra`, `auth_middleware`, `auth_spec`,
 `sse_auth_gate`, `sse_context`, `csp_nonce`,
 `chirpui_csp`, `deploy_debug`,
-`deploy_metrics`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
+`deploy_metrics`, `deploy_health`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
 misconfigurations. `chirp check myapp:app --deploy` answers "would this pass in
 production?" without changing your config: it runs those rules against a

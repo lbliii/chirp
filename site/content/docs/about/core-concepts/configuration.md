@@ -229,6 +229,8 @@ wire the secure-by-default stack, see
 | `workers` | `int` | `0` | Pounce worker count; `0` lets pounce auto-detect |
 | `metrics_enabled` | `bool` | `False` | Enable Prometheus metrics |
 | `metrics_path` | `str` | `"/metrics"` | Metrics endpoint path |
+| `health_path` | `str` | `"/health"` | Auto-mounted liveness probe path (plain 200; K8s `livenessProbe`). `CHIRP_HEALTH_PATH` |
+| `ready_path` | `str` | `"/ready"` | Auto-mounted readiness probe path (runs registered checks + startup gate; 503 until ready; K8s `readinessProbe`). `CHIRP_READY_PATH` |
 | `rate_limit_enabled` | `bool` | `False` | Enable rate limiting |
 | `rate_limit_requests_per_second` | `float` | `100.0` | Rate limit steady-state rate |
 | `rate_limit_burst` | `int` | `200` | Rate limit burst size |

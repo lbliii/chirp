@@ -266,6 +266,13 @@ class AppConfig:
     metrics_enabled: bool = False
     metrics_path: str = "/metrics"
 
+    # Health probes (auto-mounted): /health (liveness, plain 200) and /ready
+    # (readiness — runs registered checks + gates on the startup-complete flag,
+    # 503 until ready). Auto-mounted unless a user route claims the path; probe
+    # paths short-circuit before the secure middleware stack + commit teardown.
+    health_path: str = "/health"
+    ready_path: str = "/ready"
+
     # Phase 6.2: Rate Limiting
     rate_limit_enabled: bool = False
     rate_limit_requests_per_second: float = 100.0
@@ -438,6 +445,7 @@ class AppConfig:
             HTTP_TIMEOUT, HTTP_RETRIES,
             TRUSTED_PROXIES (comma/space-separated reverse-proxy peers),
             FORWARDED_FOR_TRUSTED_HOPS (int >= 1),
+            HEALTH_PATH, READY_PATH (auto-mounted probe paths),
             FEATURE_<NAME>=true|false (e.g. CHIRP_FEATURE_X=true)
 
         Railway compatibility:
@@ -490,6 +498,8 @@ class AppConfig:
                     "MAX_UPLOAD_PARTS",
                     "TRUSTED_PROXIES",
                     "FORWARDED_FOR_TRUSTED_HOPS",
+                    "HEALTH_PATH",
+                    "READY_PATH",
                 }
             ),
         )
@@ -528,6 +538,8 @@ class AppConfig:
             max_upload_size=_env_int(f"{p}MAX_UPLOAD_SIZE", 16 * 1024 * 1024),
             upload_spool_threshold=_env_int(f"{p}UPLOAD_SPOOL_THRESHOLD", 1024 * 1024),
             max_upload_parts=_env_int(f"{p}MAX_UPLOAD_PARTS", 1000),
+            health_path=os.environ.get(f"{p}HEALTH_PATH", "/health"),
+            ready_path=os.environ.get(f"{p}READY_PATH", "/ready"),
         )
         if overrides:
             config = replace(config, **overrides)

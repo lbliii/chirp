@@ -147,6 +147,40 @@ class TestAppConfig:
         finally:
             os.environ.update(saved)
 
+    def test_health_ready_path_defaults(self) -> None:
+        """health_path/ready_path default to /health and /ready."""
+        cfg = AppConfig()
+        assert cfg.health_path == "/health"
+        assert cfg.ready_path == "/ready"
+
+    def test_health_ready_path_env_parity(self) -> None:
+        """CHIRP_HEALTH_PATH / CHIRP_READY_PATH are recognized (no unknown-env warning)."""
+        saved = _pop_app_env()
+        try:
+            os.environ["CHIRP_HEALTH_PATH"] = "/healthz"
+            os.environ["CHIRP_READY_PATH"] = "/readyz"
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                cfg = AppConfig.from_env()
+            assert cfg.health_path == "/healthz"
+            assert cfg.ready_path == "/readyz"
+        finally:
+            os.environ.pop("CHIRP_HEALTH_PATH", None)
+            os.environ.pop("CHIRP_READY_PATH", None)
+            os.environ.update(saved)
+
+    def test_health_ready_path_env_unset_defaults(self) -> None:
+        """Unset probe env vars leave the /health + /ready defaults."""
+        saved = _pop_app_env()
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.health_path == "/health"
+            assert cfg.ready_path == "/ready"
+        finally:
+            os.environ.update(saved)
+
     def test_override(self) -> None:
         cfg = AppConfig(host="0.0.0.0", port=3000, debug=True, secret_key="s3cret")
 
