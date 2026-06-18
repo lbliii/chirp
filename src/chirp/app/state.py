@@ -193,6 +193,12 @@ class MutableAppState:
     #: resolves an ``AuthSpec.policy`` NAME against this mapping at request time;
     #: the ``auth_spec`` check flags a named policy missing from it at startup.
     policy_registry: dict[str, Callable[..., Any]] = field(default_factory=dict)
+    #: Declared machine-token scope names (``app.register_scope``). The
+    #: machine-auth counterpart to ``permission_registry``: when non-empty the
+    #: ``auth_spec`` check ERRORs (env-aware) on any ``AuthSpec.scopes`` entry not
+    #: in this set. Scopes are the token axis (webhook/cron/provisioning),
+    #: deliberately separate from human permissions.
+    scope_registry: set[str] = field(default_factory=set)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
@@ -287,6 +293,11 @@ class ContractCheckSnapshot:
     #: Declared policy NAMES (``app.register_policy``); empty when none declared.
     #: The ``auth_spec`` check flags an ``AuthSpec.policy`` name absent from it.
     policy_registry: frozenset[str] = field(default_factory=frozenset)
+    #: Declared machine-token scope names (``app.register_scope``); empty when
+    #: none declared. When non-empty the ``auth_spec`` check ERRORs (env-aware)
+    #: on an ``AuthSpec.scopes`` entry absent from it (registry-backed like
+    #: permissions; the machine-auth axis).
+    scope_registry: frozenset[str] = field(default_factory=frozenset)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)

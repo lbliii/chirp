@@ -399,6 +399,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         sections=getattr(app._mutable_state, "sections", {}),
         permission_registry=frozenset(getattr(app._mutable_state, "permission_registry", set())),
         policy_registry=frozenset(getattr(app._mutable_state, "policy_registry", {})),
+        scope_registry=frozenset(getattr(app._mutable_state, "scope_registry", set())),
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
         discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
@@ -1023,6 +1024,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             _auth_meta_provider_paths,
             getattr(snapshot, "permission_registry", frozenset()),
             getattr(snapshot, "policy_registry", frozenset()),
+            getattr(snapshot, "scope_registry", frozenset()),
         )
     )
 

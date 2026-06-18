@@ -60,6 +60,19 @@ class Anon:
     permissions: frozenset[str] = frozenset()
 
 
+@dataclass(frozen=True, slots=True)
+class ScopeClient:
+    """Machine client carrying token scopes but NO human permissions.
+
+    Satisfies ClientWithScopes (has ``scopes``) but NOT UserWithPermissions
+    (no ``permissions``) — proving the two axes are independent.
+    """
+
+    id: str
+    is_authenticated: bool = True
+    scopes: frozenset[str] = frozenset()
+
+
 # ---------------------------------------------------------------------------
 # normalize_auth_spec — exact back-compat
 # ---------------------------------------------------------------------------
@@ -271,9 +284,27 @@ def _policy_declarative_app() -> App:
     return app
 
 
+def _scope_declarative_app(scopes: tuple[str, ...], mode: str = "all") -> App:
+    """Declarative path: ``AuthSpec(scopes=...)`` enforced inline, mirroring the
+    page wrapper. Scopes gate the machine-auth axis via the shared core."""
+    app = App()
+    app.add_middleware(SessionMiddleware(SessionConfig(secret_key="parity-secret")))
+    app.add_middleware(AuthMiddleware(AuthConfig(verify_token=_verify_token, login_url="/login")))
+
+    @app.route("/needs-scope")
+    async def needs_scope(request):
+        await enforce_route_meta_auth(RouteMeta(auth=AuthSpec(scopes=scopes, mode=mode)), request)
+        return "ok"
+
+    return app
+
+
 _PARITY_USERS = {
     "tok_admin": PermUser(id="a", permissions=frozenset({"admin"})),
     "tok_plain_perm": PermUser(id="p", permissions=frozenset({"viewer"})),
+    # Machine clients: scopes, no permissions.
+    "tok_scope_write": ScopeClient(id="mw", scopes=frozenset({"webhook:write"})),
+    "tok_scope_read": ScopeClient(id="mr", scopes=frozenset({"webhook:read"})),
 }
 
 
@@ -382,6 +413,48 @@ class TestAuditEventParity:
         async with TestClient(_policy_declarative_app()) as client:
             r = await client.get("/needs-owner", headers={"Authorization": "Bearer tok_admin"})
             assert r.status == 403
+
+    async def test_scope_denied_payload_lock(self, events_sink) -> None:
+        """A declared scope the client lacks emits the canonical authz.scope.denied
+        payload: name='authz.scope.denied', details={'missing': sorted([...])}.
+
+        The machine-auth axis is distinct from authz.permission.denied so SIEM
+        can separate machine-token denials from human-permission denials. The
+        shared core (used by both gate paths) is the single producer, so locking
+        the payload here keeps the event from drifting.
+        """
+        await self._emit_for(
+            _scope_declarative_app(("webhook:write",)),
+            {"Authorization": "Bearer tok_scope_read"},
+            path="/needs-scope",
+        )
+        evt = _captured_event(events_sink, "authz.scope.denied")
+        assert evt is not None
+        assert evt.name == "authz.scope.denied"
+        assert evt.details == {"missing": ["webhook:write"]}
+
+    async def test_scope_missing_protocol_payload_lock(self, events_sink) -> None:
+        """A client with no scopes attribute hitting a scope gate emits the
+        missing-scopes-protocol shape."""
+        await self._emit_for(
+            _scope_declarative_app(("webhook:write",)),
+            {"Authorization": "Bearer tok_admin"},  # PermUser: no scopes attr
+            path="/needs-scope",
+        )
+        evt = _captured_event(events_sink, "authz.scope.denied")
+        assert evt is not None
+        assert evt.details == {
+            "reason": "missing_scopes_protocol",
+            "missing": ["webhook:write"],
+        }
+
+    async def test_scope_granted_emits_nothing(self, events_sink) -> None:
+        await self._emit_for(
+            _scope_declarative_app(("webhook:write",)),
+            {"Authorization": "Bearer tok_scope_write"},
+            path="/needs-scope",
+        )
+        assert _captured_event(events_sink, "authz.scope.denied") is None
 
 
 # ---------------------------------------------------------------------------

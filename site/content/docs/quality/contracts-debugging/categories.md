@@ -146,7 +146,7 @@ app would fare in production without changing your config, use `chirp check
 | `middleware_chain` | INFO | Diagnostic only — reports the freeze-resolved user middleware order (outermost → innermost). Use `add_middleware(priority=...)` to make the order explicit; lower priority runs outermost. Ordering *violations* (CSRF outside Session) are still the `csrf_session` ERROR, not this category. |
 | `security_stack` | ERROR / WARNING | Wire the secure-by-default stack on apps with mutating routes. See the `security_stack` canonical reference below. |
 | `auth_middleware` | ERROR / WARNING / INFO | Register `AuthMiddleware` (after `SessionMiddleware`) when any route declares auth via `RouteMeta.auth` or `@login_required`/`@requires`. Without it the auth gate's `get_user()` raises `LookupError` → 500. See the dropdown below. |
-| `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` (unknown permission/policy → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
+| `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy/scope that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` / `app.register_scope()` (unknown permission/policy/scope → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
 | `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
@@ -440,13 +440,23 @@ flagged in heuristic mode — without a registry Chirp cannot know which strings
 real permissions, and false positives erode trust. Declare a permission registry
 to validate them precisely.
 
+**Machine-token scopes (`AuthSpec.scopes`).** The machine-auth axis — webhook /
+cron / provisioning endpoints gate on a token-resolved client's scopes
+independently of human permissions — folds into this same `auth_spec` category
+(no separate category). Scope validation is **opt-in like permissions**: declare
+scopes with `app.register_scope("webhook:write")` and every `AuthSpec.scopes`
+entry not in the registry becomes an env-aware ERROR. With no scope registry,
+scopes are free strings and are not heuristically flagged (a scope is an
+arbitrary machine token, so a plausible-name heuristic has no signal).
+
 **Severity** is env-aware (silent dev / WARNING staging / ERROR prod), same as
 `auth_middleware`, and escalates under `chirp check --deploy`. Dynamic `meta()`
 pages are skipped (their auth value is not statically known).
 
 **Fix:** declare the permission with `app.register_permission()` (or fix the typo),
-register the policy with `app.register_policy()`, or use the exact reserved token
-(`"required"` / `"none"` / `"optional"`).
+register the policy with `app.register_policy()`, declare the scope with
+`app.register_scope()`, or use the exact reserved token (`"required"` / `"none"` /
+`"optional"`).
 
 ### `sse_auth_gate` / `sse_context`: reading the user inside an SSE generator
 

@@ -38,10 +38,25 @@ permissive helpers or misleading deployment advice.
   | permission denied | `authz.permission.denied` | `{"missing": sorted([...])}` |
   | missing permissions protocol | `authz.permission.denied` | `{"reason": "missing_permissions_protocol", "missing": sorted([...])}` |
   | named-policy denied (RESOLVED policy returned falsy) | `authz.policy.denied` | `{"policy": <name>}` |
+  | scope denied (machine-auth axis) | `authz.scope.denied` | `{"missing": sorted([...])}` |
+  | missing scopes protocol | `authz.scope.denied` | `{"reason": "missing_scopes_protocol", "missing": sorted([...])}` |
 
   `missing` is always a sorted `list[str]` (was a bare string on the declarative
-  path before unification). The permission-denied / missing-protocol events also
-  emit `_log.warning` via the `chirp.security` logger.
+  path before unification). The permission-denied / missing-protocol / scope-denied
+  events also emit `_log.warning` via the `chirp.security` logger.
+
+  **`authz.scope.denied` is the MACHINE-AUTH axis** — distinct from
+  `authz.permission.denied` so SIEM can tell a machine-token scope denial
+  (webhook/cron/provisioning) from a human-permission denial. It is emitted by
+  the shared core's scope step (`enforce_auth`) when an `AuthSpec.scopes` gate is
+  declared and the resolved client (a
+  `chirp.middleware.auth.ClientWithScopes` / `MachineClient`) lacks the required
+  scope(s) under `spec.mode`. Scope enforcement is implicitly off (no gate runs)
+  when `spec.scopes` is empty. Scope-name equality is compared with
+  `secrets.compare_digest` (constant-time), never `==`. This event is in the
+  parity lock (`tests/test_auth_parity.py::TestAuditEventParity`) like the
+  permission/policy events; changing its name or `details` keys requires updating
+  that lock and the changelog.
 
   **No `unresolved_policy` event exists.** An unresolved/unregistered policy NAME
   is a MISCONFIGURATION, not a denial: the shared core raises `LookupError` ->
@@ -112,12 +127,14 @@ permissive helpers or misleading deployment advice.
   dynamic `meta()` structured auth is enforced identically to static `META` (do
   not let those two parse paths diverge again — a dropped dynamic auth value is a
   silent security gap).
-- **Permission/policy registries are setup-only.**
-  `app.register_permission(name)` / `app.register_policy(name, fn)` mutate
-  `MutableAppState` and raise `RuntimeError` after freeze (mirror
-  `register_section`). They thread into `ContractCheckSnapshot` so the
-  registry-backed `auth_spec` check validates every declared permission/policy at
-  startup.
+- **Permission/policy/scope registries are setup-only.**
+  `app.register_permission(name)` / `app.register_policy(name, fn)` /
+  `app.register_scope(name)` mutate `MutableAppState` and raise `RuntimeError`
+  after freeze (mirror `register_section`). They thread into
+  `ContractCheckSnapshot` so the registry-backed `auth_spec` check validates
+  every declared permission/policy/scope at startup. `register_scope` is the
+  machine-auth axis: an `AuthSpec.scopes` entry absent from a declared scope
+  registry is an env-aware `auth_spec` ERROR (opt-in like permissions).
 - **Lockout state has lifecycle risk.** Shared lockout/rate-limit maps need
   cleanup or bounded-state reasoning.
 - **Helpers are primitives.** Do not turn this package into a full auth product.

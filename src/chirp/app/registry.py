@@ -97,6 +97,18 @@ class AppRegistry:
         self._ensure_mutable()
         self._state.permission_registry.add(name)
 
+    def register_scope(self, name: str, *, description: str | None = None) -> None:
+        """Declare a machine-token scope name for the ``auth_spec`` check.
+
+        The machine-auth counterpart to :meth:`register_permission`. Declaring
+        scopes makes the ``auth_spec`` check registry-backed for the scope axis:
+        an ``AuthSpec.scopes`` entry not in the declared set becomes a startup
+        ERROR (env-aware) instead of a silent request-time 403. ``description``
+        is accepted for self-documentation but not yet stored. Setup-only.
+        """
+        self._ensure_mutable()
+        self._state.scope_registry.add(name)
+
     def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
         """Register a named policy callable resolved by the declarative auth gate.
 

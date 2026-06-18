@@ -360,28 +360,43 @@ identical `emit_security_event` audit payloads. `auth` is `str | AuthSpec | None
 - `None`/`"none"`/`"optional"`/`""` open; `"required"` authn-only; any other
   string a single required permission (back-compat, exact runtime meaning
   preserved by `normalize_auth_spec`).
-- `AuthSpec(required=True, permissions=(...), mode="all"|"any", policy=<name>)`
-  for permission sets and named policies. `AuthSpec` is **static serializable
-  data** — `policy` is a string NAME, never a live `Callable`. `AuthSpec` lives
-  in `chirp.pages.types` (symmetry with `RouteMeta`; not a top-level export).
+- `AuthSpec(permissions=(...), mode="all"|"any", policy=<name>, scopes=(...))`
+  for permission sets, named policies, and machine-token scopes. There is **no
+  `required` flag** — an `AuthSpec` always requires authentication, so
+  `AuthSpec()` is authn-only. `AuthSpec` is **static serializable data** —
+  `policy` is a string NAME, never a live `Callable`. `AuthSpec` lives in
+  `chirp.pages.types` (symmetry with `RouteMeta`; not a top-level export).
+
+`scopes` is the **machine-auth** axis, distinct from human `permissions`:
+webhook/cron/provisioning endpoints gate on a token-resolved client's scopes (a
+`chirp.middleware.auth.ClientWithScopes` / `MachineClient` exposing `scopes:
+frozenset[str]`, module-level not top-level). A client with the scope but no
+permissions passes; a user with permissions but not the scope fails the scope
+gate. Scope enforcement is **implicitly off** when a spec declares no scopes (no
+enable flag). Scope-name equality uses `secrets.compare_digest` (constant-time).
 
 `auth` is normalized to a canonical `AuthSpec | None` at **discovery time** (and
 for dynamic `meta()` results at request time) so the per-request gate is
 allocation-free and reserved-token confusion fails loud at startup. A `dict` auth
-value (`{"permissions": ["a"], "mode": "any"}`) constructs an `AuthSpec`; static
-`META` and dynamic `meta()` parse `auth` through one shared
-`dict_to_route_meta` / `normalize_route_meta` helper (`chirp/pages/discovery.py`).
+value (`{"permissions": ["a"], "mode": "any"}` / `{"scopes": ["webhook:write"]}`)
+constructs an `AuthSpec`; static `META` and dynamic `meta()` parse `auth` through
+one shared `dict_to_route_meta` / `normalize_route_meta` helper
+(`chirp/pages/discovery.py`).
 
-Two App registries (before-freeze only, raise `RuntimeError` after freeze):
+Three App registries (before-freeze only, raise `RuntimeError` after freeze):
 
 - `app.register_permission(name, *, description=None)` — declares a permission.
 - `app.register_policy(name, fn)` — registers a `(user, request) -> bool`
   callable; the declarative gate resolves an `AuthSpec.policy` NAME against it at
   request time. An unregistered policy name fails loud (500).
+- `app.register_scope(name, *, description=None)` — declares a machine-token
+  scope (the machine-auth axis).
 
-The `auth_spec` contract check is **registry-backed** when permissions/policies
-are declared (unknown permission/policy → env-aware ERROR); with no registry it
-falls back to the high-signal reserved-token-typo heuristic. See
+The `auth_spec` contract check is **registry-backed** when
+permissions/policies/scopes are declared (unknown permission/policy/scope →
+env-aware ERROR); with no registry it falls back to the high-signal
+reserved-token-typo heuristic for permissions. A scope denial emits the canonical
+`authz.scope.denied` event (distinct from `authz.permission.denied`). See
 `src/chirp/contracts/rules_auth_meta.py` and `src/chirp/security/AGENTS.md`.
 
 ## Dependencies

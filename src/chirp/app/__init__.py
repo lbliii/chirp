@@ -747,6 +747,20 @@ class App:
         """
         self._registry.register_permission(name, description=description)
 
+    def register_scope(self, name: str, *, description: str | None = None) -> None:
+        """Declare a machine-token scope used by ``AuthSpec.scopes``.
+
+        The **machine-auth** counterpart to :meth:`register_permission`: scopes
+        gate webhook / cron / provisioning endpoints on a token-resolved
+        client's scopes (a :class:`~chirp.middleware.auth.ClientWithScopes`),
+        independent of human permissions. Declaring scopes makes the
+        ``auth_spec`` contract check registry-backed for the scope axis: an
+        ``AuthSpec.scopes`` name not in the declared set becomes a startup ERROR
+        (env-aware via deploy posture) instead of a silent request-time 403.
+        Call during setup; raises ``RuntimeError`` after freeze.
+        """
+        self._registry.register_scope(name, description=description)
+
     def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
         """Register a named policy callable for declarative ``AuthSpec`` gating.
 
@@ -1125,6 +1139,7 @@ class App:
             sections=self._mutable_state.sections,
             permission_registry=frozenset(self._mutable_state.permission_registry),
             policy_registry=frozenset(self._mutable_state.policy_registry),
+            scope_registry=frozenset(self._mutable_state.scope_registry),
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
             discovered_routes=self._mutable_state.discovered_routes,

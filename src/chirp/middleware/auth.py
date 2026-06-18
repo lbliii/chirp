@@ -73,6 +73,38 @@ class UserWithPermissions(User, Protocol):
     def permissions(self) -> frozenset[str]: ...
 
 
+@runtime_checkable
+class ClientWithScopes(User, Protocol):
+    """Machine-client protocol with token-scope support.
+
+    The **machine-auth** counterpart to :class:`UserWithPermissions`: a
+    ``verify_token``-resolved client (webhook / cron / provisioning caller)
+    exposes the token's scopes so a declarative ``AuthSpec(scopes=...)`` can gate
+    on them independently of human permissions. The scope axis is deliberately
+    separate from ``permissions`` — a machine client need not implement
+    :class:`UserWithPermissions`, and a human user need not implement this
+    protocol; the shared gate checks each axis only when the active ``AuthSpec``
+    declares it.
+
+    ``scopes`` is a ``frozenset[str]`` (same shape as ``permissions``). Bring
+    your own client model — any object with ``id``, ``is_authenticated``, and
+    ``scopes`` satisfies it. The scope-bearing client flows through
+    :meth:`AuthMiddleware._authenticate_token` unchanged.
+    """
+
+    @property
+    def scopes(self) -> frozenset[str]: ...
+
+
+#: Alias for :class:`ClientWithScopes`. ``MachineClient`` reads naturally at
+#: call sites that model a webhook/cron/provisioning caller, while
+#: ``ClientWithScopes`` names the structural shape (parallels
+#: ``UserWithPermissions``). Both are module-level names in
+#: ``chirp.middleware.auth`` (mirror ``SessionStore`` / ``TokenRevocationStore``;
+#: NOT top-level exports).
+MachineClient = ClientWithScopes
+
+
 # ---------------------------------------------------------------------------
 # Token revocation store protocol
 # ---------------------------------------------------------------------------
@@ -134,6 +166,7 @@ class AnonymousUser:
     id: str = ""
     is_authenticated: bool = False
     permissions: frozenset[str] = frozenset()
+    scopes: frozenset[str] = frozenset()
 
 
 # ---------------------------------------------------------------------------

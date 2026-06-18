@@ -518,9 +518,11 @@ def dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
 def _coerce_auth(value: Any) -> Any:
     """Coerce a raw ``auth`` value to the canonical ``AuthSpec | None`` shape.
 
-    - ``dict`` -> ``AuthSpec`` built from ``permissions``/``mode``/``policy``
-      (a dict auth is always a *declared* gate; an ``AuthSpec`` always requires
-      authentication, so there is no ``required`` key).
+    - ``dict`` -> ``AuthSpec`` built from
+      ``permissions``/``mode``/``policy``/``scopes`` (a dict auth is always a
+      *declared* gate; an ``AuthSpec`` always requires authentication, so there
+      is no ``required`` key). ``scopes`` is the machine-token axis, parallel to
+      ``permissions``.
     - ``str`` / ``AuthSpec`` / ``None`` -> normalized via the shared core so the
       runtime meaning of every legacy string is preserved exactly.
 
@@ -537,6 +539,11 @@ def _coerce_auth(value: Any) -> Any:
             permissions = tuple(str(p) for p in permissions)
         else:
             permissions = (str(permissions),)
+        scopes = value.get("scopes", ())
+        if isinstance(scopes, (list, tuple)):
+            scopes = tuple(str(s) for s in scopes)
+        else:
+            scopes = (str(scopes),)
         mode = value.get("mode", "all")
         if mode not in ("all", "any"):
             msg = (
@@ -548,6 +555,7 @@ def _coerce_auth(value: Any) -> Any:
             permissions=permissions,
             mode=mode,
             policy=value.get("policy"),
+            scopes=scopes,
         )
     return normalize_auth_spec(value)
 
