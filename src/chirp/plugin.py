@@ -16,6 +16,19 @@ Usage (plugin consumer)::
     app = App()
     app.mount("/blog", BlogPlugin())
 
+Fail-soft at boot
+~~~~~~~~~~~~~~~~~
+
+If a plugin's ``register()`` *raises*, ``app.mount`` **quarantines** it: the
+exception is caught, the plugin is skipped, and the app keeps booting so one
+broken plugin cannot abort startup. The quarantine is never silent — a WARNING
+is logged at mount time and ``app.check()`` reports it as an ERROR in category
+``plugin_quarantine`` (deploy-blocking under ``chirp check --deploy``). A plugin
+that registers some routes before raising leaves that partial state behind;
+quarantine does not roll it back. Passing a non-plugin object (no callable
+``register``) is a programmer error and stays fail-loud with
+``ConfigurationError``.
+
 Contract checks
 ~~~~~~~~~~~~~~~
 

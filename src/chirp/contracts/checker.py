@@ -69,6 +69,7 @@ from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
 from .rules_page_handlers import check_page_handlers
 from .rules_page_shell import check_page_shell_contracts
+from .rules_plugin_quarantine import check_plugin_quarantine
 from .rules_reactive import (
     check_reactive_audience_scopes,
     check_reactive_block_existence,
@@ -404,6 +405,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         page_handler_findings=list(getattr(app._mutable_state, "page_handler_findings", [])),
         route_name_collisions=dict(getattr(app._runtime_state, "route_name_collisions", {})),
         mount_app_skips=list(getattr(app._mutable_state, "mount_app_skips", [])),
+        plugin_quarantines=list(getattr(app._mutable_state, "plugin_quarantines", [])),
         template_sources=ts,
         extras=dict(getattr(app._mutable_state, "contract_check_data", {})),
         signal_names=_signal_names(app),
@@ -488,6 +490,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     result.issues.extend(check_page_handlers(snapshot.page_handler_findings))
     result.issues.extend(check_route_names(snapshot.route_name_collisions))
     result.issues.extend(check_mount_app_merge(snapshot.mount_app_skips))
+    result.issues.extend(check_plugin_quarantine(snapshot.plugin_quarantines))
     result.issues.extend(check_debug_wiring(snapshot.debug_wiring))
 
     referenced_templates_from_routes, referenced_route_paths = _route_prepass(

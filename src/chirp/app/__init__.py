@@ -26,6 +26,7 @@ from .state import (
     MutableAppState,
     PendingRoute,
     PendingTool,
+    PluginQuarantine,
     RuntimeAppState,
 )
 
@@ -626,13 +627,42 @@ class App:
         """Mount a plugin at the given URL prefix.
 
         Calls ``plugin.register(app, prefix)`` during setup phase.
+
+        A plugin whose ``register()`` *raises* is **quarantined**: the exception
+        is caught, the plugin is skipped, and the app keeps booting so one broken
+        plugin cannot take down startup. The quarantine is recorded on the app's
+        mutable state and surfaced as an ERROR contract issue (category
+        ``plugin_quarantine``) by ``app.check()``; a non-fatal WARNING is also
+        logged here at mount time so the signal exists even when contract checks
+        are skipped. Passing a non-plugin object (no callable ``register``)
+        remains a fail-loud :class:`ConfigurationError` — that is a programmer
+        typo at the call site, not a runtime plugin fault.
+
+        Known limitation: a plugin that registers some routes before raising
+        leaves that partial state behind; quarantine does not roll it back.
         """
         self._check_not_frozen()
         register = getattr(plugin, "register", None)
         if register is None or not callable(register):
             msg = f"Plugin {plugin!r} must have a register(app, prefix) method"
             raise ConfigurationError(msg)
-        register(self, prefix)
+        try:
+            register(self, prefix)
+        except Exception as exc:
+            import logging
+
+            self._mutable_state.plugin_quarantines.append(
+                PluginQuarantine(prefix=prefix, plugin_repr=repr(plugin), error=str(exc))
+            )
+            logging.getLogger("chirp").warning(
+                "Plugin %r quarantined at mount(%r): register() raised %s: %s. "
+                "App boot continues; app.check() reports this as a "
+                "'plugin_quarantine' ERROR.",
+                plugin,
+                prefix,
+                type(exc).__name__,
+                exc,
+            )
 
     def mount_app(self, prefix: str, sub_app: App) -> None:
         """Mount another Chirp :class:`App` at ``prefix``, consuming it.
@@ -1079,6 +1109,7 @@ class App:
             page_handler_findings=list(self._mutable_state.page_handler_findings),
             route_name_collisions=dict(self._runtime_state.route_name_collisions),
             mount_app_skips=list(self._mutable_state.mount_app_skips),
+            plugin_quarantines=list(self._mutable_state.plugin_quarantines),
             debug_wiring=self._runtime_state.debug_wiring,
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),

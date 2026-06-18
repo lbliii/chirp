@@ -599,3 +599,4 @@ No-op when `kida_env` is `None` (registry drift still runs).
 | `a11y_heading` | WARNING | Fix skipped or incoherent heading levels. |
 | `a11y_landmark` | WARNING | Add page landmarks such as `main`, `nav`, or `header` where expected. |
 | `plugin_check_error` | ERROR | Fix a custom check that raised during `app.check()`; the original exception should name the plugin/check. |
+| `plugin_quarantine` | ERROR | Fix the plugin whose `register()` raised during `app.mount()`. The plugin was quarantined (skipped) so the app could still boot — leaving it half-configured — and a WARNING was logged at mount time. The message names the prefix, plugin, and original error. |

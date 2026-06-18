@@ -67,6 +67,28 @@ class MountAppSkip:
 
 
 @dataclass(frozen=True, slots=True)
+class PluginQuarantine:
+    """One plugin whose ``register()`` raised during ``App.mount``.
+
+    Mounting wraps the lone ``plugin.register(app, prefix)`` call so a single
+    broken plugin is *quarantined* (skipped) instead of aborting boot. The
+    quarantine is recorded on the app's mutable state and surfaced as an ERROR
+    issue in category ``plugin_quarantine`` by a contract check — mirroring the
+    ``MountAppSkip`` -> ``mount_app_merge`` precedent. A non-fatal WARNING is
+    also logged at ``mount`` time so the signal exists even when contract checks
+    are skipped (honors root AGENTS.md "no silent except").
+
+    Partial registration is a known limitation: a plugin that registers some
+    routes before raising leaves that partial state behind; quarantine does not
+    roll it back (full transactional mount is out of scope).
+    """
+
+    prefix: str
+    plugin_repr: str
+    error: str
+
+
+@dataclass(frozen=True, slots=True)
 class InternalRouteSpec:
     """Framework-owned URL surface published at freeze time."""
 
@@ -182,6 +204,12 @@ class MutableAppState:
     #: signals never construct a ``ReactiveBus``.
     signal_registry: SignalRegistry | None = None
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    #: Plugins quarantined during ``App.mount`` because their ``register()``
+    #: raised. Appended only during single-threaded setup (``mount`` is
+    #: ``_check_not_frozen``-guarded), then copied into the frozen snapshot —
+    #: same publication boundary as ``mount_app_skips``, no new lock needed. A
+    #: contract check surfaces each as an ERROR in category ``plugin_quarantine``.
+    plugin_quarantines: list[PluginQuarantine] = field(default_factory=list)
     #: Set when this app has been consumed by another app's ``mount_app``.
     #: Subsequent ``freeze()``/``run()`` raise rather than produce a stale
     #: standalone runtime. Carries the prefix for the error message.
@@ -256,6 +284,9 @@ class ContractCheckSnapshot:
     page_handler_findings: list[PageHandlerFinding] = field(default_factory=list)
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    #: Plugins quarantined during ``App.mount`` (``register()`` raised). The
+    #: ``plugin_quarantine`` check emits one ERROR per entry.
+    plugin_quarantines: list[PluginQuarantine] = field(default_factory=list)
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
