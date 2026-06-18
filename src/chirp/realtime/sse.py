@@ -11,13 +11,16 @@ import json as json_module
 import logging
 from collections.abc import Callable
 from contextvars import Token
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Send
 from chirp.realtime.events import EventStream, SSEEvent
 from chirp.templating.returns import Fragment
+
+if TYPE_CHECKING:
+    from chirp.server.streaming_context import _CapturedRequestContext
 
 logger = logging.getLogger("chirp.server")
 
@@ -34,7 +37,7 @@ async def handle_sse(
     allow_origin: str | None = None,
     trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
-    csp_nonce: str | None = None,
+    captured_context: _CapturedRequestContext | None = None,
 ) -> None:
     """Stream Server-Sent Events over an ASGI connection.
 
@@ -46,13 +49,19 @@ async def handle_sse(
          and cancels the producer.
     3. Sends periodic heartbeat comments (``:``) on idle.
 
-    *csp_nonce* is the live CSP nonce captured at negotiation time.
-    ``CSPNonceMiddleware`` resets its nonce ``ContextVar`` the instant the
-    handler returns — before any event is produced here — so it is
-    re-established inside ``produce_events`` for the lifetime of the stream,
-    keeping framework inline scripts emitted by yielded ``Fragment`` renders
-    nonced under a CSP that no longer ships ``'unsafe-inline'`` (mirrors the
+    *captured_context* carries the request-scoped state (request, auth user,
+    CSRF token, ``g``, CSP nonce) snapshotted at negotiation time, while the
+    middleware ContextVars were still live. The handler ``finally`` resets
+    those vars the instant it returns — before any event is produced here — so
+    they are re-established inside ``produce_events`` (in its own task) for the
+    lifetime of the stream. This keeps ``get_request()``, ``get_user()`` /
+    ``current_user()``, ``get_csrf_token()``, ``g``, and the live CSP nonce
+    working identically inside the EventStream generator (mirrors the
     ``StreamingResponse`` drain in :func:`chirp.server.sender`).
+
+    SSE identity is **pinned at connect time**: the captured snapshot is fixed
+    for the connection's lifetime. A user logged out or permission-revoked
+    mid-stream keeps the connect-time identity until they reconnect.
     """
     # Send SSE headers.
     #
@@ -123,17 +132,48 @@ async def handle_sse(
         the ``finally`` block could suppress the exception.
         """
         pending_next: asyncio.Task[Any] | None = None
+        # Re-establish the captured request-scoped context for the whole stream
+        # lifetime. The handler finally already reset these vars (it runs before
+        # the SSE drain), so each is a self-contained set/reset with its own
+        # token. produce_events runs in its own task, so setting here guarantees
+        # the vars are live for every _format_event (render_fragment) call and
+        # stable across the connection's lifetime.
+        request_token: Token | None = None
+        request_id_token: Token | None = None
         csp_nonce_token: Token | None = None
-        if csp_nonce is not None:
-            # Re-establish the CSP nonce for the whole stream lifetime. The
-            # middleware finally already reset the var (it runs before the SSE
-            # drain), so this is a self-contained set/reset with its own token.
-            # produce_events runs in its own task, so setting here guarantees the
-            # var is live for every _format_event (render_fragment) call and
-            # stable across the connection's lifetime.
-            from chirp.middleware.csp_nonce import _set_csp_nonce
+        auth_user_token: Token | None = None
+        csrf_token_token: Token | None = None
+        csrf_field_token: Token | None = None
+        g_token: Token | None = None
+        ctx = captured_context
+        if ctx is not None:
+            if ctx.request_context is not None:
+                from chirp.context import request_var
+                from chirp.logging import request_id_var
 
-            csp_nonce_token = _set_csp_nonce(csp_nonce)
+                request_token = request_var.set(ctx.request_context)
+                request_id_token = request_id_var.set(ctx.request_context.request_id)
+            if ctx.csp_nonce is not None:
+                from chirp.middleware.csp_nonce import _set_csp_nonce
+
+                csp_nonce_token = _set_csp_nonce(ctx.csp_nonce)
+            if ctx.auth_user is not None:
+                from chirp.middleware.auth import _set_stream_user
+
+                auth_user_token = _set_stream_user(ctx.auth_user)
+            if ctx.csrf_token is not None:
+                from chirp.middleware.csrf import _set_stream_csrf
+
+                csrf_token_token, csrf_field_token = _set_stream_csrf(
+                    ctx.csrf_token,
+                    ctx.csrf_field_name,
+                )
+            # Gate on `is not None` (not truthiness): an empty-dict snapshot must
+            # still install a writable g store for the generator.
+            if ctx.g_snapshot is not None:
+                from chirp.context import g
+
+                g_token = g._restore(ctx.g_snapshot)
         try:
             heartbeat_interval = event_stream.heartbeat_interval
             gen_iter = event_stream.generator.__aiter__()
@@ -294,12 +334,35 @@ async def handle_sse(
             if _aclose is not None:
                 with contextlib.suppress(Exception):
                     await _aclose()
-            # Reset the CSP nonce var last so it stays live through generator
-            # aclose() (user try/finally blocks may render a final Fragment).
+            # Reset the request-scoped vars last so they stay live through
+            # generator aclose() (user try/finally blocks may render a final
+            # Fragment that reads the request/user/CSRF/g). Each resets the same
+            # var it set, so a later unrelated request never sees this stream's
+            # identity or g — critical under free-threading (3.14t).
+            if g_token is not None:
+                from chirp.context import g
+
+                g._restore_reset(g_token)
+            if csrf_token_token is not None:
+                from chirp.middleware.csrf import _reset_stream_csrf
+
+                _reset_stream_csrf(csrf_token_token, csrf_field_token)
+            if auth_user_token is not None:
+                from chirp.middleware.auth import _reset_stream_user
+
+                _reset_stream_user(auth_user_token)
             if csp_nonce_token is not None:
                 from chirp.middleware.csp_nonce import _reset_csp_nonce
 
                 _reset_csp_nonce(csp_nonce_token)
+            if request_id_token is not None:
+                from chirp.logging import request_id_var
+
+                request_id_var.reset(request_id_token)
+            if request_token is not None:
+                from chirp.context import request_var
+
+                request_var.reset(request_token)
 
     # Run producer and disconnect monitor concurrently
     producer_task = asyncio.create_task(produce_events())

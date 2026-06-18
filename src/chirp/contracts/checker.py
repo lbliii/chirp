@@ -1010,6 +1010,21 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         )
     )
 
+    # SSE auth context: an EventStream generator that reads the request user
+    # (get_user()/current_user()) needs AuthMiddleware — without it the
+    # connect-time-captured SSE user is AnonymousUser for the whole stream
+    # (sse_auth_gate, env-aware ERROR prod / WARNING staging / silent dev,
+    # parallels auth_middleware). sse_context is a post-fix SEMANTIC nudge (never
+    # ERROR): reading the user inside a long-lived SSE loop now WORKS, but the
+    # identity is pinned at connect time and not refreshed on a mid-stream
+    # logout/permission change. Both take posture_config so --deploy escalates via
+    # the production-posture view. See rules_sse + categories.md (inline +
+    # module-level generator resolution; single-indirection blind spot).
+    from chirp.contracts.rules_sse import check_sse_auth_gate, check_sse_context
+
+    result.issues.extend(check_sse_auth_gate(router, posture_config, middleware_list))
+    result.issues.extend(check_sse_context(router, posture_config))
+
     # Password hashing: a login/mutating surface on argon2-less production posture
     # should install chirp[auth] (argon2id). Env-aware WARNING advisory (silent in
     # development), so --deploy surfaces it via the production-posture view.

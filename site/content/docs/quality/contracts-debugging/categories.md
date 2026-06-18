@@ -117,6 +117,8 @@ app would fare in production without changing your config, use `chirp check
 | `sse_scope` | ERROR | Add an SSE scope boundary such as `hx-disinherit="hx-target hx-swap"` when streams live inside broad htmx targets. |
 | `sse_crossref` | ERROR / INFO | Align `sse-swap="event"` listeners with declared or inferred `SSEEvent(event=...)` and `Fragment(target=...)` channels. |
 | `sse_speculation` | WARNING | Add `referenced=True` to SSE routes so browser speculation does not open long-lived prefetch streams. |
+| `sse_auth_gate` | ERROR / WARNING | Register `AuthMiddleware` (after `SessionMiddleware`) when an `EventStream` generator reads the request user (`get_user()` / `current_user()`). Without it the connect-time-captured SSE user is `AnonymousUser` for the whole stream. Env-aware (silent dev / WARNING staging / ERROR prod). See the dropdown below. |
+| `sse_context` | WARNING | Semantic nudge only — the pattern WORKS. SSE user identity is **pinned at connect time**; a mid-stream logout / permission change is not reflected. Re-check authorization per event (or close the stream on revoke) for an auth-sensitive long-lived feed. Never ERROR. See the dropdown below. |
 | `reactive_block` | ERROR | Fix `DependencyIndex` `BlockRef` template or block names. |
 | `reactive_cycle` | WARNING | Remove cycles from `DependencyIndex.derive()` relationships. |
 | `reactive_paths` | WARNING | Register every declared emitted path in the dependency index or remove stale metadata. |
@@ -212,7 +214,8 @@ needs. The `style-src 'unsafe-inline'` relaxation is scoped to `style-src` only 
 ### `chirp check --deploy`: production-posture preflight
 
 The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
-`cookie_secure`, `hsts`, `password_extra`, `auth_middleware`, `auth_spec`, `csp_nonce`,
+`cookie_secure`, `hsts`, `password_extra`, `auth_middleware`, `auth_spec`,
+`sse_auth_gate`, `sse_context`, `csp_nonce`,
 `chirpui_csp`, `deploy_debug`,
 `deploy_metrics`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
@@ -442,6 +445,55 @@ pages are skipped (their auth value is not statically known).
 **Fix:** declare the permission with `app.register_permission()` (or fix the typo),
 register the policy with `app.register_policy()`, or use the exact reserved token
 (`"required"` / `"none"` / `"optional"`).
+
+### `sse_auth_gate` / `sse_context`: reading the user inside an SSE generator
+
+`get_request()`, `get_user()` / `current_user()`, `get_csrf_token()`, and `g`
+work inside an `EventStream` generator — the request-scoped context is captured
+at connect time and re-established for the lifetime of the stream. Two checks
+guard the two ways this can surprise you.
+
+**`sse_auth_gate` — the user is `AnonymousUser` without `AuthMiddleware`.** An
+`EventStream` generator that calls `get_user()` / `current_user()` resolves the
+connect-time-captured user, but only when `AuthMiddleware` is wired. Without it,
+the captured user is `AnonymousUser` for the entire stream, so an auth-sensitive
+feed silently serves the anonymous view to everyone — no error, no startup
+signal. Env-aware, mirroring `auth_middleware`:
+
+| Condition | development | staging | production |
+|---|---|---|---|
+| SSE generator reads the user + no `AuthMiddleware` | silent | WARNING | ERROR |
+
+**`sse_context` — the SSE user identity is pinned at connect time.** This is a
+**post-fix semantic nudge, never an ERROR** — the pattern WORKS. When a generator
+reads the user inside a **long-lived loop** (`while` / `async for` / `for`), the
+identity is fixed for the connection's lifetime: a mid-stream logout or
+permission revoke is **not** reflected until the client reconnects. It fires as a
+`WARNING` in staging/production (silent in development) so you can decide whether
+the feed is auth-sensitive enough to re-check authorization per event (or close
+the stream on revoke). A short-lived top-level user read (outside any loop) is
+*not* nudged — it resolves once and the stream ends.
+
+::::{warning} Static-analysis scope: inline and module-level generators only
+Both rules resolve the generator passed to `EventStream(...)` in **two** scopes:
+
+1. an **inline** nested `async def generate()` defined inside the route handler
+   (the common case), and
+2. a **module-level** `async def gen()` passed as `EventStream(gen())`, resolved
+   by name through the handler's `__globals__`.
+
+A generator built by any **other indirection** — a factory function, a method,
+a value threaded through another call, or a comprehension — is **not** statically
+resolvable and is **silently skipped**. This is a deliberate false-NEGATIVE: the
+rules err toward silence so they never raise a false ERROR, but they are **not**
+complete coverage. If your SSE handler reads the user through an indirected
+generator, wire `AuthMiddleware` and re-check per-event authorization manually —
+neither check will catch the gap for you.
+::::
+
+These rules do not fire on the shipped `chat` / `kanban` / `dashboard` /
+`lucky_cat` SSE examples: their generators read **global** state (the message
+bus, the task store, the market feed), never the request user.
 
 ## Data
 

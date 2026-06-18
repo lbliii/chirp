@@ -415,6 +415,7 @@ async def handle_request(
     match response:
         case SSEResponse():
             from chirp.realtime.sse import handle_sse
+            from chirp.server.streaming_context import _CapturedRequestContext
 
             stream = response.event_stream
             if stream.heartbeat_interval == 15.0:
@@ -443,6 +444,14 @@ async def handle_request(
 
                 trace_sink = _trace_sink
 
+            captured_context = _CapturedRequestContext(
+                auth_user=response.auth_user,
+                csrf_token=response.csrf_token,
+                csrf_field_name=response.csrf_field_name,
+                g_snapshot=response.g_snapshot,
+                request_context=response.request_context,
+                csp_nonce=response.csp_nonce,
+            )
             await handle_sse(
                 stream,
                 send,
@@ -454,7 +463,7 @@ async def handle_request(
                 allow_origin=stream.allow_origin,
                 trace_sink=trace_sink,
                 extra_headers=extra_headers,
-                csp_nonce=response.csp_nonce,
+                captured_context=captured_context,
             )
         case StreamingResponse():
             await send_streaming_response(response, send, debug=debug, request_id=rid)
