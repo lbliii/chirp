@@ -17,6 +17,13 @@ the internet. Chirp ships the secure-by-default building blocks — sessions, CS
 rate limiting, security headers, password hashing — but you wire and configure
 them for production yourself. This page is that wiring.
 
+:::{tip}
+New to Chirp auth? Start with [[docs/tutorials/auth-login-walkthrough|A Login That Is Correct by Default]] —
+the whole login → gated page → logout loop in one copy-pasteable file, with the
+secure stack wired and `app.check()` catching the one wire you forgot. Then come
+back here for the production hardening checklist.
+:::
+
 :::{note}
 Most of these items are also enforced by `app.check()`, the contracts you run in
 CI. The severity is environment-aware: missing CSRF or session protection on a
@@ -243,6 +250,7 @@ it — SMTP, a provider API, or a queue.
 :::
 
 :::{note} See also
+- [[docs/tutorials/auth-login-walkthrough|A Login That Is Correct by Default]] — the golden-path login loop, end to end
 - [[docs/quality/deployment/production|Production deployment]] — the rest of the ship-to-prod checklist
 - [[docs/quality/contracts-debugging/categories|Contract categories]] — the env-aware severity model these items map to
 - [[docs/quality/contracts-debugging/route-contract|The route and security-stack contract]] — how `app.check()` enforces the secure-by-default stack
