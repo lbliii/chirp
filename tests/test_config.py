@@ -309,6 +309,26 @@ class TestAppConfig:
         finally:
             os.environ.update(env_backup)
 
+    def test_from_env_log_level(self) -> None:
+        """CHIRP_LOG_LEVEL maps onto the existing log_level field (env parity)."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_LOG_LEVEL"] = "debug"
+            cfg = AppConfig.from_env()
+            assert cfg.log_level == "debug"
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_invalid_log_level_ignored(self) -> None:
+        """Invalid CHIRP_LOG_LEVEL falls back to the default ('info')."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_LOG_LEVEL"] = "trace"
+            cfg = AppConfig.from_env()
+            assert cfg.log_level == "info"
+        finally:
+            os.environ.update(env_backup)
+
     def test_invalid_view_transitions_raises(self) -> None:
         with pytest.raises(ValueError, match="view_transitions"):
             AppConfig(view_transitions="bad")

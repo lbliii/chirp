@@ -876,6 +876,14 @@ class App:
             self._freeze()
 
     def _freeze(self) -> None:
+        # Install the framework JSON log formatter once at this deterministic,
+        # idempotent lifecycle point when configured, so Chirp's own "chirp"
+        # logger lines match the server (Pounce) JSON envelope. Scoped to the
+        # "chirp" logger only — never logging.basicConfig. See chirp.logging.
+        if self.config.log_format == "json":
+            from chirp.logging import configure_json_logging
+
+            configure_json_logging()
         self._compiler.freeze(
             self,
             lambda: self._run_debug_checks(),

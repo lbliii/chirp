@@ -31,7 +31,12 @@ CHIRP_ENV=production
 CHIRP_DEBUG=0
 CHIRP_SECRET_KEY=<generated secret>
 CHIRP_LOG_FORMAT=json
+CHIRP_LOG_LEVEL=info
 ```
+
+`CHIRP_LOG_FORMAT=json` also installs Chirp's own JSON log formatter (matching
+the server envelope), and `CHIRP_LOG_LEVEL` sets the log threshold
+(`debug`/`info`/`warning`/`error`/`critical`, default `info`).
 
 If the app has a custom domain, set allowed hosts explicitly:
 

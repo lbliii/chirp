@@ -83,6 +83,14 @@ def _env_log_format(key: str, default: str) -> str:
     return default
 
 
+def _env_log_level(key: str, default: str) -> str:
+    """Read log level from env; invalid values fall back to default."""
+    val = (os.environ.get(key) or "").lower().strip()
+    if val in ("debug", "info", "warning", "error", "critical"):
+        return val
+    return default
+
+
 def _levenshtein(a: str, b: str) -> int:
     """Compute Levenshtein distance between two strings."""
     if len(a) < len(b):
@@ -468,6 +476,7 @@ class AppConfig:
                     "REDIS_URL",
                     "AUDIT_SINK",
                     "LOG_FORMAT",
+                    "LOG_LEVEL",
                     "HTTP_TIMEOUT",
                     "HTTP_RETRIES",
                     "SKIP_CONTRACT_CHECKS",
@@ -501,6 +510,7 @@ class AppConfig:
             trusted_proxies=_env_trusted_proxies(p),
             forwarded_for_trusted_hops=_env_int(f"{p}FORWARDED_FOR_TRUSTED_HOPS", 1),
             log_format=_env_log_format(f"{p}LOG_FORMAT", "auto"),
+            log_level=_env_log_level(f"{p}LOG_LEVEL", "info"),
             debug=debug,
             secret_key=os.environ.get(f"{p}SECRET_KEY", ""),
             env=env_val,

@@ -198,6 +198,8 @@ allowed-unresolved-imports = [
     "argon2.exceptions",
     "dotenv",
     "redis.asyncio",
+    "opentelemetry",
+    "opentelemetry.trace",
 ]
 
 [tool.ty.src]
