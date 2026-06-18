@@ -326,6 +326,21 @@ Applied migrations are recorded in a `_chirp_migrations` table. Each migration r
 Do not write `BEGIN`, `COMMIT`, or `ROLLBACK` in a migration file. Chirp wraps each migration in its own transaction and owns the boundary; a manual statement breaks that contract.
 :::
 
+### Applied migrations are immutable
+
+Chirp records a SHA-256 checksum of each migration's SQL when it applies it (in the `checksum` column of `_chirp_migrations`). On every run it re-hashes the on-disk file and compares. **Editing an already-applied `NNN_*.sql` file fails loud** with `MigrationError` on the next `migrate()` — naming the file, before applying anything — instead of being silently ignored forever (a real data-corruption footgun when a team "just fixes a typo").
+
+The correct workflow when an applied migration is wrong is to **write a new forward migration** that corrects it:
+
+```sql
+-- migrations/003_add_email_index.sql
+CREATE INDEX idx_users_email ON users (email);
+```
+
+:::{note}
+Tracking rows written by a Chirp version older than this checksum support have a `NULL` checksum and are treated as legacy — they are skipped by the drift check, never retroactively flagged. The `checksum` column is added to an existing tracking table automatically and idempotently.
+:::
+
 ## SQLite vs PostgreSQL
 
 The only thing that changes between drivers is the connection string and the SQL placeholder style.
