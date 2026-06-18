@@ -476,7 +476,10 @@ app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
 
 ## AuthRateLimitMiddleware
 
-Auth-focused in-memory limiter for login/signup/reset endpoints:
+A keyed in-memory limiter. The defaults target the common auth endpoints
+(login/signup/reset) keyed by trusted client IP, but with `key_fn` plus open
+path targeting it limits **any** route or group — per-user, per-resource, or
+per-tenant.
 
 ```python
 from chirp.middleware import AuthRateLimitConfig, AuthRateLimitMiddleware
@@ -489,9 +492,72 @@ app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
 )))
 ```
 
-Returns `429 Too Many Requests` with `Retry-After` when the threshold is exceeded.
-By default it keys requests by the socket client address. If the app sits behind a
-trusted proxy, pass `key_header="x-forwarded-for"` explicitly.
+Returns `429 Too Many Requests` with `Retry-After` when the threshold is
+exceeded. By default it keys requests by `request.trusted_client_ip` — the
+trusted-proxy-corrected client IP, never a raw client-supplied
+`X-Forwarded-For` (which is spoofable). To key on a trusted, server-set
+identity header instead (e.g. an authenticated API-key header), set
+`key_header`; it is consumed verbatim, never comma-split.
+
+### Targeting arbitrary routes with a custom key
+
+Set `paths=()` to limit **every** matching-method route, and supply `key_fn`
+to compute the bucket key per request. Return a non-empty `str` to key on it,
+or `None` to **skip** rate-limiting that request (an explicit per-request
+opt-out):
+
+```python
+app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
+    requests=30,
+    window_seconds=60,
+    paths=(),  # every POST route
+    # Key per authenticated user. Skip anonymous requests here (None) so the
+    # default trusted-IP limiter on the auth endpoints handles them instead.
+    key_fn=lambda req: f"user:{req.user.id}" if req.user.is_authenticated else None,
+)))
+```
+
+:::{warning}
+`key_fn` is an authorization-adjacent input. Derive the key from a
+**server-side** identity — `request.user.id`, `request.trusted_client_ip`, or a
+route param resolved against your records — never from a value the caller can
+freely rotate (a query param, a request body field, a raw `X-Forwarded-For`),
+or a client can dodge its own bucket.
+:::
+
+### HTML 429 for htmx form-action POSTs
+
+By default the over-limit body is plain text. Set `error_template` (and
+optionally `error_block`) to render an HTML `429` for htmx requests — the
+middleware renders the block (or whole template, with `retry_after` in context)
+to the response itself:
+
+```python
+app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
+    paths=(),
+    error_template="rate_limit.html",
+    error_block="too_many",   # block in rate_limit.html; rendered for htmx POSTs
+)))
+```
+
+Non-htmx and unconfigured over-limit responses keep the plain `Too Many
+Requests` body. A configured block that does not exist is fail-loud
+(`BlockNotFoundError`) — point at a block that exists.
+
+### Pluggable backends
+
+The in-memory backend is per-worker. For a shared limit across workers, pass a
+backend implementing the `RateLimitBackend` protocol (both importable from
+`chirp.middleware`). A Redis sliding-window backend ships behind the `redis`
+extra:
+
+```python
+from chirp.middleware import AuthRateLimitConfig, redis_rate_limit_backend
+
+config = AuthRateLimitConfig(
+    backend=redis_rate_limit_backend("redis://localhost:6379/0"),
+)
+```
 
 ## AllowedHostsMiddleware
 

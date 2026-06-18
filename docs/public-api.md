@@ -121,6 +121,34 @@ The route-protection helpers (`login_required`, `requires`) and lockout/audit
 helpers (`LoginLockout`, `LockoutConfig`, `set_security_event_sink`) are also
 exported from `chirp.security`.
 
+## `chirp.middleware` Module Surface
+
+Built-in middleware and their config dataclasses live on the `chirp.middleware`
+module rather than the top-level `from chirp import` surface. They are **not**
+part of the `chirp.__all__` snapshot (this listing is maintained by hand) but are
+documented-public and stable for application code.
+
+```python
+from chirp.middleware import (
+    AuthRateLimitMiddleware,
+    AuthRateLimitConfig,
+    RateLimitBackend,
+    redis_rate_limit_backend,
+)
+```
+
+| Name | Purpose |
+|------|---------|
+| `AuthRateLimitMiddleware` | Keyed rate limiter. Defaults limit the common auth endpoints by `request.trusted_client_ip`; with `key_fn` + open path targeting it limits any route/group (per-user, per-resource, per-tenant). |
+| `AuthRateLimitConfig` | Config: `requests`, `window_seconds`, `block_seconds`, `methods`, `paths` (`()` = all routes), `key_header`, `key_fn` (`(Request) -> str \| None`; `None` skips the request), `error_template` / `error_block` (HTML 429 for htmx POSTs), `backend`. |
+| `RateLimitBackend` | Protocol for pluggable rate-limit storage (`check_and_update(...)`). Implement it for a custom shared backend. |
+| `redis_rate_limit_backend` | `(redis_url, key_prefix="chirp:ratelimit:") -> RateLimitBackend` — Redis sliding-window backend shared across workers (requires `chirp[redis]`). |
+
+(The other built-in middleware — `SessionMiddleware`, `CSRFMiddleware`,
+`SecurityHeadersMiddleware`, `AuthMiddleware`, `CORSMiddleware`,
+`AllowedHostsMiddleware`, `StaticFiles`, `CSPNonceMiddleware`, `HTMLInject` — are
+also `chirp.middleware` exports.)
+
 ## Middleware Ordering
 
 `app.add_middleware(middleware, *, priority=0)` registers a middleware in the

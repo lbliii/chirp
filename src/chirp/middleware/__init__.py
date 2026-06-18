@@ -5,7 +5,11 @@ A middleware is any callable matching:
 
 Built-in middleware:
     AuthMiddleware -- Dual-mode authentication (session + token)
-    AuthRateLimitMiddleware -- Auth endpoint rate limiting
+    AuthRateLimitMiddleware -- Keyed rate limiting (auth endpoints by default;
+        any route/group via key_fn + open paths). Pluggable storage via the
+        RateLimitBackend Protocol; redis_rate_limit_backend builds a
+        Redis-backed sliding window. Set error_template/error_block for an
+        HTML 429 on htmx form-action POSTs.
     CORSMiddleware -- Cross-Origin Resource Sharing
     CSRFMiddleware -- CSRF token protection (requires SessionMiddleware)
     HTMLInject -- Inject snippets into HTML responses
@@ -16,7 +20,12 @@ Built-in middleware:
 
 from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
-from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
+from chirp.middleware.auth_rate_limit import (
+    AuthRateLimitConfig,
+    AuthRateLimitMiddleware,
+    RateLimitBackend,
+    redis_rate_limit_backend,
+)
 from chirp.middleware.builtin import CORSConfig, CORSMiddleware
 from chirp.middleware.csp_nonce import CSPNonceMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
@@ -42,7 +51,9 @@ __all__ = [
     "HTMLInject",
     "Middleware",
     "Next",
+    "RateLimitBackend",
     "SecurityHeadersConfig",
     "SecurityHeadersMiddleware",
     "StaticFiles",
+    "redis_rate_limit_backend",
 ]

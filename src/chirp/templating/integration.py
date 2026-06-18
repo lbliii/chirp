@@ -25,6 +25,24 @@ _render_capture: ContextVar[list[tuple[str, dict[str, Any]]] | None] = ContextVa
     "chirp_render_capture", default=None
 )
 
+#: The active app's kida ``Environment`` for the current request.
+#: ``handle_request`` sets this around dispatch so middleware (which runs
+#: *before* the handler and only receives ``AnyResponse``, never a Chirp
+#: return type) can render a template/block to a self-contained ``Response``
+#: without coupling to ``negotiate_response``. ``None`` outside a request or
+#: when the app has no template environment configured.
+_active_kida_env: ContextVar[Environment | None] = ContextVar("chirp_active_kida_env", default=None)
+
+
+def get_active_kida_env() -> Environment | None:
+    """Return the kida ``Environment`` for the active request, or ``None``.
+
+    Set by ``handle_request`` around dispatch. Middleware uses this to render
+    a template/block to HTML inside the pipeline (e.g. an HTML 429 body)
+    without reaching back into the handler's negotiation path.
+    """
+    return _active_kida_env.get(None)
+
 
 def _is_chirp_ui_filter_override(name: str, func: Callable[..., Any]) -> bool:
     """True when *func* is chirp-ui's implementation replacing chirp stubs for the UI kit."""

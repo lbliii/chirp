@@ -53,6 +53,7 @@ from chirp.server.negotiation import negotiate
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_file_response, send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.integration import _active_kida_env
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.trace import encode_return_trace, get_return_trace
 from chirp.tools.registry import ToolRegistry
@@ -444,6 +445,11 @@ async def handle_request(
     token: Token[Request] = request_var.set(request)
     rid_token = request_id_var.set(request.request_id)
     sync_token = force_inline_sync_var.set(force_inline_sync)
+    # Publish the app's template environment for the life of the request so
+    # middleware (which only sees AnyResponse, never a Chirp return type) can
+    # render a self-contained HTML body (e.g. an HTML 429) without coupling to
+    # the handler's negotiate_response path.
+    env_token = _active_kida_env.set(kida_env)
 
     if compiled_handler is None:
         msg = "compiled_handler is required; ASGIRuntime always provides it"
@@ -483,6 +489,7 @@ async def handle_request(
         request_var.reset(token)
         request_id_var.reset(rid_token)
         force_inline_sync_var.reset(sync_token)
+        _active_kida_env.reset(env_token)
 
     # Dispatch based on response type — X-Request-ID injected at send time
     # to avoid an extra Response clone + tuple allocation per request.
