@@ -59,6 +59,30 @@ the way out. Here `timing_middleware` is the outermost layer — it sees the tot
 time including CORS and auth processing.
 :::
 
+### Explicit ordering with `priority`
+
+When registration order is awkward (for example a plugin adds middleware you want
+to keep outermost regardless of where its setup runs), pass a keyword-only
+`priority` so the order is explicit and independent of registration order:
+
+```python
+app.add_middleware(timing_middleware, priority=-100)  # always outermost
+app.add_middleware(cors_middleware)                    # priority 0 (default)
+app.add_middleware(auth_middleware, priority=10)       # innermost of the three
+```
+
+**Lower priority runs outermost.** At freeze the user middleware is sorted by
+`(priority, registration_order)` with a *stable* sort, so equal-priority
+middleware keep their registration order and a stack that never passes `priority`
+is byte-identical to plain registration order. Built-in middleware (allowed-hosts,
+CSP nonce, security headers, injection) stays positionally pinned around your
+chain — `priority` only reorders middleware you register.
+
+A `priority` that would place `CSRFMiddleware` outside `SessionMiddleware` still
+raises `ConfigurationError` at freeze (CSRF reads the session). `app.check()`
+reports the resolved order under the INFO `middleware_chain` diagnostic so you
+can confirm the pipeline you registered is the pipeline that runs.
+
 ## What you can do in a middleware
 
 Inside the function you control both halves of the round trip:

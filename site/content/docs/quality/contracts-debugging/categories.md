@@ -143,6 +143,7 @@ app would fare in production without changing your config, use `chirp check
 | `allowed_hosts` | ERROR / WARNING | Configure explicit hosts outside development instead of `allowed_hosts=("*",)`. |
 | `trusted_proxies` | WARNING | Configure explicit reverse-proxy peer IPs/hostnames instead of `trusted_proxies=("*",)` outside development. Details in the dropdown below. |
 | `csrf_session` | ERROR | Register `SessionMiddleware` before `CSRFMiddleware`. |
+| `middleware_chain` | INFO | Diagnostic only — reports the freeze-resolved user middleware order (outermost → innermost). Use `add_middleware(priority=...)` to make the order explicit; lower priority runs outermost. Ordering *violations* (CSRF outside Session) are still the `csrf_session` ERROR, not this category. |
 | `security_stack` | ERROR / WARNING | Wire the secure-by-default stack on apps with mutating routes. See the `security_stack` canonical reference below. |
 | `auth_middleware` | ERROR / WARNING / INFO | Register `AuthMiddleware` (after `SessionMiddleware`) when any route declares auth via `RouteMeta.auth` or `@login_required`/`@requires`. Without it the auth gate's `get_user()` raises `LookupError` → 500. See the dropdown below. |
 | `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` (unknown permission/policy → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |

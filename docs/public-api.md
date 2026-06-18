@@ -29,7 +29,7 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Application | `App`, `AppConfig` |
 | HTTP | `Request`, `Response`, `FileResponse`, `JSONResponse`, `Redirect`, `hx_redirect` |
 | Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `Action` |
-| Middleware | `Middleware`, `Next`, `AnyResponse` |
+| Middleware | `Middleware`, `Next`, `AnyResponse` (register with `app.add_middleware(mw, *, priority=0)`) |
 | Request context | `g`, `get_request` |
 | Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
@@ -120,6 +120,19 @@ from chirp.security import (
 The route-protection helpers (`login_required`, `requires`) and lockout/audit
 helpers (`LoginLockout`, `LockoutConfig`, `set_security_event_sink`) are also
 exported from `chirp.security`.
+
+## Middleware Ordering
+
+`app.add_middleware(middleware, *, priority=0)` registers a middleware in the
+request pipeline. The optional keyword-only `priority` makes the resolved order
+explicit and independent of registration order: at freeze the user middleware is
+stably sorted by `(priority, registration_order)`, and **lower priority runs
+outermost** (it wraps the higher-priority middleware). The default `priority=0`
+keeps registration order, so existing apps are byte-identical. Built-in
+middleware stays positionally pinned around the user chain. A `priority` that
+places CSRF middleware outside session middleware still raises a configuration
+error at freeze, and `app.check()` reports the resolved chain under the INFO
+`middleware_chain` diagnostic category (see the contract categories reference).
 
 ## Debug And Advanced
 

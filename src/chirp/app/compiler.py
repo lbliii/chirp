@@ -500,7 +500,17 @@ class AppCompiler:
         self._runtime.routes_by_name = routes_by_name
         self._runtime.route_name_collisions = name_collisions
 
-        middleware_list = list(self._mutable.middleware_list)
+        # Stable priority sort of USER middleware (default priority 0 keeps
+        # registration order byte-identical). Runs under the freeze lock before
+        # publication, and before _validate_middleware_ordering so the hard
+        # CSRF-before-Session floor sees the resolved order. Builtins are added
+        # after this and stay positionally pinned.
+        from chirp.middleware.ordering import sort_user_middleware
+
+        middleware_list = sort_user_middleware(
+            self._mutable.middleware_list,
+            self._mutable.middleware_priorities,
+        )
         _validate_middleware_ordering(middleware_list)
         middleware_list = _collect_builtin_middleware(
             self._config,

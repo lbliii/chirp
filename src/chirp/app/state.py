@@ -154,6 +154,15 @@ class MutableAppState:
     pending_routes: list[PendingRoute] = field(default_factory=list)
     pending_tools: list[PendingTool] = field(default_factory=list)
     middleware_list: list[Middleware] = field(default_factory=list)
+    #: Per-entry priority for ``middleware_list``, kept index-aligned with it
+    #: (one int per registered USER middleware). Lower runs *outermost* (wraps
+    #: later ones); default ``0``. The freeze-time sort uses ``(priority,
+    #: insertion_seq)`` so equal priorities preserve registration order and a
+    #: stack with all-default priorities resolves byte-identically to today's
+    #: append order. Builtin middleware (added in the compiler) is NOT recorded
+    #: here — it stays positionally pinned. ``mount_app`` extends both lists in
+    #: lockstep so a hoisted sub-app keeps its priorities.
+    middleware_priorities: list[int] = field(default_factory=list)
     error_handlers: dict[int | type, ErrorHandler] = field(default_factory=dict)
     template_filters: dict[str, Callable[..., Any]] = field(default_factory=dict)
     template_globals: dict[str, Any] = field(default_factory=dict)

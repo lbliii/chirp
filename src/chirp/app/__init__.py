@@ -704,8 +704,30 @@ class App:
         """Add a template loader (e.g., from a plugin's PackageLoader)."""
         self._registry.add_loader(loader)
 
-    def add_middleware(self, middleware: object) -> None:
-        self._registry.add_middleware(middleware)
+    def add_middleware(self, middleware: object, *, priority: int = 0) -> None:
+        """Register a middleware in the request pipeline.
+
+        Middleware run as nested wrappers: the **outermost** middleware sees the
+        request first and the response last. With default ``priority=0`` the
+        chain is resolved in registration order (the first ``add_middleware``
+        call is outermost), exactly as before — so existing apps are unchanged.
+
+        ``priority`` makes the resolved order explicit and independent of
+        registration order. **Lower priority runs outermost** (wraps the
+        higher-priority middleware). At freeze the registered (user) middleware
+        is sorted by ``(priority, registration_order)`` — a *stable* sort, so
+        equal-priority middleware keep their registration order. Built-in
+        middleware (allowed-hosts, CSP nonce, security headers, injection, …)
+        stays positionally pinned around the user middleware and is unaffected
+        by ``priority``.
+
+        The hard ordering floor still applies: a ``priority`` that would place
+        ``CSRFMiddleware`` outside ``SessionMiddleware`` raises
+        :class:`~chirp.errors.ConfigurationError` at freeze (CSRF reads the
+        session). ``app.check()`` also reports the resolved chain under the
+        ``middleware_chain`` diagnostic category.
+        """
+        self._registry.add_middleware(middleware, priority=priority)
 
     def add_reload_dir(self, path: str) -> None:
         self._registry.add_reload_dir(path)

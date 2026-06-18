@@ -469,6 +469,9 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     kida_env = snapshot.kida_env
     result.coverage = _build_coverage(snapshot)
     middleware_list = getattr(getattr(app, "_mutable_state", None), "middleware_list", [])
+    middleware_priorities = getattr(
+        getattr(app, "_mutable_state", None), "middleware_priorities", None
+    )
 
     # Deploy-preflight posture (#160): the env-aware rules below decide severity
     # from config.env. To answer "would this app pass in production?" without a
@@ -917,6 +920,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 )
 
     # Safety checks: catch silent failure modes
+    from chirp.contracts.rules_middleware_chain import check_middleware_chain
     from chirp.contracts.rules_safety import (
         check_allowed_hosts,
         check_csrf_session_order,
@@ -925,10 +929,17 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         check_sse_speculation,
         check_trusted_proxies,
     )
+    from chirp.middleware.ordering import sort_user_middleware
+
+    # Order-sensitive checks must see the FREEZE-resolved order (priority sort),
+    # not raw registration order: a priority that reorders Session/CSRF would
+    # otherwise be missed by csrf_session here while still breaking at runtime.
+    resolved_middleware = sort_user_middleware(middleware_list, middleware_priorities)
 
     result.issues.extend(check_sse_speculation(router))
-    result.issues.extend(check_csrf_session_order(middleware_list))
+    result.issues.extend(check_csrf_session_order(resolved_middleware))
     result.issues.extend(check_middleware_signatures(middleware_list))
+    result.issues.extend(check_middleware_chain(middleware_list, middleware_priorities))
     result.issues.extend(check_secret_key(posture_config))
     result.issues.extend(check_allowed_hosts(posture_config))
     result.issues.extend(check_trusted_proxies(posture_config))

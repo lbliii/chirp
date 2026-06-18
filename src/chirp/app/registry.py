@@ -72,9 +72,10 @@ class AppRegistry:
 
         return decorator
 
-    def add_middleware(self, middleware: Any) -> None:
+    def add_middleware(self, middleware: Any, *, priority: int = 0) -> None:
         self._ensure_mutable()
         self._state.middleware_list.append(middleware)
+        self._state.middleware_priorities.append(priority)
 
     def add_reload_dir(self, path: str | Path) -> None:
         self._ensure_mutable()
