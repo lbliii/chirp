@@ -56,7 +56,7 @@ from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.middleware.static import StaticFiles
-from chirp.security.passwords import hash_password, verify_password
+from chirp.security.passwords import hash_password, verify_login
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -464,7 +464,9 @@ async def do_login(request: Request):
     password = form.get("password", "")
 
     user = _get_users().get(username)
-    if user and verify_password(password, user.password_hash):
+    # verify_login burns a decoy hash for an unknown user so the unknown-user
+    # and wrong-password paths take comparable time (no enumeration oracle).
+    if verify_login(password, user.password_hash if user else None):
         login(user)
         next_url = request.query.get("next", "/")
         if not is_safe_url(next_url):

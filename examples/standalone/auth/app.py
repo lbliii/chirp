@@ -9,7 +9,7 @@ Demonstrates:
 - ``login()`` / ``logout()`` helpers
 - ``@login_required`` decorator
 - ``current_user()`` template global
-- ``hash_password`` / ``verify_password``
+- ``hash_password`` / ``verify_login`` (enumeration-safe login)
 
 Run:
     python app.py
@@ -33,7 +33,7 @@ from chirp import (
 )
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-from chirp.security.passwords import hash_password, verify_password
+from chirp.security.passwords import hash_password, verify_login
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -52,7 +52,7 @@ class User:
     is_authenticated: bool = True
 
 
-# Pre-hash the demo password so verify_password works correctly
+# Pre-hash the demo password so verify_login works correctly
 _DEMO_HASH = hash_password("password")
 
 USERS: dict[str, User] = {
@@ -102,7 +102,10 @@ async def do_login(request: Request):
     password = form.get("password", "")
 
     user = USERS.get(username)
-    if user and verify_password(password, user.password_hash):
+    # verify_login runs a decoy hash for an unknown user (hash is None) so the
+    # "no such user" and "wrong password" paths take comparable time — no
+    # user-enumeration timing oracle.
+    if verify_login(password, user.password_hash if user else None):
         login(user)
         # Honour ?next= only if the URL is safe (relative, same origin)
         next_url = request.query.get("next", "/dashboard")

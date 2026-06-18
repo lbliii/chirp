@@ -20,12 +20,32 @@ Password hashing (``pip install chirp[auth]``)::
 
     hashed = hash_password("my-password")
     ok = verify_password("my-password", hashed)
+
+Login verification with a user-enumeration timing defence, plus
+opportunistic hash upgrades::
+
+    from chirp.security import verify_login, verify_and_upgrade
+
+    # Unknown user (hash is None) still runs a decoy verify → constant-ish time.
+    if not verify_login(password, user.password_hash if user else None):
+        return reject()
+
+    # Re-derive stale hashes on a successful login (never on a wrong password).
+    ok, new_hash = verify_and_upgrade(password, user.password_hash)
+    if new_hash is not None:
+        user.password_hash = new_hash
 """
 
 from chirp.security.audit import SecurityEvent, emit_security_event, set_security_event_sink
 from chirp.security.decorators import login_required, requires
 from chirp.security.lockout import LockoutConfig, LoginLockout
-from chirp.security.passwords import hash_password, verify_password
+from chirp.security.passwords import (
+    hash_password,
+    needs_rehash,
+    verify_and_upgrade,
+    verify_login,
+    verify_password,
+)
 
 __all__ = [
     "LockoutConfig",
@@ -34,7 +54,10 @@ __all__ = [
     "emit_security_event",
     "hash_password",
     "login_required",
+    "needs_rehash",
     "requires",
     "set_security_event_sink",
+    "verify_and_upgrade",
+    "verify_login",
     "verify_password",
 ]

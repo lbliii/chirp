@@ -1010,6 +1010,23 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         )
     )
 
+    # Password hashing: a login/mutating surface on argon2-less production posture
+    # should install chirp[auth] (argon2id). Env-aware WARNING advisory (silent in
+    # development), so --deploy surfaces it via the production-posture view.
+    # argon2 availability is read via _has_argon2 — the same predicate the runtime
+    # uses to pick the hashing algorithm — not a middleware class name. Built-in
+    # (not a plugin check) because it reads config.env + the route surface, which
+    # the plugin ContractCheckSnapshot does not expose. See rules_password_extra.
+    from chirp.contracts.rules_password_extra import check_password_extra
+
+    result.issues.extend(
+        check_password_extra(
+            router,
+            posture_config,
+            getattr(snapshot, "discovered_routes", []),
+        )
+    )
+
     # CSP-nonce: framework inline scripts are built through per-request snippet
     # factories (#195), so they carry the live nonce when a nonce mechanism is
     # active (CSPNonceMiddleware / csp_nonce_enabled). This rule ERRORs (env-aware)

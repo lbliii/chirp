@@ -57,6 +57,19 @@ class TestLoginFlow:
             assert response.status == 200
             assert "Invalid" in response.text
 
+    async def test_unknown_user_is_rejected(self, example_app) -> None:
+        """Regression for the verify_login swap: an unknown username (hash is
+        None) is rejected with the same generic error as a wrong password — the
+        decoy verify runs and no enumeration signal leaks through the response."""
+        async with TestClient(example_app) as client:
+            response = await client.post(
+                "/login",
+                body=b"username=does-not-exist&password=whatever",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert response.status == 200
+            assert "Invalid" in response.text
+
     async def test_full_login_dashboard_logout(self, example_app) -> None:
         """Login → dashboard → logout → dashboard redirects again."""
         async with TestClient(example_app) as client:

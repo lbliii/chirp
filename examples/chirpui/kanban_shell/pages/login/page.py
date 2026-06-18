@@ -1,7 +1,7 @@
 """Login page handler — GET/POST /login."""
 
 from chirp import Page, Redirect, get_user, is_safe_url, login
-from chirp.security.passwords import verify_password
+from chirp.security.passwords import verify_login
 
 
 def get(request) -> Page:
@@ -33,7 +33,9 @@ async def post(request) -> Page | Redirect:
 
     users = get_users()
     user = users.get(username)
-    if user and verify_password(password, user.password_hash):
+    # verify_login runs a decoy hash for an unknown user (hash is None) so the
+    # unknown-user and wrong-password paths take comparable time (no oracle).
+    if verify_login(password, user.password_hash if user else None):
         login(user)
         if not is_safe_url(next_url):
             next_url = "/"

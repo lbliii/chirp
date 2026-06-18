@@ -77,6 +77,35 @@ hardens and documents that surface:
 | Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |
 | `use_chirp_ui` bridge | Keep provisional | It couples this package to `chirp-ui` runtime and manifest behavior. |
 
+## `chirp.security` Module Surface
+
+A few public helpers live on the `chirp.security` module rather than the top-level
+`from chirp import` surface. They are **not** part of the `chirp.__all__` snapshot
+(so this listing is maintained by hand), but they are documented-public and stable
+for application code.
+
+```python
+from chirp.security import (
+    hash_password,
+    verify_password,
+    verify_login,
+    verify_and_upgrade,
+    needs_rehash,
+)
+```
+
+| Name | Signature | Purpose |
+|------|-----------|---------|
+| `hash_password` | `(password: str) -> str` | Hash a password with argon2id (`chirp[auth]`) or stdlib scrypt fallback; returns a PHC string. |
+| `verify_password` | `(password: str, phc_hash: str) -> bool` | Verify against a stored hash; auto-detects the algorithm from the PHC prefix. |
+| `verify_login` | `(password: str, phc_hash: str \| None) -> bool` | Login verification that resists user-enumeration timing: an unknown user (`phc_hash is None`) still runs a decoy verify. Pass `None` for "no such user". |
+| `verify_and_upgrade` | `(password: str, phc_hash: str) -> tuple[bool, str \| None]` | Verify and opportunistically return a fresh hash when the password is correct **and** the stored hash is below current cost. `(True, new_hash)` / `(True, None)` / `(False, None)`. Never rehashes a wrong guess. |
+| `needs_rehash` | `(phc_hash: str, *, upgrade_algorithm: bool = False) -> bool` | Report whether a stored hash is below current cost parameters. The algorithm-upgrade clause (scrypt stale because argon2 is now installed) is gated behind `upgrade_algorithm`, off by default. |
+
+The route-protection helpers (`login_required`, `requires`) and lockout/audit
+helpers (`LoginLockout`, `LockoutConfig`, `set_security_event_sink`) are also
+exported from `chirp.security`.
+
 ## Debug And Advanced
 
 These are exported so debugging, tests, and framework tooling can inspect how Chirp resolved a

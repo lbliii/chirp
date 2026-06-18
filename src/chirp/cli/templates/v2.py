@@ -202,7 +202,7 @@ if __name__ == "__main__":
 V2_MODELS_PY = """\
 from dataclasses import dataclass
 
-from chirp.security.passwords import hash_password, verify_password
+from chirp.security.passwords import hash_password, verify_login
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,7 +226,9 @@ async def load_user(user_id: str) -> User | None:
 
 def verify_user(username: str, password: str) -> User | None:
     user = USERS.get(username)
-    if user and verify_password(password, user.password_hash):
+    # verify_login runs a decoy hash for an unknown user so the unknown-user and
+    # wrong-password paths take comparable time (no user-enumeration oracle).
+    if verify_login(password, user.password_hash if user else None):
         return user
     return None
 """

@@ -146,6 +146,7 @@ app would fare in production without changing your config, use `chirp check
 | `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` (unknown permission/policy → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
+| `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
 | `csp_nonce` | ERROR / WARNING | Enable a per-request nonce mechanism (`AppConfig(csp_nonce_enabled=True)`) so framework inline scripts carry a nonce under an inline-forbidding CSP. See the dropdown below. |
 | `chirpui_csp` | ERROR / WARNING | **chirp-ui apps only.** Remove a conflicting static CSP so `use_chirp_ui`'s auto-wired nonce CSP can keep Alpine alive. See the dropdown below. |
 | `middleware_signature` | ERROR / WARNING | Make middleware callable as `async __call__(request, next)`. |
@@ -211,7 +212,7 @@ needs. The `style-src 'unsafe-inline'` relaxation is scoped to `style-src` only 
 ### `chirp check --deploy`: production-posture preflight
 
 The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
-`cookie_secure`, `hsts`, `auth_middleware`, `auth_spec`, `csp_nonce`,
+`cookie_secure`, `hsts`, `password_extra`, `auth_middleware`, `auth_spec`, `csp_nonce`,
 `chirpui_csp`, `deploy_debug`,
 `deploy_metrics`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
@@ -325,6 +326,29 @@ irreversible decision to you.
 add a `SecurityHeadersMiddleware` configured with it). Either source clears the
 warning. It is silent in development and staging — only the declared production
 posture is nudged — and surfaces under `chirp check --deploy`.
+
+### `password_extra`: argon2 in production
+
+WARNING (never ERROR) when an app has a login/mutating surface (the same
+`is_mutating_route` definition `security_stack` owns) **and** `argon2-cffi` is not
+importable — so password hashing falls back to stdlib scrypt. scrypt is a correct,
+always-available fallback (no hash is ever rejected and `verify_password`
+auto-detects the algorithm from the PHC prefix), but argon2id is the recommended
+algorithm for new production deployments.
+
+This is a posture **advisory**, never an ERROR: there is no correctness gap to
+fail loud on, and existing scrypt hashes upgrade to argon2 on the next successful
+login via `verify_and_upgrade()` once the extra is installed. Severity is
+env-aware — silent in development (and the scrypt-only base CI environment),
+WARNING in staging/production — so dev apps and shipped examples stay clean, and
+it escalates under `chirp check --deploy`. argon2 availability is read via the
+same `_has_argon2()` predicate the runtime uses to pick the hashing algorithm, so
+the check and the runtime never disagree.
+
+**Fix:** `pip install chirp[auth]` (pulls in `argon2-cffi`). New hashes then use
+argon2id; existing scrypt hashes re-derive to argon2 the next time each user logs
+in if you wire `verify_and_upgrade()` (see
+[[docs/quality/deployment/auth-hardening|Auth Hardening]]).
 
 ### `auth_middleware`: auth-declaring routes need `AuthMiddleware`
 
