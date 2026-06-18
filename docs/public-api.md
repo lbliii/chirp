@@ -37,6 +37,18 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
 | Markdown | `MarkdownRenderer` |
 
+### Request notes
+
+`Request.trusted_client_ip` is the blessed accessor for the trusted-proxy-corrected
+client IP — use it for rate-limit and audit keying. It returns `client[0]` (falling
+back to `"unknown"` when the scope has no client) and **never raises**. It is
+fail-closed: it deliberately does not read a raw, client-spoofable `X-Forwarded-For`
+header. In production Chirp's ASGI server (pounce) applies the trusted-proxy model
+(`AppConfig.trusted_proxies` + `AppConfig.forwarded_for_trusted_hops`) into
+`scope["client"]` before the `Request` is built, so `client[0]` is already the
+trusted-derived IP; under a non-pounce server that leaves `scope["client"]` as the
+raw peer, this is only as trustworthy as that server.
+
 ## Provisional Extension Surface
 
 These names are public because extension authors and serious apps need them, but their exact

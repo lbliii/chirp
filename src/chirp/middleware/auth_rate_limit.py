@@ -40,6 +40,12 @@ class AuthRateLimitConfig:
     block_seconds: int = 300
     methods: tuple[str, ...] = ("POST",)
     paths: tuple[str, ...] = ("/login", "/signup", "/register", "/password-reset")
+    # key_header names a TRUSTED, server-set identity header (e.g. an
+    # authenticated API-key header) to key the limiter on. It is consumed
+    # verbatim — it is NOT an X-Forwarded-For override and is NOT comma-split,
+    # because the first hop of a client-supplied XFF chain is spoofable. When
+    # unset (or the header is absent), keying falls back to the fail-closed
+    # trusted-proxy-corrected client IP (``request.trusted_client_ip``).
     key_header: str | None = None
     backend: RateLimitBackend | None = None  # None = in-memory
 
@@ -101,15 +107,18 @@ class AuthRateLimitMiddleware:
     def _identity_key(self, request: Request) -> str:
         header_name = self._config.key_header
         if header_name:
+            # key_header must name a TRUSTED, server-set identity header. It is
+            # consumed verbatim — no first-comma split — so a spoofable
+            # client-supplied chain (e.g. X-Forwarded-For) cannot be used to
+            # rotate identities and evade the limit.
             raw = request.headers.get(header_name)
             if raw:
-                # Respect standard comma-separated proxy chain, first hop is client.
-                forwarded = raw.split(",")[0].strip()
-                if forwarded:
-                    return forwarded
-        if request.client:
-            return request.client[0]
-        return "unknown"
+                identity = raw.strip()
+                if identity:
+                    return identity
+        # Fail-closed default: the trusted-proxy-corrected client IP. Raw
+        # X-Forwarded-For is never trusted here.
+        return request.trusted_client_ip
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         cfg = self._config

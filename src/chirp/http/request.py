@@ -357,6 +357,33 @@ class Request:
         return current_user()
 
     @property
+    def trusted_client_ip(self) -> str:
+        """The trusted-proxy-corrected client IP — the blessed accessor for
+        rate limiting and audit keying.
+
+        Returns ``client[0]`` (the source IP for the TCP peer), falling back to
+        ``"unknown"`` when the ASGI scope carries no client. **Never raises.**
+
+        This is fail-closed: it deliberately does **not** read a raw
+        ``X-Forwarded-For`` header, which is client-controlled and trivially
+        spoofable. In production Chirp's ASGI server (pounce) applies the
+        trusted-proxy model (``trusted_proxies`` + ``forwarded_for_trusted_hops``)
+        and writes the corrected client into ``scope["client"]`` **before**
+        Chirp builds this ``Request`` — so ``client[0]`` is already the
+        trusted-derived IP. Under the dev/run path and ``TestClient``, the
+        forwarded-for logic is not run, so an attacker-supplied
+        ``X-Forwarded-For`` is correctly ignored here.
+
+        Caveat: under a non-pounce ASGI server that leaves ``scope["client"]``
+        as the raw socket peer without applying a trusted-proxy model, this is
+        only as trustworthy as that server's handling of the proxy chain.
+        """
+        client = self.client
+        if client:
+            return client[0]
+        return "unknown"
+
+    @property
     def session(self) -> dict[str, Any]:
         """The request-scoped session dict.
 
