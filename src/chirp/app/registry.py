@@ -85,6 +85,31 @@ class AppRegistry:
         self._ensure_mutable()
         self._state.sections[section.id] = section
 
+    def register_permission(self, name: str, *, description: str | None = None) -> None:
+        """Declare a permission name for the ``auth_spec`` contract check.
+
+        Declaring permissions makes the ``auth_spec`` check registry-backed: an
+        ``AuthSpec`` (or bare-string) permission not in the declared set becomes
+        a startup ERROR (env-aware) instead of a silent request-time 403.
+        ``description`` is accepted for self-documentation but not yet stored.
+        """
+        self._ensure_mutable()
+        self._state.permission_registry.add(name)
+
+    def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
+        """Register a named policy callable resolved by the declarative auth gate.
+
+        A declarative ``AuthSpec(policy=name)`` names this callable; the shared
+        auth core resolves the name against this registry at request time
+        (``policy(user, request) -> bool | Awaitable[bool]``). An unknown policy
+        name fails loud (the ``auth_spec`` check flags it at startup).
+        """
+        self._ensure_mutable()
+        if not callable(fn):
+            msg = f"Policy {name!r} must be callable, got {type(fn).__name__}"
+            raise TypeError(msg)
+        self._state.policy_registry[name] = fn
+
     def template_filter(
         self, name: str | None
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -212,10 +237,29 @@ class AppRegistry:
         _actions = actions
         _viewmodel_provider = viewmodel_provider
         _sections = self._state.sections
+        _policy_registry = self._state.policy_registry
         if template_name:
             self._state.page_leaf_templates.add(template_name)
             self._state.page_templates.add(template_name)
         _service_providers = self._state.providers
+
+        def _resolve_policy(name: str) -> Callable[..., Any]:
+            """Resolve a declarative ``AuthSpec.policy`` NAME to its callable.
+
+            Fails loud (``LookupError`` -> 500) on an unregistered name: a
+            named-policy route with no matching ``app.register_policy`` is a
+            startup-detectable misconfiguration (also flagged by the
+            ``auth_spec`` contract check), not a silent deny.
+            """
+            try:
+                return _policy_registry[name]
+            except KeyError:
+                msg = (
+                    f"Route declares policy '{name}' but no policy with that name "
+                    "is registered. Register it with app.register_policy(name, fn) "
+                    "during setup."
+                )
+                raise LookupError(msg) from None
 
         async def page_wrapper(request: Request) -> Any:
             cascade_ctx = await build_cascade_context(
@@ -224,7 +268,7 @@ class AppRegistry:
             meta_resolved = await resolve_meta(
                 _meta, _meta_provider, request.path_params, _service_providers
             )
-            await enforce_route_meta_auth(meta_resolved, request)
+            await enforce_route_meta_auth(meta_resolved, request, policy_resolver=_resolve_policy)
             section_ctx = resolve_section_context(meta_resolved, _sections)
             shell_ctx = build_shell_context(request, meta_resolved, section_ctx, cascade_ctx)
             route_debug = build_route_debug_info(

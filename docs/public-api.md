@@ -33,7 +33,8 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Request context | `g`, `get_request` |
 | Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
-| Auth and security | `get_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
+| Auth and security | `get_user`, `current_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
+| Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
 | Markdown | `MarkdownRenderer` |
 
 ## Provisional Extension Surface
@@ -52,6 +53,7 @@ shape may still evolve before 1.0:
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
+| Secure-by-default stack | `secure_stack` |
 | Optional UI bridge | `use_chirp_ui` |
 
 ## 1.0 Audit Decisions

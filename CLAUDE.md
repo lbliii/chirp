@@ -321,6 +321,40 @@ the secret key from `CHIRP_SECRET_KEY`, so generated apps pass the contract out
 of the box. See `src/chirp/cli/templates/minimal.py` and
 `site/content/docs/quality/contracts-debugging/categories.md`.
 
+### Declarative auth (`RouteMeta.auth` / `AuthSpec`)
+
+Filesystem pages gate via `RouteMeta.auth` (in `_meta.py`), enforced by the same
+shared core (`chirp.security.auth_core.enforce_auth`) as the imperative
+`@login_required` / `@requires` decorators — identical 302/401/403 outcomes and
+identical `emit_security_event` audit payloads. `auth` is `str | AuthSpec | None`:
+
+- `None`/`"none"`/`"optional"`/`""` open; `"required"` authn-only; any other
+  string a single required permission (back-compat, exact runtime meaning
+  preserved by `normalize_auth_spec`).
+- `AuthSpec(required=True, permissions=(...), mode="all"|"any", policy=<name>)`
+  for permission sets and named policies. `AuthSpec` is **static serializable
+  data** — `policy` is a string NAME, never a live `Callable`. `AuthSpec` lives
+  in `chirp.pages.types` (symmetry with `RouteMeta`; not a top-level export).
+
+`auth` is normalized to a canonical `AuthSpec | None` at **discovery time** (and
+for dynamic `meta()` results at request time) so the per-request gate is
+allocation-free and reserved-token confusion fails loud at startup. A `dict` auth
+value (`{"permissions": ["a"], "mode": "any"}`) constructs an `AuthSpec`; static
+`META` and dynamic `meta()` parse `auth` through one shared
+`dict_to_route_meta` / `normalize_route_meta` helper (`chirp/pages/discovery.py`).
+
+Two App registries (before-freeze only, raise `RuntimeError` after freeze):
+
+- `app.register_permission(name, *, description=None)` — declares a permission.
+- `app.register_policy(name, fn)` — registers a `(user, request) -> bool`
+  callable; the declarative gate resolves an `AuthSpec.policy` NAME against it at
+  request time. An unregistered policy name fails loud (500).
+
+The `auth_spec` contract check is **registry-backed** when permissions/policies
+are declared (unknown permission/policy → env-aware ERROR); with no registry it
+falls back to the high-signal reserved-token-typo heuristic. See
+`src/chirp/contracts/rules_auth_meta.py` and `src/chirp/security/AGENTS.md`.
+
 ## Dependencies
 
 Core: `kida-templates`, `anyio`, `bengal-pounce`. Everything else optional:

@@ -237,6 +237,7 @@ under free-threading.
 | `httponly` | `True` | Prevent JavaScript access |
 | `samesite` | `"lax"` | SameSite policy |
 | `secure` | `False` | HTTPS-only (set `True` in production) |
+| `signer_digest` | `"sha256"` | Cookie HMAC digest (`"sha256"` or `"sha512"`); SHA-1 cookies from older releases still read |
 | `idle_timeout_seconds` | `None` | Optional idle timeout before the session expires |
 | `absolute_timeout_seconds` | `None` | Optional absolute max lifetime for a session |
 ::::

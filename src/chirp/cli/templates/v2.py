@@ -14,10 +14,23 @@ from models import load_user
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
 
+# Env-driven so the generated app can run in any environment:
+#   CHIRP_ENV=production   selects the production security contract track and
+#                          makes session cookies Secure (secure="auto").
+#   CHIRP_DEBUG=1          enables dev tooling (defaults on outside production).
+_env = os.environ.get("CHIRP_ENV", "development")
+_debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not in (
+    "0",
+    "false",
+    "False",
+    "",
+)
+
 config = AppConfig(
     secret_key=_secret,
     template_dir="pages",
-    debug=True,
+    env=_env,
+    debug=_debug,
 )
 app = App(config=config)
 
@@ -32,7 +45,8 @@ app.add_middleware(
     SessionMiddleware(
         SessionConfig(
             secret_key=config.secret_key,
-            secure=not config.debug,
+            # secure defaults to "auto": Secure cookies in production/staging
+            # (resolved from AppConfig.env at freeze), off in local dev.
             httponly=True,
             samesite="lax",
         )
@@ -81,6 +95,18 @@ from models import load_user
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
 
+# Env-driven so the generated app can run in any environment:
+#   CHIRP_ENV=production   selects the production security contract track and
+#                          makes session cookies Secure (secure="auto").
+#   CHIRP_DEBUG=1          enables dev tooling (defaults on outside production).
+_env = os.environ.get("CHIRP_ENV", "development")
+_debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not in (
+    "0",
+    "false",
+    "False",
+    "",
+)
+
 # chirp-ui components use inline Alpine expressions (x-data factory calls,
 # inline @click/x-show/:class), which the @alpinejs/csp build forbids. So we
 # run the normal Alpine build under a per-request nonce CSP instead:
@@ -89,7 +115,8 @@ _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
 config = AppConfig(
     secret_key=_secret,
     template_dir="pages",
-    debug=True,
+    env=_env,
+    debug=_debug,
     islands=True,
     csp_nonce_enabled=True,
 )
@@ -106,7 +133,8 @@ app.add_middleware(
     SessionMiddleware(
         SessionConfig(
             secret_key=config.secret_key,
-            secure=not config.debug,
+            # secure defaults to "auto": Secure cookies in production/staging
+            # (resolved from AppConfig.env at freeze), off in local dev.
             httponly=True,
             samesite="lax",
         )

@@ -396,6 +396,8 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         islands_contract_strict=app.config.islands_contract_strict,
         oob_registry=getattr(app._runtime_state, "oob_registry", None),
         sections=getattr(app._mutable_state, "sections", {}),
+        permission_registry=frozenset(getattr(app._mutable_state, "permission_registry", set())),
+        policy_registry=frozenset(getattr(app._mutable_state, "policy_registry", {})),
         route_metas=getattr(app._mutable_state, "route_metas", {}),
         route_templates=getattr(app._mutable_state, "route_templates", {}),
         discovered_routes=getattr(app._mutable_state, "discovered_routes", []),
@@ -951,6 +953,60 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             posture_config,
             middleware_list,
             getattr(snapshot, "discovered_routes", []),
+        )
+    )
+
+    # Cookie hardening (Wave 2): a present SessionMiddleware must emit a Secure
+    # session cookie under production posture (env-aware: ERROR prod / WARNING
+    # staging / silent dev), plus an env-independent ERROR for the
+    # samesite='none'+insecure browser-drop footgun. HSTS is a production-posture
+    # WARNING nudge (never auto-emitted). Both take posture_config so --deploy
+    # escalates via the production-posture view, and share resolve_cookie_secure
+    # with the runtime as one source of truth.
+    from chirp.contracts.rules_cookie_secure import check_cookie_secure, check_hsts
+
+    result.issues.extend(check_cookie_secure(posture_config, middleware_list))
+    result.issues.extend(
+        check_hsts(
+            router,
+            posture_config,
+            middleware_list,
+            getattr(snapshot, "discovered_routes", []),
+        )
+    )
+
+    # Auth wiring: a route that DECLARES auth (static RouteMeta.auth non-open, or
+    # an @login_required/@requires marker on its handler) needs AuthMiddleware in
+    # the stack — without it the auth gate's get_user() raises LookupError -> 500
+    # at request time. The auth_spec rule catches the silent-403 permission-typo
+    # class in static RouteMeta.auth (a near-miss of none/optional/required is
+    # treated as a required PERMISSION). Both take posture_config so --deploy
+    # escalates via the production-posture view, reuse class-name detection, and
+    # skip dynamic meta() pages (a static blind spot — auth_middleware emits a
+    # single INFO note for them rather than a false ERROR). See rules_auth_meta.
+    from chirp.contracts.rules_auth_meta import check_auth_middleware, check_auth_spec
+
+    _auth_meta_provider_paths = {
+        r.url_path
+        for r in getattr(snapshot, "discovered_routes", [])
+        if getattr(r, "meta_provider", None) is not None
+    }
+    result.issues.extend(
+        check_auth_middleware(
+            router,
+            posture_config,
+            middleware_list,
+            getattr(snapshot, "route_metas", {}),
+            _auth_meta_provider_paths,
+        )
+    )
+    result.issues.extend(
+        check_auth_spec(
+            posture_config,
+            getattr(snapshot, "route_metas", {}),
+            _auth_meta_provider_paths,
+            getattr(snapshot, "permission_registry", frozenset()),
+            getattr(snapshot, "policy_registry", frozenset()),
         )
     )
 

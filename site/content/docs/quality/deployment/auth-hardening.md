@@ -91,8 +91,8 @@ Each row maps a hardening area to the field you set in the stack above.
   - What to set
   - Symbol / value
 * - Session cookies
-  - Sign cookies, mark them secure and HTTP-only, and bound their lifetime
-  - `SessionConfig(secure=True, httponly=True, samesite="lax", idle_timeout_seconds=..., absolute_timeout_seconds=...)`
+  - Sign cookies (HMAC-SHA-256 by default), mark them secure and HTTP-only, and bound their lifetime. `secure` defaults to `"auto"` (Secure in production/staging via `AppConfig.env`, off in local dev); the explicit `secure=True` below is belt-and-suspenders.
+  - `SessionConfig(secure=True, httponly=True, samesite="lax", signer_digest="sha256", idle_timeout_seconds=..., absolute_timeout_seconds=...)`
 * - Session invalidation
   - Invalidate stale sessions after a password change or account event
   - `AuthConfig(session_version=...)`

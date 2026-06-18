@@ -478,9 +478,9 @@ def _load_meta(meta_file: Path, root: Path) -> tuple[RouteMeta | None, Any]:
 
     if static_meta is not None:
         if isinstance(static_meta, RouteMeta):
-            return (static_meta, None)
+            return (normalize_route_meta(static_meta), None)
         if isinstance(static_meta, dict):
-            return (_dict_to_route_meta(static_meta), None)
+            return (dict_to_route_meta(static_meta), None)
         msg = f"_meta.py META must be RouteMeta or dict, got {type(static_meta).__name__}"
         raise ValueError(msg)
 
@@ -491,17 +491,85 @@ def _load_meta(meta_file: Path, root: Path) -> tuple[RouteMeta | None, Any]:
     raise ValueError(msg)
 
 
-def _dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
-    """Convert dict to RouteMeta, filling only provided keys."""
+# The single shared site that parses ``RouteMeta``-shaped data from BOTH static
+# ``META`` dicts (here) and dynamic ``meta()`` dict results
+# (``chirp.pages.shell_context``). Keeping one implementation closes the security
+# gap where a dynamic ``meta()`` returning structured ``auth`` (a dict or
+# ``AuthSpec``) was silently dropped because only the static path normalized it.
+def dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
+    """Convert a meta dict to a normalized ``RouteMeta``, filling provided keys.
+
+    ``auth`` accepts a plain ``str`` (back-compatible), a structured
+    :class:`~chirp.pages.types.AuthSpec`, or a ``dict`` that constructs an
+    ``AuthSpec`` (e.g. ``{"permissions": ["a", "b"], "mode": "any"}``). The
+    result is canonicalized so the request-time gate is allocation-free.
+    """
     return RouteMeta(
         title=d.get("title"),
         section=d.get("section"),
         breadcrumb_label=d.get("breadcrumb_label"),
         shell_mode=d.get("shell_mode"),
-        auth=d.get("auth"),
+        auth=_coerce_auth(d.get("auth")),
         cache=d.get("cache"),
         tags=tuple(d.get("tags", ())) if isinstance(d.get("tags"), (list, tuple)) else (),
     )
+
+
+def _coerce_auth(value: Any) -> Any:
+    """Coerce a raw ``auth`` value to the canonical ``AuthSpec | None`` shape.
+
+    - ``dict`` -> ``AuthSpec`` built from ``permissions``/``mode``/``policy``
+      (a dict auth is always a *declared* gate; an ``AuthSpec`` always requires
+      authentication, so there is no ``required`` key).
+    - ``str`` / ``AuthSpec`` / ``None`` -> normalized via the shared core so the
+      runtime meaning of every legacy string is preserved exactly.
+
+    A ``dict`` ``mode`` other than ``"all"`` / ``"any"`` raises ``ValueError`` at
+    coercion time (discovery for static ``META``, request time for dynamic
+    ``meta()``) — fail loud rather than silently degrading an invalid mode.
+    """
+    from chirp.pages.types import AuthSpec
+    from chirp.security.auth_core import normalize_auth_spec
+
+    if isinstance(value, dict):
+        permissions = value.get("permissions", ())
+        if isinstance(permissions, (list, tuple)):
+            permissions = tuple(str(p) for p in permissions)
+        else:
+            permissions = (str(permissions),)
+        mode = value.get("mode", "all")
+        if mode not in ("all", "any"):
+            msg = (
+                f"Invalid auth mode {mode!r}: must be 'all' or 'any'. "
+                "Fix the _meta.py auth declaration."
+            )
+            raise ValueError(msg)
+        return AuthSpec(
+            permissions=permissions,
+            mode=mode,
+            policy=value.get("policy"),
+        )
+    return normalize_auth_spec(value)
+
+
+def normalize_route_meta(meta: RouteMeta | None) -> RouteMeta | None:
+    """Return *meta* with ``auth`` canonicalized to ``AuthSpec | None``.
+
+    Applied at discovery time (static ``META``) and at request time for dynamic
+    ``meta()`` results, so the request-time gate
+    (:func:`chirp.pages.auth_gate.enforce_route_meta_auth`) never re-allocates a
+    spec and reserved-token confusion (``"Required"`` / ``" required "`` / ``""``)
+    surfaces as a startup ``auth_spec`` issue rather than a silent 403. Returns
+    *meta* unchanged when ``auth`` is already canonical (allocation-free).
+    """
+    if meta is None:
+        return None
+    coerced = _coerce_auth(meta.auth)
+    if coerced is meta.auth:
+        return meta
+    import dataclasses
+
+    return dataclasses.replace(meta, auth=coerced)
 
 
 def _load_context_provider(context_file: Path, root: Path, depth: int) -> ContextProvider | None:

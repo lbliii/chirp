@@ -529,7 +529,9 @@ def notif_announce(feed) -> int:
 # CSRF — adjacency is not required, so Auth in the middle is fine). Lucky Cat is
 # public-browse / gated-trading: AuthMiddleware authenticates every request
 # (anonymous when there is no session), and the gated routes/pages enforce
-# @login_required. secure cookies off in debug so local http works.
+# @login_required. secure cookies use the "auto" default: Secure in
+# production/staging (resolved from AppConfig.env, wired via from_env above),
+# off in local dev so plain http works.
 # ---------------------------------------------------------------------------
 
 
@@ -587,7 +589,8 @@ app.add_middleware(
         SessionConfig(
             secret_key=config.secret_key,
             cookie_name="chirp_session_lucky_cat",
-            secure=not config.debug,
+            # secure defaults to "auto" — Secure in production/staging via
+            # AppConfig.env, off in local dev.
             httponly=True,
             samesite="lax",
         )

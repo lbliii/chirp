@@ -16,6 +16,7 @@ from chirp.http.query import QueryParams
 
 if TYPE_CHECKING:
     from chirp.http.forms import FormData
+    from chirp.middleware.auth import User
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +277,18 @@ class Request:
     Body is accessed asynchronously via ``.body()``, ``.json()``, ``.form()``.
 
     Query params and cookies are parsed lazily on first access (not at creation).
+
+    Request-scoped auth and session accessors are deliberately asymmetric,
+    mirroring their underlying primitives:
+
+    - ``request.user`` **never raises** — returns ``AnonymousUser`` when
+      ``AuthMiddleware`` is absent or the request is anonymous (mirrors
+      ``chirp.middleware.auth.current_user``).
+    - ``request.session`` **raises ``LookupError``** when ``SessionMiddleware``
+      is absent (mirrors ``chirp.middleware.sessions.get_session``). It does not
+      return ``None``, so ``request.session.get("x")`` is the ergonomic, and a
+      missing-middleware misconfiguration fails loud rather than silently
+      reading from a non-existent session.
     """
 
     method: str
@@ -325,6 +338,39 @@ class Request:
         if "_htmx" not in self._cache:
             self._cache["_htmx"] = HtmxDetails(self.headers, self.server)
         return self._cache["_htmx"]
+
+    @property
+    def user(self) -> User:
+        """The current authenticated user, or ``AnonymousUser``.
+
+        Never raises: returns ``AnonymousUser`` when ``AuthMiddleware`` is
+        absent or the request is anonymous. Mirrors
+        ``chirp.middleware.auth.current_user``::
+
+            if request.user.is_authenticated:
+                greet(request.user.id)
+        """
+        # Lazy import: chirp.middleware.auth imports chirp.http.request, so a
+        # module-level import here would create a cycle.
+        from chirp.middleware.auth import current_user
+
+        return current_user()
+
+    @property
+    def session(self) -> dict[str, Any]:
+        """The request-scoped session dict.
+
+        Raises ``LookupError`` when ``SessionMiddleware`` is absent — this
+        fail-loud contract mirrors ``chirp.middleware.sessions.get_session``
+        (it never returns ``None``)::
+
+            request.session["cart"] = items
+            count = request.session.get("count", 0)
+        """
+        # Lazy import: avoid an import cycle (sessions imports request).
+        from chirp.middleware.sessions import get_session
+
+        return get_session()
 
     def with_url_scope(self, scope: RequestUrlScope | str | None) -> Request:
         """Return a copy of this request with a public URL scope attached."""

@@ -1,6 +1,7 @@
 """Tests for chirp.http.request — frozen Request with async body access."""
 
 import json
+from dataclasses import dataclass
 
 import pytest
 
@@ -476,3 +477,58 @@ class TestRequestFrozen:
 
         with pytest.raises(AttributeError):
             req.method = "POST"  # type: ignore[misc]
+
+
+class TestRequestUser:
+    """request.user mirrors current_user(): never raises, AnonymousUser default."""
+
+    def test_user_anonymous_without_auth_middleware(self) -> None:
+        from chirp.middleware.auth import AnonymousUser
+
+        req = Request.from_asgi(_make_scope(), _make_receive())
+        user = req.user
+
+        assert isinstance(user, AnonymousUser)
+        assert user.is_authenticated is False
+
+    def test_user_matches_current_user(self) -> None:
+        from chirp.middleware.auth import _user_var, current_user
+
+        @dataclass(frozen=True, slots=True)
+        class _FakeUser:
+            id: str = "42"
+            is_authenticated: bool = True
+
+        fake = _FakeUser()
+        token = _user_var.set(fake)
+        try:
+            req = Request.from_asgi(_make_scope(), _make_receive())
+            assert req.user is fake
+            assert req.user is current_user()
+        finally:
+            _user_var.reset(token)
+
+
+class TestRequestSession:
+    """request.session mirrors get_session(): fail-loud LookupError, same dict."""
+
+    def test_session_raises_without_session_middleware(self) -> None:
+        req = Request.from_asgi(_make_scope(), _make_receive())
+
+        with pytest.raises(LookupError, match="No active session"):
+            _ = req.session
+
+    def test_session_returns_get_session_dict(self) -> None:
+        from chirp.middleware.sessions import _session_var, get_session
+
+        active: dict[str, object] = {"cart": ["x"]}
+        token = _session_var.set(active)
+        try:
+            req = Request.from_asgi(_make_scope(), _make_receive())
+            assert req.session is active
+            assert req.session is get_session()
+            # Ergonomic .get() works directly on request.session
+            assert req.session.get("cart") == ["x"]
+            assert req.session.get("missing") is None
+        finally:
+            _session_var.reset(token)

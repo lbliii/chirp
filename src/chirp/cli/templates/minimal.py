@@ -40,7 +40,8 @@ app.add_middleware(
     SessionMiddleware(
         SessionConfig(
             secret_key=config.secret_key,
-            secure=not config.debug,
+            # secure defaults to "auto": Secure cookies in production/staging
+            # (resolved from AppConfig.env at freeze), off in local dev.
             httponly=True,
             samesite="lax",
         )

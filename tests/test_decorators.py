@@ -1,5 +1,6 @@
 """Tests for route protection decorators — @login_required and @requires."""
 
+import inspect
 from dataclasses import dataclass, replace
 
 from chirp import App
@@ -129,6 +130,50 @@ async def _tenant_scope(request, next_handler):  # type: ignore[no-untyped-def]
         local_path = request.path.removeprefix("/c/acme") or "/"
         request = replace(request, path=local_path).with_url_scope("/c/acme")
     return await next_handler(request)
+
+
+# ---------------------------------------------------------------------------
+# Static auth-gate marker (contract-check introspection)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthGateMarker:
+    """The decorators carry a static `_chirp_requires_auth` marker so a contract
+    check can prove a handler is auth-gated without executing it."""
+
+    def test_login_required_sets_marker(self) -> None:
+        async def handler():
+            return "ok"
+
+        wrapped = login_required(handler)
+        assert wrapped._chirp_requires_auth is True
+
+    def test_requires_sets_marker(self) -> None:
+        async def handler():
+            return "ok"
+
+        wrapped = requires("perm")(handler)
+        assert wrapped._chirp_requires_auth is True
+
+    def test_undecorated_handler_has_no_marker(self) -> None:
+        async def handler():
+            return "ok"
+
+        assert not hasattr(handler, "_chirp_requires_auth")
+
+    def test_marker_on_outermost_wrapper_with_unwrappable_inner(self) -> None:
+        """Marker sits on the outermost wrapper (what the router stores) while
+        @wraps copies __wrapped__ so inspect.unwrap still reaches the inner
+        handler — the way contract checks walk handlers."""
+
+        async def handler():
+            return "ok"
+
+        for wrapped in (login_required(handler), requires("perm")(handler)):
+            # Marker is discoverable on the stored wrapper itself.
+            assert getattr(wrapped, "_chirp_requires_auth", False) is True
+            # inspect.unwrap reaches the original inner handler.
+            assert inspect.unwrap(wrapped) is handler
 
 
 # ---------------------------------------------------------------------------

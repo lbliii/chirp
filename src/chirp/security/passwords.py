@@ -35,6 +35,17 @@ _SCRYPT_DKLEN = 64  # Derived key length
 _SALT_LENGTH = 16  # Salt length in bytes
 _SCRYPT_MAXMEM = 2 * 128 * _SCRYPT_N * _SCRYPT_R  # OpenSSL needs ~2x theoretical
 
+# Argon2id parameters — RFC 9106 §4 second recommended option (memory-constrained:
+# t=3, m=2^16 KiB = 64 MiB, p=4). These values intentionally equal argon2-cffi's
+# current ``PasswordHasher()`` defaults so existing argon2 hashes keep verifying and
+# are not flagged stale by ``check_needs_rehash``. They are stated explicitly (rather
+# than relying on library defaults) so the cost factors are auditable and pinned.
+_ARGON2_TIME_COST = 3  # iterations
+_ARGON2_MEMORY_COST = 65536  # KiB (64 MiB)
+_ARGON2_PARALLELISM = 4  # lanes / threads
+_ARGON2_HASH_LEN = 32  # output length in bytes
+_ARGON2_SALT_LEN = 16  # salt length in bytes
+
 
 def _has_argon2() -> bool:
     """Check if argon2-cffi is available."""
@@ -84,25 +95,28 @@ def _verify_scrypt(password: str, phc_hash: str) -> bool:
 
         salt = base64.b64decode(parts[3])
         expected_dk = base64.b64decode(parts[4])
+
+        # Fail-closed: hashlib.scrypt rejects malformed cost/length inputs
+        # (e.g. a zero-length dk segment → dklen=0) with ValueError. Derive
+        # inside the guard so a corrupt hash returns False rather than raising.
+        n = params.get("n", _SCRYPT_N)
+        r = params.get("r", _SCRYPT_R)
+        maxmem = 2 * 128 * n * r
+        dk = hashlib.scrypt(
+            password.encode("utf-8"),
+            salt=salt,
+            n=n,
+            r=r,
+            p=params.get("p", _SCRYPT_P),
+            maxmem=maxmem,
+            dklen=len(expected_dk),
+        )
     except Exception:
         logging.getLogger("chirp.security").debug(
             "Password hash parsing failed (malformed hash string)",
             exc_info=True,
         )
         return False
-
-    n = params.get("n", _SCRYPT_N)
-    r = params.get("r", _SCRYPT_R)
-    maxmem = 2 * 128 * n * r
-    dk = hashlib.scrypt(
-        password.encode("utf-8"),
-        salt=salt,
-        n=n,
-        r=r,
-        p=params.get("p", _SCRYPT_P),
-        maxmem=maxmem,
-        dklen=len(expected_dk),
-    )
 
     return hmac.compare_digest(dk, expected_dk)
 
@@ -112,23 +126,49 @@ def _verify_scrypt(password: str, phc_hash: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _hash_argon2(password: str) -> str:
-    """Hash password with argon2id via argon2-cffi."""
+def _argon2_hasher():
+    """Build a ``PasswordHasher`` with explicit, pinned argon2id cost params.
+
+    Cost factors follow RFC 9106 §4 (second recommended option) and are pinned
+    to argon2-cffi's current ``PasswordHasher()`` defaults so existing hashes
+    still verify. The same construction is used for hashing and verifying so the
+    two paths always agree.
+    """
     from argon2 import PasswordHasher
 
-    ph = PasswordHasher()
-    return ph.hash(password)
+    return PasswordHasher(
+        time_cost=_ARGON2_TIME_COST,
+        memory_cost=_ARGON2_MEMORY_COST,
+        parallelism=_ARGON2_PARALLELISM,
+        hash_len=_ARGON2_HASH_LEN,
+        salt_len=_ARGON2_SALT_LEN,
+    )
+
+
+def _hash_argon2(password: str) -> str:
+    """Hash password with argon2id via argon2-cffi."""
+    return _argon2_hasher().hash(password)
 
 
 def _verify_argon2(password: str, phc_hash: str) -> bool:
-    """Verify password against an argon2 hash."""
-    from argon2 import PasswordHasher
-    from argon2.exceptions import VerificationError
+    """Verify password against an argon2 hash.
 
-    ph = PasswordHasher()
+    Fails closed: any argon2-cffi failure — a wrong password
+    (``VerificationError``, an ``Argon2Error`` subclass) or a malformed/corrupt
+    hash string (``InvalidHashError``, which derives from ``ValueError`` — NOT
+    from ``Argon2Error``) — returns ``False`` instead of propagating. Both are
+    caught so any malformed-input failure fails closed, mirroring the scrypt
+    path which returns ``False`` for unparseable hashes.
+    """
+    from argon2.exceptions import Argon2Error, InvalidHashError
+
     try:
-        return ph.verify(phc_hash, password)
-    except VerificationError:
+        return _argon2_hasher().verify(phc_hash, password)
+    except Argon2Error, InvalidHashError:
+        logging.getLogger("chirp.security").debug(
+            "Password hash verification failed (wrong password or malformed hash)",
+            exc_info=True,
+        )
         return False
 
 

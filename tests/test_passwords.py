@@ -5,9 +5,17 @@ from unittest.mock import patch
 import pytest
 
 from chirp.security.passwords import (
+    _ARGON2_HASH_LEN,
+    _ARGON2_MEMORY_COST,
+    _ARGON2_PARALLELISM,
+    _ARGON2_SALT_LEN,
+    _ARGON2_TIME_COST,
     _SCRYPT_N,
     _SCRYPT_PREFIX,
+    _has_argon2,
+    _hash_argon2,
     _hash_scrypt,
+    _verify_argon2,
     _verify_scrypt,
     hash_password,
     verify_password,
@@ -49,6 +57,20 @@ class TestScryptHash:
     def test_verify_invalid_format_returns_false(self) -> None:
         assert _verify_scrypt("password", "not-a-hash") is False
         assert _verify_scrypt("password", "$bcrypt$something") is False
+
+    def test_verify_corrupt_hash_fails_closed(self) -> None:
+        """Fail-closed contract: a corrupt/truncated scrypt hash returns False,
+
+        never raises. This is the default-env mirror of the argon2 fail-closed
+        guard (argon2-cffi is optional and often absent), so the contract is
+        covered even when the auth extra is not installed.
+        """
+        # Truncated PHC string (missing dk segment).
+        assert _verify_scrypt("password", "$scrypt$n=65536,r=8,p=1$c2FsdA==") is False
+        # Non-base64 salt/dk segments.
+        assert _verify_scrypt("password", "$scrypt$n=65536,r=8,p=1$!!!$!!!") is False
+        # Garbage params.
+        assert _verify_scrypt("password", "$scrypt$n=abc,r=8,p=1$c2FsdA==$ZGs=") is False
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +151,82 @@ class TestArgon2:
         assert verify_password("cross-test", scrypt_hash) is True
         assert verify_password("wrong", argon2_hash) is False
         assert verify_password("wrong", scrypt_hash) is False
+
+
+# ---------------------------------------------------------------------------
+# Argon2 fail-closed + cost params (if available)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _has_argon2(), reason="argon2-cffi not installed")
+class TestArgon2FailClosed:
+    """Argon2 hardening — fail-closed verification and pinned cost params.
+
+    Guarded with skipif (not a fixture) so the base env, which has no
+    argon2-cffi, skips cleanly instead of erroring on import.
+    """
+
+    def test_verify_corrupt_hash_fails_closed(self) -> None:
+        """A corrupt/truncated argon2 hash returns False, never raises.
+
+        Two distinct argon2-cffi failure families must both fail closed:
+        ``VerificationError`` (an ``Argon2Error``) for inputs that parse but do
+        not match, and ``InvalidHashError`` (a ``ValueError`` — NOT an
+        ``Argon2Error``) for unparseable strings. Catching only ``Argon2Error``
+        would let the ``InvalidHashError`` inputs below raise a 500.
+        """
+        # VerificationError territory (parseable PHC, no match).
+        assert _verify_argon2("password", "$argon2id$v=19$m=65536,t=3,p=4$short") is False
+        assert _verify_argon2("password", "$argon2id$not-a-valid-hash") is False
+        assert _verify_argon2("password", "$argon2id$") is False
+        # InvalidHashError territory (unparseable) — these are the inputs that
+        # raise ValueError-derived InvalidHashError, the real fail-open gap.
+        assert _verify_argon2("password", "$argon2") is False
+        assert _verify_argon2("password", "$argon2$garbage") is False
+
+    def test_verify_password_routes_invalid_argon2_closed(self) -> None:
+        """The public verify_password() must not 500 on a malformed $argon2 hash.
+
+        verify_password routes anything starting with ``$argon2`` to the argon2
+        path; a bare/garbage ``$argon2*`` hash hits InvalidHashError. Proven
+        through the public API, which is the actual fail-open surface.
+        """
+        assert verify_password("password", "$argon2") is False
+        assert (
+            verify_password(
+                "password",
+                "$argon2xyz$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA",
+            )
+            is False
+        )
+
+    def test_fresh_hash_verifies_with_documented_params(self) -> None:
+        """A freshly created argon2 hash verifies and embeds the pinned costs."""
+        hashed = _hash_argon2("argon2-cost-params")
+
+        assert hashed.startswith("$argon2id$")
+        # Cost factors are embedded in the PHC string.
+        assert f"m={_ARGON2_MEMORY_COST}" in hashed
+        assert f"t={_ARGON2_TIME_COST}" in hashed
+        assert f"p={_ARGON2_PARALLELISM}" in hashed
+        # Round-trips through the same explicit construction.
+        assert _verify_argon2("argon2-cost-params", hashed) is True
+        assert _verify_argon2("wrong", hashed) is False
+
+    def test_pinned_params_equal_library_defaults(self) -> None:
+        """Pinned costs must equal argon2-cffi's PasswordHasher() defaults.
+
+        If they diverge, existing argon2 hashes would be flagged stale by
+        check_needs_rehash. This asserts the pin against the live library.
+        """
+        from argon2 import PasswordHasher
+
+        default = PasswordHasher()
+        assert default.time_cost == _ARGON2_TIME_COST
+        assert default.memory_cost == _ARGON2_MEMORY_COST
+        assert default.parallelism == _ARGON2_PARALLELISM
+        assert default.hash_len == _ARGON2_HASH_LEN
+        assert default.salt_len == _ARGON2_SALT_LEN
 
 
 # ---------------------------------------------------------------------------
