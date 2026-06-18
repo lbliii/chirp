@@ -66,7 +66,7 @@ shape may still evolve before 1.0:
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
-| Secure-by-default stack | `secure_stack` |
+| Secure-by-default stack | `secure_stack` (optional `auth=AuthConfig(...)` and `audit=AuditConfig(...)` legs) |
 | Optional UI bridge | `use_chirp_ui` |
 
 ## 1.0 Audit Decisions
@@ -143,6 +143,8 @@ from chirp.middleware import (
 | `AuthRateLimitConfig` | Config: `requests`, `window_seconds`, `block_seconds`, `methods`, `paths` (`()` = all routes), `key_header`, `key_fn` (`(Request) -> str \| None`; `None` skips the request), `error_template` / `error_block` (HTML 429 for htmx POSTs), `backend`. |
 | `RateLimitBackend` | Protocol for pluggable rate-limit storage (`check_and_update(...)`). Implement it for a custom shared backend. |
 | `redis_rate_limit_backend` | `(redis_url, key_prefix="chirp:ratelimit:") -> RateLimitBackend` — Redis sliding-window backend shared across workers (requires `chirp[redis]`). |
+| `AuditMiddleware` | Opt-in per-request who/what/when/status audit trail. Emits one `http.request` event per audited request through the existing `emit_security_event` sink (`status_code`/`source_ip`/`user_agent`/`user_id` in `details`). OFF by default; downgrades to metadata-only and never drains the body for `StreamingResponse`/`SSEResponse`/`FileResponse` (`Stream`/`Suspense`/`EventStream`). Source IP from `request.trusted_client_ip` (never a re-parsed `X-Forwarded-For`). |
+| `AuditConfig` | Config: `level` (`"none"` default OFF, `"metadata"`, `"request"`, `"request_response"`), `max_body_bytes` (default `4096`), `audited_methods` (default `MUTATING_METHODS`), `redact_keys` (default `("password", "token", "secret", "csrf_token")`, case-insensitive form-key masking), `redact_patterns` (regex masking). Frozen + slotted. |
 
 (The other built-in middleware — `SessionMiddleware`, `CSRFMiddleware`,
 `SecurityHeadersMiddleware`, `AuthMiddleware`, `CORSMiddleware`,

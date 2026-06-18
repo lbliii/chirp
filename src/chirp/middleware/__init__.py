@@ -4,6 +4,9 @@ A middleware is any callable matching:
     async def mw(request: Request, next: Next) -> Response
 
 Built-in middleware:
+    AuditMiddleware -- Opt-in per-request who/what/when/status audit trail over
+        the existing security-event sink (off by default; downgrades to
+        metadata-only for streaming/SSE responses).
     AuthMiddleware -- Dual-mode authentication (session + token)
     AuthRateLimitMiddleware -- Keyed rate limiting (auth endpoints by default;
         any route/group via key_fn + open paths). Pluggable storage via the
@@ -19,6 +22,7 @@ Built-in middleware:
 """
 
 from chirp.middleware.allowed_hosts import AllowedHostsMiddleware
+from chirp.middleware.audit import AuditConfig, AuditMiddleware
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.auth_rate_limit import (
     AuthRateLimitConfig,
@@ -39,6 +43,8 @@ from chirp.middleware.static import StaticFiles
 
 __all__ = [
     "AllowedHostsMiddleware",
+    "AuditConfig",
+    "AuditMiddleware",
     "AuthConfig",
     "AuthMiddleware",
     "AuthRateLimitConfig",

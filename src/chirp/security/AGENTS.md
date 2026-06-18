@@ -61,6 +61,23 @@ permissive helpers or misleading deployment advice.
   (unauthenticated, permission-denied, missing-protocol, and policy-denied with
   matching `policy` value); changing any key here requires updating that lock and
   the changelog.
+
+  **General HTTP request audit (`http.request`)** is a separate, single-producer
+  event emitted by the opt-in `AuditMiddleware`
+  (`src/chirp/middleware/audit.py`) — NOT part of the two-path auth-gate parity
+  lock above (there is only one producer, so there is nothing to keep
+  byte-identical *across paths*). It flows through the same
+  `emit_security_event` sink so audit + auth telemetry stay one pipeline. Its
+  payload (Option B — `SecurityEvent` shape unchanged, all new fields packed into
+  the free-form `details` dict; SIEM/`_log_sink` consumers see them as
+  `**event.details`):
+
+  | `name` | `details` keys |
+  | --- | --- |
+  | `http.request` | `status_code: int`, `source_ip: str`, `user_agent: str \| None`, plus (at `level="request"`+) `body: str \| None` and, on a streaming downgrade, `body_omitted: "streaming_response"` |
+
+  `source_ip` is always `request.trusted_client_ip`. Changing these `details`
+  keys requires updating `tests/test_security_audit.py` and the changelog.
 - **`RouteMeta.auth` is `str | AuthSpec | None` and stays serializable.**
   `AuthSpec.policy` is a string NAME resolved against the app policy registry
   (`app.register_policy(name, fn)`) via the `enforce_auth(policy_resolver=...)`
