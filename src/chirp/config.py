@@ -227,6 +227,15 @@ class AppConfig:
     islands_version: str = "1"
     islands_contract_strict: bool = False  # Validate mount metadata in app.check()
 
+    # Passkeys / WebAuthn — vendored inline JS bridge (window.chirp.passkeys).
+    # Opt-in injection mirroring ``islands``/``htmx`` above: when ``passkeys=True``
+    # Chirp injects a dependency-free base64url + navigator.credentials bridge
+    # before ``</body>`` (with a per-request CSP nonce), deduped on
+    # ``data-chirp="passkeys"``. The server verbs need ``chirp[passkeys]``; the
+    # bridge itself loads nothing external. See chirp.security.passkeys.
+    passkeys: bool = False
+    passkeys_version: str = "1"
+
     # Request body / upload limits. Two distinct concerns, two distinct knobs:
     #
     #   - max_request_body_size: the GENERAL envelope — a hard ceiling on the

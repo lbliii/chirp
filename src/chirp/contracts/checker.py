@@ -1042,6 +1042,17 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         )
     )
 
+    # Passkeys (Wave 5): when AppConfig(passkeys=True), require the webauthn dep
+    # (env-INDEPENDENT ERROR — passkeys are broken in every env without it) and
+    # nudge on the cookie-store challenge-bloat footgun (env-aware WARNING, silent
+    # dev). Built-in because it reads config + middleware_list, which the plugin
+    # ContractCheckSnapshot omits. The mutating-route Session/CSRF presence check
+    # is owned by security_stack; the rp_id-suffix-of-origin invariant by
+    # PasskeyConfig itself; HTTPS-in-prod by cookie_secure. See rules_passkeys.
+    from chirp.contracts.rules_passkeys import check_passkeys
+
+    result.issues.extend(check_passkeys(posture_config, middleware_list))
+
     # CSP-nonce: framework inline scripts are built through per-request snippet
     # factories (#195), so they carry the live nonce when a nonce mechanism is
     # active (CSPNonceMiddleware / csp_nonce_enabled). This rule ERRORs (env-aware)

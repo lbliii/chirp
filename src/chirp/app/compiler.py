@@ -182,6 +182,22 @@ def _collect_builtin_middleware(
                 full_page_only=True,
             )
         )
+    if config.passkeys:
+        from chirp.middleware.inject import HTMLInject
+        from chirp.server.passkeys import passkeys_snippet
+
+        # Plain HTMLInject (not StreamingHTMLInject): the bridge belongs on
+        # login/register pages, which render via Page/Template and never stream
+        # via Suspense — so the streaming-rewrite + dedup machinery htmx/alpine
+        # need (they boot inside Suspense dashboard shells) is unnecessary here.
+        # full_page_only=True keeps the bridge out of htmx fragment swaps.
+        passkeys_version = config.passkeys_version
+        middleware_list.append(
+            HTMLInject(
+                lambda nonce: passkeys_snippet(passkeys_version, nonce=nonce),
+                full_page_only=True,
+            )
+        )
     from chirp.server.view_transitions import normalize_view_transitions
 
     vt_mode = normalize_view_transitions(config.view_transitions)
