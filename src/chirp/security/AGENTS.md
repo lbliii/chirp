@@ -78,6 +78,25 @@ permissive helpers or misleading deployment advice.
 
   `source_ip` is always `request.trusted_client_ip`. Changing these `details`
   keys requires updating `tests/test_security_audit.py` and the changelog.
+
+  **Bearer-path token revocation (`auth.token.revoked` /
+  `auth.token.revocation_check_error`)** are single-producer events emitted by
+  `AuthMiddleware._authenticate_token` when an optional
+  `AuthConfig.token_revocation_store` is wired (token branch only, after
+  `verify_token` returns a user). Like `auth.token.invalid` and
+  `auth.session.version_mismatch` they have ONE producer, so they are NOT part
+  of the two-path auth-gate parity lock above. Revocation **fails open** on any
+  store/claims error (token treated as not revoked). Canonical payloads:
+
+  | `name` | `details` |
+  | --- | --- |
+  | `auth.token.revoked` (per-token) | `{"reason": "jti", "jti": <jti>}` |
+  | `auth.token.revoked` (per-user cutoff) | `{"reason": "user_cutoff", "iat": <iat>, "revoked_at": <cutoff>}` |
+  | `auth.token.revocation_check_error` | `{"error": <ExceptionClassName>}` |
+
+  Both carry `user_id=<user.id>`. Changing these keys requires updating
+  `tests/test_auth.py` (the `@pytest.mark.issue(373)` revocation tests) and the
+  changelog.
 - **`RouteMeta.auth` is `str | AuthSpec | None` and stays serializable.**
   `AuthSpec.policy` is a string NAME resolved against the app policy registry
   (`app.register_policy(name, fn)`) via the `enforce_auth(policy_resolver=...)`

@@ -108,6 +108,9 @@ Each row maps a hardening area to the field you set in the stack above.
 * - Session invalidation
   - Invalidate stale sessions after a password change or account event
   - `AuthConfig(session_version=...)`
+* - Bearer-token revocation
+  - Reject revoked bearer tokens (per-`jti` revoke + per-user `iat <= revoked_at` cutoff); the bearer-path analogue of `session_version`. Fails open on a store outage.
+  - `AuthConfig(token_revocation_store=..., token_claims=...)`
 * - CSRF
   - Validate unsafe requests; emit a token in every mutating form
   - `CSRFMiddleware()` + `{{ csrf_field() }}`

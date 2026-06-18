@@ -405,6 +405,8 @@ crafts a link like `/login?next=//evil.com`.
 | `session_version` | `None` | Optional callback `user -> version` for session invalidation |
 | `session_version_key` | `"_session_version"` | Session key used by `session_version` |
 | `exclude_paths` | `frozenset()` | Paths that skip auth entirely |
+| `token_revocation_store` | `None` | Optional `TokenRevocationStore` consulted after `verify_token` to reject revoked bearer tokens (per-`jti` + per-user `iat <= revoked_at` cutoff). Unset = no bearer revocation. Fails open on store error. |
+| `token_claims` | `None` | Optional `(token) -> {jti, sub, iat}` callback (sync or async) that surfaces an opaque token's claims for the revocation store. Without it the per-user cutoff axis is skipped. |
 
 **Password hashing** — argon2id (preferred) or scrypt (stdlib fallback):
 

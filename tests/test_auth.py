@@ -11,12 +11,14 @@ from chirp.middleware.auth import (
     AnonymousUser,
     AuthConfig,
     AuthMiddleware,
+    TokenRevocationStore,
     User,
     get_user,
     login,
     logout,
 )
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware, get_session
+from chirp.security.audit import SecurityEvent, set_security_event_sink
 from chirp.testing import TestClient
 from tests.helpers.auth import extract_session_cookie
 
@@ -755,3 +757,174 @@ class TestDictAuthCoercion:
 
         spec = _coerce_auth({"permissions": ["a"], "mode": mode})
         assert spec == AuthSpec(permissions=("a",), mode=mode)
+
+
+# ---------------------------------------------------------------------------
+# #373 — bearer-path token revocation store (jti + per-user cutoff)
+# ---------------------------------------------------------------------------
+
+
+class _FakeRevocationStore:
+    """In-memory revocation store satisfying the TokenRevocationStore Protocol.
+
+    The store owns its own concurrency per the Protocol contract; this fake is
+    test-only and single-threaded so a plain dict/set is fine.
+    """
+
+    def __init__(
+        self,
+        revoked_jtis: set[str] | None = None,
+        cutoffs: dict[str, int | float] | None = None,
+        raise_on_jti: bool = False,
+    ) -> None:
+        self._revoked_jtis = revoked_jtis or set()
+        self._cutoffs = cutoffs or {}
+        self._raise_on_jti = raise_on_jti
+
+    async def is_token_revoked(self, jti: str) -> bool:
+        if self._raise_on_jti:
+            raise RuntimeError("revocation backend down")
+        return jti in self._revoked_jtis
+
+    async def user_revoked_at(self, user_id: str) -> int | float | None:
+        return self._cutoffs.get(user_id)
+
+
+# Tokens whose claims encode {jti, sub/user_id, iat}. The app's verify_token
+# resolves the user; token_claims surfaces the opaque token's claims.
+_REVOC_TOKENS: dict[str, FakeUser] = {
+    "tok_alice_jti1": _USERS["1"],
+    "tok_bob_jti2": _USERS["2"],
+}
+
+_REVOC_CLAIMS: dict[str, dict[str, object]] = {
+    "tok_alice_jti1": {"jti": "jti1", "sub": "1", "iat": 1000},
+    "tok_bob_jti2": {"jti": "jti2", "sub": "2", "iat": 2000},
+}
+
+
+async def _revoc_verify_token(token: str) -> FakeUser | None:
+    return _REVOC_TOKENS.get(token)
+
+
+def _revoc_claims(token: str) -> dict[str, object]:
+    return _REVOC_CLAIMS.get(token, {})
+
+
+def _revoc_app(store: TokenRevocationStore, with_claims: bool = True) -> App:
+    app = App()
+    app.add_middleware(
+        AuthMiddleware(
+            AuthConfig(
+                verify_token=_revoc_verify_token,
+                token_revocation_store=store,
+                token_claims=_revoc_claims if with_claims else None,
+            )
+        )
+    )
+
+    @app.route("/whoami")
+    def whoami():
+        user = get_user()
+        return f"id={user.id},auth={user.is_authenticated}"
+
+    return app
+
+
+@pytest.fixture
+def events() -> list[SecurityEvent]:
+    captured: list[SecurityEvent] = []
+    set_security_event_sink(captured.append)
+    try:
+        yield captured
+    finally:
+        set_security_event_sink(None)
+
+
+@pytest.mark.issue(373)
+class TestTokenRevocationStore:
+    async def test_fake_store_satisfies_protocol(self) -> None:
+        store = _FakeRevocationStore()
+        assert isinstance(store, TokenRevocationStore)
+
+    async def test_revoked_jti_rejected(self, events: list[SecurityEvent]) -> None:
+        """Success criterion 1: a revoked jti is rejected on the bearer path."""
+        store = _FakeRevocationStore(revoked_jtis={"jti1"})
+        async with TestClient(_revoc_app(store)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            # Revoked -> anonymous (no session fallback, no auth.token.invalid).
+            assert r.text == "id=,auth=False"
+        revoked = [e for e in events if e.name == "auth.token.revoked"]
+        assert len(revoked) == 1
+        assert revoked[0].user_id == "1"
+        assert revoked[0].details == {"reason": "jti", "jti": "jti1"}
+        # A revoked (but valid) token must NOT also be flagged invalid.
+        assert not any(e.name == "auth.token.invalid" for e in events)
+
+    async def test_unrevoked_token_passes(self, events: list[SecurityEvent]) -> None:
+        """Success criterion 1 (negative): an unrevoked token is unaffected."""
+        store = _FakeRevocationStore(revoked_jtis={"jti_other"})
+        async with TestClient(_revoc_app(store)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            assert r.text == "id=1,auth=True"
+        assert not any(e.name == "auth.token.revoked" for e in events)
+
+    async def test_per_user_cutoff_invalidates_pre_cutoff_tokens(
+        self, events: list[SecurityEvent]
+    ) -> None:
+        """Success criterion 2: per-user cutoff invalidates all of a user's
+        bearer tokens issued before revoked_at (iat <= revoked_at)."""
+        # alice's token iat=1000; cutoff at 1500 -> revoked.
+        store = _FakeRevocationStore(cutoffs={"1": 1500})
+        async with TestClient(_revoc_app(store)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            assert r.text == "id=,auth=False"
+        revoked = [e for e in events if e.name == "auth.token.revoked"]
+        assert len(revoked) == 1
+        assert revoked[0].user_id == "1"
+        assert revoked[0].details == {"reason": "user_cutoff", "iat": 1000, "revoked_at": 1500}
+
+    async def test_cutoff_does_not_affect_post_cutoff_tokens(self) -> None:
+        """A token issued after the cutoff (iat > revoked_at) stays valid."""
+        # bob's token iat=2000; cutoff at 1500 -> still valid.
+        store = _FakeRevocationStore(cutoffs={"2": 1500})
+        async with TestClient(_revoc_app(store)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_bob_jti2"})
+            assert r.text == "id=2,auth=True"
+
+    async def test_store_unset_is_no_op(self) -> None:
+        """Success criterion 3: with no store the bearer path is byte-identical
+        to today's behavior (token authenticates normally)."""
+        app = App()
+        app.add_middleware(AuthMiddleware(AuthConfig(verify_token=_revoc_verify_token)))
+
+        @app.route("/whoami")
+        def whoami():
+            user = get_user()
+            return f"id={user.id},auth={user.is_authenticated}"
+
+        async with TestClient(app) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            assert r.text == "id=1,auth=True"
+
+    async def test_store_error_fails_open(self, events: list[SecurityEvent]) -> None:
+        """Locked decision: a store error FAILS OPEN (token treated as not
+        revoked) and emits auth.token.revocation_check_error."""
+        store = _FakeRevocationStore(revoked_jtis={"jti1"}, raise_on_jti=True)
+        async with TestClient(_revoc_app(store)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            # Fail-open: the user still authenticates despite the backend error.
+            assert r.text == "id=1,auth=True"
+        errors = [e for e in events if e.name == "auth.token.revocation_check_error"]
+        assert len(errors) == 1
+        assert errors[0].user_id == "1"
+        assert errors[0].details == {"error": "RuntimeError"}
+        assert not any(e.name == "auth.token.revoked" for e in events)
+
+    async def test_cutoff_skipped_without_claims(self) -> None:
+        """Without token_claims the per-user cutoff axis is skipped (no jti/iat
+        to evaluate), so the token authenticates normally even with a cutoff."""
+        store = _FakeRevocationStore(revoked_jtis={"jti1"}, cutoffs={"1": 1500})
+        async with TestClient(_revoc_app(store, with_claims=False)) as client:
+            r = await client.get("/whoami", headers={"Authorization": "Bearer tok_alice_jti1"})
+            assert r.text == "id=1,auth=True"
