@@ -53,7 +53,6 @@ from chirp import (
     App,
     AppConfig,
     AuthConfig,
-    AuthMiddleware,
     FormAction,
     Request,
     Template,
@@ -64,7 +63,6 @@ from chirp import (
     logout,
     secure_stack,
 )
-from chirp.middleware.sessions import SessionMiddleware
 from chirp.security import hash_password, verify_login
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -102,9 +100,9 @@ auto-detected by `verify_password` later, so a hash survives an algorithm change
 
 `secure_stack(app.config)` returns the canonical
 `[SessionMiddleware, CSRFMiddleware, SecurityHeadersMiddleware]` list — already
-in contract-passing order. `AuthMiddleware` belongs right after sessions (it
-reads the session) and before CSRF, so we add the session leg, then auth, then
-the rest.
+in contract-passing order. Pass `auth=AuthConfig(...)` and `AuthMiddleware` is
+placed for you — right after sessions (it reads the session) and before CSRF —
+so the whole stack is one loop.
 
 ```python
 config = AppConfig(
@@ -113,16 +111,10 @@ config = AppConfig(
 )
 app = App(config=config)
 
-# secure_stack returns [SessionMiddleware, CSRFMiddleware, SecurityHeadersMiddleware]
-# in contract-passing order. AuthMiddleware belongs right after sessions (it reads
-# the session) and before CSRF, so we add the session leg, then auth, then the rest.
-stack = secure_stack(app.config)
-session_mw = next(mw for mw in stack if isinstance(mw, SessionMiddleware))
-app.add_middleware(session_mw)
-app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
-for mw in stack:
-    if mw is not session_mw:
-        app.add_middleware(mw)
+# secure_stack wires the whole stack in the correct order:
+# SessionMiddleware -> AuthMiddleware -> CSRFMiddleware -> SecurityHeadersMiddleware.
+for mw in secure_stack(app.config, auth=AuthConfig(load_user=load_user)):
+    app.add_middleware(mw)
 ```
 
 :::{tip} Why this is safe

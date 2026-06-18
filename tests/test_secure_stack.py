@@ -223,3 +223,44 @@ def test_explicit_session_config_overrides_redis_url() -> None:
     stack = secure_stack(cfg, session=custom, redis_url="redis://localhost:6379/0")
     # Default cookie store — NOT Redis.
     assert not isinstance(stack[0]._store, RedisSessionStore)
+
+
+# ---------------------------------------------------------------------------
+# Optional auth leg
+# ---------------------------------------------------------------------------
+
+
+async def _load_user(user_id: str) -> None:
+    return None
+
+
+def test_no_auth_middleware_by_default() -> None:
+    """Omitting auth keeps the original three-leg stack (back-compat)."""
+    cfg = AppConfig(secret_key="x" * 32)
+    names = [type(mw).__name__ for mw in secure_stack(cfg)]
+    assert "AuthMiddleware" not in names
+
+
+def test_auth_config_inserts_auth_after_session_before_csrf() -> None:
+    """auth=AuthConfig(...) adds AuthMiddleware between Session and CSRF, so the
+    whole stack is one loop and a CSRF rejection's audit event has the user."""
+    from chirp.middleware.auth import AuthConfig
+
+    cfg = AppConfig(secret_key="x" * 32)
+    stack = secure_stack(cfg, auth=AuthConfig(load_user=_load_user))
+    assert [type(mw).__name__ for mw in stack] == [
+        "SessionMiddleware",
+        "AuthMiddleware",
+        "CSRFMiddleware",
+        "SecurityHeadersMiddleware",
+    ]
+
+
+def test_auth_stack_passes_contracts() -> None:
+    """The four-leg auth stack still passes security_stack + csrf_session order."""
+    from chirp.middleware.auth import AuthConfig
+
+    cfg = AppConfig(env="production", secret_key="x" * 32)
+    stack = secure_stack(cfg, auth=AuthConfig(load_user=_load_user))
+    assert check_security_stack(_mutating_router(), cfg, stack) == []
+    assert check_csrf_session_order(stack) == []

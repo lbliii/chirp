@@ -10,6 +10,12 @@ line **without** anything being force-injected:
     for mw in secure_stack(app.config):
         app.add_middleware(mw)
 
+Pass ``auth=AuthConfig(...)`` to include ``AuthMiddleware`` in the right place
+(after sessions, before CSRF) so login auth is part of the same one-line wiring:
+
+    for mw in secure_stack(app.config, auth=AuthConfig(load_user=load_user)):
+        app.add_middleware(mw)
+
 This is deliberately explicit-over-magic: it is a pure list-returning function
 (the most inspectable/testable shape), not an auto-injecting hook. The app
 author still calls ``add_middleware`` for each piece, and can drop or reorder
@@ -27,6 +33,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersConfig, SecurityHeadersMiddleware
 from chirp.middleware.sessions import (
@@ -42,6 +49,7 @@ if TYPE_CHECKING:
 def secure_stack(
     config: AppConfig,
     *,
+    auth: AuthConfig | None = None,
     session: SessionConfig | None = None,
     csrf: CSRFConfig | None = None,
     headers: SecurityHeadersConfig | None = None,
@@ -52,10 +60,13 @@ def secure_stack(
     The returned list is ``[SessionMiddleware, CSRFMiddleware,
     SecurityHeadersMiddleware]`` — exactly the order the ``security_stack`` and
     ``csrf_session`` contracts require (Session before CSRF, since the CSRF token
-    lives in the session). Nothing is force-injected: the caller adds each
+    lives in the session). Pass ``auth`` to also include ``AuthMiddleware``,
+    placed after the session leg and before CSRF, giving
+    ``[SessionMiddleware, AuthMiddleware, CSRFMiddleware,
+    SecurityHeadersMiddleware]``. Nothing is force-injected: the caller adds each
     middleware itself, typically::
 
-        for mw in secure_stack(app.config):
+        for mw in secure_stack(app.config, auth=AuthConfig(load_user=load_user)):
             app.add_middleware(mw)
 
     Defaults are derived from *config*:
@@ -79,6 +90,10 @@ def secure_stack(
     Args:
         config: The app config. Supplies ``secret_key`` and (via freeze
             resolution) the ``env``-derived cookie ``Secure`` posture.
+        auth: Optional ``AuthConfig``. When provided, ``AuthMiddleware(auth)`` is
+            inserted after the session leg and before CSRF (so a CSRF rejection's
+            audit event already carries the resolved ``user_id``). When omitted,
+            no auth leg is added — wire ``AuthMiddleware`` yourself if needed.
         session: Optional explicit ``SessionConfig``. Overrides the derived
             default entirely (including ``redis_url``).
         csrf: Optional explicit ``CSRFConfig``. Defaults to ``CSRFConfig()``.
@@ -90,7 +105,9 @@ def secure_stack(
 
     Returns:
         ``[SessionMiddleware(...), CSRFMiddleware(...),
-        SecurityHeadersMiddleware(...)]`` in that order.
+        SecurityHeadersMiddleware(...)]`` in that order — or, when ``auth`` is
+        given, ``[SessionMiddleware(...), AuthMiddleware(...), CSRFMiddleware(...),
+        SecurityHeadersMiddleware(...)]``.
     """
     if session is None:
         # secure is deliberately left at SessionConfig's "auto" default so the
@@ -110,8 +127,13 @@ def secure_stack(
         else:
             session = SessionConfig(secret_key=config.secret_key)
 
-    return [
-        SessionMiddleware(session),
-        CSRFMiddleware(csrf or CSRFConfig()),
-        SecurityHeadersMiddleware(headers or SecurityHeadersConfig()),
-    ]
+    stack: list[Any] = [SessionMiddleware(session)]
+    if auth is not None:
+        # AuthMiddleware belongs after SessionMiddleware (it reads the session to
+        # rehydrate the user) and before CSRFMiddleware, so a CSRF rejection's
+        # audit event already carries the resolved user_id. Pass auth=AuthConfig(...)
+        # and the whole stack — including the auth leg — is one loop.
+        stack.append(AuthMiddleware(auth))
+    stack.append(CSRFMiddleware(csrf or CSRFConfig()))
+    stack.append(SecurityHeadersMiddleware(headers or SecurityHeadersConfig()))
+    return stack
