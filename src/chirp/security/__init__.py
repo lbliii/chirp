@@ -34,6 +34,17 @@ opportunistic hash upgrades::
     ok, new_hash = verify_and_upgrade(password, user.password_hash)
     if new_hash is not None:
         user.password_hash = new_hash
+
+Group -> permission rollup for the flat ``user.permissions`` gate::
+
+    from chirp.security import resolve_permissions
+
+    # Inside your own load_user — most-permissive-wins union over the user's
+    # groups, dotted-key flatten, result lands on user.permissions.
+    perms = resolve_permissions(
+        [group.permissions for group in record.groups],
+        base=frozenset(record.direct_permissions),
+    )
 """
 
 from chirp.security.audit import SecurityEvent, emit_security_event, set_security_event_sink
@@ -46,6 +57,7 @@ from chirp.security.passwords import (
     verify_login,
     verify_password,
 )
+from chirp.security.resolve_permissions import resolve_permissions
 
 __all__ = [
     "LockoutConfig",
@@ -56,6 +68,7 @@ __all__ = [
     "login_required",
     "needs_rehash",
     "requires",
+    "resolve_permissions",
     "set_security_event_sink",
     "verify_and_upgrade",
     "verify_login",

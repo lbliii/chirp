@@ -91,6 +91,7 @@ from chirp.security import (
     verify_login,
     verify_and_upgrade,
     needs_rehash,
+    resolve_permissions,
 )
 ```
 
@@ -101,6 +102,7 @@ from chirp.security import (
 | `verify_login` | `(password: str, phc_hash: str \| None) -> bool` | Login verification that resists user-enumeration timing: an unknown user (`phc_hash is None`) still runs a decoy verify. Pass `None` for "no such user". |
 | `verify_and_upgrade` | `(password: str, phc_hash: str) -> tuple[bool, str \| None]` | Verify and opportunistically return a fresh hash when the password is correct **and** the stored hash is below current cost. `(True, new_hash)` / `(True, None)` / `(False, None)`. Never rehashes a wrong guess. |
 | `needs_rehash` | `(phc_hash: str, *, upgrade_algorithm: bool = False) -> bool` | Report whether a stored hash is below current cost parameters. The algorithm-upgrade clause (scrypt stale because argon2 is now installed) is gated behind `upgrade_algorithm`, off by default. |
+| `resolve_permissions` | `(group_blobs: Iterable[Mapping[str, Any] \| Iterable[str]], *, base: frozenset[str] = frozenset()) -> frozenset[str]` | OR-merge (most-permissive-wins union) a user's group permission blobs into the flat `frozenset` the gate checks. Accepts both flat `Iterable[str]` blobs and nested truthy-leaf `Mapping` blobs (flattened to dotted keys, only truthy leaves). Call it in your own `load_user`; matching stays exact (no dotted-prefix coverage). |
 
 The route-protection helpers (`login_required`, `requires`) and lockout/audit
 helpers (`LoginLockout`, `LockoutConfig`, `set_security_event_sink`) are also
