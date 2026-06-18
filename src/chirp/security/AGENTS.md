@@ -25,6 +25,63 @@ permissive helpers or misleading deployment advice.
   empty production secrets.
 - **Audit events are explicit.** `src/chirp/security/audit.py` owns emitted
   security event shape and sink registration.
+- **One shared auth gate, one canonical audit payload.** Both the imperative
+  decorators (`@login_required` / `@requires`) and the declarative
+  `RouteMeta.auth` gate (`chirp.pages.auth_gate.enforce_route_meta_auth`)
+  delegate to `chirp.security.auth_core.enforce_auth`. Downstream SIEM keys off
+  these `emit_security_event` payloads, so the two paths MUST stay byte-identical
+  per outcome. Do not let them drift again. The canonical payloads are:
+
+  | Outcome | `name` | `details` |
+  | --- | --- | --- |
+  | unauthenticated | `auth.require.unauthenticated` | `{}` |
+  | permission denied | `authz.permission.denied` | `{"missing": sorted([...])}` |
+  | missing permissions protocol | `authz.permission.denied` | `{"reason": "missing_permissions_protocol", "missing": sorted([...])}` |
+  | named-policy denied (RESOLVED policy returned falsy) | `authz.policy.denied` | `{"policy": <name>}` |
+
+  `missing` is always a sorted `list[str]` (was a bare string on the declarative
+  path before unification). The permission-denied / missing-protocol events also
+  emit `_log.warning` via the `chirp.security` logger.
+
+  **No `unresolved_policy` event exists.** An unresolved/unregistered policy NAME
+  is a MISCONFIGURATION, not a denial: the shared core raises `LookupError` ->
+  500 and emits NOTHING. The only `authz.policy.denied` is a RESOLVED policy
+  callable returning falsy. (The `auth_spec` startup check is the real guard.)
+
+  **The `policy` payload value is the policy IDENTIFIER as referenced**, which
+  differs by registration style *by construction* — do not claim byte-identical
+  `policy` values across styles unconditionally:
+  - declarative `AuthSpec(policy="name")` -> the REGISTERED NAME (`"name"`);
+  - imperative `@requires(policy=fn)` -> the function `fn.__name__`.
+  When a policy is registered under a name EQUAL to its callable's `__name__`,
+  the two paths' `authz.policy.denied` payloads ARE byte-identical — that exact
+  case is the parity lock below.
+
+  Parity is locked by `tests/test_auth_parity.py::TestAuditEventParity`
+  (unauthenticated, permission-denied, missing-protocol, and policy-denied with
+  matching `policy` value); changing any key here requires updating that lock and
+  the changelog.
+- **`RouteMeta.auth` is `str | AuthSpec | None` and stays serializable.**
+  `AuthSpec.policy` is a string NAME resolved against the app policy registry
+  (`app.register_policy(name, fn)`) via the `enforce_auth(policy_resolver=...)`
+  seam — never a `Callable`. The declarative gate's resolver fails loud
+  (`LookupError` -> 500) on an unregistered name; that misconfiguration is also a
+  startup `auth_spec` ERROR. `normalize_auth_spec` preserves the exact runtime
+  meaning of every legacy string value (`none`/`optional`/`""`/`None` open,
+  `required` authn-only, any other string a single required permission).
+- **`auth` is canonicalized once, at discovery.** Static `META` (and dynamic
+  `meta()` results, including dict `auth`) are normalized to a canonical
+  `AuthSpec | None` through one shared `chirp.pages.discovery.dict_to_route_meta`
+  / `normalize_route_meta` helper, so the per-request gate is allocation-free and
+  dynamic `meta()` structured auth is enforced identically to static `META` (do
+  not let those two parse paths diverge again — a dropped dynamic auth value is a
+  silent security gap).
+- **Permission/policy registries are setup-only.**
+  `app.register_permission(name)` / `app.register_policy(name, fn)` mutate
+  `MutableAppState` and raise `RuntimeError` after freeze (mirror
+  `register_section`). They thread into `ContractCheckSnapshot` so the
+  registry-backed `auth_spec` check validates every declared permission/policy at
+  startup.
 - **Lockout state has lifecycle risk.** Shared lockout/rate-limit maps need
   cleanup or bounded-state reasoning.
 - **Helpers are primitives.** Do not turn this package into a full auth product.

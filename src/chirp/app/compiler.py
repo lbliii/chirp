@@ -346,6 +346,30 @@ def _reject_internal_route_collisions(
     )
 
 
+def _resolve_session_cookie_secure(middleware_list: list, env: str) -> None:
+    """Resolve ``SessionConfig.secure`` (``"auto"`` -> bool) at freeze, by env.
+
+    ``secure`` defaults to the string ``"auto"``, which means "Secure in
+    production/staging, off in local dev". The store reads ``cfg.secure`` and
+    passes it straight to ``with_cookie`` (typed ``bool``), so the string must
+    be resolved to a concrete bool before any request runs. Doing it at freeze
+    keeps resolution deterministic and statically checkable, and uses
+    ``config.env`` — the single posture signal — exactly like the secret_key
+    env gate and the security-stack severity matrix.
+
+    Detection is by class **name** (``type(mw).__name__``), mirroring the
+    contracts layer, so a SessionMiddleware is found without importing it here
+    purely for an isinstance check. The actual resolution is delegated to the
+    middleware's ``resolve_secure``, which also resolves the store's inner
+    config (the two-config pattern).
+    """
+    for mw in middleware_list:
+        if type(mw).__name__ == "SessionMiddleware":
+            resolve = getattr(mw, "resolve_secure", None)
+            if callable(resolve):
+                resolve(env)
+
+
 def _validate_middleware_ordering(middleware_list: list) -> None:
     """Check that middleware dependencies are satisfied.
 
@@ -467,6 +491,10 @@ class AppCompiler:
             oob_registry=self._mutable.oob_registry,
             debug_wiring=debug_wiring,
         )
+        # Resolve SessionConfig.secure="auto" -> concrete bool using config.env
+        # (production/staging -> Secure cookies, local dev -> off). Must run
+        # before publication so no request ever sees the "auto" sentinel.
+        _resolve_session_cookie_secure(middleware_list, self._config.env)
         self._runtime.middleware = tuple(middleware_list)
 
         for middleware in self._runtime.middleware:

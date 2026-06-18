@@ -538,6 +538,10 @@ class StreamingResponse:
     #: CSRF token + field name captured at construction for deferred rendering.
     csrf_token: str | None = None
     csrf_field_name: str | None = None
+    #: Shallow copy of ``g``'s store captured at construction, re-installed by
+    #: the sender while the chunk generator drains. ``None`` when ``g`` was
+    #: never touched in the handler.
+    g_snapshot: dict[str, Any] | None = None
 
     def with_status(self, status: int) -> StreamingResponse:
         """Return a new StreamingResponse with a different status code."""
@@ -618,6 +622,22 @@ class SSEResponse:
     #: inside a yielded ``Fragment`` would otherwise render with a dead nonce.
     #: ``None`` when CSP nonces are not enabled.
     csp_nonce: str | None = None
+    #: Request-scoped state captured at negotiation time (while middleware
+    #: ContextVars are live) so the SSE drain (``produce_events``) can
+    #: re-establish identical context for the life of the connection. The
+    #: handler ``finally`` resets these the instant it returns — before
+    #: ``handle_sse`` runs — so ``get_request()`` / ``get_user()`` /
+    #: ``get_csrf_token()`` / ``g`` inside the EventStream generator would
+    #: otherwise raise ``LookupError`` or return ``AnonymousUser``.
+    #:
+    #: SSE identity is **pinned at connect time**: these snapshots are fixed for
+    #: the connection's lifetime. A user logged out or permission-revoked
+    #: mid-stream keeps the connect-time identity until they reconnect.
+    request_context: Request | None = None
+    auth_user: Any | None = None
+    csrf_token: str | None = None
+    csrf_field_name: str | None = None
+    g_snapshot: dict[str, Any] | None = None
     _noop_warned: bool = False
 
     def _warn_noop(self, method: str) -> None:

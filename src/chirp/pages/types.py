@@ -32,18 +32,63 @@ class LayoutPreset:
     outlet_mode: OutletSwapMode | None = None
 
 
+type AuthMode = Literal["all", "any"]
+
+
+@dataclass(frozen=True, slots=True)
+class AuthSpec:
+    """Structured declarative auth requirement for ``RouteMeta.auth``.
+
+    This is the data-model parity layer for the imperative
+    ``@login_required`` / ``@requires`` decorators: a declarative page can now
+    express authn-only gating, a permission set with ``all``/``any`` matching,
+    and a named policy — without embedding a live callable in frozen route
+    metadata.
+
+    ``RouteMeta`` is **static serializable data**: ``policy`` is therefore a
+    string NAME resolved later against an app policy registry, never a
+    ``Callable``. Plain ``str`` ``auth`` values remain fully supported and are
+    normalized to an equivalent ``AuthSpec`` (see
+    :func:`chirp.security.auth_core.normalize_auth_spec`).
+
+    An ``AuthSpec`` **always requires an authenticated user** — the gate always
+    checks ``is_authenticated``. The only way to express an open/optional route
+    is ``RouteMeta.auth = None`` (or an open string token ``"none"`` /
+    ``"optional"`` / ``""``), NOT an ``AuthSpec``. There is therefore no
+    ``required`` flag: an authn-only gate is ``AuthSpec()`` (no permissions, no
+    policy).
+
+    Attributes:
+        permissions: Required permission names. Empty means authn-only.
+        mode: ``"all"`` requires every permission (subset check); ``"any"``
+            requires a non-empty intersection.
+        policy: Optional policy NAME resolved against the app policy registry
+            at request time. Never a callable — keeps ``RouteMeta``
+            serializable.
+    """
+
+    permissions: tuple[str, ...] = ()
+    mode: AuthMode = "all"
+    policy: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class RouteMeta:
     """Route metadata from ``_meta.py``.
 
     All fields optional. Static META or meta() callable provides values.
+
+    ``auth`` accepts a plain ``str`` (back-compatible: ``"none"``/``"optional"``
+    are open, ``"required"`` is authn-only, any other non-empty string is a
+    single required permission) or a structured :class:`AuthSpec` for permission
+    sets, ``all``/``any`` matching, and named policies.
     """
 
     title: str | None = None
     section: str | None = None
     breadcrumb_label: str | None = None
     shell_mode: str | None = None
-    auth: str | None = None
+    auth: str | AuthSpec | None = None
     cache: str | None = None
     tags: tuple[str, ...] = ()
 

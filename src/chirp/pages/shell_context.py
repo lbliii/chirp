@@ -8,6 +8,7 @@ import inspect
 from typing import Any
 
 from chirp.http.request import Request
+from chirp.pages.discovery import dict_to_route_meta, normalize_route_meta
 from chirp.pages.types import RouteMeta
 
 
@@ -35,23 +36,12 @@ async def resolve_meta(
     if inspect.isawaitable(result):
         result = await result
     if isinstance(result, RouteMeta):
-        return result
+        # Canonicalize ``auth`` so a dynamic meta() returning a structured spec
+        # is enforced identically to a static META (the closed security gap).
+        return normalize_route_meta(result)
     if isinstance(result, dict):
-        return _dict_to_route_meta(result)
+        return dict_to_route_meta(result)
     return None
-
-
-def _dict_to_route_meta(d: dict[str, Any]) -> RouteMeta:
-    """Convert a dict returned by a meta provider to RouteMeta."""
-    return RouteMeta(
-        title=d.get("title"),
-        section=d.get("section"),
-        breadcrumb_label=d.get("breadcrumb_label"),
-        shell_mode=d.get("shell_mode"),
-        auth=d.get("auth"),
-        cache=d.get("cache"),
-        tags=tuple(d.get("tags", ())) if isinstance(d.get("tags"), (list, tuple)) else (),
-    )
 
 
 def _call_meta_provider(

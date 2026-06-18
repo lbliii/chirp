@@ -117,6 +117,8 @@ app would fare in production without changing your config, use `chirp check
 | `sse_scope` | ERROR | Add an SSE scope boundary such as `hx-disinherit="hx-target hx-swap"` when streams live inside broad htmx targets. |
 | `sse_crossref` | ERROR / INFO | Align `sse-swap="event"` listeners with declared or inferred `SSEEvent(event=...)` and `Fragment(target=...)` channels. |
 | `sse_speculation` | WARNING | Add `referenced=True` to SSE routes so browser speculation does not open long-lived prefetch streams. |
+| `sse_auth_gate` | ERROR / WARNING | Register `AuthMiddleware` (after `SessionMiddleware`) when an `EventStream` generator reads the request user (`get_user()` / `current_user()`). Without it the connect-time-captured SSE user is `AnonymousUser` for the whole stream. Env-aware (silent dev / WARNING staging / ERROR prod). See the dropdown below. |
+| `sse_context` | WARNING | Semantic nudge only — the pattern WORKS. SSE user identity is **pinned at connect time**; a mid-stream logout / permission change is not reflected. Re-check authorization per event (or close the stream on revoke) for an auth-sensitive long-lived feed. Never ERROR. See the dropdown below. |
 | `reactive_block` | ERROR | Fix `DependencyIndex` `BlockRef` template or block names. |
 | `reactive_cycle` | WARNING | Remove cycles from `DependencyIndex.derive()` relationships. |
 | `reactive_paths` | WARNING | Register every declared emitted path in the dependency index or remove stale metadata. |
@@ -142,6 +144,11 @@ app would fare in production without changing your config, use `chirp check
 | `trusted_proxies` | WARNING | Configure explicit reverse-proxy peer IPs/hostnames instead of `trusted_proxies=("*",)` outside development. Details in the dropdown below. |
 | `csrf_session` | ERROR | Register `SessionMiddleware` before `CSRFMiddleware`. |
 | `security_stack` | ERROR / WARNING | Wire the secure-by-default stack on apps with mutating routes. See the `security_stack` canonical reference below. |
+| `auth_middleware` | ERROR / WARNING / INFO | Register `AuthMiddleware` (after `SessionMiddleware`) when any route declares auth via `RouteMeta.auth` or `@login_required`/`@requires`. Without it the auth gate's `get_user()` raises `LookupError` → 500. See the dropdown below. |
+| `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` (unknown permission/policy → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
+| `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
+| `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
+| `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
 | `csp_nonce` | ERROR / WARNING | Enable a per-request nonce mechanism (`AppConfig(csp_nonce_enabled=True)`) so framework inline scripts carry a nonce under an inline-forbidding CSP. See the dropdown below. |
 | `chirpui_csp` | ERROR / WARNING | **chirp-ui apps only.** Remove a conflicting static CSP so `use_chirp_ui`'s auto-wired nonce CSP can keep Alpine alive. See the dropdown below. |
 | `middleware_signature` | ERROR / WARNING | Make middleware callable as `async __call__(request, next)`. |
@@ -207,8 +214,10 @@ needs. The `style-src 'unsafe-inline'` relaxation is scoped to `style-src` only 
 ### `chirp check --deploy`: production-posture preflight
 
 The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
-`csp_nonce`, `chirpui_csp`, `deploy_debug`, `deploy_metrics`, `deploy_sentry`)
-pick their severity from `config.env`. In development most are silent or WARNING,
+`cookie_secure`, `hsts`, `password_extra`, `auth_middleware`, `auth_spec`,
+`sse_auth_gate`, `sse_context`, `csp_nonce`,
+`chirpui_csp`, `deploy_debug`,
+`deploy_metrics`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
 misconfigurations. `chirp check myapp:app --deploy` answers "would this pass in
 production?" without changing your config: it runs those rules against a
@@ -264,6 +273,227 @@ mutating routes emits no `security_stack` issue.
 `MUTATING_METHODS`); the forms (`csrf_form`) and auth contracts are the intended
 future consumers, rather than each re-deriving "what counts as a mutating route."
 ::::
+
+### `cookie_secure`: Secure session cookies
+
+A `Secure` cookie is only ever sent over HTTPS. A session cookie without `Secure`
+— whether it carries the session data (`CookieSessionStore`) or just the session
+id (`RedisSessionStore`) — can be sniffed over a plaintext path and replayed to
+hijack the session. The check is **store-agnostic**: both stores emit a
+`Set-Cookie`, so it fires on the effective `Secure` flag, never on the store type.
+
+It is a no-op when no `SessionMiddleware` is registered — `security_stack` already
+owns the presence check. When a `SessionMiddleware` is present, the check reads
+its effective `Secure` flag (`SessionMiddleware.secure`, resolved through the same
+`resolve_cookie_secure` the runtime uses, so the check and runtime never
+disagree). The blessed default `SessionConfig(secure="auto")` resolves to `Secure`
+in production/staging, so a default-config app passes.
+
+**Two severity tracks:**
+
+| Condition | development | staging | production |
+|---|---|---|---|
+| Session cookie not `Secure` (hardening gap) | silent | WARNING | ERROR |
+| `samesite="none"` **and** cookie not `Secure` | ERROR | ERROR | ERROR |
+
+The `samesite="none"` + not-`Secure` case is **env-independent ERROR** because
+browsers silently **drop** a `SameSite=None` cookie that is not `Secure` — the
+session simply breaks in *every* environment, including development. That is a
+correctness footgun, not a hardening preference, so it is reported regardless of
+`env`.
+
+**Fix:** keep `SessionConfig(secure="auto")` (the default) and serve over HTTPS in
+production/staging, or set `SessionConfig(secure=True)` explicitly. For the
+`SameSite=None` case, either add `Secure` or use `samesite="lax"`/`"strict"`.
+Severity is env-aware (silent dev / WARNING staging / ERROR prod) for the
+hardening track and escalates under `chirp check --deploy`.
+
+### `hsts`: HTTP Strict Transport Security nudge
+
+WARNING (never ERROR) when an app declares `env="production"`, has an auth/mutating
+surface (same `is_mutating_route` definition `security_stack` owns), and leaves
+`strict_transport_security` unset both on `AppConfig` and on any
+`SecurityHeadersMiddleware`. Without HSTS a first request over plain HTTP can be
+downgraded/MITM'd before the redirect to HTTPS.
+
+This is deliberately a **WARNING + docs nudge only** — Chirp does **not**
+auto-emit an HSTS header, and `strict_transport_security=None` is **not**
+overloaded to mean "auto"; `None` stays "off". An HSTS header is an irreversible
+multi-year browser pin: emitting it because `env` *says* production — while the
+app may actually be reached over plain HTTP behind a misconfigured proxy — is
+worse than the gap. So the contract surfaces the gap and leaves the
+irreversible decision to you.
+
+**Fix:** once you have confirmed the app is only ever reached over HTTPS, set
+`AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` (or
+add a `SecurityHeadersMiddleware` configured with it). Either source clears the
+warning. It is silent in development and staging — only the declared production
+posture is nudged — and surfaces under `chirp check --deploy`.
+
+### `password_extra`: argon2 in production
+
+WARNING (never ERROR) when an app has a login/mutating surface (the same
+`is_mutating_route` definition `security_stack` owns) **and** `argon2-cffi` is not
+importable — so password hashing falls back to stdlib scrypt. scrypt is a correct,
+always-available fallback (no hash is ever rejected and `verify_password`
+auto-detects the algorithm from the PHC prefix), but argon2id is the recommended
+algorithm for new production deployments.
+
+This is a posture **advisory**, never an ERROR: there is no correctness gap to
+fail loud on, and existing scrypt hashes upgrade to argon2 on the next successful
+login via `verify_and_upgrade()` once the extra is installed. Severity is
+env-aware — silent in development (and the scrypt-only base CI environment),
+WARNING in staging/production — so dev apps and shipped examples stay clean, and
+it escalates under `chirp check --deploy`. argon2 availability is read via the
+same `_has_argon2()` predicate the runtime uses to pick the hashing algorithm, so
+the check and the runtime never disagree.
+
+**Fix:** `pip install chirp[auth]` (pulls in `argon2-cffi`). New hashes then use
+argon2id; existing scrypt hashes re-derive to argon2 the next time each user logs
+in if you wire `verify_and_upgrade()` (see
+[[docs/quality/deployment/auth-hardening|Auth Hardening]]).
+
+### `auth_middleware`: auth-declaring routes need `AuthMiddleware`
+
+A route can declare that it needs authentication two ways, and **both** call
+`get_user()` — which raises `LookupError` → a **500 at request time** when
+`AuthMiddleware` is absent from the stack:
+
+- **`RouteMeta.auth`** on a filesystem page (`_meta.py`): `None` / `"none"` /
+  `"optional"` are open; `"required"` requires an authenticated user; any other
+  non-empty string is treated as a single required **permission**.
+- **`@login_required` / `@requires`** on an `@app.route` handler. These
+  decorators carry a static `_chirp_requires_auth` marker on the handler the
+  router stores, so the check can prove the route is auth-gated without executing
+  it.
+
+When **any** auth-declaring route exists and no `AuthMiddleware` is registered,
+this fires, naming a concrete offending route and the fix (register
+`AuthMiddleware` after `SessionMiddleware`).
+
+**Env-severity matrix.** Mirrors `security_stack` — the dev 500 surfaces the gap
+locally, so a standing dev WARNING would be noise:
+
+| Condition | development | staging | production |
+|---|---|---|---|
+| Auth-declaring route + no `AuthMiddleware` | silent | WARNING | ERROR |
+| Dynamic `meta()` page + no `AuthMiddleware` | INFO | INFO | INFO |
+
+**Dynamic `meta()` pages are a static blind spot.** A page whose `_meta.py`
+defines `meta()` resolves its auth value at runtime, so its requirement is
+invisible to a static check. Those pages are **never** false-ERRORed; instead,
+when `AuthMiddleware` is absent and such pages exist, a single **INFO** notes
+that auth wiring could not be statically verified — wire `AuthMiddleware` if any
+dynamic-meta page is gated. This mirrors how `route_contract`'s section-coverage
+check handles meta providers.
+
+**Fix:** register `AuthMiddleware` after `SessionMiddleware`
+(`app.add_middleware(AuthMiddleware(AuthConfig(load_user=...)))`). It is silent
+in development and escalates under `chirp check --deploy`.
+
+### `auth_spec`: declared permissions/policies that silently fail
+
+`RouteMeta.auth` treats any non-reserved string (and every `AuthSpec.permissions`
+entry) as a required **permission**, and an `AuthSpec.policy` as a **named policy**
+resolved against the app policy registry. A wrong permission silently `403`s; an
+unresolved policy name **fails loud** (`500` — a misconfiguration, not an auth
+denial) — both with no other startup signal. This check has two modes.
+
+**Registry-backed (precise).** When you declare permissions/policies during setup:
+
+```python
+app.register_permission("admin")
+app.register_permission("editor")
+app.register_policy("is_owner", lambda user, request: ...)
+```
+
+every `RouteMeta.auth` permission **not** in the permission registry is an ERROR,
+and every `AuthSpec.policy` **not** in the policy registry is an ERROR. The
+registry is the source of truth, so even a plausible-looking `"admni"` typo is
+caught.
+
+**Permissions and policies are checked asymmetrically.** Permission validation is
+**opt-in**: it only runs when a permission registry is declared (otherwise the
+heuristic below applies). Policy validation is **always on**: a referenced
+`AuthSpec.policy` name that is not registered is **always** an ERROR — even with
+no policy registered at all — because an unregistered policy name unconditionally
+`500`s at request time, so there is no false-positive risk.
+
+**Heuristic-only (no permission registry).** With no permission registry declared,
+permission validation falls back to a **high-signal** reserved-token-confusion
+heuristic. A near-miss of
+a reserved token — `"Required"`, `"REQUIRED"`, `" required "`, `"None"`,
+`"Optional"`, or a tight misspelling like `"requied"` — silently becomes a
+*permission named that exact string* and **403s forever** instead of gating as
+intended. Empty-after-strip / whitespace-only auth (`"   "`) is the same bug. It
+flags exactly:
+
+- a case/whitespace variant of a reserved token (`"Required"`, `" required "`,
+  `"None"`, `"Optional"`);
+- a tight misspelling of `"required"` (edit distance ≤ 2, e.g. `"requied"`); and
+- empty-after-strip / whitespace-only.
+
+Plausible permission names (`"admin"`, `"editor"`, `"billing.read"`) are **not**
+flagged in heuristic mode — without a registry Chirp cannot know which strings are
+real permissions, and false positives erode trust. Declare a permission registry
+to validate them precisely.
+
+**Severity** is env-aware (silent dev / WARNING staging / ERROR prod), same as
+`auth_middleware`, and escalates under `chirp check --deploy`. Dynamic `meta()`
+pages are skipped (their auth value is not statically known).
+
+**Fix:** declare the permission with `app.register_permission()` (or fix the typo),
+register the policy with `app.register_policy()`, or use the exact reserved token
+(`"required"` / `"none"` / `"optional"`).
+
+### `sse_auth_gate` / `sse_context`: reading the user inside an SSE generator
+
+`get_request()`, `get_user()` / `current_user()`, `get_csrf_token()`, and `g`
+work inside an `EventStream` generator — the request-scoped context is captured
+at connect time and re-established for the lifetime of the stream. Two checks
+guard the two ways this can surprise you.
+
+**`sse_auth_gate` — the user is `AnonymousUser` without `AuthMiddleware`.** An
+`EventStream` generator that calls `get_user()` / `current_user()` resolves the
+connect-time-captured user, but only when `AuthMiddleware` is wired. Without it,
+the captured user is `AnonymousUser` for the entire stream, so an auth-sensitive
+feed silently serves the anonymous view to everyone — no error, no startup
+signal. Env-aware, mirroring `auth_middleware`:
+
+| Condition | development | staging | production |
+|---|---|---|---|
+| SSE generator reads the user + no `AuthMiddleware` | silent | WARNING | ERROR |
+
+**`sse_context` — the SSE user identity is pinned at connect time.** This is a
+**post-fix semantic nudge, never an ERROR** — the pattern WORKS. When a generator
+reads the user inside a **long-lived loop** (`while` / `async for` / `for`), the
+identity is fixed for the connection's lifetime: a mid-stream logout or
+permission revoke is **not** reflected until the client reconnects. It fires as a
+`WARNING` in staging/production (silent in development) so you can decide whether
+the feed is auth-sensitive enough to re-check authorization per event (or close
+the stream on revoke). A short-lived top-level user read (outside any loop) is
+*not* nudged — it resolves once and the stream ends.
+
+::::{warning} Static-analysis scope: inline and module-level generators only
+Both rules resolve the generator passed to `EventStream(...)` in **two** scopes:
+
+1. an **inline** nested `async def generate()` defined inside the route handler
+   (the common case), and
+2. a **module-level** `async def gen()` passed as `EventStream(gen())`, resolved
+   by name through the handler's `__globals__`.
+
+A generator built by any **other indirection** — a factory function, a method,
+a value threaded through another call, or a comprehension — is **not** statically
+resolvable and is **silently skipped**. This is a deliberate false-NEGATIVE: the
+rules err toward silence so they never raise a false ERROR, but they are **not**
+complete coverage. If your SSE handler reads the user through an indirected
+generator, wire `AuthMiddleware` and re-check per-event authorization manually —
+neither check will catch the gap for you.
+::::
+
+These rules do not fire on the shipped `chat` / `kanban` / `dashboard` /
+`lucky_cat` SSE examples: their generators read **global** state (the message
+bus, the task store, the market feed), never the request user.
 
 ## Data
 

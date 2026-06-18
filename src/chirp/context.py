@@ -13,7 +13,7 @@ Thread safety:
     free-threading (3.14t). No locks needed.
 """
 
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import Any
 
 from chirp.http.request import Request
@@ -72,6 +72,41 @@ class _RequestGlobals:
         """Clear the store for the current context. Called by the handler after each request."""
         store: ContextVar[dict[str, Any] | None] = object.__getattribute__(self, "_store")
         store.set(None)
+
+    def snapshot(self) -> dict[str, Any] | None:
+        """Return a shallow copy of the current store, or ``None`` if unused.
+
+        Used to carry request-scoped ``g`` into deferred stream renders
+        (``Suspense``, ``Stream``, ``EventStream``) that run after the handler
+        ``finally`` has reset the store. Reads the **raw** ContextVar so the
+        zero-``g`` hot path allocates nothing: when no handler ever touched
+        ``g``, the store is ``None`` and this returns ``None`` (no dict copy).
+        """
+        store: ContextVar[dict[str, Any] | None] = object.__getattribute__(self, "_store")
+        d = store.get()
+        if d is None:
+            return None
+        return dict(d)
+
+    def _restore(self, snap: dict[str, Any] | None) -> Token[dict[str, Any] | None] | None:
+        """Install a snapshotted store for the current context.
+
+        Returns a reset token (pass to :meth:`_restore_reset`) or ``None`` when
+        there was nothing to restore. Gates on ``is not None`` (not truthiness)
+        so an **empty-dict** snapshot still installs a fresh writable store — a
+        deferred block can write to ``g`` without crashing.
+        """
+        if snap is None:
+            return None
+        store: ContextVar[dict[str, Any] | None] = object.__getattribute__(self, "_store")
+        return store.set(dict(snap))
+
+    def _restore_reset(self, token: Token[dict[str, Any] | None] | None) -> None:
+        """Reset a store installed by :meth:`_restore`. No-op when *token* is None."""
+        if token is None:
+            return
+        store: ContextVar[dict[str, Any] | None] = object.__getattribute__(self, "_store")
+        store.reset(token)
 
     def __getattr__(self, name: str) -> Any:
         d = self._get_dict()

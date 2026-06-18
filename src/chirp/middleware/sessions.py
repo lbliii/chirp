@@ -4,6 +4,11 @@ Session data is stored via a pluggable ``SessionStore``. Default is
 ``CookieSessionStore`` (signed cookie with itsdangerous). For
 horizontal scaling, use ``RedisSessionStore``.
 
+Cookies are signed with HMAC-SHA-256 by default (configurable via
+``SessionConfig.signer_digest``). A SHA-1 fallback signer keeps cookies
+issued by older releases (itsdangerous' historical default) readable, so
+upgrading does not log every existing user out.
+
 The session object is stored in a ContextVar, accessible via
 ``get_session()`` from any handler or middleware.
 
@@ -11,11 +16,16 @@ The session object is stored in a ContextVar, accessible via
 for RedisSessionStore (``pip install chirp[redis]``).
 """
 
+import hashlib
 import logging
+from collections.abc import Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from time import time
-from typing import TYPE_CHECKING, Any, Protocol
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol
+
+from itsdangerous import BadData
 
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
@@ -70,6 +80,34 @@ def get_session() -> dict[str, Any]:
     return session
 
 
+# Empty read-only session view returned by the template-safe ``session()``
+# global when no SessionMiddleware is active. A shared MappingProxyType keeps
+# templates from accidentally mutating a throwaway dict (writes would be lost),
+# and avoids allocating per render.
+_EMPTY_SESSION: Mapping[str, Any] = MappingProxyType({})
+
+
+def session() -> Mapping[str, Any]:
+    """Return the current session for templates — never raises.
+
+    Template-friendly counterpart to ``get_session()``. Returns the live
+    session dict when ``SessionMiddleware`` is active, or an empty read-only
+    mapping otherwise (mirroring ``current_user()``'s never-raise contract, so
+    a template rendered without a session does not blow up)::
+
+        {% if session().get("flash") %}
+            <div class="flash">{{ session()["flash"] }}</div>
+        {% endif %}
+
+    Use the imperative ``get_session()`` (which raises ``LookupError`` without
+    ``SessionMiddleware``) from handlers where the session is required.
+    """
+    active = _session_var.get()
+    if active is None:
+        return _EMPTY_SESSION
+    return active
+
+
 _regenerate_var: ContextVar[str | None] = ContextVar("chirp_regenerate_old_id", default=None)
 
 
@@ -113,14 +151,56 @@ class SessionConfig:
     max_age: int = 86400  # 24 hours
     path: str = "/"
     domain: str | None = None
-    secure: bool = False
+    secure: bool | Literal["auto"] = "auto"
     httponly: bool = True
     samesite: str = "lax"
+    signer_digest: Literal["sha256", "sha512"] = "sha256"
     idle_timeout_seconds: int | None = None
     absolute_timeout_seconds: int | None = None
     created_at_key: str = "__created_at"
     last_seen_at_key: str = "__last_seen_at"
     store: SessionStore | None = None  # None = CookieSessionStore (default)
+
+
+# Deployment environments that imply a secure (HTTPS) origin. ``"auto"``
+# resolves ``secure=True`` for these and ``False`` everywhere else. This mirrors
+# the secret_key env gate and the rules_security_stack severity matrix:
+# ``env`` is the single posture signal — NOT request scheme or ``ssl_certfile``
+# (which is set in local HTTPS dev and would otherwise silently log dev users
+# out when the cookie is sent over a non-secure mixed-content path).
+_SECURE_ENVS = frozenset({"production", "staging"})
+
+
+def resolve_cookie_secure(secure: bool | Literal["auto"], *, env: str) -> bool:
+    """Resolve a (possibly ``"auto"``) ``SessionConfig.secure`` to a concrete bool.
+
+    An explicit ``bool`` is returned unchanged — the app author opted in or out
+    deliberately. ``"auto"`` returns ``True`` iff ``env`` is a secure-origin
+    deployment environment (``"production"`` / ``"staging"``) and ``False``
+    otherwise (notably local development), so a default-config app over HTTPS in
+    production ships ``Secure`` session cookies without the author touching the
+    field.
+
+    ``env`` is the sole posture signal: this resolver deliberately does NOT key
+    off ``ssl_certfile`` or request scheme, because local HTTPS dev sets
+    ``ssl_certfile`` yet must keep ``secure=False`` to avoid logging dev users
+    out.
+    """
+    if secure is True or secure is False:
+        return secure
+    return env in _SECURE_ENVS
+
+
+def _secure_for_cookie(secure: bool | Literal["auto"]) -> bool:
+    """Narrow a (resolved) ``secure`` to ``bool`` for ``with_cookie``.
+
+    ``resolve_secure`` runs at freeze, so by request time ``secure`` is always a
+    concrete ``bool``. This guard makes that invariant statically true at the
+    ``with_cookie`` call site (which is typed ``bool``) and fails safe to
+    ``False`` — the non-secure / development posture — for the impossible case
+    where resolution did not run, rather than emitting a stringly ``"auto"``.
+    """
+    return secure if isinstance(secure, bool) else False
 
 
 # -- Store implementations --
@@ -129,7 +209,7 @@ class SessionConfig:
 class CookieSessionStore:
     """Signed cookie session store. Session data stored in cookie."""
 
-    __slots__ = ("_config", "_serializer")
+    __slots__ = ("_config", "_configured_secure", "_serializer")
 
     def __init__(self, config: SessionConfig) -> None:
         try:
@@ -146,8 +226,45 @@ class CookieSessionStore:
                 "AppConfig(secret_key=...) / CHIRP_SECRET_KEY before adding SessionMiddleware."
             )
             raise ConfigurationError(msg)
+        # Resolve the configured digest via an explicit allowlist — never a
+        # stringly ``getattr(hashlib, ...)`` lookup. Fail loud at construction.
+        digest_methods = {"sha256": hashlib.sha256, "sha512": hashlib.sha512}
+        digest = digest_methods.get(config.signer_digest)
+        if digest is None:
+            msg = (
+                f"SessionConfig.signer_digest must be one of "
+                f"{sorted(digest_methods)}, got {config.signer_digest!r}."
+            )
+            raise ConfigurationError(msg)
         self._config = config
-        self._serializer = URLSafeTimedSerializer(config.secret_key)
+        # Preserve the originally-configured secure value ("auto" | bool) before
+        # freeze resolution mutates _config. Contract checks re-resolve THIS
+        # against the posture env so --deploy evaluates the app as it would be in
+        # production, not the dev-resolved bool (which would burn the "auto"
+        # sentinel and false-ERROR a deploy-ready default).
+        self._configured_secure = config.secure
+        # Sign new cookies with the configured (SHA-256+) digest. Keep a SHA-1
+        # fallback signer so cookies issued by older releases (itsdangerous'
+        # historical default) still verify and load.
+        self._serializer = URLSafeTimedSerializer(
+            config.secret_key,
+            signer_kwargs={"digest_method": digest},
+            fallback_signers=[{"digest_method": hashlib.sha1}],
+        )
+
+    def resolve_secure(self, env: str) -> None:
+        """Resolve ``config.secure`` (``"auto"`` -> bool) for *env*, in place.
+
+        Called once at freeze. ``save()`` passes ``cfg.secure`` straight to
+        ``with_cookie`` (typed ``bool``), so the cached config must never hold
+        the string ``"auto"`` at request time. The serializer does not depend on
+        ``secure``, so no rebuild is needed — only the frozen config is swapped.
+        """
+        from dataclasses import replace
+
+        self._config = replace(
+            self._config, secure=resolve_cookie_secure(self._config.secure, env=env)
+        )
 
     async def load(self, request: Request) -> dict[str, Any]:
         cookie_value = request.cookies.get(self._config.cookie_name)
@@ -155,7 +272,11 @@ class CookieSessionStore:
             return {}
         try:
             data = self._serializer.loads(cookie_value, max_age=self._config.max_age)
-        except Exception:
+        except BadData:
+            # BadData covers tamper (BadSignature), expiry (SignatureExpired),
+            # and malformed tokens — a fresh empty session is the correct
+            # fail-safe. Any OTHER exception (a real bug or library break)
+            # must propagate rather than be silently swallowed.
             _log.debug(
                 "Failed to deserialize session cookie %r; starting fresh session",
                 self._config.cookie_name,
@@ -181,7 +302,7 @@ class CookieSessionStore:
             max_age=cfg.max_age,
             path=cfg.path,
             domain=cfg.domain,
-            secure=cfg.secure,
+            secure=_secure_for_cookie(cfg.secure),
             httponly=cfg.httponly,
             samesite=cfg.samesite,
         )
@@ -215,7 +336,7 @@ class CookieSessionStore:
 class RedisSessionStore:
     """Redis-backed session store. Cookie stores session ID only."""
 
-    __slots__ = ("_config", "_prefix", "_redis_url")
+    __slots__ = ("_config", "_configured_secure", "_prefix", "_redis_url")
 
     def __init__(
         self,
@@ -233,8 +354,23 @@ class RedisSessionStore:
             msg = "SessionConfig.secret_key must not be empty."
             raise ConfigurationError(msg)
         self._config = config
+        # Preserve the originally-configured secure value (see CookieSessionStore).
+        self._configured_secure = config.secure
         self._redis_url = redis_url
         self._prefix = key_prefix
+
+    def resolve_secure(self, env: str) -> None:
+        """Resolve ``config.secure`` (``"auto"`` -> bool) for *env*, in place.
+
+        Mirror of ``CookieSessionStore.resolve_secure``: ``save()`` passes
+        ``cfg.secure`` straight to ``with_cookie`` (typed ``bool``), so the
+        cached config must hold a concrete bool by request time.
+        """
+        from dataclasses import replace
+
+        self._config = replace(
+            self._config, secure=resolve_cookie_secure(self._config.secure, env=env)
+        )
 
     async def load(self, request: Request) -> dict[str, Any]:
         import json
@@ -304,7 +440,7 @@ class RedisSessionStore:
             max_age=cfg.max_age,
             path=cfg.path,
             domain=cfg.domain,
-            secure=cfg.secure,
+            secure=_secure_for_cookie(cfg.secure),
             httponly=cfg.httponly,
             samesite=cfg.samesite,
         )
@@ -361,11 +497,73 @@ class SessionMiddleware:
         )))
     """
 
-    __slots__ = ("_config", "_store")
+    __slots__ = ("_config", "_configured_secure", "_store")
+
+    # Template globals auto-registered by the AppCompiler when this middleware
+    # is present (it scans every registered middleware for ``.template_globals``;
+    # see ``src/chirp/app/compiler.py``). Mirrors ``AuthMiddleware.template_globals``.
+    template_globals: ClassVar[dict[str, Any]] = {
+        "session": session,
+    }
 
     def __init__(self, config: SessionConfig) -> None:
         self._config = config
+        self._configured_secure = config.secure
         self._store = config.store or CookieSessionStore(config)
+
+    @property
+    def configured_secure(self) -> bool | Literal["auto"]:
+        """The ``secure`` value as originally configured (``"auto"`` | bool).
+
+        Unlike :attr:`secure` (the freeze-resolved concrete bool), this is the
+        *unresolved* value, so a contract check can re-resolve it against a
+        posture env. That is what lets ``app.check(deploy=True)`` evaluate a
+        blessed-default ``secure="auto"`` app as it WOULD be in production
+        (resolves Secure → clean) instead of the dev-resolved ``False`` (a false
+        ERROR). Prefers the store's captured value (authoritative for the
+        two-config pattern); falls back to this middleware's own.
+        """
+        store_configured = getattr(self._store, "_configured_secure", None)
+        if store_configured is not None:
+            return store_configured
+        return self._configured_secure
+
+    @property
+    def secure(self) -> bool | Literal["auto"]:
+        """Effective ``secure`` value of the cookie this middleware emits.
+
+        Reads the **store's** config (the store owns the cookie attributes at
+        ``save`` time, which matters for the two-config pattern where a user
+        passes ``SessionConfig(store=RedisSessionStore(SessionConfig(...), ...))``
+        — the inner config is authoritative). Lets contract checks read the
+        effective value without reaching into private slots across store types.
+        After ``resolve_secure`` runs at freeze this is a concrete ``bool``;
+        before freeze it may still be ``"auto"``.
+        """
+        store_config = getattr(self._store, "_config", None)
+        if store_config is not None:
+            return store_config.secure
+        return self._config.secure
+
+    def resolve_secure(self, env: str) -> None:
+        """Resolve ``secure`` (``"auto"`` -> bool) for *env* across configs.
+
+        Called once at freeze (see ``AppCompiler``). Resolves this middleware's
+        own ``_config`` AND the store's cached config. For the two-config
+        pattern — a user passes ``config.store=RedisSessionStore(SessionConfig(
+        secure="auto"), ...)`` — the store carries its OWN inner ``SessionConfig``
+        that ``save()`` reads, so it must be resolved independently. A custom
+        store that does not implement ``resolve_secure`` is left untouched (it
+        owns its own cookie policy).
+        """
+        from dataclasses import replace
+
+        self._config = replace(
+            self._config, secure=resolve_cookie_secure(self._config.secure, env=env)
+        )
+        store_resolve = getattr(self._store, "resolve_secure", None)
+        if callable(store_resolve):
+            store_resolve(env)
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Load session, dispatch, then save session to response."""

@@ -50,7 +50,12 @@ class TestChirpNewDefaultV2:
         source = (tmp_path / "myapp" / "app.py").read_text()
         assert "CHIRP_SECRET_KEY" in source
         assert "Refusing to start in production with default secret key" in source
-        assert "secure=not config.debug" in source
+        # The old `secure=not config.debug` band-aid is gone — secure now
+        # relies on the "auto" default (Secure in prod/staging via AppConfig.env).
+        assert "secure=not config.debug" not in source
+        assert "env=_env" in source
+        assert "CHIRP_ENV" in source
+        assert "SessionConfig" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source
 
@@ -164,7 +169,11 @@ class TestChirpNewMinimal:
         source = (tmp_path / "myapp" / "app.py").read_text()
         assert "CHIRP_SECRET_KEY" in source
         assert "Refusing to start in production with default secret key" in source
-        assert "secure=not config.debug" in source
+        # The old `secure=not config.debug` band-aid is gone — secure now
+        # relies on the "auto" default (Secure in prod/staging via AppConfig.env).
+        assert "secure=not config.debug" not in source
+        assert "env=_env" in source
+        assert "CHIRP_ENV" in source
         assert "SessionMiddleware" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source
@@ -223,7 +232,11 @@ class TestChirpNewShell:
         source = (tmp_path / "myapp" / "app.py").read_text()
         assert "CHIRP_SECRET_KEY" in source
         assert "Refusing to start in production with default secret key" in source
-        assert "secure=not config.debug" in source
+        # The old `secure=not config.debug` band-aid is gone — secure now
+        # relies on the "auto" default (Secure in prod/staging via AppConfig.env).
+        assert "secure=not config.debug" not in source
+        assert "env=_env" in source
+        assert "CHIRP_ENV" in source
         assert "SessionMiddleware" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source

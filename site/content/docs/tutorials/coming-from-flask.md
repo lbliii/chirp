@@ -245,7 +245,7 @@ def dashboard():
 ```
 ::::
 
-Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup.
+Chirp has built-in `login()` / `logout()` helpers and `@login_required` — no Flask-Login equivalent needed. Both `login()` and `logout()` regenerate the session to prevent session fixation attacks. Use `is_safe_url()` to validate `?next=` redirects (prevents open redirects). Requires `SessionMiddleware` + `AuthMiddleware`. See [[docs/build-apps/request-pipeline/builtin|Built-in Middleware]] for setup, or [[docs/tutorials/auth-login-walkthrough|A Login That Is Correct by Default]] for the whole loop in one file.
 
 ## What Chirp Adds
 

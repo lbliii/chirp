@@ -23,50 +23,29 @@ Usage::
         return Template("admin.html")
 """
 
-import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from inspect import isawaitable
 from typing import Any
-from urllib.parse import quote
 
 from chirp._internal.invoke import invoke
-from chirp.errors import HTTPError
-from chirp.security.audit import emit_security_event
+from chirp.pages.types import AuthSpec
+from chirp.security.auth_core import (
+    _build_login_redirect,
+    _is_api_request,
+    _next_url_for_request,
+    enforce_auth,
+)
 
-_log = logging.getLogger("chirp.security")
-
-
-def _build_login_redirect(login_url: str, request_url: str) -> str:
-    """Build a login redirect URL with a ``next`` parameter."""
-    next_url = quote(request_url, safe="")
-    separator = "&" if "?" in login_url else "?"
-    return f"{login_url}{separator}next={next_url}"
-
-
-def _next_url_for_request(request: Any) -> str:
-    scoped_url = getattr(request, "scoped_url", None)
-    if callable(scoped_url):
-        return scoped_url(request.url)
-    return request.url
-
-
-def _is_api_request(request: Any) -> bool:
-    """Detect whether the request is from an API client (not a browser).
-
-    Heuristic:
-    - Has ``Authorization`` header → API client
-    - ``Accept`` prefers JSON over HTML → API client
-    - Otherwise → browser
-    """
-    if request.headers.get("authorization"):
-        return True
-
-    accept = request.headers.get("accept", "")
-    # If accept explicitly mentions json but not html, treat as API
-    has_json = "application/json" in accept
-    has_html = "text/html" in accept
-    return bool(has_json and not has_html)
+# Re-exported for back-compat: ``chirp.pages.auth_gate`` and tests historically
+# import these helpers from this module. The canonical home is now
+# ``chirp.security.auth_core``.
+__all__ = [
+    "_build_login_redirect",
+    "_is_api_request",
+    "_next_url_for_request",
+    "login_required",
+    "requires",
+]
 
 
 def login_required(handler: Callable) -> Callable:
@@ -86,28 +65,21 @@ def login_required(handler: Callable) -> Callable:
     @wraps(handler)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         from chirp.context import get_request
-        from chirp.middleware.auth import _active_config, get_user
+        from chirp.middleware.auth import get_user
 
-        user = get_user()
-        if not user.is_authenticated:
-            request = get_request()
-            if _is_api_request(request):
-                emit_security_event("auth.require.unauthenticated", request=request)
-                raise HTTPError(status=401, detail="Authentication required")
-
-            config = _active_config.get()
-            login_url = config.login_url if config else "/login"
-            if login_url:
-                redirect_url = _build_login_redirect(login_url, _next_url_for_request(request))
-                raise HTTPError(
-                    status=302,
-                    detail="Login required",
-                    headers=(("Location", redirect_url),),
-                )
-            emit_security_event("auth.require.unauthenticated", request=request)
-            raise HTTPError(status=401, detail="Authentication required")
+        # Authn-only: AuthSpec with no permissions and no policy. Delegates to
+        # the one shared gate so the unauthenticated outcome + audit event match
+        # the declarative path exactly.
+        await enforce_auth(AuthSpec(), get_request(), get_user())
 
         return await invoke(handler, *args, **kwargs)
+
+    # Static, introspectable marker so a contract check can prove this route is
+    # auth-gated WITHOUT executing the handler. @wraps copies __wrapped__, so
+    # inspect.unwrap reaches the inner handler while this marker stays on the
+    # outermost wrapper the router stores. Framework-internal (single leading
+    # underscore, no name-mangling).
+    wrapper._chirp_requires_auth = True  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     return wrapper
 
@@ -133,74 +105,33 @@ def requires(
             return Template("edit.html")
     """
 
+    # Build the structured spec once (the public signature is unchanged). A
+    # callable ``policy`` keeps working: we name it by ``__name__`` (preserving
+    # the historical ``details={"policy": <name>}`` audit payload) and hand the
+    # core a resolver that maps that name back to the live callable, so the core
+    # stays registry-agnostic and identical for both gate paths.
+    policy_name = getattr(policy, "__name__", "custom_policy") if policy is not None else None
+    spec = AuthSpec(permissions=tuple(permissions), mode="all", policy=policy_name)
+
+    def _policy_resolver(name: str) -> Callable[[Any, Any], bool | Awaitable[bool]] | None:
+        return policy if name == policy_name else None
+
     def decorator(handler: Callable) -> Callable:
         @wraps(handler)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             from chirp.context import get_request
-            from chirp.middleware.auth import UserWithPermissions, _active_config, get_user
+            from chirp.middleware.auth import get_user
 
-            user = get_user()
-            if not user.is_authenticated:
-                request = get_request()
-                if _is_api_request(request):
-                    emit_security_event("auth.require.unauthenticated", request=request)
-                    raise HTTPError(status=401, detail="Authentication required")
-
-                config = _active_config.get()
-                login_url = config.login_url if config else "/login"
-                if login_url:
-                    redirect_url = _build_login_redirect(login_url, _next_url_for_request(request))
-                    raise HTTPError(
-                        status=302,
-                        detail="Login required",
-                        headers=(("Location", redirect_url),),
-                    )
-                emit_security_event("auth.require.unauthenticated", request=request)
-                raise HTTPError(status=401, detail="Authentication required")
-
-            # Check permissions
-            if not isinstance(user, UserWithPermissions):
-                _log.warning(
-                    "User %s model does not implement permissions protocol",
-                    user.id,
-                )
-                emit_security_event(
-                    "authz.permission.denied",
-                    user_id=user.id,
-                    details={"reason": "missing_permissions_protocol"},
-                )
-                raise HTTPError(status=403, detail="Forbidden")
-
-            required = frozenset(permissions)
-            if not required.issubset(user.permissions):
-                missing = required - user.permissions
-                _log.warning(
-                    "User %s missing permissions: %s",
-                    user.id,
-                    ", ".join(sorted(missing)),
-                )
-                emit_security_event(
-                    "authz.permission.denied",
-                    user_id=user.id,
-                    details={"missing": sorted(missing)},
-                )
-                raise HTTPError(status=403, detail="Forbidden")
-
-            if policy is not None:
-                request = get_request()
-                allowed = policy(user, request)
-                if isawaitable(allowed):
-                    allowed = await allowed
-                if not allowed:
-                    emit_security_event(
-                        "authz.policy.denied",
-                        request=request,
-                        user_id=user.id,
-                        details={"policy": getattr(policy, "__name__", "custom_policy")},
-                    )
-                    raise HTTPError(status=403, detail="Forbidden")
+            await enforce_auth(spec, get_request(), get_user(), policy_resolver=_policy_resolver)
 
             return await invoke(handler, *args, **kwargs)
+
+        # Static, introspectable marker so a contract check can prove this route
+        # is auth-gated WITHOUT executing the handler. @wraps copies __wrapped__,
+        # so inspect.unwrap reaches the inner handler while this marker stays on
+        # the outermost wrapper the router stores. Framework-internal (single
+        # leading underscore, no name-mangling).
+        wrapper._chirp_requires_auth = True  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
         return wrapper
 

@@ -18,7 +18,7 @@ The store follows the example's store convention exactly (see ``wallet.py`` /
 
 Passwords are hashed with :mod:`chirp.security.passwords` — argon2id when
 ``chirp[auth]`` (``argon2-cffi``) is installed, else the stdlib **scrypt**
-fallback (always available, no extra dependency). ``verify_password``
+fallback (always available, no extra dependency). ``verify_login``
 auto-detects the algorithm from the PHC prefix, so the demo runs on the slim
 deploy image (which drops ``argon2-cffi``) with no code change.
 """
@@ -26,7 +26,7 @@ deploy image (which drops ``argon2-cffi``) with no code change.
 import threading
 from dataclasses import dataclass
 
-from chirp.security.passwords import hash_password, verify_password
+from chirp.security.passwords import hash_password, verify_login
 
 # ---------------------------------------------------------------------------
 # Demo credentials — shown on the login page so the live demo is frictionless
@@ -99,9 +99,14 @@ def authenticate(username: str, password: str) -> User | None:
     """Return the user iff the password verifies, else ``None``.
 
     The single credential-check path: a blank/unknown username or a wrong
-    password is an indistinguishable ``None`` (no user-enumeration signal).
+    password is an indistinguishable ``None``. ``verify_login`` runs a decoy
+    hash for an unknown user (``phc_hash is None``) so the unknown-user and
+    wrong-password paths take comparable time — no user-enumeration timing
+    oracle.
     """
     user = get((username or "").strip())
-    if user is not None and verify_password(password or "", user.password_hash):
+    # Always call verify_login (passing None for an unknown user) so the decoy
+    # hash runs and the unknown-user / wrong-password paths cost the same.
+    if verify_login(password or "", user.password_hash if user is not None else None):
         return user
     return None

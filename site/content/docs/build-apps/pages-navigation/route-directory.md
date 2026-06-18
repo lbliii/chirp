@@ -225,6 +225,62 @@ key. The exact mechanism is documented with the shell, not here.
 
 ::::{/dropdown}
 
+## Gate a route with `auth`
+
+`RouteMeta.auth` declares the authentication/authorization a page requires. It is
+enforced before the handler runs, sharing the exact gate logic (and audit events)
+of the `@login_required` / `@requires` decorators.
+
+The simplest form is a string:
+
+```python
+META = RouteMeta(auth="required")   # any authenticated user
+META = RouteMeta(auth="admin")      # the single permission "admin"
+```
+
+- `None` / `"none"` / `"optional"` / `""` — open, no gate.
+- `"required"` — an authenticated user (browser → login redirect, API → 401).
+- any other string — a single required permission (missing → 403).
+
+For permission sets, `any`/`all` matching, or a named policy, use a structured
+`AuthSpec`. `RouteMeta` is static serializable data, so a policy is named by
+**string**, never a live callable:
+
+```python
+from chirp.pages.types import RouteMeta, AuthSpec
+
+# Needs ALL of these permissions:
+META = RouteMeta(auth=AuthSpec(permissions=("editor", "publisher"), mode="all"))
+
+# Needs ANY one of these:
+META = RouteMeta(auth=AuthSpec(permissions=("admin", "moderator"), mode="any"))
+
+# A named policy (resolved against the app policy registry):
+META = RouteMeta(auth=AuthSpec(policy="is_owner"))
+```
+
+A dynamic `meta()` can return the same structured auth (a dict works too,
+`{"auth": {"permissions": ["admin"], "mode": "any"}}`) and is enforced
+identically to a static `META`.
+
+Register the permission names and policy callables during app setup so the
+[[docs/quality/contracts-debugging/categories#auth_spec|`auth_spec` contract check]]
+can validate every declared `auth` at startup:
+
+```python
+app.register_permission("editor")
+app.register_permission("publisher")
+app.register_policy("is_owner", lambda user, request: user.id == request.path_params["owner_id"])
+```
+
+A policy callable receives `(user, request)` and returns truthy to allow (sync or
+async). An `AuthSpec.policy` naming an unregistered policy fails loud — the
+`auth_spec` check flags it at startup and the gate `500`s at request time rather
+than silently denying. Gating a route via `RouteMeta.auth` also requires
+`AuthMiddleware` in the stack (see the
+[[docs/quality/contracts-debugging/categories#auth_middleware|`auth_middleware`]]
+check).
+
 :::{note} See also
 - [[docs/build-apps/pages-navigation/filesystem-routing|Filesystem routing]] — the cascade and discovery rules behind these files
 - [[docs/build-apps/ui-extensions/app-shell|App shell]] — the topbar, sidebar, and tabs this layout targets

@@ -1,17 +1,33 @@
 """Tests for session middleware — signed cookie sessions."""
 
+import hashlib
+import importlib.util
+from typing import ClassVar
+
 import pytest
 
-from chirp import App
+from chirp import App, AppConfig
 from chirp.errors import ConfigurationError
 from chirp.middleware.sessions import (
+    CookieSessionStore,
+    RedisSessionStore,
     SessionConfig,
     SessionMiddleware,
     get_session,
     regenerate_session,
+    resolve_cookie_secure,
 )
 from chirp.testing import TestClient
 from tests.helpers.auth import extract_session_cookie
+
+
+def _set_cookie_header(response: object, cookie_name: str = "chirp_session") -> str | None:
+    """Return the full ``Set-Cookie`` header (with attributes) for *cookie_name*."""
+    headers = getattr(response, "headers", ())
+    for hname, hvalue in headers:
+        if hname.lower() == "set-cookie" and hvalue.startswith(f"{cookie_name}="):
+            return hvalue
+    return None
 
 
 class TestSessionConfig:
@@ -46,6 +62,49 @@ class TestGetSession:
     def test_raises_outside_request(self) -> None:
         with pytest.raises(LookupError, match="No active session"):
             get_session()
+
+
+class TestSessionTemplateGlobal:
+    """session() is the template-safe, never-raising session accessor."""
+
+    def test_session_global_never_raises_without_middleware(self) -> None:
+        from chirp.middleware.sessions import session
+
+        # Unlike get_session(), the template-safe accessor returns an empty
+        # read-only mapping instead of raising LookupError.
+        result = session()
+        assert result == {}
+        assert result.get("anything") is None
+        # Read-only: templates cannot accidentally mutate a throwaway dict.
+        with pytest.raises(TypeError):
+            result["x"] = 1  # type: ignore[index]
+
+    def test_session_global_returns_active_session(self) -> None:
+        from chirp.middleware.sessions import _session_var, get_session, session
+
+        active: dict[str, object] = {"flash": "saved"}
+        token = _session_var.set(active)
+        try:
+            assert session() is active
+            assert session() is get_session()
+        finally:
+            _session_var.reset(token)
+
+    def test_session_global_registered_only_with_session_middleware(self) -> None:
+        from chirp.middleware.sessions import session as session_global
+
+        # No SessionMiddleware -> session global is NOT registered.
+        bare = App()
+        bare.freeze()
+        assert "session" not in bare._mutable_state.template_globals
+
+        # SessionMiddleware present -> session global harvested via the
+        # middleware .template_globals scan in AppCompiler.
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.freeze()
+        registered = app._mutable_state.template_globals
+        assert registered.get("session") is session_global
 
 
 class TestSessionBasicOperations:
@@ -168,6 +227,92 @@ class TestSessionSecurity:
                 headers={"Cookie": f"chirp_session={cookie}"},
             )
             assert r.text == "data=none"
+
+
+class TestSessionSigningDigest:
+    """SHA-256 signing by default, with SHA-1 backward read."""
+
+    def test_default_digest_is_sha256(self) -> None:
+        """Fresh cookies are signed with HMAC-SHA-256 by default."""
+        store = CookieSessionStore(SessionConfig(secret_key="test-secret"))
+        signer = store._serializer.make_signer()
+        assert signer.digest_method is hashlib.sha256
+
+    def test_sha512_digest_opt_in(self) -> None:
+        store = CookieSessionStore(SessionConfig(secret_key="test-secret", signer_digest="sha512"))
+        signer = store._serializer.make_signer()
+        assert signer.digest_method is hashlib.sha512
+
+    def test_bogus_digest_raises_configuration_error(self) -> None:
+        with pytest.raises(ConfigurationError) as exc_info:
+            CookieSessionStore(SessionConfig(secret_key="test-secret", signer_digest="bogus"))  # type: ignore[arg-type]
+        msg = str(exc_info.value)
+        assert "signer_digest" in msg
+        assert "bogus" in msg
+
+    async def test_backward_read_of_legacy_sha1_cookie(self) -> None:
+        """A cookie signed with itsdangerous' historical SHA-1 default still loads."""
+        from itsdangerous import URLSafeTimedSerializer
+
+        secret = "test-secret"
+        # Emulate a cookie produced by an older release: bare serializer = SHA-1.
+        legacy = URLSafeTimedSerializer(secret)
+        legacy_cookie = legacy.dumps({"name": "alice"})
+
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key=secret)))
+
+        @app.route("/get")
+        def get_name():
+            session = get_session()
+            return f"name={session.get('name', 'none')}"
+
+        async with TestClient(app) as client:
+            resp = await client.get(
+                "/get",
+                headers={"Cookie": f"chirp_session={legacy_cookie}"},
+            )
+            assert resp.text == "name=alice"
+
+
+class TestSessionLoadExceptionHandling:
+    """``load()`` swallows BadData (fail-safe) but propagates real bugs."""
+
+    async def test_tampered_cookie_yields_empty_session(self) -> None:
+        """Tampered/malformed cookies fail safe to an empty session."""
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+
+        @app.route("/check")
+        def check():
+            session = get_session()
+            return f"empty={len(session) == 0}"
+
+        async with TestClient(app) as client:
+            resp = await client.get(
+                "/check",
+                headers={"Cookie": "chirp_session=tampered-value"},
+            )
+            assert resp.text == "empty=True"
+
+    async def test_non_baddata_error_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A non-BadData error from serializer.loads must NOT be swallowed.
+
+        ``load()`` only reads ``request.cookies`` so a minimal stub suffices to
+        drive it to the ``serializer.loads`` call.
+        """
+        store = CookieSessionStore(SessionConfig(secret_key="test-secret"))
+
+        def boom(*_args: object, **_kwargs: object) -> None:
+            raise TypeError("genuine bug, not tamper")
+
+        monkeypatch.setattr(store._serializer, "loads", boom)
+
+        class _StubRequest:
+            cookies: ClassVar[dict[str, str]] = {"chirp_session": "anything"}
+
+        with pytest.raises(TypeError, match="genuine bug"):
+            await store.load(_StubRequest())  # type: ignore[arg-type]
 
 
 class TestSessionDataTypes:
@@ -503,3 +648,175 @@ class TestSessionTimeouts:
             cookie = extract_session_cookie(r1, "chirp_session")
             r2 = await client.get("/check", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "k=none"
+
+
+class TestResolveCookieSecure:
+    """The ``secure="auto"`` resolver: env is the sole posture signal."""
+
+    def test_auto_production_is_true(self) -> None:
+        assert resolve_cookie_secure("auto", env="production") is True
+
+    def test_auto_staging_is_true(self) -> None:
+        assert resolve_cookie_secure("auto", env="staging") is True
+
+    def test_auto_development_is_false(self) -> None:
+        assert resolve_cookie_secure("auto", env="development") is False
+
+    def test_auto_unknown_env_is_false(self) -> None:
+        """An unrecognized env is treated as non-secure (fail safe to dev)."""
+        assert resolve_cookie_secure("auto", env="local") is False
+
+    def test_explicit_true_passes_through(self) -> None:
+        # Explicit opt-in is honored even in development.
+        assert resolve_cookie_secure(True, env="development") is True
+
+    def test_explicit_false_passes_through(self) -> None:
+        # Explicit opt-out is honored even in production.
+        assert resolve_cookie_secure(False, env="production") is False
+
+    def test_config_default_secure_is_auto(self) -> None:
+        assert SessionConfig(secret_key="s").secure == "auto"
+
+
+class TestSessionSecureResolutionAtFreeze:
+    """Freeze resolves ``secure="auto"`` to a concrete bool by ``config.env``.
+
+    Regression guard: ``ssl_certfile`` set in *development* must NOT promote
+    secure to True (the dropped clause that would silently log local-HTTPS dev
+    users out). env is the only signal.
+    """
+
+    def test_production_default_emits_secure_cookie(self) -> None:
+        app = App(config=AppConfig(secret_key="s", env="production", debug=False))
+        mw = SessionMiddleware(SessionConfig(secret_key="s"))
+        app.add_middleware(mw)
+        app.freeze()
+        assert mw.secure is True
+
+    def test_development_default_is_not_secure(self) -> None:
+        app = App(config=AppConfig(secret_key="s", env="development", debug=True))
+        mw = SessionMiddleware(SessionConfig(secret_key="s"))
+        app.add_middleware(mw)
+        app.freeze()
+        assert mw.secure is False
+
+    def test_development_with_ssl_certfile_stays_not_secure(self) -> None:
+        """ssl_certfile in dev (local HTTPS) must NOT force Secure cookies."""
+        app = App(
+            config=AppConfig(
+                secret_key="s",
+                env="development",
+                debug=True,
+                ssl_certfile="cert.pem",
+            )
+        )
+        mw = SessionMiddleware(SessionConfig(secret_key="s"))
+        app.add_middleware(mw)
+        app.freeze()
+        assert mw.secure is False
+
+    def test_explicit_false_not_promoted_in_production(self) -> None:
+        app = App(config=AppConfig(secret_key="s", env="production", debug=False))
+        mw = SessionMiddleware(SessionConfig(secret_key="s", secure=False))
+        app.add_middleware(mw)
+        app.freeze()
+        assert mw.secure is False
+
+    def test_store_config_never_holds_auto_after_freeze(self) -> None:
+        """The store's cached config must hold a bool (with_cookie is typed bool)."""
+        app = App(config=AppConfig(secret_key="s", env="production", debug=False))
+        mw = SessionMiddleware(SessionConfig(secret_key="s"))
+        app.add_middleware(mw)
+        app.freeze()
+        assert mw._store._config.secure is True
+        assert mw._config.secure is True
+
+
+class TestSessionSecureEndToEnd:
+    """The resolved value is actually emitted on the Set-Cookie header."""
+
+    async def test_production_sets_secure_attribute(self) -> None:
+        app = App(config=AppConfig(secret_key="s", env="production", debug=False))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="s")))
+
+        @app.route("/set")
+        def set_session():
+            get_session()["k"] = "v"
+            return "ok"
+
+        async with TestClient(app) as client:
+            r = await client.get("/set")
+            header = _set_cookie_header(r)
+            assert header is not None
+            assert "Secure" in header.split("; ")
+
+    async def test_development_omits_secure_attribute(self) -> None:
+        app = App(config=AppConfig(secret_key="s", env="development", debug=False))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="s")))
+
+        @app.route("/set")
+        def set_session():
+            get_session()["k"] = "v"
+            return "ok"
+
+        async with TestClient(app) as client:
+            r = await client.get("/set")
+            header = _set_cookie_header(r)
+            assert header is not None
+            assert "Secure" not in header.split("; ")
+
+
+def _redis_available() -> bool:
+    # find_spec raises ModuleNotFoundError when the top-level 'redis' package is
+    # absent (not just when the submodule is missing), so guard the lookup.
+    try:
+        return importlib.util.find_spec("redis.asyncio") is not None
+    except ModuleNotFoundError:
+        return False
+
+
+_REDIS_AVAILABLE = _redis_available()
+
+
+@pytest.mark.skipif(not _REDIS_AVAILABLE, reason="requires the optional 'redis' extra")
+class TestRedisStoreSecureResolution:
+    """RedisSessionStore honors the resolved secure value (no real Redis needed)."""
+
+    def test_redis_store_resolve_secure_auto_production(self) -> None:
+        store = RedisSessionStore(SessionConfig(secret_key="s", secure="auto"), "redis://localhost")
+        store.resolve_secure("production")
+        assert store._config.secure is True
+
+    def test_redis_store_resolve_secure_auto_development(self) -> None:
+        store = RedisSessionStore(SessionConfig(secret_key="s", secure="auto"), "redis://localhost")
+        store.resolve_secure("development")
+        assert store._config.secure is False
+
+    def test_two_config_pattern_resolves_inner_store_config(self) -> None:
+        """A user-supplied store carries its OWN inner config that must resolve.
+
+        The save() path reads the *store's* config for cookie attributes, so the
+        inner SessionConfig — not just the outer one — must be resolved at freeze.
+        """
+        inner = SessionConfig(secret_key="inner", secure="auto")
+        store = RedisSessionStore(inner, "redis://localhost")
+        outer = SessionConfig(secret_key="outer", secure="auto", store=store)
+        app = App(config=AppConfig(secret_key="s", env="production", debug=False))
+        mw = SessionMiddleware(outer)
+        app.add_middleware(mw)
+        app.freeze()
+        # The store's inner config (authoritative for cookie attrs) is resolved...
+        assert store._config.secure is True
+        # ...and the middleware's effective `secure` reads the store's config.
+        assert mw.secure is True
+
+    def test_two_config_pattern_development_stays_false(self) -> None:
+        inner = SessionConfig(secret_key="inner", secure="auto")
+        store = RedisSessionStore(inner, "redis://localhost")
+        outer = SessionConfig(secret_key="outer", secure="auto", store=store)
+        app = App(config=AppConfig(secret_key="s", env="development", debug=True))
+        mw = SessionMiddleware(outer)
+        app.add_middleware(mw)
+        app.freeze()
+        assert store._config.secure is False
+        assert mw.secure is False

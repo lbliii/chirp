@@ -30,7 +30,10 @@ from chirp.server.negotiation_oob import (
     should_append_layout_oob,
     should_append_streamed_shell_actions_oob,
 )
-from chirp.server.streaming_context import attach_streaming_render_context
+from chirp.server.streaming_context import (
+    attach_streaming_render_context,
+    capture_streaming_render_context,
+)
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
@@ -689,10 +692,23 @@ def negotiate(
                 streaming=True,
                 sse=True,
             )
+            # Capture the full request-scoped context (request, auth user, CSRF,
+            # g, CSP nonce) while middleware ContextVars are still live. The
+            # handler finally resets them before handle_sse drains, so the SSE
+            # producer re-establishes this snapshot for the connection lifetime.
+            captured = capture_streaming_render_context(
+                request_context=request,
+                csp_nonce=_get_csp_nonce() or None,
+            )
             return SSEResponse(
                 event_stream=value,
                 kida_env=kida_env,
-                csp_nonce=_get_csp_nonce() or None,
+                csp_nonce=captured.csp_nonce,
+                request_context=captured.request_context,
+                auth_user=captured.auth_user,
+                csrf_token=captured.csrf_token,
+                csrf_field_name=captured.csrf_field_name,
+                g_snapshot=captured.g_snapshot,
             )
         case str():
             _trace_return(

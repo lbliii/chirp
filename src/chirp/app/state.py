@@ -153,6 +153,14 @@ class MutableAppState:
     oob_registry: OOBRegistry = field(default_factory=OOBRegistry)
     fragment_target_registry: FragmentTargetRegistry = field(default_factory=FragmentTargetRegistry)
     sections: dict[str, Section] = field(default_factory=dict)
+    #: Declared permission names (``app.register_permission``). When non-empty,
+    #: the ``auth_spec`` contract check is registry-backed: an ``AuthSpec`` /
+    #: bare-string permission not in this set is a startup ERROR (env-aware).
+    permission_registry: set[str] = field(default_factory=set)
+    #: Named policy callables (``app.register_policy``). The shared auth core
+    #: resolves an ``AuthSpec.policy`` NAME against this mapping at request time;
+    #: the ``auth_spec`` check flags a named policy missing from it at startup.
+    policy_registry: dict[str, Callable[..., Any]] = field(default_factory=dict)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
@@ -220,6 +228,13 @@ class ContractCheckSnapshot:
     islands_contract_strict: bool
     oob_registry: OOBRegistry | None = None
     sections: dict[str, Section] = field(default_factory=dict)
+    #: Declared permission names (``app.register_permission``); empty when no
+    #: registry was declared. The ``auth_spec`` check is registry-backed when
+    #: non-empty (unknown permission -> ERROR) and heuristic-only otherwise.
+    permission_registry: frozenset[str] = field(default_factory=frozenset)
+    #: Declared policy NAMES (``app.register_policy``); empty when none declared.
+    #: The ``auth_spec`` check flags an ``AuthSpec.policy`` name absent from it.
+    policy_registry: frozenset[str] = field(default_factory=frozenset)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)

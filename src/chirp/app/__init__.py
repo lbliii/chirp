@@ -683,6 +683,29 @@ class App:
         """Register a named section for route metadata resolution."""
         self._registry.register_section(section)
 
+    def register_permission(self, name: str, *, description: str | None = None) -> None:
+        """Declare a permission name used by ``RouteMeta.auth`` / ``AuthSpec``.
+
+        Declaring permissions makes the ``auth_spec`` contract check
+        registry-backed: an ``AuthSpec`` (or bare-string) permission not in the
+        declared set becomes a startup ERROR (env-aware via deploy posture)
+        instead of a silent request-time 403. Call during setup; raises
+        ``RuntimeError`` after freeze.
+        """
+        self._registry.register_permission(name, description=description)
+
+    def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
+        """Register a named policy callable for declarative ``AuthSpec`` gating.
+
+        ``RouteMeta`` stays static serializable data, so an ``AuthSpec`` names a
+        policy by string; the declarative gate resolves the name against this
+        registry at request time and calls ``fn(user, request)`` (sync or async,
+        returning truthy to allow). An ``AuthSpec`` naming an unregistered policy
+        is flagged by the ``auth_spec`` check at startup and fails loud at
+        request time. Call during setup; raises ``RuntimeError`` after freeze.
+        """
+        self._registry.register_policy(name, fn)
+
     def register_contract_check(self, check: Callable[..., Any]) -> None:
         """Register a custom contract check that runs during ``app.check()``.
 
@@ -974,6 +997,8 @@ class App:
             islands_contract_strict=self.config.islands_contract_strict,
             oob_registry=self._runtime_state.oob_registry,
             sections=self._mutable_state.sections,
+            permission_registry=frozenset(self._mutable_state.permission_registry),
+            policy_registry=frozenset(self._mutable_state.policy_registry),
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
             discovered_routes=self._mutable_state.discovered_routes,

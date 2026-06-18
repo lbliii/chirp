@@ -17,6 +17,13 @@ the internet. Chirp ships the secure-by-default building blocks — sessions, CS
 rate limiting, security headers, password hashing — but you wire and configure
 them for production yourself. This page is that wiring.
 
+:::{tip}
+New to Chirp auth? Start with [[docs/tutorials/auth-login-walkthrough|A Login That Is Correct by Default]] —
+the whole login → gated page → logout loop in one copy-pasteable file, with the
+secure stack wired and `app.check()` catching the one wire you forgot. Then come
+back here for the production hardening checklist.
+:::
+
 :::{note}
 Most of these items are also enforced by `app.check()`, the contracts you run in
 CI. The severity is environment-aware: missing CSRF or session protection on a
@@ -91,8 +98,8 @@ Each row maps a hardening area to the field you set in the stack above.
   - What to set
   - Symbol / value
 * - Session cookies
-  - Sign cookies, mark them secure and HTTP-only, and bound their lifetime
-  - `SessionConfig(secure=True, httponly=True, samesite="lax", idle_timeout_seconds=..., absolute_timeout_seconds=...)`
+  - Sign cookies (HMAC-SHA-256 by default), mark them secure and HTTP-only, and bound their lifetime. `secure` defaults to `"auto"` (Secure in production/staging via `AppConfig.env`, off in local dev); the explicit `secure=True` below is belt-and-suspenders.
+  - `SessionConfig(secure=True, httponly=True, samesite="lax", signer_digest="sha256", idle_timeout_seconds=..., absolute_timeout_seconds=...)`
 * - Session invalidation
   - Invalidate stale sessions after a password change or account event
   - `AuthConfig(session_version=...)`
@@ -109,8 +116,8 @@ Each row maps a hardening area to the field you set in the stack above.
   - Strict Content-Security-Policy; HSTS over HTTPS; keep the safe defaults
   - `SecurityHeadersConfig(content_security_policy=..., strict_transport_security=...)`
 * - Password hashing
-  - Use argon2 in production
-  - `pip install bengal-chirp[auth]`
+  - Use argon2 in production; verify logins with the enumeration-safe primitive and upgrade stale hashes on login
+  - `pip install bengal-chirp[auth]`; `verify_login(...)`, `verify_and_upgrade(...)`
 * - Audit
   - Register a sink and alert on auth/CSRF/authz event spikes
   - `set_security_event_sink(...)`
@@ -122,6 +129,74 @@ The authorization decorators and lockout helpers live in `chirp.security`, not
 ```python
 from chirp.security import LockoutConfig, LoginLockout, login_required, requires
 ```
+
+### Password hashing and login verification
+
+`chirp.security` ships the credential primitives. They live one import away:
+
+```python
+from chirp.security import (
+    hash_password,
+    verify_password,
+    verify_login,
+    verify_and_upgrade,
+    needs_rehash,
+)
+```
+
+**Hashing algorithm.** `hash_password` uses **argon2id** when `chirp[auth]`
+(`argon2-cffi`) is installed and falls back to **stdlib scrypt** otherwise. Both
+produce PHC-format strings, and `verify_password` auto-detects the algorithm from
+the prefix — so a hash survives a later default change. argon2id is the
+recommended production algorithm; the `password_extra` contract WARNs (in
+staging/production) when a login surface ships without `argon2-cffi`. Install it
+with `pip install chirp[auth]`. The argon2id cost factors are pinned in
+`chirp.security.passwords` to RFC 9106 §4's memory-constrained option (`t=3`,
+`m=64 MiB`, `p=4`) — auditable and stable across the dependency's defaults.
+
+**Timing-safe login (kill the enumeration oracle).** The naive login check
+`if user and verify_password(password, user.password_hash)` leaks a
+**user-enumeration timing oracle**: when the username does not exist, no hash is
+computed, so the request returns measurably faster than a wrong password for a
+real account. An attacker times the difference to enumerate valid usernames.
+`verify_login` closes this — pass `None` for an unknown user and it still runs a
+full verify against a process-wide decoy hash before returning `False`, so the
+unknown-user and wrong-password paths take comparable time:
+
+```python
+user = USERS.get(username)
+if verify_login(password, user.password_hash if user else None):
+    login(user)
+    return Redirect("/dashboard")
+return Template("login.html", error="Invalid username or password")
+```
+
+Always call `verify_login` (do not short-circuit on `user is None`), or the decoy
+never runs. The decoy is computed once under a lock; subsequent logins read the
+published value. The timing equivalence is approximate, not byte-constant: in a
+mixed-algorithm corpus (legacy scrypt hashes while argon2 is the default) the
+decoy's cost differs from a stored scrypt verify. Re-deriving stale hashes (next)
+converges the corpus toward one algorithm over time.
+
+**Rehash-on-login (opportunistic upgrade).** `verify_and_upgrade` verifies the
+password and, when correct **and** the stored hash is below the current cost
+parameters, returns a freshly computed replacement. It never re-derives a hash
+for a wrong guess, so a failed login can never trigger a database write:
+
+```python
+ok, new_hash = verify_and_upgrade(password, user.password_hash)
+if not ok:
+    return reject()
+if new_hash is not None:
+    user.password_hash = new_hash  # persist the upgrade
+```
+
+`needs_rehash(phc_hash, *, upgrade_algorithm=False)` reports parameter staleness
+on its own (argon2 `check_needs_rehash`; scrypt `n`/`r` below the current pinned
+cost). The algorithm-upgrade clause — flagging a scrypt hash stale merely because
+argon2 is now installed — is gated behind `upgrade_algorithm` and **off by
+default**, so installing the `auth` extra does not trigger a fleet-wide
+rehash-write storm. Opt in during a controlled migration window.
 
 `policy=` is a keyword parameter of `@requires(...)`, not a separate API. It takes
 a callback that receives the user and request and returns a bool for object-level
@@ -175,6 +250,7 @@ it — SMTP, a provider API, or a queue.
 :::
 
 :::{note} See also
+- [[docs/tutorials/auth-login-walkthrough|A Login That Is Correct by Default]] — the golden-path login loop, end to end
 - [[docs/quality/deployment/production|Production deployment]] — the rest of the ship-to-prod checklist
 - [[docs/quality/contracts-debugging/categories|Contract categories]] — the env-aware severity model these items map to
 - [[docs/quality/contracts-debugging/route-contract|The route and security-stack contract]] — how `app.check()` enforces the secure-by-default stack

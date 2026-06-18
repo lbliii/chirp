@@ -110,6 +110,13 @@ def get_user() -> User:
 
     Raises ``LookupError`` if called outside a request with
     ``AuthMiddleware`` active.
+
+    Inside an ``EventStream`` generator (SSE), this returns the user captured
+    at **connect time**. SSE identity is pinned for the connection's lifetime:
+    a user logged out or permission-revoked mid-stream keeps the connect-time
+    identity until they reconnect. (Per-event revalidation is a deferred
+    follow-up, not currently available.) An unauthenticated connection sees
+    ``AnonymousUser`` for the whole stream.
     """
     try:
         return _user_var.get()
@@ -230,6 +237,9 @@ def current_user() -> User:
         {% else %}
             <a href="/login">Sign in</a>
         {% endif %}
+
+    Inside an ``EventStream`` generator (SSE), this returns the user captured at
+    **connect time** — see :func:`get_user` for the pinned-identity semantics.
     """
     try:
         return _user_var.get()

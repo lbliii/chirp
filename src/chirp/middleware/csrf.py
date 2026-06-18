@@ -78,8 +78,14 @@ def get_csrf_token() -> str:
     """Return the current CSRF token.
 
     Raises ``LookupError`` if called outside a request with
-    ``CSRFMiddleware`` active. For streamed or deferred rendering,
-    capture the token in the handler before returning the stream.
+    ``CSRFMiddleware`` active.
+
+    For ``Stream``, ``Suspense``, and ``EventStream`` renders, Chirp now
+    re-establishes the connect-time token automatically for the drain, so
+    ``get_csrf_token()`` works inside deferred blocks and SSE generators. The
+    token is **pinned at connect time** for the life of an SSE connection. (You
+    may still capture the token in the handler and pass it as plain template
+    context if you prefer an explicit value.)
     """
     token = _csrf_token_var.get()
     if token is None:

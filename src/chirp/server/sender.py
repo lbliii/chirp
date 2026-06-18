@@ -220,6 +220,7 @@ async def send_streaming_response(
     auth_user_token: Token | None = None
     csrf_token_token: Token | None = None
     csrf_field_token: Token | None = None
+    g_token: Token | None = None
     if response.request_context is not None:
         request_token = request_var.set(response.request_context)
         request_id_token = request_id_var.set(response.request_context.request_id)
@@ -241,6 +242,12 @@ async def send_streaming_response(
             response.csrf_token,
             response.csrf_field_name,
         )
+    # Gate on `is not None` (not truthiness): an empty-dict snapshot must still
+    # install a writable g store so a deferred block can write to g.
+    if response.g_snapshot is not None:
+        from chirp.context import g
+
+        g_token = g._restore(response.g_snapshot)
 
     try:
         if isinstance(response.chunks, AsyncIterator):
@@ -326,6 +333,10 @@ async def send_streaming_response(
             from chirp.middleware.csrf import _reset_stream_csrf
 
             _reset_stream_csrf(csrf_token_token, csrf_field_token)
+        if g_token is not None:
+            from chirp.context import g
+
+            g._restore_reset(g_token)
 
     # Close the stream
     await send(

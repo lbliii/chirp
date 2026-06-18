@@ -1,10 +1,11 @@
 """Tests for auth middleware — session auth, token auth, dual-mode, login/logout."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
-from chirp import App
+from chirp import App, AppConfig
 from chirp.errors import ConfigurationError
 from chirp.middleware.auth import (
     AnonymousUser,
@@ -570,3 +571,187 @@ class TestSessionVersioning:
             versions["1"] = "v2"
             r3 = await client.get("/whoami", headers={"Cookie": f"chirp_session={cookie}"})
             assert r3.text == "auth=False"
+
+
+# ---------------------------------------------------------------------------
+# Permission / policy registries
+# ---------------------------------------------------------------------------
+
+
+class TestAuthRegistries:
+    def test_register_permission_raises_after_freeze(self) -> None:
+        app = App()
+        app.register_permission("admin")  # before freeze: ok
+        app.freeze()
+        with pytest.raises(RuntimeError):
+            app.register_permission("editor")
+
+    def test_register_policy_raises_after_freeze(self) -> None:
+        app = App()
+        app.register_policy("owner", lambda user, request: True)
+        app.freeze()
+        with pytest.raises(RuntimeError):
+            app.register_policy("late", lambda user, request: True)
+
+    def test_register_policy_rejects_non_callable(self) -> None:
+        app = App()
+        with pytest.raises(TypeError):
+            app.register_policy("bad", "not-callable")  # type: ignore[arg-type]
+
+    def test_registries_thread_into_snapshot(self) -> None:
+        from chirp.contracts.checker import _build_snapshot
+
+        app = App(AppConfig(secret_key="x" * 32))
+        app.register_permission("admin")
+        app.register_policy("owner", lambda user, request: True)
+        app.freeze()
+        snap = _build_snapshot(app)
+        assert "admin" in snap.permission_registry
+        assert "owner" in snap.policy_registry
+
+
+# ---------------------------------------------------------------------------
+# Declarative structured-auth enforcement (static META == dynamic meet())
+# ---------------------------------------------------------------------------
+
+
+def _build_auth_pages_tree(tmp_path: Path, *, dynamic: bool) -> Path:
+    """A pages tree whose /gated route declares a structured permission gate.
+
+    ``dynamic=False`` -> static ``META`` (an ``AuthSpec``); ``dynamic=True`` ->
+    a ``meta()`` callable returning a dict ``auth``. Both must enforce identically
+    — that parity is the closed security gap (dynamic meta() auth was dropped).
+    """
+    pages_dir = tmp_path / "pages"
+    (pages_dir / "gated").mkdir(parents=True)
+    (pages_dir / "_layout.html").write_text(
+        '<html><body id="body">{% block content %}{% end %}</body></html>'
+    )
+    if dynamic:
+        meta_body = "def meta():\n    return {'auth': {'permissions': ['admin'], 'mode': 'all'}}\n"
+    else:
+        meta_body = (
+            "from chirp.pages.types import RouteMeta, AuthSpec\n"
+            "META = RouteMeta(auth=AuthSpec(permissions=('admin',), mode='all'))\n"
+        )
+    (pages_dir / "gated" / "_meta.py").write_text(meta_body)
+    (pages_dir / "gated" / "page.py").write_text(
+        "from chirp import Page\n"
+        "def get():\n"
+        "    return Page('gated/page.html', 'content', page_block_name='content')\n"
+    )
+    (pages_dir / "gated" / "page.html").write_text("{% block content %}gated-ok{% end %}")
+    return pages_dir
+
+
+def _auth_pages_app(pages_dir: Path) -> App:
+    app = App(AppConfig(template_dir=str(pages_dir)))
+    app.add_middleware(SessionMiddleware(SessionConfig(secret_key="x" * 32)))
+    app.add_middleware(AuthMiddleware(AuthConfig(verify_token=_verify_token, login_url="/login")))
+    app.mount_pages(str(pages_dir))
+    return app
+
+
+class TestDeclarativeStructuredAuthParity:
+    @pytest.mark.parametrize("dynamic", [False, True], ids=["static-META", "dynamic-meta"])
+    async def test_missing_permission_denied(self, tmp_path: Path, dynamic: bool) -> None:
+        app = _auth_pages_app(_build_auth_pages_tree(tmp_path, dynamic=dynamic))
+        async with TestClient(app) as client:
+            # tok_alice has no 'admin' permission.
+            r = await client.get("/gated", headers={"Authorization": "Bearer tok_alice"})
+            assert r.status == 403
+
+    @pytest.mark.parametrize("dynamic", [False, True], ids=["static-META", "dynamic-meta"])
+    async def test_permission_allows(self, tmp_path: Path, dynamic: bool) -> None:
+        app = _auth_pages_app(_build_auth_pages_tree(tmp_path, dynamic=dynamic))
+        async with TestClient(app) as client:
+            # tok_bob has the 'admin' permission.
+            r = await client.get("/gated", headers={"Authorization": "Bearer tok_bob"})
+            assert r.status == 200
+            assert "gated-ok" in r.body.decode("utf-8")
+
+    @pytest.mark.parametrize("dynamic", [False, True], ids=["static-META", "dynamic-meta"])
+    async def test_unauthenticated_api_401(self, tmp_path: Path, dynamic: bool) -> None:
+        app = _auth_pages_app(_build_auth_pages_tree(tmp_path, dynamic=dynamic))
+        async with TestClient(app) as client:
+            r = await client.get("/gated", headers={"Authorization": "Bearer bad"})
+            assert r.status == 401
+
+
+# ---------------------------------------------------------------------------
+# Named-policy resolution via the policy registry
+# ---------------------------------------------------------------------------
+
+
+def _policy_pages_tree(tmp_path: Path, policy_name: str) -> Path:
+    pages_dir = tmp_path / "pages"
+    (pages_dir / "secret").mkdir(parents=True)
+    (pages_dir / "_layout.html").write_text(
+        '<html><body id="body">{% block content %}{% end %}</body></html>'
+    )
+    (pages_dir / "secret" / "_meta.py").write_text(
+        "from chirp.pages.types import RouteMeta, AuthSpec\n"
+        f"META = RouteMeta(auth=AuthSpec(policy='{policy_name}'))\n"
+    )
+    (pages_dir / "secret" / "page.py").write_text(
+        "from chirp import Page\n"
+        "def get():\n"
+        "    return Page('secret/page.html', 'content', page_block_name='content')\n"
+    )
+    (pages_dir / "secret" / "page.html").write_text("{% block content %}secret-ok{% end %}")
+    return pages_dir
+
+
+class TestNamedPolicyResolution:
+    async def test_registered_policy_allows(self, tmp_path: Path) -> None:
+        pages_dir = _policy_pages_tree(tmp_path, "is_alice")
+        app = App(AppConfig(template_dir=str(pages_dir)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="x" * 32)))
+        app.add_middleware(
+            AuthMiddleware(AuthConfig(verify_token=_verify_token, login_url="/login"))
+        )
+        app.register_policy("is_alice", lambda user, request: user.id == "1")
+        app.mount_pages(str(pages_dir))
+
+        async with TestClient(app) as client:
+            r_ok = await client.get("/secret", headers={"Authorization": "Bearer tok_alice"})
+            assert r_ok.status == 200
+            r_deny = await client.get("/secret", headers={"Authorization": "Bearer tok_bob"})
+            assert r_deny.status == 403
+
+    async def test_unregistered_policy_fails_loud(self, tmp_path: Path) -> None:
+        # No app.register_policy("ghost", ...) -> the resolver raises -> 500.
+        pages_dir = _policy_pages_tree(tmp_path, "ghost")
+        app = App(AppConfig(template_dir=str(pages_dir)))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="x" * 32)))
+        app.add_middleware(
+            AuthMiddleware(AuthConfig(verify_token=_verify_token, login_url="/login"))
+        )
+        app.mount_pages(str(pages_dir))
+
+        async with TestClient(app) as client:
+            r = await client.get("/secret", headers={"Authorization": "Bearer tok_alice"})
+            assert r.status == 500
+
+
+# ---------------------------------------------------------------------------
+# Dict auth coercion — invalid mode fails loud at coercion time
+# ---------------------------------------------------------------------------
+
+
+class TestDictAuthCoercion:
+    def test_invalid_mode_raises_value_error(self) -> None:
+        """A dict ``auth`` with a mode other than 'all'/'any' fails loud at
+        coercion time rather than silently degrading to 'all'."""
+        from chirp.pages.discovery import _coerce_auth
+
+        with pytest.raises(ValueError, match="Invalid auth mode 'bogus'"):
+            _coerce_auth({"permissions": ["a"], "mode": "bogus"})
+
+    @pytest.mark.parametrize("mode", ["all", "any"])
+    def test_valid_modes_coerce(self, mode: str) -> None:
+        from chirp.pages.discovery import _coerce_auth
+        from chirp.pages.types import AuthSpec
+
+        spec = _coerce_auth({"permissions": ["a"], "mode": mode})
+        assert spec == AuthSpec(permissions=("a",), mode=mode)

@@ -50,11 +50,15 @@ def run_security_check(args) -> None:
         "debug=True in production \u2014 never deploy with debug enabled",
     )
 
-    # 4. HSTS
+    # 4. HSTS \u2014 applicable whenever env == production. TLS in production is
+    # frequently terminated at a proxy/load balancer, so ssl_certfile being
+    # unset does NOT mean "no HTTPS"; keying applicability off ssl_certfile
+    # alone missed proxy-terminated deployments. This stays a recommendation:
+    # we report HSTS as not-enabled (a warning the operator should heed), not
+    # as "configured".
     has_hsts = bool(getattr(config, "strict_transport_security", None))
-    has_ssl = bool(config.ssl_certfile)
     check(
-        has_hsts or not (config.env == "production" and has_ssl),
+        has_hsts or config.env != "production",
         "HSTS configured or not applicable",
         "HSTS not enabled \u2014 set strict_transport_security for HTTPS production",
     )

@@ -563,11 +563,15 @@ signal layer points at, out of scope here. Passwords hash through
 **scrypt** fallback), so the demo adds **no dependency** and runs on the slim
 deploy image (which drops `argon2-cffi`).
 
-> **Footnote — `RouteMeta.auth` is not enforced.** The `auth=` field on
-> `RouteMeta` (in `_meta.py`) exists but the framework does *not* act on it; only
-> `meta.section` / `meta.shell_mode` are consumed by contract rules. Protection is
-> the **`@login_required` decorator** on the handler (the idiom the `chirp new`
-> v2 scaffold uses). The example does not rely on `meta.auth`.
+> **Footnote — `RouteMeta.auth` IS enforced.** The `auth=` field on `RouteMeta`
+> (in `_meta.py`) is enforced by a declarative gate run before each mounted page
+> handler (`app/registry.py` dispatch -> `enforce_route_meta_auth`). It accepts
+> `"required"` (authn-only), a permission string, or a structured `AuthSpec`
+> (authn-only `AuthSpec()`, an `all`/`any` permission set, or a named `policy`
+> resolved against `app.register_policy`). This example still protects account
+> pages with the **`@login_required` decorator** on the handler (the idiom the
+> `chirp new` v2 scaffold uses) — both paths share one authenticate-or-deny core
+> — so it does not additionally rely on `meta.auth`.
 
 ---
 
