@@ -1,10 +1,11 @@
 """Tests for chirp.data.Query — immutable query builder."""
 
+import re
 from dataclasses import dataclass
 
 import pytest
 
-from chirp.data import Database, Query
+from chirp.data import Database, Query, json_path
 
 # -- Test models --
 
@@ -354,3 +355,103 @@ class TestStream:
     async def test_stream_empty_result(self, seeded_db) -> None:
         todos = [t async for t in Query(Todo, "todos").where("id = ?", 9999).stream(seeded_db)]
         assert todos == []
+
+
+# =============================================================================
+# json_path — dialect-aware JSON extraction (issue #381)
+# =============================================================================
+
+
+class TestJsonPathHelper:
+    """Test the free chirp.data.json_path() SQL-fragment builder (no DB needed)."""
+
+    def test_single_key_sqlite(self) -> None:
+        assert json_path("oauth", "sub", dialect="sqlite") == "json_extract(oauth, '$.sub')"
+
+    def test_single_key_postgres(self) -> None:
+        assert json_path("oauth", "sub", dialect="postgresql") == "oauth->>'sub'"
+
+    def test_nested_keys_sqlite(self) -> None:
+        assert json_path("data", "a", "b", dialect="sqlite") == "json_extract(data, '$.a.b')"
+
+    def test_nested_keys_postgres(self) -> None:
+        # Intermediate keys use ->, the final key uses ->> (returns text).
+        assert json_path("data", "a", "b", dialect="postgresql") == "data->'a'->>'b'"
+
+    def test_unknown_dialect_treated_as_postgres(self) -> None:
+        # Driver-dispatch convention: any non-"sqlite" value is PostgreSQL.
+        assert json_path("data", "k", dialect="postgresql") == "data->>'k'"
+
+    def test_emits_no_bind_placeholder(self) -> None:
+        # JSON path keys are static identifiers, never bound params — the
+        # fragment must not introduce a ? or $N bind placeholder of its own.
+        # (SQLite's "$." is the JSON-path root, not a $N placeholder.)
+        for dialect in ("sqlite", "postgresql"):
+            frag = json_path("data", "a", "b", dialect=dialect)
+            assert "?" not in frag
+            assert not re.search(r"\$\d", frag)
+
+    def test_no_keys_raises(self) -> None:
+        with pytest.raises(ValueError, match="at least one path key"):
+            json_path("data", dialect="sqlite")
+
+
+class TestDatabaseJsonPath:
+    """Test the Database.json_path() convenience wrapper picks the dialect from _driver."""
+
+    def test_sqlite_database_emits_sqlite_syntax(self) -> None:
+        db = Database("sqlite:///:memory:")
+        assert db.json_path("oauth", "sub") == "json_extract(oauth, '$.sub')"
+
+    def test_postgres_database_emits_postgres_syntax(self) -> None:
+        # Construction does not connect, so no driver install is needed here.
+        db = Database("postgresql://user@localhost/db")
+        assert db.json_path("oauth", "sub") == "oauth->>'sub'"
+        assert db.json_path("data", "a", "b") == "data->'a'->>'b'"
+
+
+@pytest.fixture
+async def json_db(tmp_path):
+    """SQLite database with a table holding a JSON TEXT column."""
+    db_path = tmp_path / "json.db"
+    db = Database(f"sqlite:///{db_path}")
+    await db.connect()
+    await db.execute(
+        "CREATE TABLE accounts ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  oauth TEXT NOT NULL"  # stores JSON as TEXT
+        ")"
+    )
+    await db.execute(
+        "INSERT INTO accounts (oauth) VALUES (?)", '{"sub": "user-42", "provider": "github"}'
+    )
+    await db.execute(
+        "INSERT INTO accounts (oauth) VALUES (?)", '{"sub": "user-99", "provider": "google"}'
+    )
+    yield db
+    await db.disconnect()
+
+
+@dataclass(frozen=True, slots=True)
+class Account:
+    id: int
+    oauth: str
+
+
+class TestJsonPathAcceptance:
+    """Acceptance: a WHERE built with json_path runs without call-site dialect branching."""
+
+    @pytest.mark.issue(381)
+    async def test_query_where_with_json_path_no_dialect_branch(self, json_db) -> None:
+        # The call site supplies the dialect once via db.json_path / json_path —
+        # there is NO `if driver == "sqlite"` / `if dialect` branch here.
+        clause = json_path("oauth", "sub", dialect="sqlite") + " = ?"
+        accounts = await Query(Account, "accounts").where(clause, "user-42").fetch(json_db)
+        assert len(accounts) == 1
+        assert accounts[0].id == 1
+
+        # The ergonomic Database.json_path() wrapper produces the identical result.
+        clause2 = json_db.json_path("oauth", "sub") + " = ?"
+        accounts2 = await Query(Account, "accounts").where(clause2, "user-99").fetch(json_db)
+        assert len(accounts2) == 1
+        assert accounts2[0].id == 2
