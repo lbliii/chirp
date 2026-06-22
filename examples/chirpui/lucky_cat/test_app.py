@@ -2475,6 +2475,7 @@ class TestPortfolioDashboard:
                 assert text.count(f'id="{dom_id}"') == 2, dom_id
 
 
+@pytest.mark.issue(227)
 class TestFreeThreadingPanel:
     """#227 Part A: the visible free-threading proof panel + its live SSE twin."""
 
@@ -2546,6 +2547,7 @@ class TestFreeThreadingPanel:
         assert feed.worker_count >= 2
 
 
+@pytest.mark.issue(227)
 class TestTickCounter:
     """#227 Part A: the observability-only tick counter is honest and never
     perturbs the deterministic price engine."""

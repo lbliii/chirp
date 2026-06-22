@@ -107,6 +107,30 @@ avatars, and attachments.
 Avoid Railway volumes for core forum data. Services with attached volumes can
 have deployment downtime even when a healthcheck is configured.
 
+## Deploy source (GitHub vs CLI upload)
+
+Prefer connecting the Railway service to your GitHub repository so every deploy
+builds the **committed** Dockerfile and application tree with a real commit SHA.
+Directory uploads via `railway up` deploy whatever is on the operator's laptop at
+that moment — including stale checkouts — and carry no commit SHA in the deploy
+metadata. That mismatch caused intermittent Lucky Cat deploy failures (#350): a
+stale local tree still pinned Chirp from PyPI while the example code expected a
+newer framework API.
+
+Recommended shape for the Lucky Cat demo (service root
+`examples/chirpui/lucky_cat/`):
+
+```text
+source_repo: lbliii/chirp
+branch: main
+root_directory: examples/chirpui/lucky_cat
+```
+
+If you keep using `railway up`, run it from an up-to-date `main` checkout so the
+Dockerfile's git-install layer (`GIT_REF=main`) always matches the framework the
+demo imports. See `examples/chirpui/lucky_cat/railway.toml` for the required
+service variables.
+
 ## Scaling
 
 Start with one web replica. Add more only after sessions, rate limits, caches,
