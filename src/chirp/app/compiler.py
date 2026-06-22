@@ -522,7 +522,7 @@ class AppCompiler:
                 self._mutable.template_globals.setdefault(name, fn)
             from chirp.realtime.emit_bridge import register_emit_impl
 
-            register_emit_impl(app.emit)
+            register_emit_impl(cast("App", app).emit)
 
         router = _compile_routes(
             self._mutable.pending_routes,

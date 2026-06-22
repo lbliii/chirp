@@ -11,9 +11,9 @@ receive global-only bindings.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
@@ -22,12 +22,18 @@ from chirp.realtime.signal_globals import reset_signal_audience, set_signal_audi
 SeedFactory = Callable[[], Mapping[str, Any]] | Mapping[str, Callable[[], Any]] | Mapping[str, Any]
 
 
+def _resolve_seed_value(value: Any) -> Any:
+    if callable(value):
+        return cast(Callable[[], Any], value)()
+    return value
+
+
 def _resolve_seeds(seeds: SeedFactory) -> dict[str, Any]:
-    raw = seeds() if callable(seeds) else seeds
-    resolved: dict[str, Any] = {}
-    for name, value in raw.items():
-        resolved[name] = value() if callable(value) else value
-    return resolved
+    if isinstance(seeds, Mapping):
+        raw = cast(Mapping[str, Any], seeds)
+    else:
+        raw = cast(Callable[[], Mapping[str, Any]], seeds)()
+    return {name: _resolve_seed_value(value) for name, value in raw.items()}
 
 
 @dataclass(frozen=True, slots=True)

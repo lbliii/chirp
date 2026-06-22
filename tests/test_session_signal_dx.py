@@ -18,9 +18,7 @@ from chirp.http.headers import Headers
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.middleware import auth as auth_module
-from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.session_signals import SessionSignalConfig, SessionSignalMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.realtime.emit_bridge import clear_emit_impl, register_emit_impl
 from chirp.realtime.signal_globals import make_signal_globals
 from chirp.realtime.signal_trace import encode_signal_emit_trace, get_signal_emit_trace
@@ -150,6 +148,7 @@ class TestSignalBind:
 
 
 class TestSignalEmit:
+    @pytest.mark.issue(395)
     @pytest.mark.issue(409)
     def test_negotiate_emits_and_returns_204(self) -> None:
         app = _make_signal_app()
