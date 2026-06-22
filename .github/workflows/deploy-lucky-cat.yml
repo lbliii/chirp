@@ -38,7 +38,7 @@ jobs:
     # Don't fork-deploy: only the canonical repo holds the token.
     if: github.repository == 'lbliii/chirp'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Install via npm so the `railway` binary lands on PATH (the curl installer
       # drops it in ~/.railway/bin, which isn't on PATH in later steps -> exit 127).
