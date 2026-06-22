@@ -34,6 +34,22 @@ class SwapResolution:
     fragment_block: str | None
     """Block name from the fragment registry when registered."""
 
+    htmx_swap: str | None = None
+    """Optional ``hx-swap`` when the target is a shell outlet (e.g. ``innerHTML``)."""
+
+    htmx_select: str | None = None
+    """Optional ``hx-select`` for shell-outlet boosted nav (e.g. ``#page-content``)."""
+
+    htmx_sync: str | None = None
+    """Optional ``hx-sync`` for shell-outlet boosted nav (e.g. ``#main:replace``)."""
+
+
+# Shell outlets whose boosted GET responses are full documents: swap into the
+# outer target but select the inner content wrapper (chirp-ui shell_outlet contract).
+_SHELL_OUTLET_CONTENT_SELECT: dict[str, str] = {
+    "main": "page-content",
+}
+
 
 def normalize_route_path(path: str) -> str:
     """Normalize a URL path for comparisons (no query or fragment)."""
@@ -248,11 +264,19 @@ def resolve_navigation_swap(
             tid,
         )
 
+    select_id = _SHELL_OUTLET_CONTENT_SELECT.get(tid)
+    htmx_select = f"#{select_id}" if select_id else None
+    htmx_swap = "innerHTML" if select_id else None
+    htmx_sync = f"#{tid}:replace" if select_id else None
+
     return SwapResolution(
         htmx_target=f"#{tid}",
         target_id=tid,
         scope=scope,
         fragment_block=cfg.fragment_block if cfg is not None else None,
+        htmx_swap=htmx_swap,
+        htmx_select=htmx_select,
+        htmx_sync=htmx_sync,
     )
 
 
@@ -303,6 +327,12 @@ def make_swap_attrs(
         if res is None:
             return {}
         out: dict[str, str] = {"hx-target": res.htmx_target}
+        if res.htmx_swap:
+            out["hx-swap"] = res.htmx_swap
+        if res.htmx_select:
+            out["hx-select"] = res.htmx_select
+        if res.htmx_sync:
+            out["hx-sync"] = res.htmx_sync
         if hx_boost:
             out["hx-boost"] = "true"
         return out

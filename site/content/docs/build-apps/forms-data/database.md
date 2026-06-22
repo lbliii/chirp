@@ -348,13 +348,11 @@ The only thing that changes between drivers is the connection string and the SQL
 ::::{code-tabs}
 :sync: db
 
-```python
-# SQLite — built in, no extra dependency
+```python title="SQLite"
 app = App(db="sqlite:///app.db")
 ```
 
-```python
-# PostgreSQL — pip install bengal-chirp[data-pg]
+```python title="PostgreSQL"
 app = App(db="postgresql://user:pass@localhost/mydb", pool_size=10)
 ```
 ::::
@@ -370,13 +368,11 @@ SQLite uses `?` placeholders; PostgreSQL uses `$1`, `$2`, and so on. The mapped 
 ::::{code-tabs}
 :sync: db
 
-```python
-# SQLite
+```python title="SQLite placeholders"
 await db.fetch(User, "SELECT * FROM users WHERE id = ?", 42)
 ```
 
-```python
-# PostgreSQL
+```python title="PostgreSQL placeholders"
 await db.fetch(User, "SELECT * FROM users WHERE id = $1", 42)
 ```
 ::::

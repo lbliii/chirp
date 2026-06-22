@@ -171,8 +171,7 @@ that fills it in.
 ::::{code-tabs}
 :sync: chat-phase
 
-```python
-# Phase 1 — POST returns the scaffolding
+```python title="Phase 1 — POST scaffolding"
 async def post(doc_id: str, request: Request) -> Fragment:
     form = await request.form()
     message = form["message"]
@@ -180,8 +179,7 @@ async def post(doc_id: str, request: Request) -> Fragment:
                     doc_id=doc_id, user_content=message)
 ```
 
-```python
-# Phase 2 — SSE streams tokens
+```python title="Phase 2 — SSE stream"
 def get(doc_id: str) -> EventStream:
     async def generate():
         async for token in ai_session.stream_reply():

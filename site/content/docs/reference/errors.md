@@ -122,22 +122,19 @@ pick whichever fits. Sync and async handlers both work.
 ::::{code-tabs}
 :sync: signature
 
-```python
-# No args
+```python title="No args"
 @app.error(404)
 def handle_404():
     return "Not Found"
 ```
 
-```python
-# Request
+```python title="Request only"
 @app.error(404)
 def handle_404(request: Request):
     return Template("404.html", path=request.path)
 ```
 
-```python
-# Request + error
+```python title="Request + error"
 @app.error(500)
 def handle_500(request: Request, error: Exception):
     log_error(error)

@@ -74,6 +74,7 @@ def test_resolve_navigation_swap_targets_last_shared_shell_ancestor() -> None:
     assert res is not None
     assert res.htmx_target == "#site-content"
     assert res.scope == "site"
+    assert res.htmx_select is None
 
 
 def test_resolve_navigation_swap_targets_nearest_shared_nested_shell() -> None:
@@ -156,6 +157,7 @@ def test_resolve_navigation_swap_targets_nearest_shared_nested_shell() -> None:
     assert res is not None
     assert res.htmx_target == "#community-content"
     assert res.scope == "community"
+    assert res.htmx_select is None
 
 
 def test_resolve_navigation_swap_prefers_explicit_domains_over_shell_metadata() -> None:
@@ -209,6 +211,7 @@ def test_resolve_navigation_swap_prefers_explicit_domains_over_shell_metadata() 
     assert res is not None
     assert res.htmx_target == "#site-content"
     assert res.scope == "site"
+    assert res.htmx_select is None
 
 
 def test_resolve_navigation_swap_returns_none_without_shared_shell_ancestor() -> None:
@@ -284,6 +287,40 @@ def test_resolve_navigation_swap_keeps_legacy_behavior_without_shell_annotations
     assert res is not None
     assert res.htmx_target == "#site-content"
     assert res.scope == "site"
+    assert res.htmx_select is None
+
+
+def test_resolve_navigation_swap_adds_shell_outlet_select_for_main() -> None:
+    registry = FragmentTargetRegistry()
+    registry.register("main", fragment_block="page_root", scope_name="shell")
+    registry.freeze()
+
+    chain = LayoutChain(
+        layouts=(
+            LayoutInfo(
+                "pages/_layout.html",
+                "body",
+                0,
+                swap_scope_name="shell",
+                outlet_target_id="main",
+            ),
+        )
+    )
+
+    res = resolve_navigation_swap(
+        current_path="/markets/SOL-MEOW",
+        destination_path="/",
+        layout_chain_current=chain,
+        layout_chain_dest=chain,
+        registry=registry,
+        swap_scope_map={"shell": "main"},
+    )
+
+    assert res is not None
+    assert res.htmx_target == "#main"
+    assert res.htmx_swap == "innerHTML"
+    assert res.htmx_select == "#page-content"
+    assert res.htmx_sync == "#main:replace"
 
 
 @pytest.mark.asyncio

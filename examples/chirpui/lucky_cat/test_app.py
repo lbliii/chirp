@@ -828,6 +828,27 @@ class TestTopbar:
             # No 'controls' zone: section nav does not belong in the topbar.
             assert "chirpui-shell-actions__group--controls" not in response.text
 
+    @pytest.mark.issue(410)
+    async def test_overflow_about_link_carries_boosted_outlet_select(self, example_app) -> None:
+        """Regression (#410): topbar overflow links use route_link_attrs and must
+        carry the full shell-outlet contract (hx-select), not just hx-target."""
+        import re
+
+        async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            detail = await client.get("/markets/SOL-MEOW", headers=_cookie_header(cookie))
+            assert detail.status == 200
+            m = re.search(
+                r'<a class="chirpui-dropdown__item[^"]*" href="/"[^>]*data-label="About Lucky Cat"',
+                detail.text,
+            )
+            assert m is not None, "overflow About link not found"
+            tag = detail.text[m.start() : detail.text.index(">", m.start()) + 1]
+            assert 'hx-target="#main"' in tag
+            assert 'hx-select="#page-content"' in tag, (
+                "overflow About missing hx-select -> boosted swap nests the shell (#410)"
+            )
+
     async def test_deposit_modal_present(self, example_app) -> None:
         """The deposit dialog + its CSRF-protected form ship inside the page (for
         a signed-in user, who owns the Deposit affordance)."""
