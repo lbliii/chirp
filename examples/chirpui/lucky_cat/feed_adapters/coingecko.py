@@ -12,7 +12,6 @@ import time
 from collections.abc import AsyncIterator
 
 import httpx
-
 from feed import DEFAULT_SEED, SimFeed, Tick
 from feed_adapters._helpers import synthetic_book, ticker_from_last
 from feed_adapters._mapping import COINGECKO_IDS, USER_AGENT
@@ -56,7 +55,9 @@ class CoinGeckoFeed:
         try:
             await self._refresh_once(client)
         except Exception:
-            logger.warning("CoinGeckoFeed could not reach the API; falling back to sim.", exc_info=True)
+            logger.warning(
+                "CoinGeckoFeed could not reach the API; falling back to sim.", exc_info=True
+            )
             await client.aclose()
             _client_var.set(None)
             return False
@@ -167,7 +168,7 @@ class CoinGeckoFeed:
             async for tick in self._sim.subscribe(symbol):
                 yield tick
             return
-        self._sim._require(symbol)  # noqa: SLF001
+        self._sim._require(symbol)
         event = self._events.setdefault(symbol, asyncio.Event())
         while True:
             t = self.ticker(symbol)

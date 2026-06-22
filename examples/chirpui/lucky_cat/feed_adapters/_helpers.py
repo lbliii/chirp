@@ -53,7 +53,9 @@ def ticker_from_last(
     )
 
 
-def synthetic_book(symbol: str, mid: float, *, depth: int = 12, ts: float | None = None) -> OrderBook:
+def synthetic_book(
+    symbol: str, mid: float, *, depth: int = 12, ts: float | None = None
+) -> OrderBook:
     """A tight synthetic ladder around ``mid`` when upstream has no L2 feed."""
     dp = price_dp(mid)
     spread = max(mid * 0.0004, 10.0**-dp)
@@ -80,7 +82,10 @@ def empty_trades() -> tuple[Trade, ...]:
 def map_kraken_book(symbol: str, bids: list, asks: list, *, depth: int, ts: float) -> OrderBook:
     def levels(raw: list, *, reverse: bool) -> tuple[BookLevel, ...]:
         out = [
-            BookLevel(price=round(float(row["price"]), price_dp(float(row["price"]))), size=float(row["qty"]))
+            BookLevel(
+                price=round(float(row["price"]), price_dp(float(row["price"]))),
+                size=float(row["qty"]),
+            )
             for row in raw[:depth]
         ]
         if reverse:

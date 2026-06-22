@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from feed import FeedSource, SimFeed
-from feed_adapters._helpers import map_kraken_ticker, synthetic_book, ticker_from_last
+from feed_adapters._helpers import map_kraken_ticker
 from feed_adapters.kraken import KrakenFeed
 from feed_adapters.mempool import ChainSnapshot, MempoolFeed
 

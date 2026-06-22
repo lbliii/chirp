@@ -22,7 +22,7 @@ def build_adapter(name: str) -> FeedSource | None:
     key = name.strip().lower()
     if key == "kraken":
         try:
-            import websockets  # noqa: F401
+            import websockets
         except ImportError:
             logger.warning("KrakenFeed requires websockets; install websockets to enable.")
             return None
@@ -31,7 +31,7 @@ def build_adapter(name: str) -> FeedSource | None:
         return KrakenFeed()
     if key == "coingecko":
         try:
-            import httpx  # noqa: F401
+            import httpx
         except ImportError:
             logger.warning("CoinGeckoFeed requires httpx; install httpx to enable.")
             return None
@@ -40,7 +40,7 @@ def build_adapter(name: str) -> FeedSource | None:
         return CoinGeckoFeed()
     if key == "mempool":
         try:
-            import websockets  # noqa: F401
+            import websockets
         except ImportError:
             logger.warning("MempoolFeed requires websockets; install websockets to enable.")
             return None

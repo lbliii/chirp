@@ -223,7 +223,7 @@ class KrakenFeed:
             async for tick in self._sim.subscribe(symbol):
                 yield tick
             return
-        self._sim._require(symbol)  # noqa: SLF001 — validate symbol
+        self._sim._require(symbol)
         while True:
             live = self._snapshot(symbol)
             if live and live.ticker is not None:

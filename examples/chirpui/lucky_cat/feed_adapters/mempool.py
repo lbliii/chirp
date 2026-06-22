@@ -98,7 +98,9 @@ class MempoolFeed:
                     ping_interval=30,
                 ) as ws:
                     await ws.send(
-                        json.dumps({"action": "want", "data": ["stats", "mempool-blocks", "blocks"]})
+                        json.dumps(
+                            {"action": "want", "data": ["stats", "mempool-blocks", "blocks"]}
+                        )
                     )
                     async for raw in ws:
                         if self._stop.is_set():
@@ -125,7 +127,9 @@ class MempoolFeed:
             mempool_txs=int(info.get("size") or 0),
             mempool_vbytes=int(info.get("bytes") or 0) // 4 if info.get("bytes") else 0,
             block_height=int(block.get("height")) if block.get("height") is not None else None,
-            block_tx_count=int(block.get("tx_count")) if block.get("tx_count") is not None else None,
+            block_tx_count=int(block.get("tx_count"))
+            if block.get("tx_count") is not None
+            else None,
             updated_at=time.time(),
         )
         with self._lock:
