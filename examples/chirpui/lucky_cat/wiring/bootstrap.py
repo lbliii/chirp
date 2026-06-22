@@ -35,9 +35,7 @@ def _module_foreign_to(mod, root: Path) -> bool:
     mod_path = getattr(mod, "__path__", None)
     if mod_path is not None:
         paths = mod_path if isinstance(mod_path, (list, tuple)) else [mod_path]
-        return all(
-            root.resolve() not in Path(str(p)).resolve().parents for p in paths
-        )
+        return all(root.resolve() not in Path(str(p)).resolve().parents for p in paths)
     return False
 
 
