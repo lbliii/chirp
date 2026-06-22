@@ -8,8 +8,9 @@ SSE routes consume.
 
 The default ``SimFeed`` is fully deterministic (same seed → identical tick
 sequence), dependency-free, and doubles as the test fixture so Lucky Cat runs
-offline and CI-safe with zero external services. Live adapters (Kraken, Coinbase,
-…) are out of scope; only the protocol seam and the sim ship.
+offline and CI-safe with zero external services. Opt-in live adapters (Kraken WS,
+CoinGecko REST, mempool.space on-chain panel) sit behind ``LUCKY_CAT_FEED`` and
+gracefully fall back to ``SimFeed`` when deps or upstream endpoints are unavailable.
 
 Determinism + parallelism: each symbol owns an independent, seeded
 :class:`random.Random` stream, so the *advance* of one symbol never depends on
@@ -804,25 +805,39 @@ class SimFeed:
 # ---------------------------------------------------------------------------
 
 _feed_lock = threading.Lock()
-_feed: SimFeed | None = None
+_feed: FeedSource | None = None
+_feed_name: str | None = None
 
 
-def _build_feed() -> SimFeed:
-    source = os.environ.get("LUCKY_CAT_FEED", "sim").strip().lower()
-    if source != "sim":
-        # Live adapters are out of scope. Anything else is unknown
-        # or unreachable: fall back to the deterministic sim with a logged
-        # warning.
-        logger.warning(
-            "LUCKY_CAT_FEED=%r is not available (live adapters are out of scope for M1); "
-            "falling back to the deterministic SimFeed.",
-            source,
-        )
+def _build_sim() -> SimFeed:
     feed = SimFeed(seed=DEFAULT_SEED)
-    # Warm so the first page paint shows a populated tape / candles / 24h stats
-    # instead of empty placeholders. Deterministic (fixed step count).
     feed.warm()
     return feed
+
+
+def _build_feed() -> FeedSource:
+    source = os.environ.get("LUCKY_CAT_FEED", "sim").strip().lower()
+    if source == "sim":
+        return _build_sim()
+    try:
+        from feed_adapters import build_adapter
+
+        adapter = build_adapter(source)
+        if adapter is not None:
+            global _feed_name
+            _feed_name = source
+            return adapter
+    except Exception:
+        logger.warning(
+            "LUCKY_CAT_FEED=%r failed to construct; falling back to SimFeed.",
+            source,
+            exc_info=True,
+        )
+    logger.warning(
+        "LUCKY_CAT_FEED=%r unavailable; falling back to the deterministic SimFeed.",
+        source,
+    )
+    return _build_sim()
 
 
 def get_feed() -> FeedSource:
@@ -835,15 +850,66 @@ def get_feed() -> FeedSource:
     return _feed
 
 
-def reset() -> None:
-    """Reset the cached app feed to seed state, then re-warm. Used by tests /
-    conftest for isolation. Re-warming mirrors :func:`_build_feed` so every
-    test sees the same populated first-paint snapshots the running app shows
-    (instance ``SimFeed.reset`` stays a pure restore for determinism tests)."""
-    global _feed
+def get_chain_snapshot():
+    """Return the live on-chain panel snapshot when ``LUCKY_CAT_FEED=mempool``."""
+    feed = get_feed()
+    getter = getattr(feed, "chain_snapshot", None)
+    if getter is None:
+        return None
+    return getter()
+
+
+def feed_source_name() -> str:
+    """Resolved ``LUCKY_CAT_FEED`` value (``sim`` when unset or after fallback)."""
+    get_feed()
+    return _feed_name or "sim"
+
+
+def _replace_with_sim() -> None:
+    """Swap the cached feed for ``SimFeed`` after a live adapter fails to start."""
+    global _feed, _feed_name
     with _feed_lock:
-        if _feed is None:
-            _feed = _build_feed()
-        else:
-            _feed.reset()
-            _feed.warm()
+        old = _feed
+        _feed = _build_sim()
+        _feed_name = "sim"
+    if old is not None and hasattr(old, "shutdown_sync"):
+        old.shutdown_sync()
+
+
+async def start_live_feed() -> bool:
+    """Worker-startup hook: connect live adapters; fall back to sim on failure."""
+    feed = get_feed()
+    starter = getattr(feed, "start", None)
+    if starter is None:
+        return True
+    ok = await starter()
+    if not ok:
+        logger.warning("Live feed failed to start; replacing cached feed with SimFeed.")
+        _replace_with_sim()
+    return ok
+
+
+async def shutdown_live_feed() -> None:
+    feed = get_feed()
+    if isinstance(feed, SimFeed):
+        return
+    shutdown = getattr(feed, "shutdown", None)
+    if shutdown is not None and asyncio.iscoroutinefunction(shutdown):
+        await shutdown()
+    elif hasattr(feed, "shutdown_sync"):
+        feed.shutdown_sync()
+
+
+def reset() -> None:
+    """Drop the cached feed so the next :func:`get_feed` rebuilds from env.
+
+    Used by tests / conftest for isolation. Live adapters are shut down when
+    present; the deterministic ``SimFeed`` is the default on the next build.
+    """
+    global _feed, _feed_name
+    with _feed_lock:
+        old = _feed
+        _feed = None
+        _feed_name = None
+    if old is not None and hasattr(old, "shutdown_sync"):
+        old.shutdown_sync()

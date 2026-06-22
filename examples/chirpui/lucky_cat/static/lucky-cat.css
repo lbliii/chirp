@@ -2714,6 +2714,43 @@ a.luckycat-watchlist-star,
   color: var(--lc-down);
 }
 
+/* On-chain panel — mempool.space stats (LUCKY_CAT_FEED=mempool). */
+.luckycat-chain-panel {
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--lc-radius);
+  background: var(--lc-plane-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-hairline),
+    var(--lc-elevation-1);
+}
+.luckycat-chain-panel__lead {
+  margin: 0 0 0.85rem;
+  font-size: var(--lc-text-sm);
+}
+.luckycat-chain-panel__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin: 0;
+}
+.luckycat-chain-panel__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.luckycat-chain-panel__item dt {
+  font-size: var(--lc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.luckycat-chain-panel__item dd {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Featured + watchlist preview — side by side on wide viewports, stacked below. */
 .luckycat-lobby__cols {
   display: grid;

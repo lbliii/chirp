@@ -168,6 +168,35 @@
 {{ featured_spotlight_body(market ?? none, t ?? none, spark ?? none, dir ?? "") }}
 {% endfragment %}
 
+{#- ON-CHAIN PANEL — live Bitcoin mempool stats when LUCKY_CAT_FEED=mempool.
+    Upstream WS → chain signal on /_chirp/live (same idiom as the stat strip). -#}
+{% def chain_panel_body(chain) %}
+{% if (chain ?? none) is not none %}
+<dl class="luckycat-chain-panel__grid">
+  <div class="luckycat-chain-panel__item">
+    <dt class="chirpui-text-muted">Fastest fee</dt>
+    <dd>{{ chain.fastest_fee }} sat/vB</dd>
+  </div>
+  <div class="luckycat-chain-panel__item">
+    <dt class="chirpui-text-muted">Half-hour fee</dt>
+    <dd>{{ chain.half_hour_fee }} sat/vB</dd>
+  </div>
+  <div class="luckycat-chain-panel__item">
+    <dt class="chirpui-text-muted">Mempool txs</dt>
+    <dd>{{ chain.mempool_txs | int }}</dd>
+  </div>
+  <div class="luckycat-chain-panel__item">
+    <dt class="chirpui-text-muted">Latest block</dt>
+    <dd>{% if chain.block_height is not none %}{{ chain.block_height }}{% else %}…{% end %}</dd>
+  </div>
+</dl>
+{% end %}
+{% end %}
+
+{% fragment chain_panel_signal %}
+{{ chain_panel_body(chain ?? none) }}
+{% endfragment %}
+
 {% block page_root %}
 <div id="page-root">
 {% block page_root_inner %}
@@ -208,6 +237,19 @@
              {{ signal_attrs('market_stats') }}>
       {{ stat_strip_body(_stats) }}
     </section>
+
+    {% if (chain ?? none) is not none %}
+    <section id="chain-panel" class="luckycat-chain-panel" aria-label="Bitcoin network"
+             {{ signal_attrs('chain') }}>
+      <h2 class="luckycat-lobby__heading">
+        <span aria-hidden="true">⛓</span> On-chain
+      </h2>
+      <p class="chirpui-text-muted luckycat-chain-panel__lead">
+        Live mempool.space feed — fees, mempool depth, and blocks (upstream WebSocket → Chirp signal).
+      </p>
+      {{ chain_panel_body(chain) }}
+    </section>
+    {% end %}
 
     <div class="luckycat-lobby__cols">
 

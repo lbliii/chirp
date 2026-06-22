@@ -264,8 +264,17 @@ config = replace(
   one-command; production (`CHIRP_ENV != development`) must set it.
 - The market data source defaults to the deterministic `SimFeed`
   (`LUCKY_CAT_FEED=sim`) — no external dependencies, and it doubles as the test
-  fixture. Live adapters are out of scope; only the `FeedSource` protocol seam and
-  the sim ship.
+  fixture. Opt-in live adapters:
+
+  | `LUCKY_CAT_FEED` | Upstream | Notes |
+  |------------------|----------|-------|
+  | `sim` (default) | in-process | deterministic, CI-safe |
+  | `kraken` | Kraken WS v2 | full ticker/book/trades → same SSE surface |
+  | `coingecko` | CoinGecko REST | price/ticker only; synthetic book. Set `COINGECKO_DEMO_API_KEY` on cloud IPs that hit 403/429 |
+  | `mempool` | mempool.space WS | on-chain panel on Markets Home + sim market seam |
+
+  Live adapters need `websockets` and/or `httpx`. If deps or upstream endpoints are
+  unavailable at worker startup, Lucky Cat logs a warning and falls back to `sim`.
 
 ## Structure
 

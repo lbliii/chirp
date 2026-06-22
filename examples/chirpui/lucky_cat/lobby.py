@@ -145,7 +145,21 @@ def lobby_context(
         "research_href": "/markets/research",
         "trending_href": "/markets/trending",
         "favorites_href": "/markets/favorites",
+        "chain": _chain_snapshot(),
+        "feed_source": _feed_source_name(),
     }
+
+
+def _chain_snapshot():
+    from feed import get_chain_snapshot
+
+    return get_chain_snapshot()
+
+
+def _feed_source_name() -> str:
+    from feed import feed_source_name
+
+    return feed_source_name()
 
 
 # ---------------------------------------------------------------------------

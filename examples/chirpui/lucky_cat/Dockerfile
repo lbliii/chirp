@@ -64,7 +64,8 @@ RUN uv venv --python 3.14t /opt/venv
 ARG GIT_REF=main
 ADD "https://api.github.com/repos/lbliii/chirp/commits/${GIT_REF}" /tmp/chirp-commit.json
 RUN uv pip install --python /opt/venv/bin/python \
-    "bengal-chirp[ui,sessions,forms] @ git+https://github.com/lbliii/chirp.git@${GIT_REF}"
+    "bengal-chirp[ui,sessions,forms] @ git+https://github.com/lbliii/chirp.git@${GIT_REF}" \
+    "websockets>=14.0" "httpx>=0.27.0"
 
 # The example is a flat package of sibling modules + a pages/ tree + static/.
 # Copy the whole example directory; app.py inserts its own dir on sys.path.
