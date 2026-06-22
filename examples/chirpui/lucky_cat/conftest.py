@@ -64,10 +64,11 @@ def example_app(request: pytest.FixtureRequest):
         sys.modules[module_name] = module
         sys.modules["app"] = module
         spec.loader.exec_module(module)
-        # Reset the feed to seed state for test isolation (#222 adds reset()).
+        # Reset the feed cache for test isolation (#222); next get_feed() rebuilds.
         feed_mod = sys.modules.get("feed")
         if feed_mod is not None and hasattr(feed_mod, "reset"):
             feed_mod.reset()
+            feed_mod.get_feed()
         session_mod = sys.modules.get("session_store")
         if session_mod is not None and hasattr(session_mod, "reset"):
             session_mod.reset()

@@ -287,15 +287,16 @@ class TestSimFeed:
 
         import feed as feed_mod
 
-        monkeypatch.setenv("LUCKY_CAT_FEED", "kraken")
+        monkeypatch.setenv("LUCKY_CAT_FEED", "not-a-real-feed")
         feed_mod._feed = None
+        feed_mod._feed_name = None
         try:
             with caplog.at_level(logging.WARNING, logger="lucky_cat.feed"):
                 source = feed_mod.get_feed()
             assert isinstance(source, feed_mod.SimFeed)
             assert any("falling back" in r.message for r in caplog.records)
         finally:
-            feed_mod._feed = None
+            feed_mod.reset()
 
     def test_snapshots_render(self) -> None:
         """ticker / order_book / trades / candles all populate after ticks."""

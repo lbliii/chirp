@@ -28,8 +28,9 @@ It is **not** wired to a real exchange. `feed.py` defines a source-agnostic
 `FeedSource` protocol and ships one implementation, `SimFeed` — a fully
 deterministic, dependency-free price engine. Same seed (`DEFAULT_SEED = 0xCA7`)
 => identical tick sequence, so the sim doubles as the test fixture and lets the
-example clone-and-run offline and CI-safe. Live adapters (Kraken/Coinbase) are
-explicitly out of scope.
+example clone-and-run offline and CI-safe. Opt-in live adapters (Kraken WS,
+CoinGecko REST, mempool.space on-chain panel) sit behind ``LUCKY_CAT_FEED`` and
+fall back to ``SimFeed`` when deps or upstream endpoints are unavailable.
 
 ### Web3 non-goals (deliberately out of scope)
 

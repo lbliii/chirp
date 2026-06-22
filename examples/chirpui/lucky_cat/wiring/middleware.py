@@ -61,3 +61,15 @@ def register(app_instance) -> None:
     app_instance.add_middleware(
         SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None))
     )
+
+    @app_instance.on_worker_startup
+    async def _start_live_market_feed() -> None:
+        from feed import start_live_feed
+
+        await start_live_feed()
+
+    @app_instance.on_worker_shutdown
+    async def _shutdown_live_market_feed() -> None:
+        from feed import shutdown_live_feed
+
+        await shutdown_live_feed()

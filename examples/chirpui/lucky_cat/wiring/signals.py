@@ -272,4 +272,34 @@ def notif_announce(feed) -> int:
     return feed.unread
 
 
+# CHIRP — on-chain panel (#226, LUCKY_CAT_FEED=mempool)
+
+
+def _chain_seed():
+    from feed import get_chain_snapshot
+
+    return get_chain_snapshot()
+
+
+def _render_chain_panel(chain) -> str | None:
+    if chain is None:
+        return None
+    return app.render(Fragment("markets/page.html", "chain_panel_signal", chain=chain))
+
+
+@app.signal("chain", initial=_chain_seed, render=_render_chain_panel)
+async def chain_signal():
+    """Live Bitcoin mempool stats when the feed exposes ``watch_chain()``."""
+    from feed import get_feed
+
+    feed = get_feed()
+    watcher = getattr(feed, "watch_chain", None)
+    if watcher is None:
+        if False:  # pragma: no cover - push-only marker for the signal pump
+            yield None
+        return
+    async for snap in watcher():
+        yield snap
+
+
 # CHIRP — DESIGN.md
