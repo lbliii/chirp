@@ -148,6 +148,7 @@ app would fare in production without changing your config, use `chirp check
 | `auth_middleware` | ERROR / WARNING / INFO | Register `AuthMiddleware` (after `SessionMiddleware`) when any route declares auth via `RouteMeta.auth` or `@login_required`/`@requires`. Without it the auth gate's `get_user()` raises `LookupError` → 500. See the dropdown below. |
 | `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy/scope that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` / `app.register_scope()` (unknown permission/policy/scope → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
 | `access_grant_scalar_loop` | ERROR / WARNING | Use `Query.accessible_to(user, perm, resource_type=...)` for paginated list filtering instead of calling `check_access()` / `require_access()` inside a handler loop (N+1 trap). Env-aware (silent dev / WARNING staging / ERROR prod). |
+| `settings_spec` | ERROR / WARNING | Fix a declared `app.register_setting()` spec that shadows a boot-time `AppConfig` field or marks a sensitive value persistable (`secret=False`). Env-aware (silent dev / WARNING staging / ERROR prod). |
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
 | `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
@@ -219,7 +220,7 @@ needs. The `style-src 'unsafe-inline'` relaxation is scoped to `style-src` only 
 
 The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
 `cookie_secure`, `hsts`, `password_extra`, `passkeys`, `auth_middleware`, `auth_spec`,
-`access_grant_scalar_loop`, `sse_auth_gate`, `sse_context`, `csp_nonce`,
+`access_grant_scalar_loop`, `settings_spec`, `sse_auth_gate`, `sse_context`, `csp_nonce`,
 `chirpui_csp`, `deploy_debug`,
 `deploy_metrics`, `deploy_health`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
