@@ -110,6 +110,14 @@ class LifecycleCoordinator:
 
                         await migrate(self._state.db, self._state.migrations_dir)
 
+            settings_registry = self._state.settings_registry
+            if settings_registry is not None and not settings_registry.empty:
+                store = settings_registry.store
+                if store is not None:
+                    doc = await store.load()
+                    settings_registry.apply_persisted(doc)
+                settings_registry.apply_env()
+
             for hook in self._state.startup_hooks:
                 await _run_hook(hook)
             # Startup complete: flip the readiness gate True AFTER all startup

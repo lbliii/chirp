@@ -1047,6 +1047,15 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
 
     result.issues.extend(check_access_grant_scalar_loops(router, posture_config))
 
+    from chirp.contracts.rules_settings import check_settings_spec
+
+    result.issues.extend(
+        check_settings_spec(
+            posture_config,
+            getattr(snapshot, "settings_specs", ()),
+        )
+    )
+
     # Password hashing: a login/mutating surface on argon2-less production posture
     # should install chirp[auth] (argon2id). Env-aware WARNING advisory (silent in
     # development), so --deploy surfaces it via the production-posture view.

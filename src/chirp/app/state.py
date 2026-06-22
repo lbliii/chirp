@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from chirp.live_blocks import LiveBlockSpec
     from chirp.pages.reactive.bus import ReactiveBus
     from chirp.realtime.signals import SignalRegistry
+    from chirp.settings.registry import SettingsRegistry
 
 
 @dataclass(slots=True)
@@ -221,6 +222,13 @@ class MutableAppState:
     #: Lazily created on first ``@app.signal``/``@app.derived`` so apps with no
     #: signals never construct a ``ReactiveBus``.
     signal_registry: SignalRegistry | None = None
+    #: Runtime-mutable operator settings (``app.register_setting``). Lazily
+    #: created on first registration; persisted via an optional store wired at
+    #: ``App()`` construction.
+    settings_registry: SettingsRegistry | None = None
+    #: Optional JSON file path for :class:`~chirp.settings.store.FileSettingsStore`.
+    #: When omitted and a database is wired, settings persist in ``_chirp_settings``.
+    settings_store_path: str | None = None
     #: App-owned :class:`~chirp.pages.reactive.bus.ReactiveBus` instances
     #: (``app.register_reactive_bus``). ``kick_user`` closes matching subscribers
     #: on every registered bus plus the signal registry bus when present.
@@ -322,6 +330,8 @@ class ContractCheckSnapshot:
     #: this explicit producer set (AST inference is insufficient — signal names
     #: are dynamic by nature). Empty when no signals are registered.
     signal_names: frozenset[str] = field(default_factory=frozenset)
+    #: Declared runtime settings specs for the ``settings_spec`` contract check.
+    settings_specs: tuple[Any, ...] = ()
     #: Declared database schema parsed from migrations (or live-introspected),
     #: or ``None`` for HTML-only / db-less apps. Source for the ``data`` shape
     #: contract; keeps the typed-SQL column-mapping check no-op without a db.
