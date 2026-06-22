@@ -446,6 +446,24 @@ class AppCompiler:
             self._registry.discover_and_register_pages(self._mutable.lazy_pages_dir)
             self._mutable.lazy_pages_dir = None
 
+        # Auto-include a Database.probe()-backed readiness check when a db is
+        # wired, so the auto-mounted /ready probe reflects DB connectivity with
+        # no hand-wiring. Idempotent: never append twice across re-freeze.
+        # Guarded by hasattr so a duck-typed db without probe() (test stubs,
+        # legacy facades) does not break freeze — only a real Database opts in.
+        db = self._mutable.db
+        probe = getattr(db, "probe", None)
+        if (
+            db is not None
+            and callable(probe)
+            and not any(hc.name == "database" for hc in self._mutable.health_checks)
+        ):
+            from chirp.health import HealthCheck
+
+            self._mutable.health_checks.append(
+                HealthCheck("database", check=probe, message="database: probe failed")
+            )
+
         from chirp.server.debug_runtime import build_runtime_debug_wiring
 
         debug_wiring = build_runtime_debug_wiring(self._config)
@@ -498,7 +516,17 @@ class AppCompiler:
         self._runtime.routes_by_name = routes_by_name
         self._runtime.route_name_collisions = name_collisions
 
-        middleware_list = list(self._mutable.middleware_list)
+        # Stable priority sort of USER middleware (default priority 0 keeps
+        # registration order byte-identical). Runs under the freeze lock before
+        # publication, and before _validate_middleware_ordering so the hard
+        # CSRF-before-Session floor sees the resolved order. Builtins are added
+        # after this and stay positionally pinned.
+        from chirp.middleware.ordering import sort_user_middleware
+
+        middleware_list = sort_user_middleware(
+            self._mutable.middleware_list,
+            self._mutable.middleware_priorities,
+        )
         _validate_middleware_ordering(middleware_list)
         middleware_list = _collect_builtin_middleware(
             self._config,

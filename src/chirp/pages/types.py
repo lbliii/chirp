@@ -58,18 +58,36 @@ class AuthSpec:
     ``required`` flag: an authn-only gate is ``AuthSpec()`` (no permissions, no
     policy).
 
+    ``scopes`` is the **machine-auth** axis, distinct from the human
+    ``permissions`` axis. Webhook / cron / provisioning endpoints gate on the
+    *token* scopes carried by the resolved client (a
+    :class:`~chirp.middleware.auth.ClientWithScopes` exposing ``scopes:
+    frozenset[str]``), independent of human permissions: a token-resolved client
+    holding the required scope passes even with no permissions, and a human user
+    holding the permissions but not the scope fails the scope gate. Scope
+    enforcement is **implicitly off** — a ``spec`` with no ``scopes`` runs no
+    scope step at all, so existing ``verify_token`` users are never newly 403'd
+    (there is no separate enable flag). Scope-equality is compared in
+    constant time (``secrets.compare_digest``), and a declared scope absent from
+    ``app.register_scope`` is a startup ``auth_spec`` contract ERROR.
+
     Attributes:
         permissions: Required permission names. Empty means authn-only.
         mode: ``"all"`` requires every permission (subset check); ``"any"``
-            requires a non-empty intersection.
+            requires a non-empty intersection. The same mode governs ``scopes``.
         policy: Optional policy NAME resolved against the app policy registry
             at request time. Never a callable — keeps ``RouteMeta``
             serializable.
+        scopes: Required machine-token scope names (independent of
+            ``permissions``). Empty (the default) means no scope gate. ``mode``
+            applies: ``"all"`` requires every scope, ``"any"`` a non-empty
+            intersection.
     """
 
     permissions: tuple[str, ...] = ()
     mode: AuthMode = "all"
     policy: str | None = None
+    scopes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

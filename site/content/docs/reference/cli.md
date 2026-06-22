@@ -53,12 +53,14 @@ chirp <command> --help # flags for any command
   - Render routes to static HTML files.
 * - `chirp makemigrations`
   - Generate a schema migration from a SQL diff.
+* - `chirp migrate`
+  - Apply pending schema migrations (one-shot deploy job).
 :::
 
 The three commands below are documented in full. For `run`/`dev` see
 [[docs/quality/deployment/production|Production deployment]]; for `freeze` see
 [[docs/quality/deployment/freeze-hybrid|Freeze and hybrid hosting]]; for
-`makemigrations` see [[docs/build-apps/forms-data/database|Database]].
+`makemigrations` and `migrate` see [[docs/build-apps/forms-data/database|Database]].
 
 ---
 
@@ -206,6 +208,45 @@ chirp shapes-codegen myapp:app --audit
   - Audit `surface_contracts` for names with no backing Shape; exit non-zero on drift.
 * - `--migrations DIR`
   - Migrations directory (reserved for future incremental codegen output).
+:::
+
+## `chirp migrate` — apply pending migrations
+
+:::{since} 0.9
+:::
+
+`chirp migrate --db <url> --migrations-dir <dir>` applies pending migrations
+from a directory as a **one-shot job**. It connects to the database, runs
+[[docs/build-apps/forms-data/database|`migrate()`]], prints a summary, and
+disconnects. It does **not** import or boot your app (no freeze, no contract
+checks) — it takes the same `--db` / `--migrations-dir` flags as
+`makemigrations`, not an app import string.
+
+```bash
+chirp migrate --db "$DATABASE_URL" --migrations-dir migrations
+```
+
+It is fail-loud: a failed migration, an invalid migrations directory, or a
+checksum-drift edit of an already-applied migration prints the error and exits
+`1`. Nothing is swallowed.
+
+Pair it with `AppConfig(skip_migrations=True)` (or `CHIRP_SKIP_MIGRATIONS=1`) so
+the app does not also run migrations on boot. In a multi-replica deploy this
+lets a single pre-deploy job own migration application instead of every replica
+racing on startup. When the on-boot run is skipped, the app logs a
+`lifecycle:migrations-skipped` warning so a missing deploy job (and the
+resulting stale schema) is visible. See
+[[docs/quality/deployment/production|Production deployment]].
+
+:::{list-table}
+:header-rows: 1
+
+* - Flag
+  - Effect
+* - `--db`
+  - Database URL (required), e.g. `sqlite:///app.db`.
+* - `--migrations-dir`
+  - Directory containing migration files (default `migrations`).
 :::
 
 ## Gotchas

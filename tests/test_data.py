@@ -175,6 +175,31 @@ class TestLifecycle:
         await db.disconnect()
         await db.disconnect()  # should not raise
 
+    async def test_probe_returns_true_on_healthy_db(self, tmp_path) -> None:
+        """probe() runs SELECT 1 on a fresh pooled connection and returns True."""
+        db = Database(f"sqlite:///{tmp_path / 'probe.db'}")
+        await db.connect()
+        try:
+            assert await db.probe() is True
+        finally:
+            await db.disconnect()
+
+    async def test_probe_returns_false_on_failure(self, tmp_path, monkeypatch) -> None:
+        """probe() never raises — a query/connection failure returns False."""
+        import chirp.data.database as db_mod
+
+        db = Database(f"sqlite:///{tmp_path / 'probe_fail.db'}")
+        await db.connect()
+        try:
+
+            async def _boom(*args, **kwargs):
+                raise RuntimeError("connection refused")
+
+            monkeypatch.setattr(db_mod, "_execute_fetch_one", _boom)
+            assert await db.probe() is False
+        finally:
+            await db.disconnect()
+
 
 # =============================================================================
 # Fetch
@@ -604,6 +629,105 @@ class TestMigrations:
 
         await db.disconnect()
 
+    @pytest.mark.issue(367)
+    async def test_migrate_edited_applied_migration_fails_loud(self, tmp_path) -> None:
+        """Editing an already-applied migration file fails loud on the next run."""
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        mig = migrations_dir / "001_create_t.sql"
+        mig.write_text("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+        db_path = tmp_path / "drift.db"
+        db = Database(f"sqlite:///{db_path}")
+        await db.connect()
+
+        result1 = await migrate(db, migrations_dir)
+        assert result1.applied == ["001_create_t"]
+
+        # Mutate the already-applied migration on disk.
+        mig.write_text("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+
+        with pytest.raises(MigrationError, match="001_create_t"):
+            await migrate(db, migrations_dir)
+
+        await db.disconnect()
+
+    async def test_migrate_checksum_written_on_apply(self, tmp_path) -> None:
+        """A fresh apply populates the checksum column."""
+        import hashlib
+
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        sql = "CREATE TABLE t (id INTEGER PRIMARY KEY)"
+        (migrations_dir / "001_create_t.sql").write_text(sql)
+
+        db_path = tmp_path / "written.db"
+        db = Database(f"sqlite:///{db_path}")
+        await db.connect()
+
+        await migrate(db, migrations_dir)
+
+        stored = await db.fetch_val("SELECT checksum FROM _chirp_migrations WHERE version = 1")
+        # Migration.sql is the .strip()-ed file body.
+        assert stored == hashlib.sha256(sql.encode("utf-8")).hexdigest()
+
+        await db.disconnect()
+
+    async def test_migrate_unchanged_reruns_clean(self, tmp_path) -> None:
+        """Re-running with the file untouched is a no-op (no false drift)."""
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        (migrations_dir / "001_create_t.sql").write_text("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+        db_path = tmp_path / "clean.db"
+        db = Database(f"sqlite:///{db_path}")
+        await db.connect()
+
+        await migrate(db, migrations_dir)
+        result2 = await migrate(db, migrations_dir)
+        assert result2.applied == []
+
+        await db.disconnect()
+
+    async def test_migrate_legacy_null_checksum_not_flagged(self, tmp_path) -> None:
+        """A pre-checksum tracking row (NULL checksum) is never flagged as drift.
+
+        Simulates a tracking table created by a pre-checksum Chirp version: the
+        table has no checksum column, so the upgrade path adds it as NULL for the
+        existing legacy row. Re-running migrate() must not raise.
+        """
+        migrations_dir = tmp_path / "migrations"
+        migrations_dir.mkdir()
+        (migrations_dir / "001_create_t.sql").write_text("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+        db_path = tmp_path / "legacy.db"
+        db = Database(f"sqlite:///{db_path}")
+        await db.connect()
+
+        # Hand-build the OLD (pre-checksum) tracking table + a legacy row, then
+        # create the migration's table so the migration is "already applied".
+        await db.execute(
+            "CREATE TABLE _chirp_migrations ("
+            "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
+        )
+        await db.execute(
+            "INSERT INTO _chirp_migrations (version, name, applied_at) VALUES (1, ?, ?)",
+            "001_create_t",
+            "2026-01-01T00:00:00+00:00",
+        )
+        await db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+        # Upgrade path adds the column (NULL for the legacy row) and skips drift.
+        result = await migrate(db, migrations_dir)
+        assert result.applied == []
+
+        legacy_checksum = await db.fetch_val(
+            "SELECT checksum FROM _chirp_migrations WHERE version = 1"
+        )
+        assert legacy_checksum is None
+
+        await db.disconnect()
+
 
 # =============================================================================
 # LISTEN/NOTIFY
@@ -738,6 +862,7 @@ class TestExports:
             "ShapeError",
             "composite",
             "get_db",
+            "json_path",
             "migrate",
             "nested",
             "register_shape",

@@ -181,6 +181,36 @@ For every `AppConfig` field, see [[docs/about/core-concepts/configuration|Config
 Chirp does not read Pounce's own environment variable names. If your platform injects deploy variables, read them in your app code and build an `AppConfig`, or start through `pounce serve --config pounce.toml`.
 :::
 
+## Health and readiness probes
+
+Chirp auto-mounts two ops endpoints — no hand-wiring, present on every app including the `chirp new --minimal` scaffold:
+
+- **`/health`** (liveness) — always returns plain `200 ok`. Wire it to a Kubernetes `livenessProbe`: if it stops answering, the orchestrator restarts the pod.
+- **`/ready`** (readiness) — returns `503` until startup completes (db connect, migrations, and every `@app.on_startup` hook), then runs every registered readiness check. If a check fails it returns `503` plus the failure list; otherwise plain `200 ready`. Wire it to a `readinessProbe` so the pod is pulled from the load-balancer rotation while it is starting up, draining on shutdown, or a dependency is down.
+
+Both probes **bypass the secure middleware stack** (Session/CSRF/SecurityHeaders) and the commit teardown — they run no user handler, set no cookie, and never touch the session — and return plain `200`/`503` text outside Chirp's return-type negotiation.
+
+Change the paths with `AppConfig(health_path=..., ready_path=...)` or `CHIRP_HEALTH_PATH` / `CHIRP_READY_PATH`. A user route claiming a probe path wins (the probe steps aside); `app.check()` flags the collision as a `deploy_health` ERROR so it never happens silently.
+
+Register dependency checks before freeze:
+
+```python
+from chirp import HealthCheck
+
+app.add_health_check(HealthCheck("cache", check=ping_cache))   # sync or async
+```
+
+When a database is wired, Chirp auto-includes a `Database.probe()`-backed check (a `SELECT 1` on a **fresh pooled connection**, never the request session), so `/ready` reflects DB connectivity for free.
+
+A Kubernetes deployment wires them like this:
+
+```yaml
+livenessProbe:
+  httpGet: { path: /health, port: 8000 }
+readinessProbe:
+  httpGet: { path: /ready, port: 8000 }
+```
+
 ## Wire the secure-by-default stack
 
 A production app with any mutating route must wire `SessionMiddleware` → `CSRFMiddleware` → `SecurityHeadersMiddleware`. Chirp does not inject these for you; `chirp check --deploy` fails when they are missing in production. Every `chirp new` scaffold wires them out of the box.

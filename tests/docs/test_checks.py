@@ -247,7 +247,7 @@ class TestAppCheckIntegration:
             autodoc=True,
         )
 
-        @app.route("/health")
+        @app.route("/api/health")
         def health():
             """Health check."""
             return "ok"

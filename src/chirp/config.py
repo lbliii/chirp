@@ -83,6 +83,14 @@ def _env_log_format(key: str, default: str) -> str:
     return default
 
 
+def _env_log_level(key: str, default: str) -> str:
+    """Read log level from env; invalid values fall back to default."""
+    val = (os.environ.get(key) or "").lower().strip()
+    if val in ("debug", "info", "warning", "error", "critical"):
+        return val
+    return default
+
+
 def _levenshtein(a: str, b: str) -> int:
     """Compute Levenshtein distance between two strings."""
     if len(a) < len(b):
@@ -267,6 +275,13 @@ class AppConfig:
     metrics_enabled: bool = False
     metrics_path: str = "/metrics"
 
+    # Health probes (auto-mounted): /health (liveness, plain 200) and /ready
+    # (readiness — runs registered checks + gates on the startup-complete flag,
+    # 503 until ready). Auto-mounted unless a user route claims the path; probe
+    # paths short-circuit before the secure middleware stack + commit teardown.
+    health_path: str = "/health"
+    ready_path: str = "/ready"
+
     # Phase 6.2: Rate Limiting
     rate_limit_enabled: bool = False
     rate_limit_requests_per_second: float = 100.0
@@ -348,6 +363,7 @@ class AppConfig:
     http_timeout: float = 30.0
     http_retries: int = 0
     skip_contract_checks: bool = False
+    skip_migrations: bool = False
     lazy_pages: bool = False
 
     # Debug fragment validator (debug mode only) — warns when fragment
@@ -435,10 +451,11 @@ class AppConfig:
             SECRET_KEY, DEBUG, ENV, HOST, PORT, ALLOWED_HOSTS,
             LOG_FORMAT (auto|text|json — forwarded to Pounce),
             SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE,
-            REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, LAZY_PAGES,
+            REDIS_URL, AUDIT_SINK, SKIP_CONTRACT_CHECKS, SKIP_MIGRATIONS, LAZY_PAGES,
             HTTP_TIMEOUT, HTTP_RETRIES,
             TRUSTED_PROXIES (comma/space-separated reverse-proxy peers),
             FORWARDED_FOR_TRUSTED_HOPS (int >= 1),
+            HEALTH_PATH, READY_PATH (auto-mounted probe paths),
             FEATURE_<NAME>=true|false (e.g. CHIRP_FEATURE_X=true)
 
         Railway compatibility:
@@ -477,9 +494,11 @@ class AppConfig:
                     "REDIS_URL",
                     "AUDIT_SINK",
                     "LOG_FORMAT",
+                    "LOG_LEVEL",
                     "HTTP_TIMEOUT",
                     "HTTP_RETRIES",
                     "SKIP_CONTRACT_CHECKS",
+                    "SKIP_MIGRATIONS",
                     "LAZY_PAGES",
                     "SENTRY_DSN",
                     "SENTRY_ENVIRONMENT",
@@ -490,6 +509,8 @@ class AppConfig:
                     "MAX_UPLOAD_PARTS",
                     "TRUSTED_PROXIES",
                     "FORWARDED_FOR_TRUSTED_HOPS",
+                    "HEALTH_PATH",
+                    "READY_PATH",
                 }
             ),
         )
@@ -510,6 +531,7 @@ class AppConfig:
             trusted_proxies=_env_trusted_proxies(p),
             forwarded_for_trusted_hops=_env_int(f"{p}FORWARDED_FOR_TRUSTED_HOPS", 1),
             log_format=_env_log_format(f"{p}LOG_FORMAT", "auto"),
+            log_level=_env_log_level(f"{p}LOG_LEVEL", "info"),
             debug=debug,
             secret_key=os.environ.get(f"{p}SECRET_KEY", ""),
             env=env_val,
@@ -519,6 +541,7 @@ class AppConfig:
             http_timeout=_env_float(f"{p}HTTP_TIMEOUT", 30.0),
             http_retries=_env_int(f"{p}HTTP_RETRIES", 0),
             skip_contract_checks=_env_bool(f"{p}SKIP_CONTRACT_CHECKS", False),
+            skip_migrations=_env_bool(f"{p}SKIP_MIGRATIONS", False),
             lazy_pages=_env_bool(f"{p}LAZY_PAGES", False),
             sentry_dsn=os.environ.get(f"{p}SENTRY_DSN") or None,
             sentry_environment=os.environ.get(f"{p}SENTRY_ENVIRONMENT") or None,
@@ -527,6 +550,8 @@ class AppConfig:
             max_upload_size=_env_int(f"{p}MAX_UPLOAD_SIZE", 16 * 1024 * 1024),
             upload_spool_threshold=_env_int(f"{p}UPLOAD_SPOOL_THRESHOLD", 1024 * 1024),
             max_upload_parts=_env_int(f"{p}MAX_UPLOAD_PARTS", 1000),
+            health_path=os.environ.get(f"{p}HEALTH_PATH", "/health"),
+            ready_path=os.environ.get(f"{p}READY_PATH", "/ready"),
         )
         if overrides:
             config = replace(config, **overrides)

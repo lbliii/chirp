@@ -275,6 +275,82 @@ class TestLifespanProtocol:
         assert app._frozen is True
 
 
+class _FakeDatabase:
+    """Minimal Database stand-in for migration-gating lifespan tests."""
+
+    async def connect(self) -> None:
+        pass
+
+    async def disconnect(self) -> None:
+        pass
+
+
+class TestOnBootMigrationGate:
+    """skip_migrations gates the on-boot migrate() run (issue #380)."""
+
+    async def test_migrate_runs_when_not_skipped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import importlib
+
+        migrate_mod = importlib.import_module("chirp.data.migrate")
+
+        app = App()
+        calls: list[tuple[Any, Any]] = []
+
+        async def _spy_migrate(db: Any, directory: Any):
+            calls.append((db, directory))
+
+        # Patch the submodule attribute directly: chirp.data re-exports
+        # `migrate`, so the dotted name `chirp.data.migrate` resolves to the
+        # function in that package namespace, not the submodule. The lifecycle
+        # does `from chirp.data.migrate import migrate`, which imports from this
+        # module object — patching it here intercepts that import.
+        monkeypatch.setattr(migrate_mod, "migrate", _spy_migrate)
+
+        app._mutable_state.db = cast(Any, _FakeDatabase())
+        app._mutable_state.migrations_dir = "migrations"
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        _sent, ok = await _lifespan_exchange(app)
+
+        assert ok is True
+        assert len(calls) == 1, "migrate() must run on boot when skip_migrations is False"
+        assert calls[0][1] == "migrations"
+
+    async def test_migrate_skipped_when_skip_migrations_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import importlib
+
+        from chirp import AppConfig
+
+        migrate_mod = importlib.import_module("chirp.data.migrate")
+
+        app = App(config=AppConfig(skip_migrations=True))
+        calls: list[tuple[Any, Any]] = []
+
+        async def _spy_migrate(db: Any, directory: Any):
+            calls.append((db, directory))
+
+        monkeypatch.setattr(migrate_mod, "migrate", _spy_migrate)
+
+        app._mutable_state.db = cast(Any, _FakeDatabase())
+        app._mutable_state.migrations_dir = "migrations"
+
+        @app.route("/")
+        def index():
+            return "ok"
+
+        _sent, ok = await _lifespan_exchange(app)
+
+        # Startup still succeeds — the migration run is intentionally bypassed,
+        # not failed (the deploy job owns migration application instead).
+        assert ok is True
+        assert calls == [], "migrate() must NOT run on boot when skip_migrations is True"
+
+
 class TestLifespanTestClient:
     """Hooks fire during async with TestClient(app)."""
 

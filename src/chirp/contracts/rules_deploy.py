@@ -5,6 +5,7 @@ production-posture mistakes that otherwise surface only after deploy:
 
 - ``deploy_debug``: ``debug=True`` while ``env="production"``
 - ``deploy_metrics``: ``metrics_path`` collides with an application route
+- ``deploy_health``: ``health_path``/``ready_path`` collides with an app route
 - ``deploy_sentry``: a Sentry DSN is set but traces are silently disabled
 
 Scope is strictly *check rules* — no deploy automation, no Procfile/Dockerfile
@@ -72,6 +73,40 @@ def check_metrics_path_collision(config: Any, router: Router) -> list[ContractIs
                 )
             ]
     return []
+
+
+def check_health_path_collision(config: Any, router: Router) -> list[ContractIssue]:
+    """ERROR when an auto-mounted probe path collides with an app route.
+
+    Chirp auto-mounts ``/health`` (liveness) and ``/ready`` (readiness) at
+    ``health_path`` / ``ready_path``. These are always mounted (no enable gate),
+    so an application route sharing a probe path shadows the probe: the route
+    serves and the probe silently steps aside, so K8s liveness/readiness checks
+    hit the app handler (secure stack, CSRF, return-type negotiation) instead of
+    the plain 200/503 probe. Fix: rename the route or change ``health_path`` /
+    ``ready_path``.
+    """
+    issues: list[ContractIssue] = []
+    route_paths = {getattr(r, "path", None) for r in getattr(router, "routes", [])}
+    for label, path in (
+        ("health_path", getattr(config, "health_path", "/health")),
+        ("ready_path", getattr(config, "ready_path", "/ready")),
+    ):
+        if path in route_paths:
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="deploy_health",
+                    message=(
+                        f"{label} '{path}' collides with an application route. "
+                        f"The auto-mounted health probe and the route shadow each "
+                        f"other — the route wins and the probe never serves. "
+                        f"Rename the route or change {label}."
+                    ),
+                    route=path,
+                )
+            )
+    return issues
 
 
 def check_sentry_sample_rate(config: Any) -> list[ContractIssue]:

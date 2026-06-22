@@ -40,6 +40,7 @@ from chirp.data.errors import (
     DriverNotInstalledError,
     QueryError,
 )
+from chirp.data.query import json_path as _json_path
 from chirp.data.types import DatabaseConfig, Notification
 
 _log = logging.getLogger("chirp.data")
@@ -500,6 +501,53 @@ class Database:
                 raise QueryError(str(exc)) from exc
             finally:
                 self._log_query(sql, params, time.perf_counter() - t0)
+
+    # -- Readiness probe --
+
+    async def probe(self) -> bool:
+        """Readiness probe — can the pool serve a trivial query?
+
+        Runs ``SELECT 1`` on a **fresh pooled connection** (acquired via
+        ``self._connection()``, released on exit), never the request session or
+        a live ``transaction()`` connection. A probe must never reuse a possibly
+        poisoned request-scoped connection — it asks "is the database reachable
+        right now?", independent of any in-flight request's transaction state.
+
+        Returns ``True`` when the query succeeds, ``False`` on any error
+        (connection refused, pool exhausted, driver error). Never raises — it is
+        wired into the ``/ready`` probe via ``app.add_health_check`` and a raise
+        would surface as the check's failure message either way, but returning a
+        plain bool keeps the probe's contract simple.
+
+        Auto-wired into ``/ready`` when a db is attached to the app; db-less apps
+        never call it.
+        """
+        try:
+            async with self._connection() as conn:
+                await _execute_fetch_one(self._driver, conn, "SELECT 1", ())
+            return True
+        except Exception:
+            return False
+
+    # -- JSON path helper --
+
+    def json_path(self, column: str, /, *keys: str) -> str:
+        """Build a dialect-correct JSON-extraction SQL expression fragment.
+
+        Convenience wrapper over :func:`chirp.data.json_path` that supplies this
+        database's active driver as the dialect, so call sites never hand-branch
+        on sqlite-vs-postgres::
+
+            where_clause = db.json_path("oauth", "sub") + " = ?"
+            user = await db.fetch_one(User, f"SELECT * FROM users WHERE {where_clause}", sub_id)
+
+        On SQLite this emits ``json_extract(oauth, '$.sub')``; on PostgreSQL it
+        emits ``oauth->>'sub'``. The expression contains no bound-parameter
+        placeholder of its own — keep filter values as separate bound params and
+        **never** pass request/user values as ``column`` or ``keys`` (they are
+        concatenated into the SQL text, not parameterized).
+        """
+        return _json_path(column, *keys, dialect=self._driver)
 
     # -- LISTEN/NOTIFY (PostgreSQL only) --
 

@@ -29,13 +29,25 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Application | `App`, `AppConfig` |
 | HTTP | `Request`, `Response`, `FileResponse`, `JSONResponse`, `Redirect`, `hx_redirect` |
 | Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `Action` |
-| Middleware | `Middleware`, `Next`, `AnyResponse` |
+| Middleware | `Middleware`, `Next`, `AnyResponse` (register with `app.add_middleware(mw, *, priority=0)`) |
 | Request context | `g`, `get_request` |
 | Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
 | Auth and security | `get_user`, `current_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
 | Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
 | Markdown | `MarkdownRenderer` |
+
+### Request notes
+
+`Request.trusted_client_ip` is the blessed accessor for the trusted-proxy-corrected
+client IP — use it for rate-limit and audit keying. It returns `client[0]` (falling
+back to `"unknown"` when the scope has no client) and **never raises**. It is
+fail-closed: it deliberately does not read a raw, client-spoofable `X-Forwarded-For`
+header. In production Chirp's ASGI server (pounce) applies the trusted-proxy model
+(`AppConfig.trusted_proxies` + `AppConfig.forwarded_for_trusted_hops`) into
+`scope["client"]` before the `Request` is built, so `client[0]` is already the
+trusted-derived IP; under a non-pounce server that leaves `scope["client"]` as the
+raw peer, this is only as trustworthy as that server.
 
 ## Provisional Extension Surface
 
@@ -53,7 +65,8 @@ shape may still evolve before 1.0:
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
-| Secure-by-default stack | `secure_stack` |
+| Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
+| Secure-by-default stack | `secure_stack` (optional `auth=AuthConfig(...)` and `audit=AuditConfig(...)` legs) |
 | Optional UI bridge | `use_chirp_ui` |
 
 ## 1.0 Audit Decisions
@@ -91,6 +104,7 @@ from chirp.security import (
     verify_login,
     verify_and_upgrade,
     needs_rehash,
+    resolve_permissions,
 )
 ```
 
@@ -101,10 +115,54 @@ from chirp.security import (
 | `verify_login` | `(password: str, phc_hash: str \| None) -> bool` | Login verification that resists user-enumeration timing: an unknown user (`phc_hash is None`) still runs a decoy verify. Pass `None` for "no such user". |
 | `verify_and_upgrade` | `(password: str, phc_hash: str) -> tuple[bool, str \| None]` | Verify and opportunistically return a fresh hash when the password is correct **and** the stored hash is below current cost. `(True, new_hash)` / `(True, None)` / `(False, None)`. Never rehashes a wrong guess. |
 | `needs_rehash` | `(phc_hash: str, *, upgrade_algorithm: bool = False) -> bool` | Report whether a stored hash is below current cost parameters. The algorithm-upgrade clause (scrypt stale because argon2 is now installed) is gated behind `upgrade_algorithm`, off by default. |
+| `resolve_permissions` | `(group_blobs: Iterable[Mapping[str, Any] \| Iterable[str]], *, base: frozenset[str] = frozenset()) -> frozenset[str]` | OR-merge (most-permissive-wins union) a user's group permission blobs into the flat `frozenset` the gate checks. Accepts both flat `Iterable[str]` blobs and nested truthy-leaf `Mapping` blobs (flattened to dotted keys, only truthy leaves). Call it in your own `load_user`; matching stays exact (no dotted-prefix coverage). |
 
 The route-protection helpers (`login_required`, `requires`) and lockout/audit
 helpers (`LoginLockout`, `LockoutConfig`, `set_security_event_sink`) are also
 exported from `chirp.security`.
+
+## `chirp.middleware` Module Surface
+
+Built-in middleware and their config dataclasses live on the `chirp.middleware`
+module rather than the top-level `from chirp import` surface. They are **not**
+part of the `chirp.__all__` snapshot (this listing is maintained by hand) but are
+documented-public and stable for application code.
+
+```python
+from chirp.middleware import (
+    AuthRateLimitMiddleware,
+    AuthRateLimitConfig,
+    RateLimitBackend,
+    redis_rate_limit_backend,
+)
+```
+
+| Name | Purpose |
+|------|---------|
+| `AuthRateLimitMiddleware` | Keyed rate limiter. Defaults limit the common auth endpoints by `request.trusted_client_ip`; with `key_fn` + open path targeting it limits any route/group (per-user, per-resource, per-tenant). |
+| `AuthRateLimitConfig` | Config: `requests`, `window_seconds`, `block_seconds`, `methods`, `paths` (`()` = all routes), `key_header`, `key_fn` (`(Request) -> str \| None`; `None` skips the request), `error_template` / `error_block` (HTML 429 for htmx POSTs), `backend`. |
+| `RateLimitBackend` | Protocol for pluggable rate-limit storage (`check_and_update(...)`). Implement it for a custom shared backend. |
+| `redis_rate_limit_backend` | `(redis_url, key_prefix="chirp:ratelimit:") -> RateLimitBackend` — Redis sliding-window backend shared across workers (requires `chirp[redis]`). |
+| `AuditMiddleware` | Opt-in per-request who/what/when/status audit trail. Emits one `http.request` event per audited request through the existing `emit_security_event` sink (`status_code`/`source_ip`/`user_agent`/`user_id` in `details`). OFF by default; downgrades to metadata-only and never drains the body for `StreamingResponse`/`SSEResponse`/`FileResponse` (`Stream`/`Suspense`/`EventStream`). Source IP from `request.trusted_client_ip` (never a re-parsed `X-Forwarded-For`). |
+| `AuditConfig` | Config: `level` (`"none"` default OFF, `"metadata"`, `"request"`, `"request_response"`), `max_body_bytes` (default `4096`), `audited_methods` (default `MUTATING_METHODS`), `redact_keys` (default `("password", "token", "secret", "csrf_token")`, case-insensitive form-key masking), `redact_patterns` (regex masking). Frozen + slotted. |
+
+(The other built-in middleware — `SessionMiddleware`, `CSRFMiddleware`,
+`SecurityHeadersMiddleware`, `AuthMiddleware`, `CORSMiddleware`,
+`AllowedHostsMiddleware`, `StaticFiles`, `CSPNonceMiddleware`, `HTMLInject` — are
+also `chirp.middleware` exports.)
+
+## Middleware Ordering
+
+`app.add_middleware(middleware, *, priority=0)` registers a middleware in the
+request pipeline. The optional keyword-only `priority` makes the resolved order
+explicit and independent of registration order: at freeze the user middleware is
+stably sorted by `(priority, registration_order)`, and **lower priority runs
+outermost** (it wraps the higher-priority middleware). The default `priority=0`
+keeps registration order, so existing apps are byte-identical. Built-in
+middleware stays positionally pinned around the user chain. A `priority` that
+places CSRF middleware outside session middleware still raises a configuration
+error at freeze, and `app.check()` reports the resolved chain under the INFO
+`middleware_chain` diagnostic category (see the contract categories reference).
 
 ## Debug And Advanced
 

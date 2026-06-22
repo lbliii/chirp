@@ -1,8 +1,8 @@
-"""Tests for auth-focused rate limiting middleware."""
+"""Tests for keyed rate limiting middleware."""
 
 import pytest
 
-from chirp import App
+from chirp import App, AppConfig
 from chirp.middleware.auth_rate_limit import AuthRateLimitConfig, AuthRateLimitMiddleware
 from chirp.testing import TestClient
 
@@ -57,7 +57,10 @@ async def test_non_limited_path_is_ignored() -> None:
 
 
 @pytest.mark.anyio
-async def test_limit_is_per_identity_key() -> None:
+async def test_limit_is_per_identity_key_via_trusted_header() -> None:
+    # key_header now names a TRUSTED, server-set identity header consumed
+    # verbatim (NOT an X-Forwarded-For override). Distinct identities get
+    # distinct buckets.
     app = App()
     app.add_middleware(
         AuthRateLimitMiddleware(
@@ -66,7 +69,7 @@ async def test_limit_is_per_identity_key() -> None:
                 window_seconds=60,
                 block_seconds=120,
                 paths=("/login",),
-                key_header="x-forwarded-for",
+                key_header="x-api-key",
             )
         )
     )
@@ -78,25 +81,67 @@ async def test_limit_is_per_identity_key() -> None:
 
     async with TestClient(app) as client:
         common_headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        first_ip_1 = await client.post(
+        first_id_1 = await client.post(
             "/login",
             body=b"a=1",
-            headers={**common_headers, "x-forwarded-for": "10.0.0.1"},
+            headers={**common_headers, "x-api-key": "tenant-a"},
         )
-        second_ip_1 = await client.post(
+        second_id_1 = await client.post(
             "/login",
             body=b"a=1",
-            headers={**common_headers, "x-forwarded-for": "10.0.0.1"},
+            headers={**common_headers, "x-api-key": "tenant-a"},
         )
-        first_ip_2 = await client.post(
+        first_id_2 = await client.post(
             "/login",
             body=b"a=1",
-            headers={**common_headers, "x-forwarded-for": "10.0.0.2"},
+            headers={**common_headers, "x-api-key": "tenant-b"},
         )
 
-    assert first_ip_1.status == 200
-    assert second_ip_1.status == 429
-    assert first_ip_2.status == 200
+    assert first_id_1.status == 200
+    assert second_id_1.status == 429
+    assert first_id_2.status == 200
+
+
+@pytest.mark.anyio
+async def test_trusted_header_is_consumed_verbatim_not_comma_split() -> None:
+    # A trusted identity header is used as-is — no first-comma split — so two
+    # callers presenting the same header value share one bucket even when the
+    # value happens to contain commas.
+    app = App()
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=("/login",),
+                key_header="x-api-key",
+            )
+        )
+    )
+
+    @app.route("/login", methods=["POST"])
+    async def login_route(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        common_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        first = await client.post(
+            "/login",
+            body=b"a=1",
+            headers={**common_headers, "x-api-key": "a,b"},
+        )
+        # Same verbatim value → same bucket → blocked. (Old comma-split logic
+        # would have keyed both off "a" too, but for the wrong reason.)
+        second = await client.post(
+            "/login",
+            body=b"a=1",
+            headers={**common_headers, "x-api-key": "a,b"},
+        )
+
+    assert first.status == 200
+    assert second.status == 429
 
 
 @pytest.mark.anyio
@@ -128,3 +173,311 @@ async def test_forwarded_for_is_ignored_by_default() -> None:
 
     assert first.status == 200
     assert second.status == 429
+
+
+@pytest.mark.issue(378)
+@pytest.mark.anyio
+async def test_spoofed_x_forwarded_for_cannot_evade_limit() -> None:
+    # Acceptance: an attacker on one real client rotates a spoofed
+    # X-Forwarded-For on every request to try to win a fresh bucket each time.
+    # Keying off request.trusted_client_ip (the real peer) — never raw XFF —
+    # means all attempts collapse to one bucket and the limiter still blocks.
+    app = App()
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(requests=2, window_seconds=60, block_seconds=120, paths=("/login",))
+        )
+    )
+
+    @app.route("/login", methods=["POST"])
+    async def login_route(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        common_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        statuses = []
+        for i in range(4):
+            resp = await client.post(
+                "/login",
+                body=b"a=1",
+                # Distinct spoofed first-hop on every attempt.
+                headers={**common_headers, "x-forwarded-for": f"203.0.113.{i}"},
+            )
+            statuses.append(resp.status)
+
+    # First two within the window pass; the rotating spoof does not earn a
+    # fresh bucket, so the third+ are blocked.
+    assert statuses == [200, 200, 429, 429]
+
+
+def test_identity_key_ignores_spoofed_x_forwarded_for() -> None:
+    # Unit-level proof of the invariant (TestClient hardcodes scope["client"],
+    # so the spoof evasion is keyed at the property layer): the identity key is
+    # stable across rotating raw X-Forwarded-For values for the same peer.
+    from chirp.http.request import Request
+
+    def make_request(xff: str) -> Request:
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "path": "/login",
+            "raw_path": b"/login",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [(b"x-forwarded-for", xff.encode())],
+            "server": ("localhost", 8000),
+            "client": ("198.51.100.9", 5000),
+        }
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        return Request.from_asgi(scope, receive)
+
+    mw = AuthRateLimitMiddleware(AuthRateLimitConfig())
+    key_a = mw._identity_key(make_request("1.2.3.4"))
+    key_b = mw._identity_key(make_request("5.6.7.8, 9.9.9.9"))
+
+    assert key_a == key_b == "198.51.100.9"
+
+
+# --- Generalized keyed limiter (#377) ---
+
+
+def test_rate_limit_backend_importable_from_chirp_middleware() -> None:
+    # Success criterion: the storage Protocol (and the Redis factory) are part
+    # of the public submodule surface.
+    from chirp.middleware import RateLimitBackend, redis_rate_limit_backend
+
+    assert RateLimitBackend is not None
+    assert callable(redis_rate_limit_backend)
+
+
+@pytest.mark.anyio
+async def test_empty_paths_limits_all_matching_method_routes() -> None:
+    # paths=() means "every route" (subject to ``methods``), so an arbitrary
+    # non-auth route is limited.
+    app = App()
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(requests=1, window_seconds=60, block_seconds=120, paths=())
+        )
+    )
+
+    @app.route("/api/widgets", methods=["POST"])
+    async def widgets(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        first = await client.post("/api/widgets", body=b"a=1", headers=headers)
+        second = await client.post("/api/widgets", body=b"a=1", headers=headers)
+
+    assert first.status == 200
+    assert second.status == 429
+
+
+@pytest.mark.anyio
+async def test_key_fn_keys_per_resource_on_non_auth_route() -> None:
+    # Success criterion: a non-auth route limited by a CUSTOM key (here a route
+    # param, i.e. per-resource). Distinct resources get distinct buckets even
+    # from the same client; the same resource shares one bucket.
+    app = App()
+
+    def per_resource_key(request):
+        # Key on the server-resolved path segment (per-resource), NOT a
+        # client-controlled value the caller could rotate.
+        return f"widget:{request.path}"
+
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=(),
+                key_fn=per_resource_key,
+            )
+        )
+    )
+
+    @app.route("/widgets/{wid}", methods=["POST"])
+    async def widget(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        a1 = await client.post("/widgets/1", body=b"a=1", headers=headers)
+        a2 = await client.post("/widgets/1", body=b"a=1", headers=headers)
+        b1 = await client.post("/widgets/2", body=b"a=1", headers=headers)
+
+    assert a1.status == 200
+    assert a2.status == 429  # same resource → same bucket → blocked
+    assert b1.status == 200  # different resource → fresh bucket
+
+
+@pytest.mark.anyio
+async def test_key_fn_returning_none_skips_rate_limiting() -> None:
+    # None from key_fn is an explicit per-request opt-out: no bucket, never
+    # blocked, regardless of volume.
+    app = App()
+
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=(),
+                key_fn=lambda request: None,
+            )
+        )
+    )
+
+    @app.route("/skip", methods=["POST"])
+    async def skip(request):
+        _ = await request.form()
+        return "ok"
+
+    async with TestClient(app) as client:
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        statuses = []
+        for _ in range(3):
+            resp = await client.post("/skip", body=b"a=1", headers=headers)
+            statuses.append(resp.status)
+
+    assert statuses == [200, 200, 200]
+
+
+def _ratelimit_template_app(tmp_path, **cfg_overrides):
+    """App with an on-disk 429 template and the limiter wired open at 1/req."""
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "ratelimit.html").write_text(
+        "{% block too_many %}Slow down — retry in {{ retry_after }}s{% end %}"
+    )
+    app = App(AppConfig(template_dir=str(templates)))
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=(),
+                **cfg_overrides,
+            )
+        )
+    )
+
+    @app.route("/act", methods=["POST"])
+    async def act(request):
+        _ = await request.form()
+        return "ok"
+
+    return app
+
+
+@pytest.mark.anyio
+async def test_htmx_over_limit_returns_html_429_fragment(tmp_path) -> None:
+    app = _ratelimit_template_app(tmp_path, error_template="ratelimit.html", error_block="too_many")
+    async with TestClient(app) as client:
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "HX-Request": "true",
+        }
+        first = await client.post("/act", body=b"a=1", headers=headers)
+        second = await client.post("/act", body=b"a=1", headers=headers)
+
+    assert first.status == 200
+    assert second.status == 429
+    body = second.body.decode()
+    assert "Slow down" in body
+    assert "Too Many Requests" not in body
+    assert second.header("retry-after") is not None
+
+
+@pytest.mark.anyio
+async def test_non_htmx_over_limit_keeps_plain_text_body(tmp_path) -> None:
+    # The HTML fragment is gated on htmx; a plain POST keeps the text body even
+    # when error_template is configured.
+    app = _ratelimit_template_app(tmp_path, error_template="ratelimit.html", error_block="too_many")
+    async with TestClient(app) as client:
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        first = await client.post("/act", body=b"a=1", headers=headers)
+        second = await client.post("/act", body=b"a=1", headers=headers)
+
+    assert first.status == 200
+    assert second.status == 429
+    assert second.body.decode() == "Too Many Requests"
+
+
+@pytest.mark.issue(377)
+@pytest.mark.anyio
+async def test_generalized_keyed_rate_limiter_acceptance(tmp_path) -> None:
+    """Acceptance for #377: the three success criteria end to end.
+
+    1. A non-auth route is rate-limited with a custom key (per-user here).
+    2. ``RateLimitBackend`` is importable from ``chirp.middleware``.
+    3. An htmx POST over the limit gets an HTML 429 fragment (not a bare 429).
+    """
+    # (2) importable Protocol
+    from chirp.middleware import RateLimitBackend
+
+    assert RateLimitBackend is not None
+
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "limit.html").write_text(
+        "{% block over %}<div id='rl'>Rate limited ({{ retry_after }}s)</div>{% end %}"
+    )
+
+    app = App(AppConfig(template_dir=str(templates)))
+
+    def per_user_key(request):
+        # A SERVER-set header standing in for an authenticated identity — never
+        # key off a value the caller can freely rotate to dodge its own bucket.
+        return request.headers.get("x-user-id")
+
+    app.add_middleware(
+        AuthRateLimitMiddleware(
+            AuthRateLimitConfig(
+                requests=1,
+                window_seconds=60,
+                block_seconds=120,
+                paths=(),  # (1) arbitrary non-auth route targeting
+                key_fn=per_user_key,
+                error_template="limit.html",
+                error_block="over",
+            )
+        )
+    )
+
+    @app.route("/api/posts", methods=["POST"])
+    async def create_post(request):
+        _ = await request.form()
+        return "created"
+
+    async with TestClient(app) as client:
+        base = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "HX-Request": "true",
+        }
+        # (1) per-user keying: user A burns the bucket, user B is unaffected.
+        a1 = await client.post("/api/posts", body=b"a=1", headers={**base, "x-user-id": "A"})
+        a2 = await client.post("/api/posts", body=b"a=1", headers={**base, "x-user-id": "A"})
+        b1 = await client.post("/api/posts", body=b"a=1", headers={**base, "x-user-id": "B"})
+
+    assert a1.status == 200
+    assert b1.status == 200
+    # (3) over-limit htmx POST → HTML 429 fragment, not a bare body.
+    assert a2.status == 429
+    body = a2.body.decode()
+    assert "Rate limited" in body
+    assert "<div id='rl'>" in body
+    assert "Too Many Requests" not in body
+    assert a2.header("retry-after") is not None

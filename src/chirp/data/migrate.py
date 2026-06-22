@@ -25,6 +25,7 @@ Or integrated with the app::
 """
 
 import contextlib
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,9 +39,20 @@ _CREATE_TRACKING_SQL = f"""
 CREATE TABLE IF NOT EXISTS {_TRACKING_TABLE} (
     version  INTEGER PRIMARY KEY,
     name     TEXT    NOT NULL,
-    applied_at TEXT  NOT NULL
+    applied_at TEXT  NOT NULL,
+    checksum TEXT
 )
 """
+
+
+def _checksum(sql: str) -> str:
+    """Stable content hash of a migration's SQL body.
+
+    Hashes the already-``.strip()``-ed ``Migration.sql`` exactly as stored at
+    apply time so the drift recompute matches byte-for-byte (a whitespace or
+    normalization mismatch would be a false-positive drift error).
+    """
+    return hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,19 +123,56 @@ def _discover_migrations(directory: str | Path) -> list[Migration]:
 
 
 async def _ensure_tracking_table(db: Database) -> None:
-    """Create the migration tracking table if it doesn't exist."""
+    """Create the migration tracking table if it doesn't exist.
+
+    Also brings a tracking table created by a pre-checksum Chirp version up to
+    date: ``CREATE TABLE IF NOT EXISTS`` never alters an existing table, so the
+    nullable ``checksum`` column is added idempotently here. Existing rows get
+    ``NULL`` (legacy → skip-verify). Column existence is introspected per driver
+    so the ``ALTER`` only runs when the column is genuinely absent — no broad
+    exception swallowing.
+    """
     await db.execute(_CREATE_TRACKING_SQL)
+    if not await _tracking_has_checksum_column(db):
+        await db.execute(f"ALTER TABLE {_TRACKING_TABLE} ADD COLUMN checksum TEXT")
 
 
-async def _get_applied_versions(db: Database) -> set[int]:
-    """Get the set of already-applied migration versions."""
+async def _tracking_has_checksum_column(db: Database) -> bool:
+    """Report whether the tracking table already has a ``checksum`` column."""
 
     @dataclass(frozen=True, slots=True)
-    class _Version:
-        version: int
+    class _Column:
+        name: str
 
-    rows = await db.fetch(_Version, f"SELECT version FROM {_TRACKING_TABLE}")
-    return {row.version for row in rows}
+    if getattr(db, "_driver", None) == "sqlite":
+        rows = await db.fetch(_Column, f"SELECT name FROM pragma_table_info('{_TRACKING_TABLE}')")
+        return any(row.name == "checksum" for row in rows)
+
+    rows = await db.fetch(
+        _Column,
+        "SELECT column_name AS name FROM information_schema.columns "
+        "WHERE table_name = ? AND column_name = ?",
+        _TRACKING_TABLE,
+        "checksum",
+    )
+    return bool(rows)
+
+
+async def _get_applied_versions(db: Database) -> dict[int, tuple[str | None, str | None]]:
+    """Get applied migrations as ``version -> (name, checksum)``.
+
+    ``checksum`` is ``None`` for rows written before the checksum column existed
+    (legacy → skipped by the drift guard).
+    """
+
+    @dataclass(frozen=True, slots=True)
+    class _Row:
+        version: int
+        name: str | None
+        checksum: str | None
+
+    rows = await db.fetch(_Row, f"SELECT version, name, checksum FROM {_TRACKING_TABLE}")
+    return {row.version: (row.name, row.checksum) for row in rows}
 
 
 async def _apply_migration(db: Database, migration: Migration) -> None:
@@ -135,6 +184,7 @@ async def _apply_migration(db: Database, migration: Migration) -> None:
     the connection's surrounding transaction mode.
     """
     now = datetime.now(UTC).isoformat()
+    checksum = _checksum(migration.sql)
     if getattr(db, "_driver", None) == "sqlite":
         migration_sql = migration.sql.rstrip()
         if not migration_sql.endswith(";"):
@@ -142,8 +192,9 @@ async def _apply_migration(db: Database, migration: Migration) -> None:
         script = (
             "BEGIN;\n"
             f"{migration_sql}\n"
-            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) "
-            f"VALUES ({migration.version}, {_sql_literal(migration.name)}, {_sql_literal(now)});\n"
+            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at, checksum) "
+            f"VALUES ({migration.version}, {_sql_literal(migration.name)}, "
+            f"{_sql_literal(now)}, {_sql_literal(checksum)});\n"
             "COMMIT;"
         )
         # Pin one connection so the script's BEGIN/COMMIT and the failure-path
@@ -162,10 +213,12 @@ async def _apply_migration(db: Database, migration: Migration) -> None:
     async with db.transaction():
         await db.execute_script(migration.sql)
         await db.execute(
-            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at) VALUES (?, ?, ?)",
+            f"INSERT INTO {_TRACKING_TABLE} (version, name, applied_at, checksum) "
+            "VALUES (?, ?, ?, ?)",
             migration.version,
             migration.name,
             now,
+            checksum,
         )
 
 
@@ -192,9 +245,30 @@ async def migrate(db: Database, directory: str | Path) -> MigrationResult:
     """
     migrations = _discover_migrations(directory)
     await _ensure_tracking_table(db)
-    applied_versions = await _get_applied_versions(db)
+    applied = await _get_applied_versions(db)
 
-    pending = [m for m in migrations if m.version not in applied_versions]
+    # Drift guard: an already-applied migration whose on-disk SQL no longer
+    # matches the checksum recorded at apply time has been edited in place — a
+    # silent data-corruption footgun. Fail loud before applying anything. A
+    # NULL recorded checksum is a legacy row (written before the checksum
+    # column existed) and is skipped.
+    for migration in migrations:
+        record = applied.get(migration.version)
+        if record is None:
+            continue
+        _, recorded_checksum = record
+        if recorded_checksum is None:
+            continue
+        if recorded_checksum != _checksum(migration.sql):
+            msg = (
+                f"Migration {migration.name} has been modified after it was applied "
+                f"(on-disk SQL no longer matches the recorded checksum). Applied "
+                f"migrations are immutable: write a new forward migration instead of "
+                f"editing {migration.name}.sql."
+            )
+            raise MigrationError(msg)
+
+    pending = [m for m in migrations if m.version not in applied]
     pending.sort(key=lambda m: m.version)
 
     applied_names: list[str] = []
@@ -208,6 +282,6 @@ async def migrate(db: Database, directory: str | Path) -> MigrationResult:
 
     return MigrationResult(
         applied=applied_names,
-        already_applied=len(applied_versions),
+        already_applied=len(applied),
         total_available=len(migrations),
     )

@@ -77,9 +77,17 @@ class TestClient:
             _worker_lifecycle_receive,
             _worker_lifecycle_send,
         )
+
+        # Mirror the lifespan startup-complete gate: /ready returns 503 until
+        # this flips True (set here AFTER startup hooks, matching
+        # LifecycleCoordinator._on_startup), so probe behaviour under TestClient
+        # matches production.
+        self.app._mutable_state.ready = True
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        # Mirror lifespan shutdown: drop out of the readiness rotation first.
+        self.app._mutable_state.ready = False
         # Run worker shutdown before app shutdown so hooks are cleaned up.
         await self.app(
             {"type": "pounce.worker.shutdown", "worker_id": 0},

@@ -92,12 +92,32 @@ class LifecycleCoordinator:
 
                 _db_var.set(self._state.db)
                 if self._state.migrations_dir is not None:
-                    from chirp.data.migrate import migrate
+                    if self._config.skip_migrations:
+                        # Operator opted out of the on-boot run (CHIRP_SKIP_MIGRATIONS
+                        # / AppConfig(skip_migrations=True)) so a one-shot deploy job
+                        # (`chirp migrate`) can own migration application instead of
+                        # every replica racing on startup. Log loudly so a missing
+                        # deploy job (= app serving a stale schema) is visible.
+                        from chirp.logging import structured_log
 
-                    await migrate(self._state.db, self._state.migrations_dir)
+                        structured_log(
+                            30,  # WARNING
+                            "lifecycle:migrations-skipped",
+                            migrations_dir=str(self._state.migrations_dir),
+                        )
+                    else:
+                        from chirp.data.migrate import migrate
+
+                        await migrate(self._state.db, self._state.migrations_dir)
 
             for hook in self._state.startup_hooks:
                 await _run_hook(hook)
+            # Startup complete: flip the readiness gate True AFTER all startup
+            # hooks (and the db connect/migrate) succeed. If startup raised above
+            # this point, the except re-raises before we get here, so the flag
+            # stays False and /ready keeps returning 503. Single writer,
+            # monotonic for a process life (reset only on shutdown).
+            self._state.ready = True
         except Exception:
             if db_connected and self._state.db is not None:
                 with contextlib.suppress(Exception):
@@ -107,6 +127,9 @@ class LifecycleCoordinator:
             raise
 
     async def _on_shutdown(self) -> None:
+        # Drop out of the load balancer rotation first: /ready returns 503 while
+        # shutdown hooks drain.
+        self._state.ready = False
         for hook in self._state.shutdown_hooks:
             await _run_hook(hook)
         if self._state.db is not None:

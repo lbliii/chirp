@@ -143,9 +143,10 @@ app would fare in production without changing your config, use `chirp check
 | `allowed_hosts` | ERROR / WARNING | Configure explicit hosts outside development instead of `allowed_hosts=("*",)`. |
 | `trusted_proxies` | WARNING | Configure explicit reverse-proxy peer IPs/hostnames instead of `trusted_proxies=("*",)` outside development. Details in the dropdown below. |
 | `csrf_session` | ERROR | Register `SessionMiddleware` before `CSRFMiddleware`. |
+| `middleware_chain` | INFO | Diagnostic only — reports the freeze-resolved user middleware order (outermost → innermost). Use `add_middleware(priority=...)` to make the order explicit; lower priority runs outermost. Ordering *violations* (CSRF outside Session) are still the `csrf_session` ERROR, not this category. |
 | `security_stack` | ERROR / WARNING | Wire the secure-by-default stack on apps with mutating routes. See the `security_stack` canonical reference below. |
 | `auth_middleware` | ERROR / WARNING / INFO | Register `AuthMiddleware` (after `SessionMiddleware`) when any route declares auth via `RouteMeta.auth` or `@login_required`/`@requires`. Without it the auth gate's `get_user()` raises `LookupError` → 500. See the dropdown below. |
-| `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` (unknown permission/policy → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
+| `auth_spec` | ERROR / WARNING | Fix a `RouteMeta.auth` permission/policy/scope that will silently fail. Registry-backed when you declare `app.register_permission()` / `app.register_policy()` / `app.register_scope()` (unknown permission/policy/scope → ERROR); otherwise a high-signal reserved-token typo heuristic. See the dropdown below. |
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
 | `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
@@ -158,6 +159,7 @@ app would fare in production without changing your config, use `chirp check
 | `nojs_floor` | INFO | Return `FormAction` (303 for plain POST, fragments for htmx) from mutating routes instead of an htmx-only `Fragment`/`OOB`. INFO by default; promote with `override_contract_severity("nojs_floor", Severity.ERROR)` to enforce the no-JS floor. |
 | `deploy_debug` | ERROR | Set `debug=False` (or `CHIRP_DEBUG=0`) when `env="production"`. |
 | `deploy_metrics` | ERROR | Change `metrics_path` or move the colliding application route so the Prometheus endpoint does not shadow a route. |
+| `deploy_health` | ERROR | Rename the colliding application route or change `health_path` / `ready_path` so the auto-mounted `/health` + `/ready` probes are not shadowed by an app route. |
 | `deploy_sentry` | WARNING | Set a non-zero `sentry_traces_sample_rate` when a Sentry DSN is configured, or clear the DSN. |
 
 ::::{dropdown} `trusted_proxies` — why `"*"` trusts every peer
@@ -218,7 +220,7 @@ The env-aware categories above (`secret_key`, `allowed_hosts`, `security_stack`,
 `cookie_secure`, `hsts`, `password_extra`, `passkeys`, `auth_middleware`, `auth_spec`,
 `sse_auth_gate`, `sse_context`, `csp_nonce`,
 `chirpui_csp`, `deploy_debug`,
-`deploy_metrics`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
+`deploy_metrics`, `deploy_health`, `deploy_sentry`) pick their severity from `config.env`. In development most are silent or WARNING,
 so a dev app passes `app.check()` while still carrying production-blocking
 misconfigurations. `chirp check myapp:app --deploy` answers "would this pass in
 production?" without changing your config: it runs those rules against a
@@ -470,13 +472,23 @@ flagged in heuristic mode — without a registry Chirp cannot know which strings
 real permissions, and false positives erode trust. Declare a permission registry
 to validate them precisely.
 
+**Machine-token scopes (`AuthSpec.scopes`).** The machine-auth axis — webhook /
+cron / provisioning endpoints gate on a token-resolved client's scopes
+independently of human permissions — folds into this same `auth_spec` category
+(no separate category). Scope validation is **opt-in like permissions**: declare
+scopes with `app.register_scope("webhook:write")` and every `AuthSpec.scopes`
+entry not in the registry becomes an env-aware ERROR. With no scope registry,
+scopes are free strings and are not heuristically flagged (a scope is an
+arbitrary machine token, so a plausible-name heuristic has no signal).
+
 **Severity** is env-aware (silent dev / WARNING staging / ERROR prod), same as
 `auth_middleware`, and escalates under `chirp check --deploy`. Dynamic `meta()`
 pages are skipped (their auth value is not statically known).
 
 **Fix:** declare the permission with `app.register_permission()` (or fix the typo),
-register the policy with `app.register_policy()`, or use the exact reserved token
-(`"required"` / `"none"` / `"optional"`).
+register the policy with `app.register_policy()`, declare the scope with
+`app.register_scope()`, or use the exact reserved token (`"required"` / `"none"` /
+`"optional"`).
 
 ### `sse_auth_gate` / `sse_context`: reading the user inside an SSE generator
 
@@ -630,3 +642,4 @@ No-op when `kida_env` is `None` (registry drift still runs).
 | `a11y_heading` | WARNING | Fix skipped or incoherent heading levels. |
 | `a11y_landmark` | WARNING | Add page landmarks such as `main`, `nav`, or `header` where expected. |
 | `plugin_check_error` | ERROR | Fix a custom check that raised during `app.check()`; the original exception should name the plugin/check. |
+| `plugin_quarantine` | ERROR | Fix the plugin whose `register()` raised during `app.mount()`. The plugin was quarantined (skipped) so the app could still boot — leaving it half-configured — and a WARNING was logged at mount time. The message names the prefix, plugin, and original error. |

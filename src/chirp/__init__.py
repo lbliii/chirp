@@ -128,6 +128,7 @@ _API_STATUS: dict[str, str] = {
     "ContractIssue": "provisional",
     "DependencyIndex": "provisional",
     "DeferredCache": "provisional",
+    "HealthCheck": "provisional",
     "HtmxDetails": "provisional",
     "FileResponse": "stable",
     "JSONResponse": "stable",
@@ -187,6 +188,7 @@ __all__ = [
     "FormBindingError",
     "Fragment",
     "HTTPError",
+    "HealthCheck",
     "HtmxDetails",
     "InlineTemplate",
     "JSONResponse",
@@ -352,6 +354,8 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToolDef": ("chirp.tools.registry", "ToolDef"),
     "ToolEventBus": ("chirp.tools.events", "ToolEventBus"),
     "ToolRegistry": ("chirp.tools.registry", "ToolRegistry"),
+    # Health probes (auto-mounted /health + /ready)
+    "HealthCheck": ("chirp.health", "HealthCheck"),
     # Markdown
     "MarkdownRenderer": ("chirp.markdown.renderer", "MarkdownRenderer"),
     # Cache

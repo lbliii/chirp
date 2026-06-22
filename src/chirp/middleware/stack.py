@@ -16,6 +16,14 @@ Pass ``auth=AuthConfig(...)`` to include ``AuthMiddleware`` in the right place
     for mw in secure_stack(app.config, auth=AuthConfig(load_user=load_user)):
         app.add_middleware(mw)
 
+Pass ``audit=AuditConfig(level=...)`` to append an opt-in ``AuditMiddleware`` as
+the **outermost** leg (after ``SecurityHeadersMiddleware``) so it observes the
+final status code of every audited request. Like the auth leg it is OFF unless
+you ask for it (``AuditConfig`` defaults to ``level="none"``):
+
+    for mw in secure_stack(app.config, audit=AuditConfig(level="metadata")):
+        app.add_middleware(mw)
+
 This is deliberately explicit-over-magic: it is a pure list-returning function
 (the most inspectable/testable shape), not an auto-injecting hook. The app
 author still calls ``add_middleware`` for each piece, and can drop or reorder
@@ -33,6 +41,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from chirp.middleware.audit import AuditConfig, AuditMiddleware
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersConfig, SecurityHeadersMiddleware
@@ -53,6 +62,7 @@ def secure_stack(
     session: SessionConfig | None = None,
     csrf: CSRFConfig | None = None,
     headers: SecurityHeadersConfig | None = None,
+    audit: AuditConfig | None = None,
     redis_url: str | None = None,
 ) -> list[Any]:
     """Return the secure-by-default middleware stack, in contract-passing order.
@@ -99,6 +109,12 @@ def secure_stack(
         csrf: Optional explicit ``CSRFConfig``. Defaults to ``CSRFConfig()``.
         headers: Optional explicit ``SecurityHeadersConfig``. Defaults to
             ``SecurityHeadersConfig()``.
+        audit: Optional ``AuditConfig``. When provided, ``AuditMiddleware(audit)``
+            is appended as the **outermost** leg (after
+            ``SecurityHeadersMiddleware``) so it wraps the whole chain and
+            observes the final status code. OFF unless requested — the default
+            ``AuditConfig`` is ``level="none"``. When omitted, no audit leg is
+            added.
         redis_url: Optional Redis URL. When set (and ``session`` is omitted),
             sessions are stored in ``RedisSessionStore`` rather than a signed
             cookie.
@@ -107,7 +123,8 @@ def secure_stack(
         ``[SessionMiddleware(...), CSRFMiddleware(...),
         SecurityHeadersMiddleware(...)]`` in that order — or, when ``auth`` is
         given, ``[SessionMiddleware(...), AuthMiddleware(...), CSRFMiddleware(...),
-        SecurityHeadersMiddleware(...)]``.
+        SecurityHeadersMiddleware(...)]``. When ``audit`` is given,
+        ``AuditMiddleware(...)`` is appended as the last (outermost) element.
     """
     if session is None:
         # secure is deliberately left at SessionConfig's "auto" default so the
@@ -136,4 +153,9 @@ def secure_stack(
         stack.append(AuthMiddleware(auth))
     stack.append(CSRFMiddleware(csrf or CSRFConfig()))
     stack.append(SecurityHeadersMiddleware(headers or SecurityHeadersConfig()))
+    if audit is not None:
+        # AuditMiddleware is the outermost leg so it wraps the whole chain and
+        # sees the final status code (including a CSRF rejection's 403). It is
+        # opt-in: AuditConfig defaults to level="none" and emits nothing.
+        stack.append(AuditMiddleware(audit))
     return stack

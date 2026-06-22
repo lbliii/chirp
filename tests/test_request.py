@@ -113,6 +113,34 @@ class TestRequestFromASGI:
         assert req.client is None
 
 
+class TestTrustedClientIP:
+    def test_returns_client_ip_when_present(self) -> None:
+        req = Request.from_asgi(_make_scope(client=("203.0.113.7", 443)), _make_receive())
+        assert req.trusted_client_ip == "203.0.113.7"
+
+    def test_returns_unknown_when_client_missing(self) -> None:
+        scope = _make_scope()
+        del scope["client"]
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.trusted_client_ip == "unknown"
+
+    def test_ignores_raw_x_forwarded_for(self) -> None:
+        """Fail-closed: a spoofable X-Forwarded-For never overrides client[0]."""
+        scope = _make_scope(
+            client=("10.0.0.1", 443),
+            headers=[(b"x-forwarded-for", b"1.2.3.4, 5.6.7.8")],
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.trusted_client_ip == "10.0.0.1"
+
+    def test_never_raises(self) -> None:
+        scope = _make_scope()
+        del scope["client"]
+        req = Request.from_asgi(scope, _make_receive())
+        # Property access must not raise even with no client.
+        assert isinstance(req.trusted_client_ip, str)
+
+
 class TestRequestUrlScope:
     def test_normalizes_prefix(self) -> None:
         scope = RequestUrlScope("c/acme/")

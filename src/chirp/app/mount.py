@@ -135,6 +135,10 @@ def hoist(parent_state: MutableAppState, sub_state: MutableAppState, prefix: str
 
     parent_state.pending_tools.extend(sub_state.pending_tools)
     parent_state.middleware_list.extend(sub_state.middleware_list)
+    # Keep the parallel priority list index-aligned with middleware_list. A
+    # sub-app built before this field always populates middleware_priorities in
+    # lockstep with add_middleware, so the two lists are the same length here.
+    parent_state.middleware_priorities.extend(sub_state.middleware_priorities)
     parent_state.startup_hooks.extend(sub_state.startup_hooks)
     parent_state.shutdown_hooks.extend(sub_state.shutdown_hooks)
     parent_state.worker_startup_hooks.extend(sub_state.worker_startup_hooks)

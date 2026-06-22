@@ -33,7 +33,7 @@ from chirp.data.errors import (
 )
 from chirp.data.migrate import migrate
 from chirp.data.pagination import PageResult
-from chirp.data.query import Query
+from chirp.data.query import Query, json_path
 from chirp.data.shapes import (
     Composite,
     NestedShape,
@@ -61,6 +61,7 @@ __all__ = [
     "ShapeError",
     "composite",
     "get_db",
+    "json_path",
     "migrate",
     "nested",
     "register_shape",

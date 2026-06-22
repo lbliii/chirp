@@ -1,6 +1,7 @@
 """Tests for chirp.config — AppConfig frozen dataclass."""
 
 import os
+import warnings
 from pathlib import Path
 
 import pytest
@@ -147,6 +148,40 @@ class TestAppConfig:
         finally:
             os.environ.update(saved)
 
+    def test_health_ready_path_defaults(self) -> None:
+        """health_path/ready_path default to /health and /ready."""
+        cfg = AppConfig()
+        assert cfg.health_path == "/health"
+        assert cfg.ready_path == "/ready"
+
+    def test_health_ready_path_env_parity(self) -> None:
+        """CHIRP_HEALTH_PATH / CHIRP_READY_PATH are recognized (no unknown-env warning)."""
+        saved = _pop_app_env()
+        try:
+            os.environ["CHIRP_HEALTH_PATH"] = "/healthz"
+            os.environ["CHIRP_READY_PATH"] = "/readyz"
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                cfg = AppConfig.from_env()
+            assert cfg.health_path == "/healthz"
+            assert cfg.ready_path == "/readyz"
+        finally:
+            os.environ.pop("CHIRP_HEALTH_PATH", None)
+            os.environ.pop("CHIRP_READY_PATH", None)
+            os.environ.update(saved)
+
+    def test_health_ready_path_env_unset_defaults(self) -> None:
+        """Unset probe env vars leave the /health + /ready defaults."""
+        saved = _pop_app_env()
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.health_path == "/health"
+            assert cfg.ready_path == "/ready"
+        finally:
+            os.environ.update(saved)
+
     def test_override(self) -> None:
         cfg = AppConfig(host="0.0.0.0", port=3000, debug=True, secret_key="s3cret")
 
@@ -267,6 +302,41 @@ class TestAppConfig:
         finally:
             os.environ.update(env_backup)
 
+    def test_skip_migrations_default_false(self) -> None:
+        """skip_migrations defaults False, mirroring skip_contract_checks."""
+        cfg = AppConfig()
+        assert cfg.skip_migrations is False
+
+    def test_skip_migrations_env_parity(self) -> None:
+        """CHIRP_SKIP_MIGRATIONS=1 sets skip_migrations via from_env()."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_SKIP_MIGRATIONS"] = "1"
+            cfg = AppConfig.from_env()
+            assert cfg.skip_migrations is True
+        finally:
+            os.environ.update(env_backup)
+
+    def test_skip_migrations_env_unset_defaults_false(self) -> None:
+        """from_env() leaves skip_migrations False when the env var is unset."""
+        env_backup = _pop_app_env()
+        try:
+            cfg = AppConfig.from_env()
+            assert cfg.skip_migrations is False
+        finally:
+            os.environ.update(env_backup)
+
+    def test_skip_migrations_no_unknown_env_warning(self) -> None:
+        """CHIRP_SKIP_MIGRATIONS is on the known-suffix allowlist (no warning)."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_SKIP_MIGRATIONS"] = "1"
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                AppConfig.from_env()
+        finally:
+            os.environ.update(env_backup)
+
     def test_from_env_railway_port_host_and_healthcheck_hosts(self) -> None:
         env_backup = _pop_app_env()
         try:
@@ -306,6 +376,26 @@ class TestAppConfig:
             os.environ["CHIRP_LOG_FORMAT"] = "xml"
             cfg = AppConfig.from_env()
             assert cfg.log_format == "auto"
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_log_level(self) -> None:
+        """CHIRP_LOG_LEVEL maps onto the existing log_level field (env parity)."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_LOG_LEVEL"] = "debug"
+            cfg = AppConfig.from_env()
+            assert cfg.log_level == "debug"
+        finally:
+            os.environ.update(env_backup)
+
+    def test_from_env_invalid_log_level_ignored(self) -> None:
+        """Invalid CHIRP_LOG_LEVEL falls back to the default ('info')."""
+        env_backup = _pop_app_env()
+        try:
+            os.environ["CHIRP_LOG_LEVEL"] = "trace"
+            cfg = AppConfig.from_env()
+            assert cfg.log_level == "info"
         finally:
             os.environ.update(env_backup)
 

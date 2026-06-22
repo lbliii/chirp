@@ -99,7 +99,11 @@ of them.
 - The product is primarily a JSON API — choose FastAPI or another API-first framework.
 - You need Django's admin, ORM, ecosystem, and long-term compatibility story.
 - You need WSGI hosting or older Python versions.
-- You want a client-side SPA with a JSON serialization boundary.
+- You want a client-side SPA with a JSON serialization boundary. That boundary
+  has a recurring cost: the server hand-builds a config blob the client fetches
+  on boot, and re-states every flag again as a read/write API — see the
+  [[docs/about/core-concepts/hypermedia-model#no-client-config-blob-to-keep-in-sync|no-client-config-blob side-by-side]]
+  for what that drift looks like and what Chirp does instead.
 - You want server-side reactive component state as the core model — Livewire or LiveView may fit better.
 - You need the broadest plugin ecosystem more than tight hypermedia contracts.
 

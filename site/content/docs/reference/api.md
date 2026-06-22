@@ -400,9 +400,9 @@ you return a `Page` or `Template`. Do not import `LayoutPage`.
 ## CLI
 
 The `chirp` console command (`new`, `dev`, `run`, `check`, `routes`, `freeze`,
-`security-check`, `makemigrations`, `shapes-codegen`) is documented in full,
-with every flag, in the [[docs/reference/cli|CLI reference]]. `chirp check <app>`
-wraps `app.check()`.
+`security-check`, `makemigrations`, `migrate`, `shapes-codegen`) is documented in
+full, with every flag, in the [[docs/reference/cli|CLI reference]]. `chirp check
+<app>` wraps `app.check()`.
 
 ## See also
 

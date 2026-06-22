@@ -298,6 +298,19 @@ def _permission_names(auth: Any) -> tuple[str, ...]:
     return ()
 
 
+def _scope_names(auth: Any) -> tuple[str, ...]:
+    """Return the declared machine-token scope name(s) for an ``auth`` value.
+
+    Only a structured ``AuthSpec`` carries ``scopes`` — a bare string ``auth``
+    never produces scopes (it normalizes to a permission). The machine-auth
+    counterpart to :func:`_permission_names`.
+    """
+    scopes = getattr(auth, "scopes", None)
+    if isinstance(scopes, (tuple, list)):
+        return tuple(str(s) for s in scopes)
+    return ()
+
+
 def _looks_like_reserved_token_confusion(name: str) -> bool:
     """True when a permission *name* is almost certainly a botched reserved token.
 
@@ -325,15 +338,17 @@ def check_auth_spec(
     meta_provider_paths: set[str] | None = None,
     permission_registry: frozenset[str] | set[str] | None = None,
     policy_registry: frozenset[str] | set[str] | None = None,
+    scope_registry: frozenset[str] | set[str] | None = None,
 ) -> list[ContractIssue]:
-    """Flag declared ``RouteMeta.auth`` permissions/policies that will silently fail.
+    """Flag declared ``RouteMeta.auth`` permissions/policies/scopes that fail silently.
 
     A non-reserved ``auth`` string (or an ``AuthSpec.permissions`` entry) is a
     required PERMISSION; an ``AuthSpec.policy`` is a NAME resolved against the app
-    policy registry. Both 403 (permission) / 500 (unresolved policy) at request
-    time when wrong, with no other startup signal.
+    policy registry; an ``AuthSpec.scopes`` entry is a machine-token SCOPE. All
+    403 (permission/scope) / 500 (unresolved policy) at request time when wrong,
+    with no other startup signal.
 
-    PERMISSIONS and POLICIES are validated ASYMMETRICALLY, by design:
+    PERMISSIONS, POLICIES, and SCOPES are validated by design:
 
     - **Permissions are opt-in.** They are only validated against
       *permission_registry* when that registry is non-empty (a declared
@@ -347,6 +362,13 @@ def check_auth_spec(
       *policy_registry* is empty. An ``AuthSpec(policy="x")`` with no
       ``register_policy("x")`` is unconditionally a bug — it raises
       ``LookupError`` -> 500 at request time, so there is no false-positive risk.
+    - **Scopes are opt-in** (machine-auth axis). They are validated against
+      *scope_registry* only when that registry is non-empty (a declared
+      ``app.register_scope``); an ``AuthSpec.scopes`` entry not in the declared
+      set is an env-aware ERROR. With no scope registry scopes are free strings
+      — there is no typo heuristic (a scope is an arbitrary machine token, so a
+      plausible-name heuristic has no signal). This folds into the EXISTING
+      ``auth_spec`` category — no new category, no severity change.
 
     Env-aware via *config.env* (ERROR production / WARNING staging / silent
     development), same as ``auth_middleware``. Dynamic ``meta()`` pages
@@ -359,6 +381,7 @@ def check_auth_spec(
     skip_meta_provider = meta_provider_paths or set()
     perms = permission_registry or frozenset()
     policies = policy_registry or frozenset()
+    scopes_registry = scope_registry or frozenset()
 
     env = getattr(config, "env", "development")
     if env not in ("production", "staging"):
@@ -420,6 +443,26 @@ def check_auth_spec(
                     ),
                     route=path,
                 )
+            )
+
+        # Scope validation (machine-auth axis). Opt-in like permissions: only
+        # validated when a SCOPE registry exists. With no registry, scopes are
+        # free strings (no typo heuristic — a scope is an arbitrary token). This
+        # folds into the existing auth_spec category (no new category).
+        if scopes_registry:
+            issues.extend(
+                ContractIssue(
+                    severity=severity,
+                    category="auth_spec",
+                    message=(
+                        f"auth scope {scope!r} on {path} is not a registered "
+                        "scope. Declare it with app.register_scope(name) or fix "
+                        "the typo; an unknown scope silently 403s machine clients."
+                    ),
+                    route=path,
+                )
+                for scope in _scope_names(auth)
+                if scope not in scopes_registry
             )
 
     return issues

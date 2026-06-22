@@ -26,6 +26,7 @@ from .state import (
     MutableAppState,
     PendingRoute,
     PendingTool,
+    PluginQuarantine,
     RuntimeAppState,
 )
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
+    from chirp.health import HealthCheck
 
 
 # Backwards-compatible symbol aliases (historically imported from chirp.app).
@@ -625,13 +627,42 @@ class App:
         """Mount a plugin at the given URL prefix.
 
         Calls ``plugin.register(app, prefix)`` during setup phase.
+
+        A plugin whose ``register()`` *raises* is **quarantined**: the exception
+        is caught, the plugin is skipped, and the app keeps booting so one broken
+        plugin cannot take down startup. The quarantine is recorded on the app's
+        mutable state and surfaced as an ERROR contract issue (category
+        ``plugin_quarantine``) by ``app.check()``; a non-fatal WARNING is also
+        logged here at mount time so the signal exists even when contract checks
+        are skipped. Passing a non-plugin object (no callable ``register``)
+        remains a fail-loud :class:`ConfigurationError` — that is a programmer
+        typo at the call site, not a runtime plugin fault.
+
+        Known limitation: a plugin that registers some routes before raising
+        leaves that partial state behind; quarantine does not roll it back.
         """
         self._check_not_frozen()
         register = getattr(plugin, "register", None)
         if register is None or not callable(register):
             msg = f"Plugin {plugin!r} must have a register(app, prefix) method"
             raise ConfigurationError(msg)
-        register(self, prefix)
+        try:
+            register(self, prefix)
+        except Exception as exc:
+            import logging
+
+            self._mutable_state.plugin_quarantines.append(
+                PluginQuarantine(prefix=prefix, plugin_repr=repr(plugin), error=str(exc))
+            )
+            logging.getLogger("chirp").warning(
+                "Plugin %r quarantined at mount(%r): register() raised %s: %s. "
+                "App boot continues; app.check() reports this as a "
+                "'plugin_quarantine' ERROR.",
+                plugin,
+                prefix,
+                type(exc).__name__,
+                exc,
+            )
 
     def mount_app(self, prefix: str, sub_app: App) -> None:
         """Mount another Chirp :class:`App` at ``prefix``, consuming it.
@@ -673,8 +704,30 @@ class App:
         """Add a template loader (e.g., from a plugin's PackageLoader)."""
         self._registry.add_loader(loader)
 
-    def add_middleware(self, middleware: object) -> None:
-        self._registry.add_middleware(middleware)
+    def add_middleware(self, middleware: object, *, priority: int = 0) -> None:
+        """Register a middleware in the request pipeline.
+
+        Middleware run as nested wrappers: the **outermost** middleware sees the
+        request first and the response last. With default ``priority=0`` the
+        chain is resolved in registration order (the first ``add_middleware``
+        call is outermost), exactly as before — so existing apps are unchanged.
+
+        ``priority`` makes the resolved order explicit and independent of
+        registration order. **Lower priority runs outermost** (wraps the
+        higher-priority middleware). At freeze the registered (user) middleware
+        is sorted by ``(priority, registration_order)`` — a *stable* sort, so
+        equal-priority middleware keep their registration order. Built-in
+        middleware (allowed-hosts, CSP nonce, security headers, injection, …)
+        stays positionally pinned around the user middleware and is unaffected
+        by ``priority``.
+
+        The hard ordering floor still applies: a ``priority`` that would place
+        ``CSRFMiddleware`` outside ``SessionMiddleware`` raises
+        :class:`~chirp.errors.ConfigurationError` at freeze (CSRF reads the
+        session). ``app.check()`` also reports the resolved chain under the
+        ``middleware_chain`` diagnostic category.
+        """
+        self._registry.add_middleware(middleware, priority=priority)
 
     def add_reload_dir(self, path: str) -> None:
         self._registry.add_reload_dir(path)
@@ -694,6 +747,20 @@ class App:
         """
         self._registry.register_permission(name, description=description)
 
+    def register_scope(self, name: str, *, description: str | None = None) -> None:
+        """Declare a machine-token scope used by ``AuthSpec.scopes``.
+
+        The **machine-auth** counterpart to :meth:`register_permission`: scopes
+        gate webhook / cron / provisioning endpoints on a token-resolved
+        client's scopes (a :class:`~chirp.middleware.auth.ClientWithScopes`),
+        independent of human permissions. Declaring scopes makes the
+        ``auth_spec`` contract check registry-backed for the scope axis: an
+        ``AuthSpec.scopes`` name not in the declared set becomes a startup ERROR
+        (env-aware via deploy posture) instead of a silent request-time 403.
+        Call during setup; raises ``RuntimeError`` after freeze.
+        """
+        self._registry.register_scope(name, description=description)
+
     def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
         """Register a named policy callable for declarative ``AuthSpec`` gating.
 
@@ -705,6 +772,25 @@ class App:
         request time. Call during setup; raises ``RuntimeError`` after freeze.
         """
         self._registry.register_policy(name, fn)
+
+    def add_health_check(self, check: HealthCheck) -> None:
+        """Register a readiness check for the auto-mounted ``/ready`` probe.
+
+        Chirp auto-mounts ``/health`` (liveness, plain 200) and ``/ready``
+        (readiness) at ``AppConfig.health_path`` / ``ready_path`` — no
+        hand-wiring needed. ``/ready`` runs every registered ``HealthCheck`` and
+        gates on the startup-complete flag, returning 503 plus the failure list
+        until the app has finished startup and all checks pass::
+
+            from chirp import HealthCheck
+
+            app.add_health_check(HealthCheck("cache", check=ping_cache))
+
+        The ``check`` callable may be sync or async. When a database is wired, a
+        ``Database.probe()``-backed check is auto-included at freeze. Call during
+        setup; raises ``RuntimeError`` after freeze.
+        """
+        self._registry.add_health_check(check)
 
     def register_contract_check(self, check: Callable[..., Any]) -> None:
         """Register a custom contract check that runs during ``app.check()``.
@@ -773,15 +859,61 @@ class App:
         return resolve_url(self._runtime_state.routes_by_name or {}, name, **params)
 
     def on_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once at ASGI lifespan startup.
+
+        The hook is invoked with **no arguments** — sync or async, your choice.
+        Open resources you own (HTTP client, cache, queue) and stash them where
+        handlers can reach them; pass any inputs the hook needs in explicitly
+        via closures or module-level state. (Chirp connects ``db=`` for you, so
+        a hook is not needed for the database.)
+
+        Do **not** fabricate a ``Request`` to pre-warm caches at startup. There
+        is no request at boot: ``chirp.context.get_request()`` raises
+        ``LookupError`` here, and the ContextVar capture/re-establish machinery
+        in ``chirp.server.streaming_context`` only **re-pins an already-live
+        request** for a ``Suspense`` / ``Stream`` / ``EventStream`` drain — it
+        never synthesizes one. Building a mock ASGI scope to call request-shaped
+        code couples startup to request internals and skips middleware, auth,
+        and CSRF. Refactor the warm-up into a plain function that takes its
+        inputs as parameters and call it from the hook instead.
+
+        Example::
+
+            import httpx
+
+            client: httpx.AsyncClient | None = None
+
+            @app.on_startup
+            async def open_client():
+                global client
+                client = httpx.AsyncClient(base_url="https://api.example.com")
+
+        See ``docs/about/core-concepts/app-lifecycle.md`` for the full pattern.
+        """
         return self._registry.on_startup(func)
 
     def on_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once at ASGI lifespan shutdown.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_shutdown(func)
 
     def on_worker_startup(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once per worker at worker startup.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_worker_startup(func)
 
     def on_worker_shutdown(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Register a hook to run once per worker at worker shutdown.
+
+        Invoked with no arguments. See :meth:`on_startup` for the
+        no-fabricated-``Request`` rule and the explicit-parameterization model.
+        """
         return self._registry.on_worker_shutdown(func)
 
     def run(
@@ -876,6 +1008,14 @@ class App:
             self._freeze()
 
     def _freeze(self) -> None:
+        # Install the framework JSON log formatter once at this deterministic,
+        # idempotent lifecycle point when configured, so Chirp's own "chirp"
+        # logger lines match the server (Pounce) JSON envelope. Scoped to the
+        # "chirp" logger only — never logging.basicConfig. See chirp.logging.
+        if self.config.log_format == "json":
+            from chirp.logging import configure_json_logging
+
+            configure_json_logging()
         self._compiler.freeze(
             self,
             lambda: self._run_debug_checks(),
@@ -999,12 +1139,14 @@ class App:
             sections=self._mutable_state.sections,
             permission_registry=frozenset(self._mutable_state.permission_registry),
             policy_registry=frozenset(self._mutable_state.policy_registry),
+            scope_registry=frozenset(self._mutable_state.scope_registry),
             route_metas=self._mutable_state.route_metas,
             route_templates=self._mutable_state.route_templates,
             discovered_routes=self._mutable_state.discovered_routes,
             page_handler_findings=list(self._mutable_state.page_handler_findings),
             route_name_collisions=dict(self._runtime_state.route_name_collisions),
             mount_app_skips=list(self._mutable_state.mount_app_skips),
+            plugin_quarantines=list(self._mutable_state.plugin_quarantines),
             debug_wiring=self._runtime_state.debug_wiring,
             template_sources=ts,
             extras=dict(self._mutable_state.contract_check_data),

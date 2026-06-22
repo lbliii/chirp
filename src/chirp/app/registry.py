@@ -72,9 +72,10 @@ class AppRegistry:
 
         return decorator
 
-    def add_middleware(self, middleware: Any) -> None:
+    def add_middleware(self, middleware: Any, *, priority: int = 0) -> None:
         self._ensure_mutable()
         self._state.middleware_list.append(middleware)
+        self._state.middleware_priorities.append(priority)
 
     def add_reload_dir(self, path: str | Path) -> None:
         self._ensure_mutable()
@@ -96,6 +97,18 @@ class AppRegistry:
         self._ensure_mutable()
         self._state.permission_registry.add(name)
 
+    def register_scope(self, name: str, *, description: str | None = None) -> None:
+        """Declare a machine-token scope name for the ``auth_spec`` check.
+
+        The machine-auth counterpart to :meth:`register_permission`. Declaring
+        scopes makes the ``auth_spec`` check registry-backed for the scope axis:
+        an ``AuthSpec.scopes`` entry not in the declared set becomes a startup
+        ERROR (env-aware) instead of a silent request-time 403. ``description``
+        is accepted for self-documentation but not yet stored. Setup-only.
+        """
+        self._ensure_mutable()
+        self._state.scope_registry.add(name)
+
     def register_policy(self, name: str, fn: Callable[..., Any]) -> None:
         """Register a named policy callable resolved by the declarative auth gate.
 
@@ -109,6 +122,24 @@ class AppRegistry:
             msg = f"Policy {name!r} must be callable, got {type(fn).__name__}"
             raise TypeError(msg)
         self._state.policy_registry[name] = fn
+
+    def add_health_check(self, check: Any) -> None:
+        """Register a readiness check for the auto-mounted ``/ready`` probe.
+
+        Setup-only (raises ``RuntimeError`` after freeze via ``_ensure_mutable``).
+        ``check`` must be a :class:`~chirp.health.HealthCheck`; its ``check``
+        callable (sync or async, returning truthy when healthy) runs on every
+        ``/ready`` request once startup has completed. A ``Database.probe()``-backed
+        check is auto-included at freeze when a db is wired, so DB connectivity is
+        reflected with no hand-wiring.
+        """
+        self._ensure_mutable()
+        from chirp.health import HealthCheck
+
+        if not isinstance(check, HealthCheck):
+            msg = f"add_health_check expects a chirp.HealthCheck, got {type(check).__name__}"
+            raise TypeError(msg)
+        self._state.health_checks.append(check)
 
     def template_filter(
         self, name: str | None

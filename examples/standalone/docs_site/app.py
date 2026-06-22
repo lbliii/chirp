@@ -98,16 +98,6 @@ def delete_contact(contact_id: int):
     return {"status": "deleted"}
 
 
-@app.route("/health")
-def health():
-    """Health check endpoint.
-
-    Returns ``{"status": "ok"}`` when the service is running.
-    Used by load balancers and monitoring systems.
-    """
-    return {"status": "ok"}
-
-
 @app.route("/search")
 def search_contacts(request: Request):
     """Search contacts by name or email.

@@ -111,6 +111,10 @@ if the app has logins. Read `SECRET_KEY` from the environment — see
   - Rate-limit login / signup / reset endpoints
   - —
   - `chirp.middleware`
+* - [Audit](#auditmiddleware)
+  - Opt-in per-request who/what/when/status trail (off by default)
+  - —
+  - `chirp.middleware`
 * - [AllowedHosts](#allowedhostsmiddleware)
   - Reject spoofed `Host` headers
   - —
@@ -401,6 +405,8 @@ crafts a link like `/login?next=//evil.com`.
 | `session_version` | `None` | Optional callback `user -> version` for session invalidation |
 | `session_version_key` | `"_session_version"` | Session key used by `session_version` |
 | `exclude_paths` | `frozenset()` | Paths that skip auth entirely |
+| `token_revocation_store` | `None` | Optional `TokenRevocationStore` consulted after `verify_token` to reject revoked bearer tokens (per-`jti` + per-user `iat <= revoked_at` cutoff). Unset = no bearer revocation. Fails open on store error. |
+| `token_claims` | `None` | Optional `(token) -> {jti, sub, iat}` callback (sync or async) that surfaces an opaque token's claims for the revocation store. Without it the per-user cutoff axis is skipped. |
 
 **Password hashing** — argon2id (preferred) or scrypt (stdlib fallback):
 
@@ -476,7 +482,10 @@ app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(
 
 ## AuthRateLimitMiddleware
 
-Auth-focused in-memory limiter for login/signup/reset endpoints:
+A keyed in-memory limiter. The defaults target the common auth endpoints
+(login/signup/reset) keyed by trusted client IP, but with `key_fn` plus open
+path targeting it limits **any** route or group — per-user, per-resource, or
+per-tenant.
 
 ```python
 from chirp.middleware import AuthRateLimitConfig, AuthRateLimitMiddleware
@@ -489,9 +498,137 @@ app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
 )))
 ```
 
-Returns `429 Too Many Requests` with `Retry-After` when the threshold is exceeded.
-By default it keys requests by the socket client address. If the app sits behind a
-trusted proxy, pass `key_header="x-forwarded-for"` explicitly.
+Returns `429 Too Many Requests` with `Retry-After` when the threshold is
+exceeded. By default it keys requests by `request.trusted_client_ip` — the
+trusted-proxy-corrected client IP, never a raw client-supplied
+`X-Forwarded-For` (which is spoofable). To key on a trusted, server-set
+identity header instead (e.g. an authenticated API-key header), set
+`key_header`; it is consumed verbatim, never comma-split.
+
+### Targeting arbitrary routes with a custom key
+
+Set `paths=()` to limit **every** matching-method route, and supply `key_fn`
+to compute the bucket key per request. Return a non-empty `str` to key on it,
+or `None` to **skip** rate-limiting that request (an explicit per-request
+opt-out):
+
+```python
+app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
+    requests=30,
+    window_seconds=60,
+    paths=(),  # every POST route
+    # Key per authenticated user. Skip anonymous requests here (None) so the
+    # default trusted-IP limiter on the auth endpoints handles them instead.
+    key_fn=lambda req: f"user:{req.user.id}" if req.user.is_authenticated else None,
+)))
+```
+
+:::{warning}
+`key_fn` is an authorization-adjacent input. Derive the key from a
+**server-side** identity — `request.user.id`, `request.trusted_client_ip`, or a
+route param resolved against your records — never from a value the caller can
+freely rotate (a query param, a request body field, a raw `X-Forwarded-For`),
+or a client can dodge its own bucket.
+:::
+
+### HTML 429 for htmx form-action POSTs
+
+By default the over-limit body is plain text. Set `error_template` (and
+optionally `error_block`) to render an HTML `429` for htmx requests — the
+middleware renders the block (or whole template, with `retry_after` in context)
+to the response itself:
+
+```python
+app.add_middleware(AuthRateLimitMiddleware(AuthRateLimitConfig(
+    paths=(),
+    error_template="rate_limit.html",
+    error_block="too_many",   # block in rate_limit.html; rendered for htmx POSTs
+)))
+```
+
+Non-htmx and unconfigured over-limit responses keep the plain `Too Many
+Requests` body. A configured block that does not exist is fail-loud
+(`BlockNotFoundError`) — point at a block that exists.
+
+### Pluggable backends
+
+The in-memory backend is per-worker. For a shared limit across workers, pass a
+backend implementing the `RateLimitBackend` protocol (both importable from
+`chirp.middleware`). A Redis sliding-window backend ships behind the `redis`
+extra:
+
+```python
+from chirp.middleware import AuthRateLimitConfig, redis_rate_limit_backend
+
+config = AuthRateLimitConfig(
+    backend=redis_rate_limit_backend("redis://localhost:6379/0"),
+)
+```
+
+## AuditMiddleware
+
+Emit a per-request who/what/when/status audit trail through the **same**
+security-event sink as login/CSRF events, under an `http.request` namespace —
+so audit and auth telemetry stay one pipeline:
+
+```python
+from chirp.middleware.audit import AuditConfig, AuditMiddleware
+
+app.add_middleware(AuditMiddleware(AuditConfig(level="metadata")))
+```
+
+It is **opt-in and off by default** (`level="none"`). Verbosity is tiered:
+
+- `"none"` — disabled (default).
+- `"metadata"` — method, path, `status_code`, `source_ip`, `user_agent`,
+  `user_id` only.
+- `"request"` — metadata **plus** a byte-capped, redacted request-body snapshot.
+- `"request_response"` — reserved; behaves like `"request"` for body capture.
+
+Only `audited_methods` are trailed — by default the canonical
+`MUTATING_METHODS` (`POST`/`PUT`/`PATCH`/`DELETE`). Events are delivered to the
+sink set by `AppConfig(audit_sink=...)` (`"log"` structured-logs them) or
+`set_security_event_sink(...)`. The new fields ride in `event.details`
+(`status_code`, `source_ip`, `user_agent`, and at `level="request"`+ a `body`).
+
+```python
+from chirp.middleware.audit import AuditConfig, AuditMiddleware
+
+app.add_middleware(AuditMiddleware(AuditConfig(
+    level="request",
+    max_body_bytes=2048,
+    redact_keys=("password", "token", "secret", "csrf_token", "ssn"),
+    redact_patterns=(r"\d{16}",),  # mask anything that looks like a card number
+)))
+```
+
+:::{important}
+**Source IP is trusted, not spoofable.** `source_ip` comes from
+`request.trusted_client_ip` (the trusted-proxy-corrected client) — never a
+re-parsed `X-Forwarded-For`, which is client-controlled.
+
+**Hypermedia-safe by construction.** For `Stream`, `Suspense`, and `EventStream`
+return types (which resolve to `StreamingResponse` / `SSEResponse` /
+`FileResponse`) the middleware downgrades to metadata-only and **never** drains
+the request body — draining a stream would buffer unbounded or break it.
+
+**`user_id` needs `AuthMiddleware`.** Without it the trail records an anonymous
+user (it never crashes).
+:::
+
+Wire it as the outermost leg of the secure-by-default stack:
+
+```python
+from chirp.middleware.audit import AuditConfig
+from chirp.middleware.stack import secure_stack
+
+for mw in secure_stack(app.config, audit=AuditConfig(level="metadata")):
+    app.add_middleware(mw)
+```
+
+`AuditMiddleware` is appended **after** `SecurityHeadersMiddleware` so it wraps
+the whole chain and observes the final status code (including a CSRF
+rejection's 403).
 
 ## AllowedHostsMiddleware
 

@@ -79,12 +79,17 @@ app.add_middleware(
 ```
 
 :::{warning}
-`AuthRateLimitMiddleware` keys its rate-limit buckets off the socket client
-address by default. Behind a trusted proxy that rewrites forwarded headers, every
-request arrives from the proxy IP — so all clients share one bucket and the limit
-is meaningless. Pass `key_header="x-forwarded-for"` so the middleware reads the
-real client address from the proxy chain. Only set this when you control the proxy
-and it strips inbound `X-Forwarded-For`, or an attacker can spoof the header.
+`AuthRateLimitMiddleware` keys its rate-limit buckets off
+`request.trusted_client_ip` — the trusted-proxy-corrected client IP. It never
+reads a raw client-supplied `X-Forwarded-For` (which is spoofable: an attacker
+rotating the first hop would otherwise win a fresh bucket on every request).
+Behind a proxy, configure the proxy chain on Chirp's ASGI server (pounce)
+`trusted_proxies` / `forwarded_for_trusted_hops` so `scope["client"]` carries
+the real client address before the limiter sees it. To key on a different
+trusted, server-set identity (e.g. an authenticated API-key header), set
+`key_header`; it is consumed verbatim, never comma-split. For per-user or
+per-resource limits, set `key_fn` to derive the key from a **server-side**
+identity — never from a client-controlled value a caller could rotate.
 :::
 
 ## What each item does
@@ -103,6 +108,9 @@ Each row maps a hardening area to the field you set in the stack above.
 * - Session invalidation
   - Invalidate stale sessions after a password change or account event
   - `AuthConfig(session_version=...)`
+* - Bearer-token revocation
+  - Reject revoked bearer tokens (per-`jti` revoke + per-user `iat <= revoked_at` cutoff); the bearer-path analogue of `session_version`. Fails open on a store outage.
+  - `AuthConfig(token_revocation_store=..., token_claims=...)`
 * - CSRF
   - Validate unsafe requests; emit a token in every mutating form
   - `CSRFMiddleware()` + `{{ csrf_field() }}`

@@ -20,6 +20,7 @@ from chirp.tools.registry import ToolRegistry
 if TYPE_CHECKING:
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
+    from chirp.health import HealthCheck
     from chirp.live_blocks import LiveBlockSpec
     from chirp.realtime.signals import SignalRegistry
 
@@ -63,6 +64,28 @@ class MountAppSkip:
 
     key: str
     prefix: str
+
+
+@dataclass(frozen=True, slots=True)
+class PluginQuarantine:
+    """One plugin whose ``register()`` raised during ``App.mount``.
+
+    Mounting wraps the lone ``plugin.register(app, prefix)`` call so a single
+    broken plugin is *quarantined* (skipped) instead of aborting boot. The
+    quarantine is recorded on the app's mutable state and surfaced as an ERROR
+    issue in category ``plugin_quarantine`` by a contract check — mirroring the
+    ``MountAppSkip`` -> ``mount_app_merge`` precedent. A non-fatal WARNING is
+    also logged at ``mount`` time so the signal exists even when contract checks
+    are skipped (honors root AGENTS.md "no silent except").
+
+    Partial registration is a known limitation: a plugin that registers some
+    routes before raising leaves that partial state behind; quarantine does not
+    roll it back (full transactional mount is out of scope).
+    """
+
+    prefix: str
+    plugin_repr: str
+    error: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +154,15 @@ class MutableAppState:
     pending_routes: list[PendingRoute] = field(default_factory=list)
     pending_tools: list[PendingTool] = field(default_factory=list)
     middleware_list: list[Middleware] = field(default_factory=list)
+    #: Per-entry priority for ``middleware_list``, kept index-aligned with it
+    #: (one int per registered USER middleware). Lower runs *outermost* (wraps
+    #: later ones); default ``0``. The freeze-time sort uses ``(priority,
+    #: insertion_seq)`` so equal priorities preserve registration order and a
+    #: stack with all-default priorities resolves byte-identically to today's
+    #: append order. Builtin middleware (added in the compiler) is NOT recorded
+    #: here — it stays positionally pinned. ``mount_app`` extends both lists in
+    #: lockstep so a hoisted sub-app keeps its priorities.
+    middleware_priorities: list[int] = field(default_factory=list)
     error_handlers: dict[int | type, ErrorHandler] = field(default_factory=dict)
     template_filters: dict[str, Callable[..., Any]] = field(default_factory=dict)
     template_globals: dict[str, Any] = field(default_factory=dict)
@@ -161,6 +193,12 @@ class MutableAppState:
     #: resolves an ``AuthSpec.policy`` NAME against this mapping at request time;
     #: the ``auth_spec`` check flags a named policy missing from it at startup.
     policy_registry: dict[str, Callable[..., Any]] = field(default_factory=dict)
+    #: Declared machine-token scope names (``app.register_scope``). The
+    #: machine-auth counterpart to ``permission_registry``: when non-empty the
+    #: ``auth_spec`` check ERRORs (env-aware) on any ``AuthSpec.scopes`` entry not
+    #: in this set. Scopes are the token axis (webhook/cron/provisioning),
+    #: deliberately separate from human permissions.
+    scope_registry: set[str] = field(default_factory=set)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
@@ -181,10 +219,30 @@ class MutableAppState:
     #: signals never construct a ``ReactiveBus``.
     signal_registry: SignalRegistry | None = None
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    #: Plugins quarantined during ``App.mount`` because their ``register()``
+    #: raised. Appended only during single-threaded setup (``mount`` is
+    #: ``_check_not_frozen``-guarded), then copied into the frozen snapshot —
+    #: same publication boundary as ``mount_app_skips``, no new lock needed. A
+    #: contract check surfaces each as an ERROR in category ``plugin_quarantine``.
+    plugin_quarantines: list[PluginQuarantine] = field(default_factory=list)
     #: Set when this app has been consumed by another app's ``mount_app``.
     #: Subsequent ``freeze()``/``run()`` raise rather than produce a stale
     #: standalone runtime. Carries the prefix for the error message.
     consumed_by_mount_app_prefix: str | None = None
+    #: Readiness checks for the auto-mounted ``/ready`` probe
+    #: (``app.add_health_check``). Before-freeze registration; a
+    #: ``Database.probe()``-backed check is auto-appended at freeze when a db is
+    #: wired. The per-request ``/ready`` read iterates this list directly.
+    health_checks: list[HealthCheck] = field(default_factory=list)
+    #: Startup-complete gate for the ``/ready`` probe. This is a
+    #: lifecycle-bounded flag, NOT a freeze violation: it has a single writer
+    #: (``LifecycleCoordinator._on_startup`` sets it ``True`` after all startup
+    #: hooks run; ``_on_shutdown`` resets it), is monotonic within a process
+    #: life, and is never late-registered. The request handler reads this bool
+    #: lock-free — acceptable for a monotonic flag set once at startup. See
+    #: ``app/AGENTS.md`` "Setup then freeze" — this is setup-then-runtime
+    #: mutation crossing the lifecycle boundary by design.
+    ready: bool = False
 
 
 @dataclass(slots=True)
@@ -235,12 +293,20 @@ class ContractCheckSnapshot:
     #: Declared policy NAMES (``app.register_policy``); empty when none declared.
     #: The ``auth_spec`` check flags an ``AuthSpec.policy`` name absent from it.
     policy_registry: frozenset[str] = field(default_factory=frozenset)
+    #: Declared machine-token scope names (``app.register_scope``); empty when
+    #: none declared. When non-empty the ``auth_spec`` check ERRORs (env-aware)
+    #: on an ``AuthSpec.scopes`` entry absent from it (registry-backed like
+    #: permissions; the machine-auth axis).
+    scope_registry: frozenset[str] = field(default_factory=frozenset)
     route_metas: dict[str, RouteMeta | None] = field(default_factory=dict)
     route_templates: dict[str, str] = field(default_factory=dict)
     discovered_routes: list[Any] = field(default_factory=list)
     page_handler_findings: list[PageHandlerFinding] = field(default_factory=list)
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
+    #: Plugins quarantined during ``App.mount`` (``register()`` raised). The
+    #: ``plugin_quarantine`` check emits one ERROR per entry.
+    plugin_quarantines: list[PluginQuarantine] = field(default_factory=list)
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     template_sources: dict[str, str] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)

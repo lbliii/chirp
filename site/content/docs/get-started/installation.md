@@ -137,6 +137,7 @@ After installation the `chirp` command is available:
 | `chirp freeze <app> <output>` | Render routes to static HTML files |
 | `chirp security-check <app>` | Audit app config against the security checklist |
 | `chirp makemigrations --db <url> --schema <module>` | Generate a schema migration from model changes |
+| `chirp migrate --db <url> --migrations-dir <dir>` | Apply pending schema migrations (one-shot deploy job) |
 
 See the [[docs/reference/cli|CLI reference]] for full flag details.
 

@@ -28,15 +28,19 @@ Usage::
     await logout()
 """
 
-from collections.abc import Awaitable, Callable
+import logging
+from collections.abc import Awaitable, Callable, Mapping
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from inspect import isawaitable
+from typing import Any, ClassVar, Protocol, cast, runtime_checkable
 
 from chirp.errors import ConfigurationError
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.security.audit import emit_security_event
+
+_log = logging.getLogger("chirp.security")
 
 # ---------------------------------------------------------------------------
 # User protocols
@@ -69,6 +73,83 @@ class UserWithPermissions(User, Protocol):
     def permissions(self) -> frozenset[str]: ...
 
 
+@runtime_checkable
+class ClientWithScopes(User, Protocol):
+    """Machine-client protocol with token-scope support.
+
+    The **machine-auth** counterpart to :class:`UserWithPermissions`: a
+    ``verify_token``-resolved client (webhook / cron / provisioning caller)
+    exposes the token's scopes so a declarative ``AuthSpec(scopes=...)`` can gate
+    on them independently of human permissions. The scope axis is deliberately
+    separate from ``permissions`` — a machine client need not implement
+    :class:`UserWithPermissions`, and a human user need not implement this
+    protocol; the shared gate checks each axis only when the active ``AuthSpec``
+    declares it.
+
+    ``scopes`` is a ``frozenset[str]`` (same shape as ``permissions``). Bring
+    your own client model — any object with ``id``, ``is_authenticated``, and
+    ``scopes`` satisfies it. The scope-bearing client flows through
+    :meth:`AuthMiddleware._authenticate_token` unchanged.
+    """
+
+    @property
+    def scopes(self) -> frozenset[str]: ...
+
+
+#: Alias for :class:`ClientWithScopes`. ``MachineClient`` reads naturally at
+#: call sites that model a webhook/cron/provisioning caller, while
+#: ``ClientWithScopes`` names the structural shape (parallels
+#: ``UserWithPermissions``). Both are module-level names in
+#: ``chirp.middleware.auth`` (mirror ``SessionStore`` / ``TokenRevocationStore``;
+#: NOT top-level exports).
+MachineClient = ClientWithScopes
+
+
+# ---------------------------------------------------------------------------
+# Token revocation store protocol
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class TokenRevocationStore(Protocol):
+    """Protocol for an app-supplied bearer-token revocation backend.
+
+    The stateless bearer path (``verify_token``) has no built-in revocation:
+    once a token verifies, it stays valid until it expires. A revocation store
+    closes that gap — it is consulted **after** ``verify_token`` returns a user
+    (token branch only) and gives two revocation axes that mirror how
+    :attr:`AuthConfig.session_version` gives the session path mass revocation:
+
+    - **per-token**: :meth:`is_token_revoked` rejects a single revoked ``jti``;
+    - **per-user cutoff**: :meth:`user_revoked_at` rejects every token a user
+      was issued before a ``revoked_at`` timestamp (token ``iat <= revoked_at``).
+
+    Both axes require token claims, which Chirp does not decode itself — supply
+    :attr:`AuthConfig.token_claims` to surface ``{jti, sub, iat}`` from the
+    opaque token. With ``token_claims`` unset, only :meth:`is_token_revoked` can
+    run (and only if the store is reachable without a ``jti``); the cutoff axis
+    is skipped.
+
+    The store is app-supplied and async. **Chirp holds no lock** — the store is
+    responsible for its own concurrency (mirrors :class:`SessionStore`). On a
+    store error Chirp **fails open** (treats the token as not revoked) and emits
+    an ``auth.token.revocation_check_error`` security event, so a backend blip
+    does not 401 every API client.
+    """
+
+    async def is_token_revoked(self, jti: str) -> bool:
+        """Return ``True`` if the token with this ``jti`` has been revoked."""
+        ...
+
+    async def user_revoked_at(self, user_id: str) -> int | float | None:
+        """Return a user's revocation-cutoff timestamp, or ``None`` if none.
+
+        Tokens with ``iat <= revoked_at`` are rejected. ``None`` means the user
+        has no cutoff (all their tokens remain valid).
+        """
+        ...
+
+
 # ---------------------------------------------------------------------------
 # AnonymousUser sentinel
 # ---------------------------------------------------------------------------
@@ -85,6 +166,7 @@ class AnonymousUser:
     id: str = ""
     is_authenticated: bool = False
     permissions: frozenset[str] = frozenset()
+    scopes: frozenset[str] = frozenset()
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +288,16 @@ class AuthConfig:
         login_url: URL to redirect unauthenticated browsers to.
             Set to ``None`` to disable redirects (return 401 instead).
         exclude_paths: Paths that skip authentication entirely.
+        token_revocation_store: Optional :class:`TokenRevocationStore` consulted
+            on the bearer path **after** ``verify_token`` returns a user. Unset
+            (``None``) = today's behavior (no bearer-token revocation). Rejecting
+            a token here returns an anonymous user and emits ``auth.token.revoked``.
+        token_claims: Optional callback ``(token) -> Mapping`` (sync or async)
+            returning at least ``jti`` (for :meth:`TokenRevocationStore.is_token_revoked`)
+            and ``iat`` (for the :meth:`TokenRevocationStore.user_revoked_at`
+            per-user cutoff). Chirp does not decode tokens itself; this is the
+            claims seam that keeps ``verify_token`` an opaque ``(token) -> User``
+            contract. Without it the store's per-user cutoff axis is skipped.
     """
 
     session_key: str = "user_id"
@@ -217,6 +309,8 @@ class AuthConfig:
     session_version_key: str = "_session_version"
     login_url: str | None = "/login"
     exclude_paths: frozenset[str] = frozenset()
+    token_revocation_store: TokenRevocationStore | None = None
+    token_claims: Callable[[str], Mapping[str, Any] | Awaitable[Mapping[str, Any]]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -302,15 +396,87 @@ class AuthMiddleware:
         token = header[len(prefix) :].strip()
         return token if token else None
 
-    async def _authenticate_token(self, token: str | None) -> User | None:
-        """Try token-based authentication."""
+    async def _authenticate_token(self, token: str | None) -> tuple[User | None, bool]:
+        """Try token-based authentication.
+
+        On success, the optional :class:`TokenRevocationStore` is consulted
+        (token branch only, **after** ``verify_token`` returns a user). A
+        revoked token emits ``auth.token.revoked``. Store errors **fail open**
+        (token treated as not revoked) and emit
+        ``auth.token.revocation_check_error``.
+
+        Returns ``(user, revoked)``: ``user`` is the resolved :class:`User` or
+        ``None`` (verify_token failed / no token / revoked); ``revoked`` is
+        ``True`` only when ``verify_token`` succeeded but the store rejected the
+        token — the caller uses it to suppress the ``auth.token.invalid`` event.
+        """
         if self._config.verify_token is None:
-            return None
+            return None, False
 
         if token is None:
-            return None
+            return None, False
 
-        return await self._config.verify_token(token)
+        user = await self._config.verify_token(token)
+        if user is None:
+            return None, False
+
+        store = self._config.token_revocation_store
+        if store is not None and await self._is_token_revoked(store, token, user):
+            return None, True
+
+        return user, False
+
+    async def _resolve_claims(self, token: str) -> Mapping[str, Any]:
+        """Resolve token claims via ``token_claims`` (sync or async).
+
+        Mirrors the sync-or-async resolution in ``chirp.health.readiness``.
+        """
+        claims_fn = self._config.token_claims
+        if claims_fn is None:
+            return {}
+        result = claims_fn(token)
+        if isawaitable(result):
+            # ``isawaitable`` narrows ``result`` to a bare ``Awaitable`` (the
+            # generic param is erased at runtime), so the awaited value is typed
+            # ``object``; the field declares ``Awaitable[Mapping[str, Any]]``.
+            return cast("Mapping[str, Any]", await result)
+        return result
+
+    async def _is_token_revoked(self, store: TokenRevocationStore, token: str, user: User) -> bool:
+        """Consult the revocation store. Fail OPEN on any store/claims error."""
+        try:
+            claims = await self._resolve_claims(token)
+            jti = claims.get("jti")
+            if jti is not None and await store.is_token_revoked(str(jti)):
+                emit_security_event(
+                    "auth.token.revoked",
+                    user_id=user.id,
+                    details={"reason": "jti", "jti": str(jti)},
+                )
+                return True
+
+            iat = claims.get("iat")
+            if iat is not None:
+                cutoff = await store.user_revoked_at(user.id)
+                if cutoff is not None and iat <= cutoff:
+                    emit_security_event(
+                        "auth.token.revoked",
+                        user_id=user.id,
+                        details={"reason": "user_cutoff", "iat": iat, "revoked_at": cutoff},
+                    )
+                    return True
+        except Exception as exc:
+            # Fail OPEN: availability over strict revocation. A revocation
+            # backend blip must not 401 every API client. WARNING (not
+            # exception) — this is expected degradation, not an app error.
+            _log.warning("token revocation check failed (fail-open): %s", exc)
+            emit_security_event(
+                "auth.token.revocation_check_error",
+                user_id=user.id,
+                details={"error": type(exc).__name__},
+            )
+            return False
+        return False
 
     async def _authenticate_session(self) -> User | None:
         """Try session-based authentication."""
@@ -367,8 +533,10 @@ class AuthMiddleware:
 
         # Try token auth first (stateless, for API clients)
         raw_token = self._extract_token(request)
-        user = await self._authenticate_token(raw_token)
-        if raw_token is not None and user is None:
+        user, revoked = await self._authenticate_token(raw_token)
+        # A revoked token already emitted auth.token.revoked — do not also flag
+        # it as auth.token.invalid. Both revoked and invalid fall back to session.
+        if raw_token is not None and user is None and not revoked:
             emit_security_event(
                 "auth.token.invalid",
                 request=request,

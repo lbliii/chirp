@@ -53,6 +53,7 @@ from chirp.server.negotiation import negotiate
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_file_response, send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.templating.integration import _active_kida_env
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.trace import encode_return_trace, get_return_trace
 from chirp.tools.registry import ToolRegistry
@@ -196,9 +197,76 @@ def create_request_handler(
     debug_wiring: RuntimeDebugWiring | None = None,
     suspense_error_template: str | None = None,
     suspense_error_block: str = "fallback",
+    health_path: str | None = None,
+    ready_path: str | None = None,
+    probe_state: Any | None = None,
 ) -> Callable[[Request], Any]:
-    """Build the full middleware + dispatch chain once. Reuse per request."""
+    """Build the full middleware + dispatch chain once. Reuse per request.
+
+    ``health_path`` / ``ready_path`` and ``probe_state`` (the ``MutableAppState``
+    carrying the ``ready`` flag + ``health_checks`` list) wire the auto-mounted
+    ops probes. The probe short-circuit runs BEFORE the middleware chain so
+    ``/health`` and ``/ready`` bypass the secure stack (Session/CSRF/Security
+    headers) and commit teardown entirely — they run no user handler, write no
+    ``Set-Cookie``, and never touch the session.
+    """
     routes = discovered_routes or []
+
+    # Probe paths the app does NOT claim with a user route. A user route wins
+    # (mirrors metrics_path precedence): if the app registered a route at the
+    # probe path, that path is dropped here so the route serves and the probe
+    # silently steps aside. Computed once at build time — the per-request check
+    # is a pair of string compares against a small frozenset, allocation-free.
+    _route_paths = frozenset(getattr(r, "path", None) for r in router.routes)
+    _active_probe_paths: frozenset[str] = frozenset(
+        p for p in (health_path, ready_path) if p is not None and p not in _route_paths
+    )
+
+    async def _probe_response(req: Request) -> Response | None:
+        """Plain 200/503 ops-probe responses, outside return-type negotiation.
+
+        Returns ``None`` when *req* is not an auto-mounted probe so the caller
+        falls through to the normal middleware chain.
+        """
+        if probe_state is None:
+            return None
+        path = req.path
+        if path not in _active_probe_paths:
+            return None
+        # Probes are GET/HEAD only; anything else falls through to routing (a
+        # 405 from the router if nothing else claims the path).
+        if req.method not in ("GET", "HEAD"):
+            return None
+        is_health = path == health_path
+        if is_health:
+            return Response(
+                body="ok",
+                content_type="text/plain; charset=utf-8",
+                render_intent="full_page",
+            )
+        # /ready: gate on the startup-complete flag, then run the checks.
+        if not probe_state.ready:
+            return Response(
+                body="not ready: starting up",
+                status=503,
+                content_type="text/plain; charset=utf-8",
+                render_intent="full_page",
+            )
+        from chirp.health import readiness
+
+        ok, failures = await readiness(probe_state.health_checks)
+        if ok:
+            return Response(
+                body="ready",
+                content_type="text/plain; charset=utf-8",
+                render_intent="full_page",
+            )
+        return Response(
+            body="not ready:\n" + "\n".join(failures),
+            status=503,
+            content_type="text/plain; charset=utf-8",
+            render_intent="full_page",
+        )
 
     def _internal_response(req: Request, response: Response) -> Response:
         if debug_wiring is None:
@@ -308,6 +376,14 @@ def create_request_handler(
     chain = compile_middleware_chain(middleware, dispatch)
 
     async def dispatch_with_fragment_resolution(req: Request) -> AnyResponse:
+        # Ops probes short-circuit BEFORE the middleware chain: /health and
+        # /ready bypass Session/CSRF/SecurityHeaders and the commit-teardown
+        # middleware entirely (no user handler, no Set-Cookie, no session
+        # touch). They return plain 200/503 outside return-type negotiation.
+        if _active_probe_paths:
+            probe = await _probe_response(req)
+            if probe is not None:
+                return probe
         if not is_fragment_dispatch_request(req):
             return await chain(req)
         target = resolve_fragment_dispatch_target(router, req)
@@ -369,6 +445,11 @@ async def handle_request(
     token: Token[Request] = request_var.set(request)
     rid_token = request_id_var.set(request.request_id)
     sync_token = force_inline_sync_var.set(force_inline_sync)
+    # Publish the app's template environment for the life of the request so
+    # middleware (which only sees AnyResponse, never a Chirp return type) can
+    # render a self-contained HTML body (e.g. an HTML 429) without coupling to
+    # the handler's negotiate_response path.
+    env_token = _active_kida_env.set(kida_env)
 
     if compiled_handler is None:
         msg = "compiled_handler is required; ASGIRuntime always provides it"
@@ -408,6 +489,7 @@ async def handle_request(
         request_var.reset(token)
         request_id_var.reset(rid_token)
         force_inline_sync_var.reset(sync_token)
+        _active_kida_env.reset(env_token)
 
     # Dispatch based on response type — X-Request-ID injected at send time
     # to avoid an extra Response clone + tuple allocation per request.

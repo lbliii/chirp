@@ -43,6 +43,55 @@ if TYPE_CHECKING:
     from chirp.data.pagination import PageResult
 
 
+def json_path(column: str, /, *keys: str, dialect: str) -> str:
+    """Build a dialect-correct JSON-extraction SQL expression fragment.
+
+    Emits the right syntax for the active driver so the sqlite-vs-postgres
+    branch stops leaking into every call site::
+
+        json_path("oauth", "sub", dialect="sqlite")      # json_extract(oauth, '$.sub')
+        json_path("oauth", "sub", dialect="postgresql")  # oauth->>'sub'
+        json_path("data", "a", "b", dialect="sqlite")    # json_extract(data, '$.a.b')
+        json_path("data", "a", "b", dialect="postgresql")# data->'a'->>'b'
+
+    Drop the result straight into a ``WHERE``/``SELECT`` string and keep the
+    actual filter value as a separate bound parameter::
+
+        Query(Row, "users").where(
+            json_path("oauth", "sub", dialect="sqlite") + " = ?", sub_id
+        )
+
+    The expression contains **no** bound-parameter placeholder of its own — the
+    JSON path ``keys`` are static, author-supplied identifiers concatenated into
+    the SQL text. **Never** pass request/user-controlled values as ``column`` or
+    ``keys``: they are not parameterized and would be an injection vector. Keep
+    real filter values in the separate bound params of ``Query.where(clause,
+    *params)`` / ``db.fetch(sql, *params)``.
+
+    Args:
+        column: The JSON column name.
+        keys: One or more static path segments. At least one is required.
+        dialect: The driver dialect — ``"sqlite"`` or ``"postgresql"`` (any
+            non-``"sqlite"`` value is treated as PostgreSQL, matching the
+            driver-dispatch convention in ``chirp.data.shapes``).
+
+    Returns:
+        A raw SQL expression fragment (a ``str``) — not a full query.
+
+    Raises:
+        ValueError: if no path ``keys`` are given.
+    """
+    if not keys:
+        msg = "json_path() requires at least one path key (e.g. json_path('oauth', 'sub'))."
+        raise ValueError(msg)
+    if dialect == "sqlite":
+        path = "$." + ".".join(keys)
+        return f"json_extract({column}, '{path}')"
+    # PostgreSQL: intermediate keys use ->, the final key uses ->> (returns text).
+    parts = [column, *(f"->'{key}'" for key in keys[:-1]), f"->>'{keys[-1]}'"]
+    return "".join(parts)
+
+
 @dataclass(frozen=True, slots=True)
 class Query[T]:
     """Immutable SELECT query builder.

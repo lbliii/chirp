@@ -27,6 +27,7 @@ Design constraints:
 from __future__ import annotations
 
 import logging
+import secrets
 from collections.abc import Awaitable, Callable
 from inspect import isawaitable
 from typing import TYPE_CHECKING, Any
@@ -138,6 +139,20 @@ def _deny_unauthenticated(request: Any) -> HTTPError:
     return HTTPError(status=401, detail="Authentication required")
 
 
+def _scope_held(required: str, held: frozenset[str]) -> bool:
+    """Return whether ``required`` is in ``held``, comparing in constant time.
+
+    A plain ``required in held`` set membership leaks (via early-exit string
+    compare) how many leading characters of a scope matched. Webhook/cron scope
+    tokens can be secret-bearing, so the issue's success criterion is a
+    constant-time compare — route every scope-name equality through
+    :func:`secrets.compare_digest` (the same primitive ``csrf.py`` /
+    ``passwords.py`` use), never ``==``. The iteration count still varies with
+    ``len(held)``, but each individual scope comparison is constant-time.
+    """
+    return any(secrets.compare_digest(required, candidate) for candidate in held)
+
+
 async def enforce_auth(
     spec: AuthSpec,
     request: Request,
@@ -158,6 +173,17 @@ async def enforce_auth(
     3. **Policy** — when ``spec.policy`` is set, resolve it via
        ``policy_resolver`` and call ``policy(user, request)``; deny (403) only
        on a falsy result from the RESOLVED callable (a real denial).
+    4. **Scope check (machine auth)** — when ``spec.scopes`` is non-empty, the
+       resolved client must implement the scopes protocol
+       (:class:`~chirp.middleware.auth.ClientWithScopes`, else 403) and satisfy
+       the scope set under ``spec.mode``. This is the machine-token axis,
+       **independent of permissions**: a token-resolved client with the scope
+       but no permissions passes, while a human user with permissions but not
+       the scope fails. Scope-equality uses :func:`secrets.compare_digest`
+       (constant-time). Scope enforcement is implicitly off — a spec with no
+       ``scopes`` runs no scope step, so existing ``verify_token`` users are
+       never newly denied (no separate enable flag). Denial emits
+       ``authz.scope.denied`` with ``details={"missing": sorted([...])}``.
 
     An unresolved policy NAME (no ``policy_resolver`` wired, or the resolver
     returns ``None``) is a MISCONFIGURATION, not an auth denial: it raises
@@ -250,5 +276,48 @@ async def enforce_auth(
                 request=request,
                 user_id=user.id,
                 details={"policy": spec.policy},
+            )
+            raise HTTPError(status=403, detail="Forbidden")
+
+    # 4. Scopes (machine-auth axis). Implicitly off when spec.scopes is empty.
+    if spec.scopes:
+        from chirp.middleware.auth import ClientWithScopes
+
+        if not isinstance(user, ClientWithScopes):
+            _log.warning(
+                "Client %s model does not implement scopes protocol",
+                user.id,
+            )
+            emit_security_event(
+                "authz.scope.denied",
+                request=request,
+                user_id=user.id,
+                details={
+                    "reason": "missing_scopes_protocol",
+                    "missing": sorted(spec.scopes),
+                },
+            )
+            raise HTTPError(status=403, detail="Forbidden")
+
+        required = spec.scopes
+        held = user.scopes
+        if spec.mode == "any":
+            satisfied = any(_scope_held(scope, held) for scope in required)
+            missing = sorted(set(required)) if not satisfied else []
+        else:  # "all"
+            missing = sorted({scope for scope in required if not _scope_held(scope, held)})
+            satisfied = not missing
+        if not satisfied:
+            _log.warning(
+                "Client %s missing scopes (mode=%s): %s",
+                user.id,
+                spec.mode,
+                ", ".join(missing),
+            )
+            emit_security_event(
+                "authz.scope.denied",
+                request=request,
+                user_id=user.id,
+                details={"missing": missing},
             )
             raise HTTPError(status=403, detail="Forbidden")
