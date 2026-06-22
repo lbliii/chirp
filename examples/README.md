@@ -1,11 +1,19 @@
 # Chirp Examples
 
-Examples are now organized by runtime layer so the support matrix is obvious:
+Examples are organized by runtime layer so the support matrix is obvious:
 
 - [`examples/standalone`](examples/standalone/README.md): baseline Chirp without `chirp_ui`
 - [`examples/chirpui`](examples/chirpui/README.md): app-shell and component-driven examples using ChirpUI
 
-> **Featured:** [`examples/chirpui/lucky_cat`](chirpui/lucky_cat/README.md) — the flagship ChirpUI demo: a Maneki-neko **$MEOW** crypto exchange. A markets grid + market-detail page (interactive chart, depth-bar order book, trades tape), a `FormAction`/`ValidationError` trade flow, a `Suspense` portfolio dashboard, a watchlist, an activity feed, and a command palette — with the cross-page ticker, balance, and notification bell all riding server-owned `signal()`s over one `/_chirp/live` SSE connection.
+## Learning path
+
+| Tier | Example | Teaches |
+|------|---------|---------|
+| **1** | [`standalone/hello`](standalone/hello/), [`standalone/contacts`](standalone/contacts/) | Routes, forms, `Page` / `Fragment` |
+| **2** | [`chirpui/contacts_shell`](chirpui/contacts_shell/) | App shell, `_actions.py`, `_context.py` |
+| **3** | [`chirpui/lucky_cat`](chirpui/lucky_cat/) | Signals, Suspense, SSE, OOB capstone |
+
+> **Featured:** [`chirpui/lucky_cat`](chirpui/lucky_cat/README.md) — flagship ChirpUI demo (tier 3). Not your first Chirp app — complete tiers 1–2 first.
 
 ## Which Bucket To Use
 

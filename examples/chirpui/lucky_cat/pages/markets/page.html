@@ -25,6 +25,7 @@
     bespoke lobby links below opt into the explicit contract. -#}
 {% imports %}
   {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/forms.html" import hidden_field %}
   {% from "chirpui/modal.html" import modal %}
   {% from "chirpui/shell_frame.html" import shell_outlet_attrs %}
   {#- Card + sparkline + star — the single source of truth for the card markup,
@@ -324,10 +325,11 @@
 {% if current_user().is_authenticated %}
 {% call modal("deposit-modal", title="Deposit $MEOW") %}
 <form id="deposit-form" class="chirpui-stack chirpui-stack--sm"
-      hx-post="{{ url_for('deposit') }}" hx-swap="none"
+      hx-post="/markets" hx-swap="none"
       hx-disabled-elt="find button"
       hx-on::after-request="if(event.detail.successful){this.closest('dialog').close();this.reset()}">
   {{ csrf_field() }}
+  {{ hidden_field("_action", "deposit") }}
   {#- NOTE: no `{{ signal('balance') }}` binding here. A signal sink inside a
       <dialog> that is closed at page load (then promoted to the top layer on
       showModal()) does NOT receive htmx-ext-sse swaps — it would show a stale

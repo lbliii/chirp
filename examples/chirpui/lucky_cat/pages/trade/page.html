@@ -1,5 +1,6 @@
 {% imports %}
   {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/forms.html" import hidden_field %}
 {% end %}
 
 {#- Single source of truth for the order-form body so the full-page render and
@@ -10,9 +11,10 @@
 {% set f = form ?? {} %}
 {% set errs = errors ?? {} %}
 <form id="order-form" class="luckycat-order-form chirpui-stack chirpui-stack--sm"
-      hx-post="{{ url_for('trade.order') }}" hx-swap="none"
+      hx-post="/trade" hx-swap="none"
       hx-disabled-elt="find button">
   {{ csrf_field() }}
+  {{ hidden_field("_action", "order") }}
   <div class="chirpui-field">
     <label class="chirpui-field__label" for="order-symbol">Market</label>
     <select id="order-symbol" name="symbol" class="chirpui-field__input">

@@ -27,7 +27,7 @@ dynamic segment (which only matches ``/markets/<x>``) — proven by ``app.check(
 
 import lobby
 
-from chirp import Page
+from chirp import Page, Request
 
 
 def get(markets, tickers, sparklines, watchlist_starred) -> Page:
@@ -38,3 +38,8 @@ def get(markets, tickers, sparklines, watchlist_starred) -> Page:
         page_block_name="page_root",
         **ctx,
     )
+
+
+async def post(request: Request, markets, tickers, sparklines, watchlist_starred) -> Page:
+    """Fallback — deposit dispatches via ``pages/markets/_actions.py`` (_action field)."""
+    return get(markets, tickers, sparklines, watchlist_starred)

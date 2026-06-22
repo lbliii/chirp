@@ -335,10 +335,10 @@ class TestActionGating:
             cookie = await _signed_in_cookie(client)
             response, _ = await csrf_post(
                 client,
-                "/deposit",
+                "/markets",
                 cookie=cookie,
                 cookie_name=_SESSION_COOKIE,
-                data={"amount": "250"},
+                data={"_action": "deposit", "amount": "250"},
             )
             assert response.status == 204
             assert response.text == ""
@@ -350,8 +350,8 @@ class TestActionGating:
         async with TestClient(example_app) as client:
             cookie = await _signed_in_cookie(client)
             response = await client.post(
-                "/deposit",
-                data={"amount": "100"},
+                "/markets",
+                data={"_action": "deposit", "amount": "100"},
                 headers={"Cookie": f"{_SESSION_COOKIE}={cookie}"},
             )
             assert response.status == 403
@@ -362,7 +362,7 @@ class TestActionGating:
         rejected (403) or redirected to login (302) — never the 204 a real credit
         returns."""
         async with TestClient(example_app) as client:
-            response = await client.post("/deposit", data={"amount": "100"})
+            response = await client.post("/markets", data={"_action": "deposit", "amount": "100"})
             assert response.status in (302, 403)
             assert response.status != 204
 

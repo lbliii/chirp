@@ -1,15 +1,4 @@
-{# target: body #}
-{# outlet: main #}
-{#
-  TEMPLATE CONSTRUCT LEGEND (Chirp / Kida — "one template, many modes")
-
-  {% block name %}     Named region the layout or render plan fills.
-  {% fragment id %}    Standalone HTML chunk for SSE, OOB, or signal() renders.
-  {% def name(...) %}  Reusable macro — import with {% from ... import ... %}.
-  {% region id %}      DOM target for OOB swaps / Suspense deferred panels.
-
-  Full doctrine: examples/chirpui/lucky_cat/DESIGN.md §4
-#}
+{# Template legend + shell doctrine: DESIGN.md §4 #}
 {% extends "chirpui/app_shell_layout.html" %}
 {% from "chirpui/theme_toggle.html" import theme_toggle %}
 {% from "chirpui/drawer.html" import drawer %}
@@ -21,10 +10,7 @@
 
 {% block title %}Lucky Cat{% end %}
 
-{#- Inner ticker-strip body — the single source of truth for both the layout
-    region (full-page render) and the SSE fragment twin, so the markup can never
-    drift. `ticker` is None on the initial paint (the strip shows a hint); the
-    SSE stream supplies a live `ticker`. -#}
+{# Cross-page ticker — `ticker` signal renders ticker_signal fragment. DESIGN.md §4 #}
 {% def ticker_strip_body(ticker=none) %}
 {% if (ticker ?? none) is not none %}
 {% set up = ticker.change_pct_24h >= 0 %}
@@ -41,56 +27,18 @@
 {% end %}
 {% end %}
 
-{#- Cross-page ticker strip — now a live `ticker` SIGNAL ({{ signal_block('ticker') }}
-    in topbar_center below). The app.py `ticker` signal renders THIS block as its
-    SSE/SSR payload (render=_render_ticker_strip -> app.render(ticker_signal)), so
-    the live strip and the initial paint share one body and can never drift. The
-    block emits ONLY the inner body — the signal_block() sink owns the
-    <div sse-swap="ticker"> wrapper, so this fragment bakes NO id / hx-swap-oob
-    (unlike the old OOB ticker_strip_sse twin a plain Fragment(target) needed). -#}
 {% fragment ticker_signal %}
 {{ ticker_strip_body(ticker ?? none) }}
 {% endfragment %}
 
-{#- House-token balance body — single source of truth for the topbar token AND
-    the deposit-modal balance line (page.html), so the chrome can never drift. The
-    amount is now a live `balance` SIGNAL: {{ signal('balance') }} fans one
-    `event: balance` out to EVERY binding (topbar + modal) over the single
-    /_chirp/live connection. The coin + $MEOW sym are static chrome around the
-    live scalar. ZERO hand-maintained OOB twin — /deposit + /trade call
-    app.emit('balance', ...) and both homes swap in lockstep (the showcase). -#}
+{# $MEOW balance — `balance` signal; no OOB twin. DESIGN.md §4 #}
 {% def meow_balance_body() %}
 <span class="luckycat-token__coin" aria-hidden="true">🪙</span>
 <span class="luckycat-token__amount">{{ signal('balance') }}</span>
 <span class="luckycat-token__sym">$MEOW</span>
 {% end %}
 
-{#- =========================================================================
-    NOTIFICATIONS BELL — the topbar bell + unread badge + dropdown feed, folded
-    onto the ONE /_chirp/live signal connection (the headline N→1 win).
-
-    A global piece of shell chrome (every page) so it lives here, not in any
-    page-content block. Three body defs are the SSR seeds AND the signal renders
-    (one source of truth — the live update and the initial paint can never drift):
-
-      * notification_row(note)        — single source of truth for one row;
-      * notification_list_body(notes) — the dropdown's list (rows or empty state),
-        the `notifications` SIGNAL's render;
-      * notif_badge_body(n)           — the unread-count pill, the `notif_badge`
-        DERIVED signal's render;
-      * notif_announce_body(n)        — the spoken count, the `notif_announce`
-        DERIVED signal's render.
-
-    The bell's sinks are EXISTING elements (<ul id="notif-list">, the badge span,
-    the announce span), so each carries a MANUAL `sse-swap="..."` attribute bound
-    to its signal — NOT the signal_block() helper, which would inject its own
-    <div> wrapper (invalid inside/around the <ul>). app.py's `notifications`
-    source generator drains the log + raises price alerts and emits the recent
-    list; the derived `notif_badge` / `notif_announce` recompute the count in the
-    same cascade. Opening the bell POSTs /notifications/read, which marks read +
-    emits the signal so the badge derives to 0 over the live connection.
-    ========================================================================= -#}
-
+{# Notifications bell — manual sse-swap on existing elements (not signal_block). DESIGN.md §4 #}
 {#- One notification row — shared by the dropdown list and the SSE prepend twin,
     so the markup can never drift. `kind` picks the icon + jade/red/gold accent. -#}
 {% def notification_row(note) %}

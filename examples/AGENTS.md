@@ -11,6 +11,24 @@ Related: `AGENTS.md`, `README.md`, `docs/hypermedia-footguns.md`,
 
 You are the developer learning Chirp by copying an example into a real app.
 
+## Example comment budget
+
+Flagship examples (especially `chirpui/lucky_cat`) teach by running code, not by
+inline essays. Keep comments within this budget:
+
+- **Module docstring** — ≤15 lines: what the example is, how to run it, and where
+  domain logic lives (the DOMAIN vs CHIRP seam). Link `DESIGN.md` for doctrine.
+- **Function docstring** — one line on behavior plus one non-obvious *why* when
+  needed. No restating the return-type table or IA rules.
+- **Inline comments** — pointer only: `DESIGN.md §N`, a site doc URL, or a
+  one-line footgun. Do not duplicate footgun essays from `DESIGN.md` or the site.
+- **Verbose inline is allowed** only where the code looks like a bug without it
+  (`if False: yield`, `hx-select` overrides, `sys.modules` purge, `is deferred`
+  vs bare truthiness).
+
+When trimming, move duplicated doctrine into the example's `DESIGN.md` (single
+source of truth) and leave a short pointer in code.
+
 ## Protect
 
 - **Examples are collected by pytest.** `pyproject.toml:219` includes

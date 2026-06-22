@@ -185,6 +185,32 @@ chart fragment) keeps `app.check()`'s orphan-route rule quiet and the
 
 ---
 
+## 3.5 Where code lives
+
+After the Wave 2 split (#404 / #406), the teaching layout is:
+
+| Layer | Location | What |
+|-------|----------|------|
+| **Bootstrap** | `app.py` (~30 lines) | `mount_pages`, import wiring |
+| **Wiring** | `wiring/app_factory.py` | App config, `emit_signal`, ChirpUI registration |
+| | `wiring/middleware.py` | Session → Auth → CSRF → security headers |
+| | `wiring/signals.py` | `@app.signal` / `@app.derived` (freeze-before-mount) |
+| | `wiring/routes/` | SSE / EventStream + layout-global POST (`/logout`, `/notifications/read`, `/watchlist/toggle`) |
+| **Pages (GET)** | `pages/**/page.py` | Filesystem routes — `Page`, `Suspense`, … |
+| **Mutations (POST)** | `pages/**/_actions.py` | POST-to-self via `_action` field (`contacts_shell` pattern) |
+| **Domain** | `feed.py`, `trade_store.py`, … | Simulated stores — no Chirp imports upward |
+
+Trade example: `pages/trade/_actions.py` `@action("order")` handles
+`POST /trade`; deposit lives in `pages/markets/_actions.py`; cancel in
+`pages/portfolio/orders/_actions.py`. Shell-global mutations that fire from
+every page (`/logout`, bell read, star toggle) stay in `wiring/routes/` because
+they are not colocated with one page tree.
+
+Stale-module purge for shared pytest workers lives in `wiring/bootstrap.py`
+(conftest calls it — **not** in `app.py`).
+
+---
+
 ## 4. Patterns worth stealing
 
 ### The kanban `*_oob` twin idiom
@@ -234,6 +260,10 @@ The catch is footgun #2 (§5): anything inside `#main` that does a *local* swap
 inherits this outlet and must override it on itself.
 
 ### SSE / Suspense / Stream — pick the right one
+
+Canonical decision tree (site):
+[[docs/build-apps/streaming-updates/realtime-decision-tree|Realtime decision tree]]
+— when to use each mechanism and which Lucky Cat feature uses which.
 
 - **`EventStream` + `sse_scope()`** for *page-specific* live updates after the
   page loads: the per-market `/markets/{symbol}/stream` (detail page only) and

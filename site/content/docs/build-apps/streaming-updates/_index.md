@@ -24,8 +24,10 @@ automatically.
 :::{note} Which one do I reach for?
 A slow first paint that should appear section-by-section is `Stream`. A
 dashboard whose shell should appear instantly while slow panels fill in is
-`Suspense`. A feed that updates after the page is live is `EventStream`. For the
-full picture, see [[docs/about/core-concepts/return-values|the return-type decision tree]].
+`Suspense`. A feed that updates after the page is live is `EventStream`.
+Cross-page chrome and post-mutation fan-out belong on
+[[docs/build-apps/streaming-updates/realtime-decision-tree|the realtime decision tree]]
+(includes Stream / Suspense / EventStream / Signal / OOB and a Lucky Cat map).
 :::
 
 :::{cards}
