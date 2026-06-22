@@ -123,6 +123,22 @@ class AppRegistry:
             raise TypeError(msg)
         self._state.policy_registry[name] = fn
 
+    def register_reactive_bus(self, bus: Any) -> None:
+        """Register an app-owned ``ReactiveBus`` for ``kick_user`` eviction.
+
+        Call during setup for buses passed to :func:`~chirp.pages.reactive.stream.reactive_stream`
+        (the signal registry bus is wired automatically). Raises ``RuntimeError``
+        after freeze.
+        """
+        from chirp.pages.reactive.bus import ReactiveBus
+
+        self._ensure_mutable()
+        if not isinstance(bus, ReactiveBus):
+            msg = f"register_reactive_bus expects ReactiveBus, got {type(bus).__name__}"
+            raise TypeError(msg)
+        if bus not in self._state.reactive_buses:
+            self._state.reactive_buses.append(bus)
+
     def add_health_check(self, check: Any) -> None:
         """Register a readiness check for the auto-mounted ``/ready`` probe.
 

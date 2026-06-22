@@ -227,6 +227,38 @@ class ReactiveBus:
         for queue, _conn, loop in subs:
             self._schedule_close(loop, queue)
 
+    def close_user(self, user_id: str, *, scope: str | None = None) -> int:
+        """Close subscriptions whose ``ConnectionInfo.user_id`` matches *user_id*.
+
+        Delivers the ``None`` sentinel so ``subscribe()`` exits and the owning
+        ``EventStream`` terminates. Other users' streams are unaffected.
+
+        Returns the number of subscriptions closed.
+        """
+        to_close: list[tuple[asyncio.Queue[ChangeEvent | None], asyncio.AbstractEventLoop]] = []
+        with self._lock:
+            scope_keys = [scope] if scope is not None else list(self._subscribers)
+            for key in scope_keys:
+                subs = self._subscribers.get(key)
+                if not subs:
+                    continue
+                remaining: set[_Sub] = set()
+                for sub in subs:
+                    queue, conn, loop = sub
+                    if conn is not None and conn.user_id == user_id:
+                        to_close.append((queue, loop))
+                    else:
+                        remaining.add(sub)
+                if remaining:
+                    self._subscribers[key] = remaining
+                else:
+                    self._subscribers.pop(key, None)
+                    self._drop_log_last.pop(key, None)
+                    self._drop_log_counts.pop(key, None)
+        for queue, loop in to_close:
+            self._schedule_close(loop, queue)
+        return len(to_close)
+
     def _schedule_close(
         self,
         loop: asyncio.AbstractEventLoop,

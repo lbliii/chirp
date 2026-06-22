@@ -196,8 +196,9 @@ def get_user() -> User:
     Inside an ``EventStream`` generator (SSE), this returns the user captured
     at **connect time**. SSE identity is pinned for the connection's lifetime:
     a user logged out or permission-revoked mid-stream keeps the connect-time
-    identity until they reconnect. (Per-event revalidation is a deferred
-    follow-up, not currently available.) An unauthenticated connection sees
+    identity until they reconnect. Call :meth:`~chirp.app.App.kick_user` to
+    terminate that user's live streams so htmx reconnect re-runs auth middleware
+    and re-pins fresh permissions. An unauthenticated connection sees
     ``AnonymousUser`` for the whole stream.
     """
     try:

@@ -110,8 +110,9 @@ that were live in the handler.
 
 **SSE identity is pinned at connect time.** The snapshot is fixed for the life
 of the SSE connection: a user logged out or permission-revoked mid-stream keeps
-the connect-time identity until they reconnect. (Per-event revalidation is a
-deferred follow-up.) The SSE session is a **read-only connect-time snapshot** —
+the connect-time identity until they reconnect. Call ``app.kick_user(user_id)``
+to terminate that user's live streams so htmx reconnect re-runs auth middleware
+and re-pins fresh permissions. The SSE session is a **read-only connect-time snapshot** —
 there is no response to write `Set-Cookie`, so session mutations inside an SSE
 generator do not persist. `g` writes inside a deferred block / generator are
 local to that render and do not flow back to the (already-completed) handler.
