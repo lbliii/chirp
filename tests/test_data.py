@@ -862,6 +862,7 @@ class TestExports:
             "ShapeError",
             "composite",
             "get_db",
+            "json_path",
             "migrate",
             "nested",
             "register_shape",

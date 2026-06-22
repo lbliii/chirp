@@ -616,12 +616,6 @@ app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_secur
 # ---------------------------------------------------------------------------
 
 
-@app.route("/health")
-def health():
-    """Unauthenticated Railway healthcheck."""
-    return ("ok", 200)
-
-
 @app.route("/logout", methods=["POST"], name="logout")
 def do_logout():
     """Sign out — regenerate the session and full-page redirect home.
