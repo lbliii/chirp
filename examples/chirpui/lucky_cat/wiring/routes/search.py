@@ -5,8 +5,6 @@ from feed import get_feed
 
 from chirp import Fragment, Request
 
-from wiring.app_factory import app
-
 _PALETTE_TEMPLATE = "_components/command_palette.html"
 
 

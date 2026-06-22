@@ -1,7 +1,8 @@
 """Register app.py routes not covered by filesystem pages."""
-from chirp import App
 
 from wiring.routes import account, ft, markets_sse, notifications, search, watchlist
+
+from chirp import App
 
 
 def register(app: App) -> None:

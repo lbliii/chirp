@@ -1,14 +1,11 @@
 """Market detail SSE + chart fragments — referenced=True htmx/SSE-only routes."""
 
 import contextlib
-import sys
 
 from feed import DEFAULT_INTERVAL, INTERVALS, get_feed
 from pages._context import hero_chart as build_chart_geometry
 
 from chirp import EventStream, Fragment, Request
-
-from wiring.app_factory import app
 
 _DETAIL_TEMPLATE = "markets/{symbol}/page.html"
 

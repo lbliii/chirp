@@ -4,13 +4,12 @@ import notifications
 import session_store
 import users
 from wallet import balance as meow_balance
+from wiring.app_factory import _signal_audience_key, app, config
 
 from chirp.middleware.auth import AuthConfig, AuthMiddleware, current_user
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersConfig, SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
-
-from wiring.app_factory import _signal_audience_key, app, config
 
 
 async def load_user(user_id: str) -> users.User | None:

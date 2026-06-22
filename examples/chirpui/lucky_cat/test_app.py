@@ -959,7 +959,10 @@ class TestSessionScopedStores:
             await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
 
             headers_a = await TestTradeOrder()._csrf_headers(client_a)
-            response = await client_a.post("/trade", data={"_action": "order", 
+            response = await client_a.post(
+                "/trade",
+                data={
+                    "_action": "order",
                     "symbol": "PAW-MEOW",
                     "side": "buy",
                     "kind": "market",
@@ -1176,8 +1179,18 @@ class TestActivityFeed:
                 "HX-Request": "true",
                 "Cookie": f"{_SESSION_COOKIE}={cookie}",
             }
-            await client.post("/markets", data={"_action": "deposit", "amount": "250"}, headers=headers)
-            await client.post("/trade", data={"_action": "order", "symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+            await client.post(
+                "/markets", data={"_action": "deposit", "amount": "250"}, headers=headers
+            )
+            await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
                 headers=headers,
             )
             response = await client.get("/activity", headers=_cookie_header(cookie))
@@ -1371,7 +1384,15 @@ class TestTradeOrder:
         no full-page nav (the order_form block, not the whole page)."""
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            response = await client.post("/trade", data={"_action": "order", "symbol": "BTC-MEOW", "side": "buy", "kind": "market", "size": "10"},
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "BTC-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "10",
+                },
                 headers=headers,
             )
             assert response.status == 422
@@ -1396,7 +1417,15 @@ class TestTradeOrder:
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
             before = wallet.INITIAL_MEOW
-            response = await client.post("/trade", data={"_action": "order", "symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
                 headers=headers,
             )
             assert response.status == 200
@@ -1428,7 +1457,10 @@ class TestTradeOrder:
 
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            response = await client.post("/trade", data={"_action": "order", 
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
                     "symbol": symbol,
                     "side": "buy",
                     "kind": "market",
@@ -1449,7 +1481,15 @@ class TestTradeOrder:
     async def test_order_requires_csrf(self, example_app) -> None:
         """Without a CSRF token the mutating route is rejected (secure-by-default)."""
         async with TestClient(example_app) as client:
-            response = await client.post("/trade", data={"_action": "order", "symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
             )
             assert response.status in (400, 403)
 
@@ -1457,7 +1497,15 @@ class TestTradeOrder:
         """A plain (non-htmx) POST gets the FormAction 303 redirect to /trade."""
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client, htmx=False)
-            response = await client.post("/trade", data={"_action": "order", "symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
                 headers=headers,
             )
             assert_mutation_redirect(response, "/trade")
@@ -1490,7 +1538,10 @@ class TestTradeOrder:
 
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            await client.post("/trade", data={"_action": "order", 
+            await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
                     "symbol": "SOL-MEOW",
                     "side": "buy",
                     "kind": "limit",
@@ -1506,7 +1557,9 @@ class TestTradeOrder:
 
             headers = await self._csrf_headers(client)
             response = await client.post(
-                "/portfolio/orders", data={"_action": "cancel", "order_id": str(order.id)}, headers=headers
+                "/portfolio/orders",
+                data={"_action": "cancel", "order_id": str(order.id)},
+                headers=headers,
             )
             assert response.status == 200
             # The empty-table OOB swap fired, targeting the real container id.
@@ -1531,7 +1584,9 @@ class TestTradeOrder:
                 first = trade_store.open_limit_order("SOL-MEOW", "buy", 1.0, 100.0)
                 trade_store.open_limit_order("BTC-MEOW", "sell", 0.5, 90000.0)
             response = await client.post(
-                "/portfolio/orders", data={"_action": "cancel", "order_id": str(first.id)}, headers=headers
+                "/portfolio/orders",
+                data={"_action": "cancel", "order_id": str(first.id)},
+                headers=headers,
             )
             assert response.status == 200
             # Count badge still updates, but the table container does NOT swap.
@@ -1550,7 +1605,10 @@ class TestTradeOrder:
         before = wallet.INITIAL_MEOW
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            response = await client.post("/trade", data={"_action": "order", 
+            response = await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
                     "symbol": "PAW-MEOW",
                     "side": "buy",
                     "kind": "limit",
@@ -1588,7 +1646,10 @@ class TestTradeOrder:
                 # Size 9000 PAW-MEOW ≈ 73k $MEOW each: every buy validates against the
                 # 100k seed alone, but two cannot both clear — the loser hits the
                 # atomic re-check and gets a 422, not a 500.
-                resp = await client.post("/trade", data={"_action": "order", 
+                resp = await client.post(
+                    "/trade",
+                    data={
+                        "_action": "order",
                         "symbol": "PAW-MEOW",
                         "side": "buy",
                         "kind": "market",
@@ -2885,7 +2946,9 @@ class TestNotificationsBell:
         # Seed the value cache from the initial() seed (empty), then deposit.
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client)
-            await client.post("/markets", data={"_action": "deposit", "amount": "250"}, headers=headers)
+            await client.post(
+                "/markets", data={"_action": "deposit", "amount": "250"}, headers=headers
+            )
             with sole_client_store():
                 feed = notifications.recent()
                 assert len(feed) == 1
@@ -2904,7 +2967,9 @@ class TestNotificationsBell:
             assert cached.unread == 1
             assert registry.cached_value("notif_badge", audience_key=aud) == 1
             # A clamped/no-op deposit adds nothing (no new log entry, cache stays 1).
-            await client.post("/markets", data={"_action": "deposit", "amount": "not-a-number"}, headers=headers)
+            await client.post(
+                "/markets", data={"_action": "deposit", "amount": "not-a-number"}, headers=headers
+            )
             with sole_client_store():
                 assert len(notifications.recent()) == 1
             assert len(registry.cached_value("notifications", audience_key=aud).notes) == 1
@@ -2915,7 +2980,15 @@ class TestNotificationsBell:
 
         async with TestClient(example_app) as client:
             headers = await self._csrf_headers(client, path="/trade")
-            await client.post("/trade", data={"_action": "order", "symbol": "PAW-MEOW", "side": "buy", "kind": "market", "size": "1"},
+            await client.post(
+                "/trade",
+                data={
+                    "_action": "order",
+                    "symbol": "PAW-MEOW",
+                    "side": "buy",
+                    "kind": "market",
+                    "size": "1",
+                },
                 headers=headers,
             )
             with sole_client_store():
@@ -2978,9 +3051,9 @@ class TestNotificationsBell:
         emits on session signals (a ValueError that previously propagated out of
         the source and killed the pump — a permanently dead bell). It must be
         skipped, not coerced to ``""``."""
-        from wiring.app_factory import fan_out_notifications_live
         import notifications
         import session_store
+        from wiring.app_factory import fan_out_notifications_live
 
         # A store holding ONLY the DEFAULT_KEY bucket (anonymous / pre-store-key
         # state): the old code coerced this to audience_key="" and raised.
@@ -2996,10 +3069,10 @@ class TestNotificationsBell:
     async def test_fan_out_notifications_emits_to_real_session(self, example_app) -> None:
         """A real (non-default) session key fans out without the empty-key error
         and caches that session's notifications snapshot."""
-        from wiring.app_factory import fan_out_notifications_live
         import app as lucky_app
         import notifications
         import session_store
+        from wiring.app_factory import fan_out_notifications_live
 
         key = "sess-regression"
         with session_store.bind(key):

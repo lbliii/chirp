@@ -11,13 +11,13 @@ ROOT_DIR = Path(__file__).parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from wiring import middleware
 from wiring.app_factory import PAGES_DIR, app, register_chirp_ui
-from wiring import middleware, signals
 from wiring.routes import register as register_routes
 
 register_chirp_ui()
 middleware.register(app)
-import wiring.signals  # noqa: F401,E402 — registers @app.signal before mount_pages
+import wiring.signals  # noqa: F401 — registers @app.signal before mount_pages
 
 register_routes(app)
 

@@ -8,8 +8,6 @@ from feed import get_feed
 
 from chirp import EventStream, Fragment
 
-from wiring.app_factory import app
-
 _PORTFOLIO_TEMPLATE = "portfolio/page.html"
 
 

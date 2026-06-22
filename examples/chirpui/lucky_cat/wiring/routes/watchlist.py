@@ -4,9 +4,7 @@ import watchlist
 from feed import get_feed
 from navigation import active_route_path
 
-from chirp import Fragment, OOB, Redirect, Request, login_required
-
-from wiring.app_factory import app
+from chirp import OOB, Fragment, Redirect, Request, login_required
 
 
 def register(app_instance) -> None:
@@ -25,7 +23,9 @@ def register(app_instance) -> None:
             if hasattr(feed, "has_symbol")
             else any(m.symbol == symbol for m in feed.markets())
         )
-        starred = watchlist.contains(symbol) if not symbol or not known else watchlist.toggle(symbol)
+        starred = (
+            watchlist.contains(symbol) if not symbol or not known else watchlist.toggle(symbol)
+        )
         fragments: list[Fragment] = [
             Fragment(
                 "_components/market.html",

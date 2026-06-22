@@ -3,13 +3,12 @@
 import notifications
 import trade_store
 from feed import get_feed
+from pages.trade._trade_helpers import fill_fragments, open_order_count_fragment, toast
 from wallet import balance as meow_balance
+from wiring.app_factory import emit_signal
 
 from chirp import FormAction, Fragment, ValidationError, login_required
 from chirp.pages.actions import action
-
-from pages.trade._trade_helpers import fill_fragments, open_order_count_fragment, toast
-from wiring.app_factory import emit_signal
 
 _TRADE_TEMPLATE = "trade/page.html"
 

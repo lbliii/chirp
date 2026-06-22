@@ -1,4 +1,5 @@
 """Live signal registration — must run before mount_pages. DESIGN.md §7."""
+
 import asyncio
 import contextlib
 import time
@@ -7,10 +8,9 @@ import lobby
 import notifications
 import session_store
 from feed import get_feed
+from wiring.app_factory import app, fan_out_notifications_live
 
 from chirp import Fragment
-
-from wiring.app_factory import app, fan_out_notifications_live, emit_signal
 
 _TICKER_ROTATE_S = 2.5
 
@@ -273,5 +273,3 @@ def notif_announce(feed) -> int:
 
 
 # CHIRP — DESIGN.md
-
-

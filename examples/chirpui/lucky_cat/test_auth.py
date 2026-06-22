@@ -349,7 +349,9 @@ class TestActionGating:
         bypass CSRF (the secure stack enforces both)."""
         async with TestClient(example_app) as client:
             cookie = await _signed_in_cookie(client)
-            response = await client.post("/markets", data={"_action": "deposit", "amount": "100"},
+            response = await client.post(
+                "/markets",
+                data={"_action": "deposit", "amount": "100"},
                 headers={"Cookie": f"{_SESSION_COOKIE}={cookie}"},
             )
             assert response.status == 403

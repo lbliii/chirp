@@ -2,13 +2,12 @@
 
 import trade_store
 from feed import get_feed
+from pages.trade._trade_helpers import toast
 from wallet import balance as meow_balance
+from wiring.app_factory import emit_signal
 
 from chirp import FormAction, Fragment, Request, login_required
 from chirp.pages.actions import action
-
-from pages.trade._trade_helpers import toast
-from wiring.app_factory import emit_signal
 
 
 @action("convert")
@@ -18,7 +17,9 @@ async def convert_order(request: Request, symbol="", size=""):
     markets = feed.markets()
     values = {"symbol": (symbol or "").strip(), "size": (size or "").strip()}
 
-    errors, parsed = trade_store.validate_order(values["symbol"], "buy", "market", values["size"], "")
+    errors, parsed = trade_store.validate_order(
+        values["symbol"], "buy", "market", values["size"], ""
+    )
     if not errors:
         order, fill_errors = trade_store.try_place_order(
             values["symbol"],

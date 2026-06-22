@@ -1,12 +1,11 @@
 """Actions for /markets — deposit (topbar modal posts here)."""
 
 import notifications
-from wallet import balance as meow_balance, deposit as credit_meow
+from wallet import deposit as credit_meow
+from wiring.app_factory import emit_signal
 
 from chirp import login_required
 from chirp.pages.actions import action
-
-from wiring.app_factory import emit_signal
 
 
 @action("deposit")
