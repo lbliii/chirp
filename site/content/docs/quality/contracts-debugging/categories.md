@@ -128,6 +128,7 @@ app would fare in production without changing your config, use `chirp check
 | `signal_dead_binding` | ERROR | Declare a `@app.signal('x')` / `@app.derived('x', ...)` producer for every `signal('x')` / `signal_block('x')` / `sse-swap="x"` binding under the merged `/_chirp/live` connection, or fix the name. A bound signal with no registered producer never updates. |
 | `signal_raw_sse_swap` | INFO | Prefer `{{ signal_attrs('x') }}` over hand-written `sse-swap="x"` on pages composed under `signal_connect()` so the binding is validated. |
 | `signal_orphan` | INFO | Bind the registered signal with `signal()`/`signal_block()` in a template, or remove the unused producer. An orphan signal is produced but never displayed. |
+| `signal_connect_budget` | INFO | Merge multiple persistent `/_chirp/live` scopes into one `signal_connect()` wrapper — browsers cap concurrent SSE connections per origin (HTTP/1.1 footgun). |
 | `signal_scope` | ERROR / WARNING | Register `SessionMiddleware` before using `audience="session"` signals so each connection can resolve its `/_chirp/live?aud=…` key. WARNs when a derived signal depends on both global and session-scoped deps — verify the mixed dependency graph is intentional. |
 
 ## Forms, Commands, And Safety
