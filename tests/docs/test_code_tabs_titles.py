@@ -38,10 +38,11 @@ def test_code_tabs_groups_with_multiple_fences_have_titles() -> None:
     offenders: list[str] = []
     for path in _site_markdown_files():
         rel = path.relative_to(_ROOT)
-        for msg in _untitled_fences_in_code_tabs(path.read_text(encoding="utf-8")):
-            offenders.append(f"{rel}: {msg}")
+        offenders.extend(
+            f"{rel}: {msg}"
+            for msg in _untitled_fences_in_code_tabs(path.read_text(encoding="utf-8"))
+        )
 
     assert not offenders, (
-        "Add title=\"...\" to each fence in code-tabs groups with 2+ tabs. "
-        f"Offenders: {offenders}"
+        f'Add title="..." to each fence in code-tabs groups with 2+ tabs. Offenders: {offenders}'
     )
