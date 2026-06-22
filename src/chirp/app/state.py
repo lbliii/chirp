@@ -1,5 +1,7 @@
 """Application setup/runtime state containers."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
     from chirp.data.schema.types import SchemaSnapshot
     from chirp.health import HealthCheck
     from chirp.live_blocks import LiveBlockSpec
+    from chirp.pages.reactive.bus import ReactiveBus
     from chirp.realtime.signals import SignalRegistry
 
 
@@ -218,6 +221,10 @@ class MutableAppState:
     #: Lazily created on first ``@app.signal``/``@app.derived`` so apps with no
     #: signals never construct a ``ReactiveBus``.
     signal_registry: SignalRegistry | None = None
+    #: App-owned :class:`~chirp.pages.reactive.bus.ReactiveBus` instances
+    #: (``app.register_reactive_bus``). ``kick_user`` closes matching subscribers
+    #: on every registered bus plus the signal registry bus when present.
+    reactive_buses: list[ReactiveBus] = field(default_factory=list)
     mount_app_skips: list[MountAppSkip] = field(default_factory=list)
     #: Plugins quarantined during ``App.mount`` because their ``register()``
     #: raised. Appended only during single-threaded setup (``mount`` is

@@ -773,6 +773,34 @@ class App:
         """
         self._registry.register_policy(name, fn)
 
+    def register_reactive_bus(self, bus: Any) -> None:
+        """Register a ``ReactiveBus`` used by ``reactive_stream`` for ``kick_user``."""
+        self._registry.register_reactive_bus(bus)
+
+    def kick_user(self, user_id: str) -> int:
+        """Terminate live SSE streams for *user_id* so reconnect re-pins auth.
+
+        Closes matching subscribers on the signal registry bus (when signals
+        are registered) and every bus passed to :meth:`register_reactive_bus`.
+        Returns the total number of subscriptions closed. Emits
+        ``sse.connection.kicked`` when any stream is terminated.
+        """
+        from chirp.security.audit import emit_security_event
+
+        closed = 0
+        registry = self._mutable_state.signal_registry
+        if registry is not None:
+            closed += registry.bus.close_user(user_id)
+        for bus in self._mutable_state.reactive_buses:
+            closed += bus.close_user(user_id)
+        if closed:
+            emit_security_event(
+                "sse.connection.kicked",
+                user_id=user_id,
+                details={"closed": closed},
+            )
+        return closed
+
     def add_health_check(self, check: HealthCheck) -> None:
         """Register a readiness check for the auto-mounted ``/ready`` probe.
 

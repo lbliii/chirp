@@ -172,6 +172,45 @@ class Query[T]:
         """
         return replace(self, _columns=columns)
 
+    def accessible_to(
+        self,
+        user: object,
+        perm: str = "read",
+        *,
+        resource_type: str,
+        resource_column: str = "id",
+        group_ids: frozenset[str] | None = None,
+        grants_table: str = "access_grants",
+    ) -> Query[T]:
+        """Filter rows to those *user* can access via ``access_grants``.
+
+        Injects a correlated ``EXISTS`` subquery so paginated list renders stay
+        set-based (no per-row scalar ``check_access`` in a loop). Pass explicit
+        *group_ids* when the user model does not expose ``group_ids``.
+
+        ::
+
+            Query(Doc, "documents").accessible_to(
+                user, "read", resource_type="document"
+            ).order_by("id DESC").paginate(db, page=1)
+        """
+        from chirp.security.access_grants import access_exists_clause
+
+        user_id = str(getattr(user, "id", ""))
+        if group_ids is None:
+            raw = getattr(user, "group_ids", None)
+            group_ids = frozenset(str(g) for g in raw) if raw is not None else frozenset()
+        clause, params = access_exists_clause(
+            table=self._table,
+            resource_column=resource_column,
+            resource_type=resource_type,
+            perm=perm,
+            user_id=user_id,
+            group_ids=tuple(sorted(group_ids)),
+            grants_table=grants_table,
+        )
+        return self.where(clause, *params)
+
     # ── Compilation ──────────────────────────────────────────────────────
 
     @property

@@ -47,6 +47,17 @@ Group -> permission rollup for the flat ``user.permissions`` gate::
     )
 """
 
+from chirp.security.access_grants import (
+    ACCESS_GRANTS_DDL,
+    AccessGrant,
+    SharingEscalationError,
+    access_policy,
+    check_access,
+    create_grant,
+    register_access_policy,
+    require_access,
+    sharing_escalation_errors,
+)
 from chirp.security.audit import SecurityEvent, emit_security_event, set_security_event_sink
 from chirp.security.decorators import login_required, requires
 from chirp.security.lockout import LockoutConfig, LoginLockout
@@ -60,16 +71,25 @@ from chirp.security.passwords import (
 from chirp.security.resolve_permissions import resolve_permissions
 
 __all__ = [
+    "ACCESS_GRANTS_DDL",
+    "AccessGrant",
     "LockoutConfig",
     "LoginLockout",
     "SecurityEvent",
+    "SharingEscalationError",
+    "access_policy",
+    "check_access",
+    "create_grant",
     "emit_security_event",
     "hash_password",
     "login_required",
     "needs_rehash",
+    "register_access_policy",
+    "require_access",
     "requires",
     "resolve_permissions",
     "set_security_event_sink",
+    "sharing_escalation_errors",
     "verify_and_upgrade",
     "verify_login",
     "verify_password",

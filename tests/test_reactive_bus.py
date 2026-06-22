@@ -18,7 +18,7 @@ import threading
 
 import pytest
 
-from chirp.pages.reactive import ChangeEvent, ReactiveBus
+from chirp.pages.reactive import ChangeEvent, ConnectionInfo, ReactiveBus
 
 
 def _event(scope: str = "s", paths: str | set[str] = "x") -> ChangeEvent:
@@ -401,3 +401,64 @@ class TestThreadSafety:
 
         await asyncio.wait_for(task, timeout=2.0)
         assert len(received) == count
+
+
+# ---------------------------------------------------------------------------
+# close_user
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.issue(372)
+class TestCloseUser:
+    """close_user evicts only matching user_id subscribers."""
+
+    async def test_close_user_terminates_matching_subscriber(self) -> None:
+        bus = ReactiveBus()
+        conn_alice = ConnectionInfo(session_id="s1", user_id="alice")
+        conn_bob = ConnectionInfo(session_id="s2", user_id="bob")
+        alice_done = asyncio.Event()
+        bob_received: list[ChangeEvent] = []
+
+        async def alice_sub() -> None:
+            async for _event in bus.subscribe("room", connection=conn_alice):
+                pass
+            alice_done.set()
+
+        async def bob_sub() -> None:
+            async for event in bus.subscribe("room", connection=conn_bob):
+                bob_received.append(event)
+                break
+
+        alice_task = asyncio.create_task(alice_sub())
+        bob_task = asyncio.create_task(bob_sub())
+        await asyncio.sleep(0.01)
+
+        closed = bus.close_user("alice")
+        assert closed == 1
+        await asyncio.wait_for(alice_done.wait(), timeout=1.0)
+
+        await bus.emit(_event("room"))
+        await asyncio.sleep(0.01)
+        bus.close("room")
+        await alice_task
+        await bob_task
+        assert len(bob_received) == 1
+
+    async def test_close_user_scope_limited(self) -> None:
+        bus = ReactiveBus()
+        conn = ConnectionInfo(session_id="s1", user_id="alice")
+
+        async def sub(scope: str) -> bool:
+            async for _event in bus.subscribe(scope, connection=conn):
+                return False
+            return True
+
+        task_a = asyncio.create_task(sub("a"))
+        task_b = asyncio.create_task(sub("b"))
+        await asyncio.sleep(0.01)
+        assert bus.close_user("alice", scope="a") == 1
+        assert await asyncio.wait_for(task_a, timeout=1.0) is True
+        await bus.emit(_event("b"))
+        await asyncio.sleep(0.01)
+        bus.close("b")
+        assert await asyncio.wait_for(task_b, timeout=1.0) is False

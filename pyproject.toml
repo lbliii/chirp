@@ -181,6 +181,7 @@ ignore = [
 "src/chirp/data/query.py" = ["S608"]  # Query builder constructs SQL safely (parameterized)
 "src/chirp/data/migrate.py" = ["S608"] # Migration SQL is framework-generated
 "src/chirp/data/shapes.py" = ["S608"]  # Shape SQL is author-declared; :name placeholders parameterized (never concatenated)
+"src/chirp/security/access_grants.py" = ["S608"] # Grant SQL uses validated identifiers + bound params
 "src/chirp/server/production.py" = ["S104"] # Server binds to 0.0.0.0 intentionally
 "src/chirp/contracts/**/*.py" = ["S110", "S112", "S608"] # Contract checkers intentionally suppress errors
 
