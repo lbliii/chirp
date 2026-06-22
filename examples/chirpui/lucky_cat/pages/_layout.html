@@ -701,7 +701,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
         live region below). The read POST returns 204; the visible clear flows
         over this signal binding, not a response body. -#}
     <span id="notif-badge" class="luckycat-notif-bell__badge-wrap" aria-hidden="true"
-          sse-swap="notif_badge" hx-target="this">{{ notif_badge_body(notifications_unread | default(0)) }}</span>
+          {{ signal_bind('notif_badge') }}>{{ notif_badge_body(notifications_unread | default(0)) }}</span>
   </button>
   {#- The SPOKEN unread count — a polite live region OUTSIDE the labelled button
       (a live region buried inside a button whose accessible name is fixed by
@@ -709,7 +709,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
       `notif_announce` DERIVED-signal sink: sse-swap="notif_announce" so each count
       change is announced exactly once over the live connection (SSR-seeded). -#}
   <span id="notif-announce" class="chirpui-visually-hidden" role="status" aria-live="polite"
-        sse-swap="notif_announce" hx-target="this">{{ notif_announce_body(notifications_unread | default(0)) }}</span>
+        {{ signal_bind('notif_announce') }}>{{ notif_announce_body(notifications_unread | default(0)) }}</span>
   <div class="luckycat-notif-bell__panel chirpui-dropdown__menu" x-ref="panel"
        :id="$id('notif-panel')" role="region" aria-label="Notifications"
        x-show="open" x-cloak x-transition>
@@ -724,7 +724,7 @@ document.body.addEventListener("htmx:configRequest", function(event) {
         (single-source notification_list_body), so the live list and the initial
         paint can never drift. -#}
     <ul id="notif-list" class="luckycat-notif-list" role="list"
-        sse-swap="notifications" hx-target="this">
+        {{ signal_bind('notifications') }}>
       {{ notification_list_body(notifications | default(())) }}
     </ul>
   </div>

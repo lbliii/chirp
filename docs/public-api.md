@@ -28,13 +28,13 @@ from chirp import App, AppConfig, Page, Fragment, Template
 |------|-------|
 | Application | `App`, `AppConfig` |
 | HTTP | `Request`, `Response`, `FileResponse`, `JSONResponse`, `Redirect`, `hx_redirect` |
-| Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `Action` |
+| Return types | `Template`, `InlineTemplate`, `Fragment`, `Page`, `OOB`, `Stream`, `Suspense`, `TemplateStream`, `EventStream`, `SSEEvent`, `ValidationError`, `FormAction`, `MutationResult`, `SignalEmit`, `Action` |
 | Middleware | `Middleware`, `Next`, `AnyResponse` (register with `app.add_middleware(mw, *, priority=0)`) |
 | Request context | `g`, `get_request` |
 | Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
 | Auth and security | `get_user`, `current_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
-| Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
+| Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `SessionSignalMiddleware`, `SessionSignalConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
 | Markdown | `MarkdownRenderer` |
 
 ### Request notes
@@ -61,7 +61,7 @@ shape may still evolve before 1.0:
 | HTTP/request helpers | `RequestUrlScope` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
-| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals `signal()` / `signal_block()` / `signal_attrs()` / `signal_connect()`; the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) categories |
+| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |

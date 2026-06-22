@@ -7,13 +7,14 @@ Three request-aware globals, registered at freeze **only when** signals exist:
   current rendered value (from the value cache / ``spec.initial``) so there is no
   empty-then-fill flash; htmx's default ``sse-swap`` swap is ``innerHTML``.
 - ``signal_block(name)`` — the same, for an HTML fragment, on a ``<div>``.
-- ``signal_attrs(name)`` — the binding **attributes only**
+- ``signal_attrs(name)`` / ``signal_bind(name)`` — the binding **attributes only**
   (``sse-swap="name" hx-target="this"``) for an EXISTING element, so a layout's own
   semantic container (a CSS-grid ``<section>``, a ``<ul>``) becomes a live sink with
   no injected wrapper. The element keeps rendering its own SSR body; live events
   ``innerHTML``-swap it. Like ``signal()``/``signal_block()`` it records the topic and
   is detected by the dead-binding contract via the call-site, so the binding is
   validated even though the element's ``sse-swap`` is produced at render time.
+  ``signal_bind`` is the preferred public name; ``signal_attrs`` is retained as an alias.
 - ``signal_connect()`` — the **one** shared connection wrapper:
   ``<div hx-ext="sse" sse-connect="/_chirp/live?topics=..." hx-disinherit="...">``.
   All signal sinks on the page live inside this single wrapper; one connection
@@ -108,26 +109,28 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         inner = seed if seed is not None else ""
         return Markup(f'<div sse-swap="{escape(name)}" hx-target="this">{inner}</div>')
 
-    def signal_attrs(name: str) -> Markup:
-        """Emit the binding ATTRIBUTES for an existing element bound to signal *name*.
+    def signal_bind(name: str) -> Markup:
+        """Emit binding attrs for an existing element bound to signal *name*.
 
         Returns ``sse-swap="name" hx-target="this"`` (no element, no wrapper) for
         placement inside an existing tag::
 
-            <section class="board" {{ signal_attrs('market_stats') }}>
-              {{ stat_strip_body(stats) }}   {#- the element renders its own SSR body -#}
-            </section>
+            <ul id="notif-list" {{ signal_bind('notifications') }}>
+              {{ notification_list_body(notes) }}
+            </ul>
 
         Use this when ``signal()``/``signal_block()`` would inject a ``<span>``/
         ``<div>`` that breaks the element's own layout (a CSS grid/flex container)
         or is otherwise wrong (binding a ``<ul>``). Unlike a hand-written
-        ``sse-swap`` attribute, the ``signal_attrs('x')`` CALL is recorded for topic
+        ``sse-swap`` attribute, the ``signal_bind('x')`` CALL is recorded for topic
         scoping AND recognised by the dead-binding contract, so the binding is
         validated. The element must be a descendant of :func:`signal_connect`.
         """
         validate_signal_name(name)
         _record(name)
         return Markup(f'sse-swap="{escape(name)}" hx-target="this"')
+
+    signal_attrs = signal_bind
 
     def signal_connect() -> Markup:
         """Emit the one shared ``sse-connect`` wrapper for all page signals.
@@ -163,6 +166,7 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
     return {
         "signal": signal,
         "signal_block": signal_block,
+        "signal_bind": signal_bind,
         "signal_attrs": signal_attrs,
         "signal_connect": signal_connect,
     }

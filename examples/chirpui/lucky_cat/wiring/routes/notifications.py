@@ -1,9 +1,9 @@
 """Notifications bell — POST /notifications/read (layout-global)."""
 
 import notifications
-from wiring.app_factory import emit_signal
 
 from chirp import login_required
+from chirp.templating.returns import SignalEmit
 
 
 def register(app_instance) -> None:
@@ -11,5 +11,4 @@ def register(app_instance) -> None:
     @login_required
     def notifications_read():
         notifications.mark_all_read()
-        emit_signal("notifications", notifications.snapshot())
-        return ("", 204)
+        return SignalEmit(("notifications", notifications.snapshot()))

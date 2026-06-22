@@ -3,11 +3,16 @@
 import contextlib
 
 from feed import DEFAULT_INTERVAL, INTERVALS, get_feed
-from pages._context import hero_chart as build_chart_geometry
 
 from chirp import EventStream, Fragment, Request
 
 _DETAIL_TEMPLATE = "markets/{symbol}/page.html"
+
+
+def _hero_chart(closes: tuple[float, ...], interval: str):
+    from pages._context import hero_chart
+
+    return hero_chart(closes, interval)
 
 
 def register(app_instance) -> None:
@@ -29,7 +34,7 @@ def register(app_instance) -> None:
             _DETAIL_TEMPLATE,
             "chart_region",
             symbol=symbol,
-            hero_chart=build_chart_geometry(closes, interval),
+            hero_chart=_hero_chart(closes, interval),
             chart_interval=interval,
             chart_intervals=INTERVALS,
         )

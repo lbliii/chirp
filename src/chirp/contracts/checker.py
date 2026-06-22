@@ -89,6 +89,7 @@ from .rules_route_names import check_route_names
 from .rules_shapecheck import check_shapecheck
 from .rules_signals import (
     check_signal_bindings,
+    check_signal_connect_budget,
     check_signal_mixed_audience_derived,
     check_signal_scope,
 )
@@ -644,6 +645,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         result.issues.extend(check_sse_event_crossref(template_sources, router))
         result.issues.extend(check_signal_bindings(template_sources, snapshot.signal_names))
         result.issues.extend(check_signal_scope(middleware_list, _session_signal_names(app)))
+        result.issues.extend(check_signal_connect_budget(template_sources))
         result.issues.extend(
             check_signal_mixed_audience_derived(_mixed_audience_derived_names(app))
         )

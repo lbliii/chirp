@@ -614,6 +614,15 @@ function renderActivityLog() {
         dc.appendChild(hlSection("Return Trace", hlJSON(esc(JSON.stringify(r.returnTrace, null, 2))), false));
       }
 
+      if (r.signalEmits && r.signalEmits.length) {
+        var emitLines = r.signalEmits.map(function(item) {
+          var line = "emit " + item.name + " (" + (item.scope || "global") + ")";
+          if (item.audience_key) line += " aud=" + item.audience_key;
+          return line;
+        }).join("\n");
+        dc.appendChild(hlSection("Signal Emits (" + r.signalEmits.length + ")", esc(emitLines), true));
+      }
+
       if (r.requestHeaders && typeof r.requestHeaders === "object") {
         var hxReqLines = [];
         var hxReqKeys = ["HX-Request", "HX-Target", "HX-Trigger", "HX-Trigger-Name",

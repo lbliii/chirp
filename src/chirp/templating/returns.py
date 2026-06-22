@@ -340,6 +340,37 @@ FormAction = MutationResult
 """Form-submission alias of :class:`MutationResult`. Same class, different name."""
 
 
+class SignalEmit:
+    """Mutation that fans out signals and returns an empty body (default 204).
+
+    Pairs with ``hx-swap="none"`` on the triggering element. Each ``(name, value)``
+    tuple is emitted through the app's signal registry before the empty response
+    is returned. DevTools surfaces the emit trace on the mutation row.
+
+    Usage::
+
+        return SignalEmit(("balance", new_balance))
+        return SignalEmit(
+            ("balance", new_balance),
+            ("notifications", notifications.snapshot()),
+        )
+    """
+
+    __slots__ = ("items", "status")
+
+    def __init__(self, *items: tuple[str, Any], status: int = 204) -> None:
+        if not items:
+            msg = "SignalEmit requires at least one (name, value) pair"
+            raise ValueError(msg)
+        if status in {100, 101, 102, 103, 204, 304}:
+            pass
+        elif status < 200 or status >= 600:
+            msg = f"SignalEmit status must be a valid HTTP status, got {status}"
+            raise ValueError(msg)
+        self.items = items
+        self.status = status
+
+
 @dataclass(frozen=True, slots=True)
 class ValidationError:
     """Return a form fragment with 422 status for htmx validation.

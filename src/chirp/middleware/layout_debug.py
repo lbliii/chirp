@@ -13,6 +13,7 @@ import logging
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.realtime.signal_trace import encode_signal_emit_trace, get_signal_emit_trace
 from chirp.server.debug.render_plan_snapshot import (
     RENDER_DEBUG_CACHE_KEY,
     get_render_plan,
@@ -149,6 +150,19 @@ class LayoutDebugMiddleware:
         except Exception:
             logging.getLogger("chirp.debug").debug(
                 "Return trace encoding failed",
+                exc_info=True,
+            )
+
+        try:
+            signal_emits = get_signal_emit_trace(request)
+            if signal_emits:
+                response = response.with_header(
+                    "X-Chirp-Signal-Emits",
+                    encode_signal_emit_trace(signal_emits),
+                )
+        except Exception:
+            logging.getLogger("chirp.debug").debug(
+                "Signal emit trace encoding failed",
                 exc_info=True,
             )
 

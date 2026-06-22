@@ -11,6 +11,10 @@ ROOT_DIR = Path(__file__).parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from wiring.bootstrap import purge_stale_sibling_modules
+
+purge_stale_sibling_modules(ROOT_DIR)
+
 from wiring import middleware
 from wiring.app_factory import PAGES_DIR, app, register_chirp_ui
 from wiring.routes import register as register_routes

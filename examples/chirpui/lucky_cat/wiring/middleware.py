@@ -6,9 +6,10 @@ import users
 from wallet import balance as meow_balance
 from wiring.app_factory import _signal_audience_key, app, config
 
-from chirp.middleware.auth import AuthConfig, AuthMiddleware, current_user
+from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersConfig, SecurityHeadersMiddleware
+from chirp.middleware.session_signals import SessionSignalConfig, SessionSignalMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 
@@ -25,28 +26,11 @@ class _EnsureStoreKeyMiddleware:
         return await next(request)
 
 
-class _SessionSignalsMiddleware:
-    """Seed session-scoped signal SSR + bind the SSE audience for this visitor."""
-
-    async def __call__(self, request, next):
-        from chirp.realtime.signal_globals import reset_signal_audience, set_signal_audience
-
-        session_store.ensure_store_key()
-        key = session_store.session_key()
-        aud = _signal_audience_key()
-        token = set_signal_audience(aud)
-        registry = app._mutable_state.signal_registry
-        try:
-            if registry is not None and aud and current_user().is_authenticated:
-                with session_store.bind(key):
-                    registry.seed("balance", meow_balance(), audience_key=aud)
-                    registry.seed("notifications", notifications.snapshot(), audience_key=aud)
-            elif not current_user().is_authenticated:
-                reset_signal_audience(token)
-                token = set_signal_audience("")
-            return await next(request)
-        finally:
-            reset_signal_audience(token)
+def _session_signal_seeds() -> dict[str, object]:
+    return {
+        "balance": meow_balance,
+        "notifications": notifications.snapshot,
+    }
 
 
 def register(app_instance) -> None:
@@ -63,7 +47,16 @@ def register(app_instance) -> None:
     )
     app_instance.add_middleware(_EnsureStoreKeyMiddleware())
     app_instance.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user, login_url="/login")))
-    app_instance.add_middleware(_SessionSignalsMiddleware())
+    app_instance.add_middleware(
+        SessionSignalMiddleware(
+            SessionSignalConfig(
+                app=app,
+                audience_key=_signal_audience_key,
+                seeds=_session_signal_seeds,
+                seed_context=lambda: session_store.bind(session_store.session_key()),
+            )
+        )
+    )
     app_instance.add_middleware(CSRFMiddleware(CSRFConfig()))
     app_instance.add_middleware(
         SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None))
