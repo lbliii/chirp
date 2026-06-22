@@ -124,7 +124,22 @@ Picking the wrong one is the most common return-type mistake. Use this table:
 | `Suspense` | Yes — shell renders, deferred blocks stream as OOB swaps | Single chunked HTTP response | Dashboards / detail pages with multiple slow data sources, one round trip | Post-load updates |
 | `EventStream` | N/A — pure event channel | SSE (`text/event-stream`, long-lived) | Notifications, tickers, chat tails *after* the page loads | Initial page render |
 
-**Rule of thumb**: initial render that streams → `Suspense` (or `Stream` for SEO-heavy sections); updates after the page loads → `EventStream`. If you're hesitating between `Suspense` and `EventStream`, ask: *is this the initial render or a post-load update?*
+**Rule of thumb**: initial render that streams → `Suspense` (or `Stream` for SEO-heavy sections); updates after the page loads → `EventStream` for page-local regions, `signal()` for cross-page chrome. Multi-target mutations → `OOB` / `FormAction`. See the [realtime decision tree](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/realtime-decision-tree/) (with a Lucky Cat feature map).
+
+---
+
+## Learning path
+
+Chirp examples are tiered on purpose. Start small; Lucky Cat is the capstone, not
+the on-ramp.
+
+| Tier | Example | Teaches |
+|------|---------|---------|
+| **1 — Basics** | [`standalone/hello`](examples/standalone/hello/), [`standalone/contacts`](examples/standalone/contacts/) | Routes, forms, `Page` / `Fragment`, validation |
+| **2 — App shell** | [`chirpui/contacts_shell`](examples/chirpui/contacts_shell/) | ChirpUI shell, `_actions.py`, `_context.py`, boosted nav |
+| **3 — Capstone** | [`chirpui/lucky_cat`](examples/chirpui/lucky_cat/) | Signals, Suspense, SSE, OOB, secure stack |
+
+Full runnable index: [examples/README.md](examples/README.md) and [Examples on the site](https://lbliii.github.io/chirp/docs/examples/).
 
 ---
 

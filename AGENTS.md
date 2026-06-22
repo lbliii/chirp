@@ -78,7 +78,7 @@ otherwise.
 | `src/chirp/tools/` | MCP/tool registry, schema, handler, event surface |
 | `tests/` | Test suite ownership and regression proof |
 | `tests/contracts/` | End-to-end `app.check()` contract coverage |
-| `examples/` | Executable docs and scaffold-pattern proof |
+| `examples/` | Executable docs and scaffold-pattern proof; see **Example comment budget** in `examples/AGENTS.md` |
 | `docs/` | Narrative docs, RFCs, release policy, public API notes |
 | `site/` | Bengal docs site source and generated-output boundary |
 | `benchmarks/` | Performance methodology and benchmark claims |

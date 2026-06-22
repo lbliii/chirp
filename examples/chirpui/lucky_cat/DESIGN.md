@@ -235,6 +235,10 @@ inherits this outlet and must override it on itself.
 
 ### SSE / Suspense / Stream — pick the right one
 
+Canonical decision tree (site):
+[[docs/build-apps/streaming-updates/realtime-decision-tree|Realtime decision tree]]
+— when to use each mechanism and which Lucky Cat feature uses which.
+
 - **`EventStream` + `sse_scope()`** for *page-specific* live updates after the
   page loads: the per-market `/markets/{symbol}/stream` (detail page only) and
   `/ft/stream` (the portfolio free-threading proof panel).

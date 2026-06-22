@@ -126,6 +126,22 @@ checks in `@app.on_startup`, and use a health check for dependencies that can
 fail after startup. Fail-loud worker startup is tracked upstream in
 [pounce#65](https://github.com/lbliii/pounce/issues/65).
 
+## Demo tier vs production tier
+
+Some examples (notably Lucky Cat) pin `workers=1` and keep wallet, trades,
+notifications, and the signal bus in process memory so they run offline in CI.
+That is a **demo boundary**, not a framework ceiling.
+
+| Concern | Demo (in-memory example) | Production |
+|---------|--------------------------|------------|
+| Workers | `1` | `N` with shared signal backplane |
+| State | In-process stores | External source of truth |
+| Signals | In-process fan-out | Shared bus (Redis adapter, etc.) |
+| Secret | Dev fallback in `development` | Required `CHIRP_SECRET_KEY` |
+
+See `examples/chirpui/lucky_cat/DESIGN.md` §7 and `backplane.py`. Published
+copy: [production deployment — demo vs production](https://lbliii.github.io/chirp/docs/quality/deployment/production/).
+
 ## Realtime And Compression
 
 SSE is Chirp's realtime contract. Pounce intentionally avoids compressing

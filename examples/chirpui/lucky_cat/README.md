@@ -1,5 +1,11 @@
 # Lucky Cat 🐱 — a Maneki-neko simulated trading-floor UI
 
+> **Not your first Chirp app.** Complete the [learning path](../../../README.md#learning-path)
+> first: [`standalone/hello`](../../standalone/hello/) →
+> [`standalone/contacts`](../../standalone/contacts/) →
+> [`chirpui/contacts_shell`](../contacts_shell/). Then use Lucky Cat as the
+> capstone for signals, Suspense, SSE, and OOB together.
+
 **▶ Live demo: <https://luckycat-production.up.railway.app>**
 
 Browse markets, open a coin detail page with a live chart and order book, place
@@ -200,6 +206,12 @@ Link integrity (`test_links.py`) runs in the default suite via
 ``chirp.testing.assert_link_integrity`` — every rendered same-origin href must
 resolve to 200.
 
+## Realtime patterns
+
+Return-type choice for streaming and live updates:
+[realtime decision tree](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/realtime-decision-tree/)
+(site) · feature map in [`DESIGN.md`](DESIGN.md) §4.
+
 ## Deploy (Railway)
 
 The directory ships a `Dockerfile` and `railway.toml` so it runs as a standalone
@@ -207,8 +219,26 @@ Railway service. `app.run()` reads `PORT` and the `RAILWAY_*` hints through
 `AppConfig.from_env()` and binds `0.0.0.0:$PORT` with no extra flags; the
 healthcheck targets `/health`. Set `CHIRP_ENV=production`, `CHIRP_DEBUG=0`,
 `CHIRP_LOG_FORMAT=json`, and a generated `CHIRP_SECRET_KEY` as service variables,
-and keep it a **single web replica** (see Configuration). The full production
+and keep it a **single web replica** (see [Production vs demo](#production-vs-demo) below). The full production
 shape is in `docs/deployment/railway.md`.
+
+## Production vs demo
+
+Lucky Cat is a **single-process demo**, not a production multi-tenant deployment.
+The table below is honest about what the example pins and what you must add for
+real production.
+
+| Concern | Demo (Lucky Cat) | Production |
+|---------|------------------|------------|
+| **Workers** | `workers=1` (in-memory state + one `/_chirp/live` pin) | `workers=N` + shared `SignalBackplane` |
+| **State** | In-process wallet, trades, notifications, `SimFeed` | External store (DB/Redis) as source of truth |
+| **Signals** | `InProcessBackplane` (default in `backplane.py`) | `RedisBackplane` or equivalent fan-out |
+| **Secret** | Dev fallback when `env=development` | Required `CHIRP_SECRET_KEY` |
+
+See [`DESIGN.md`](DESIGN.md) §7, [`backplane.py`](backplane.py), and the site
+[production deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/)
+for the full tier story. Do not claim this demo is production-ready multi-worker
+without both a shared backplane and external state.
 
 ## Configuration
 

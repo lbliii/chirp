@@ -21,10 +21,18 @@ one part of the framework surface — [[docs/about/core-concepts/return-values|r
 htmx fragments, Suspense, SSE, or the chirp-ui app shell — so you can see the
 idiomatic pattern in working code.
 
-New to Chirp? [[docs/get-started/_index|Start with the basics]], then read the
-**Contacts** or **Returns Gallery** apps below. Already fluent in hypermedia?
-Jump straight to **RAG Demo** or **Lucky Cat** for the full app-shell and
-[[docs/build-apps/streaming-updates/_index|streaming and realtime patterns]].
+New to Chirp? [[docs/get-started/_index|Start with the basics]], then work the
+**learning path** below. Already fluent in hypermedia? Jump to **RAG Demo** or
+**Lucky Cat** for the full app-shell and
+[[docs/build-apps/streaming-updates/realtime-decision-tree|streaming and realtime patterns]].
+
+## Learning path
+
+| Tier | Example | Teaches |
+|------|---------|---------|
+| **1 — Basics** | [[docs/examples/contacts|Contacts]] (standalone) | Routes, forms, `Page` / `Fragment`, OOB |
+| **2 — App shell** | [[docs/examples/contacts-shell|Contacts shell]] | ChirpUI shell, `_actions.py`, boosted nav |
+| **3 — Capstone** | [[docs/examples/lucky-cat|Lucky Cat]] | Signals, Suspense, SSE, OOB, secure stack |
 
 :::{cards}
 :columns: 2

@@ -1,15 +1,7 @@
-"""Lucky Cat — CHIRP wiring layer for the Maneki-neko simulated trading-floor demo.
+"""Lucky Cat — CHIRP wiring: App, middleware, signals, mutations, SSE routes.
 
-This file is the framework side of the example: ``App`` setup (``use_chirp_ui``
-+ mounted filesystem pages), the secure-by-default middleware stack, live
-``signal()`` / ``EventStream`` routes, and the mutation endpoints that pages
-call into. Business logic lives in sibling **DOMAIN** modules (``feed``,
-``wallet``, ``trade_store``, ``notifications``, …); sections below mark where
-each seam starts.
-
-Run from the repo root (never ``app.run()`` in tests — import + ``app.check()``):
-
-    PYTHONPATH=src python examples/chirpui/lucky_cat/app.py
+DOMAIN modules: feed, wallet, trade_store, … — see DESIGN.md.
+Run: PYTHONPATH=src python examples/chirpui/lucky_cat/app.py
 """
 
 import asyncio
@@ -22,8 +14,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 sys.path.insert(0, str(ROOT_DIR))
 
-# Avoid sys.modules collision when another example (e.g. kanban_shell's
-# ``store`` / forum_shell's ``forum_store``) loaded a same-named module first.
+# Purge stale sibling modules before local imports (shared test collection).
+# Rationale: DESIGN.md; package-scoped fix tracked in #413.
 for _name in (
     "feed",
     "store",
@@ -43,13 +35,6 @@ for _name in (
     if _file and Path(_file).resolve() != (ROOT_DIR / f"{_name}.py").resolve():
         del sys.modules[_name]
 
-# The ``pages`` package name is shared by every mounted-pages example
-# (kanban_shell, forum_shell, …). A sibling example's test can leave a stale
-# ``pages``/``pages.*`` in sys.modules (the per-example conftests do not all run
-# the shared module purge), so purge any whose file lives outside THIS example
-# before the ``from pages._context import hero_chart`` below — otherwise that
-# import resolves to a sibling's ``pages._context`` (which has no ``hero_chart``)
-# and the whole Lucky Cat suite errors at collection under the shared test run.
 for _name in [n for n in list(sys.modules) if n == "pages" or n.startswith("pages.")]:
     _mod = sys.modules.get(_name)
     _file = getattr(_mod, "__file__", None) if _mod is not None else None
@@ -94,32 +79,14 @@ from chirp.middleware.static import StaticFiles
 PAGES_DIR = ROOT_DIR / "pages"
 STATIC_DIR = ROOT_DIR / "static"
 
-# ---------------------------------------------------------------------------
-# CHIRP — app config & ChirpUI shell
-#
-# from_env() takes NO template_dir/worker_mode, so layer them on with
-# dataclasses.replace. worker_mode="async" is required by EventStream routes
-# and the live signal bus. A dev fallback secret keeps the example runnable
-# without CHIRP_SECRET_KEY; production deploys (env != "development") must set it.
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 _base = AppConfig.from_env()
 config = replace(
     _base,
     template_dir=PAGES_DIR,
     worker_mode="async",
-    # SINGLE worker (not the CPU-count default). This example keeps ALL state in
-    # process memory — the wallet, trade store, notifications log, the SimFeed, AND
-    # the signal bus (the ReactiveBus behind @app.signal). Multiple OS-process
-    # workers would each hold a SEPARATE copy, so state would split across requests
-    # (a deposit on one worker invisible to the next) AND the live /_chirp/live SSE
-    # connection — pinned to one worker — would stall the page loads that land on a
-    # tied-up worker (the "white screen" / freeze). A single-user in-memory demo is
-    # inherently single-process. Real multi-worker realtime needs a shared bus
-    # inherently single-process today. Scale by implementing SignalBackplane
-    # (backplane.py — InProcessBackplane default, RedisBackplane stub) plus an
-    # external state store; see DESIGN.md §7 and the signal RFC.
-    workers=1,
+    workers=1,  # Demo: in-memory state + one /_chirp/live pin — DESIGN.md §7
     # view_transitions="htmx" animates the boosted #main swap on navigation.
     # Keep htmx unset (the chirp-ui shell bundles it) and do NOT add alpine=True
     # (use_chirp_ui owns Alpine — adding it would double-inject).
@@ -165,12 +132,7 @@ def fan_out_notifications_live() -> None:
 use_chirp_ui(app)
 app.add_middleware(StaticFiles(directory=STATIC_DIR, prefix="/static"))
 
-# ---------------------------------------------------------------------------
-# CHIRP — server-side navigation globals (template context)
-#
-# Exposed to the layout as template globals. route_state() + shell_navigation()
-# recompute the two-tier rail on every (boosted) navigation. Pure-Python, no I/O.
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 app.template_global()(route_state)
 app.template_global()(shell_navigation)
@@ -180,29 +142,7 @@ app.template_global()(active_route_path)
 # static/lucky-cat-shell.js.
 app.template_global()(rail_is_collapsed)
 
-# ---------------------------------------------------------------------------
-# CHIRP — live signals (declare-once / bind-many over /_chirp/live)
-# DOMAIN data: feed tickers, wallet balance, notifications log
-#
-# ONE /_chirp/live connection carries every named topic. A signal is a server
-# value fanned out to N bindings: {{ signal('balance') }} in the topbar AND in
-# the deposit modal both swap from one `event: balance` — zero hand-maintained
-# OOB twins.
-#
-# - `balance` is PUSH (no source generator): the /deposit and /trade routes call
-#   app.emit('balance', new_balance) and every binding updates. The decorated
-#   async generator yields nothing — the blessed push-only pattern (the framework
-#   pumps it once, it ends immediately, and emit() drives the value thereafter).
-# - `ticker` is SOURCE-driven: a rotating market spotlight async generator
-#   replaces the deleted /ticker/stream route. Its render emits the SAME
-#   ticker_strip_body block the layout paints (one source of truth, no drift).
-# - A DERIVED signal recomputes from another signal's value and re-emits to its
-#   own bindings in the same emit cascade — the planned `notif_badge` (unread
-#   count derived from the notifications list) is the showcase for that fold.
-#
-# worker_mode="async" (set on the config above) is required: the merge stream is
-# an async EventStream and cross-thread emits ride the bus's call_soon_threadsafe.
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 # Topbar ticker rotation cadence (seconds). The deterministic sim ticks fast;
 # rotating the spotlight on a human-readable window keeps the strip legible
@@ -257,27 +197,7 @@ async def ticker_signal():
                 yield feed.ticker(symbol)
 
 
-# ---------------------------------------------------------------------------
-# CHIRP — live MARKETS LOBBY board (the compute-once / broadcast-many showcase)
-#
-# The Markets lobby (/ and /markets) is fully reactive: the stat strip, the movers
-# grid (which RE-RANKS live), and the featured spotlight (price + a live redrawing
-# sparkline) all update over the SAME single /_chirp/live connection — no second
-# sse-connect, no extra page weight.
-#
-# ONE source signal does the work: `lobby_snapshot` SAMPLES the feed on a human
-# cadence (read-only — the `ticker` signal above is the sole engine clock) and emits
-# a self-contained lobby.LobbySnapshot. Three @app.derived signals PROJECT that one
-# snapshot into the three regions and re-render in lockstep — the genuine derived
-# cascade (rank ONCE, fan out to N regions). The snapshot carries per-value
-# direction flags so each region flashes only the values that actually moved, and
-# the derived stay PURE functions of the snapshot value (no feed/store reads — the
-# notif_badge purity contract, applied to the board).
-#
-# `lobby_snapshot` itself has NO DOM sink (only the three derived do), so its own
-# wire event is suppressed (render returns None → the merge stream skips it); it
-# exists purely to drive the cascade.
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 # Lobby board refresh cadence (seconds). The sim ticks fast; re-ranking + emitting
 # on a human-readable window keeps the board legible (and the payload small)
@@ -361,37 +281,7 @@ def lobby_featured_derived(snap):
     return (snap.featured_market, snap.featured_ticker, snap.featured_spark, snap.featured_dir)
 
 
-# ---------------------------------------------------------------------------
-# Notifications — the topbar bell, folded onto the ONE /_chirp/live connection.
-#
-# This is the headline N→1 fold: the old shell opened a SECOND persistent SSE
-# scope (/notifications/stream) on every page. That stream is now the
-# `notifications` SIGNAL — a SOURCE-driven async generator carrying the SAME
-# drain + price-move-alert loop — so the app holds exactly ONE sse-connect.
-#
-# - `notifications` is SOURCE-driven: its generator runs the price-alert
-#   hysteresis + cooldown walk and, whenever the log changes, yields a fresh
-#   notifications.snapshot() — a NotifFeed carrying BOTH the recent rows AND the
-#   watermark-aware unread count, captured atomically (coalescing-latest). Its
-#   render emits the notification_list_body block the bell already paints from
-#   feed.notes, so the live list and the initial paint share one body and can
-#   never drift.
-# - `notif_badge` is DERIVED from `notifications`: a COUNT read PURELY from the
-#   emitted value (feed.unread) — the genuine `@app.derived` showcase. It
-#   recomputes + re-emits in the same cascade whenever `notifications` changes.
-#   It must NOT re-read the store: a derived is a pure function of its INPUT
-#   SIGNAL VALUES (deterministic across workers, race-free across threads) — the
-#   snapshot already bundled the count with the rows it ships.
-# - `notif_announce` is DERIVED too (also feed.unread): its render emits the
-#   visually-hidden spoken-count body so a11y keeps working.
-#
-# CRITICAL: the bell's sinks are EXISTING elements (the <ul id="notif-list">,
-# the <span id="notif-badge">, the <span id="notif-announce">), so the layout
-# binds them with a MANUAL `sse-swap="..."` attribute on each element (NOT the
-# signal_block() helper, which would inject its own <div> wrapper around/inside
-# the <ul> — invalid + wrong). The signal dead-binding contract scans those
-# literal sse-swap attrs under the signal connect, so they ARE validated.
-# ---------------------------------------------------------------------------
+# Notifications — DESIGN.md
 
 # Price-move alert threshold: raise a "price" notification when a market's 24h
 # change crosses another whole step (in either direction) from the last value
@@ -478,10 +368,6 @@ async def notifications_signal():
                     and now - last_alert_t.get(symbol, 0.0) >= _PRICE_ALERT_COOLDOWN_S
                 ):
                     # Headline follows the universal ticker convention: the arrow
-                    # tracks the SIGN of the 24h pct shown beside it, so
-                    # "PAW-MEOW ▲ +22.36%" never reads as a contradiction. The
-                    # move-from-baseline (the `if` above) is the FIRING rule, not
-                    # the glyph — a coin can tick down yet still be green.
                     notifications.add_broadcast(
                         "price",
                         f"{symbol} {'▲' if pct >= 0 else '▼'} {pct:+.2f}%",
@@ -521,18 +407,7 @@ def notif_announce(feed) -> int:
     return feed.unread
 
 
-# ---------------------------------------------------------------------------
-# CHIRP — secure-by-default middleware stack (Session -> Auth -> CSRF -> SecurityHeaders)
-#
-# Auth slots in between Session and CSRF (the order chirp's auth subsystem
-# prescribes, and the order the csrf_session contract requires: Session before
-# CSRF — adjacency is not required, so Auth in the middle is fine). Lucky Cat is
-# public-browse / gated-trading: AuthMiddleware authenticates every request
-# (anonymous when there is no session), and the gated routes/pages enforce
-# @login_required. secure cookies use the "auto" default: Secure in
-# production/staging (resolved from AppConfig.env, wired via from_env above),
-# off in local dev so plain http works.
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 
 async def load_user(user_id: str) -> users.User | None:
@@ -603,17 +478,9 @@ app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user, login_url="/lo
 app.add_middleware(_SessionSignalsMiddleware())
 app.add_middleware(CSRFMiddleware(CSRFConfig()))
 # SecurityHeaders for the clickjacking / MIME-sniff / referrer headers only —
-# content_security_policy=None so it does NOT emit a CSP header. use_chirp_ui
-# (called above) flipped csp_nonce_enabled, so the compiler wires
-# CSPNonceMiddleware as the single CSP authority: a per-request nonce script-src
-# plus 'unsafe-eval' and style-src 'unsafe-inline' that chirp-ui's Alpine shell
-# requires. No hand-written CSP — the chirpui_csp contract check would WARN/ERROR
-# if a future edit re-broke it.
 app.add_middleware(SecurityHeadersMiddleware(SecurityHeadersConfig(content_security_policy=None)))
 
-# ---------------------------------------------------------------------------
-# DOMAIN — mutation & fragment routes (registered BEFORE mount_pages)
-# ---------------------------------------------------------------------------
+# DOMAIN — DESIGN.md
 
 
 @app.route("/logout", methods=["POST"], name="logout")
@@ -713,17 +580,7 @@ async def deposit(request: Request):
     return ("", 204)
 
 
-# ---------------------------------------------------------------------------
-# Watchlist — a thread-safe starred-markets set behind the rail's Favorites
-# destination (the /markets/favorites page renders the starred-only grid). The
-# per-card / detail-header star <button> POSTs here; the route flips the star and
-# returns TWO OOB twins: the star control itself (so aria-pressed + the ★/☆ glyph
-# flip in place) and the rail count badge (so the Favorites tally stays honest on
-# every page). The one mutating watchlist route, covered by the secure-by-default
-# stack (CSRF enforced). The POST route keeps its /watchlist/toggle name (it is a
-# referenced mutation, never an <a href>), even though the VIEW moved to
-# /markets/favorites.
-# ---------------------------------------------------------------------------
+# Watchlist — DESIGN.md
 
 
 @app.route("/watchlist", name="watchlist.moved")
@@ -777,11 +634,6 @@ async def watchlist_toggle(request: Request):
     # flips atomically and returns the NEW starred state.
     starred = watchlist.contains(symbol) if not symbol or not known else watchlist.toggle(symbol)
     # Two OOB targets in one response: the star control
-    # itself (primary — emitted verbatim, its baked #watchlist-star-{symbol} id +
-    # hx-swap-oob lets htmx swap it in place) and the rail count badge sibling
-    # (#watchlist-count, registered wrap=False so its baked wrapper is emitted
-    # verbatim too). The toggling <button> posts with hx-swap="none" + an
-    # hx-select of its own star fragment, so #main never churns.
     fragments: list[Fragment] = [
         Fragment(
             "_components/market.html",
@@ -797,15 +649,6 @@ async def watchlist_toggle(request: Request):
         ),
     ]
     # Unstar-on-Favorites polish: when the toggle originated ON /markets/favorites
-    # AND the result is unstarred, append a THIRD OOB twin that removes the card
-    # cell live (hx-swap-oob="delete" on #luckycat-card-{symbol}), so the
-    # starred-only grid stays a one-glance view of exactly the stars (no stale ☆
-    # card lingering until reload). htmx sends the originating URL in
-    # HX-Current-URL; we read its path only (queryless) so a fragment/query can't
-    # fool it. On the landing / detail pages the toggle is left reversible in place
-    # — only /markets/favorites prunes. The #luckycat-card-{symbol} id only exists
-    # on grid pages, so the delete is a harmless no-op elsewhere (the cancel-route
-    # orders_table_oob precedent).
     if symbol and known and not starred:
         current_url = request.headers.get("HX-Current-URL", "")
         if active_route_path(current_url) == "/markets/favorites":
@@ -819,14 +662,7 @@ async def watchlist_toggle(request: Request):
     return OOB(*fragments)
 
 
-# ---------------------------------------------------------------------------
-# Notifications bell — the mutating route. /trade/order + /deposit append
-# fill/deposit entries (and emit the `notifications` signal); the live drain +
-# price-move-alert walk is now the `notifications` SIGNAL declared above (one
-# fewer persistent connection). Opening the bell POSTs /notifications/read
-# (open-marks-read) and emits the signal so the derived badge/announce clear —
-# the one mutating notifications route, covered by the secure-by-default stack.
-# ---------------------------------------------------------------------------
+# Notifications bell — DESIGN.md
 
 
 @app.route("/notifications/read", methods=["POST"], name="notifications.read")
@@ -850,10 +686,7 @@ def notifications_read():
     return ("", 204)
 
 
-# ---------------------------------------------------------------------------
-# DOMAIN — trade flow (place + cancel orders against SimFeed + house wallet)
-# CHIRP return types: FormAction + ValidationError + multi-target OOB
-# ---------------------------------------------------------------------------
+# DOMAIN — DESIGN.md
 
 _TRADE_TEMPLATE = "trade/page.html"
 _TOAST_TEMPLATE = "_components/toast_oob.html"
@@ -1096,13 +929,7 @@ async def convert_order(request: Request):
     )
 
 
-# ---------------------------------------------------------------------------
-# DOMAIN + CHIRP — free-threading proof panel (live ticks/sec via EventStream)
-#
-# Streams a ticks/sec figure into the portfolio dashboard's #ft-panel. SimFeed
-# fans every tick across its worker pool; this route reads the observability-only
-# tick counter and OOB-swaps a derived rate.
-# ---------------------------------------------------------------------------
+# DOMAIN + CHIRP — DESIGN.md
 
 _PORTFOLIO_TEMPLATE = "portfolio/page.html"
 
@@ -1260,44 +1087,20 @@ def market_stream(symbol: str):
                     trades=tick.trades,
                 )
                 # NOTE: the cross-page topbar strip (#lucky-cat-ticker) is owned
-                # solely by the global `ticker` SIGNAL (a single rotating spotlight
-                # live on EVERY page over /_chirp/live). This per-market stream must
-                # NOT also swap it — two sources innerHTML-swapping one element fight
-                # and flicker. The viewed market shows in the hero #market-ticker.
 
     return EventStream(generate())
 
 
-# ---------------------------------------------------------------------------
-# CHIRP — OOB region registration
-#
-# The cross-page ticker strip is a `ticker` signal now (not an OOB region).
-# Market-detail streams still OOB-swap market_ticker_oob / order_book_oob /
-# trade_tape_oob (registered by their own templates).
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 # Notifications bell — the #notif-list / #notif-badge / #notif-announce sinks are
-# now LIVE SIGNALS (the `notifications` source + the `notif_badge` / `notif_announce`
-# derived signals), bound by MANUAL sse-swap="..." attributes on those existing
-# elements in _layout.html (the signal dead-binding contract validates them). The
-# old notif_badge_oob region + its OOB-region registration are gone — the badge is
-# no longer an OOB twin, it is a derived-signal sink.
 
 # Watchlist rail count badge — the layout's inner rail always renders the
-# #watchlist-count element on the Markets room, so a missing block is an honest
-# ERROR (non-optional). The /watchlist/toggle route re-renders this region as an
-# innerHTML OOB swap (same #watchlist-count id). Ticker/balance/bell chrome use
-# signals instead of OOB regions.
-# wrap=False: the count twin (watchlist_count_swap) bakes its OWN
-# #watchlist-count wrapper + hx-swap-oob, so the OOB framework must emit it
-# verbatim rather than double-wrapping it.
 app.register_oob_region(
     "watchlist_count_oob", target_id="watchlist-count", swap="innerHTML", wrap=False
 )
 
-# ---------------------------------------------------------------------------
-# CHIRP — mount filesystem pages LAST
-# ---------------------------------------------------------------------------
+# CHIRP — DESIGN.md
 
 app.mount_pages(str(PAGES_DIR))
 

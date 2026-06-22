@@ -256,6 +256,23 @@ The `"*"` wildcard trusts every direct peer's `X-Forwarded-For`, which lets any 
 
 [[docs/build-apps/streaming-updates/server-sent-events|SSE]] is Chirp's realtime contract. Pounce intentionally avoids compressing `text/event-stream` responses so event delivery is not buffered behind a compression window. Use `worker_mode="async"` for apps with long-lived SSE connections.
 
+### Demo tier vs production tier
+
+Some examples (notably [[docs/examples/lucky-cat|Lucky Cat]]) pin `workers=1` and
+keep wallet, trades, notifications, and the signal bus in process memory so they
+clone-and-run offline. That is a **demo boundary**, not a framework ceiling.
+
+| Concern | Demo (in-memory example) | Production |
+|---------|--------------------------|------------|
+| Workers | `1` | `N` with a shared signal backplane |
+| State | In-process stores | External source of truth (DB/Redis) |
+| Signal fan-out | `InProcessBackplane` | Shared bus (e.g. Redis — see signal RFC §12) |
+| Secret | Dev fallback in `development` | Required `CHIRP_SECRET_KEY` |
+
+Multi-worker production needs both external state **and** a shared backplane so
+`/_chirp/live` connections and `app.emit` fan-out stay coherent across processes.
+See the Lucky Cat `DESIGN.md` §7 and `backplane.py` seam for the worked example.
+
 ## Advanced
 
 :::{dropdown} Worker lifecycle hooks and async workers
