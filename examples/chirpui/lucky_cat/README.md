@@ -223,6 +223,12 @@ healthcheck targets `/health`. Set `CHIRP_ENV=production`, `CHIRP_DEBUG=0`,
 and keep it a **single web replica** (see [Production vs demo](#production-vs-demo) below). The full production
 shape is in `docs/deployment/railway.md`.
 
+**Recommended:** connect the Railway service to GitHub (`lbliii/chirp`, branch
+`main`, root directory `examples/chirpui/lucky_cat`) so every deploy builds the
+committed Dockerfile — not a stale local tree from `railway up`. Set `GIT_REF=main`
+as a service variable so the Dockerfile installs Chirp from the same ref. See
+`docs/deployment/railway.md` § Deploy source.
+
 ## Production vs demo
 
 Lucky Cat is a **single-process demo**, not a production multi-tenant deployment.
