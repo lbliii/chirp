@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from feed import FeedSource, SimFeed
+from feed import FeedSource
 from feed_adapters._helpers import map_kraken_ticker
 from feed_adapters.kraken import KrakenFeed
 from feed_adapters.mempool import ChainSnapshot, MempoolFeed
@@ -200,5 +200,5 @@ class TestLiveFeedStartupFallback:
         monkeypatch.setattr(feed, "start", _fail_start)
         ok = await feed_mod.start_live_feed()
         assert ok is False
-        assert isinstance(feed_mod.get_feed(), SimFeed)
+        assert isinstance(feed_mod.get_feed(), feed_mod.SimFeed)
         feed_mod.reset()
