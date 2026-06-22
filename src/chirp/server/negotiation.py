@@ -54,6 +54,7 @@ from chirp.templating.returns import (
     LayoutSuspense,
     MutationResult,
     Page,
+    SignalEmit,
     Stream,
     Suspense,
     Template,
@@ -493,6 +494,22 @@ def negotiate(
             if value.refresh:
                 response = response.with_hx_refresh()
             return response
+        case SignalEmit():
+            from chirp.realtime.emit_bridge import emit_signal
+
+            notes: list[str] = []
+            for name, payload in value.items:
+                emit_signal(name, payload)
+                notes.append(f"emit {name}")
+            _trace_return(
+                request,
+                return_type="SignalEmit",
+                category="mutation",
+                render_intent="none",
+                status=value.status,
+                notes=tuple(notes),
+            )
+            return Response(body="").with_status(value.status)
         case ValidationError():
             _trace_return(
                 request,

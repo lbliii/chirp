@@ -773,7 +773,7 @@ class TestDeadBindingCheck:
         issues = check_signal_bindings(sources, frozenset({"balance"}))
         nudges = [i for i in issues if i.category == "signal_raw_sse_swap"]
         assert len(nudges) == 1
-        assert "signal_attrs" in nudges[0].message
+        assert "signal_bind" in nudges[0].message
 
     @pytest.mark.issue(316)
     def test_competing_sse_scope_not_signal_binding(self) -> None:

@@ -18,6 +18,7 @@ from chirp.server.debug.render_plan_snapshot import (
     get_render_plan,
 )
 from chirp.templating.trace import encode_return_trace, get_return_trace
+from chirp.realtime.signal_trace import encode_signal_emit_trace, get_signal_emit_trace
 
 _CACHE_KEY = "_layout_debug"
 _ROUTE_CACHE_KEY = "_route_debug"
@@ -149,6 +150,19 @@ class LayoutDebugMiddleware:
         except Exception:
             logging.getLogger("chirp.debug").debug(
                 "Return trace encoding failed",
+                exc_info=True,
+            )
+
+        try:
+            signal_emits = get_signal_emit_trace(request)
+            if signal_emits:
+                response = response.with_header(
+                    "X-Chirp-Signal-Emits",
+                    encode_signal_emit_trace(signal_emits),
+                )
+        except Exception:
+            logging.getLogger("chirp.debug").debug(
+                "Signal emit trace encoding failed",
                 exc_info=True,
             )
 

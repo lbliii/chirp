@@ -35,19 +35,31 @@ _SESSION_MIDDLEWARE = "SessionMiddleware"
 #: Path of the merged signal stream (kept in sync with signal_globals).
 SIGNAL_STREAM_PATH = "/_chirp/live"
 
-#: A ``{{ signal('x') }}`` / ``{{ signal_block('x') }}`` / ``{{ signal_attrs('x') }}``
+#: A ``{{ signal('x') }}`` / ``{{ signal_block('x') }}`` / ``{{ signal_bind('x') }}``
 #: binding — the canonical ways to bind a signal. The element's ``sse-swap`` is
 #: produced at render time, so a literal-``sse-swap`` scan misses it; the helper
-#: CALL is the real signal. ``(?:_block|_attrs)?`` keeps ``signal_connect(`` /
+#: CALL is the real signal. ``(?:_block|_bind|_attrs)?`` keeps ``signal_connect(`` /
 #: ``make_signal_globals(`` excluded.
-_SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block|_attrs)?\s*\(\s*["']([^"']+)["']""")
+_SIGNAL_CALL_PATTERN = re.compile(
+    r"""\bsignal(?:_block|_bind|_attrs)?\s*\(\s*["']([^"']+)["']"""
+)
 #: ``sse_scope(url)`` opens a dedicated non-signal SSE stream (see chirp/sse.html).
 _SSE_SCOPE_PATTERN = re.compile(r"\bsse_scope\s*\(")
 
 
 def _signal_call_names(source: str) -> set[str]:
-    """Signal names bound via ``signal()`` / ``signal_block()`` / ``signal_attrs()`` calls."""
+    """Signal names bound via ``signal()`` / ``signal_block()`` / ``signal_bind()`` calls."""
     return {m.group(1) for m in _SIGNAL_CALL_PATTERN.finditer(source)}
+
+
+def _count_signal_stream_connects(source: str) -> int:
+    """Count ``/_chirp/live`` connect sites in *source*."""
+    count = source.count("signal_connect()") + source.count("signal_connect ()")
+    for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+        url = normalize_sse_url(match.group("url"))
+        if url == SIGNAL_STREAM_PATH or url.startswith(SIGNAL_STREAM_PATH + "?"):
+            count += 1
+    return count
 
 
 def _connects_to_signal_stream(source: str) -> bool:
@@ -132,7 +144,7 @@ def check_signal_bindings(
                     message=(
                         f'Raw sse-swap="{name}" in a template composed under '
                         "signal_connect() — prefer "
-                        f"{{{{ signal_attrs({name!r}) }}}} so the binding is validated."
+                        f"{{{{ signal_bind({name!r}) }}}} so the binding is validated."
                     ),
                     template=template_name,
                 )
@@ -164,7 +176,7 @@ def check_signal_bindings(
             category="signal_orphan",
             message=(
                 f"signal {name!r} is registered but no template binds it with "
-                "signal()/signal_block()/signal_attrs(). It will be produced but "
+                "signal()/signal_block()/signal_bind(). It will be produced but "
                 "never displayed."
             ),
         )
@@ -220,3 +232,50 @@ def check_signal_mixed_audience_derived(
         )
         for name in sorted(mixed_audience_derived_names)
     ]
+
+
+def check_signal_connect_budget(
+    template_sources: dict[str, str],
+) -> list[ContractIssue]:
+    """INFO when more than one persistent ``/_chirp/live`` scope is opened.
+
+    Browsers cap concurrent SSE connections per origin (HTTP/1.1 footgun). One
+    ``signal_connect()`` wrapper per composed page is the supported pattern.
+    """
+    issues: list[ContractIssue] = []
+    templates_with_connect: list[str] = []
+    for template_name, source in template_sources.items():
+        if template_name.startswith("chirp/"):
+            continue
+        stripped = strip_template_comments(source)
+        count = _count_signal_stream_connects(stripped)
+        if count > 1:
+            issues.append(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="signal_connect_budget",
+                    message=(
+                        f"Template {template_name!r} opens {count} persistent "
+                        "/_chirp/live scopes — merge into one signal_connect() "
+                        "wrapper so the browser uses a single SSE connection."
+                    ),
+                    template=template_name,
+                )
+            )
+        if count > 0:
+            templates_with_connect.append(template_name)
+    if len(templates_with_connect) > 1:
+        joined = ", ".join(sorted(templates_with_connect))
+        issues.append(
+            ContractIssue(
+                severity=Severity.INFO,
+                category="signal_connect_budget",
+                message=(
+                    f"{len(templates_with_connect)} templates each open /_chirp/live "
+                    f"({joined}). When composed on one page this nests multiple "
+                    "persistent SSE scopes — prefer a single signal_connect() in "
+                    "the shell layout."
+                ),
+            )
+        )
+    return issues

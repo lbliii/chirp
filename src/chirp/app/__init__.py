@@ -624,6 +624,9 @@ class App:
             )
             raise KeyError(msg)
         registry.emit(name, value, audience_key=audience_key)
+        from chirp.realtime.signal_trace import record_signal_emit
+
+        record_signal_emit(name, audience_key=audience_key)
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

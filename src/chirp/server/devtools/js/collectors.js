@@ -179,6 +179,7 @@ function createRecord() {
     contentType: "",
     renderPlan: null,
     returnTrace: null,
+    signalEmits: null,
     effectiveConfigDetails: null,
     select: "",
     selectMatched: null,
@@ -278,6 +279,10 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     var rtHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Return-Trace");
     if (rtHeader) {
       r.returnTrace = decodeRenderPlan(rtHeader);
+    }
+    var seHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Signal-Emits");
+    if (seHeader) {
+      r.signalEmits = decodeRenderPlan(seHeader);
     }
 
     // Extract HX-Trigger events for devtools display
