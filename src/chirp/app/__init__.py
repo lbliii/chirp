@@ -116,6 +116,7 @@ class App:
         *,
         db: Database | str | None = None,
         migrations: str | None = None,
+        settings: str | None = None,
         kida_env: Environment | None = None,
     ) -> None:
         self.config = config or AppConfig()
@@ -130,6 +131,7 @@ class App:
         else:
             self._mutable_state.db = db
         self._mutable_state.migrations_dir = migrations
+        self._mutable_state.settings_store_path = settings
         self._mutable_state.custom_kida_env = kida_env
 
         self._registry = AppRegistry(self._mutable_state, self._check_not_frozen)
@@ -773,6 +775,38 @@ class App:
         """
         self._registry.register_policy(name, fn)
 
+    def register_setting(self, spec: Any) -> None:
+        """Declare a runtime-mutable operator setting beside frozen ``AppConfig``.
+
+        Register a :class:`~chirp.settings.SettingSpec` during setup. Reads are
+        in-memory via :meth:`setting`; mutations via :meth:`set_setting` persist
+        through the configured store (``settings=`` file path or the app database)
+        and emit the ``chirp.settings.changed`` signal for SSE invalidation.
+        Raises ``RuntimeError`` after freeze.
+        """
+        self._registry.register_setting(spec)
+
+    def setting(self, name: str) -> Any:
+        """Return the current in-memory value for a registered setting."""
+        registry = self._mutable_state.settings_registry
+        if registry is None:
+            msg = f"setting {name!r} is not registered"
+            raise KeyError(msg)
+        return registry.get(name)
+
+    async def set_setting(self, name: str, value: Any) -> None:
+        """Persist a runtime setting mutation and fan out invalidation."""
+        from chirp.settings.registry import SETTINGS_CHANGED_SIGNAL
+
+        registry = self._mutable_state.settings_registry
+        if registry is None:
+            msg = f"setting {name!r} is not registered"
+            raise KeyError(msg)
+        version = await registry.set(name, value)
+        sig = self._mutable_state.signal_registry
+        if sig is not None and sig.has(SETTINGS_CHANGED_SIGNAL):
+            self.emit(SETTINGS_CHANGED_SIGNAL, version)
+
     def register_reactive_bus(self, bus: Any) -> None:
         """Register a ``ReactiveBus`` used by ``reactive_stream`` for ``kick_user``."""
         self._registry.register_reactive_bus(bus)
@@ -1182,6 +1216,11 @@ class App:
                 self._mutable_state.signal_registry.names
                 if self._mutable_state.signal_registry is not None
                 else frozenset()
+            ),
+            settings_specs=(
+                self._mutable_state.settings_registry.specs
+                if self._mutable_state.settings_registry is not None
+                else ()
             ),
             schema=schema,
         )

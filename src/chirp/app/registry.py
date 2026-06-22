@@ -123,6 +123,36 @@ class AppRegistry:
             raise TypeError(msg)
         self._state.policy_registry[name] = fn
 
+    def register_setting(self, spec: Any) -> None:
+        """Declare a runtime-mutable operator setting (#370).
+
+        Setup-only (raises ``RuntimeError`` after freeze). Values are read
+        in-memory via ``app.setting(name)``; mutations via ``await app.set_setting(...)``
+        persist through the configured settings store and bump the
+        ``chirp.settings.changed`` invalidation signal when signals are wired.
+        """
+        from chirp.settings.registry import SettingSpec
+
+        self._ensure_mutable()
+        if not isinstance(spec, SettingSpec):
+            msg = f"register_setting expects SettingSpec, got {type(spec).__name__}"
+            raise TypeError(msg)
+        registry = self._settings_registry()
+        registry.register(spec)
+
+    def _settings_registry(self) -> Any:
+        from chirp.settings.registry import SettingsRegistry
+        from chirp.settings.store import DatabaseSettingsStore, FileSettingsStore
+
+        if self._state.settings_registry is None:
+            store = None
+            if self._state.settings_store_path is not None:
+                store = FileSettingsStore(Path(self._state.settings_store_path))
+            elif self._state.db is not None:
+                store = DatabaseSettingsStore(self._state.db)
+            self._state.settings_registry = SettingsRegistry(store=store)
+        return self._state.settings_registry
+
     def register_reactive_bus(self, bus: Any) -> None:
         """Register an app-owned ``ReactiveBus`` for ``kick_user`` eviction.
 

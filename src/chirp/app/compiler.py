@@ -487,6 +487,24 @@ class AppCompiler:
         _reject_reserved_prefix_collisions(self._mutable.pending_routes, FRAGMENT_ROUTE_PREFIX)
         self._mutable.pending_routes.append(make_fragment_dispatch_pending_route(cast("App", app)))
 
+        settings_registry = self._mutable.settings_registry
+        if settings_registry is not None and not settings_registry.empty:
+            settings_registry.freeze()
+            from chirp.realtime.signals import SignalRegistry, SignalSpec
+            from chirp.settings.registry import SETTINGS_CHANGED_SIGNAL
+
+            if self._mutable.signal_registry is None:
+                self._mutable.signal_registry = SignalRegistry()
+            signal_registry = self._mutable.signal_registry
+            if not signal_registry.has(SETTINGS_CHANGED_SIGNAL):
+                version = settings_registry.version
+                signal_registry.register(
+                    SignalSpec(
+                        name=SETTINGS_CHANGED_SIGNAL,
+                        initial=lambda: version,
+                    )
+                )
+
         # Signals: auto-register the single merged /_chirp/live stream IFF any
         # signal exists, mirroring the live_blocks gating. Apps with no signals
         # pay nothing — no route, no globals, no ReactiveBus.
