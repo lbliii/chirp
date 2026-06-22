@@ -13,12 +13,12 @@ import logging
 
 from chirp.http.request import Request
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.realtime.signal_trace import encode_signal_emit_trace, get_signal_emit_trace
 from chirp.server.debug.render_plan_snapshot import (
     RENDER_DEBUG_CACHE_KEY,
     get_render_plan,
 )
 from chirp.templating.trace import encode_return_trace, get_return_trace
-from chirp.realtime.signal_trace import encode_signal_emit_trace, get_signal_emit_trace
 
 _CACHE_KEY = "_layout_debug"
 _ROUTE_CACHE_KEY = "_route_debug"

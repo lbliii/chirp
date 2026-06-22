@@ -40,9 +40,7 @@ SIGNAL_STREAM_PATH = "/_chirp/live"
 #: produced at render time, so a literal-``sse-swap`` scan misses it; the helper
 #: CALL is the real signal. ``(?:_block|_bind|_attrs)?`` keeps ``signal_connect(`` /
 #: ``make_signal_globals(`` excluded.
-_SIGNAL_CALL_PATTERN = re.compile(
-    r"""\bsignal(?:_block|_bind|_attrs)?\s*\(\s*["']([^"']+)["']"""
-)
+_SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block|_bind|_attrs)?\s*\(\s*["']([^"']+)["']""")
 #: ``sse_scope(url)`` opens a dedicated non-signal SSE stream (see chirp/sse.html).
 _SSE_SCOPE_PATTERN = re.compile(r"\bsse_scope\s*\(")
 

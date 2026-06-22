@@ -32,7 +32,9 @@ def _current_request() -> Request | None:
         return None
 
 
-def record_signal_emit(name: str, *, audience_key: str = "", request: Request | None = None) -> None:
+def record_signal_emit(
+    name: str, *, audience_key: str = "", request: Request | None = None
+) -> None:
     """Append a signal emit to the active request trace, if any."""
     req = request if request is not None else _current_request()
     if req is None:
