@@ -13,7 +13,7 @@ navigation.py keeps Trade active and lights the inner rail's "Convert" lane
 
 import trade_store
 
-from chirp import Page, login_required
+from chirp import Page, Request, login_required
 
 
 @login_required
@@ -24,3 +24,9 @@ def get() -> Page:
         page_block_name="page_root",
         positions=trade_store.positions(),
     )
+
+
+@login_required
+async def post(request: Request) -> Page:
+    """Fallback — convert dispatches via ``pages/trade/convert/_actions.py``."""
+    return get()

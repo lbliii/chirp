@@ -20,7 +20,7 @@ import time
 
 import trade_store
 
-from chirp import Page, login_required
+from chirp import Page, Request, login_required
 
 # The template only renders strings, so format the wall-clock placement time
 # here (no datetime-filter assumptions in the template), mirroring the history
@@ -50,3 +50,9 @@ def get() -> Page:
         page_block_name="page_root",
         orders=_rows(),
     )
+
+
+@login_required
+async def post(request: Request) -> Page:
+    """Fallback — cancel dispatches via ``pages/portfolio/orders/_actions.py``."""
+    return get()

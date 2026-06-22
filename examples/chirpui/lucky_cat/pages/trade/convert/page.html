@@ -1,8 +1,7 @@
-{#- Trade → Convert. A simple "convert $MEOW into a market" form. To avoid a
-    second mutating route, it posts (plain, non-htmx) to the existing #225
-    trade.order route as a market BUY — a clean submit fills via the thread-safe
-    try_place_order path and gets the FormAction 303 redirect back to /trade.
-    CSRF-protected (csrf_field). Composes into the chirp-ui shell content block. -#}
+{#- Trade → Convert. POST-to-self via _action=convert in pages/trade/convert/_actions.py. -#}
+{% imports %}
+  {% from "chirpui/forms.html" import hidden_field %}
+{% end %}
 {% block page_root %}
 <div id="page-root">
 {% block page_root_inner %}
@@ -34,10 +33,11 @@
           rule warns about). hx-disinherit only affects DESCENDANTS, so it can't fix
           self-inheritance — hx-select is the right lever. -#}
       <form id="convert-form" class="luckycat-order-form chirpui-stack chirpui-stack--sm"
-            method="post" action="{{ url_for('trade.convert') }}"
-            hx-post="{{ url_for('trade.convert') }}" hx-target="#convert-form"
+            method="post" action="/trade/convert"
+            hx-post="/trade/convert" hx-target="#convert-form"
             hx-swap="outerHTML" hx-select="#convert-form">
         {{ csrf_field() }}
+        {{ hidden_field("_action", "convert") }}
         {% set errs = errors ?? {} %}
         {% set f = form ?? {} %}
         {#- A convert is a market buy; the route hardcodes side / kind. -#}

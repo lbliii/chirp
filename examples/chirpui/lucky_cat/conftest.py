@@ -14,6 +14,12 @@ _here = Path(__file__).parent
 if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
+from wiring.bootstrap import purge_stale_sibling_modules, purge_wiring_modules
+
+
+def _purge_wiring_modules() -> None:
+    purge_wiring_modules()
+
 
 @pytest.fixture(autouse=True)
 def _lucky_cat_on_path(request: pytest.FixtureRequest):
@@ -48,6 +54,8 @@ def example_app(request: pytest.FixtureRequest):
     if str(here) not in sys.path:
         sys.path.insert(0, str(here))
     try:
+        purge_stale_sibling_modules(here)
+        _purge_wiring_modules()
         spec = importlib.util.spec_from_file_location(module_name, app_path)
         assert spec is not None
         assert spec.loader is not None

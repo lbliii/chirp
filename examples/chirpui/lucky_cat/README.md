@@ -42,11 +42,11 @@ composes.
 | **— chart timeframe** | `GET /markets/{symbol}/chart?tf=` | `Fragment` | segmented 1m/1H/1D/1W toggle |
 | **— live ticker/book/tape** | `GET /markets/{symbol}/stream` | `EventStream` | per-page SSE; OOB swaps for detail blocks |
 | **Topbar live ticker** | `ticker` signal on `/_chirp/live` | live signal | rotating market spotlight on every page |
-| **Topbar $MEOW balance** | `balance` signal on `/_chirp/live` | live signal | `/deposit` + `/trade` call `app.emit('balance', …)` |
-| **Trade (spot)** | `POST /trade/order` | `ValidationError` **or** `FormAction` | multi-target OOB: positions + open-order badge + toast |
-| **— cancel** | `POST /trade/order/{id}/cancel` | `FormAction` | per-row delete + count OOB |
-| **— convert** | `POST /trade/convert` | `Fragment` / `FormAction` | self-contained `#convert-form` swap |
-| **Deposit** | `POST /deposit` | empty 204 | modal via `data-action="deposit"`; emits balance + notifications signals |
+| **Topbar $MEOW balance** | `balance` signal on `/_chirp/live` | live signal | deposit + trade actions call `emit_signal('balance', …)` |
+| **Trade (spot)** | `POST /trade` (`_action=order`) | `ValidationError` **or** `FormAction` | multi-target OOB: positions + open-order badge + toast |
+| **— cancel** | `POST /portfolio/orders` (`_action=cancel`) | `FormAction` | per-row delete + count OOB |
+| **— convert** | `POST /trade/convert` (`_action=convert`) | `Fragment` / `FormAction` | self-contained `#convert-form` swap |
+| **Deposit** | `POST /markets` (`_action=deposit`) | empty 204 | modal via `data-action="deposit"`; emits balance + notifications signals |
 | **Favorites** | `POST /watchlist/toggle`, `GET /markets/favorites` | `OOB` / `Page` | star toggle + starred-only grid |
 | **Notifications bell** | `POST /notifications/read` + `notifications` signal | 204 / live signals | derived `notif_badge` / `notif_announce` on one connection |
 | **Command palette (Cmd-K)** | `GET /search` | `Fragment` | chirp-ui `command_palette` dialog |
@@ -88,16 +88,17 @@ the stack. Cross-check the primitive guides when a pattern is new:
 | 1 | [`pages/_layout.html`](pages/_layout.html) | The ChirpUI app shell: topbar, live signal sinks, two-tier rail, auth-aware chrome. |
 | 2 | [`pages/page.py`](pages/page.py) | Filesystem routing entry — `GET /` aliases the Markets Home lobby (`Page` return type). |
 | 3 | [`pages/login/page.py`](pages/login/page.py) | Auth showcase: `ValidationError` (422, form in place) vs `FormAction` (full reload on success). |
-| 4 | [`app.py`](app.py) — [`/deposit`](app.py) route | First mutation on the secure stack; credits the wallet and `app.emit('balance', …)` fans the topbar + modal. See the [Signals guide](../../../site/content/docs/build-apps/streaming-updates/signals.md). |
-| 5 | [`pages/trade/page.py`](pages/trade/page.py) + [`app.py`](app.py) `/trade/order` | Trade flow: invalid order → `ValidationError`; clean fill → `FormAction` with multi-target OOB swaps. |
-| 6 | [`pages/portfolio/page.py`](pages/portfolio/page.py) | Suspense dashboard: shell paints with skeletons, six panels stream in as awaitables resolve. See [Streaming HTML & Suspense](../../../site/content/docs/build-apps/streaming-updates/html-streaming.md). |
-| 7 | [`feed.py`](feed.py) | **DOMAIN** seam — `FeedSource` protocol + deterministic `SimFeed`; everything else calls `get_feed()`. |
+| 4 | [`pages/markets/_actions.py`](pages/markets/_actions.py) | First mutation: `POST /markets` with `_action=deposit` credits the wallet and `emit_signal('balance', …)` fans the topbar. See [Signals guide](../../../site/content/docs/build-apps/streaming-updates/signals.md). |
+| 5 | [`pages/trade/page.py`](pages/trade/page.py) + [`pages/trade/_actions.py`](pages/trade/_actions.py) | Trade flow: `POST /trade` with `_action=order` → `ValidationError` or `FormAction` multi-target OOB. |
+| 6 | [`pages/portfolio/page.py`](pages/portfolio/page.py) | **Advanced Suspense** — six deferred panels; learn the 4-line idiom in its module docstring first. See [Streaming HTML & Suspense](../../../site/content/docs/build-apps/streaming-updates/html-streaming.md). |
+| 7 | [`app.py`](app.py) + [`wiring/`](wiring/) | Bootstrap only (~30 lines): middleware, signals, SSE routes. Mutations live under `pages/**/_actions.py`. |
+| 8 | [`feed.py`](feed.py) | **DOMAIN** seam — `FeedSource` protocol + deterministic `SimFeed`. |
 
 Deeper doctrine (IA rules, footguns, design tokens) lives in [`DESIGN.md`](DESIGN.md).
 
 **Tutorial:** [Build a Live Trade Panel in 20 Minutes](../../../site/content/docs/tutorials/lucky-cat-trade-panel.md) —
 a from-scratch build-along for the markets grid (`Page` at `GET /`) and the
-`POST /trade/order` handler (`ValidationError` → `FormAction` multi-target OOB).
+`POST /trade` `_action=order` handler (`ValidationError` → `FormAction` multi-target OOB).
 
 ## What it demonstrates
 

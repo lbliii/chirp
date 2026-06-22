@@ -1,5 +1,6 @@
 {% imports %}
   {% from "chirpui/empty.html" import empty_state %}
+  {% from "chirpui/forms.html" import hidden_field %}
 {% end %}
 
 {#- Portfolio → Open orders. Lists resting limit orders from trade_store in a
@@ -54,9 +55,10 @@
       <td class="luckycat-fills__num">{{ o.limit_price }} $MEOW</td>
       <td class="luckycat-fills__action">
         <form class="luckycat-orders__cancel"
-              hx-post="{{ url_for('trade.cancel', order_id=o.id) }}"
-              hx-target="closest tr" hx-swap="delete">
+              hx-post="/portfolio/orders" hx-target="closest tr" hx-swap="delete">
           {{ csrf_field() }}
+          {{ hidden_field("_action", "cancel") }}
+          {{ hidden_field("order_id", o.id) }}
           <button type="submit" class="chirpui-btn chirpui-btn--sm chirpui-btn--ghost"
                   aria-label="Cancel {{ o.side }} {{ o.symbol }} order">Cancel</button>
         </form>

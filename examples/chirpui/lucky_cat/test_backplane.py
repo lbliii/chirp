@@ -68,15 +68,14 @@ class TestSignalBackplane:
             backplane.get_backplane()
 
     def test_emit_signal_calls_get_backplane(self, monkeypatch) -> None:
-        import importlib.util
+        import sys
         from pathlib import Path
 
-        app_path = Path(__file__).parent / "app.py"
-        spec = importlib.util.spec_from_file_location("lucky_cat_app_emit_signal", app_path)
-        assert spec is not None
-        assert spec.loader is not None
-        app_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(app_mod)
+        root = Path(__file__).parent
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from wiring.app_factory import emit_signal
+        import wiring.app_factory as app_factory
 
         seen: list[tuple[str, object]] = []
 
@@ -84,6 +83,6 @@ class TestSignalBackplane:
             def publish(self, name: str, value: object, *, audience_key: str = "") -> None:
                 seen.append((name, value))
 
-        monkeypatch.setattr(app_mod, "get_backplane", lambda: _FakeBackplane())
-        app_mod.emit_signal("balance", 7, audience_key="visitor-1")
+        monkeypatch.setattr(app_factory, "get_backplane", lambda: _FakeBackplane())
+        emit_signal("balance", 7, audience_key="visitor-1")
         assert seen == [("balance", 7)]
