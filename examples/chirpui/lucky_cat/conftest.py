@@ -36,6 +36,7 @@ def _lucky_cat_on_path(request: pytest.FixtureRequest):
     added = str(here) not in sys.path
     if added:
         sys.path.insert(0, str(here))
+    purge_stale_sibling_modules(here)
     try:
         yield
     finally:
