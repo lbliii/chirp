@@ -69,14 +69,14 @@ The `swap_attrs(href)` template global computes the nearest shared navigation bo
 ::::{code-tabs}
 :sync: links
 
-```html
+```html title="Hand-coded hx-target"
 <!-- Hand-coded: you must know the right id for every link -->
 <a href="/dashboard/reports"
    hx-target="#main"
    hx-boost="true">Reports</a>
 ```
 
-```html
+```html title="swap_attrs resolver"
 <!-- swap_attrs: Chirp resolves the target from the route layout chain -->
 <a href="/dashboard/reports"
    {{ swap_attrs("/dashboard/reports") | html_attrs }}>Reports</a>

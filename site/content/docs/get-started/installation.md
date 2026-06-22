@@ -30,18 +30,15 @@ concurrent request handling.
 ::::{code-tabs}
 :sync: install
 
-```bash
-# uv
+```bash title="uv"
 uv add bengal-chirp
 ```
 
-```bash
-# pip
+```bash title="pip"
 pip install bengal-chirp
 ```
 
-```bash
-# From source
+```bash title="From source"
 git clone https://github.com/lbliii/chirp.git
 cd chirp
 uv sync --group dev

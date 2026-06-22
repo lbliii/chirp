@@ -21,7 +21,7 @@ This page maps every Flask move you know to its Chirp equivalent, then shows the
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 from flask import Flask
 
@@ -29,7 +29,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 from chirp import App, AppConfig
 
@@ -45,14 +45,14 @@ Chirp uses a frozen dataclass instead of a dict. No `app.config["SECRET_KEY"]` t
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 @app.route("/users/<int:id>")
 def user(id):
     return render_template("user.html", user=get_user(id))
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 @app.route("/users/{id:int}")
 def user(id: int):
@@ -70,7 +70,7 @@ Differences:
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 from flask import request
 
@@ -80,7 +80,7 @@ def search():
     return render_template("search.html", q=q)
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 from chirp import Request
 
@@ -101,7 +101,7 @@ Differences:
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 from flask import jsonify
 
@@ -110,7 +110,7 @@ def api_users():
     return jsonify({"users": get_all_users()})
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 @app.route("/api/users")
 def api_users():
@@ -129,14 +129,14 @@ Chirp's primary model is HTML return types. A returned dict is a convenience for
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 @app.errorhandler(404)
 def not_found(error):
     return render_template("404.html"), 404
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 @app.error(404)
 def not_found(request: Request):
@@ -151,14 +151,14 @@ Chirp's error handlers use the same return-value system. No tuple return for sta
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 @app.template_filter()
 def currency(value):
     return f"${value:,.2f}"
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 @app.template_filter()
 def currency(value: float) -> str:
@@ -173,7 +173,7 @@ Identical decorator pattern. Chirp adds type annotations.
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask — separate before/after hooks
 @app.before_request
 def before():
@@ -186,7 +186,7 @@ def after(response):
     return response
 ```
 
-```python
+```python title="Chirp"
 # Chirp — one function wraps the request
 async def timing(request: Request, next: Next) -> Response:
     start = time.monotonic()
@@ -204,7 +204,7 @@ Chirp uses a single middleware function instead of separate before/after hooks.
 ::::{code-tabs}
 :sync: flask-chirp
 
-```python
+```python title="Flask"
 # Flask
 from flask import session, redirect
 from flask_login import login_user, login_required
@@ -221,7 +221,7 @@ def dashboard():
     return render_template("dashboard.html")
 ```
 
-```python
+```python title="Chirp"
 # Chirp
 from chirp import login, logout, login_required, get_user, is_safe_url, Redirect, Template
 

@@ -121,16 +121,14 @@ A file can mix methods — a sync `get` for the form and an async `post` for the
 ::::{code-tabs}
 :sync: handler
 
-```python
-# pages/documents/{doc_id}/edit.py — GET handler
+```python title="GET handler"
 from chirp import Page
 
 def get(doc_id: str, doc):  # doc comes from _context.py
     return Page("documents/{doc_id}/edit.html", "content", doc=doc)
 ```
 
-```python
-# pages/documents/{doc_id}/edit.py — POST handler
+```python title="POST handler"
 from chirp import Redirect
 
 async def post(doc_id: str, doc, request):

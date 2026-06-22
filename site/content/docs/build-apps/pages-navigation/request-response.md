@@ -55,32 +55,27 @@ method that matches your content type; they all read the same underlying body.
 ::::{code-tabs}
 :sync: body
 
-```python
-# Raw bytes
+```python title="Raw bytes"
 async def upload(request: Request):
     body_bytes = await request.body()
 ```
 
-```python
-# Decoded text
+```python title="Decoded text"
 async def note(request: Request):
     text = await request.text()
 ```
 
-```python
-# Parsed JSON (dict)
+```python title="Parsed JSON"
 async def api(request: Request):
     data = await request.json()
 ```
 
-```python
-# Form data (urlencoded or multipart)
+```python title="Form data"
 async def submit(request: Request):
     form = await request.form()
 ```
 
-```python
-# Stream the body in chunks
+```python title="Stream chunks"
 async def ingest(request: Request):
     async for chunk in request.stream():
         process(chunk)

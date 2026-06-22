@@ -258,22 +258,9 @@ def context() -> dict:
             # top-level destinations. Deposit (primary, a global account action)
             # + About (overflow) are the only topbar actions.
             # Overflow: auto-wrapped into a "More" dropdown by shell_actions.html.
-            # The overflow "About" link points home (/). Like the brand/logo it
-            # MUST carry the full boosted shell-outlet contract — explicit
-            # hx-target/hx-swap + hx-select="#page-content" — or a boosted swap
-            # nests the whole shell inside #main (the same "shell duplicates
-            # inside itself" bug). chirp-ui's route_link_attrs resolver only emits
-            # hx-target + hx-boost (no select); supplying explicit hx attrs here
-            # both bypasses that resolver and gives htmx the content selector the
-            # rest of the shell uses.
-            # NOTE: this overflow "About" link points home (/) and, like the
-            # brand/logo, currently renders WITHOUT hx-select="#page-content"
-            # (chirp-ui's route_link_attrs resolver emits only hx-target +
-            # hx-boost). The brand link works around this by bypassing
-            # shell_brand_link; the overflow-dropdown render path ignores
-            # ShellAction.attrs, so the same workaround is not available here.
-            # Tracked as an upstream chirp-ui finding (route_link_attrs / shell
-            # links should carry the content selector the rest of the shell uses).
+            # The overflow "About" link points home (/). route_link_attrs now emits
+            # the full shell-outlet contract (hx-select="#page-content") via Chirp's
+            # swap resolver — see #410.
             overflow=ShellActionZone(
                 items=(ShellAction(id="docs", label="About Lucky Cat", href="/", icon="home"),)
             ),
