@@ -6,7 +6,7 @@ for live server requests instead of static site builds.
 """
 
 import inspect
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chirp.pages.shell_actions import (
     SHELL_ACTIONS_CONTEXT_KEY,
@@ -15,11 +15,16 @@ from chirp.pages.shell_actions import (
 )
 from chirp.pages.types import ContextProvider
 
+if TYPE_CHECKING:
+    from chirp.http.request import Request
+
 
 async def build_cascade_context(
     providers: tuple[ContextProvider, ...],
     path_params: dict[str, str],
     service_providers: dict[type, Any] | None = None,
+    *,
+    request: Request | None = None,
 ) -> dict[str, Any]:
     """Run context providers from root to leaf, merging results.
 
@@ -57,7 +62,7 @@ async def build_cascade_context(
     ctx: dict[str, Any] = {}
     svc = service_providers or {}
     for provider in providers:
-        result = _call_provider(provider.func, path_params, ctx, svc)
+        result = _call_provider(provider.func, path_params, ctx, svc, request=request)
         if inspect.isawaitable(result):
             result = await result
         if isinstance(result, dict):
@@ -79,10 +84,13 @@ def _call_provider(
     path_params: dict[str, str],
     accumulated_ctx: dict[str, Any],
     service_providers: dict[type, Any],
+    *,
+    request: Request | None = None,
 ) -> Any:
     """Call a context provider, injecting path params, parent context, and services.
 
     The provider function's signature determines which arguments it receives:
+    - ``request`` (by name or ``Request`` annotation) comes from the active request.
     - Path params (e.g. ``name`` from ``/skill/{name}``) come from the URL.
     - Other params come from the accumulated context of parent providers.
     - Params with type annotations matching ``app.provide()`` are resolved
@@ -91,14 +99,21 @@ def _call_provider(
         def context() -> dict:
             ...  # receives nothing
 
+        def context(request: Request) -> dict:
+            ...  # current_path from request.path
+
         def context(doc_id: str, store: DocumentStore) -> dict:
             ...  # doc_id from path, store from app.provide()
     """
+    from chirp.http.request import Request as RequestType
+
     sig = inspect.signature(func, eval_str=True)
     kwargs: dict[str, Any] = {}
 
     for name, param in sig.parameters.items():
-        if name in path_params:
+        if request is not None and (name == "request" or param.annotation is RequestType):
+            kwargs[name] = request
+        elif name in path_params:
             value = path_params[name]
             if param.annotation is not inspect.Parameter.empty:
                 try:

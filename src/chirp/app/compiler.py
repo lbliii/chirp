@@ -618,6 +618,18 @@ class AppCompiler:
                 plugin_loaders=self._mutable.plugin_loaders,
             )
 
+        signal_registry = self._mutable.signal_registry
+        if (
+            signal_registry is not None
+            and not signal_registry.empty
+            and self._runtime.kida_env is not None
+        ):
+            setattr(  # noqa: B010 — attach registry for signal_connect finalization
+                self._runtime.kida_env,
+                "_chirp_signal_registry",
+                signal_registry,
+            )
+
         self._runtime.route_layout_chains = dict(self._mutable.route_layout_chains)
         self._runtime.swap_scope_map = dict(self._mutable.swap_scope_map)
         if (

@@ -9,6 +9,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from chirp.pages.types import LayoutChain
+from chirp.realtime.signal_globals import (
+    apply_signal_connect,
+    bind_signal_render_path,
+    reset_referenced,
+    restore_referenced,
+    restore_signal_render_path,
+)
 from chirp.shell_actions import SHELL_ACTIONS_TARGET
 from chirp.templating.composition import PageComposition, RegionUpdate, ViewRef
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -428,128 +435,145 @@ def execute_render_plan(
             if ru.view.template and ru.view.block:
                 _validate_view_ref(adapter, ru.view)
 
-    # Render main content
-    if plan.render_full_template:
-        _capture_render(plan.main_view.template, plan.main_view.context)
-        main_html = adapter.render_template(
-            plan.main_view.template,
-            plan.main_view.context,
-        )
-    else:
-        main_html = adapter.render_block(
-            plan.main_view.template,
-            plan.main_view.block,
-            plan.main_view.context,
-        )
+    ref_token = reset_referenced()
+    render_path = ""
+    if plan.layout_context:
+        render_path = str(plan.layout_context.get("current_path") or "")
+    elif plan.main_view.context:
+        render_path = str(plan.main_view.context.get("current_path") or "")
+    path_token = bind_signal_render_path(render_path)
+    try:
+        # Render main content
+        if plan.render_full_template:
+            _capture_render(plan.main_view.template, plan.main_view.context)
+            main_html = adapter.render_template(
+                plan.main_view.template,
+                plan.main_view.context,
+            )
+        else:
+            main_html = adapter.render_block(
+                plan.main_view.template,
+                plan.main_view.block,
+                plan.main_view.context,
+            )
 
-    # Apply layout chain if needed
-    if plan.apply_layouts and plan.layout_chain is not None:
-        layouts = plan.layout_chain.layouts[plan.layout_start_index :]
-        per_layout_oob: dict[str, set[str]] = {}
-        if plan.intent == "full_page":
-            registry_blocks = set(oob_registry.registered_blocks) if oob_registry else set()
-            for layout_info in layouts:
-                own_oob = _oob_block_names(adapter, layout_info.template_name)
-                # Registry blocks (e.g. shell_actions_oob) only suppressed
-                # when the layout actually defines them.
-                meta = adapter.template_metadata(layout_info.template_name)
-                all_blocks = set(getattr(meta, "blocks", None) or ()) if meta else set()
-                per_layout_oob[layout_info.template_name] = own_oob | (registry_blocks & all_blocks)
-        for layout_info in reversed(layouts):
-            block_overrides: dict[str, str] = {"content": main_html}
+        # Apply layout chain if needed
+        if plan.apply_layouts and plan.layout_chain is not None:
+            layouts = plan.layout_chain.layouts[plan.layout_start_index :]
+            per_layout_oob: dict[str, set[str]] = {}
             if plan.intent == "full_page":
-                for name in per_layout_oob.get(layout_info.template_name, set()):
-                    block_overrides[name] = ""
-            main_html = adapter.compose_layout(
-                layout_info.template_name,
-                block_overrides,
-                plan.layout_context,
-            )
-
-    # Augment region_updates with shell OOB blocks discovered via AST
-    region_updates_list: list[RegionUpdate] = list(plan.region_updates)
-    if plan.include_layout_oob and plan.layout_chain and plan.layout_chain.layouts:
-        layout_ctx = plan.layout_context
-        # Nested filesystem layouts (e.g. marketing root + section app shell) each
-        # define *_oob regions. Deepest layout wins per target_id so section
-        # sidebars/breadcrumbs refresh on boosted navigation, not only root OOB.
-        #
-        # Scoped OOB: when oob_scope is set, only include OOB from layouts at
-        # or above the matched scope's depth (the scope's layout + ancestors).
-        # When oob_scope is None (boosted nav), include all layouts.
-        max_oob_depth: int | None = None
-        if plan.oob_scope is not None:
-            for li in plan.layout_chain.layouts:
-                scope = getattr(li, "swap_scope_name", None)
-                if scope == plan.oob_scope:
-                    max_oob_depth = li.depth
-                    break
-
-        seen_oob_targets: set[str] = set()
-        for layout_info in reversed(plan.layout_chain.layouts):
-            if max_oob_depth is not None and layout_info.depth > max_oob_depth:
-                continue
-            if oob_registry is not None:
-                contract = oob_registry.get_or_build_contract(adapter, layout_info.template_name)
-            else:
-                contract = build_layout_contract(adapter, layout_info.template_name)
-
-            for oob in contract.oob_blocks:
-                if oob.cache_scope == "site" and not oob.depends_on:
-                    continue
-                if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
-                    continue
-                if oob.target_id in seen_oob_targets:
-                    continue
-                seen_oob_targets.add(oob.target_id)
-                region_updates_list.append(
-                    RegionUpdate(
-                        region=oob.target_id,
-                        view=ViewRef(
-                            template=layout_info.template_name,
-                            block=oob.block_name,
-                            context=layout_ctx,
-                        ),
+                registry_blocks = set(oob_registry.registered_blocks) if oob_registry else set()
+                for layout_info in layouts:
+                    own_oob = _oob_block_names(adapter, layout_info.template_name)
+                    # Registry blocks (e.g. shell_actions_oob) only suppressed
+                    # when the layout actually defines them.
+                    meta = adapter.template_metadata(layout_info.template_name)
+                    all_blocks = set(getattr(meta, "blocks", None) or ()) if meta else set()
+                    per_layout_oob[layout_info.template_name] = own_oob | (
+                        registry_blocks & all_blocks
                     )
+            for layout_info in reversed(layouts):
+                block_overrides: dict[str, str] = {"content": main_html}
+                if plan.intent == "full_page":
+                    for name in per_layout_oob.get(layout_info.template_name, set()):
+                        block_overrides[name] = ""
+                main_html = adapter.compose_layout(
+                    layout_info.template_name,
+                    block_overrides,
+                    plan.layout_context,
                 )
 
-    # Render region updates.
-    #
-    # Pre-check pattern (Kida raises a bare KeyError for missing blocks, too
-    # ambiguous to narrow-catch): look up the block in the template's metadata
-    # first. If absent and the region is registered as optional=True, drop the
-    # region entirely — emitting an empty OOB wrapper would wipe existing DOM
-    # content on swap. If absent and non-optional, raise BlockNotFoundError so
-    # the failure is visible instead of silently substituting "". Any other
-    # render error propagates to the route error handler.
-    region_htmls: dict[str, str] = {}
-    for ru in region_updates_list:
-        if not (ru.view.template and ru.view.block):
-            region_htmls[ru.region] = ""
-            continue
-        if not _block_exists(adapter, ru.view.template, ru.view.block):
-            if _region_is_optional(ru.view.block, oob_registry):
-                _log.debug(
-                    "RenderPlan: optional OOB region %r block=%r missing from %r; skipping",
-                    ru.region,
-                    ru.view.block,
-                    ru.view.template,
-                )
+        main_html = apply_signal_connect(main_html)
+
+        # Augment region_updates with shell OOB blocks discovered via AST
+        region_updates_list: list[RegionUpdate] = list(plan.region_updates)
+        if plan.include_layout_oob and plan.layout_chain and plan.layout_chain.layouts:
+            layout_ctx = plan.layout_context
+            # Nested filesystem layouts (e.g. marketing root + section app shell) each
+            # define *_oob regions. Deepest layout wins per target_id so section
+            # sidebars/breadcrumbs refresh on boosted navigation, not only root OOB.
+            #
+            # Scoped OOB: when oob_scope is set, only include OOB from layouts at
+            # or above the matched scope's depth (the scope's layout + ancestors).
+            # When oob_scope is None (boosted nav), include all layouts.
+            max_oob_depth: int | None = None
+            if plan.oob_scope is not None:
+                for li in plan.layout_chain.layouts:
+                    scope = getattr(li, "swap_scope_name", None)
+                    if scope == plan.oob_scope:
+                        max_oob_depth = li.depth
+                        break
+
+            seen_oob_targets: set[str] = set()
+            for layout_info in reversed(plan.layout_chain.layouts):
+                if max_oob_depth is not None and layout_info.depth > max_oob_depth:
+                    continue
+                if oob_registry is not None:
+                    contract = oob_registry.get_or_build_contract(
+                        adapter, layout_info.template_name
+                    )
+                else:
+                    contract = build_layout_contract(adapter, layout_info.template_name)
+
+                for oob in contract.oob_blocks:
+                    if oob.cache_scope == "site" and not oob.depends_on:
+                        continue
+                    if "page_title" in oob.depends_on and "page_title" not in layout_ctx:
+                        continue
+                    if oob.target_id in seen_oob_targets:
+                        continue
+                    seen_oob_targets.add(oob.target_id)
+                    region_updates_list.append(
+                        RegionUpdate(
+                            region=oob.target_id,
+                            view=ViewRef(
+                                template=layout_info.template_name,
+                                block=oob.block_name,
+                                context=layout_ctx,
+                            ),
+                        )
+                    )
+
+        # Render region updates.
+        #
+        # Pre-check pattern (Kida raises a bare KeyError for missing blocks, too
+        # ambiguous to narrow-catch): look up the block in the template's metadata
+        # first. If absent and the region is registered as optional=True, drop the
+        # region entirely — emitting an empty OOB wrapper would wipe existing DOM
+        # content on swap. If absent and non-optional, raise BlockNotFoundError so
+        # the failure is visible instead of silently substituting "". Any other
+        # render error propagates to the route error handler.
+        region_htmls: dict[str, str] = {}
+        for ru in region_updates_list:
+            if not (ru.view.template and ru.view.block):
+                region_htmls[ru.region] = ""
                 continue
-            from chirp.errors import BlockNotFoundError
+            if not _block_exists(adapter, ru.view.template, ru.view.block):
+                if _region_is_optional(ru.view.block, oob_registry):
+                    _log.debug(
+                        "RenderPlan: optional OOB region %r block=%r missing from %r; skipping",
+                        ru.region,
+                        ru.view.block,
+                        ru.view.template,
+                    )
+                    continue
+                from chirp.errors import BlockNotFoundError
 
-            raise BlockNotFoundError(
-                template=ru.view.template,
-                block=ru.view.block,
-                region=ru.region,
+                raise BlockNotFoundError(
+                    template=ru.view.template,
+                    block=ru.view.block,
+                    region=ru.region,
+                )
+            region_htmls[ru.region] = adapter.render_block(
+                ru.view.template,
+                ru.view.block,
+                ru.view.context,
             )
-        region_htmls[ru.region] = adapter.render_block(
-            ru.view.template,
-            ru.view.block,
-            ru.view.context,
-        )
 
-    return RenderedPlan(main_html=main_html, region_htmls=region_htmls)
+        return RenderedPlan(main_html=main_html, region_htmls=region_htmls)
+    finally:
+        restore_referenced(ref_token)
+        restore_signal_render_path(path_token)
 
 
 def _block_exists(adapter: TemplateAdapter, template: str, block: str) -> bool:

@@ -34,13 +34,21 @@ def register(app_instance) -> None:
     @app_instance.route("/auth/passkey/register/finish", methods=["POST"])
     @login_required
     async def passkey_register_finish(request: Request):
-        from chirp.security.passkeys import PasskeyVerificationError, finish_registration
+        from chirp.security.passkeys import (
+            PasskeyChallengeError,
+            PasskeyVerificationError,
+            finish_registration,
+        )
 
         user = current_user()
         body = await request.json()
         try:
             registered = finish_registration(
                 credential=body, config=passkey_config.config_for_request(request)
+            )
+        except PasskeyChallengeError:
+            return JSONResponse.from_value(
+                {"error": "Enrollment expired — please try again."}, status=422
             )
         except PasskeyVerificationError:
             return JSONResponse.from_value({"error": "Registration failed."}, status=422)
@@ -60,7 +68,11 @@ def register(app_instance) -> None:
 
     @app_instance.route("/auth/passkey/login/finish", methods=["POST"])
     async def passkey_login_finish(request: Request):
-        from chirp.security.passkeys import PasskeyVerificationError, finish_authentication
+        from chirp.security.passkeys import (
+            PasskeyChallengeError,
+            PasskeyVerificationError,
+            finish_authentication,
+        )
 
         body = await request.json()
         cred_id = body.get("id") if isinstance(body, dict) else None
@@ -78,6 +90,10 @@ def register(app_instance) -> None:
                 credential=body,
                 stored=stored,
                 config=passkey_config.config_for_request(request),
+            )
+        except PasskeyChallengeError:
+            return JSONResponse.from_value(
+                {"error": "Sign-in expired — please try again."}, status=422
             )
         except PasskeyVerificationError:
             return JSONResponse.from_value({"error": "Authentication failed."}, status=422)

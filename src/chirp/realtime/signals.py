@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -149,6 +149,8 @@ class SignalRegistry:
     _dependents: dict[str, set[str]] = field(default_factory=dict)
     #: (audience_key, name) -> last value. ``audience_key`` is ``""`` for global.
     _values: dict[tuple[str, str], Any] = field(default_factory=dict)
+    #: Longest-prefix URL map for proactive topic activation (#317).
+    _prefix_topics: dict[str, frozenset[str]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     bus: ReactiveBus = field(default_factory=ReactiveBus)
 
@@ -259,6 +261,48 @@ class SignalRegistry:
         """Primary signals that have an async ``source`` generator."""
         with self._lock:
             return tuple(s for s in self._specs.values() if s.source is not None)
+
+    def set_prefix_topics(self, mapping: Mapping[str, Iterable[str]]) -> None:
+        """Configure optional URL-prefix → signal topics for proactive activation."""
+        normalized: dict[str, frozenset[str]] = {}
+        for prefix, names in mapping.items():
+            if not isinstance(prefix, str) or not prefix.startswith("/"):
+                msg = f"signal prefix topic key {prefix!r} must be an absolute path prefix"
+                raise ValueError(msg)
+            normalized[prefix] = frozenset(validate_signal_name(name) for name in names)
+        with self._lock:
+            self._prefix_topics = normalized
+
+    def prefix_topics_for_path(self, path: str) -> frozenset[str]:
+        """Return configured topics for the longest matching *path* prefix."""
+        if not path:
+            return frozenset()
+        with self._lock:
+            prefixes = self._prefix_topics
+        best = ""
+        topics: frozenset[str] = frozenset()
+        for prefix, names in prefixes.items():
+            if path.startswith(prefix) and len(prefix) > len(best):
+                best = prefix
+                topics = names
+        return topics
+
+    def expand_connection_topics(self, names: Iterable[str]) -> tuple[str, ...]:
+        """Expand *names* with derived-signal dependency closures."""
+        expanded = {validate_signal_name(name) for name in names}
+        changed = True
+        while changed:
+            changed = False
+            for name in list(expanded):
+                with self._lock:
+                    dspec = self._derived.get(name)
+                if dspec is None:
+                    continue
+                for dep in dspec.deps:
+                    if dep not in expanded:
+                        expanded.add(dep)
+                        changed = True
+        return tuple(sorted(expanded))
 
     # -- value cache / SSR seed --
 

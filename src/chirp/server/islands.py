@@ -391,7 +391,7 @@ def islands_snippet(version: str, *, nonce: str = "") -> str:
         loadKey,
         import(payload.src)
           .then((mod) => {{
-            const adapter = normalizeAdapter(mod);
+            const adapter = normalizeAdapter(mod) || adapters.get(payload.name);
             if (adapter) {{
               adapters.set(payload.name, adapter);
             }}

@@ -73,3 +73,39 @@ class TestContextCascade:
         body = response.body.decode("utf-8")
         assert "foo" in body
         assert "from-root" in body
+
+    @pytest.mark.asyncio
+    @pytest.mark.issue(472)
+    async def test_context_provider_receives_request(self, tmp_path: Path) -> None:
+        """Shell scaffold's context(request) must receive the active request."""
+        pages_dir = tmp_path / "pages"
+        pages_dir.mkdir()
+        (pages_dir / "_layout.html").write_text(
+            "<html><body>{% block content %}{% end %}</body></html>"
+        )
+        (pages_dir / "_context.py").write_text(
+            """
+def context(request) -> dict:
+    return {"current_path": request.path}
+"""
+        )
+        (pages_dir / "page.py").write_text(
+            """
+from chirp import Page
+
+def get(current_path: str) -> Page:
+    return Page("page.html", "content", page_block_name="content", current_path=current_path)
+"""
+        )
+        (pages_dir / "page.html").write_text(
+            '{% block content %}<span id="path">{{ current_path }}</span>{% end %}'
+        )
+
+        app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+        app.mount_pages(str(pages_dir))
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+
+        assert response.status == 200
+        assert 'id="path">/' in response.body.decode("utf-8")

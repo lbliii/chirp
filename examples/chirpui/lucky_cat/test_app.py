@@ -2475,6 +2475,36 @@ class TestPortfolioDashboard:
                 assert text.count(f'id="{dom_id}"') == 2, dom_id
 
 
+@pytest.mark.issue(317)
+class TestSignalTopicScoping:
+    """#317: runtime topic scoping on the one /_chirp/live connection."""
+
+    async def test_markets_page_scopes_connect_to_bound_topics(self, example_app) -> None:
+        """Markets lobby binds derived board signals; connect URL includes them + deps."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/markets")
+            assert response.status == 200
+            html = response.text
+            assert 'sse-connect="/_chirp/live?topics=' in html
+            assert "ticker" in html
+            assert "market_stats" in html
+            assert "lobby_snapshot" in html
+
+    async def test_non_markets_page_omits_lobby_board_topics(self, example_app) -> None:
+        """Trade room binds shell chrome only — lobby sources stay off the wire."""
+        async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            response = await client.get("/trade", headers=_cookie_header(cookie))
+        assert response.status == 200
+        connect = next(
+            part for part in response.text.split('"') if part.startswith("/_chirp/live?topics=")
+        )
+        assert "market_stats" not in connect
+        assert "lobby_snapshot" not in connect
+        assert "balance" in connect
+        assert "ticker" in connect
+
+
 @pytest.mark.issue(227)
 class TestFreeThreadingPanel:
     """#227 Part A: the visible free-threading proof panel + its live SSE twin."""
@@ -2545,6 +2575,59 @@ class TestFreeThreadingPanel:
         # The pool is bounded to at least the market count (genuine parallel width).
         assert feed.worker_count >= feed.market_count
         assert feed.worker_count >= 2
+
+    async def test_ft_stream_includes_throughput_meter_when_rate_known(self, example_app) -> None:
+        """The SSE twin renders the GIL-contrast meter once ticks/sec is known."""
+        async with TestClient(example_app) as client:
+            result = await client.sse("/ft/stream", max_events=4)
+        joined = "".join(e.data for e in result.events if e.data)
+        assert 'class="luckycat-ft__meter"' in joined
+        assert "Throughput" in joined
+
+    @pytest.mark.skipif(
+        not hasattr(__import__("sys"), "_is_gil_enabled") or __import__("sys")._is_gil_enabled(),
+        reason="requires free-threaded build (python3.14t with GIL disabled)",
+    )
+    def test_parallel_advance_beats_serial_baseline(self, monkeypatch) -> None:
+        """On a GIL-off build, pool fan-out must overlap — not just architecture
+        by inspection. Skipped (not silently passed) on GIL-bound interpreters."""
+        import sys
+        import time
+
+        from feed import SimFeed
+
+        assert hasattr(sys, "_is_gil_enabled")
+        assert not sys._is_gil_enabled()
+
+        # Default 6-market catalog is too small to beat thread-pool overhead;
+        # scale the catalog so the fan-out has enough CPU work to overlap.
+        monkeypatch.setenv("LUCKY_CAT_CATALOG", "48")
+
+        feed = SimFeed(seed=1, tick_interval=0)
+        steps = 80
+
+        feed.reset()
+        t0 = time.perf_counter()
+        for _ in range(steps):
+            for sym in list(feed._states):
+                feed._advance_symbol(sym)
+        serial_elapsed = time.perf_counter() - t0
+
+        feed.reset()
+        t0 = time.perf_counter()
+        for _ in range(steps):
+            feed._advance_all()
+        parallel_elapsed = time.perf_counter() - t0
+
+        speedup = serial_elapsed / parallel_elapsed
+        # Modest margin — CI runners are small (often ~1.2x); dev boxes with more
+        # cores regularly see ~2x with the same catalog/steps.
+        assert speedup >= 1.05, (
+            f"expected parallel fan-out to beat serial baseline by >=1.05x; "
+            f"got {speedup:.2f}x (parallel={parallel_elapsed:.4f}s "
+            f"serial={serial_elapsed:.4f}s catalog={feed.market_count} "
+            f"workers={feed.worker_count})"
+        )
 
 
 @pytest.mark.issue(227)

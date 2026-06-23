@@ -13,6 +13,7 @@ from typing import Any, cast
 from kida import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 
 from chirp.config import AppConfig
+from chirp.realtime.signal_globals import render_with_signal_finalize
 from chirp.templating.filters import BUILTIN_FILTERS, BUILTIN_GLOBALS
 from chirp.templating.returns import Fragment, Template
 from chirp.templating.suspense import DEFERRED
@@ -247,7 +248,7 @@ def render_template(env: Environment, tpl: Template) -> str:
     capture = _render_capture.get(None)
     if capture is not None:
         capture.append((tpl.template_name, dict(tpl.context)))
-    return template.render(tpl.context)
+    return render_with_signal_finalize(lambda: template.render(tpl.context))
 
 
 def render_fragment(env: Environment, frag: Fragment) -> str:
@@ -263,4 +264,4 @@ def render_fragment(env: Environment, frag: Fragment) -> str:
         from chirp.errors import BlockNotFoundError
 
         raise BlockNotFoundError(template=frag.template_name, block=frag.block_name)
-    return template.render_block(frag.block_name, frag.context)
+    return render_with_signal_finalize(lambda: template.render_block(frag.block_name, frag.context))

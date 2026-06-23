@@ -343,7 +343,10 @@ class AppRegistry:
 
         async def page_wrapper(request: Request) -> Any:
             cascade_ctx = await build_cascade_context(
-                _providers, request.path_params, _service_providers
+                _providers,
+                request.path_params,
+                _service_providers,
+                request=request,
             )
             meta_resolved = await resolve_meta(
                 _meta, _meta_provider, request.path_params, _service_providers
@@ -375,6 +378,7 @@ class AppRegistry:
                     request.path_params,
                     base_ctx,
                     _service_providers,
+                    request=request,
                 )
                 if inspect.isawaitable(vm_result):
                     vm_result = await vm_result
