@@ -47,4 +47,27 @@ __all__ = [
     "PostgresError",
     "ProtocolError",
     "TLSError",
+    "connect",
+    "create_pool",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name == "connect":
+        from chirp.data.drivers._pelt.pool import connect as _connect
+
+        return _connect
+    if name == "create_pool":
+        from chirp.data.drivers._pelt.pool import create_pool as _create_pool
+
+        return _create_pool
+    if name == "Connection":
+        from chirp.data.drivers._pelt.connection import Connection
+
+        return Connection
+    if name == "Pool":
+        from chirp.data.drivers._pelt.pool import Pool
+
+        return Pool
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

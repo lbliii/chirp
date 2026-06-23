@@ -1,6 +1,6 @@
 """Typed async database access.
 
-Supports SQLite (via stdlib ``sqlite3`` + ``anyio``) and PostgreSQL (via ``asyncpg``).
+Supports SQLite (via stdlib ``sqlite3`` + ``anyio``) and PostgreSQL (via in-tree ``pelt``).
 SQL in, frozen dataclasses out.
 
 Connection URL format::
@@ -588,17 +588,9 @@ class Database:
             msg = "listen() requires at least one channel name"
             raise DataError(msg)
 
-        try:
-            import asyncpg
-        except ImportError:
-            msg = (
-                "chirp.data requires 'asyncpg' for PostgreSQL LISTEN/NOTIFY. "
-                "Install it with: pip install chirp[data-pg]"
-            )
-            raise DriverNotInstalledError(msg) from None
+        from chirp.data.drivers import _pelt
 
-        # Open a dedicated connection for LISTEN (not from pool)
-        conn = await asyncpg.connect(self._config.url)
+        conn = await _pelt.connect(self._config.url)
         queue: asyncio.Queue[Notification] = asyncio.Queue()
         loop = asyncio.get_running_loop()
 
@@ -606,8 +598,8 @@ class Database:
             queue.put_nowait(Notification(channel=channel, payload=payload))
 
         def _on_notify(
-            conn: Any,
-            pid: int,
+            _conn: Any,
+            _pid: int,
             channel: str,
             payload: str,
         ) -> None:

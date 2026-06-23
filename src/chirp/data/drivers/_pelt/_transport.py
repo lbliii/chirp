@@ -18,6 +18,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import anyio
+from anyio import EndOfStream
 from anyio.streams.tls import TLSStream
 
 from chirp.data.drivers._pelt import _auth
@@ -245,7 +246,10 @@ async def _drive_until_ready(
         await _handle(protocol.receive_bytes(b""))
         if protocol.state is ProtocolState.READY:
             break
-        chunk = await stream.stream.receive(65536)
+        try:
+            chunk = await stream.stream.receive(65536)
+        except EndOfStream:
+            chunk = b""
         if not chunk:
             msg = "connection closed before ReadyForQuery"
             raise PeltConnectionError(msg)

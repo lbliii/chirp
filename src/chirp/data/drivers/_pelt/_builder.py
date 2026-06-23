@@ -21,6 +21,7 @@ _TAG_DESCRIBE = b"D"
 _TAG_EXECUTE = b"E"
 _TAG_SYNC = b"S"
 _TAG_FLUSH = b"H"
+_TAG_CLOSE = b"C"
 _TAG_TERMINATE = b"X"
 _TAG_PASSWORD = b"p"
 _NUL = b"\x00"
@@ -154,6 +155,18 @@ def build_flush() -> bytes:
     return frame(_TAG_FLUSH, b"")
 
 
+def build_close(*, kind: str, name: str = "") -> bytes:
+    """Extended-protocol ``Close`` (tag ``'C'``). ``kind`` is ``'S'`` (statement) or
+    ``'P'`` (portal)."""
+    if kind not in ("S", "P"):
+        msg = f"close kind must be 'S' or 'P' (got {kind!r})"
+        raise ValueError(msg)
+    b = MessageBuilder()
+    b.write_byte(ord(kind))
+    b.write_cstring(name)
+    return frame(_TAG_CLOSE, b.getvalue())
+
+
 def build_terminate() -> bytes:
     """``Terminate`` (tag ``'X'``) — a graceful goodbye."""
     return frame(_TAG_TERMINATE, b"")
@@ -168,6 +181,7 @@ __all__ = [
     "PROTOCOL_VERSION",
     "MessageBuilder",
     "build_bind",
+    "build_close",
     "build_describe",
     "build_execute",
     "build_flush",
