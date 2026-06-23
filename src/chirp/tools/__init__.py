@@ -23,10 +23,22 @@ Usage::
         return EventStream(stream())
 """
 
+from chirp.tools.approval import (
+    InMemoryToolApprovalStore,
+    PendingToolApproval,
+    SessionToolApprovalStore,
+    ToolApprovalError,
+    ToolApprovalStore,
+)
 from chirp.tools.events import ToolCallEvent, ToolEventBus
 from chirp.tools.registry import ToolDef, ToolRegistry
 
 __all__ = [
+    "InMemoryToolApprovalStore",
+    "PendingToolApproval",
+    "SessionToolApprovalStore",
+    "ToolApprovalError",
+    "ToolApprovalStore",
     "ToolCallEvent",
     "ToolDef",
     "ToolEventBus",

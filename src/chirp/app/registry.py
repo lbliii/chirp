@@ -53,10 +53,13 @@ class AppRegistry:
         name: str,
         *,
         description: str,
+        approval_required: bool = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._ensure_mutable()
-            self._state.pending_tools.append(PendingTool(name, description, func))
+            self._state.pending_tools.append(
+                PendingTool(name, description, func, approval_required)
+            )
             return func
 
         return decorator

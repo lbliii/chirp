@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Tool HITL</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext/sse@2.2.2/sse.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .approval { background: #fff8e6; border-color: #e6c200; margin-top: 1rem; }
+    .danger { color: #b00020; font-weight: 600; }
+    ul { padding-left: 1.2rem; }
+    .muted { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Tool approval (HITL)</h1>
+  <p class="muted">
+    Dangerous tools pause the agent until a human approves via a CSRF-protected form.
+  </p>
+
+  <div class="panel">
+    <h2>Notes</h2>
+    <form hx-post="{{ url_for('notes.add') }}" hx-target="#note-list" hx-swap="outerHTML">
+      {{ csrf_field() }}
+      <label>
+        Text
+        <input name="text" required>
+      </label>
+      <button type="submit">Add note</button>
+    </form>
+
+    {% block note_list %}
+    <div id="note-list">
+      {% if notes %}
+      <ul>
+        {% for note in notes %}
+        <li>{{ note.text }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No notes yet.</p>
+      {% end %}
+    </div>
+    {% end %}
+  </div>
+
+  <div class="panel">
+    <h2>Agent</h2>
+    <form hx-post="{{ url_for('agent.run') }}" hx-target="#agent-panel" hx-swap="innerHTML">
+      {{ csrf_field() }}
+      <button type="submit">Ask agent to clear all notes</button>
+    </form>
+    <div id="agent-panel">
+      <p class="muted">Agent output appears here.</p>
+    </div>
+  </div>
+
+  {% block agent_panel %}
+  <div id="agent-stream" hx-ext="sse" sse-connect="{{ stream_url | default('/agent/stream') }}" hx-disinherit="hx-target hx-swap">
+    <div sse-swap="message" hx-target="#agent-panel" hx-swap="innerHTML"></div>
+  </div>
+  {% end %}
+
+  {% block approval_dialog %}
+  {% if (approval_id ?? none) %}
+  <div class="approval panel" id="approval-dialog">
+    <p class="danger">Approve tool call: {{ tool_name }}</p>
+    <p class="muted">Arguments: {{ arguments | format_args }}</p>
+    <form
+      hx-post="{{ url_for('agent.resume') }}"
+      hx-target="#agent-panel"
+      hx-swap="innerHTML"
+    >
+      {{ csrf_field() }}
+      <input type="hidden" name="approval_id" value="{{ approval_id }}">
+      <input type="hidden" name="decision" value="approve">
+      <button type="submit">Approve</button>
+    </form>
+    <form
+      hx-post="{{ url_for('agent.resume') }}"
+      hx-target="#agent-panel"
+      hx-swap="innerHTML"
+      style="display:inline"
+    >
+      {{ csrf_field() }}
+      <input type="hidden" name="approval_id" value="{{ approval_id }}">
+      <input type="hidden" name="decision" value="deny">
+      <button type="submit">Deny</button>
+    </form>
+  </div>
+  {% end %}
+  {% end %}
+
+  {% block agent_reply %}
+  {% if (text ?? none) %}
+  <p><strong>Agent:</strong> {{ text }}</p>
+  {% end %}
+  {% end %}
+</body>
+</html>

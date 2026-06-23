@@ -39,6 +39,16 @@ class StreamToolResultEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class StreamToolApprovalEvent:
+    """Tool call paused until a human approves or denies via web UI."""
+
+    approval_id: str
+    call_id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class ErrorEvent:
     """Provider or framework error surfaced on the stream."""
 
@@ -52,4 +62,11 @@ class DoneEvent:
     tokens_out: int | None = None
 
 
-type StreamEvent = TokenEvent | StreamToolCallEvent | StreamToolResultEvent | ErrorEvent | DoneEvent
+type StreamEvent = (
+    TokenEvent
+    | StreamToolCallEvent
+    | StreamToolResultEvent
+    | StreamToolApprovalEvent
+    | ErrorEvent
+    | DoneEvent
+)

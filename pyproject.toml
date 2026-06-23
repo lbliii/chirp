@@ -232,7 +232,7 @@ unused-ignore-comment = "warn" # Flag stale type: ignore for cleanup
 
 # Mapping.get override in Headers/QueryParams/FormData/LazyHeaders/LazyCookies
 # is intentional (str-only keys/values); LSP violation is accepted.
-invalid-method-override = "warn"
+invalid-method-override = "ignore"
 
 # =============================================================================
 # Pytest

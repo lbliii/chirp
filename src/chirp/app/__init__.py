@@ -266,8 +266,13 @@ class App:
         name: str,
         *,
         description: str = "",
+        approval_required: bool = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self._registry.tool(name, description=description)
+        return self._registry.tool(
+            name,
+            description=description,
+            approval_required=approval_required,
+        )
 
     @property
     def db(self) -> Database:

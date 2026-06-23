@@ -224,6 +224,20 @@ async def _handle_tools_call(
     if not isinstance(arguments, dict):
         return {"error": JsonRpcError(code=-32602, message="'arguments' must be an object")}
 
+    tool = registry.get(tool_name)
+    if tool is None:
+        return {"error": JsonRpcError(code=-32602, message=f"Tool not found: {tool_name!r}")}
+
+    if tool.approval_required:
+        return {
+            "error": JsonRpcError(
+                code=-32603,
+                message=(
+                    f"Tool {tool_name!r} requires human approval via the web UI before it can run."
+                ),
+            )
+        }
+
     try:
         result = await registry.call_tool(tool_name, arguments)
     except KeyError:
