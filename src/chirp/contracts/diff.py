@@ -35,7 +35,9 @@ class ContractDiff:
                 loc = f" in {issue['template']}"
             elif issue.get("route"):
                 loc = f" on {issue['route']}"
-            lines.append(f"  + [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}")
+            lines.append(
+                f"  + [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}"
+            )
         for issue in self.removed:
             sev = issue.get("severity", "?")
             loc = ""
@@ -43,7 +45,9 @@ class ContractDiff:
                 loc = f" in {issue['template']}"
             elif issue.get("route"):
                 loc = f" on {issue['route']}"
-            lines.append(f"  - [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}")
+            lines.append(
+                f"  - [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}"
+            )
         if not self.has_changes:
             lines.append("  (no issue changes)")
         return lines
