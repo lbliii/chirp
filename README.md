@@ -77,7 +77,18 @@ uv add bengal-chirp
 
 Requires Python 3.14+.
 
-Chirp works on its own with plain templates. `chirp-ui` is an optional companion UI layer, not part of the framework core.
+Chirp works on its own with plain templates. For new projects, install with the
+**`[ui]` extra** so `chirp new` scaffolds the **chirp-ui** no-build CSS layer by
+default — components, tokens, and Alpine wiring without a frontend build step.
+The UI package remains optional and is not part of the framework core.
+
+```bash
+pip install 'bengal-chirp[ui]'
+# or: uv add 'bengal-chirp[ui]'
+```
+
+When chirp-ui is installed, `chirp new` emits ChirpUI layouts automatically and
+`chirp check` verifies that `chirpui-*` classes resolve to backing styles.
 
 ---
 

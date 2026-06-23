@@ -22,6 +22,8 @@ Mirrors ``test_deploy_nojs_i18n_integration.py``: real ``App`` + ``Router`` +
 
 from dataclasses import dataclass
 
+import pytest
+
 from chirp import App
 from chirp.config import AppConfig
 from chirp.contracts import check_hypermedia_surface
@@ -592,6 +594,45 @@ def test_macro_css_silent_for_custom_classes(tmp_path) -> None:
     class -> no macro_css issue."""
     app = _macro_css_app(tmp_path, _MACRO_CSS_CLEAN)
     assert "macro_css" not in _categories(app)
+
+
+# ---------------------------------------------------------------------------
+# chirpui_css_verify (#157 child 2) -- unknown chirpui-* classes, chirp-ui on
+# ---------------------------------------------------------------------------
+
+_CHIRPUI_CSS_UNKNOWN = '<div class="chirpui-card chirpui-cardd-typo">x</div>'
+_CHIRPUI_CSS_KNOWN = '<div class="chirpui-card">x</div>'
+
+
+def _chirpui_css_verify_app(tmp_path, template_html: str) -> App:
+    pytest.importorskip("chirp_ui")
+    from chirp.ext.chirp_ui import use_chirp_ui
+
+    (tmp_path / "index.html").write_text(template_html, encoding="utf-8")
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)))
+    use_chirp_ui(app)
+
+    @app.route("/")
+    def index():
+        from chirp.templating.returns import Template
+
+        return Template("index.html")
+
+    return app
+
+
+def test_chirpui_css_verify_fires_for_unknown_class_with_chirpui(tmp_path) -> None:
+    """Unknown chirpui-* class with chirp-ui active -> chirpui_css_verify WARNING."""
+    app = _chirpui_css_verify_app(tmp_path, _CHIRPUI_CSS_UNKNOWN)
+    css_issues = [i for i in _issues(app) if i.category == "chirpui_css_verify"]
+    assert css_issues, "chirpui_css_verify (#157) did not fire through check_hypermedia_surface"
+    assert any("chirpui-cardd-typo" in i.message for i in css_issues)
+
+
+def test_chirpui_css_verify_silent_for_known_class(tmp_path) -> None:
+    """Negative control: a known chirpui-* class -> no chirpui_css_verify issue."""
+    app = _chirpui_css_verify_app(tmp_path, _CHIRPUI_CSS_KNOWN)
+    assert "chirpui_css_verify" not in _categories(app)
 
 
 # ---------------------------------------------------------------------------
