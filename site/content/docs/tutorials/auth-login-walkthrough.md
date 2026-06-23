@@ -400,9 +400,12 @@ The golden path is correct by default. Here is where each piece extends:
 - **Production posture** — `chirp check --deploy` re-runs the env-aware rules
   with `env="production"` against a throwaway config view, so you find every
   production-only failure before you ship. See [[docs/quality/deployment/production|Production Deployment]].
-- **Passkeys** — WebAuthn / passkey support is on the roadmap as an RFC; the
-  `AuthConfig` `verify_token` seam and the bring-your-own user protocol are the
-  extension points it will build on.
+- **Passkeys** — WebAuthn / passkey support ships in `chirp.security.passkeys`
+  (opt-in via `pip install chirp[passkeys]` and `AppConfig(passkeys=True)`). The
+  framework owns the ceremony verbs and session-bound challenge lifecycle; your
+  app owns the credential row — same BYO doctrine as the `User` protocol. See
+  [[docs/tutorials/passkeys-walkthrough|Passkeys walkthrough]] and
+  `examples/standalone/passkeys_minimal/`.
 
 :::{note} See also
 - [[docs/quality/deployment/auth-hardening|Auth Hardening]] — the full production wiring checklist

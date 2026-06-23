@@ -21,15 +21,35 @@
       Security
     </h1>
     <p class="luckycat-page__tagline chirpui-text-muted">
-      Keep the lucky cat’s vault safe. Demo stub — choices aren’t persisted.
+      Enroll a passkey for faster sign-in, or tweak the demo security toggles below.
     </p>
   </header>
+
+  <section class="luckycat-trade-panel" aria-label="Passkeys">
+    <h2 class="luckycat-settings__section-title">Passkeys</h2>
+    <p class="luckycat-settings__section-hint chirpui-text-muted">
+      Per-device shortcuts beside the prefilled demo password — one shared <code>neko</code> account.
+    </p>
+    <button type="button" id="passkey-register" class="chirpui-btn chirpui-btn--primary">
+      Add passkey
+    </button>
+    <p id="passkey-register-error" class="luckycat-auth__error" role="alert" hidden></p>
+    {% if passkeys %}
+    <ul class="luckycat-settings__passkey-list">
+      {% for row in passkeys %}
+      <li>{{ row.nickname }} · sign count {{ row.sign_count }}</li>
+      {% end %}
+    </ul>
+    {% else %}
+    <p class="chirpui-text-muted chirpui-font-sm">No passkeys enrolled yet.</p>
+    {% end %}
+  </section>
 
   <form id="security-form" class="luckycat-settings"
         method="get" action="/settings/security">
 
     <section class="luckycat-trade-panel" aria-label="Sign-in protection">
-      <h2 class="luckycat-settings__section-title">Sign-in protection</h2>
+      <h2 class="luckycat-settings__section-title">Sign-in protection (demo stub)</h2>
       <p class="luckycat-settings__section-hint chirpui-text-muted">
         Extra checks the lucky paw runs before letting anyone onto the trading floor.
       </p>
@@ -98,6 +118,45 @@
     <button type="submit" class="chirpui-btn chirpui-btn--primary">Save security settings</button>
     {% end %}
   </form>
+  <script>
+  (function () {
+    var btn = document.getElementById('passkey-register');
+    var err = document.getElementById('passkey-register-error');
+    if (!btn || !window.chirp || !window.chirp.passkeys) {
+      if (btn) btn.hidden = true;
+      return;
+    }
+    btn.addEventListener('click', async function () {
+      err.hidden = true;
+      var csrf = document.querySelector('meta[name="csrf-token"]')?.content
+        || document.querySelector('input[name="_csrf_token"]')?.value;
+      try {
+        var begin = await fetch('/auth/passkey/register/begin', {
+          method: 'POST',
+          headers: csrf ? {'X-CSRF-Token': csrf} : {},
+        });
+        if (!begin.ok) throw new Error('Could not start passkey enrollment.');
+        var opts = await begin.json();
+        var credential = await window.chirp.passkeys.register(opts);
+        var finish = await fetch('/auth/passkey/register/finish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrf ? {'X-CSRF-Token': csrf} : {}),
+          },
+          body: JSON.stringify(credential),
+        });
+        var result = await finish.json();
+        if (!finish.ok || !result.ok) throw new Error(result.error || 'Enrollment failed.');
+        window.location = result.redirect || '/settings/security';
+      } catch (e) {
+        if (e && e.passkeyReason === 'cancelled') return;
+        err.textContent = (e && e.message) || 'Enrollment failed.';
+        err.hidden = false;
+      }
+    });
+  })();
+  </script>
 </div>
 {% end %}
 {% end %}

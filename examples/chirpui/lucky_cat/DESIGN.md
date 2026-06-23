@@ -582,6 +582,17 @@ never leaves `/login`. `/logout` is the same shape.
 `Session → Auth → CSRF → SecurityHeaders` (the `csrf_session` contract requires
 only Session before CSRF, not adjacency).
 
+### Passkeys (second authenticator beside the demo password)
+
+`AppConfig(passkeys=True)` + `chirp[passkeys]` inject `window.chirp.passkeys` and
+wire ceremony routes under `/auth/passkey/…` (see `wiring/routes/passkeys.py`,
+`passkey_store.py`, `passkey_config.py`). Enrollment lives on
+`/settings/security`; sign-in is a second button on `/login`. Passkeys are
+**per-device shortcuts** for the same shared `neko` account — not a second
+identity model. Railway deploys must set `CHIRP_PASSKEY_ORIGIN` /
+`CHIRP_PASSKEY_RP_ID` to the public HTTPS hostname (WebAuthn requires a
+registrable-suffix match).
+
 ### Why a single shared demo account
 
 `users.py` holds ONE in-memory demo account (same store convention as the rest:

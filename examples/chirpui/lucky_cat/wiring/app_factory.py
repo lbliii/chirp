@@ -32,6 +32,7 @@ config = replace(
     # (use_chirp_ui owns Alpine — adding it would double-inject).
     view_transitions="htmx",
     secret_key=_base.secret_key or "dev-only-not-for-production",
+    passkeys=True,
 )
 
 app = App(config=config)

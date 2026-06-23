@@ -98,6 +98,9 @@ def example_app(request: pytest.FixtureRequest):
         users_mod = sys.modules.get("users")
         if users_mod is not None and hasattr(users_mod, "reset"):
             users_mod.reset()
+        passkey_mod = sys.modules.get("passkey_store")
+        if passkey_mod is not None and hasattr(passkey_mod, "reset"):
+            passkey_mod.reset()
         yield module.app
     finally:
         if module is not None and sys.modules.get("app") is module:

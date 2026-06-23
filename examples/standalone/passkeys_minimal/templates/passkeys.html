@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Passkeys{% endblock %}
+
+{% block content %}
+<h1>Passkeys</h1>
+<p>Enroll a passkey for faster sign-in on this device.</p>
+<button type="button" id="passkey-register">Add passkey</button>
+<p id="passkey-msg" class="error" hidden></p>
+<ul id="passkey-list">
+  {% for row in passkeys %}
+  <li>{{ row.nickname or 'Passkey' }} (sign count {{ row.sign_count }})</li>
+  {% end %}
+</ul>
+<script>
+(function () {
+  var btn = document.getElementById('passkey-register');
+  var msg = document.getElementById('passkey-msg');
+  if (!btn || !window.chirp || !window.chirp.passkeys) return;
+  btn.addEventListener('click', async function () {
+    msg.hidden = true;
+    var csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    try {
+      var begin = await fetch('/auth/passkey/register/begin', {
+        method: 'POST',
+        headers: csrf ? {'X-CSRF-Token': csrf} : {},
+      });
+      if (!begin.ok) throw new Error('Could not start registration.');
+      var opts = await begin.json();
+      var credential = await window.chirp.passkeys.register(opts);
+      var finish = await fetch('/auth/passkey/register/finish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrf ? {'X-CSRF-Token': csrf} : {}),
+        },
+        body: JSON.stringify(credential),
+      });
+      var result = await finish.json();
+      if (!finish.ok || !result.ok) throw new Error(result.error || 'Registration failed.');
+      window.location = result.redirect || '/passkeys';
+    } catch (e) {
+      if (e && e.passkeyReason === 'cancelled') return;
+      msg.textContent = (e && e.message) || 'Registration failed.';
+      msg.hidden = false;
+    }
+  });
+})();
+</script>
+{% endblock %}
