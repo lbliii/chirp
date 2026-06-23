@@ -505,6 +505,7 @@ class PreparedStatement:
     param_oids: tuple[int, ...]
     version: int
     resolved_param_oids: tuple[int, ...] | None = None
+    row_description: RowDescription | None = None
 
 
 class PreparedStatementCache:
@@ -601,6 +602,7 @@ class PreparedStatementCache:
         *,
         name: str,
         resolved_param_oids: tuple[int, ...] | None = None,
+        row_description: RowDescription | None = None,
     ) -> PreparedStatement | None:
         """Store a freshly prepared statement; evict the LRU entry if at capacity.
 
@@ -610,12 +612,16 @@ class PreparedStatementCache:
         if self.size == 0:
             return None
         key = self._key(sql, param_oids)
+        existing = self._entries.get(key)
+        if row_description is None and existing is not None:
+            row_description = existing.row_description
         entry = PreparedStatement(
             name=name,
             sql=sql,
             param_oids=tuple(param_oids),
             version=self._version,
             resolved_param_oids=resolved_param_oids,
+            row_description=row_description,
         )
         # Refreshing an existing key must not double-count toward the bound.
         if key in self._entries:
@@ -810,7 +816,32 @@ class ExtendedQueryProtocol:
         # Re-store with the resolved OIDs (frozen entries are replaced, not mutated). A refresh
         # of an existing key never evicts (it does not grow the cache), so there is no victim to
         # queue for Close here.
-        self.cache.put(sql, param_oids, name=entry.name, resolved_param_oids=resolved)
+        self.cache.put(
+            sql,
+            param_oids,
+            name=entry.name,
+            resolved_param_oids=resolved,
+            row_description=entry.row_description,
+        )
+
+    def record_row_description(
+        self, sql: str, param_oids: Sequence[int], description: RowDescription
+    ) -> None:
+        """Store the column layout from a ``Describe(statement)`` on the cache entry."""
+        entry = self.cache.get(sql, param_oids)
+        if entry is None:
+            return
+        self.cache.put(
+            sql,
+            param_oids,
+            name=entry.name,
+            resolved_param_oids=entry.resolved_param_oids,
+            row_description=description,
+        )
+
+    def seed_row_description(self, description: RowDescription) -> None:
+        """Pre-seed the active row layout before ``Execute`` when the server omits ``RowDescription``."""
+        self._row_description = description
 
     def drain_pending_close(self) -> tuple[PreparedStatement, ...]:
         """Return and clear the server-side statements the cache evicted but never closed.

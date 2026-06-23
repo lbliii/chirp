@@ -35,6 +35,7 @@ from chirp.data.drivers._pelt.errors import (  # noqa: E402
     ProtocolError,
     TLSError,
 )
+from chirp.data.drivers._pelt.pool import connect, create_pool  # noqa: E402
 from chirp.data.drivers._pelt.types import ConnectionConfig, PoolConfig  # noqa: E402
 
 __all__ = [
@@ -47,4 +48,19 @@ __all__ = [
     "PostgresError",
     "ProtocolError",
     "TLSError",
+    "connect",
+    "create_pool",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name == "Connection":
+        from chirp.data.drivers._pelt.connection import Connection
+
+        return Connection
+    if name == "Pool":
+        from chirp.data.drivers._pelt.pool import Pool
+
+        return Pool
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

@@ -101,7 +101,7 @@ class ScramSha256Client:
     def client_first_message(self) -> bytes:
         """First SASL payload after ``AuthenticationSASL``."""
         payload = f"n,,{self._client_first_bare}".encode()
-        return _builder.build_password(payload)
+        return _builder.build_sasl_initial(mechanism=_SCRAM_SHA256, initial_response=payload)
 
     def client_final_message(self, server_first: bytes) -> bytes:
         """Reply to ``AuthenticationSASLContinue``."""
@@ -124,7 +124,7 @@ class ScramSha256Client:
         proof = bytes(a ^ b for a, b in zip(client_key, client_signature, strict=True))
         proof_b64 = base64.b64encode(proof).decode("ascii")
         payload = f"{client_final_without_proof},p={proof_b64}".encode()
-        return _builder.build_password(payload)
+        return _builder.build_sasl_continue(payload)
 
     def verify_server_final(self, server_final: bytes) -> None:
         """Validate the server signature in ``AuthenticationSASLFinal``."""

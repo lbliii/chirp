@@ -175,7 +175,7 @@ jobs:
       - name: PostgreSQL round-trip tests
         env:
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
-        run: uv run pytest tests/test_schema_introspect.py -q --tb=short --timeout=60
+        run: uv run pytest tests/test_schema_introspect.py tests/test_pelt/test_connection_integration.py -q --tb=short --timeout=60
 
   # Free-threaded GIL gate for the data-pg backend (pelt E0.2, issue #262).
   # Imports asyncpg on 3.14t with PYTHONWARNINGS=error so a dependency that
@@ -203,7 +203,7 @@ jobs:
       - name: Install dependencies (data-pg extra)
         run: uv sync --no-sources --group dev --extra data-pg
 
-      - name: GIL gate — asyncpg / Postgres backend import
+      - name: GIL gate — pelt / Postgres backend import
         env:
           PYTHON_GIL: "0"
           PYTHONWARNINGS: error

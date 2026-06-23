@@ -23,9 +23,7 @@ from chirp.data.schema.operations import AddColumn, CreateTable, DropColumn
 # the PostgreSQL path only has live coverage when a DSN is configured (the
 # dedicated ``test-postgres`` CI job sets ``CHIRP_TEST_PG_DSN`` against a real
 # Postgres service). Without a DSN these tests skip — so local SQLite-only runs
-# and the free-threaded main test job (which does not ship asyncpg) stay green.
-# asyncpg is imported lazily by the driver inside ``connect()``, so a skipped
-# test never touches it.
+# and the free-threaded main test job stay green.
 PG_DSN = os.environ.get("CHIRP_TEST_PG_DSN")
 requires_pg = pytest.mark.skipif(
     not PG_DSN,
