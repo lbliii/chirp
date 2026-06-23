@@ -1,6 +1,6 @@
 """Post or update a PR comment with ``chirp diff`` hypermedia surface changes.
 
-Issue #344 — advisory PR feedback until merge-blocking policy is signed off.
+Issue #344 — posts PR feedback and optionally blocks merge on new contract ERRORs.
 Stdlib-only GitHub I/O (``urllib``); diff logic lives in ``chirp.contracts``.
 
 Usage (CI)::

@@ -1,8 +1,8 @@
 name: Contract diff
 
-# Advisory hypermedia surface diff on PRs (issue #344). Posts a comment listing
-# added/removed contract issues vs the base branch. Does not block merge until
-# steward sign-off on merge-blocking policy.
+# Hypermedia surface diff on PRs (issue #344). Posts a comment listing added/removed
+# contract issues vs the base branch and blocks merge when the diff introduces new
+# contract ERRORs (warnings remain advisory unless --deploy posture is used).
 
 on:
   pull_request:
@@ -47,4 +47,5 @@ jobs:
         run: |
           uv run python scripts/contract_diff_pr_comment.py \
             --app examples.chirpui.forum_shell.app:app \
-            --base "origin/${{ github.base_ref }}"
+            --base "origin/${{ github.base_ref }}" \
+            --fail-on-new-errors
