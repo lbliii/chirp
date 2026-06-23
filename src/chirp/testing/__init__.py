@@ -35,6 +35,16 @@ from chirp.testing.browser_smoke import (
 )
 from chirp.testing.chunks import CapturedStream
 from chirp.testing.client import TestClient
+from chirp.testing.eval import (
+    LLMCallTracker,
+    LLMScript,
+    assert_tool_messages_contain,
+    collect_sse_message_text,
+    install_llm_script,
+    install_mock_transport,
+    openai_completion,
+    openai_tool_call,
+)
 from chirp.testing.link_crawl import (
     LinkCrawlResult,
     assert_link_integrity,
@@ -47,6 +57,8 @@ from chirp.testing.sse import SSETestResult, assert_sse_wired, extract_sse_attrs
 __all__ = [
     "CapturedStream",
     "LinkCrawlResult",
+    "LLMCallTracker",
+    "LLMScript",
     "RouteSmokeCase",
     "SSETestResult",
     "TestClient",
@@ -70,12 +82,18 @@ __all__ = [
     "assert_route_smoke",
     "assert_sse_wired",
     "assert_status",
+    "assert_tool_messages_contain",
     "assert_zero_console_errors",
     "attach_console_capture",
+    "collect_sse_message_text",
     "crawl_links",
     "extract_sse_attrs",
     "filter_console_errors",
     "hx_headers",
+    "install_llm_script",
+    "install_mock_transport",
+    "openai_completion",
+    "openai_tool_call",
     "require_playwright",
     "same_origin_paths",
 ]

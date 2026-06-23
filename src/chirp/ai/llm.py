@@ -12,32 +12,45 @@ Free-threading safety:
     - ProviderConfig is a frozen dataclass
 """
 
-import dataclasses
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, overload
 
 from chirp.ai._providers import (
+    OPENAI_COMPAT_PROVIDERS,
     anthropic_complete,
     anthropic_generate,
     anthropic_stream,
+    bedrock_complete,
+    bedrock_generate,
+    bedrock_stream,
+    gemini_complete,
+    gemini_generate,
+    gemini_stream,
     openai_complete,
     openai_generate,
     openai_stream,
     parse_provider,
 )
-from chirp.ai._structured import dataclass_to_schema, parse_structured
+from chirp.ai._structured import (
+    is_structured_type,
+    parse_structured,
+    schema_for_type,
+    structured_repair_prompt,
+)
 from chirp.ai._tool_calls import (
     ChatCompletion,
     tools_from_registry,
     tools_to_anthropic,
     tools_to_openai,
 )
-from chirp.ai.errors import AIError
+from chirp.ai.errors import AIError, StructuredOutputError
 from chirp.ai.events import DoneEvent, ErrorEvent, StreamEvent, TokenEvent
 from chirp.telemetry import _SpanScope, trace_span
 
 if TYPE_CHECKING:
     from chirp.tools.registry import ToolRegistry
+
+_OPENAI_COMPAT_PROVIDERS = OPENAI_COMPAT_PROVIDERS
 
 
 class LLM:
@@ -54,7 +67,7 @@ class LLM:
         async for token in llm.stream("Analyze this:"):
             print(token, end="")
 
-        # Structured output (frozen dataclass)
+        # Structured output (frozen dataclass or Pydantic model)
         @dataclass(frozen=True, slots=True)
         class Summary:
             title: str
@@ -110,6 +123,7 @@ class LLM:
         system: str | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        structured_retries: int = 2,
     ) -> Any:
         """Generate a complete LLM response.
 
@@ -117,8 +131,8 @@ class LLM:
 
             text = await llm.generate("Explain quantum computing")
 
-        **Structured mode** — pass a dataclass type + prompt, get a typed
-        instance back::
+        **Structured mode** — pass a dataclass or Pydantic model type + prompt,
+        get a typed instance back::
 
             summary = await llm.generate(Summary, prompt="Summarize: ...")
 
@@ -146,30 +160,55 @@ class LLM:
             msg = "Structured generation requires a 'prompt' keyword argument"
             raise AIError(msg)
 
-        if not dataclasses.is_dataclass(cls):
+        if not is_structured_type(cls):
             msg = (
-                f"{cls.__name__} is not a dataclass — structured output requires frozen dataclasses"
+                f"{getattr(cls, '__name__', cls)!r} is not a dataclass or Pydantic model — "
+                "structured output requires frozen dataclasses or pydantic.BaseModel subclasses"
             )
             raise TypeError(msg)
 
-        schema = dataclass_to_schema(cls)
+        schema = schema_for_type(cls)
         structured_prompt = (
             f"{prompt}\n\n"
             f"Respond with a JSON object matching this schema:\n"
             f"```json\n{schema}\n```\n"
             f"Return ONLY the JSON object, no other text."
         )
-        messages = [{"role": "user", "content": structured_prompt}]
+        messages: list[dict[str, str]] = [{"role": "user", "content": structured_prompt}]
+        schema_name = getattr(cls, "__name__", "response")
         with trace_span(
             "llm.generate",
             provider=self._config.provider,
             model=self._config.model,
             mode="structured",
         ):
-            text = await self._generate_raw(
-                messages, system=system, max_tokens=max_t, temperature=temp
-            )
-        return parse_structured(cls, text)
+            last_error: StructuredOutputError | None = None
+            for attempt in range(structured_retries + 1):
+                text = await self._generate_raw(
+                    messages,
+                    system=system,
+                    max_tokens=max_t,
+                    temperature=temp,
+                    json_schema={"name": schema_name, "schema": schema},
+                )
+                try:
+                    return parse_structured(cls, text)
+                except StructuredOutputError as exc:
+                    last_error = exc
+                    if attempt >= structured_retries:
+                        raise
+                    messages = [
+                        *messages,
+                        {"role": "assistant", "content": text},
+                        {
+                            "role": "user",
+                            "content": structured_repair_prompt(error=exc, bad_text=text),
+                        },
+                    ]
+            if last_error is not None:
+                raise last_error
+            msg = "Structured generation failed without a parse error"
+            raise StructuredOutputError(msg)
 
     # -- Stream (incremental response) --
 
@@ -266,7 +305,7 @@ class LLM:
                     system=system,
                     tools=anthropic_tools,
                 )
-            if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
+            if self._config.provider in _OPENAI_COMPAT_PROVIDERS:
                 msgs = list(messages)
                 if system:
                     msgs = [{"role": "system", "content": system}, *msgs]
@@ -277,6 +316,24 @@ class LLM:
                     max_tokens=max_t,
                     temperature=temp,
                     tools=openai_tools,
+                )
+            if self._config.provider == "gemini":
+                return await gemini_complete(
+                    self._config,
+                    messages,
+                    max_tokens=max_t,
+                    temperature=temp,
+                    system=system,
+                    tools=tool_list,
+                )
+            if self._config.provider == "bedrock":
+                return await bedrock_complete(
+                    self._config,
+                    messages,
+                    max_tokens=max_t,
+                    temperature=temp,
+                    system=system,
+                    tools=tool_list,
                 )
         msg = f"Unsupported provider: {self._config.provider}"
         raise AIError(msg)
@@ -336,6 +393,7 @@ class LLM:
         system: str | None,
         max_tokens: int,
         temperature: float,
+        json_schema: dict[str, Any] | None = None,
     ) -> str:
         """Dispatch to provider-specific generation."""
         if self._config.provider == "anthropic":
@@ -345,16 +403,35 @@ class LLM:
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system=system,
+                json_schema=json_schema,
             )
-        if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
-            # OpenAI and Ollama use system message in messages array
+        if self._config.provider in _OPENAI_COMPAT_PROVIDERS:
+            msgs = list(messages)
             if system:
-                messages = [{"role": "system", "content": system}, *messages]
+                msgs = [{"role": "system", "content": system}, *msgs]
             return await openai_generate(
+                self._config,
+                msgs,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                json_schema=json_schema,
+            )
+        if self._config.provider == "gemini":
+            return await gemini_generate(
                 self._config,
                 messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                system=system,
+                json_schema=json_schema,
+            )
+        if self._config.provider == "bedrock":
+            return await bedrock_generate(
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system,
             )
         msg = f"Unsupported provider: {self._config.provider}"
         raise AIError(msg)
@@ -379,14 +456,37 @@ class LLM:
                 yield token
             return
 
-        if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
+        if self._config.provider in _OPENAI_COMPAT_PROVIDERS:
+            msgs = list(messages)
             if system:
-                messages = [{"role": "system", "content": system}, *messages]
+                msgs = [{"role": "system", "content": system}, *msgs]
             async for token in openai_stream(
+                self._config,
+                msgs,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            ):
+                yield token
+            return
+
+        if self._config.provider == "gemini":
+            async for token in gemini_stream(
                 self._config,
                 messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                system=system,
+            ):
+                yield token
+            return
+
+        if self._config.provider == "bedrock":
+            async for token in bedrock_stream(
+                self._config,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system,
             ):
                 yield token
             return

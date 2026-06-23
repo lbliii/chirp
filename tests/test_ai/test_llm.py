@@ -94,7 +94,7 @@ class TestProviderParsing:
 
     def test_unsupported_provider_raises(self) -> None:
         with pytest.raises(ValueError, match="Unsupported provider"):
-            parse_provider("gemini:flash")
+            parse_provider("not-a-provider:model")
 
     def test_llm_exposes_provider_and_model(self) -> None:
         llm = LLM("openai:gpt-4o", api_key="sk-test")
@@ -251,7 +251,7 @@ class TestStructuredOutput:
         class NotADataclass:
             pass
 
-        with pytest.raises(TypeError, match="dataclass"):
+        with pytest.raises(TypeError, match="dataclass or Pydantic"):
             await llm.generate(NotADataclass, prompt="nope")  # type: ignore[type-var]
 
 
