@@ -401,8 +401,7 @@ class Connection:
                     column_names = tuple(field.name for field in event.description.fields)
                     codec_plan = _codecs.build_codec_plan(event.description, registry)
                 values = tuple(
-                    decoder(raw)
-                    for decoder, raw in zip(codec_plan, event.row.values, strict=True)
+                    decoder(raw) for decoder, raw in zip(codec_plan, event.row.values, strict=True)
                 )
                 rows.append(Record(column_names, values))
             elif isinstance(event, CommandCompleteEvent):
