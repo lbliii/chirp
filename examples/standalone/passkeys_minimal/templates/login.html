@@ -19,7 +19,7 @@
 <button type="button" id="passkey-login" class="secondary">Sign in with passkey</button>
 <p id="passkey-error" class="error" hidden></p>
 <p><small>Hint: admin / password — or enroll a passkey after signing in.</small></p>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function () {
   var btn = document.getElementById('passkey-login');
   var err = document.getElementById('passkey-error');

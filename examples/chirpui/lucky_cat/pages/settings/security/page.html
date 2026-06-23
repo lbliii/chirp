@@ -30,6 +30,14 @@
     <p class="luckycat-settings__section-hint chirpui-text-muted">
       Per-device shortcuts beside the prefilled demo password — one shared <code>neko</code> account.
     </p>
+    <p class="chirpui-text-muted chirpui-font-sm">
+      This runs a <strong>real</strong> passkey setup: your browser or OS will prompt
+      (Touch&nbsp;ID, Face&nbsp;ID, Windows Hello, etc.) to save a login on
+      <em>this device</em> for the shared demo account on this host. Your private
+      key stays on the device; the server only stores the public key in memory and
+      forgets it on restart. Safe to try — remove the passkey from Keychain or
+      Passwords anytime if you do not want the shortcut.
+    </p>
     <button type="button" id="passkey-register" class="chirpui-btn chirpui-btn--primary">
       Add passkey
     </button>
@@ -118,7 +126,7 @@
     <button type="submit" class="chirpui-btn chirpui-btn--primary">Save security settings</button>
     {% end %}
   </form>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
   (function () {
     var btn = document.getElementById('passkey-register');
     var err = document.getElementById('passkey-register-error');

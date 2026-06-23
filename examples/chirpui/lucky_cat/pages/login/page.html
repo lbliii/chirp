@@ -63,10 +63,11 @@
 
       <p class="luckycat-auth__hint chirpui-text-muted chirpui-font-sm">
         🐾 Demo account (prefilled): <code>{{ demo_creds ?? 'neko / luckycat' }}</code>.
-        No real funds — it's all $MEOW.
+        No real funds — it's all $MEOW. Sign in with passkey works after you enroll
+        one under Settings → Security — that setup is real WebAuthn on your device.
       </p>
     </form>
-    <script>
+    <script nonce="{{ csp_nonce() }}">
     (function () {
       var btn = document.getElementById('passkey-login');
       var err = document.getElementById('passkey-login-error');
