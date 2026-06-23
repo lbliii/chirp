@@ -11,10 +11,9 @@ import json
 import sys
 from pathlib import Path
 
+from chirp.cli._diff import collect_check_json
 from chirp.cli._resolve import resolve_app
-from chirp.contracts import check_hypermedia_surface
 from chirp.contracts.diff import diff_contract_dicts
-from chirp.contracts.serialize import result_to_dict
 
 
 def run_check(args: argparse.Namespace) -> None:
@@ -42,12 +41,11 @@ def run_check(args: argparse.Namespace) -> None:
 
 
 def _run_structured_check(app, args: argparse.Namespace) -> None:
-    import time
-
-    started = time.perf_counter()
-    result = check_hypermedia_surface(app, deploy=args.deploy)
-    result.elapsed_ms = (time.perf_counter() - started) * 1000
-    payload = result_to_dict(result, include_info=args.include_info)
+    result, payload = collect_check_json(
+        app,
+        deploy=args.deploy,
+        include_info=args.include_info,
+    )
 
     if args.baseline:
         baseline_path = Path(args.baseline)
