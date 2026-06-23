@@ -1,6 +1,8 @@
 """Verify every return type in the gallery renders through the ASGI pipeline."""
 
-from chirp.testing import TestClient
+import pytest
+
+from chirp.testing import TestClient, assert_sse_wired
 
 
 class TestReturnsGallery:
@@ -61,6 +63,12 @@ class TestReturnsGallery:
             response = await client.get("/events")
             assert response.status == 200
             assert "text/event-stream" in response.content_type
+
+    @pytest.mark.issue(479)
+    async def test_eventstream_wiring(self, example_app) -> None:
+        """Page sse-swap listeners must match the wire event names the stream emits."""
+        async with TestClient(example_app) as client:
+            await assert_sse_wired(client, "/", "/events", max_events=7)
 
     async def test_validation_error_returns_422(self, example_app) -> None:
         async with TestClient(example_app) as client:

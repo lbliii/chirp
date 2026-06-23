@@ -100,12 +100,9 @@
       <button type="submit">Submit</button>
       {% endblock %}
     </form>
-    {% block demo_form_ok %}
-    {% set _form = form | default(none) %}
-    {% if _form %}
-    <div class="ok">Form accepted: {{ _form.name }} &lt;{{ _form.email }}&gt;</div>
-    {% endif %}
-    {% endblock %}
+    {% fragment demo_form_ok %}
+    <div class="ok">Form accepted: {{ form.name }} &lt;{{ form.email }}&gt;</div>
+    {% end %}
   </div>
 
   <div class="card">
@@ -125,11 +122,9 @@
         Connecting…
       </div>
     </div>
-    {% block demo_sse_item %}
-    {% if index is defined %}
+    {% fragment demo_sse_item %}
     <div>[{{ index }}] value={{ value }}</div>
-    {% endif %}
-    {% endblock %}
+    {% end %}
   </div>
 
   <div class="card">

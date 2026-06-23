@@ -4,6 +4,8 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
+
 _ROOT = Path(__file__).resolve().parents[2]
 _ROUTE_CONTRACT_DOC = (
     _ROOT / "site" / "content" / "docs" / "quality" / "contracts-debugging" / "route-contract.md"
@@ -125,6 +127,7 @@ def test_route_contract_docs_cover_recent_contract_categories() -> None:
         assert f"`{category}`" in text
 
 
+@pytest.mark.issue(480)
 def test_contract_category_reference_covers_source_categories() -> None:
     text = _category_reference_text()
     missing = sorted(

@@ -176,6 +176,10 @@ viewer_count = len(viewers)
 
 `presence()` returns only the connections that supplied a `ConnectionInfo`. Use `on_disconnect` (below) to emit a presence-only change event when a tab closes.
 
+:::{note}
+The [`reactive_tasks`](https://github.com/lbliii/chirp/tree/main/examples/standalone/reactive_tasks) example wires presence end-to-end: it emits `ChangeEvent(changed_paths={"presence"})` on connect and in `on_disconnect`, and registers `"presence"` in `reactive_emitted_paths` so `app.check()` can verify the path is indexed.
+:::
+
 ## How `reactive_stream()` runs
 
 `reactive_stream()` is the one call that ties the bus, the index, and the connection together into an `EventStream` you return from a route:
@@ -231,6 +235,12 @@ def build_doc_context(changed_paths: frozenset[str]) -> dict:
 ```
 
 **Error boundary.** If `context_builder()` raises, that one event is skipped and the stream stays alive; the next change retries with fresh data.
+
+**Disconnect hook.** Pass `on_disconnect` when presence or cleanup must run when
+a client drops the SSE connection. The callback receives `(scope, connection)` —
+the same `ConnectionInfo` passed to `reactive_stream(..., connection=...)`. Typical
+use: emit a presence-only `ChangeEvent` so remaining tabs refresh their viewer
+count.
 
 :::{changed} 0.8
 `context_builder` may now accept one argument — the `frozenset[str]` of changed paths — for selective context assembly. The zero-argument form still works.
@@ -310,7 +320,7 @@ Pass `on_drop=callback` to `ReactiveBus(...)` for a custom hook on each drop (`(
 :::{/dropdown}
 
 ::::{dropdown} Validating the index with app.check()
-`app.check()` (and the `chirp check` CLI) validates the reactive system at startup. The checks run only when you register the index as contract data:
+`app.check()` (and the `chirp check` CLI) validates the reactive system at startup. The checks run only when you register contract data:
 
 ```python
 app.set_contract_check_data("reactive_index", index)
@@ -320,6 +330,28 @@ app.set_contract_check_data("reactive_connection_scopes", {"board"})
 # Add only when you emit ChangeEvent(..., audience=...).
 app.set_contract_check_data("reactive_audience_scopes", {"board"})
 ```
+
+Contract metadata keys:
+
+:::{list-table}
+:header-rows: 1
+
+* - Key
+  - Required when
+  - What it validates
+* - `reactive_index`
+  - Always (for reactive apps)
+  - Every `BlockRef` points at a real template block; derivation graph has no cycles
+* - `reactive_emitted_paths`
+  - You emit `ChangeEvent(changed_paths=...)`
+  - Every emitted path is registered in the index
+* - `reactive_connection_scopes`
+  - You pass `connection=ConnectionInfo(...)` to `reactive_stream()`
+  - Connection-aware streams exist for declared scopes
+* - `reactive_audience_scopes`
+  - You emit `ChangeEvent(audience=...)`
+  - Audience-filtered scopes have matching connection-aware streams
+:::
 
 Four categories fire:
 
