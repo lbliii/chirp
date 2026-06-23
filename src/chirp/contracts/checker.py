@@ -105,6 +105,7 @@ from .rules_suspense_defer import (
     check_suspense_undiscoverable,
 )
 from .rules_swap import check_swap_safety, check_view_transition_safety, collect_broad_targets
+from .rules_template_stream import check_template_stream_client_shape
 from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
 from .template_scan import (
@@ -644,6 +645,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         broad_targets = collect_broad_targets(template_sources)
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
+        result.issues.extend(check_template_stream_client_shape(template_sources, router))
         result.issues.extend(check_signal_bindings(template_sources, snapshot.signal_names))
         result.issues.extend(check_signal_scope(middleware_list, _session_signal_names(app)))
         result.issues.extend(check_signal_connect_budget(template_sources))

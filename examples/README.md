@@ -25,6 +25,14 @@ Branch off after tier 1 if you want to stream LLM tokens to the browser:
 | **Next** | [`standalone/ollama`](standalone/ollama/) | Real local LLM, `AgentRun`, `@app.tool()`, live tool-call activity over SSE |
 | **In a shell** | [`chirpui/llm_playground`](chirpui/llm_playground/) | The same streaming inside a ChirpUI app shell |
 
+Streaming good-first issues (#454 and similar) should also:
+
+- keep `app.check()` / `chirp check` free of ERROR-severity issues
+- pair `TemplateStream` with plain form POST (full page), not `hx-target` swaps
+- pair `EventStream` with `Fragment` scaffolding and parametric `sse-connect`
+- test htmx paths with `HX-Request` when forms use `hx-*`
+- add `@pytest.mark.issue(N)` acceptance coverage when closing an issue
+
 ## Which Bucket To Use
 
 Use `examples/standalone` when you want to learn or validate:

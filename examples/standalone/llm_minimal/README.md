@@ -18,8 +18,25 @@ Start here if you are AI-curious and want the 5-minute path.
 PYTHONPATH=src python examples/standalone/llm_minimal/app.py
 ```
 
-Open [http://localhost:8000](http://localhost:8000), submit a prompt, and watch
-the response stream in token by token.
+Open [http://localhost:8000](http://localhost:8000).
+
+- **TemplateStream** — submit the first form; the browser navigates to a full
+  page that streams the answer in one chunked HTML response.
+- **EventStream** — submit the second form; htmx swaps in an SSE panel that
+  streams one Fragment per token.
+
+## Transport × client shape
+
+Pick the transport first, then wire the client to match:
+
+| | **Full-page client** | **htmx swap client** |
+|---|---|---|
+| **Chunked HTTP (`TemplateStream`)** | plain `<form method="post">` | not supported — use `EventStream` or `Fragment` |
+| **SSE (`EventStream`)** | rare | `Fragment` scaffold + parametric `sse-connect` |
+
+This example shows both safe pairings side by side. Chirp's
+`template_stream_client_shape` contract warns if you htmx-swap a
+`TemplateStream` response into a div.
 
 ## TemplateStream vs EventStream — the choice this example makes
 
@@ -30,7 +47,7 @@ The same simulated stream is rendered two ways so you can compare:
 | **Template** | `{% async for token in stream %}` | a `{% block token %}` re-rendered per token |
 | **Transport** | one chunked HTML response body | Server-Sent Events |
 | **Work** | O(n) — one template render | O(n) — one small Fragment per token |
-| **Client** | plain form post, no JS needed | htmx `sse` extension swaps each Fragment |
+| **Client** | plain form POST → full page | htmx POST → `Fragment` panel → SSE |
 | **Reach for it when** | a single request streams one growing answer | you fan out to multiple targets, reconnect, or push tool/status events too |
 
 **This example recommends `TemplateStream` as the default for a single chat
@@ -76,3 +93,6 @@ Tests use the simulated stream, so no server, model, or API key is required:
 ```bash
 pytest examples/standalone/llm_minimal/ -q
 ```
+
+Good-first issue acceptance (`@pytest.mark.issue(454)`) covers both streaming
+paths without Ollama.

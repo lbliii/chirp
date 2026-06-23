@@ -16,7 +16,7 @@
     h1 { font-size: 1.25rem; margin-bottom: 0.25rem; color: #f8fafc; }
     .hint { font-size: 0.8rem; color: #64748b; margin-bottom: 1.25rem; }
     h2 { font-size: 0.95rem; margin: 1.5rem 0 0.5rem; color: #cbd5e1; }
-    form { display: flex; gap: 0.5rem; }
+    form { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
     input {
       flex: 1; padding: 0.5rem 0.75rem;
       background: #1e293b; border: 1px solid #334155;
@@ -37,16 +37,21 @@
   <h1>LLM Minimal</h1>
   <p class="hint">Streaming tokens — simulated by default, no Ollama required.</p>
 
-  <h2>TemplateStream (chunked HTML body)</h2>
-  <form action="/ask" method="post" hx-post="/ask" hx-target="#answer" hx-swap="innerHTML">
+  <h2>TemplateStream (full-page chunked HTML)</h2>
+  <p class="hint">Plain form POST — navigates to a streaming response page (no htmx swap).</p>
+  <form action="/ask" method="post">
     <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
     <button type="submit">Stream</button>
   </form>
-  <div id="answer" class="response"></div>
 
   <h2>EventStream (SSE, one Fragment per token)</h2>
-  <div hx-ext="sse" sse-connect="/stream" sse-close="close" style="display: contents">
-    <div class="response" sse-swap="message" hx-swap="beforeend"></div>
+  <p class="hint">htmx POST returns a panel that connects to SSE with your prompt.</p>
+  <form hx-post="/stream/start" hx-target="#sse-section" hx-swap="innerHTML" method="post">
+    <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
+    <button type="submit">Stream SSE</button>
+  </form>
+  <div id="sse-section" class="response">
+    <p class="hint">Submit to connect and stream tokens here.</p>
   </div>
 </body>
 </html>

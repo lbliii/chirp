@@ -1,0 +1,7 @@
+{# Swap payload for POST /stream/start — SSE panel with parametric connect URL. #}
+{% block sse_panel %}
+<div hx-ext="sse" sse-connect="{{ stream_url }}" sse-close="close" hx-disinherit="hx-target hx-swap" style="display: contents">
+  <p class="prompt">Prompt: {{ prompt }}</p>
+  <div class="response" sse-swap="message" hx-target="this" hx-swap="innerHTML"></div>
+</div>
+{% endblock %}
