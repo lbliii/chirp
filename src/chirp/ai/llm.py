@@ -25,6 +25,7 @@ from chirp.ai._providers import (
 )
 from chirp.ai._structured import dataclass_to_schema, parse_structured
 from chirp.ai.errors import AIError
+from chirp.telemetry import _SpanScope, trace_span
 
 
 class LLM:
@@ -118,9 +119,14 @@ class LLM:
         if isinstance(prompt_or_cls, str):
             # Text mode
             messages = [{"role": "user", "content": prompt_or_cls}]
-            return await self._generate_raw(
-                messages, system=system, max_tokens=max_t, temperature=temp
-            )
+            with trace_span(
+                "llm.generate",
+                provider=self._config.provider,
+                model=self._config.model,
+            ):
+                return await self._generate_raw(
+                    messages, system=system, max_tokens=max_t, temperature=temp
+                )
 
         # Structured mode
         cls = prompt_or_cls
@@ -142,7 +148,15 @@ class LLM:
             f"Return ONLY the JSON object, no other text."
         )
         messages = [{"role": "user", "content": structured_prompt}]
-        text = await self._generate_raw(messages, system=system, max_tokens=max_t, temperature=temp)
+        with trace_span(
+            "llm.generate",
+            provider=self._config.provider,
+            model=self._config.model,
+            mode="structured",
+        ):
+            text = await self._generate_raw(
+                messages, system=system, max_tokens=max_t, temperature=temp
+            )
         return parse_structured(cls, text)
 
     # -- Stream (incremental response) --
@@ -187,10 +201,25 @@ class LLM:
                 raise AIError(msg)
             messages = [{"role": "user", "content": prompt}]
 
-        async for token in self._stream_raw(
-            messages, system=system, max_tokens=max_t, temperature=temp
-        ):
-            yield token
+        scope = _SpanScope.start(
+            "llm.stream",
+            provider=self._config.provider,
+            model=self._config.model,
+        )
+        token_count = 0
+        try:
+            async for token in self._stream_raw(
+                messages, system=system, max_tokens=max_t, temperature=temp
+            ):
+                token_count += 1
+                yield token
+        except BaseException as exc:
+            if scope is not None:
+                scope.close(error=exc, tokens_out=token_count or None)
+            raise
+        else:
+            if scope is not None:
+                scope.close(tokens_out=token_count or None)
 
     # -- Internal dispatch --
 

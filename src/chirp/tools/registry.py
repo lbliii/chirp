@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
+from chirp.telemetry import trace_span
 from chirp.tools.events import ToolCallEvent, ToolEventBus
 from chirp.tools.schema import function_to_schema
 
@@ -86,21 +87,25 @@ class ToolRegistry:
             msg = f"Tool not found: {name!r}"
             raise KeyError(msg)
 
-        # Call the handler with matched arguments
-        result = tool.handler(**arguments)
-        if inspect.isawaitable(result):
-            result = await result
+        with trace_span("tool.call", tool_name=name) as span:
+            try:
+                result = tool.handler(**arguments)
+                if inspect.isawaitable(result):
+                    result = await result
+            except BaseException as exc:
+                if span is not None:
+                    span.set_attribute("error", type(exc).__name__)
+                raise
 
-        # Emit event for dashboard subscribers
-        event = ToolCallEvent(
-            tool_name=name,
-            arguments=arguments,
-            result=result,
-            timestamp=time.time(),
-        )
-        await self._event_bus.emit(event)
+            event = ToolCallEvent(
+                tool_name=name,
+                arguments=arguments,
+                result=result,
+                timestamp=time.time(),
+            )
+            await self._event_bus.emit(event)
 
-        return result
+            return result
 
     def get(self, name: str) -> ToolDef | None:
         """Look up a tool by name. Returns ``None`` if not found."""

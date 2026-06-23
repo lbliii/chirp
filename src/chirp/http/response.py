@@ -4,6 +4,7 @@ Each transformation returns a new Response. Immutable by convention,
 built incrementally by design.
 """
 
+import contextvars
 import json as json_module
 import mimetypes
 from collections.abc import AsyncIterator, Iterator, Mapping
@@ -638,6 +639,10 @@ class SSEResponse:
     csrf_token: str | None = None
     csrf_field_name: str | None = None
     g_snapshot: dict[str, Any] | None = None
+    #: :func:`contextvars.copy_context` snapshot from negotiation time so the SSE
+    #: producer task inherits OTel span context after the handler ``finally``
+    #: resets request-scoped ContextVars.
+    runtime_context: contextvars.Context | None = None
     _noop_warned: bool = False
 
     def _warn_noop(self, method: str) -> None:

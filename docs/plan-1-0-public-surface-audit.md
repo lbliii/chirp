@@ -58,7 +58,7 @@ These provisional areas need explicit 1.0 decisions:
 | HTMX details | Consider stabilizing `HtmxDetails`; keep `STOP_POLLING` provisional unless the SSE/polling contract is fully documented. |
 | Reactive pages | Keep provisional until free-threading stress coverage and user-facing examples settle. |
 | Shell actions | Keep provisional unless the ChirpUI app-shell contract is declared stable in both repos. |
-| Tools | Keep provisional; the MCP/tool surface is young and should not block 1.0 for core hypermedia. |
+| Tools | **Stabilized (2026-06-22)** — Phase 1 (#421/#430): registry, MCP server, event bus, OTel spans, and tests meet the stable bar. |
 | Cache helpers | Keep provisional until backend behavior, cache key semantics, and streaming bypass behavior are documented as public contracts. |
 | Optional UI bridge | Keep provisional because it depends on `chirp-ui` compatibility and manifest behavior outside this package. |
 | Render planning / composition / navigation swaps | Keep debug/advanced, not stable. These are diagnostics and framework tooling surfaces. |

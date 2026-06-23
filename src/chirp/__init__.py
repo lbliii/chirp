@@ -23,7 +23,7 @@ Data access (``pip install chirp[data]``)::
 
 AI streaming (``pip install chirp[ai]``)::
 
-    from chirp.ai import LLM
+    from chirp import LLM
     llm = LLM("anthropic:claude-sonnet-4-20250514")
     async for token in llm.stream("Explain:"):
         ...
@@ -117,6 +117,16 @@ _API_STATUS: dict[str, str] = {
     "AuthConfig": "stable",
     "current_user": "stable",
     "MarkdownRenderer": "stable",
+    # Stable AI + tools (Phase 1 trustworthy surface — #421/#430)
+    "AIError": "stable",
+    "LLM": "stable",
+    "ProviderError": "stable",
+    "ProviderNotInstalledError": "stable",
+    "StructuredOutputError": "stable",
+    "ToolCallEvent": "stable",
+    "ToolDef": "stable",
+    "ToolEventBus": "stable",
+    "ToolRegistry": "stable",
     # Provisional extension surfaces
     "CHIRP_CAPABILITIES": "provisional",
     "CHIRP_DEFER_PENDING_KEY": "provisional",
@@ -143,10 +153,6 @@ _API_STATUS: dict[str, str] = {
     "ShellActions": "provisional",
     "ShellMenuItem": "provisional",
     "ShellSubmitSurface": "provisional",
-    "ToolCallEvent": "provisional",
-    "ToolDef": "provisional",
-    "ToolEventBus": "provisional",
-    "ToolRegistry": "provisional",
     "cache_view": "provisional",
     "get_cache": "provisional",
     "reactive_stream": "provisional",
@@ -169,6 +175,7 @@ __all__ = [
     "OOB",
     "STOP_POLLING",
     "Action",
+    "AIError",
     "AnyResponse",
     "App",
     "AppConfig",
@@ -195,6 +202,7 @@ __all__ = [
     "HtmxDetails",
     "InlineTemplate",
     "JSONResponse",
+    "LLM",
     "MarkdownRenderer",
     "MethodNotAllowed",
     "Middleware",
@@ -204,6 +212,8 @@ __all__ = [
     "Page",
     "PageComposition",
     "PayloadTooLarge",
+    "ProviderError",
+    "ProviderNotInstalledError",
     "ReactiveBus",
     "Redirect",
     "RegionUpdate",
@@ -224,6 +234,7 @@ __all__ = [
     "ShellSubmitSurface",
     "SignalEmit",
     "Stream",
+    "StructuredOutputError",
     "Suspense",
     "SwapResolution",
     "Template",
@@ -358,6 +369,12 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Render introspection
     "RenderPlan": ("chirp.templating.render_plan", "RenderPlan"),
     "get_render_plan": ("chirp.server.debug.render_plan_snapshot", "get_render_plan"),
+    # AI (requires ``pip install chirp[ai]`` for LLM HTTP calls)
+    "AIError": ("chirp.ai.errors", "AIError"),
+    "LLM": ("chirp.ai.llm", "LLM"),
+    "ProviderError": ("chirp.ai.errors", "ProviderError"),
+    "ProviderNotInstalledError": ("chirp.ai.errors", "ProviderNotInstalledError"),
+    "StructuredOutputError": ("chirp.ai.errors", "StructuredOutputError"),
     # Tools
     "ToolCallEvent": ("chirp.tools.events", "ToolCallEvent"),
     "ToolDef": ("chirp.tools.registry", "ToolDef"),

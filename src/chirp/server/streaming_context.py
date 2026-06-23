@@ -17,6 +17,7 @@ surface.
 
 from __future__ import annotations
 
+import contextvars
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
@@ -45,6 +46,9 @@ class _CapturedRequestContext:
         request_context: The current :class:`~chirp.http.request.Request`, or
             ``None``.
         csp_nonce: The live CSP nonce, or ``None`` when CSP nonces are disabled.
+        runtime_context: A :func:`contextvars.copy_context` snapshot taken while
+            middleware and OTel spans are still live, re-attached when the SSE
+            producer task starts so trace context survives the handler ``finally``.
     """
 
     auth_user: Any | None = None
@@ -53,6 +57,7 @@ class _CapturedRequestContext:
     g_snapshot: dict[str, Any] | None = None
     request_context: Request | None = None
     csp_nonce: str | None = None
+    runtime_context: contextvars.Context | None = None
 
 
 def capture_streaming_render_context(
@@ -91,6 +96,12 @@ def capture_streaming_render_context(
 
     g_snapshot = g.snapshot()
 
+    from chirp._internal.invoke import take_handler_runtime_context
+
+    runtime_context = take_handler_runtime_context()
+    if runtime_context is None:
+        runtime_context = contextvars.copy_context()
+
     return _CapturedRequestContext(
         auth_user=auth_user,
         csrf_token=csrf_token,
@@ -98,6 +109,7 @@ def capture_streaming_render_context(
         g_snapshot=g_snapshot,
         request_context=request_context,
         csp_nonce=csp_nonce,
+        runtime_context=runtime_context,
     )
 
 

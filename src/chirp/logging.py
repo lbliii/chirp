@@ -41,12 +41,11 @@ def _current_trace_context() -> tuple[str, str] | None:
     are unchanged otherwise. Returns ``None`` when opentelemetry is absent, no
     span is active, or the span context is invalid (the no-op default span).
 
-    **SSE blind spot:** the SSE drain (:mod:`chirp.realtime.sse`) re-establishes
-    request context from a captured snapshot and does **not** ``copy_context``,
-    so the OTel span ContextVar does not survive that boundary — logs emitted
-    from inside an ``EventStream`` generator carry no trace context even when one
-    was active at connect time. Buffered responses and the ``Suspense`` / ``Stream``
-    drains (which *do* ``copy_context``) keep the span for free.
+    **SSE note:** the SSE drain re-establishes request context from a captured
+    snapshot and starts the producer inside a :func:`contextvars.copy_context`
+    snapshot so OTel span context survives into ``EventStream`` generators.
+    Buffered responses and the ``Suspense`` / ``Stream`` drains (which *do*
+    ``copy_context`` on worker threads) keep the span for free.
     """
     try:
         from opentelemetry import trace
@@ -83,8 +82,9 @@ def structured_log(
     bound from :func:`opentelemetry.trace.get_current_span` so logs join the
     trace pillar. The lookup is fully guarded — no opentelemetry dependency, no
     failure surface. See :func:`_current_trace_context` for the SSE blind spot:
-    trace context survives buffered, ``Suspense``, and ``Stream`` renders but
-    **not** logs emitted from inside an SSE ``EventStream`` generator.
+    trace context survives buffered, ``Suspense``, and ``Stream`` renders and
+    **SSE ``EventStream`` generators** (via a connect-time ``copy_context``
+    snapshot). See :func:`_current_trace_context` for historical context.
     """
     rid = request_id or get_request_id()
     payload: dict[str, Any] = {"message": message, **extra}

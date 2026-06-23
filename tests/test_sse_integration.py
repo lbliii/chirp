@@ -730,6 +730,109 @@ class TestFormatErrorEvent:
 
 
 # ---------------------------------------------------------------------------
+# OTel / ContextVar propagation (#429)
+# ---------------------------------------------------------------------------
+
+
+class TestSSETraceContext:
+    """EventStream generators must inherit connect-time contextvars."""
+
+    @pytest.mark.issue(429)
+    async def test_eventstream_generator_inherits_captured_context(self) -> None:
+        import contextvars
+
+        probe: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+            "sse_probe",
+            default=None,
+        )
+        seen: list[str | None] = []
+
+        app = App()
+
+        @app.route("/events")
+        def events():
+            probe.set("connected")
+
+            async def gen():
+                seen.append(probe.get())
+                yield "payload"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert result.events[0].data == "payload"
+        assert seen == ["connected"]
+
+    @pytest.mark.issue(429)
+    async def test_eventstream_generator_sees_otel_span(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: OTel span context captured at connect time reaches the generator."""
+        import contextvars
+        import sys
+        import types
+
+        from chirp.logging import _current_trace_context
+
+        fake_trace_id = 0x0AF7651916CD43DD8448EB211C80319C
+        fake_span_id = 0xB7AD6B7169203331
+        trace_id_hex = "0af7651916cd43dd8448eb211c80319c"
+        span_id_hex = "b7ad6b7169203331"
+
+        class _SpanContext:
+            trace_id = fake_trace_id
+            span_id = fake_span_id
+            is_valid = True
+
+        class _Span:
+            def get_span_context(self) -> _SpanContext:
+                return _SpanContext()
+
+        class _InvalidSpanContext:
+            is_valid = False
+
+        class _NoopSpan:
+            def get_span_context(self) -> _InvalidSpanContext:
+                return _InvalidSpanContext()
+
+        active_span: contextvars.ContextVar[_Span | None] = contextvars.ContextVar(
+            "fake_otel_active_span",
+            default=None,
+        )
+
+        trace_mod = types.ModuleType("opentelemetry.trace")
+        trace_mod.get_current_span = lambda: active_span.get() or _NoopSpan()  # type: ignore[attr-defined]
+        trace_mod.format_trace_id = lambda tid: format(tid, "032x")  # type: ignore[attr-defined]
+        trace_mod.format_span_id = lambda sid: format(sid, "016x")  # type: ignore[attr-defined]
+
+        otel_pkg = types.ModuleType("opentelemetry")
+        otel_pkg.trace = trace_mod  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "opentelemetry", otel_pkg)
+        monkeypatch.setitem(sys.modules, "opentelemetry.trace", trace_mod)
+
+        seen: list[tuple[str, str] | None] = []
+        app = App()
+
+        @app.route("/events")
+        def events():
+            active_span.set(_Span())
+
+            async def gen():
+                seen.append(_current_trace_context())
+                yield "payload"
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        assert result.events[0].data == "payload"
+        assert seen == [(trace_id_hex, span_id_hex)]
+
+
+# ---------------------------------------------------------------------------
 # CORS posture (#146): SSE defaults to same-origin, never a hardcoded `*`
 # ---------------------------------------------------------------------------
 

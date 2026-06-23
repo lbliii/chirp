@@ -365,7 +365,15 @@ async def handle_sse(
                 request_var.reset(request_token)
 
     # Run producer and disconnect monitor concurrently
-    producer_task = asyncio.create_task(produce_events())
+    runtime_context = captured_context.runtime_context if captured_context else None
+
+    def _start_producer_task() -> asyncio.Task[None]:
+        return asyncio.create_task(produce_events())
+
+    if runtime_context is not None:
+        producer_task = runtime_context.run(_start_producer_task)
+    else:
+        producer_task = asyncio.create_task(produce_events())
     monitor_task = asyncio.create_task(monitor_disconnect())
 
     try:
