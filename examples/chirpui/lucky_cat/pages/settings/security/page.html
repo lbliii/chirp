@@ -126,45 +126,6 @@
     <button type="submit" class="chirpui-btn chirpui-btn--primary">Save security settings</button>
     {% end %}
   </form>
-  <script nonce="{{ csp_nonce() }}">
-  (function () {
-    var btn = document.getElementById('passkey-register');
-    var err = document.getElementById('passkey-register-error');
-    if (!btn || !window.chirp || !window.chirp.passkeys) {
-      if (btn) btn.hidden = true;
-      return;
-    }
-    btn.addEventListener('click', async function () {
-      err.hidden = true;
-      var csrf = document.querySelector('meta[name="csrf-token"]')?.content
-        || document.querySelector('input[name="_csrf_token"]')?.value;
-      try {
-        var begin = await fetch('/auth/passkey/register/begin', {
-          method: 'POST',
-          headers: csrf ? {'X-CSRF-Token': csrf} : {},
-        });
-        if (!begin.ok) throw new Error('Could not start passkey enrollment.');
-        var opts = await begin.json();
-        var credential = await window.chirp.passkeys.register(opts);
-        var finish = await fetch('/auth/passkey/register/finish', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrf ? {'X-CSRF-Token': csrf} : {}),
-          },
-          body: JSON.stringify(credential),
-        });
-        var result = await finish.json();
-        if (!finish.ok || !result.ok) throw new Error(result.error || 'Enrollment failed.');
-        window.location = result.redirect || '/settings/security';
-      } catch (e) {
-        if (e && e.passkeyReason === 'cancelled') return;
-        err.textContent = (e && e.message) || 'Enrollment failed.';
-        err.hidden = false;
-      }
-    });
-  })();
-  </script>
 </div>
 {% end %}
 {% end %}
