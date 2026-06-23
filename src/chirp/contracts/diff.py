@@ -71,8 +71,7 @@ class ContractDiff:
                 lines.append("")
         if self.added_errors:
             lines.append(
-                f"> **{len(self.added_errors)} new contract error(s).** "
-                "Review before merge."
+                f"> **{len(self.added_errors)} new contract error(s).** Review before merge."
             )
         elif self.added_warnings:
             lines.append(f"> {len(self.added_warnings)} new contract warning(s).")
