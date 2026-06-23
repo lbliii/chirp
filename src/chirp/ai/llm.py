@@ -297,9 +297,7 @@ class LLM:
         temp = temperature if temperature is not None else self._default_temperature
 
         if isinstance(prompt_or_messages, str):
-            messages: list[dict[str, Any]] = [
-                {"role": "user", "content": prompt_or_messages}
-            ]
+            messages: list[dict[str, Any]] = [{"role": "user", "content": prompt_or_messages}]
         else:
             messages = list(prompt_or_messages)
 

@@ -27,7 +27,7 @@ from typing import Any
 import httpx
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
-from chirp.ai import AgentRun, InMemoryConversationStore, LLM
+from chirp.ai import LLM, AgentRun, InMemoryConversationStore
 from chirp.ai.errors import AIError, ProviderError
 from chirp.ai.events import StreamEvent, StreamToolCallEvent, TokenEvent
 from chirp.markdown import register_markdown_filter
@@ -100,14 +100,18 @@ def _get_agent() -> AgentRun:
     return _agent
 
 
-async def _agent_events(*, append_user: bool = False, user_message: str = "") -> AsyncIterator[StreamEvent]:
+async def _agent_events(
+    *, append_user: bool = False, user_message: str = ""
+) -> AsyncIterator[StreamEvent]:
     """Yield AgentRun stream events — patch point for tests."""
     agent = _get_agent()
     async for event in agent.stream(user_message, append_user=append_user):
         yield event
 
 
-async def _collect_agent_reply(*, append_user: bool = False, user_message: str = "") -> tuple[str, list[str]]:
+async def _collect_agent_reply(
+    *, append_user: bool = False, user_message: str = ""
+) -> tuple[str, list[str]]:
     """Run the agent loop and return (assistant_text, tool_names)."""
     tools_called: list[str] = []
     parts: list[str] = []

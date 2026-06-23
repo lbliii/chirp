@@ -79,7 +79,7 @@ def _install_llm_mock(
         body = json.loads(request.content)
         if body.get("stream"):
             lines = [
-                f'data: {json.dumps({"choices": [{"delta": {"content": token}}]})}'
+                f"data: {json.dumps({'choices': [{'delta': {'content': token}}]})}"
                 for token in tokens
             ]
             lines.append("data: [DONE]")
@@ -295,6 +295,7 @@ class TestMCPTools:
 # -------------------------------------------------------------------------
 
 
+@pytest.mark.issue(438)
 class TestChatNonStreaming:
     """Test the non-streaming chat path (stream toggle OFF).
 
@@ -360,9 +361,7 @@ class TestChatNonStreaming:
             assert "12:00 UTC" in response.text
             assert state["n"] == 2
 
-    async def test_chat_with_calculate_tool(
-        self, example_app, example_module, monkeypatch
-    ) -> None:
+    async def test_chat_with_calculate_tool(self, example_app, example_module, monkeypatch) -> None:
         state = _install_llm_mock(
             monkeypatch,
             completes=[

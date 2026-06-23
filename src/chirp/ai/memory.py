@@ -45,14 +45,14 @@ class SessionConversationStore:
         self._session_key = session_key
 
     async def load(self, key: str) -> list[Message]:
-        from chirp.middleware.session import get_session
+        from chirp.middleware.sessions import get_session
 
         session = get_session()
         threads = session.get(self._session_key) or {}
         return list(threads.get(key, []))
 
     async def append(self, key: str, message: Message) -> None:
-        from chirp.middleware.session import get_session
+        from chirp.middleware.sessions import get_session
 
         session = get_session()
         threads = dict(session.get(self._session_key) or {})
@@ -62,7 +62,7 @@ class SessionConversationStore:
         session[self._session_key] = threads
 
     async def clear(self, key: str) -> None:
-        from chirp.middleware.session import get_session
+        from chirp.middleware.sessions import get_session
 
         session = get_session()
         threads = dict(session.get(self._session_key) or {})

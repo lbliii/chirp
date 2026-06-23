@@ -12,7 +12,7 @@ pytest.importorskip("httpx")
 
 from chirp.ai.agent import AgentRun
 from chirp.ai.llm import LLM
-from chirp.ai.memory import InMemoryConversationStore
+from chirp.ai.memory import InMemoryConversationStore, SessionConversationStore
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolDef, ToolRegistry
 
@@ -121,6 +121,36 @@ class TestCompleteWithTools:
             tools=registry,
         )
         assert completion.tool_calls[0]["name"] == "echo"
+
+
+@pytest.mark.issue(435)
+class TestConversationStore:
+    @pytest.mark.asyncio
+    async def test_in_memory_load_append_clear(self) -> None:
+        store = InMemoryConversationStore()
+        assert await store.load("thread-a") == []
+        await store.append("thread-a", {"role": "user", "content": "hi"})
+        await store.append("thread-a", {"role": "assistant", "content": "hello"})
+        messages = await store.load("thread-a")
+        assert len(messages) == 2
+        assert messages[0]["content"] == "hi"
+        await store.clear("thread-a")
+        assert await store.load("thread-a") == []
+
+    @pytest.mark.asyncio
+    async def test_session_store_persists_in_request_session(self) -> None:
+        from chirp.middleware import sessions
+
+        session: dict[str, object] = {}
+        token = sessions._session_var.set(session)
+        try:
+            store = SessionConversationStore()
+            await store.append("t1", {"role": "user", "content": "remember"})
+            assert await store.load("t1") == [{"role": "user", "content": "remember"}]
+            await store.clear("t1")
+            assert await store.load("t1") == []
+        finally:
+            sessions._session_var.reset(token)
 
 
 @pytest.mark.issue(431)
