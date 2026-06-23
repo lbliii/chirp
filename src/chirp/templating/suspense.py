@@ -42,6 +42,7 @@ import anyio
 import anyio.to_thread
 from kida import Environment
 
+from chirp.realtime.signal_globals import reset_referenced, restore_referenced
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.templating.returns import Suspense
 
@@ -452,11 +453,24 @@ async def render_suspense(
             )
         )
 
+    async def _render_page_and_wrap(
+        render_page: Callable[[], str], wrap_ctx: dict[str, Any]
+    ) -> str:
+        """Render the page body, wrap layouts, and finalize signal_connect."""
+        ref_token = reset_referenced()
+        try:
+            page_html = await _render_off_loop(render_page)
+            return await _wrap_shell(page_html, wrap_ctx)
+        finally:
+            restore_referenced(ref_token)
+
     # Fast path: no awaitables — render full page in one shot
     if not pending:
         sync_ctx = {**sync_ctx, CHIRP_DEFER_PENDING_KEY: frozenset()}
-        page_html = await _render_off_loop(lambda: template.render(sync_ctx))
-        yield await _wrap_shell(page_html, {**layout_ctx, **sync_ctx})
+        yield await _render_page_and_wrap(
+            lambda: template.render(sync_ctx),
+            {**layout_ctx, **sync_ctx},
+        )
         return
 
     # -- Phase 2: Render shell with DEFERRED sentinel for deferred keys --
@@ -465,8 +479,10 @@ async def render_suspense(
         **dict.fromkeys(pending, DEFERRED),
         CHIRP_DEFER_PENDING_KEY: frozenset(pending),
     }
-    page_html = await _render_off_loop(lambda: template.render(shell_ctx))
-    yield await _wrap_shell(page_html, {**layout_ctx, **shell_ctx})
+    yield await _render_page_and_wrap(
+        lambda: template.render(shell_ctx),
+        {**layout_ctx, **shell_ctx},
+    )
 
     # -- Phase 3: Resolve awaitables concurrently, isolating per-key failures --
     # Each task swallows its OWN exception into ``errors`` so one failing data
