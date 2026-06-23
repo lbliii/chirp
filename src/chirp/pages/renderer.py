@@ -11,11 +11,6 @@ from typing import TYPE_CHECKING, Any
 from kida import Environment
 
 from chirp.pages.types import LayoutChain
-from chirp.realtime.signal_globals import (
-    apply_signal_connect,
-    bind_signal_render_path,
-    restore_signal_render_path,
-)
 
 if TYPE_CHECKING:
     from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -99,6 +94,12 @@ def render_with_layouts(
 
     # Render inside-out: start with page HTML, wrap with each layout
     # Innermost layout first (last in the list), then outward
+    from chirp.realtime.signal_globals import (
+        apply_signal_connect,
+        bind_signal_render_path,
+        restore_signal_render_path,
+    )
+
     path = str(context.get("current_path") or "")
     path_token = bind_signal_render_path(path)
     try:
