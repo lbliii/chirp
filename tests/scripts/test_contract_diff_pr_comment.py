@@ -12,12 +12,13 @@ import pytest
 from chirp.contracts.diff import ContractDiff
 
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "contract_diff_pr_comment.py"
-_spec = importlib.util.spec_from_file_location("contract_diff_pr_comment", _SCRIPT)
-assert _spec is not None and _spec.loader is not None
-_mod = importlib.util.module_from_spec(_spec)
-sys.modules["contract_diff_pr_comment"] = _mod
-_spec.loader.exec_module(_mod)
-main = _mod.main
+_SPEC = importlib.util.spec_from_file_location("contract_diff_pr_comment", _SCRIPT)
+assert _SPEC is not None
+assert _SPEC.loader is not None
+_MOD = importlib.util.module_from_spec(_SPEC)
+sys.modules["contract_diff_pr_comment"] = _MOD
+_SPEC.loader.exec_module(_MOD)
+main = _MOD.main
 
 
 @pytest.mark.issue(344)
