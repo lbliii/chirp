@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h1>Login</h1>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+<form method="post" action="/login">
+  {{ csrf_field() }}
+  {{ csrf_field() }}
+  <label for="username">Username</label>
+  <input type="text" id="username" name="username" required autocomplete="username">
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" required autocomplete="current-password">
+  <button type="submit">Sign in with password</button>
+</form>
+<button type="button" id="passkey-login" class="secondary">Sign in with passkey</button>
+<p id="passkey-error" class="error" hidden></p>
+<p><small>Hint: admin / password — or enroll a passkey after signing in.</small></p>
+<script>
+(function () {
+  var btn = document.getElementById('passkey-login');
+  var err = document.getElementById('passkey-error');
+  if (!btn || !window.chirp || !window.chirp.passkeys) return;
+  btn.addEventListener('click', async function () {
+    err.hidden = true;
+    var csrf = document.querySelector('meta[name="csrf-token"]')?.content
+      || document.querySelector('input[name="_csrf_token"]')?.value;
+    try {
+      var begin = await fetch('/auth/passkey/login/begin', {
+        method: 'POST',
+        headers: csrf ? {'X-CSRF-Token': csrf} : {},
+      });
+      if (!begin.ok) throw new Error('Could not start passkey sign-in.');
+      var opts = await begin.json();
+      var credential = await window.chirp.passkeys.authenticate(opts);
+      var finish = await fetch('/auth/passkey/login/finish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrf ? {'X-CSRF-Token': csrf} : {}),
+        },
+        body: JSON.stringify(Object.assign({}, credential, {next: '/dashboard'})),
+      });
+      var result = await finish.json();
+      if (!finish.ok || !result.ok) throw new Error(result.error || 'Passkey sign-in failed.');
+      window.location = result.redirect || '/dashboard';
+    } catch (e) {
+      if (e && e.passkeyReason === 'cancelled') return;
+      err.textContent = (e && e.message) || 'Passkey sign-in failed.';
+      err.hidden = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

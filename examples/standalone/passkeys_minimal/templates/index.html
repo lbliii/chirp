@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h1>Passkeys Minimal</h1>
+<p>A clone-and-run reference for password auth + WebAuthn ceremonies.</p>
+{% set user = current_user() %}
+{% if user.is_authenticated %}
+  <p>Signed in as <strong>{{ user.name }}</strong>.</p>
+{% else %}
+  <p><a href="/login">Sign in</a> with a password or a passkey.</p>
+{% end %}
+{% endblock %}

@@ -23,6 +23,7 @@ _SIBLING_MODULES = (
     "notifications",
     "watchlist",
     "users",
+    "passkey_store",
 )
 
 

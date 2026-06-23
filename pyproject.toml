@@ -256,6 +256,7 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: integration tests requiring full app setup",
+    "passkeys_e2e: browser e2e with virtual WebAuthn authenticator (opt-in)",
     "issue: associate a test with the GitHub issue(s) whose acceptance criteria it proves, e.g. @pytest.mark.issue(143) (see docs/backlog-automation.md)",
 ]
 
@@ -317,6 +318,7 @@ dev = [
 ]
 browser = [
     "playwright>=1.49.0",       # Lucky Cat browser smoke — install with: uv sync --group dev --group browser
+    "webauthn>=2.8,<3",         # Lucky Cat passkeys showcase (browser-smoke boots the full app)
 ]
 
 # =============================================================================

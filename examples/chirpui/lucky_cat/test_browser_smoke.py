@@ -142,7 +142,7 @@ def base_url() -> Iterator[str]:
         "import app as _a; "
         f"_a.app.run(host='127.0.0.1', port={port})"
     )
-    cmd = ["uv", "run", "python", "-c", runner]
+    cmd = ["uv", "run", "--extra", "passkeys", "python", "-c", runner]
     # S603: fixed argv (the runner is a constant; port is an OS-assigned int) and
     # `uv` is the mandated launcher (bare PYTHONPATH=src python ships stale kida).
     proc = subprocess.Popen(  # noqa: S603

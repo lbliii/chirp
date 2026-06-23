@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p>Welcome, {{ user.name }}.</p>
+<p><a href="/passkeys">Manage passkeys</a></p>
+{% endblock %}
