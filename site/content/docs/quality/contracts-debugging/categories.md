@@ -89,6 +89,7 @@ app would fare in production without changing your config, use `chirp check
 | `template_privacy` | WARNING | Remove private literals or mark non-public template content appropriately. |
 | `i18n_missing_key` | WARNING | Add the `t("…")` key to the locale JSON catalog(s) under the i18n directory, or remove the `t()` call. |
 | `macro_css` | WARNING | Activate chirp-ui (`use_chirp_ui(app)`) or ship your own CSS for the core-macro classes (`chirp-dropdown`, `chirp-modal`, `field--error`, …) when neither is present. |
+| `chirpui_css_verify` | WARNING | Fix typoed or stale `chirpui-*` class tokens in literal `class=` attributes so they resolve to classes in the installed chirp-ui CSS. Only runs when chirp-ui is active. |
 
 ## HTMX And Swaps
 
