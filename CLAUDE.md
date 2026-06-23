@@ -406,3 +406,9 @@ Core: `kida-templates`, `anyio`, `bengal-pounce`. Everything else optional:
 - `chirp[forms]` — python-multipart for file uploads
 - `chirp[markdown]` — patitas for markdown rendering
 - `chirp[all]` — everything including httpx
+
+## GitHub Issues (agents)
+
+Do **not** implement issues labeled `good first issue` or titled `[GF] ...`.
+Those are reserved for external contributors. See root `AGENTS.md` § GitHub
+Issues. Epic #446 and children #447–#458 are all GF.

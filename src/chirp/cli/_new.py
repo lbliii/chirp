@@ -13,6 +13,10 @@ from pathlib import Path
 
 from chirp.cli.templates import (
     AGENTS_MD,
+    AI_APP_PY,
+    AI_CHAT_HTML,
+    AI_ENV_EXAMPLE,
+    AI_TEST_APP_PY,
     MIGRATIONS_README,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
@@ -99,6 +103,8 @@ def create_project(args: argparse.Namespace) -> None:
 
     if args.minimal:
         _create_minimal(project_dir, args.name)
+    elif getattr(args, "ai", False):
+        _create_ai(project_dir, args.name)
     elif getattr(args, "sse", False):
         _create_sse(project_dir, args.name)
     elif getattr(args, "shell", False):
@@ -202,6 +208,20 @@ def _create_minimal(project_dir: Path, name: str) -> None:
     (project_dir / "app.py").write_text(MINIMAL_APP_PY)
     (templates_dir / "index.html").write_text(MINIMAL_INDEX_HTML.format(name=name))
 
+    _write_scaffold_extras(project_dir, name)
+
+
+def _create_ai(project_dir: Path, name: str) -> None:
+    """Generate AI chat scaffold with tools and SSE activity."""
+    templates_dir = project_dir / "templates"
+    tests_dir = project_dir / "tests"
+    templates_dir.mkdir(parents=True)
+    tests_dir.mkdir(parents=True)
+
+    (project_dir / "app.py").write_text(AI_APP_PY)
+    (templates_dir / "chat.html").write_text(AI_CHAT_HTML)
+    (project_dir / ".env.example").write_text(AI_ENV_EXAMPLE)
+    (tests_dir / "test_app.py").write_text(AI_TEST_APP_PY.format(name=name))
     _write_scaffold_extras(project_dir, name)
 
 

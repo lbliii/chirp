@@ -1,10 +1,17 @@
 """Tests for the Ollama chat example.
 
-Mocks Ollama at the module level — no real Ollama needed to run tests.
+Mocks Ollama HTTP at the transport layer — no real Ollama needed to run tests.
 """
 
+from __future__ import annotations
+
 import json
+from collections.abc import Callable
 from typing import Any
+
+import pytest
+
+pytest.importorskip("httpx")
 
 from chirp.testing import TestClient
 
@@ -14,42 +21,80 @@ def _mcp(method: str, *, params: dict | None = None, rpc_id: int = 1) -> dict:
     return {"jsonrpc": "2.0", "method": method, "id": rpc_id, "params": params or {}}
 
 
-def _ollama_response(
+def _install_mock_transport(
+    monkeypatch: pytest.MonkeyPatch,
+    handler: Callable[..., Any],
+) -> None:
+    import httpx
+
+    transport = httpx.MockTransport(handler)
+    real_init = httpx.AsyncClient.__init__
+
+    def _patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
+        kwargs["transport"] = transport
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _patched_init)
+
+
+def _openai_complete(
     content: str = "",
     tool_calls: list[dict] | None = None,
 ) -> dict[str, Any]:
-    """Build a mock Ollama /api/chat response."""
-    msg: dict[str, Any] = {"role": "assistant", "content": content}
+    """Build a mock OpenAI-compatible /v1/chat/completions response."""
+    msg: dict[str, Any] = {"role": "assistant", "content": content or None}
     if tool_calls:
         msg["tool_calls"] = tool_calls
-    return {"model": "llama3.2", "message": msg, "done": True}
+    return {"choices": [{"message": msg}]}
 
 
 def _tool_call(name: str, **arguments: Any) -> dict[str, Any]:
-    """Build a single Ollama tool_call object."""
-    return {"function": {"name": name, "arguments": arguments}}
+    """Build a single OpenAI tool_call object."""
+    return {
+        "id": "call_1",
+        "type": "function",
+        "function": {
+            "name": name,
+            "arguments": json.dumps(arguments),
+        },
+    }
 
 
-def _fake_chat_from(*responses):
-    """Create a fake ollama_chat function from a sequence of responses."""
-    state = {"count": 0}
+def _install_llm_mock(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    completes: list[dict[str, Any]],
+    stream_tokens: list[str] | None = None,
+) -> dict[str, int]:
+    """Mock AgentRun LLM calls (complete rounds + final stream)."""
+    import httpx
 
-    async def fake_chat(client, *, model, messages, tools=None):
-        idx = min(state["count"], len(responses) - 1)
-        state["count"] += 1
-        return responses[idx]
+    state = {"n": 0}
+    tokens = stream_tokens or []
 
-    return fake_chat, state
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "llama3.2:3b"}]})
+
+        body = json.loads(request.content)
+        if body.get("stream"):
+            lines = [
+                f"data: {json.dumps({'choices': [{'delta': {'content': token}}]})}"
+                for token in tokens
+            ]
+            lines.append("data: [DONE]")
+            return httpx.Response(200, content="\n".join(lines).encode())
+
+        idx = min(state["n"], len(completes) - 1)
+        state["n"] += 1
+        return httpx.Response(200, json=completes[idx])
+
+    _install_mock_transport(monkeypatch, handler)
+    return state
 
 
-def _fake_stream(*tokens):
-    """Create a fake ollama_chat_stream that yields the given tokens."""
-
-    async def fake_stream_fn(client, *, model, messages):
-        for token in tokens:
-            yield token
-
-    return fake_stream_fn
+async def _seed_user(example_module: Any, text: str) -> None:
+    await example_module._store.append("default", {"role": "user", "content": text})
 
 
 # -------------------------------------------------------------------------
@@ -100,8 +145,15 @@ class TestRoutes:
             assert response.status == 200
             assert example_module._get_model() == "qwen3:8b"
 
-    async def test_index_falls_back_without_ollama(self, example_app) -> None:
+    async def test_index_falls_back_without_ollama(self, example_app, monkeypatch) -> None:
         """When Ollama is unreachable, the index still renders with a static badge."""
+        import httpx
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("offline", request=request)
+
+        _install_mock_transport(monkeypatch, handler)
+
         async with TestClient(example_app) as client:
             response = await client.get("/")
             assert response.status == 200
@@ -243,6 +295,7 @@ class TestMCPTools:
 # -------------------------------------------------------------------------
 
 
+@pytest.mark.issue(438)
 class TestChatNonStreaming:
     """Test the non-streaming chat path (stream toggle OFF).
 
@@ -265,18 +318,21 @@ class TestChatNonStreaming:
             assert "Hello" in response.text
             assert "/chat/complete" in response.text
 
-    async def test_chat_complete_returns_response(self, example_app, example_module) -> None:
-        fake_chat, state = _fake_chat_from(
-            _ollama_response(content="Hello! How can I help?"),
+    async def test_chat_complete_returns_response(
+        self, example_app, example_module, monkeypatch
+    ) -> None:
+        state = _install_llm_mock(
+            monkeypatch,
+            completes=[_openai_complete(content="")],
+            stream_tokens=["Hello! How can I help?"],
         )
-        example_module.ollama_chat = fake_chat
-        example_module._append_history("user", "Hello")
+        await _seed_user(example_module, "Hello")
 
         async with TestClient(example_app) as client:
             response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "Hello! How can I help?" in response.text
-            assert state["count"] == 1
+            assert state["n"] == 1
 
     async def test_chat_empty_message_ignored(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -288,54 +344,66 @@ class TestChatNonStreaming:
             )
             assert response.status == 200
 
-    async def test_chat_with_tool_call(self, example_app, example_module) -> None:
-        fake_chat, state = _fake_chat_from(
-            _ollama_response(tool_calls=[_tool_call("get_current_time")]),
-            _ollama_response(content="It is currently 12:00 UTC."),
+    async def test_chat_with_tool_call(self, example_app, example_module, monkeypatch) -> None:
+        state = _install_llm_mock(
+            monkeypatch,
+            completes=[
+                _openai_complete(tool_calls=[_tool_call("get_current_time")]),
+                _openai_complete(content=""),
+            ],
+            stream_tokens=["It is currently 12:00 UTC."],
         )
-        example_module.ollama_chat = fake_chat
-        example_module._append_history("user", "What time is it")
+        await _seed_user(example_module, "What time is it")
 
         async with TestClient(example_app) as client:
             response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "12:00 UTC" in response.text
-            assert state["count"] == 2
+            assert state["n"] == 2
 
-    async def test_chat_with_calculate_tool(self, example_app, example_module) -> None:
-        fake_chat, state = _fake_chat_from(
-            _ollama_response(tool_calls=[_tool_call("calculate", expression="2 + 2")]),
-            _ollama_response(content="2 + 2 = 4"),
+    async def test_chat_with_calculate_tool(self, example_app, example_module, monkeypatch) -> None:
+        state = _install_llm_mock(
+            monkeypatch,
+            completes=[
+                _openai_complete(tool_calls=[_tool_call("calculate", expression="2 + 2")]),
+                _openai_complete(content=""),
+            ],
+            stream_tokens=["2 + 2 = 4"],
         )
-        example_module.ollama_chat = fake_chat
-        example_module._append_history("user", "What is 2 plus 2")
+        await _seed_user(example_module, "What is 2 plus 2")
 
         async with TestClient(example_app) as client:
             response = await client.fragment("/chat/complete")
             assert response.status == 200
             assert "2 + 2 = 4" in response.text
-            assert state["count"] == 2
+            assert state["n"] == 2
 
-    async def test_chat_tool_results_sent_back(self, example_app, example_module) -> None:
-        captured_messages: list[list[dict]] = []
+    async def test_chat_tool_results_sent_back(
+        self, example_app, example_module, monkeypatch
+    ) -> None:
+        import httpx
 
-        responses = [
-            _ollama_response(
-                tool_calls=[_tool_call("add_note", text="Remember this")],
-            ),
-            _ollama_response(content="Done! I added the note."),
+        captured_messages: list[list[dict[str, Any]]] = []
+        completes = [
+            _openai_complete(tool_calls=[_tool_call("add_note", text="Remember this")]),
+            _openai_complete(content=""),
         ]
-        call_count = 0
+        state = {"n": 0}
 
-        async def fake_chat(client, *, model, messages, tools=None):
-            nonlocal call_count
-            captured_messages.append(list(messages))
-            idx = min(call_count, len(responses) - 1)
-            call_count += 1
-            return responses[idx]
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/api/tags":
+                return httpx.Response(200, json={"models": []})
+            body = json.loads(request.content)
+            if body.get("stream"):
+                lines = ['data: {"choices":[{"delta":{"content":"Done!"}}]}', "data: [DONE]"]
+                return httpx.Response(200, content="\n".join(lines).encode())
+            captured_messages.append(body["messages"])
+            idx = min(state["n"], len(completes) - 1)
+            state["n"] += 1
+            return httpx.Response(200, json=completes[idx])
 
-        example_module.ollama_chat = fake_chat
-        example_module._append_history("user", "Remember this")
+        _install_mock_transport(monkeypatch, handler)
+        await _seed_user(example_module, "Remember this")
 
         async with TestClient(example_app) as client:
             await client.fragment("/chat/complete")
@@ -346,13 +414,16 @@ class TestChatNonStreaming:
         assert len(tool_msgs) == 1
         assert "Remember this" in tool_msgs[0]["content"]
 
-    async def test_chat_shows_tools_used(self, example_app, example_module) -> None:
-        fake_chat, _ = _fake_chat_from(
-            _ollama_response(tool_calls=[_tool_call("get_current_time")]),
-            _ollama_response(content="It is noon."),
+    async def test_chat_shows_tools_used(self, example_app, example_module, monkeypatch) -> None:
+        _install_llm_mock(
+            monkeypatch,
+            completes=[
+                _openai_complete(tool_calls=[_tool_call("get_current_time")]),
+                _openai_complete(content=""),
+            ],
+            stream_tokens=["It is noon."],
         )
-        example_module.ollama_chat = fake_chat
-        example_module._append_history("user", "What time")
+        await _seed_user(example_module, "What time")
 
         async with TestClient(example_app) as client:
             response = await client.fragment("/chat/complete")
@@ -397,17 +468,16 @@ class TestChatStreaming:
             assert "/chat/complete" in response.text
             assert "sse-connect" not in response.text
 
-    async def test_chat_stream_endpoint_simple(self, example_app, example_module) -> None:
-        """GET /chat/stream streams tokens via ollama_chat_stream."""
-        example_module._append_history("user", "Hello")
-
-        # Phase 1: non-streaming probe — no tool calls (response discarded)
-        fake_chat, _ = _fake_chat_from(
-            _ollama_response(content="(discarded)"),
+    async def test_chat_stream_endpoint_simple(
+        self, example_app, example_module, monkeypatch
+    ) -> None:
+        """GET /chat/stream streams tokens from the agent loop."""
+        _install_llm_mock(
+            monkeypatch,
+            completes=[_openai_complete(content="")],
+            stream_tokens=["Hello ", "world!"],
         )
-        example_module.ollama_chat = fake_chat
-        # Phase 2: streaming delivers the actual tokens
-        example_module.ollama_chat_stream = _fake_stream("Hello ", "world!")
+        await _seed_user(example_module, "Hello")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=5)
@@ -415,45 +485,45 @@ class TestChatStreaming:
         assert result.status == 200
         fragments = [e for e in result.events if (e.event or "message") == "message"]
         text = "".join(e.data for e in fragments)
-        # SSE data fields strip trailing whitespace, so assert on content
         assert "Hello" in text
         assert "world!" in text
         done_events = [e for e in result.events if e.event == "done"]
         assert len(done_events) == 1
 
-    async def test_chat_stream_endpoint_with_tools(self, example_app, example_module) -> None:
+    async def test_chat_stream_endpoint_with_tools(
+        self, example_app, example_module, monkeypatch
+    ) -> None:
         """GET /chat/stream handles tool rounds then streams the answer."""
-        example_module._append_history("user", "What time is it?")
-
-        # Phase 1: tool round + no-tool probe (response discarded)
-        fake_chat, state = _fake_chat_from(
-            _ollama_response(tool_calls=[_tool_call("get_current_time")]),
-            _ollama_response(content="(discarded)"),
+        state = _install_llm_mock(
+            monkeypatch,
+            completes=[
+                _openai_complete(tool_calls=[_tool_call("get_current_time")]),
+                _openai_complete(content=""),
+            ],
+            stream_tokens=["It is ", "noon ", "UTC."],
         )
-        example_module.ollama_chat = fake_chat
-        # Phase 2: streaming delivers the answer
-        example_module.ollama_chat_stream = _fake_stream("It is ", "noon ", "UTC.")
+        await _seed_user(example_module, "What time is it?")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=10)
 
         assert result.status == 200
-        # Model made 2 non-streaming calls: tool round + probe
-        assert state["count"] == 2
+        assert state["n"] == 2
         fragments = [e for e in result.events if (e.event or "message") == "message"]
         text = "".join(e.data for e in fragments)
         assert "noon" in text
         assert "UTC" in text
 
-    async def test_chat_stream_endpoint_closes_with_done(self, example_app, example_module) -> None:
+    async def test_chat_stream_endpoint_closes_with_done(
+        self, example_app, example_module, monkeypatch
+    ) -> None:
         """Stream always closes with a 'done' SSE event for sse-close."""
-        example_module._append_history("user", "Tell me a joke")
-
-        fake_chat, _ = _fake_chat_from(
-            _ollama_response(content="(discarded)"),
+        _install_llm_mock(
+            monkeypatch,
+            completes=[_openai_complete(content="")],
+            stream_tokens=["Why did the chicken ", "cross the road?"],
         )
-        example_module.ollama_chat = fake_chat
-        example_module.ollama_chat_stream = _fake_stream("Why did the chicken ", "cross the road?")
+        await _seed_user(example_module, "Tell me a joke")
 
         async with TestClient(example_app) as client:
             result = await client.sse("/chat/stream", max_events=5)

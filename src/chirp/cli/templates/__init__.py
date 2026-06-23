@@ -3,6 +3,12 @@
 Re-exports all template constants from submodules.
 """
 
+from chirp.cli.templates.ai import (
+    AI_APP_PY,
+    AI_CHAT_HTML,
+    AI_ENV_EXAMPLE,
+    AI_TEST_APP_PY,
+)
 from chirp.cli.templates.minimal import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
@@ -53,6 +59,10 @@ from chirp.cli.templates.v2 import (
 
 __all__ = [
     "AGENTS_MD",
+    "AI_APP_PY",
+    "AI_CHAT_HTML",
+    "AI_ENV_EXAMPLE",
+    "AI_TEST_APP_PY",
     "MIGRATIONS_README",
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",

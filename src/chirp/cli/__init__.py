@@ -110,6 +110,11 @@ def main(argv: list[str] | None = None) -> None:
         help="Generate project with persistent app shell (topbar, sidebar)",
     )
     new_parser.add_argument(
+        "--ai",
+        action="store_true",
+        help="Scaffold AI chat with tools, SSE activity feed, and secure stack",
+    )
+    new_parser.add_argument(
         "--with-chirpui",
         action="store_true",
         help="Require ChirpUI templates (fail if chirp-ui is not installed)",

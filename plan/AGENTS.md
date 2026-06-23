@@ -60,6 +60,9 @@ When this domain changes, check:
 
 ## Do Not
 
+- Recommend or assign good first issues (`good first issue` label or `[GF]`
+  title) to maintainer/agent batches — those are contributor onboarding work
+  (see root `AGENTS.md` § GitHub Issues).
 - Let speculative plans read like documentation for shipped features.
 - Hide rejected steward findings.
 - Combine unrelated roadmap items because they share a file.

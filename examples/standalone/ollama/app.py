@@ -5,6 +5,8 @@ access to chirp tools (notes, time, calculator) and its tool calls
 stream live to an activity panel via SSE. The assistant's response
 streams token-by-token for a real-time typing effect.
 
+Uses framework primitives: ``LLM``, ``AgentRun``, and ``InMemoryConversationStore``.
+
 Requires:
     pip install httpx patitas[syntax]   # (or pip install chirp[all])
     ollama pull llama3.2
@@ -15,7 +17,6 @@ Run:
 """
 
 import contextvars
-import json as json_module
 import os
 import threading
 from collections.abc import AsyncIterator
@@ -26,21 +27,34 @@ from typing import Any
 import httpx
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, SSEEvent, Template
+from chirp.ai import LLM, AgentRun, InMemoryConversationStore
+from chirp.ai.errors import AIError, ProviderError
+from chirp.ai.events import StreamEvent, StreamToolCallEvent, TokenEvent
 from chirp.markdown import register_markdown_filter
-from chirp.tools.registry import ToolRegistry
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE", "http://localhost:11434")
 DEFAULT_MODEL = "llama3.2:3b"
+_THREAD_ID = "default"
 
-# Current model — global, thread-safe (single-user demo)
 _model: str = DEFAULT_MODEL
 _model_lock = threading.Lock()
 
 config = AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async")
 app = App(config=config)
 register_markdown_filter(app)
+
+_store = InMemoryConversationStore()
+_agent: AgentRun | None = None
+_agent_model: str | None = None
+
+SYSTEM_PROMPT = (
+    "You are a helpful assistant with access to tools. "
+    "You can manage notes (add, list, search), tell the current time, "
+    "and evaluate math expressions. Use tools when they are relevant "
+    "to the user's request. Be concise."
+)
 
 
 def _get_model() -> str:
@@ -49,102 +63,77 @@ def _get_model() -> str:
 
 
 def _set_model(name: str) -> None:
-    global _model
+    global _model, _agent, _agent_model
     with _model_lock:
         _model = name
+    _agent = None
+    _agent_model = None
 
 
-# ---------------------------------------------------------------------------
-# Ollama HTTP client helpers
-# ---------------------------------------------------------------------------
-
-
-async def ollama_list_models(client: httpx.AsyncClient) -> list[dict[str, Any]]:
-    """Fetch locally available models from Ollama."""
-    response = await client.get("/api/tags")
-    response.raise_for_status()
-    return response.json().get("models", [])
-
-
-def chirp_tools_to_ollama(registry: ToolRegistry) -> list[dict[str, Any]]:
-    """Convert chirp MCP tool schemas to Ollama function-calling format.
-
-    MCP:    ``{name, description, inputSchema: {type, properties, required}}``
-    Ollama: ``{type: "function", function: {name, description, parameters: ...}}``
-    """
+async def _visible_history() -> list[dict[str, Any]]:
+    """User/assistant turns for the chat transcript UI."""
+    messages = await _store.load(_THREAD_ID)
     return [
-        {
-            "type": "function",
-            "function": {
-                "name": t["name"],
-                "description": t["description"],
-                "parameters": t["inputSchema"],
-            },
-        }
-        for t in registry.list_tools()
+        m
+        for m in messages
+        if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()
     ]
 
 
-async def ollama_chat(
-    client: httpx.AsyncClient,
-    *,
-    model: str,
-    messages: list[dict[str, Any]],
-    tools: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """Send a non-streaming chat request to Ollama.
-
-    Used for tool-calling rounds where we need the complete response
-    (including ``tool_calls``) before dispatching.
-    """
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "stream": False,
-    }
-    if tools:
-        payload["tools"] = tools
-
-    response = await client.post("/api/chat", json=payload)
-    response.raise_for_status()
-    return response.json()
+def _get_agent() -> AgentRun:
+    """Return (and cache) an AgentRun wired to the current Ollama model."""
+    global _agent, _agent_model
+    app._ensure_frozen()
+    registry = app._tool_registry
+    assert registry is not None
+    model = _get_model()
+    if _agent is None or _agent_model != model:
+        llm = LLM(f"ollama:{model}")
+        _agent = AgentRun(
+            llm,
+            registry,
+            store=_store,
+            system=SYSTEM_PROMPT,
+            thread_id=_THREAD_ID,
+        )
+        _agent_model = model
+    return _agent
 
 
-async def ollama_chat_stream(
-    client: httpx.AsyncClient,
-    *,
-    model: str,
-    messages: list[dict[str, Any]],
-) -> AsyncIterator[str]:
-    """Stream a chat response from Ollama, yielding content tokens.
+async def _agent_events(
+    *, append_user: bool = False, user_message: str = ""
+) -> AsyncIterator[StreamEvent]:
+    """Yield AgentRun stream events — patch point for tests."""
+    agent = _get_agent()
+    async for event in agent.stream(user_message, append_user=append_user):
+        yield event
 
-    Ollama streams newline-delimited JSON. Each chunk has a ``message``
-    with partial ``content``. We yield each non-empty content fragment.
-    If Ollama reports an error mid-stream, it is yielded as text so the
-    caller can display it gracefully.
-    """
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "stream": True,
-    }
 
-    async with client.stream("POST", "/api/chat", json=payload) as response:
-        response.raise_for_status()
-        async for line in response.aiter_lines():
-            if not line.strip():
-                continue
-            chunk = json_module.loads(line)
-            if "error" in chunk:
-                yield f"\n\nOllama error: {chunk['error']}"
-                return
-            token = chunk.get("message", {}).get("content", "")
-            if token:
-                yield token
+async def _collect_agent_reply(
+    *, append_user: bool = False, user_message: str = ""
+) -> tuple[str, list[str]]:
+    """Run the agent loop and return (assistant_text, tool_names)."""
+    tools_called: list[str] = []
+    parts: list[str] = []
+    try:
+        async for event in _agent_events(append_user=append_user, user_message=user_message):
+            if isinstance(event, StreamToolCallEvent):
+                tools_called.append(event.name)
+            elif isinstance(event, TokenEvent):
+                parts.append(event.text)
+    except ProviderError as exc:
+        return f"Ollama returned an error: {exc.status}", tools_called
+    except httpx.ConnectError:
+        return "Could not connect to Ollama. Make sure it's running: `ollama serve`", tools_called
+    except AIError as exc:
+        return str(exc), tools_called
+    except Exception as exc:
+        return f"Error: {exc}", tools_called
+    return "".join(parts) or "(no response)", tools_called
 
 
 # ---------------------------------------------------------------------------
-# Per-worker httpx client (free-threading safe)
+# Ollama HTTP client — model listing only (LLM calls use chirp.ai LLM)
 # ---------------------------------------------------------------------------
 
 _client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.ContextVar(
@@ -155,13 +144,11 @@ _client_var: contextvars.ContextVar[httpx.AsyncClient | None] = contextvars.Cont
 
 @app.on_worker_startup
 async def worker_startup() -> None:
-    """Create an httpx client for this worker's event loop."""
     _client_var.set(httpx.AsyncClient(base_url=OLLAMA_BASE, timeout=120.0))
 
 
 @app.on_worker_shutdown
 async def worker_shutdown() -> None:
-    """Close the httpx client for this worker."""
     client = _client_var.get()
     if client:
         await client.aclose()
@@ -169,55 +156,26 @@ async def worker_shutdown() -> None:
 
 
 def _get_client() -> httpx.AsyncClient:
-    """Return the per-worker httpx client, creating a fallback if needed."""
     client = _client_var.get()
     if client is None:
-        # Fallback for single-worker dev server (no pounce worker hooks)
         client = httpx.AsyncClient(base_url=OLLAMA_BASE, timeout=120.0)
         _client_var.set(client)
     return client
 
 
-# ---------------------------------------------------------------------------
-# Conversation history — global, thread-safe (single-user demo)
-# ---------------------------------------------------------------------------
-
-_history: list[dict[str, Any]] = []
-_history_lock = threading.Lock()
-
-SYSTEM_PROMPT = (
-    "You are a helpful assistant with access to tools. "
-    "You can manage notes (add, list, search), tell the current time, "
-    "and evaluate math expressions. Use tools when they are relevant "
-    "to the user's request. Be concise."
-)
-
-
-def _append_history(role: str, content: str, **extra: Any) -> None:
-    """Append a message to conversation history."""
-    msg: dict[str, Any] = {"role": role, "content": content}
-    msg.update(extra)
-    with _history_lock:
-        _history.append(msg)
-
-
-def _clear_history() -> None:
-    """Reset conversation history."""
-    with _history_lock:
-        _history.clear()
+async def ollama_list_models(client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    response = await client.get("/api/tags")
+    response.raise_for_status()
+    return response.json().get("models", [])
 
 
 # ---------------------------------------------------------------------------
-# In-memory note storage — thread-safe
+# In-memory note storage
 # ---------------------------------------------------------------------------
 
 _notes: list[dict[str, Any]] = []
 _notes_lock = threading.Lock()
 _next_id = 1
-
-# ---------------------------------------------------------------------------
-# Tools — callable by Ollama, MCP clients, and route handlers
-# ---------------------------------------------------------------------------
 
 
 @app.tool("add_note", description="Add a note with an optional tag.")
@@ -263,14 +221,8 @@ def calculate(expression: str) -> str:
     return str(result)
 
 
-# ---------------------------------------------------------------------------
-# Template filters
-# ---------------------------------------------------------------------------
-
-
 @app.template_filter("format_args")
 def format_args(args: dict) -> str:
-    """Format tool call arguments for display."""
     if not args:
         return "\u2014"
     parts = []
@@ -280,99 +232,13 @@ def format_args(args: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Shared: prepare registry + tools for the agent loop
-# ---------------------------------------------------------------------------
-
-
-def _prepare_agent() -> tuple[ToolRegistry, list[dict[str, Any]]]:
-    """Freeze the app and return (registry, ollama_tools)."""
-    app._ensure_frozen()
-    registry = app._tool_registry
-    assert registry is not None
-    return registry, chirp_tools_to_ollama(registry)
-
-
-async def _run_tool_rounds(
-    client: httpx.AsyncClient,
-    messages: list[dict[str, Any]],
-    registry: ToolRegistry,
-    ollama_tools: list[dict[str, Any]],
-    *,
-    on_tool_call: Any = None,
-    consume_final: bool = True,
-) -> str | None:
-    """Execute non-streaming tool-calling rounds.
-
-    When ``consume_final`` is True (default), returns the model's final
-    content string once it stops calling tools.
-
-    When ``consume_final`` is False the final text response is discarded
-    and ``None`` is returned.  The caller should then stream the answer
-    separately via :func:`ollama_chat_stream` — this is what enables
-    real token-by-token delivery in the streaming path.
-    """
-    max_rounds = 10
-    for _ in range(max_rounds):
-        response = await ollama_chat(
-            client,
-            model=_get_model(),
-            messages=messages,
-            tools=ollama_tools,
-        )
-
-        msg = response.get("message", {})
-        tool_calls = msg.get("tool_calls")
-
-        if not tool_calls:
-            if consume_final:
-                return msg.get("content", "") or "(no response)"
-            return None
-
-        # Append the assistant message with tool_calls
-        messages.append(
-            {
-                "role": "assistant",
-                "content": msg.get("content", ""),
-                "tool_calls": tool_calls,
-            }
-        )
-
-        # Dispatch each tool call through the registry (fires event bus)
-        for call in tool_calls:
-            func = call.get("function", {})
-            tool_name = func.get("name", "")
-            tool_args = func.get("arguments", {})
-
-            if on_tool_call:
-                on_tool_call(tool_name, tool_args)
-
-            try:
-                result = await registry.call_tool(tool_name, tool_args)
-                result_str = (
-                    json_module.dumps(result, default=str)
-                    if isinstance(result, dict | list)
-                    else str(result)
-                )
-            except Exception as exc:
-                result_str = f"Error: {exc}"
-
-            messages.append({"role": "tool", "content": result_str})
-
-    return "(max tool rounds reached)" if consume_final else None
-
-
-# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 
 @app.route("/")
 async def index():
-    """Full page — chat UI and activity panel."""
-    with _history_lock:
-        history = list(_history)
-
-    # Fetch available models for the selector
+    history = await _visible_history()
     try:
         client = _get_client()
         raw_models = await ollama_list_models(client)
@@ -390,7 +256,6 @@ async def index():
 
 @app.route("/model", methods=["POST"], name="model.set")
 async def set_model(request: Request):
-    """Switch the active model."""
     form = await request.form()
     name = (form.get("model") or "").strip()
     if name:
@@ -400,16 +265,6 @@ async def set_model(request: Request):
 
 @app.route("/chat", methods=["POST"], name="chat.post")
 async def post_chat(request: Request):
-    """Handle a chat message.
-
-    Both streaming and non-streaming paths return the user bubble
-    immediately so the form clears and the user sees their message
-    right away.
-
-    - **Streaming**: returns user bubble + SSE-connected streaming div.
-    - **Non-streaming**: returns user bubble + a spinner that triggers
-      ``GET /chat/complete`` on load to fetch the assistant response.
-    """
     form = await request.form()
     user_message = (form.get("message") or "").strip()
     streaming = form.get("stream") == "1"
@@ -417,51 +272,17 @@ async def post_chat(request: Request):
     if not user_message:
         return Fragment("chat.html", "empty_response")
 
-    _append_history("user", user_message)
+    await _store.append(_THREAD_ID, {"role": "user", "content": user_message})
 
     if streaming:
         return Fragment("chat.html", "stream_start", user_content=user_message)
 
-    # Non-streaming: show user bubble + spinner immediately
     return Fragment("chat.html", "chat_pending", user_content=user_message)
 
 
 @app.route("/chat/complete", name="chat.complete")
 async def chat_complete():
-    """Run the full agent loop and return the assistant response.
-
-    Called via ``hx-get`` from the spinner placed by the non-streaming
-    ``/chat`` POST. The spinner is replaced with the assistant bubble.
-    """
-    client = _get_client()
-    registry, ollama_tools = _prepare_agent()
-
-    with _history_lock:
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-        ]
-        messages.extend(_history)
-
-    tools_called: list[str] = []
-
-    try:
-        final_content = await _run_tool_rounds(
-            client,
-            messages,
-            registry,
-            ollama_tools,
-            on_tool_call=lambda name, _args: tools_called.append(name),
-        )
-        final_content = final_content or "(no response)"
-    except httpx.ConnectError:
-        final_content = "Could not connect to Ollama. Make sure it's running: `ollama serve`"
-    except httpx.HTTPStatusError as exc:
-        final_content = f"Ollama returned an error: {exc.response.status_code}"
-    except Exception as exc:
-        final_content = f"Error: {exc}"
-
-    _append_history("assistant", final_content)
-
+    final_content, tools_called = await _collect_agent_reply(append_user=False)
     return Fragment(
         "chat.html",
         "chat_response",
@@ -472,71 +293,41 @@ async def chat_complete():
 
 @app.route("/chat/stream", referenced=True)
 def chat_stream():
-    """SSE endpoint: run the agent loop and stream the final answer.
-
-    Tool-calling rounds use non-streaming requests (with ``tools``) so
-    we can detect and dispatch tool calls reliably.  Once all tools are
-    resolved, a **separate** streaming call (without ``tools``) delivers
-    the final answer token-by-token.  Omitting ``tools`` from the
-    streaming call prevents the model from emitting raw tool-call JSON
-    as text.
-
-    A ``done`` event closes the SSE connection via ``sse-close``.
-    """
-
     async def generate():
-        client = _get_client()
-        registry, ollama_tools = _prepare_agent()
-
-        with _history_lock:
-            messages: list[dict[str, Any]] = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-            ]
-            messages.extend(_history)
+        tools_called: list[str] = []
+        tools_banner_sent = False
+        parts: list[str] = []
 
         try:
-            # --- Phase 1: non-streaming tool rounds ---
-            # consume_final=False discards the probe response so we can
-            # re-ask with streaming enabled for true token-by-token UX.
-            tools_called: list[str] = []
-            await _run_tool_rounds(
-                client,
-                messages,
-                registry,
-                ollama_tools,
-                on_tool_call=lambda name, _args: tools_called.append(name),
-                consume_final=False,
+            async for event in _agent_events(append_user=False):
+                if isinstance(event, StreamToolCallEvent):
+                    tools_called.append(event.name)
+                elif isinstance(event, TokenEvent):
+                    if tools_called and not tools_banner_sent:
+                        yield Fragment(
+                            "chat.html",
+                            "stream_tools_used",
+                            target="stream-tools",
+                            tools_used=tools_called,
+                        )
+                        tools_banner_sent = True
+                    parts.append(event.text)
+                    yield Fragment("chat.html", "stream_token", token=event.text)
+        except ProviderError as exc:
+            yield Fragment(
+                "chat.html",
+                "stream_token",
+                token=f"Ollama returned an error: {exc.status}",
             )
-
-            # Show which tools were used (OOB swap into placeholder)
-            if tools_called:
-                yield Fragment(
-                    "chat.html",
-                    "stream_tools_used",
-                    target="stream-tools",
-                    tools_used=tools_called,
-                )
-
-            # --- Phase 2: stream the final answer token-by-token ---
-            # No tools parameter — model can only respond with text.
-            collected: list[str] = []
-            async for token in ollama_chat_stream(client, model=_get_model(), messages=messages):
-                collected.append(token)
-                yield Fragment("chat.html", "stream_token", token=token)
-
-            full_response = "".join(collected) or "(no response)"
-            _append_history("assistant", full_response)
-
         except httpx.ConnectError:
             yield Fragment(
                 "chat.html",
                 "stream_token",
-                token=("Could not connect to Ollama. Make sure it's running: `ollama serve`"),
+                token="Could not connect to Ollama. Make sure it's running: `ollama serve`",
             )
         except Exception as exc:
             yield Fragment("chat.html", "stream_token", token=f"Error: {exc}")
 
-        # Signal the browser to close the SSE connection (sse-close="done")
         yield SSEEvent(event="done", data="complete")
 
     return EventStream(generate())
@@ -544,8 +335,6 @@ def chat_stream():
 
 @app.route("/feed", referenced=True)
 def feed():
-    """Stream tool call events via SSE for the live activity panel."""
-
     async def generate():
         async for event in app.tool_events.subscribe():
             yield Fragment("chat.html", "activity_row", event=event)
@@ -554,9 +343,10 @@ def feed():
 
 
 @app.route("/clear", methods=["POST"], name="chat.clear")
-def clear():
-    """Reset conversation history."""
-    _clear_history()
+async def clear():
+    global _agent
+    await _store.clear(_THREAD_ID)
+    _agent = None
     return Fragment("chat.html", "chat_cleared")
 
 

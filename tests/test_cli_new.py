@@ -179,6 +179,26 @@ class TestChirpNewMinimal:
         assert "SecurityHeadersMiddleware()" in source
 
 
+@pytest.mark.issue(437)
+class TestChirpNewAI:
+    def test_creates_ai_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--ai creates AgentRun chat scaffold with tools and SSE activity."""
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--ai"])
+
+        project = tmp_path / "myapp"
+        assert (project / "app.py").is_file()
+        assert (project / "templates" / "chat.html").is_file()
+        assert (project / ".env.example").is_file()
+        assert (project / "tests" / "test_app.py").is_file()
+
+        source = (project / "app.py").read_text()
+        assert "AgentRun" in source
+        assert "InMemoryConversationStore" in source
+        assert "secure_stack" in source
+        compile(source, "app.py", "exec")
+
+
 class TestChirpNewSSE:
     def test_creates_sse_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)

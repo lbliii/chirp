@@ -138,6 +138,62 @@ async def _stream_fragments(
         )
 
 
+def stream_events_to_fragments(
+    events: AsyncIterator[Any],
+    template_name: str,
+    block_name: str,
+    /,
+    *,
+    context_key: str = "text",
+    extra_context: dict[str, Any] | None = None,
+) -> AsyncIterator[Any]:
+    """Wrap :meth:`LLM.stream_events` as progressive ``Fragment`` renders."""
+    from chirp.ai.events import DoneEvent, TokenEvent
+    from chirp.templating.returns import Fragment
+
+    return _stream_event_fragments(
+        events,
+        template_name,
+        block_name,
+        context_key=context_key,
+        extra_context=extra_context or {},
+        fragment_cls=Fragment,
+        token_event_cls=TokenEvent,
+        done_event_cls=DoneEvent,
+    )
+
+
+async def _stream_event_fragments(
+    events: AsyncIterator[Any],
+    template_name: str,
+    block_name: str,
+    *,
+    context_key: str,
+    extra_context: dict[str, Any],
+    fragment_cls: type,
+    token_event_cls: type,
+    done_event_cls: type,
+) -> AsyncIterator[Any]:
+    accumulated = ""
+    async for event in events:
+        if isinstance(event, token_event_cls):
+            accumulated += event.text
+            yield fragment_cls(
+                template_name,
+                block_name,
+                **{context_key: accumulated, **extra_context},
+            )
+        elif isinstance(event, done_event_cls):
+            if accumulated:
+                yield fragment_cls(
+                    template_name,
+                    block_name,
+                    streaming=False,
+                    **{context_key: accumulated, **extra_context},
+                )
+            return
+
+
 def stream_with_sources(
     tokens: AsyncIterator[str],
     template_name: str,

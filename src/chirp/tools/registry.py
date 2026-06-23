@@ -117,6 +117,15 @@ class ToolRegistry:
     def __contains__(self, name: str) -> bool:
         return name in self._tools
 
+    @property
+    def event_bus(self) -> ToolEventBus:
+        return self._event_bus
+
+    def with_tools(self, extra: list[ToolDef]) -> ToolRegistry:
+        """Return a new registry combining current tools and *extra*."""
+        combined = [*self._tools.values(), *extra]
+        return ToolRegistry(combined, self._event_bus)
+
 
 def compile_tools(
     pending: list[tuple[str, str, Callable[..., Any]]],
