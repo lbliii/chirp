@@ -1,7 +1,8 @@
 """Pytest configuration for the ollama example.
 
 Overrides the shared ``example_app`` fixture to also expose the loaded
-module, so tests can monkeypatch ``ollama_chat`` for mock tests.
+module, so tests can seed ``InMemoryConversationStore`` and patch httpx
+for mock LLM responses.
 """
 
 import importlib.util
@@ -12,7 +13,7 @@ import pytest
 
 @pytest.fixture
 def example_module(request: pytest.FixtureRequest):
-    """Load a fresh module from app.py (includes the ``app`` and ``ollama_chat``)."""
+    """Load a fresh module from app.py (includes the ``app`` and ``_store``)."""
     app_path = Path(request.path).parent / "app.py"
     spec = importlib.util.spec_from_file_location("example_ollama", app_path)
     assert spec is not None

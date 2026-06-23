@@ -100,6 +100,21 @@ otherwise.
   `site/.bengal/` are not source-of-truth unless a scoped steward explicitly
   says a generated artifact must move with source.
 
+## GitHub Issues
+
+Maintainer and agent work must **not** take good first issues. Those issues exist
+for external contributors.
+
+- Skip any issue labeled `good first issue` or titled `[GF] ...`.
+- Do not implement, close, or batch-plan GF work during triage unless a
+  contributor opened the PR and maintainers are reviewing it.
+- Epic [#446](https://github.com/lbliii/chirp/issues/446) (*Learn Chirp by
+  building*) and its children (#447–#458) are all GF — leave them for
+  contributors.
+- When picking maintainer batches, prefer unlabeled or epic/P1/P2 roadmap issues
+  (for example AI Phase 2 #431–#438, Horizon RFC drafting, Lucky Cat framework
+  work without the GF label).
+
 ## Stop And Ask
 
 Check in before:

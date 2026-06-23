@@ -24,6 +24,11 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+from chirp.ai._tool_calls import (
+    ChatCompletion,
+    parse_anthropic_completion,
+    parse_openai_completion,
+)
 from chirp.ai.errors import ProviderError, ProviderNotInstalledError
 
 
@@ -173,6 +178,47 @@ async def anthropic_generate(
     return data["content"][0]["text"]
 
 
+async def anthropic_complete(
+    config: ProviderConfig,
+    messages: list[dict[str, Any]],
+    *,
+    max_tokens: int = 4096,
+    temperature: float = 0.0,
+    system: str | None = None,
+    tools: list[dict[str, Any]] | None = None,
+) -> ChatCompletion:
+    """Generate a completion, optionally with tool-use blocks."""
+    httpx = _get_httpx()
+
+    body: dict[str, Any] = {
+        "model": config.model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if system:
+        body["system"] = system
+    if tools:
+        body["tools"] = tools
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{config.base_url}/v1/messages",
+            json=body,
+            headers={
+                "x-api-key": config.api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            timeout=120.0,
+        )
+
+    if response.status_code != 200:
+        raise ProviderError("anthropic", response.status_code, response.text)
+
+    return parse_anthropic_completion(response.json())
+
+
 async def anthropic_stream(
     config: ProviderConfig,
     messages: list[dict[str, str]],
@@ -258,6 +304,44 @@ async def openai_generate(
 
     data = response.json()
     return data["choices"][0]["message"]["content"]
+
+
+async def openai_complete(
+    config: ProviderConfig,
+    messages: list[dict[str, Any]],
+    *,
+    max_tokens: int = 4096,
+    temperature: float = 0.0,
+    tools: list[dict[str, Any]] | None = None,
+) -> ChatCompletion:
+    """Generate a chat completion, optionally with function tools."""
+    httpx = _get_httpx()
+
+    body: dict[str, Any] = {
+        "model": config.model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = "auto"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{config.base_url}/v1/chat/completions",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {config.api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=120.0,
+        )
+
+    if response.status_code != 200:
+        raise ProviderError("openai", response.status_code, response.text)
+
+    return parse_openai_completion(response.json())
 
 
 async def openai_stream(

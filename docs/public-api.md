@@ -92,6 +92,7 @@ hardens and documents that surface:
 | Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
 | Tool registry/events | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): MCP server surface, event bus, OTel spans, and integration tests meet the stable bar. |
 | LLM + AI errors | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): top-level lazy imports, unit tests, OTel spans; `stream_to_fragments` / `stream_with_sources` remain `chirp.ai` helpers until a follow-up. |
+| Phase 2 AI loop (`AgentRun`, `stream_events`, `ConversationStore`, MCP client) | **Provisional (2026-06-22)** | Shipped in #431–#437; documented under `chirp.ai` / `chirp.tools.client`; promote after example refactors and soak time. |
 | Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |
 | `use_chirp_ui` bridge | Keep provisional | It couples this package to `chirp-ui` runtime and manifest behavior. |
 

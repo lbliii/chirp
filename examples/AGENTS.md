@@ -79,6 +79,9 @@ When this domain changes, check:
 
 ## Do Not
 
+- Pick up GitHub issues labeled `good first issue` or titled `[GF] ...` — those
+  are reserved for external contributors, not maintainer/agent work (see root
+  `AGENTS.md` § GitHub Issues).
 - Teach manual htmx branching when a return type solves the problem.
 - Add optional-extra imports without README/install updates.
 - Let examples drift from public API docs or scaffolds.

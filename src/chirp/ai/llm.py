@@ -14,18 +14,30 @@ Free-threading safety:
 
 import dataclasses
 from collections.abc import AsyncIterator
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from chirp.ai._providers import (
+    anthropic_complete,
     anthropic_generate,
     anthropic_stream,
+    openai_complete,
     openai_generate,
     openai_stream,
     parse_provider,
 )
 from chirp.ai._structured import dataclass_to_schema, parse_structured
+from chirp.ai._tool_calls import (
+    ChatCompletion,
+    tools_from_registry,
+    tools_to_anthropic,
+    tools_to_openai,
+)
 from chirp.ai.errors import AIError
+from chirp.ai.events import DoneEvent, ErrorEvent, StreamEvent, TokenEvent
 from chirp.telemetry import _SpanScope, trace_span
+
+if TYPE_CHECKING:
+    from chirp.tools.registry import ToolRegistry
 
 
 class LLM:
@@ -213,6 +225,102 @@ class LLM:
             ):
                 token_count += 1
                 yield token
+        except BaseException as exc:
+            if scope is not None:
+                scope.close(error=exc, tokens_out=token_count or None)
+            raise
+        else:
+            if scope is not None:
+                scope.close(tokens_out=token_count or None)
+
+    # -- Complete (tool-aware, non-streaming) --
+
+    async def complete(
+        self,
+        messages: list[dict[str, Any]],
+        /,
+        *,
+        tools: ToolRegistry | None = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> ChatCompletion:
+        """Generate a full model response, including tool-call requests."""
+        max_t = max_tokens or self._default_max_tokens
+        temp = temperature if temperature is not None else self._default_temperature
+        tool_list = tools_from_registry(tools)
+
+        with trace_span(
+            "llm.generate",
+            provider=self._config.provider,
+            model=self._config.model,
+            mode="tools" if tool_list else "text",
+        ):
+            if self._config.provider == "anthropic":
+                anthropic_tools = tools_to_anthropic(tool_list) if tool_list else None
+                return await anthropic_complete(
+                    self._config,
+                    messages,
+                    max_tokens=max_t,
+                    temperature=temp,
+                    system=system,
+                    tools=anthropic_tools,
+                )
+            if self._config.provider in ("openai", "ollama", "lmstudio", "localai"):
+                msgs = list(messages)
+                if system:
+                    msgs = [{"role": "system", "content": system}, *msgs]
+                openai_tools = tools_to_openai(tool_list) if tool_list else None
+                return await openai_complete(
+                    self._config,
+                    msgs,
+                    max_tokens=max_t,
+                    temperature=temp,
+                    tools=openai_tools,
+                )
+        msg = f"Unsupported provider: {self._config.provider}"
+        raise AIError(msg)
+
+    # -- Stream events (unified event union) --
+
+    async def stream_events(
+        self,
+        prompt_or_messages: str | list[dict[str, Any]],
+        /,
+        *,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Yield :class:`~chirp.ai.events.StreamEvent` tokens and lifecycle events."""
+        max_t = max_tokens or self._default_max_tokens
+        temp = temperature if temperature is not None else self._default_temperature
+
+        if isinstance(prompt_or_messages, str):
+            messages: list[dict[str, Any]] = [
+                {"role": "user", "content": prompt_or_messages}
+            ]
+        else:
+            messages = list(prompt_or_messages)
+
+        scope = _SpanScope.start(
+            "llm.stream",
+            provider=self._config.provider,
+            model=self._config.model,
+        )
+        token_count = 0
+        try:
+            async for token in self._stream_raw(
+                messages, system=system, max_tokens=max_t, temperature=temp
+            ):
+                token_count += 1
+                yield TokenEvent(text=token)
+            yield DoneEvent(tokens_out=token_count or None)
+        except AIError as exc:
+            yield ErrorEvent(error=exc)
+            if scope is not None:
+                scope.close(error=exc, tokens_out=token_count or None)
+            raise
         except BaseException as exc:
             if scope is not None:
                 scope.close(error=exc, tokens_out=token_count or None)

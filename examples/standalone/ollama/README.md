@@ -12,7 +12,7 @@ Server-Sent Events.
 
 - **Token-by-token streaming** — assistant response streams via SSE with a blinking cursor
 - **`@app.tool()`** — register Python functions as callable tools
-- **Agent loop** — multi-turn tool calling (Ollama calls tools, gets results, responds)
+- **Agent loop** — multi-turn tool calling via `AgentRun` + `LLM("ollama:…")`
 - **`ToolEventBus` + SSE** — tool calls stream live to the activity panel
 - **Stream toggle** — switch between streaming and instant mode in the UI
 - **htmx** — no JavaScript needed for the chat UI
@@ -80,20 +80,21 @@ sequenceDiagram
     Chirp-->>Browser: user bubble + SSE-connected div (htmx swaps HTML)
 
     Browser->>Chirp: GET /chat/stream
-    Chirp->>Ollama: POST /api/chat
+    Chirp->>Ollama: POST /v1/chat/completions (tool round)
     Ollama-->>Chirp: tool_calls
 
-    Note over Chirp: ToolRegistry.call_tool()<br>→ ToolEventBus.emit()
+    Note over Chirp: AgentRun → ToolRegistry.call_tool()<br>→ ToolEventBus.emit()
     Chirp-->>Browser: SSE /feed (activity panel lights up)
 
-    Chirp->>Ollama: streaming, with tool results
+    Chirp->>Ollama: POST /v1/chat/completions (stream)
     Ollama-->>Chirp: tokens
     Chirp-->>Browser: SSE tokens (assistant bubble grows word-by-word)
 ```
 
-The key insight: `ToolRegistry.call_tool()` is the bridge. It dispatches
-the tool, fires the event bus (activity panel lights up), and returns the
-result to the agent loop. Zero glue code.
+The key insight: `AgentRun` owns the tool loop and `ToolRegistry.call_tool()`
+is the bridge. It dispatches the tool, fires the event bus (activity panel
+lights up), and returns the result for the next LLM round. Conversation
+history lives in `InMemoryConversationStore`.
 
 When streaming is enabled (default), the POST returns scaffolding HTML
 with an `sse-connect` attribute. htmx opens a second SSE connection to
@@ -102,7 +103,7 @@ arrive. A `done` SSE event closes the connection via `sse-close`.
 
 ## Testing
 
-Tests mock Ollama at the module level — no running server needed:
+Tests mock Ollama HTTP at the transport layer — no running server needed:
 
 ```bash
 python -m pytest examples/standalone/ollama/test_app.py -v
