@@ -7,6 +7,7 @@ ContextVar, and injects it into the CSP header on the way out.
 import dataclasses
 import secrets
 from contextvars import ContextVar, Token
+from typing import Any, ClassVar
 
 from chirp.http.request import Request
 from chirp.http.response import FileResponse, Response, StreamingResponse
@@ -62,6 +63,8 @@ class CSPNonceMiddleware:
         <script nonce="{{ csp_nonce() }}">...</script>
     """
 
+    template_globals: ClassVar[dict[str, Any]] = {"csp_nonce": csp_nonce}
+
     __slots__ = ("_base_csp", "_script_origins", "_style_unsafe_inline", "_unsafe_eval")
 
     def __init__(
@@ -81,11 +84,6 @@ class CSPNonceMiddleware:
         # 'unsafe-inline'. Scoped to style-src only — script-src stays nonce-only
         # (+ 'unsafe-eval' when needed). Set by the compiler for Alpine apps.
         self._style_unsafe_inline = style_unsafe_inline
-
-    @property
-    def template_globals(self) -> dict:
-        """Expose csp_nonce() as a template global."""
-        return {"csp_nonce": csp_nonce}
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         nonce = secrets.token_urlsafe(22)
