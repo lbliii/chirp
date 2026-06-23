@@ -195,6 +195,14 @@ Run the test suite (deterministic + offline):
 PYTHONPATH=src uv run pytest examples/chirpui/lucky_cat/
 ```
 
+**Regression coverage** — headline claims are locked in CI:
+
+| Claim | Test file |
+|-------|-----------|
+| Race-safe fills (concurrent buys never 500) | [`test_app.py`](test_app.py) |
+| Deterministic warmed feed | [`test_feed_determinism.py`](test_feed_determinism.py) |
+| Public browse, gated routes, signed-in access, CSRF mutations | [`test_auth.py`](test_auth.py) |
+
 Opt-in browser smoke (Playwright — catches CSP-dead shells and runtime-only
 failures that `TestClient` cannot see):
 
