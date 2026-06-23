@@ -32,6 +32,8 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Middleware | `Middleware`, `Next`, `AnyResponse` (register with `app.add_middleware(mw, *, priority=0)`) |
 | Request context | `g`, `get_request` |
 | Errors | `ChirpError`, `ConfigurationError`, `HTTPError`, `MethodNotAllowed`, `NotFound`, `PayloadTooLarge` |
+| AI (`pip install chirp[ai]`) | `LLM`, `AIError`, `ProviderError`, `ProviderNotInstalledError`, `StructuredOutputError` |
+| Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Forms | `form_from`, `form_or_errors`, `form_values`, `FormBindingError` |
 | Auth and security | `get_user`, `current_user`, `login`, `logout`, `login_required`, `requires`, `is_safe_url` |
 | Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `SessionSignalMiddleware`, `SessionSignalConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
@@ -63,7 +65,6 @@ shape may still evolve before 1.0:
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
-| Tools | `ToolCallEvent`, `ToolDef`, `ToolEventBus`, `ToolRegistry` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
 | Secure-by-default stack | `secure_stack` (optional `auth=AuthConfig(...)` and `audit=AuditConfig(...)` legs) |
@@ -74,6 +75,9 @@ shape may still evolve before 1.0:
 The 2026-05-03 public-surface audit made one stability correction:
 `JSONResponse` is stable. It is an HTTP primitive for narrow progressive-enhancement data islands,
 not a parallel REST serialization layer.
+
+Phase 1 AI work (#421/#430, 2026-06-22) promoted the LLM client, AI error types, and tool
+registry/event bus to stable after unit tests, OTel spans, and SSE trace-context fixes landed.
 
 Everything else in the provisional table stays provisional for 1.0 unless a focused follow-up
 hardens and documents that surface:
@@ -86,7 +90,8 @@ hardens and documents that surface:
 | Reactive pages | Keep provisional | The free-threaded event story is tested, but the app-author API and examples are still settling. |
 | Signals (server reactive values) | Keep provisional | The single-node `signal()`/`@app.derived` surface ships, but the multi-worker `SignalBus` backplane + the pure-derived contract are still in design (see `plan/drafted/rfc-live-sse-topics.md` §12). |
 | Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
-| Tool registry/events | Keep provisional | MCP/tool integration is useful but young compared with the core hypermedia surface. |
+| Tool registry/events | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): MCP server surface, event bus, OTel spans, and integration tests meet the stable bar. |
+| LLM + AI errors | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): top-level lazy imports, unit tests, OTel spans; `stream_to_fragments` / `stream_with_sources` remain `chirp.ai` helpers until a follow-up. |
 | Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |
 | `use_chirp_ui` bridge | Keep provisional | It couples this package to `chirp-ui` runtime and manifest behavior. |
 

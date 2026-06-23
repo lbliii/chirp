@@ -152,6 +152,35 @@ Pounce can still compress ordinary HTTP responses and WebSocket messages where
 that is appropriate. For long-lived Chirp realtime views, tune worker mode and
 connection limits before assuming compression is the right lever.
 
+## OpenTelemetry
+
+HTTP request spans are emitted by Pounce when ``AppConfig.otel_endpoint`` is
+set (via ``CHIRP_OTEL_ENDPOINT`` in ``AppConfig.from_env()``). Chirp adds
+best-effort child spans for AI and tool operations — they no-op when the
+OpenTelemetry SDK is not installed:
+
+| Span | Source | Attributes |
+|------|--------|------------|
+| `llm.generate` | ``chirp.ai.LLM.generate()`` | `provider`, `model`, `duration_ms`, optional `mode=structured` |
+| `llm.stream` | ``chirp.ai.LLM.stream()`` | `provider`, `model`, `duration_ms`, `tokens_out` |
+| `tool.call` | ``ToolRegistry.call_tool()`` | `tool_name`, `duration_ms`, `error` on failure |
+
+These spans link to the active HTTP span when tools or LLM calls run inside a
+route or MCP handler. ``ToolEventBus`` dashboard events still fire alongside
+``tool.call`` spans.
+
+Known gap: trace context in manually spawned tasks outside the SSE producer
+path is still the caller's responsibility.
+
+Example:
+
+```python
+config = AppConfig(
+    otel_endpoint="http://otel-collector:4318/v1/traces",
+    otel_service_name="my-chirp-app",
+)
+```
+
 ## Pounce Introspection
 
 Pounce 0.7 includes a server-level introspection endpoint at `/_pounce/info`,

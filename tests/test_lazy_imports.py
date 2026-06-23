@@ -8,8 +8,10 @@ EXPECTED_PUBLIC_API = [
     "CHIRP_CAPABILITIES",
     "CHIRP_DEFER_PENDING_KEY",
     "DEFERRED",
+    "LLM",
     "OOB",
     "STOP_POLLING",
+    "AIError",
     "Action",
     "AnyResponse",
     "App",
@@ -46,6 +48,8 @@ EXPECTED_PUBLIC_API = [
     "Page",
     "PageComposition",
     "PayloadTooLarge",
+    "ProviderError",
+    "ProviderNotInstalledError",
     "ReactiveBus",
     "Redirect",
     "RegionUpdate",
@@ -66,6 +70,7 @@ EXPECTED_PUBLIC_API = [
     "ShellSubmitSurface",
     "SignalEmit",
     "Stream",
+    "StructuredOutputError",
     "Suspense",
     "SwapResolution",
     "Template",
@@ -137,6 +142,7 @@ def test_public_api_snapshot() -> None:
     assert chirp.__all__ == EXPECTED_PUBLIC_API
 
 
+@pytest.mark.issue(421)
 def test_public_api_status_covers_all_exports() -> None:
     """Every public export has an explicit stability classification."""
     assert set(chirp._API_STATUS) == set(chirp.__all__)

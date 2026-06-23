@@ -533,6 +533,7 @@ async def handle_request(
                 g_snapshot=response.g_snapshot,
                 request_context=response.request_context,
                 csp_nonce=response.csp_nonce,
+                runtime_context=response.runtime_context,
             )
             await handle_sse(
                 stream,

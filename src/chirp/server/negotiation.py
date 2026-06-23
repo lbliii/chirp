@@ -726,6 +726,7 @@ def negotiate(
                 csrf_token=captured.csrf_token,
                 csrf_field_name=captured.csrf_field_name,
                 g_snapshot=captured.g_snapshot,
+                runtime_context=captured.runtime_context,
             )
         case str():
             _trace_return(
