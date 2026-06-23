@@ -2546,9 +2546,7 @@ class TestFreeThreadingPanel:
         assert feed.worker_count >= feed.market_count
         assert feed.worker_count >= 2
 
-    async def test_ft_stream_includes_throughput_meter_when_rate_known(
-        self, example_app
-    ) -> None:
+    async def test_ft_stream_includes_throughput_meter_when_rate_known(self, example_app) -> None:
         """The SSE twin renders the GIL-contrast meter once ticks/sec is known."""
         async with TestClient(example_app) as client:
             result = await client.sse("/ft/stream", max_events=4)
@@ -2557,8 +2555,7 @@ class TestFreeThreadingPanel:
         assert "Throughput" in joined
 
     @pytest.mark.skipif(
-        not hasattr(__import__("sys"), "_is_gil_enabled")
-        or __import__("sys")._is_gil_enabled(),
+        not hasattr(__import__("sys"), "_is_gil_enabled") or __import__("sys")._is_gil_enabled(),
         reason="requires free-threaded build (python3.14t with GIL disabled)",
     )
     def test_parallel_advance_beats_serial_baseline(self, monkeypatch) -> None:
@@ -2569,7 +2566,8 @@ class TestFreeThreadingPanel:
 
         from feed import SimFeed
 
-        assert hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+        assert hasattr(sys, "_is_gil_enabled")
+        assert not sys._is_gil_enabled()
 
         # Default 6-market catalog is too small to beat thread-pool overhead;
         # scale the catalog so the fan-out has enough CPU work to overlap.
@@ -2593,8 +2591,8 @@ class TestFreeThreadingPanel:
 
         speedup = serial_elapsed / parallel_elapsed
         assert speedup >= 1.85, (
-            f"expected parallel fan-out to beat serial baseline by ≥1.85×; "
-            f"got {speedup:.2f}× (parallel={parallel_elapsed:.4f}s "
+            f"expected parallel fan-out to beat serial baseline by >=1.85x; "
+            f"got {speedup:.2f}x (parallel={parallel_elapsed:.4f}s "
             f"serial={serial_elapsed:.4f}s catalog={feed.market_count} "
             f"workers={feed.worker_count})"
         )
