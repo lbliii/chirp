@@ -61,17 +61,22 @@ async def get_stream(prompt: str) -> AsyncIterator[str]:
     example never hard-fails just because a local model is not running.
     """
     if USE_OLLAMA:
-        try:
-            from chirp.ai import LLM  # optional: pip install chirp[ai]
-
-            llm = LLM("ollama:llama3.2")
-            async for token in llm.stream(prompt):
+        live = _ollama_stream(prompt)
+        if live is not None:
+            async for token in live:
                 yield token
             return
-        except Exception:  # noqa: BLE001 — degrade to the offline path
-            pass
     async for token in simulated_stream(prompt):
         yield token
+
+
+def _ollama_stream(prompt: str) -> AsyncIterator[str] | None:
+    try:
+        from chirp.ai import LLM  # optional: pip install chirp[ai]
+
+        return LLM("ollama:llama3.2").stream(prompt)
+    except Exception:
+        return None
 
 
 @app.route("/")

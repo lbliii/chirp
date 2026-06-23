@@ -20,7 +20,10 @@ def test_warns_htmx_swap_into_template_stream_route():
     async def ask(request):
         from chirp import TemplateStream
 
-        return TemplateStream("response.html", prompt="hi", stream=get_stream(""))
+        async def tokens():
+            yield "x"
+
+        return TemplateStream("response.html", prompt="hi", stream=tokens())
 
     router = _Router([_Route("/ask", ask)])
     template_sources = {
@@ -47,7 +50,10 @@ def test_no_warning_for_plain_form_post_to_template_stream():
     async def ask(request):
         from chirp import TemplateStream
 
-        return TemplateStream("response.html", prompt="hi", stream=get_stream(""))
+        async def tokens():
+            yield "x"
+
+        return TemplateStream("response.html", prompt="hi", stream=tokens())
 
     router = _Router([_Route("/ask", ask)])
     template_sources = {

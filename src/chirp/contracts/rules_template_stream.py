@@ -15,7 +15,7 @@ from chirp.routing.router import Router
 
 from .patterns import METHOD_POST
 from .routes import build_route_index, collect_route_paths, find_matching_route
-from .rules_sse import _call_name, _string_kwarg, strip_template_comments
+from .rules_sse import _call_name, strip_template_comments
 from .types import ContractIssue, Severity
 
 _FULL_PAGE_MARKERS = re.compile(
@@ -45,13 +45,17 @@ def _template_stream_template(handler: Any) -> str | None:
             continue
         if _call_name(node.value.func) != "TemplateStream":
             continue
-        if node.value.args and isinstance(node.value.args[0], ast.Constant):
-            if isinstance(node.value.args[0].value, str):
-                return node.value.args[0].value
+        if node.value.args and isinstance(node.value.args[0], ast.Constant) and isinstance(
+            node.value.args[0].value, str
+        ):
+            return node.value.args[0].value
         for kw in node.value.keywords:
-            if kw.arg in ("template", "template_name") and isinstance(kw.value, ast.Constant):
-                if isinstance(kw.value.value, str):
-                    return kw.value.value
+            if (
+                kw.arg in ("template", "template_name")
+                and isinstance(kw.value, ast.Constant)
+                and isinstance(kw.value.value, str)
+            ):
+                return kw.value.value
     return None
 
 
