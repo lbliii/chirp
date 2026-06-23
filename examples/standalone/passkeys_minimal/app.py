@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import credential_store
-from webauthn.helpers import base64url_to_bytes
 
 from chirp import (
     App,
@@ -177,6 +176,8 @@ async def passkey_login_finish(request: Request):
     cred_id = body.get("id") if isinstance(body, dict) else None
     if not isinstance(cred_id, str) or not cred_id:
         return JSONResponse.from_value({"error": "Missing credential id."}, status=422)
+
+    from webauthn.helpers import base64url_to_bytes
 
     stored = credential_store.get(base64url_to_bytes(cred_id))
     if stored is None:
