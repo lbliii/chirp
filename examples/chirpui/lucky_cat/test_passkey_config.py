@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import passkey_config
+
 from chirp.http.headers import Headers
 from chirp.http.request import Request, _LazyCookies, _LazyQueryParams
 
