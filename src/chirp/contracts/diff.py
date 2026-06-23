@@ -79,7 +79,7 @@ class ContractDiff:
             [
                 "",
                 f"_Automated by [`chirp diff`](https://github.com/lbliii/chirp/issues/{issue_number}). "
-                "Merge-blocking policy is advisory until steward sign-off._",
+                "New contract ERRORs block merge; new warnings are advisory._",
             ]
         )
         return "\n".join(lines)
