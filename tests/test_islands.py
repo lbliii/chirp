@@ -37,6 +37,12 @@ class TestIslandsSnippet:
         assert "register: register" in s
         assert "import(payload.src)" in s
 
+    @pytest.mark.issue(466)
+    def test_ensure_adapter_falls_back_to_register_only_modules(self) -> None:
+        """Register-only adapters must mount on first load, not only after remount."""
+        s = islands_snippet("1")
+        assert "normalizeAdapter(mod) || adapters.get(payload.name)" in s
+
     def test_default_is_unnonced(self) -> None:
         assert "nonce=" not in islands_snippet("1")
 
