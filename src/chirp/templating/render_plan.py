@@ -469,7 +469,9 @@ def execute_render_plan(
                     # when the layout actually defines them.
                     meta = adapter.template_metadata(layout_info.template_name)
                     all_blocks = set(getattr(meta, "blocks", None) or ()) if meta else set()
-                    per_layout_oob[layout_info.template_name] = own_oob | (registry_blocks & all_blocks)
+                    per_layout_oob[layout_info.template_name] = own_oob | (
+                        registry_blocks & all_blocks
+                    )
             for layout_info in reversed(layouts):
                 block_overrides: dict[str, str] = {"content": main_html}
                 if plan.intent == "full_page":
@@ -507,7 +509,9 @@ def execute_render_plan(
                 if max_oob_depth is not None and layout_info.depth > max_oob_depth:
                     continue
                 if oob_registry is not None:
-                    contract = oob_registry.get_or_build_contract(adapter, layout_info.template_name)
+                    contract = oob_registry.get_or_build_contract(
+                        adapter, layout_info.template_name
+                    )
                 else:
                     contract = build_layout_contract(adapter, layout_info.template_name)
 

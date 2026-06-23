@@ -2497,9 +2497,7 @@ class TestSignalTopicScoping:
             response = await client.get("/trade", headers=_cookie_header(cookie))
         assert response.status == 200
         connect = next(
-            part
-            for part in response.text.split('"')
-            if part.startswith("/_chirp/live?topics=")
+            part for part in response.text.split('"') if part.startswith("/_chirp/live?topics=")
         )
         assert "market_stats" not in connect
         assert "lobby_snapshot" not in connect

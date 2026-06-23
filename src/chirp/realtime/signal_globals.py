@@ -143,9 +143,7 @@ def apply_signal_connect(html: str) -> str:
     if "data-chirp-signal-connect" not in html:
         return html
     url = f"{SIGNAL_STREAM_PATH}{_connect_query()}"
-    replacement = (
-        f'<div hx-ext="sse" sse-connect="{url}" hx-disinherit="hx-target hx-swap">'
-    )
+    replacement = f'<div hx-ext="sse" sse-connect="{url}" hx-disinherit="hx-target hx-swap">'
     return html.replace(_SIGNAL_CONNECT_OPEN, replacement)
 
 

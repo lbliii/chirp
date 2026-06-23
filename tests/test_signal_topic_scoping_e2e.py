@@ -46,9 +46,7 @@ def get():
 """
     )
     (pages / "board" / "page.html").write_text(
-        "{% block page_content %}"
-        '<section {{ signal_bind("board_view") }}>board</section>'
-        "{% end %}"
+        '{% block page_content %}<section {{ signal_bind("board_view") }}>board</section>{% end %}'
     )
 
     app = App(config=AppConfig(template_dir=pages))
@@ -139,7 +137,9 @@ class TestSignalTopicScopingE2E:
 
         board_pumped["n"] = 0
         async with TestClient(app) as client:
-            result = await client.sse("/_chirp/live?topics=board_view,board_feed,chrome", max_events=2)
+            result = await client.sse(
+                "/_chirp/live?topics=board_view,board_feed,chrome", max_events=2
+            )
         assert result.status == 200
         assert board_pumped["n"] >= 1
         assert lobby_pumped["n"] == 0
