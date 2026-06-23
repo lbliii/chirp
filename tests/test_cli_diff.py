@@ -10,8 +10,8 @@ from unittest.mock import patch
 import pytest
 
 from chirp.cli._diff import run_diff
-from chirp.contracts.surface_diff import check_at_git_ref, find_git_root
 from chirp.contracts.diff import diff_contract_dicts
+from chirp.contracts.surface_diff import check_at_git_ref, find_git_root
 
 
 @pytest.mark.issue(344)

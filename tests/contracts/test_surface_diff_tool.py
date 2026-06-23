@@ -30,11 +30,10 @@ def test_chirp_surface_diff_tool_returns_json_payload() -> None:
     pytest.importorskip("chirp_ui")
     import importlib.util
     import sys
-    from pathlib import Path
 
-    from chirp import App, AppConfig
-
-    app_path = Path(__file__).resolve().parents[2] / "examples" / "chirpui" / "forum_shell" / "app.py"
+    app_path = (
+        Path(__file__).resolve().parents[2] / "examples" / "chirpui" / "forum_shell" / "app.py"
+    )
     spec = importlib.util.spec_from_file_location("forum_shell_app", app_path)
     assert spec is not None
     assert spec.loader is not None
