@@ -100,6 +100,11 @@ def main(argv: list[str] | None = None) -> None:
         help="Generate a minimal single-file project",
     )
     new_parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Simulated token streaming (TemplateStream + EventStream demo)",
+    )
+    new_parser.add_argument(
         "--sse",
         action="store_true",
         help="Include SSE boilerplate (EventStream, sse_scope)",

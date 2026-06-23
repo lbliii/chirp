@@ -23,6 +23,7 @@
 </head>
 <body>
 <h1>Live Feed</h1>
+{# sse-eager-connect: intentional — this example demonstrates a static live feed. #}
 <div id="feed">
   <div hx-ext="sse" sse-connect="/events" sse-close="close" hx-disinherit="hx-target hx-swap" style="display: contents">
     <p id="placeholder">Waiting for events...</p>

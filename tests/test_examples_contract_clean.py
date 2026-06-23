@@ -116,6 +116,24 @@ def test_example_has_no_template_stream_shape_warnings(app_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize("app_path", _APP_FILES, ids=_IDS)
+def test_example_has_no_sse_token_swap_warnings(app_path: Path) -> None:
+    app = _load_isolated(app_path)
+    assert app is not None, f"{app_path} defines no top-level `app`"
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        result = check_hypermedia_surface(app)
+    warnings = [
+        i
+        for i in result.issues
+        if i.category == "sse_token_swap_mode"
+        and getattr(i.severity, "name", "") == "WARNING"
+    ]
+    assert not warnings, "{} has sse_token_swap_mode WARNING(s):\n{}".format(
+        app_path.parent.relative_to(_EXAMPLES_ROOT),
+        "\n".join(f"  {i.message}" for i in warnings),
+    )
+
+
 def test_discovered_all_examples() -> None:
     """Guard against the glob silently matching nothing (e.g. a moved dir)."""
     assert len(_APP_FILES) >= 40
