@@ -45,6 +45,20 @@ want progressive first byte without a skeleton shell). Updates after the page is
 live → `EventStream` for page-local regions, `signal()` when the same value must
 update chrome on every page. Several DOM targets from one POST → `OOB`.
 
+### Transport × client shape (LLM and chunked answers)
+
+``TemplateStream`` always renders a **whole template file** over chunked HTTP.
+It is not a fragment return type. Pair transport with the client wiring:
+
+| | **Full-page client** | **htmx swap client** |
+|---|---|---|
+| **Chunked HTTP (`TemplateStream`)** | plain `<form method="post">` | not supported — nests a document inside `#target` |
+| **SSE (`EventStream`)** | rare | `Fragment` scaffold + parametric `sse-connect` |
+
+Chirp warns on the bad pairing via the `template_stream_client_shape` contract.
+See [[docs/examples/llm-minimal|LLM Minimal]] and
+[[docs/hypermedia-footguns|Hypermedia footguns]].
+
 See also [[docs/about/core-concepts/return-values|Return values]] for the full
 type reference and [[docs/build-apps/streaming-updates/html-streaming|Streaming
 HTML & Suspense]] for template patterns.

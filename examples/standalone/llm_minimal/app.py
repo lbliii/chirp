@@ -4,8 +4,8 @@ The 5-minute path between the ChirpUI ``llm_playground`` and the heavier
 ``ollama`` example. Streams tokens to the browser two ways so you can feel
 the difference:
 
-- ``/ask``    — ``TemplateStream`` + ``{% async for %}``: one chunked HTML body.
-- ``/stream`` — ``EventStream`` + ``Fragment``-per-token: SSE, htmx-swapped.
+- ``/ask``    — ``TemplateStream`` + ``{% async for %}``: full-page chunked HTML.
+- ``/stream`` — ``EventStream`` + ``Fragment``-per-token: SSE after form submit.
 
 Simulated tokens by default — no Ollama, no API keys. Set ``USE_OLLAMA=1``
 (with ``ollama serve``) to stream from a real local LLM via ``chirp.ai.LLM``.
@@ -18,6 +18,7 @@ import asyncio
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
+from urllib.parse import quote
 
 from chirp import (
     App,
@@ -81,7 +82,7 @@ async def index() -> Template:
 
 @app.route("/ask", methods=["POST"])
 async def ask(request: Request) -> TemplateStream:
-    """TemplateStream — one chunked HTML render driven by ``{% async for %}``."""
+    """TemplateStream — full-page chunked HTML driven by ``{% async for %}``."""
     form = await request.form()
     prompt = (form.get("prompt") or "").strip() or "What is Chirp?"
     return TemplateStream(
@@ -91,12 +92,22 @@ async def ask(request: Request) -> TemplateStream:
     )
 
 
+@app.route("/stream/start", methods=["POST"])
+async def stream_start(request: Request) -> Fragment:
+    """Return an SSE panel wired to ``/stream`` with the submitted prompt."""
+    form = await request.form()
+    prompt = (form.get("prompt") or "").strip() or "What is Chirp?"
+    stream_url = f"/stream?prompt={quote(prompt)}"
+    return Fragment("sse_panel.html", "sse_panel", prompt=prompt, stream_url=stream_url)
+
+
 @app.route("/stream", referenced=True)
-def stream() -> EventStream:
+async def stream(request: Request) -> EventStream:
     """EventStream — one SSE Fragment per token, swapped in by htmx."""
 
+    prompt = (request.query.get("prompt") or "").strip() or "What is Chirp?"
+
     async def generate() -> AsyncIterator[Fragment | SSEEvent]:
-        prompt = "What is Chirp?"
         async for token in get_stream(prompt):
             yield Fragment("response.html", "token", token=token)
         yield SSEEvent(event="close", data="done")
