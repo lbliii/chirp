@@ -41,6 +41,7 @@ def passkey_config(monkeypatch):
     monkeypatch.setattr(pk_mod, "PASSKEY_CONFIG", TEST_PASSKEY_CONFIG)
     monkeypatch.setattr(pk_mod, "_ORIGIN", TEST_PASSKEY_CONFIG.origin)
     monkeypatch.setattr(pk_mod, "_RP_ID", TEST_PASSKEY_CONFIG.rp_id)
+    monkeypatch.setattr(pk_mod, "config_for_request", lambda request: TEST_PASSKEY_CONFIG)
     return TEST_PASSKEY_CONFIG
 
 

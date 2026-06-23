@@ -131,6 +131,50 @@ class TestNonceCSPAllowsFrameworkScripts:
         assert "'unsafe-inline'" not in script_directive
 
 
+# --- Inline script nonce backfill (chirp-ui theme + shell runtime) ---
+
+
+def test_nonce_inline_scripts_adds_nonce_to_bare_script():
+    from chirp.middleware.csp_nonce import nonce_inline_scripts
+
+    html = "<script>alert(1)</script>"
+    out = nonce_inline_scripts(html, "abc123")
+    assert out == '<script nonce="abc123">alert(1)</script>'
+
+
+def test_nonce_inline_scripts_skips_src_and_existing_nonce():
+    from chirp.middleware.csp_nonce import nonce_inline_scripts
+
+    html = (
+        '<script src="/app.js"></script>'
+        '<script nonce="keep">ok</script>'
+        '<script type="application/json">{}</script>'
+    )
+    out = nonce_inline_scripts(html, "abc123")
+    assert out == html.replace(
+        '<script type="application/json">',
+        '<script nonce="abc123" type="application/json">',
+        1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_middleware_nonces_unmarked_inline_scripts():
+    async def html_next(request):
+        from chirp.http.response import Response
+
+        return Response(
+            "<html><head><script>theme()</script></head><body></body></html>",
+            content_type="text/html",
+        )
+
+    mw = CSPNonceMiddleware()
+    resp = await mw(FakeRequest(), html_next)
+    csp = _get_header(resp, "content-security-policy")
+    nonce = csp.split("'nonce-")[1].split("'")[0]
+    assert f'<script nonce="{nonce}">theme()</script>' in resp.text
+
+
 # --- StreamingResponse carries the live nonce for the sender (#181) ---
 
 
