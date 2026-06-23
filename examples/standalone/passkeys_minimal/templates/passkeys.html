@@ -12,7 +12,7 @@
   <li>{{ row.nickname or 'Passkey' }} (sign count {{ row.sign_count }})</li>
   {% end %}
 </ul>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function () {
   var btn = document.getElementById('passkey-register');
   var msg = document.getElementById('passkey-msg');

@@ -68,6 +68,20 @@ class TestLuckyCatPasskeys:
             assert 'id="passkey-login"' in html
 
     @pytest.mark.issue(464)
+    async def test_login_passkey_script_carries_csp_nonce(self, example_app) -> None:
+        """The passkey click handler must be nonced — a bare inline <script> is blocked."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/login")
+            html = response.text
+            csp = response.header("content-security-policy") or ""
+            assert "nonce-" in csp
+            idx = html.index("getElementById('passkey-login')")
+            script_open = html.rfind("<script", 0, idx)
+            assert script_open != -1
+            tag = html[script_open : html.index(">", script_open) + 1]
+            assert 'nonce="' in tag
+
+    @pytest.mark.issue(464)
     async def test_register_finish_persists_for_demo_user(
         self, example_app, passkey_config, monkeypatch
     ) -> None:
