@@ -171,6 +171,45 @@ def main(argv: list[str] | None = None) -> None:
         help="Include INFO-severity issues in --json / --baseline output",
     )
 
+    # -- chirp diff -------------------------------------------------------
+    diff_parser = subparsers.add_parser(
+        "diff",
+        help="Diff hypermedia contracts against a git base ref",
+    )
+    diff_parser.add_argument(
+        "app",
+        help="Import string (e.g. myapp:app)",
+    )
+    diff_parser.add_argument(
+        "--base",
+        required=True,
+        metavar="REF",
+        help="Git ref to compare against (e.g. origin/main)",
+    )
+    diff_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a stable JSON diff payload for CI and agents",
+    )
+    diff_parser.add_argument(
+        "--warnings-as-errors",
+        action="store_true",
+        help="Exit with code 1 if new contract warnings appear",
+    )
+    diff_parser.add_argument(
+        "--deploy",
+        action="store_true",
+        help=(
+            "Run checks with production-posture severity on both sides; "
+            "implies --warnings-as-errors"
+        ),
+    )
+    diff_parser.add_argument(
+        "--include-info",
+        action="store_true",
+        help="Include INFO-severity issues in the diff",
+    )
+
     # -- chirp routes -----------------------------------------------------
     routes_parser = subparsers.add_parser("routes", help="List registered routes")
     routes_parser.add_argument(
@@ -299,6 +338,10 @@ def main(argv: list[str] | None = None) -> None:
         from chirp.cli._check import run_check
 
         run_check(args)
+    elif args.command == "diff":
+        from chirp.cli._diff import run_diff
+
+        run_diff(args)
     elif args.command == "routes":
         from chirp.cli._routes import run_routes
 

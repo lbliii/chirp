@@ -14,15 +14,15 @@ surface should be diffable.
 
 - `chirp check APP --json` emits a stable JSON payload via `result_to_dict()`
 - `chirp check APP --baseline PATH` diffs against a prior JSON run
+- `chirp diff APP --base REF` runs check at *REF* (via git worktree) and diffs against HEAD
 - Fingerprints: `(severity, category, route, template, message)`
 - CI policy: fail on **new errors**; optional fail on new warnings with `--warnings-as-errors`
 
 ## Next steps
 
-1. `chirp diff --base origin/main APP` CLI that runs check twice without a committed baseline
-2. GitHub Action posting PR comments from `--json` diff output
-3. MCP tool `chirp_surface_diff` for agent consumption
-4. Merge-blocking policy steward sign-off (ERROR-only vs WARNING)
+1. GitHub Action posting PR comments from `--json` diff output
+2. MCP tool `chirp_surface_diff` for agent consumption
+3. Merge-blocking policy steward sign-off (ERROR-only vs WARNING)
 
 ## Non-goals (v0)
 
