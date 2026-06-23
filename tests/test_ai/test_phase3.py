@@ -184,6 +184,7 @@ class TestAdditionalProviders:
     async def test_bedrock_generate_requires_botocore(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        pytest.importorskip("botocore")
         import botocore.session
         import httpx
 
