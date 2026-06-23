@@ -230,6 +230,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "plugin_check_error": "Plugins",
     "chirpui_import": "Plugins",
     "chirpui_runtime": "Plugins",
+    "chirpui_alpine_runtime": "Plugins",
     "design_system": "Plugins",
     "blog": "Plugins",
     "docs_parse": "Docs",

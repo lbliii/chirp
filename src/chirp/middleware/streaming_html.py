@@ -6,8 +6,19 @@ chunks is detected without materializing the entire body.
 """
 
 import inspect
+import re
 from collections.abc import AsyncIterator, Iterator
 from typing import cast
+
+_SCRIPT_CHIRP_MARKER = re.compile(
+    r"""<script\b[^>]*\bdata-chirp=["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+
+
+def _html_has_script_chirp_marker(html: str, chirp_value: str) -> bool:
+    return any(match.group(1) == chirp_value for match in _SCRIPT_CHIRP_MARKER.finditer(html))
+
 
 # If no </body> after this many bytes, stop buffering and pass through (full_page_only).
 _MAX_BUFFER_NO_BODY = 2 * 1024 * 1024
@@ -35,12 +46,17 @@ async def async_stream_inject_before_body(
     snippet: str,
     before: str = "</body>",
     dedup_marker: str | None = None,
+    dedup_script_chirp: str | None = None,
     full_page_only: bool = True,
 ) -> AsyncIterator[str]:
     """Yield HTML chunks, inserting *snippet* before the first *before* delimiter.
 
     If *dedup_marker* is set and appears before the first *before*, the stream is
     passed through unchanged (no double injection).
+
+    If *dedup_script_chirp* is set, dedup requires a ``<script data-chirp="…">``
+    tag with that value (avoids false positives from page content mentioning the
+    marker string).
 
     If *before* never appears and *full_page_only* is True, the buffered tail is
     yielded as-is (same as :class:`HTMLInject` when ``</body>`` is absent).
@@ -59,7 +75,11 @@ async def async_stream_inject_before_body(
 
         while not passthrough:
             i_body = buf.find(before)
-            i_dup = buf.find(dedup_marker) if dedup_marker else -1
+            i_dup = -1
+            if dedup_script_chirp and _html_has_script_chirp_marker(buf, dedup_script_chirp):
+                i_dup = 0
+            elif dedup_marker:
+                i_dup = buf.find(dedup_marker)
 
             if i_body != -1:
                 if i_dup != -1 and i_dup < i_body:

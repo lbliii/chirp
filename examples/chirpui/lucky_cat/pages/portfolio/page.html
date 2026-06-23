@@ -61,6 +61,40 @@
     <dd>{% if (ticks_per_sec ?? none) is not none %}{{ ticks_per_sec }}{% else %}<span class="chirpui-text-muted">…</span>{% end %}</dd>
   </div>
 </dl>
+{#- Throughput meter: when the GIL is on, project the free-threaded ceiling from
+    the live rate × worker width so visitors on default 3.14 see the contrast
+    without faking numbers. When GIL is off, the bar fills to the top. -#}
+{% if (ticks_per_sec ?? none) is not none and workers > 1 %}
+  {% set ceiling = ticks_per_sec * workers if gil_enabled else ticks_per_sec %}
+  {% set scale = ceiling if ceiling > 0 else 1 %}
+  {% set actual_pct = (ticks_per_sec / scale * 100) | round %}
+  <div class="luckycat-ft__meter" aria-label="Tick throughput vs parallel ceiling">
+    <div class="luckycat-ft__meter-head">
+      <span class="luckycat-ft__meter-label">Throughput</span>
+      {% if gil_enabled %}
+      <span class="luckycat-ft__meter-ghost-label">~{{ workers }}× on <code>python3.14t</code></span>
+      {% else %}
+      <span class="luckycat-ft__meter-ghost-label luckycat-ft__good">parallel ✓</span>
+      {% end %}
+    </div>
+    <div class="luckycat-ft__meter-track">
+      {% if gil_enabled %}
+      <div class="luckycat-ft__meter-ceiling" aria-hidden="true"></div>
+      {% end %}
+      <div class="luckycat-ft__meter-fill {{ 'luckycat-ft__meter-fill--bound' if gil_enabled else 'luckycat-ft__meter-fill--free' }}" style="width: {{ actual_pct }}%;"></div>
+    </div>
+    {% if gil_enabled %}
+    <p class="luckycat-ft__callout luckycat-ft__callout--bound">
+      GIL-bound — worker threads serialize here. On a free-threaded build the same
+      pool fans {{ markets }} markets across {{ workers }} cores in parallel.
+    </p>
+    {% else %}
+    <p class="luckycat-ft__callout luckycat-ft__callout--free">
+      Free-threaded — the SimFeed worker pool is running genuine parallel tick fan-out.
+    </p>
+    {% end %}
+  </div>
+{% end %}
 {% end %}
 
 {% block page_root %}
