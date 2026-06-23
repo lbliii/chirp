@@ -2546,6 +2546,59 @@ class TestFreeThreadingPanel:
         assert feed.worker_count >= feed.market_count
         assert feed.worker_count >= 2
 
+    async def test_ft_stream_includes_throughput_meter_when_rate_known(
+        self, example_app
+    ) -> None:
+        """The SSE twin renders the GIL-contrast meter once ticks/sec is known."""
+        async with TestClient(example_app) as client:
+            result = await client.sse("/ft/stream", max_events=4)
+        joined = "".join(e.data for e in result.events if e.data)
+        assert 'class="luckycat-ft__meter"' in joined
+        assert "Throughput" in joined
+
+    @pytest.mark.skipif(
+        not hasattr(__import__("sys"), "_is_gil_enabled")
+        or __import__("sys")._is_gil_enabled(),
+        reason="requires free-threaded build (python3.14t with GIL disabled)",
+    )
+    def test_parallel_advance_beats_serial_baseline(self, monkeypatch) -> None:
+        """On a GIL-off build, pool fan-out must overlap — not just architecture
+        by inspection. Skipped (not silently passed) on GIL-bound interpreters."""
+        import sys
+        import time
+
+        from feed import SimFeed
+
+        assert hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+
+        # Default 6-market catalog is too small to beat thread-pool overhead;
+        # scale the catalog so the fan-out has enough CPU work to overlap.
+        monkeypatch.setenv("LUCKY_CAT_CATALOG", "48")
+
+        feed = SimFeed(seed=1, tick_interval=0)
+        steps = 80
+
+        feed.reset()
+        t0 = time.perf_counter()
+        for _ in range(steps):
+            for sym in list(feed._states):
+                feed._advance_symbol(sym)
+        serial_elapsed = time.perf_counter() - t0
+
+        feed.reset()
+        t0 = time.perf_counter()
+        for _ in range(steps):
+            feed._advance_all()
+        parallel_elapsed = time.perf_counter() - t0
+
+        speedup = serial_elapsed / parallel_elapsed
+        assert speedup >= 1.85, (
+            f"expected parallel fan-out to beat serial baseline by ≥1.85×; "
+            f"got {speedup:.2f}× (parallel={parallel_elapsed:.4f}s "
+            f"serial={serial_elapsed:.4f}s catalog={feed.market_count} "
+            f"workers={feed.worker_count})"
+        )
+
 
 @pytest.mark.issue(227)
 class TestTickCounter:
