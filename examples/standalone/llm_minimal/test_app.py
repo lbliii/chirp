@@ -32,6 +32,7 @@ class TestIndex:
             response = await client.get("/")
             assert 'hx-post="/stream/start"' in response.text
             assert 'hx-target="#sse-section"' in response.text
+            assert "if(event.detail.successful) this.reset()" in response.text
 
 
 class TestAskTemplateStream:
