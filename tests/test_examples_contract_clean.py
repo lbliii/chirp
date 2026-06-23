@@ -125,8 +125,7 @@ def test_example_has_no_sse_token_swap_warnings(app_path: Path) -> None:
     warnings = [
         i
         for i in result.issues
-        if i.category == "sse_token_swap_mode"
-        and getattr(i.severity, "name", "") == "WARNING"
+        if i.category == "sse_token_swap_mode" and getattr(i.severity, "name", "") == "WARNING"
     ]
     assert not warnings, "{} has sse_token_swap_mode WARNING(s):\n{}".format(
         app_path.parent.relative_to(_EXAMPLES_ROOT),

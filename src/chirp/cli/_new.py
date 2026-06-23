@@ -121,7 +121,12 @@ def create_project(args: argparse.Namespace) -> None:
         _create_v2(project_dir, args.name)
 
     print(f"Created project '{args.name}'")
-    if not args.minimal and not getattr(args, "sse", False) and not getattr(args, "stream", False) and not getattr(args, "shell", False):
+    if (
+        not args.minimal
+        and not getattr(args, "sse", False)
+        and not getattr(args, "stream", False)
+        and not getattr(args, "shell", False)
+    ):
         print()
         print(f"  cd {args.name} && python app.py")
         print()
