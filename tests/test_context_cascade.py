@@ -81,7 +81,7 @@ class TestContextCascade:
         pages_dir = tmp_path / "pages"
         pages_dir.mkdir()
         (pages_dir / "_layout.html").write_text(
-            '<html><body>{% block content %}{% end %}</body></html>'
+            "<html><body>{% block content %}{% end %}</body></html>"
         )
         (pages_dir / "_context.py").write_text(
             """
