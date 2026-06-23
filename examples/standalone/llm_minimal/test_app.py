@@ -82,6 +82,7 @@ class TestStreamStart:
             )
             assert response.status == 200
             assert 'sse-connect="/stream?prompt=Hello"' in response.text
+            assert 'hx-swap="beforeend"' in response.text
             assert "Prompt: Hello" in response.text
             assert "<html" not in response.text.lower()
 
