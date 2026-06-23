@@ -39,6 +39,13 @@ Make requests against your app without a running server.
 Check the fragments, out-of-band swaps, htmx headers, and SSE wiring your handlers return.
 :::{/card}
 
+:::{card} AI route testing
+:icon: cpu
+:link: /chirp/docs/quality/testing/ai-testing/
+:description: Mock LLM providers for agent and SSE chat tests
+Script tool rounds and streamed answers without live API keys.
+:::{/card}
+
 :::{/cards}
 
 :::{note} See also
