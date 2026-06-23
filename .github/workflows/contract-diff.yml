@@ -1,0 +1,50 @@
+name: Contract diff
+
+# Advisory hypermedia surface diff on PRs (issue #344). Posts a comment listing
+# added/removed contract issues vs the base branch. Does not block merge until
+# steward sign-off on merge-blocking policy.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  contract-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14t"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-contract-diff-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-contract-diff-
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies (ChirpUI extra)
+        run: uv sync --no-sources --group dev --extra ui
+
+      - name: Post hypermedia contract diff comment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PYTHON_GIL: "0"
+        run: |
+          uv run python scripts/contract_diff_pr_comment.py \
+            --app examples.chirpui.forum_shell.app:app \
+            --base "origin/${{ github.base_ref }}"
