@@ -1120,6 +1120,9 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             snapshot.extras,
         )
     )
+    from chirp.contracts.rules_chirpui_alpine_runtime import check_chirpui_alpine_runtime
+
+    result.issues.extend(check_chirpui_alpine_runtime(app, snapshot, posture_config))
     # Static streaming: StaticFiles must keep a sane stream threshold so large
     # files stream from disk rather than buffering into memory (#178).
     from chirp.contracts.rules_static_streaming import check_static_streaming

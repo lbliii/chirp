@@ -325,6 +325,24 @@ class TestAlpineInjectDedup:
             assert response.status == 200
             assert 'data-chirp="alpine"' in response.text
 
+    async def test_injects_when_marker_only_in_page_content(self) -> None:
+        """Mentioning data-chirp=\"alpine\" in body text must not skip injection (#191)."""
+        app = App(config=AppConfig(alpine=True))
+
+        @app.route("/")
+        def index():
+            return (
+                "<html><body>"
+                '<p>Docs mention data-chirp="alpine" in prose but no script tag.</p>'
+                "</body></html>"
+            )
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+            assert 'data-chirp="alpine"' in response.text
+            assert response.text.count('data-chirp="alpine"') >= 2
+
 
 # ---------------------------------------------------------------------------
 # AlpineInject CSP-nonce tests (#195) — the inline safeData bootstrap must carry

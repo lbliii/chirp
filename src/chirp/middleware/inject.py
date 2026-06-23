@@ -10,6 +10,7 @@ markup that should appear on every page without modifying templates.
 import hashlib
 import logging
 import os
+import re
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -24,6 +25,20 @@ from chirp.middleware.streaming_html import async_stream_inject_before_body
 from chirp.server.sender import _etag_matches, _format_http_date, _parse_http_date
 
 _LOG = logging.getLogger("chirp.middleware.inject")
+
+_SCRIPT_CHIRP_MARKER = re.compile(
+    r"""<script\b[^>]*\bdata-chirp=["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+
+
+def _html_has_script_chirp_marker(html: str, chirp_value: str) -> bool:
+    """True when a ``<script>`` tag carries ``data-chirp="<value>"``.
+
+    Substring dedup on ``data-chirp="alpine"`` alone false-positives when page
+    content mentions the marker (docs, examples). Anchor to script tags (#191).
+    """
+    return any(match.group(1) == chirp_value for match in _SCRIPT_CHIRP_MARKER.finditer(html))
 
 
 async def _materialize_html_file(
@@ -389,7 +404,7 @@ class AlpineInject(HTMLInject):
         body = response.body
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
-        if 'data-chirp="alpine"' in body:
+        if _html_has_script_chirp_marker(body, "alpine"):
             return _finalize_html(response, request, mtime=mtime, stable=True)
         # Reuse the fetched response — do not call ``next`` again via super().
         target = self._target
@@ -417,7 +432,7 @@ class AlpineInject(HTMLInject):
             response.chunks,
             snippet=self._render_snippet(),
             before=self._target,
-            dedup_marker='data-chirp="alpine"',
+            dedup_script_chirp="alpine",
             full_page_only=self._full_page_only,
         )
         return replace(response, chunks=new_chunks)
