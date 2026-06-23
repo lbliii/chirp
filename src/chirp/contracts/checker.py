@@ -28,6 +28,7 @@ from .rules_accessibility import (
 )
 from .rules_alpine_cdn import check_alpine_cdn_urls
 from .rules_boundary import check_boundary_coverage
+from .rules_chirpui_css_verify import check_chirpui_css_verify
 from .rules_chirpui_runtime import check_chirpui_runtime_registration
 from .rules_commands import check_command_values, check_commandfor_targets
 from .rules_composition import check_page_extends_layout
@@ -782,10 +783,19 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         # #148 child 1: core macro classes (chirp-dropdown/field--error/...) have
         # no backing CSS without chirp-ui. extras['chirpui_components'] is a non-None
         # mapping/frozenset when use_chirp_ui(app) ran; falsy/None means inactive.
+        _chirpui_active = bool(snapshot.extras.get("chirpui_components"))
         result.issues.extend(
             check_macro_css(
                 template_sources,
-                chirpui_active=bool(snapshot.extras.get("chirpui_components")),
+                chirpui_active=_chirpui_active,
+            )
+        )
+        # #157 child 2: when chirp-ui is active, literal chirpui-* class tokens
+        # must resolve to backing CSS in the installed package.
+        result.issues.extend(
+            check_chirpui_css_verify(
+                template_sources,
+                chirpui_active=_chirpui_active,
             )
         )
         # #185: hx-*/sse-* attributes are inert unless htmx is provisioned via
