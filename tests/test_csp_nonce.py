@@ -137,7 +137,7 @@ class TestNonceCSPAllowsFrameworkScripts:
 def test_nonce_inline_scripts_adds_nonce_to_bare_script():
     from chirp.middleware.csp_nonce import nonce_inline_scripts
 
-    html = '<script>alert(1)</script>'
+    html = "<script>alert(1)</script>"
     out = nonce_inline_scripts(html, "abc123")
     assert out == '<script nonce="abc123">alert(1)</script>'
 
@@ -164,7 +164,7 @@ async def test_middleware_nonces_unmarked_inline_scripts():
         from chirp.http.response import Response
 
         return Response(
-            '<html><head><script>theme()</script></head><body></body></html>',
+            "<html><head><script>theme()</script></head><body></body></html>",
             content_type="text/html",
         )
 

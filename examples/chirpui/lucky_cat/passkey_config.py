@@ -46,7 +46,9 @@ def config_for_request(request: Request) -> PasskeyConfig:
     """
     env_origin = os.environ.get("CHIRP_PASSKEY_ORIGIN")
     if env_origin:
-        rp_id = os.environ.get("CHIRP_PASSKEY_RP_ID") or urlparse(env_origin).hostname or "localhost"
+        rp_id = (
+            os.environ.get("CHIRP_PASSKEY_RP_ID") or urlparse(env_origin).hostname or "localhost"
+        )
         return PasskeyConfig(rp_id=rp_id, rp_name="Lucky Cat", origin=env_origin)
 
     origin = _origin_from_request(request)
