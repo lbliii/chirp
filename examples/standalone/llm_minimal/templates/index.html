@@ -42,7 +42,7 @@
   <h2>TemplateStream (full-page chunked HTML)</h2>
   <p class="hint">Plain form POST — navigates to a streaming response page (no htmx swap).</p>
   <form action="/ask" method="post">
-    <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
+    <input name="prompt" placeholder="What is Chirp?" autocomplete="off">
     <button type="submit">Stream</button>
   </form>
 
@@ -53,7 +53,7 @@
         hx-swap="innerHTML"
         hx-on::after-request="if(event.detail.successful) this.reset()"
         method="post">
-    <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
+    <input name="prompt" placeholder="What is Chirp?" autocomplete="off">
     <button type="submit">Stream SSE</button>
   </form>
   <div id="sse-section">
