@@ -58,7 +58,7 @@
   </div>
 
   {% block agent_panel %}
-  <div id="agent-stream" hx-ext="sse" sse-connect="/agent/stream" hx-disinherit="*">
+  <div id="agent-stream" hx-ext="sse" sse-connect="{{ stream_url | default('/agent/stream') }}" hx-disinherit="hx-target hx-swap">
     <div sse-swap="message" hx-target="#agent-panel" hx-swap="innerHTML"></div>
   </div>
   {% end %}
@@ -70,8 +70,6 @@
     <p class="muted">Arguments: {{ arguments | format_args }}</p>
     <form
       hx-post="{{ url_for('agent.resume') }}"
-      hx-ext="sse"
-      sse-connect="/agent/resume/stream"
       hx-target="#agent-panel"
       hx-swap="innerHTML"
     >
@@ -82,8 +80,6 @@
     </form>
     <form
       hx-post="{{ url_for('agent.resume') }}"
-      hx-ext="sse"
-      sse-connect="/agent/resume/stream"
       hx-target="#agent-panel"
       hx-swap="innerHTML"
       style="display:inline"

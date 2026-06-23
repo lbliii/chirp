@@ -210,7 +210,7 @@ async def resume_agent(request: Request) -> Fragment:
         "approval_id": (form.get("approval_id") or "").strip(),
         "decision": (form.get("decision") or "").strip(),
     }
-    return Fragment("notes.html", "agent_panel")
+    return Fragment("notes.html", "agent_panel", stream_url="/agent/resume/stream")
 
 
 @app.route("/agent/resume/stream", referenced=True)

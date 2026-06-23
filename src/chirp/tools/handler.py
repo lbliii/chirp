@@ -233,8 +233,7 @@ async def _handle_tools_call(
             "error": JsonRpcError(
                 code=-32603,
                 message=(
-                    f"Tool {tool_name!r} requires human approval via the web UI "
-                    "before it can run."
+                    f"Tool {tool_name!r} requires human approval via the web UI before it can run."
                 ),
             )
         }

@@ -138,9 +138,7 @@ class ToolRegistry:
 
 
 def compile_tools(
-    pending: list[
-        tuple[str, str, Callable[..., Any], bool] | tuple[str, str, Callable[..., Any]]
-    ],
+    pending: list[tuple[str, str, Callable[..., Any], bool] | tuple[str, str, Callable[..., Any]]],
     event_bus: ToolEventBus,
 ) -> ToolRegistry:
     """Compile pending tool registrations into a frozen ToolRegistry.

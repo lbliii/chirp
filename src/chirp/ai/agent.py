@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 from chirp.ai._tool_calls import (
     format_tool_result,
@@ -150,7 +151,7 @@ class AgentRun:
             msg = f"Unknown or pending approval_id: {approval_id!r}"
             raise AIError(msg)
 
-        call = {
+        call: dict[str, Any] = {
             "call_id": approval.call_id,
             "name": approval.tool_name,
             "arguments": approval.arguments,
@@ -229,13 +230,13 @@ class AgentRun:
     async def _dispatch_tool_call(
         self,
         messages: list[Message],
-        call: dict[str, object],
+        call: dict[str, Any],
         *,
         approval_granted: bool = False,
     ) -> AsyncIterator[StreamEvent]:
         call_id = str(call["call_id"])
         name = str(call["name"])
-        arguments = dict(call["arguments"])  # type: ignore[arg-type]
+        arguments: dict[str, Any] = dict(call["arguments"])
         yield StreamToolCallEvent(
             call_id=call_id,
             name=name,
