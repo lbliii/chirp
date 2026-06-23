@@ -155,6 +155,21 @@ def main(argv: list[str] | None = None) -> None:
             "implies --warnings-as-errors"
         ),
     )
+    check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a stable JSON contract report (for baselines and CI diff)",
+    )
+    check_parser.add_argument(
+        "--baseline",
+        metavar="PATH",
+        help="Compare the current check against a JSON baseline from a prior --json run",
+    )
+    check_parser.add_argument(
+        "--include-info",
+        action="store_true",
+        help="Include INFO-severity issues in --json / --baseline output",
+    )
 
     # -- chirp routes -----------------------------------------------------
     routes_parser = subparsers.add_parser("routes", help="List registered routes")

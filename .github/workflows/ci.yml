@@ -207,4 +207,55 @@ jobs:
         env:
           PYTHON_GIL: "0"
           PYTHONWARNINGS: error
-        run: uv run pytest tests/test_pelt/test_data_pg_gil.py -q --tb=short --timeout=60
+        run: uv run pytest tests/test_pelt/test_data_pg_gil.py tests/test_pelt/test_concurrency_stress.py -q --tb=short --timeout=60
+
+  # Cross-version compatibility between Chirp and chirp-ui (issue #157).
+  # Catches same-author upstream breaks before they ship as a release regression.
+  chirp-ui-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - chirp-ui-version: "0.10.0"
+          - chirp-ui-version: latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14t"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-chirpui-${{ matrix.chirp-ui-version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-chirpui-
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies (ChirpUI extra)
+        run: uv sync --no-sources --group dev --extra ui
+
+      - name: Pin chirp-ui version
+        run: |
+          if [ "${{ matrix.chirp-ui-version }}" = "latest" ]; then
+            uv pip install --upgrade chirp-ui
+          else
+            uv pip install "chirp-ui==${{ matrix.chirp-ui-version }}"
+          fi
+
+      - name: Cross-version boundary and contract tests
+        env:
+          PYTHON_GIL: "0"
+        run: |
+          uv run pytest tests/test_chirpui_boundary.py tests/contracts/test_custom_checks_integration.py tests/test_chirpui_compat_ci.py -q --tb=short --timeout=60
+
+      - name: Cross-version shell example smoke
+        env:
+          PYTHON_GIL: "0"
+        run: |
+          uv run pytest examples/chirpui/contacts_shell examples/chirpui/forum_shell examples/chirpui/pages_shell -q --tb=short --timeout=60 -m "not slow"

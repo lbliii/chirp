@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import Any
@@ -17,7 +18,7 @@ from typing import Any
 import anyio
 from anyio import EndOfStream
 
-from chirp.data.drivers._pelt import _builder, _codecs, _params, _transport
+from chirp.data.drivers._pelt import _builder, _codecs, _params, _runtime, _transport
 from chirp.data.drivers._pelt._protocol import (
     CommandCompleteEvent,
     DataRowEvent,
@@ -385,7 +386,7 @@ class Connection:
                     callback(self, event.pid, event.channel, event.payload)
 
     def _collect_query_result(self, events: Sequence[Any]) -> tuple[_QueryResult, bool]:
-        rows: list[Record] = []
+        pending_rows: list[tuple[bytes | None, ...]] = []
         command_tag: str | None = None
         suspended = False
         codec_plan: tuple[Any, ...] | None = None
@@ -400,14 +401,12 @@ class Connection:
                 if codec_plan is None:
                     column_names = tuple(field.name for field in event.description.fields)
                     codec_plan = _codecs.build_codec_plan(event.description, registry)
-                values = tuple(
-                    decoder(raw) for decoder, raw in zip(codec_plan, event.row.values, strict=True)
-                )
-                rows.append(Record(column_names, values))
+                pending_rows.append(event.row.values)
             elif isinstance(event, CommandCompleteEvent):
                 command_tag = event.tag
             elif isinstance(event, PortalSuspendedEvent):
                 suspended = True
+        rows = _decode_rows(codec_plan, column_names, pending_rows)
         return _QueryResult(rows=rows, command_tag=command_tag), suspended
 
     async def _ensure_listen_reader(self) -> None:
@@ -435,6 +434,29 @@ class Connection:
                 break
             events = self._protocol.receive_bytes(chunk)
             self._dispatch_sideband(events)
+
+
+def _decode_row_values(
+    codec_plan: tuple[Any, ...],
+    raw_values: tuple[bytes | None, ...],
+) -> tuple[Any, ...]:
+    return tuple(decoder(raw) for decoder, raw in zip(codec_plan, raw_values, strict=True))
+
+
+def _decode_rows(
+    codec_plan: tuple[Any, ...] | None,
+    column_names: tuple[str, ...],
+    pending_rows: list[tuple[bytes | None, ...]],
+) -> list[Record]:
+    if codec_plan is None or not pending_rows:
+        return []
+    if _runtime.should_parallelize(n_rows=len(pending_rows), n_cols=len(codec_plan)):
+        workers = min(32, len(pending_rows))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            decoded = list(pool.map(lambda raw: _decode_row_values(codec_plan, raw), pending_rows))
+    else:
+        decoded = [_decode_row_values(codec_plan, raw) for raw in pending_rows]
+    return [Record(column_names, values) for values in decoded]
 
 
 def _quote_ident(name: str) -> str:
