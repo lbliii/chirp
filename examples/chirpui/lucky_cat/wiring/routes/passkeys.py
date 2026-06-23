@@ -17,7 +17,7 @@ def _safe_next(raw: str | None) -> str:
 def register(app_instance) -> None:
     @app_instance.route("/auth/passkey/register/begin", methods=["POST"])
     @login_required
-    async def passkey_register_begin():
+    async def passkey_register_begin(request: Request):
         from chirp.security.passkeys import begin_registration
 
         user = current_user()
@@ -27,7 +27,7 @@ def register(app_instance) -> None:
             user_name=user.id,
             user_display_name=user.name,
             exclude_credentials=existing,
-            config=passkey_config.PASSKEY_CONFIG,
+            config=passkey_config.config_for_request(request),
         )
         return JSONResponse.from_value(options)
 
@@ -39,20 +39,22 @@ def register(app_instance) -> None:
         user = current_user()
         body = await request.json()
         try:
-            registered = finish_registration(credential=body, config=passkey_config.PASSKEY_CONFIG)
+            registered = finish_registration(
+                credential=body, config=passkey_config.config_for_request(request)
+            )
         except PasskeyVerificationError:
             return JSONResponse.from_value({"error": "Registration failed."}, status=422)
         passkey_store.save(user.id, registered)
         return JSONResponse.from_value({"ok": True, "redirect": "/settings/security"})
 
     @app_instance.route("/auth/passkey/login/begin", methods=["POST"])
-    async def passkey_login_begin():
+    async def passkey_login_begin(request: Request):
         from chirp.security.passkeys import begin_authentication
 
         allow = passkey_store.all_credential_ids()
         options = begin_authentication(
             allow_credentials=allow or None,
-            config=passkey_config.PASSKEY_CONFIG,
+            config=passkey_config.config_for_request(request),
         )
         return JSONResponse.from_value(options)
 
@@ -75,7 +77,7 @@ def register(app_instance) -> None:
             verified = finish_authentication(
                 credential=body,
                 stored=stored,
-                config=passkey_config.PASSKEY_CONFIG,
+                config=passkey_config.config_for_request(request),
             )
         except PasskeyVerificationError:
             return JSONResponse.from_value({"error": "Authentication failed."}, status=422)

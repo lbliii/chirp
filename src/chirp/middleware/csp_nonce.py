@@ -5,6 +5,7 @@ ContextVar, and injects it into the CSP header on the way out.
 """
 
 import dataclasses
+import re
 import secrets
 from contextvars import ContextVar, Token
 from typing import Any, ClassVar
@@ -49,6 +50,24 @@ def csp_nonce() -> str:
         return _csp_nonce_var.get()
     except LookupError:
         return ""
+
+
+_INLINE_SCRIPT_OPEN = re.compile(
+    r"<script(?![^>]*\b(?:src|nonce)=)([^>]*)>",
+    re.IGNORECASE,
+)
+
+
+def nonce_inline_scripts(html: str, nonce: str) -> str:
+    """Add ``nonce="..."`` to inline ``<script>`` tags that lack ``src``/``nonce``.
+
+    Templates that ship inline bootstraps without ``{{ csp_nonce() }}`` (notably
+    chirp-ui's theme + shell runtime scripts) would otherwise be blocked by the
+    per-request nonce CSP that ``use_chirp_ui()`` auto-wires.
+    """
+    if not nonce:
+        return html
+    return _INLINE_SCRIPT_OPEN.sub(rf'<script nonce="{nonce}"\1>', html)
 
 
 class CSPNonceMiddleware:
@@ -103,6 +122,12 @@ class CSPNonceMiddleware:
                     f"{style_token}"
                 )
                 response = response.with_header("Content-Security-Policy", csp)
+                if isinstance(response, Response) and "text/html" in response.content_type:
+                    body = response.body
+                    if isinstance(body, bytes):
+                        body = body.decode("utf-8", errors="replace")
+                    body = nonce_inline_scripts(body, nonce)
+                    response = dataclasses.replace(response, body=body)
                 if isinstance(response, StreamingResponse):
                     # Carry the live nonce onto the streaming response so the
                     # sender can re-establish it while the generator drains —
