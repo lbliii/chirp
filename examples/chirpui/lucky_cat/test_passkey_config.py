@@ -8,7 +8,9 @@ from chirp.http.headers import Headers
 from chirp.http.request import Request, _LazyCookies, _LazyQueryParams
 
 
-def _request(host: str, *, current_url: str | None = None, extra: dict[str, str] | None = None) -> Request:
+def _request(
+    host: str, *, current_url: str | None = None, extra: dict[str, str] | None = None
+) -> Request:
     headers = {"host": host}
     if current_url is not None:
         headers["hx-current-url"] = current_url
