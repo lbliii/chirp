@@ -35,6 +35,7 @@ from chirp.data.drivers._pelt.errors import (  # noqa: E402
     ProtocolError,
     TLSError,
 )
+from chirp.data.drivers._pelt.pool import connect, create_pool  # noqa: E402
 from chirp.data.drivers._pelt.types import ConnectionConfig, PoolConfig  # noqa: E402
 
 __all__ = [
@@ -53,14 +54,6 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
-    if name == "connect":
-        from chirp.data.drivers._pelt.pool import connect as _connect
-
-        return _connect
-    if name == "create_pool":
-        from chirp.data.drivers._pelt.pool import create_pool as _create_pool
-
-        return _create_pool
     if name == "Connection":
         from chirp.data.drivers._pelt.connection import Connection
 

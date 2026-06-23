@@ -9,7 +9,7 @@ Owns the I/O loop that drives :class:`~._protocol.ExtendedQueryProtocol` against
 from __future__ import annotations
 
 import re
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import Any
@@ -33,7 +33,7 @@ from chirp.data.drivers._pelt._protocol import (
     SimpleQueryProtocol,
     TransactionStatus,
 )
-from chirp.data.drivers._pelt.errors import PeltConnectionError, ProtocolError
+from chirp.data.drivers._pelt.errors import PeltConnectionError
 from chirp.data.drivers._pelt.types import ConnectionConfig
 
 _IdentRe = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -114,7 +114,7 @@ class Transaction(AbstractAsyncContextManager["Transaction"]):
 class Cursor:
     """Server-side cursor over an open portal (``prefetch`` batch size)."""
 
-    __slots__ = ("_conn", "_done", "_idx", "_prefetch", "_rows", "_sql", "_params")
+    __slots__ = ("_conn", "_done", "_idx", "_params", "_prefetch", "_rows", "_sql")
 
     def __init__(
         self,
@@ -191,7 +191,7 @@ class Connection:
         self._closed = False
         self._active_row_description = None
         self._listeners: dict[str, list[Callable[[Connection, int, str, str], None]]] = {}
-        self._listener_tg: anyio.abc.TaskGroup | None = None
+        self._listener_tg: Any = None
         self._listener_tg_cm: Any = None
 
     @classmethod

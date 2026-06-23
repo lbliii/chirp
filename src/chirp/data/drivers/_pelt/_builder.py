@@ -173,8 +173,22 @@ def build_terminate() -> bytes:
 
 
 def build_password(password: bytes) -> bytes:
-    """A cleartext/MD5 ``PasswordMessage`` (tag ``'p'``); SASL reuses the same tag (epic E4)."""
+    """A cleartext/MD5 ``PasswordMessage`` (tag ``'p'``)."""
     return frame(_TAG_PASSWORD, password + _NUL)
+
+
+def build_sasl_initial(*, mechanism: str, initial_response: bytes) -> bytes:
+    """SASL initial ``PasswordMessage``: mechanism cstring + Int32 length + payload."""
+    b = MessageBuilder()
+    b.write_cstring(mechanism)
+    b.write_int32(len(initial_response))
+    b.write_bytes(initial_response)
+    return frame(_TAG_PASSWORD, b.getvalue())
+
+
+def build_sasl_continue(response: bytes) -> bytes:
+    """SASL continuation ``PasswordMessage``: raw mechanism response bytes only."""
+    return frame(_TAG_PASSWORD, response)
 
 
 __all__ = [
@@ -188,6 +202,8 @@ __all__ = [
     "build_parse",
     "build_password",
     "build_query",
+    "build_sasl_continue",
+    "build_sasl_initial",
     "build_startup",
     "build_sync",
     "build_terminate",

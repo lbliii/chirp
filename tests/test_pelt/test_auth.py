@@ -23,6 +23,19 @@ def _server_final_for(client: _auth.ScramSha256Client) -> bytes:
 
 
 @pytest.mark.issue(327)
+def test_scram_client_first_uses_sasl_password_frame():
+    client = _auth.ScramSha256Client(user="chirp", password="chirp")
+    msg = client.client_first_message()
+    # mechanism cstring + Int32 length + SCRAM payload (not a bare NUL-terminated password)
+    assert msg.startswith(b"p")
+    body = msg[5:]
+    assert body.startswith(b"SCRAM-SHA-256\x00")
+    length = int.from_bytes(body[14:18], "big")
+    assert length > 0
+    assert body[18:].startswith(b"n,,")
+
+
+@pytest.mark.issue(327)
 def test_scram_sha256_proof_and_verifier_roundtrip():
     user = "user"
     password = "pencil"

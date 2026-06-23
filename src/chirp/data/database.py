@@ -37,7 +37,6 @@ from chirp.data.drivers import postgres as _pg_driver
 from chirp.data.drivers import sqlite as _sqlite_driver
 from chirp.data.errors import (
     DataError,
-    DriverNotInstalledError,
     QueryError,
 )
 from chirp.data.query import json_path as _json_path
@@ -588,9 +587,9 @@ class Database:
             msg = "listen() requires at least one channel name"
             raise DataError(msg)
 
-        from chirp.data.drivers import _pelt
+        from chirp.data.drivers._pelt.pool import connect as pelt_connect
 
-        conn = await _pelt.connect(self._config.url)
+        conn = await pelt_connect(self._config.url)
         queue: asyncio.Queue[Notification] = asyncio.Queue()
         loop = asyncio.get_running_loop()
 
