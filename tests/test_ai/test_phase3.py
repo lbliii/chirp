@@ -216,9 +216,7 @@ class TestAdditionalProviders:
 @pytest.mark.issue(443)
 class TestEvalHelpers:
     @pytest.mark.asyncio
-    async def test_install_llm_script_tracks_calls(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_install_llm_script_tracks_calls(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import httpx
 
         script = LLMScript(

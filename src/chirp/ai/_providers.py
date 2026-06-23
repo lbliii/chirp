@@ -497,18 +497,20 @@ async def gemini_generate(
     httpx = _get_httpx()
     contents, system_instruction = _gemini_contents(messages, system=system)
 
+    generation_config: dict[str, Any] = {
+        "temperature": temperature,
+        "maxOutputTokens": max_tokens,
+    }
+    if json_schema is not None:
+        generation_config["responseMimeType"] = "application/json"
+        generation_config["responseSchema"] = json_schema["schema"]
+
     body: dict[str, Any] = {
         "contents": contents,
-        "generationConfig": {
-            "temperature": temperature,
-            "maxOutputTokens": max_tokens,
-        },
+        "generationConfig": generation_config,
     }
     if system_instruction is not None:
         body["systemInstruction"] = system_instruction
-    if json_schema is not None:
-        body["generationConfig"]["responseMimeType"] = "application/json"
-        body["generationConfig"]["responseSchema"] = json_schema["schema"]
 
     url = (
         f"{config.base_url}/v1beta/models/{quote(config.model, safe='')}:generateContent"

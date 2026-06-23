@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from typing import Any
+from typing import Any, cast
 
 from chirp.ai.errors import StructuredOutputError
 
@@ -89,7 +89,7 @@ def parse_structured[T](cls: type[T], text: str) -> T:
 
     if _is_pydantic_model(cls):
         try:
-            return cls.model_validate(data)  # type: ignore[union-attr,no-any-return]
+            return cast(T, _parse_pydantic_model(cls, data))
         except Exception as exc:
             msg = f"Failed to construct {cls.__name__} from LLM response: {exc}"
             raise StructuredOutputError(msg) from exc
@@ -115,6 +115,16 @@ def structured_repair_prompt(*, error: StructuredOutputError, bad_text: str) -> 
         f"Previous response:\n{snippet}\n\n"
         "Return ONLY a corrected JSON object matching the schema. No other text."
     )
+
+
+def _parse_pydantic_model(cls: type[Any], data: dict[str, Any]) -> Any:
+    """Parse JSON dict into a Pydantic model instance."""
+    from pydantic import BaseModel
+
+    if not issubclass(cls, BaseModel):
+        msg = f"{getattr(cls, '__name__', cls)!r} is not a Pydantic BaseModel"
+        raise TypeError(msg)
+    return cls.model_validate(data)
 
 
 def _is_pydantic_model(cls: type[Any]) -> bool:
