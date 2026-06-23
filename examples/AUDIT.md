@@ -47,6 +47,26 @@ Current contract proof guidance:
 - Example tests should assert clean contract output for the framework behavior
   the README claims, not only that the page renders.
 
+Current browser smoke guidance (June 2026 audit, issues #479 / #480):
+
+| Example | Automated wiring proof | Manual browser smoke |
+|---------|------------------------|----------------------|
+| **returns_gallery** | `assert_sse_wired` for `/` → `/events`; fragment/OOB/mutation pytest | EventStream log appends lines; OOB updates both targets; validation success panel appears |
+| **standalone/sse** | `assert_sse_wired`; fragment HTML in SSE events | Four notifications append; placeholder removed |
+| **reactive_tasks** | Named SSE events (`task_list`, `task_count`) after mutation | Two-tab add/toggle/delete; presence counter tracks tabs |
+| **chirpui/forum_shell** | Boosted shell outlet + FormContract pytest | `/boards/ic` boosted nav; reply form OOB unread count |
+
+Stale patterns removed from examples (June 2026):
+
+- No `sse-swap="fragment"` in `examples/` — use `sse-swap="message"` for untargeted `Fragment` yields or explicit block/signal names for named channels.
+- Swap-only SSE/OOB payload blocks prefer `{% fragment %}` over `{% if defined %}` guards (see `returns_gallery`, `standalone/sse`).
+- `sse-swap` must sit on a child sink, not on the `sse-connect` element (`sse_self_swap` contract).
+
+Contract and reactive docs parity:
+
+- Shipped categories are documented in `site/content/docs/quality/contracts-debugging/categories.md` (kept in sync by `tests/docs/test_contract_guidance.py`).
+- Reactive API surface (`ConnectionInfo`, `on_disconnect`, changed-path builders, contract metadata keys) lives in `site/content/docs/build-apps/streaming-updates/reactive-system.md`.
+- Browser smoke checklist: `.context/fragment-sse-browser-smoke-2026-06-23.md`.
 ## Examples Expansion (Feb 2025)
 
 Documentation and new examples added:

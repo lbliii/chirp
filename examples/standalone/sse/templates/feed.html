@@ -37,13 +37,11 @@
     }
   }).observe(feed, { childList: true, subtree: true });
 </script>
-{% block notification %}
-{% if (title ?? '') %}
+{% fragment notification %}
 <div class="notification">
   <strong>{{ title }}</strong>
   <p>{{ message }}</p>
 </div>
 {% end %}
-{% endblock %}
 </body>
 </html>
