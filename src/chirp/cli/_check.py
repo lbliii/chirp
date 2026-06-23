@@ -11,9 +11,9 @@ import json
 import sys
 from pathlib import Path
 
-from chirp.cli._diff import collect_check_json
 from chirp.cli._resolve import resolve_app
 from chirp.contracts.diff import diff_contract_dicts
+from chirp.contracts.surface_diff import collect_check_json
 
 
 def run_check(args: argparse.Namespace) -> None:

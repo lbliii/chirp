@@ -25,9 +25,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from chirp.cli._diff import check_at_git_ref, collect_check_json, find_git_root  # noqa: E402
 from chirp.cli._resolve import resolve_app  # noqa: E402
-from chirp.contracts.diff import ContractDiff, diff_contract_dicts  # noqa: E402
+from chirp.contracts.diff import ContractDiff  # noqa: E402
+from chirp.contracts.surface_diff import collect_surface_diff, find_git_root  # noqa: E402
 
 _MARKER = "<!-- chirp-contract-diff -->"
 
@@ -47,27 +47,14 @@ def collect_diff_payload(
         sys.path.insert(0, repo_root_str)
 
     resolved = resolve_app(app)
-    _, current = collect_check_json(
+    return collect_surface_diff(
         resolved,
-        deploy=deploy,
-        include_info=include_info,
-    )
-    baseline = check_at_git_ref(
         app,
         base_ref,
         repo_root=repo_root,
         deploy=deploy,
         include_info=include_info,
     )
-    diff = diff_contract_dicts(baseline, current)
-    payload = {
-        "base_ref": base_ref,
-        "app": app,
-        "baseline": baseline,
-        "current": current,
-        "diff": {"added": list(diff.added), "removed": list(diff.removed)},
-    }
-    return diff, payload
 
 
 def _github_request(

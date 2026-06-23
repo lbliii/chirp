@@ -9,7 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from chirp.cli._diff import check_at_git_ref, find_git_root, run_diff
+from chirp.cli._diff import run_diff
+from chirp.contracts.surface_diff import check_at_git_ref, find_git_root
 from chirp.contracts.diff import diff_contract_dicts
 
 
@@ -71,7 +72,7 @@ def test_diff_self_has_no_changes(capsys: pytest.CaptureFixture[str]) -> None:
             "include_info": False,
         },
     )()
-    with patch("chirp.cli._diff.check_at_git_ref", return_value=baseline):
+    with patch("chirp.contracts.surface_diff.check_at_git_ref", return_value=baseline):
         run_diff(args)
     out = capsys.readouterr().out
     assert "no issue changes" in out
@@ -104,7 +105,7 @@ def test_diff_json_output(capsys: pytest.CaptureFixture[str]) -> None:
             "include_info": False,
         },
     )()
-    with patch("chirp.cli._diff.check_at_git_ref", return_value=baseline):
+    with patch("chirp.contracts.surface_diff.check_at_git_ref", return_value=baseline):
         run_diff(args)
     payload = json.loads(capsys.readouterr().out)
     assert payload["base_ref"] == head

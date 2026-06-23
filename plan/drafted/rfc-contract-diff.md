@@ -22,7 +22,7 @@ surface should be diffable.
 ## Next steps
 
 1. ~~GitHub Action posting PR comments from `--json` diff output~~ (advisory comment shipped)
-2. MCP tool `chirp_surface_diff` for agent consumption
+2. ~~MCP tool `chirp_surface_diff` for agent consumption~~ (`register_surface_diff_tool()`)
 3. Merge-blocking policy steward sign-off (ERROR-only vs WARNING)
 
 ## Non-goals (v0)
