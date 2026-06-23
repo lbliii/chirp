@@ -24,6 +24,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `contacts`: canonical HTMX CRUD
 - `sse`: fragment-driven server-sent events
 - `streaming`: `Stream()` with concurrent context loading
+- `llm_minimal`: smallest streaming-LLM example — simulated tokens, no Ollama
 - `ollama`: local LLM chat without ChirpUI
 - `kanban`: auth, CSRF, OOB, and live updates without app shell
 - `docs_site`: DocsPlugin, autodoc, search, and tool docs without ChirpUI
@@ -49,6 +50,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - `islands`
 - `islands_swap`
 - `kanban`
+- `llm_minimal`
 - `llm_streaming_kida`
 - `nojs_floor`
 - `ollama`

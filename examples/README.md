@@ -15,6 +15,16 @@ Examples are organized by runtime layer so the support matrix is obvious:
 
 > **Featured:** [`chirpui/lucky_cat`](chirpui/lucky_cat/README.md) — flagship ChirpUI demo (tier 3). Not your first Chirp app — complete tiers 1–2 first.
 
+### AI curious
+
+Branch off after tier 1 if you want to stream LLM tokens to the browser:
+
+| Step | Example | Teaches |
+|------|---------|---------|
+| **Start** | [`standalone/llm_minimal`](standalone/llm_minimal/) | Simulated token streaming, `TemplateStream` vs `EventStream`, optional Ollama (`chirp[ai]`) |
+| **Next** | [`standalone/ollama`](standalone/ollama/) | Real local LLM, `AgentRun`, `@app.tool()`, live tool-call activity over SSE |
+| **In a shell** | [`chirpui/llm_playground`](chirpui/llm_playground/) | The same streaming inside a ChirpUI app shell |
+
 ## Which Bucket To Use
 
 Use `examples/standalone` when you want to learn or validate:
