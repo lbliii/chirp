@@ -94,9 +94,20 @@ def render_with_layouts(
 
     # Render inside-out: start with page HTML, wrap with each layout
     # Innermost layout first (last in the list), then outward
-    html = page_html
-    for layout_info in reversed(layouts_to_render):
-        template = env.get_template(layout_info.template_name)
-        html = template.render_with_blocks({"content": html}, **context)
+    from chirp.realtime.signal_globals import (
+        apply_signal_connect,
+        bind_signal_render_path,
+        restore_signal_render_path,
+    )
 
-    return html
+    path = str(context.get("current_path") or "")
+    path_token = bind_signal_render_path(path)
+    try:
+        html = page_html
+        for layout_info in reversed(layouts_to_render):
+            template = env.get_template(layout_info.template_name)
+            html = template.render_with_blocks({"content": html}, **context)
+
+        return apply_signal_connect(html)
+    finally:
+        restore_signal_render_path(path_token)

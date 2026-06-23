@@ -1,7 +1,7 @@
 """Chirp application facade."""
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
@@ -632,6 +632,15 @@ class App:
         from chirp.realtime.signal_trace import record_signal_emit
 
         record_signal_emit(name, audience_key=audience_key)
+
+    def set_signal_prefix_topics(self, mapping: Mapping[str, Iterable[str]]) -> None:
+        """Optional URL-prefix → signal topics map for proactive source activation.
+
+        Runtime ``signal()`` bindings still drive the default topic set; matching
+        prefix entries are merged at connect finalization (#317).
+        """
+        self._check_not_frozen()
+        self._signal_registry().set_prefix_topics(mapping)
 
     def mount(self, prefix: str, plugin: object) -> None:
         """Mount a plugin at the given URL prefix.

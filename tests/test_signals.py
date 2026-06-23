@@ -24,7 +24,12 @@ from chirp.contracts.rules_signals import (
     check_signal_scope,
 )
 from chirp.contracts.types import Severity
-from chirp.realtime.signal_globals import make_signal_globals
+from chirp.realtime.signal_globals import (
+    apply_signal_connect,
+    make_signal_globals,
+    reset_referenced,
+    restore_referenced,
+)
 from chirp.realtime.signal_stream import make_signal_stream
 from chirp.realtime.signals import (
     _SCOPE_PREFIX,
@@ -461,19 +466,35 @@ class TestGlobals:
         assert html.startswith('<div sse-swap="card"')
         assert "<b>hi</b>" in html  # HTML fragment seed not escaped
 
-    def test_signal_connect_subscribes_all(self) -> None:
+    def test_signal_connect_scopes_to_referenced_topics(self) -> None:
         reg = SignalRegistry()
         reg.register(SignalSpec(name="a", initial=lambda: 1))
         reg.register(SignalSpec(name="b", initial=lambda: 2))
         globals_ = make_signal_globals(reg)
-        # Subscribe-all is the deliberate default: manual sse-swap sinks (e.g. the
-        # bell badge) and composed-layout ordering make per-page ?topics= scoping
-        # unsound, so the connect emits the bare stream URL (see signal_globals).
-        str(globals_["signal"]("a"))
-        connect = str(globals_["signal_connect"]())
-        assert 'hx-ext="sse"' in connect
-        assert 'sse-connect="/_chirp/live"' in connect
-        assert "topics=" not in connect
+        token = reset_referenced()
+        try:
+            # Layout ordering: connect often renders before body bindings record.
+            connect = str(globals_["signal_connect"]())
+            str(globals_["signal"]("a"))
+            html = apply_signal_connect(connect)
+            assert 'hx-ext="sse"' in html
+            assert 'sse-connect="/_chirp/live?topics=a"' in html
+            assert "topics=b" not in html
+        finally:
+            restore_referenced(token)
+
+    def test_signal_connect_subscribes_all_when_no_topics(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="a", initial=lambda: 1))
+        globals_ = make_signal_globals(reg)
+        token = reset_referenced()
+        try:
+            connect = str(globals_["signal_connect"]())
+            html = apply_signal_connect(connect)
+            assert 'sse-connect="/_chirp/live"' in html
+            assert "topics=" not in html
+        finally:
+            restore_referenced(token)
 
     def test_signal_attrs_emits_bare_attrs_no_wrapper(self) -> None:
         """signal_attrs binds an EXISTING element: it emits only the attributes
@@ -544,6 +565,31 @@ class TestLiveStream:
         assert first.event == "ticks"
         assert first.data in {"1", "2"}
         await gen.aclose()
+
+    @pytest.mark.issue(317)
+    async def test_stream_skips_unbound_async_sources(self) -> None:
+        """Topic-scoped connections pump only the requested primary sources (#317)."""
+        reg = SignalRegistry()
+        pumped: set[str] = set()
+
+        async def balance_source():
+            pumped.add("balance")
+            yield 1
+            await asyncio.sleep(1.0)
+
+        async def ticker_source():
+            pumped.add("ticker")
+            yield 2
+            await asyncio.sleep(1.0)
+
+        reg.register(SignalSpec(name="balance", source=balance_source))
+        reg.register(SignalSpec(name="ticker", source=ticker_source))
+        stream = make_signal_stream(reg, ("balance",))
+        gen = stream.generator.__aiter__()
+        event = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
+        await gen.aclose()
+        assert event.event == "balance"
+        assert pumped == {"balance"}
 
     @pytest.mark.issue(355)
     async def test_source_recovers_after_transient_failure(self) -> None:
