@@ -27,7 +27,9 @@ _MUTATING_TAG = re.compile(
     r"<(?P<tag>form|button|a|div|span|input)\b(?P<attrs>[^>]*)\s*/?>",
     re.IGNORECASE,
 )
-_HX_MUTATION = re.compile(r"\bhx-(?:post|put|patch|delete)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
+_HX_MUTATION = re.compile(
+    r"\bhx-(?:post|put|patch|delete)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
 _ACTION_URL = re.compile(r"\baction\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 _HX_TARGET = re.compile(r"\bhx-target\s*=\s*[\"']#([^\"']+)[\"']", re.IGNORECASE)
 
@@ -45,8 +47,10 @@ def _template_stream_template(handler: Any) -> str | None:
             continue
         if _call_name(node.value.func) != "TemplateStream":
             continue
-        if node.value.args and isinstance(node.value.args[0], ast.Constant) and isinstance(
-            node.value.args[0].value, str
+        if (
+            node.value.args
+            and isinstance(node.value.args[0], ast.Constant)
+            and isinstance(node.value.args[0].value, str)
         ):
             return node.value.args[0].value
         for kw in node.value.keywords:
@@ -122,13 +126,9 @@ def check_template_stream_client_shape(
             if streamed_template is None:
                 continue
 
-            full_page = bool(
-                _FULL_PAGE_MARKERS.search(template_sources.get(streamed_template, ""))
-            )
+            full_page = bool(_FULL_PAGE_MARKERS.search(template_sources.get(streamed_template, "")))
             page_hint = (
-                " The streamed template looks like a full HTML document"
-                if full_page
-                else ""
+                " The streamed template looks like a full HTML document" if full_page else ""
             )
             issues.append(
                 ContractIssue(
