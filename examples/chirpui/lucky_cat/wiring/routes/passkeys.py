@@ -7,7 +7,6 @@ import passkey_store
 import users
 
 from chirp import JSONResponse, Request, current_user, is_safe_url, login, login_required
-from webauthn.helpers import base64url_to_bytes
 
 
 def _safe_next(raw: str | None) -> str:
@@ -65,6 +64,8 @@ def register(app_instance) -> None:
         cred_id = body.get("id") if isinstance(body, dict) else None
         if not isinstance(cred_id, str) or not cred_id:
             return JSONResponse.from_value({"error": "Missing credential id."}, status=422)
+
+        from webauthn.helpers import base64url_to_bytes
 
         stored = passkey_store.get(base64url_to_bytes(cred_id))
         if stored is None:

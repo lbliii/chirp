@@ -19,19 +19,16 @@ Chromium. Override with ``PASSKEY_ORIGIN`` / ``PASSKEY_RP_ID`` env vars.
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from webauthn.helpers import base64url_to_bytes
-
 import credential_store
+from webauthn.helpers import base64url_to_bytes
 
 from chirp import (
     App,
     AppConfig,
-    FormAction,
     JSONResponse,
     Redirect,
     Request,
@@ -121,7 +118,9 @@ async def do_login(request: Request):
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return Template("dashboard.html", user=get_user(), passkeys=credential_store.list_for_user(get_user().id))
+    return Template(
+        "dashboard.html", user=get_user(), passkeys=credential_store.list_for_user(get_user().id)
+    )
 
 
 @app.route("/passkeys")

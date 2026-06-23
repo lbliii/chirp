@@ -137,7 +137,7 @@ def base_url() -> Iterator[str]:
             with urllib.request.urlopen(f"{url}/login", timeout=1) as resp:  # noqa: S310
                 if resp.status == 200:
                     break
-        except (urllib.error.URLError, TimeoutError):
+        except urllib.error.URLError, TimeoutError:
             time.sleep(0.15)
     else:
         proc.kill()
@@ -173,14 +173,16 @@ def _seed_session(context, base_url: str) -> None:
     assert login_get.ok
     csrf = _extract_csrf(login_get.text())
     cookie = _session_cookie(login_get.headers.get("set-cookie"))
-    assert csrf and cookie
+    assert csrf
+    assert cookie
     headers = {"X-CSRF-Token": csrf, "Cookie": f"chirp_session={cookie}"}
     login_post = context.request.post(
         f"{base_url}/login",
         form={"username": "admin", "password": "password", "_csrf_token": csrf},
         headers=headers,
     )
-    assert login_post.ok and login_post.url.endswith("/dashboard")
+    assert login_post.ok
+    assert login_post.url.endswith("/dashboard")
     authed = _session_cookie(login_post.headers.get("set-cookie")) or cookie
     context.add_cookies(
         [

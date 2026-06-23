@@ -11,7 +11,6 @@ import pytest
 
 from chirp.security.passkeys import _has_webauthn
 from chirp.testing import TestClient
-
 from tests.helpers.auth import csrf_post, extract_csrf_token, extract_session_cookie, login
 from tests.helpers.passkeys_vectors import (
     AUTH_CREDENTIAL,

@@ -318,6 +318,7 @@ dev = [
 ]
 browser = [
     "playwright>=1.49.0",       # Lucky Cat browser smoke — install with: uv sync --group dev --group browser
+    "webauthn>=2.8,<3",         # Lucky Cat passkeys showcase (browser-smoke boots the full app)
 ]
 
 # =============================================================================
