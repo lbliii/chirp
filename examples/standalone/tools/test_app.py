@@ -75,7 +75,7 @@ class TestMCPHandshake:
             body = json.loads(response.text)
             tools = body["result"]["tools"]
             names = {t["name"] for t in tools}
-            assert names == {"add_note", "list_notes", "search_notes"}
+            assert names == {"add_note", "list_notes", "search_notes", "chirp_surface_diff"}
 
     async def test_tool_schemas_have_descriptions(self, example_app) -> None:
         async with TestClient(example_app) as client:
