@@ -2475,6 +2475,38 @@ class TestPortfolioDashboard:
                 assert text.count(f'id="{dom_id}"') == 2, dom_id
 
 
+@pytest.mark.issue(317)
+class TestSignalTopicScoping:
+    """#317: runtime topic scoping on the one /_chirp/live connection."""
+
+    async def test_markets_page_scopes_connect_to_bound_topics(self, example_app) -> None:
+        """Markets lobby binds derived board signals; connect URL includes them + deps."""
+        async with TestClient(example_app) as client:
+            response = await client.get("/markets")
+            assert response.status == 200
+            html = response.text
+            assert 'sse-connect="/_chirp/live?topics=' in html
+            assert "ticker" in html
+            assert "market_stats" in html
+            assert "lobby_snapshot" in html
+
+    async def test_non_markets_page_omits_lobby_board_topics(self, example_app) -> None:
+        """Trade room binds shell chrome only — lobby sources stay off the wire."""
+        async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            response = await client.get("/trade", headers=_cookie_header(cookie))
+        assert response.status == 200
+        connect = next(
+            part
+            for part in response.text.split('"')
+            if part.startswith("/_chirp/live?topics=")
+        )
+        assert "market_stats" not in connect
+        assert "lobby_snapshot" not in connect
+        assert "balance" in connect
+        assert "ticker" in connect
+
+
 @pytest.mark.issue(227)
 class TestFreeThreadingPanel:
     """#227 Part A: the visible free-threading proof panel + its live SSE twin."""

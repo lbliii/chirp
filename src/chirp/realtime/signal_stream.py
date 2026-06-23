@@ -163,7 +163,9 @@ def make_signal_pending_route(registry: SignalRegistry) -> PendingRoute:
         requested = [t.strip() for t in raw.split(",") if t.strip()]
         # Only stream topics that actually exist (drop unknown query noise).
         scoped = tuple(sorted(t for t in requested if t in available))
-        return scoped or tuple(sorted(available))
+        if not scoped:
+            return tuple(sorted(available))
+        return registry.expand_connection_topics(scoped)
 
     def _handler(request: Request) -> EventStream:
         topics = _resolve_topics(request.query.get("topics"))

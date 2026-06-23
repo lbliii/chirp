@@ -29,6 +29,7 @@ topics actually used on this render. The globals build the seeded element with
 from __future__ import annotations
 
 import contextvars
+from collections.abc import Callable
 from html import escape
 from typing import Any
 
@@ -40,6 +41,13 @@ from chirp.realtime.signals import SignalRegistry, validate_signal_name
 SIGNAL_STREAM_PREFIX = "/_chirp"
 SIGNAL_STREAM_PATH = "/_chirp/live"
 
+#: Opening tag emitted by ``signal_connect()`` before end-of-render finalization.
+#: ``apply_signal_connect()`` replaces this placeholder with a concrete
+#: ``sse-connect`` URL scoped to the topics bound during the render.
+_SIGNAL_CONNECT_OPEN = (
+    '<div hx-ext="sse" data-chirp-signal-connect="" hx-disinherit="hx-target hx-swap">'
+)
+
 #: Per-render set of signal names referenced by ``signal()`` / ``signal_block()``.
 #: ``signal_connect()`` reads it to scope the stream. Request-scoped so concurrent
 #: renders (free-threading) never leak topics across each other.
@@ -50,6 +58,11 @@ _referenced: contextvars.ContextVar[set[str]] = contextvars.ContextVar("chirp_si
 #: only to the matching connection. Empty means global-only bindings on this page.
 _signal_audience: contextvars.ContextVar[str] = contextvars.ContextVar(
     "chirp_signal_audience", default=""
+)
+
+#: Request path for optional prefix-topic merge during connect finalization (#317).
+_render_path: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "chirp_signal_render_path", default=""
 )
 
 
@@ -65,6 +78,85 @@ def _record(name: str) -> None:
 def reset_referenced() -> contextvars.Token[set[str]]:
     """Start a fresh per-render referenced-set. Returns a reset token."""
     return _referenced.set(set())
+
+
+def restore_referenced(token: contextvars.Token[set[str]]) -> None:
+    """Restore the referenced-set from a prior :func:`reset_referenced` token."""
+    _referenced.reset(token)
+
+
+def bind_signal_render_path(path: str) -> contextvars.Token[str]:
+    """Bind the page path used for optional prefix-topic merge."""
+    return _render_path.set(path)
+
+
+def restore_signal_render_path(token: contextvars.Token[str]) -> None:
+    _render_path.reset(token)
+
+
+def _active_registry() -> SignalRegistry | None:
+    """Return the active app's signal registry when rendering under a request."""
+    from chirp.templating.integration import get_active_kida_env
+
+    env = get_active_kida_env()
+    if env is None:
+        return None
+    return getattr(env, "_chirp_signal_registry", None)
+
+
+def _referenced_names() -> set[str]:
+    try:
+        return _referenced.get()
+    except LookupError:
+        return set()
+
+
+def _connect_query() -> str:
+    """Build the ``/_chirp/live`` query string from bound topics + audience."""
+    parts: list[str] = []
+    names = set(_referenced_names())
+    registry = _active_registry()
+    path = _render_path.get("")
+    if registry is not None:
+        if path:
+            names |= registry.prefix_topics_for_path(path)
+        if names:
+            names = set(registry.expand_connection_topics(names))
+    if names:
+        parts.append(f"topics={','.join(sorted(names))}")
+    aud = current_signal_audience()
+    if aud:
+        parts.append(f"aud={escape(aud, quote=True)}")
+    if not parts:
+        return ""
+    return "?" + "&".join(parts)
+
+
+def apply_signal_connect(html: str) -> str:
+    """Finalize deferred ``signal_connect()`` placeholders in rendered HTML.
+
+    ``signal_connect()`` emits a marker element at render time; once every
+    ``signal()`` / ``signal_block()`` / ``signal_bind()`` on the page has
+    recorded its topic, this patches the marker with the scoped ``sse-connect``
+    URL. When no topics were bound, subscribe-all (bare ``/_chirp/live``).
+    """
+    if "data-chirp-signal-connect" not in html:
+        return html
+    url = f"{SIGNAL_STREAM_PATH}{_connect_query()}"
+    replacement = (
+        f'<div hx-ext="sse" sse-connect="{url}" hx-disinherit="hx-target hx-swap">'
+    )
+    return html.replace(_SIGNAL_CONNECT_OPEN, replacement)
+
+
+def render_with_signal_finalize(render: Callable[[], str]) -> str:
+    """Run *render* with a fresh referenced-set and finalize signal connects."""
+    token = reset_referenced()
+    try:
+        html = render()
+        return apply_signal_connect(html)
+    finally:
+        restore_referenced(token)
 
 
 def set_signal_audience(audience_key: str) -> contextvars.Token[str]:
@@ -135,33 +227,19 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
     def signal_connect() -> Markup:
         """Emit the one shared ``sse-connect`` wrapper for all page signals.
 
-        **Subscribe-all:** emits the bare stream URL so EVERY registered signal is
-        delivered, regardless of where its binding sits. Per-page ``?topics=``
-        scoping is unsound as a default here for two reasons: (1) bindings on
-        *existing* shell elements use a manual ``sse-swap`` attribute rather than
-        the ``signal()`` / ``signal_block()`` helpers, so they never record a
-        topic; (2) in a composed layout the connect element often renders before
-        some bindings record. Most signals are global shell chrome (a balance, a
-        ticker, a notifications bell) that must update on every page anyway, and an
-        event with no matching ``sse-swap`` is a harmless htmx no-op — so
-        subscribe-all is correct. Topic scoping is a future bandwidth optimization,
-        opt-in once binding discovery is reliable.
+        Emits a deferred connect marker; :func:`apply_signal_connect` patches it
+        at end-of-render with ``?topics=`` scoped to every
+        ``signal()`` / ``signal_block()`` / ``signal_bind()`` call on the page.
+        That fixes composed-layout ordering (the connect often renders before
+        body bindings record) and lets ``/_chirp/live`` pump only the bound
+        async sources. When no topics were bound, subscribe-all (bare stream).
 
-        Place this once in the shell; every ``signal()`` / ``signal_block()`` sink
-        (and every manual ``sse-swap`` sink) must live as a descendant — htmx
-        ``sse-swap`` binds via ``querySelectorAll``, which excludes the connect
-        element itself.
+        Prefer ``signal_bind()`` over hand-written ``sse-swap`` so manual sinks
+        participate in topic discovery. Place this once in the shell; every
+        signal sink must live as a descendant — htmx ``sse-swap`` binds via
+        ``querySelectorAll``, which excludes the connect element itself.
         """
-        return Markup(
-            f'<div hx-ext="sse" sse-connect="{SIGNAL_STREAM_PATH}{_audience_query()}" '
-            'hx-disinherit="hx-target hx-swap">'
-        )
-
-    def _audience_query() -> str:
-        aud = current_signal_audience()
-        if not aud:
-            return ""
-        return f"?aud={escape(aud, quote=True)}"
+        return Markup(_SIGNAL_CONNECT_OPEN)
 
     return {
         "signal": signal,
