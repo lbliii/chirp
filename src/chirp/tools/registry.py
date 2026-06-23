@@ -40,6 +40,7 @@ class ToolDef:
     description: str
     handler: Callable[..., Any]
     schema: dict[str, Any]
+    approval_required: bool = False
 
 
 class ToolRegistry:
@@ -74,6 +75,8 @@ class ToolRegistry:
         self,
         name: str,
         arguments: dict[str, Any],
+        *,
+        approval_granted: bool = False,
     ) -> Any:
         """Dispatch a tool call by name.
 
@@ -81,11 +84,18 @@ class ToolRegistry:
         ``ToolCallEvent`` on success, and returns the result.
 
         Raises ``KeyError`` if the tool name is not registered.
+        Raises ``ToolApprovalRequired`` when ``approval_required`` is set
+        and ``approval_granted`` is false.
         """
+        from chirp.tools.approval import ToolApprovalError
+
         tool = self._tools.get(name)
         if tool is None:
             msg = f"Tool not found: {name!r}"
             raise KeyError(msg)
+
+        if tool.approval_required and not approval_granted:
+            raise ToolApprovalError(tool.name, arguments)
 
         with trace_span("tool.call", tool_name=name) as span:
             try:
@@ -128,18 +138,27 @@ class ToolRegistry:
 
 
 def compile_tools(
-    pending: list[tuple[str, str, Callable[..., Any]]],
+    pending: list[
+        tuple[str, str, Callable[..., Any], bool] | tuple[str, str, Callable[..., Any]]
+    ],
     event_bus: ToolEventBus,
 ) -> ToolRegistry:
     """Compile pending tool registrations into a frozen ToolRegistry.
 
-    Called during ``App._freeze()``. Each tuple is ``(name, description, handler)``.
+    Called during ``App._freeze()``. Each tuple is
+    ``(name, description, handler)`` or
+    ``(name, description, handler, approval_required)``.
     Schema generation happens here so errors surface at startup, not at runtime.
     """
     tools: list[ToolDef] = []
     seen_names: set[str] = set()
 
-    for name, description, handler in pending:
+    for entry in pending:
+        if len(entry) == 4:
+            name, description, handler, approval_required = entry
+        else:
+            name, description, handler = entry
+            approval_required = False
         if name in seen_names:
             msg = f"Duplicate tool name: {name!r}"
             raise ValueError(msg)
@@ -152,6 +171,7 @@ def compile_tools(
                 description=description,
                 handler=handler,
                 schema=schema,
+                approval_required=approval_required,
             )
         )
 

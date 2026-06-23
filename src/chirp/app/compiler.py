@@ -657,7 +657,10 @@ class AppCompiler:
             cast(Any, self._runtime.kida_env).install_gettext_callables(_gettext, _ngettext)
 
         self._runtime.tool_registry = compile_tools(
-            [(t.name, t.description, t.handler) for t in self._mutable.pending_tools],
+            [
+                (t.name, t.description, t.handler, t.approval_required)
+                for t in self._mutable.pending_tools
+            ],
             self._mutable.tool_events,
         )
         from chirp.shell_actions import SHELL_ACTIONS_TARGET

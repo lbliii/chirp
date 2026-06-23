@@ -51,6 +51,7 @@ class PendingTool:
     name: str
     description: str
     handler: Callable[..., Any]
+    approval_required: bool = False
 
 
 @dataclass(frozen=True, slots=True)
