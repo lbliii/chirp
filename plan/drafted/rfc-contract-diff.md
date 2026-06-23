@@ -17,10 +17,11 @@ surface should be diffable.
 - `chirp diff APP --base REF` runs check at *REF* (via git worktree) and diffs against HEAD
 - Fingerprints: `(severity, category, route, template, message)`
 - CI policy: fail on **new errors**; optional fail on new warnings with `--warnings-as-errors`
+- PR workflow (`.github/workflows/contract-diff.yml`) posts an advisory comment via `scripts/contract_diff_pr_comment.py`
 
 ## Next steps
 
-1. GitHub Action posting PR comments from `--json` diff output
+1. ~~GitHub Action posting PR comments from `--json` diff output~~ (advisory comment shipped)
 2. MCP tool `chirp_surface_diff` for agent consumption
 3. Merge-blocking policy steward sign-off (ERROR-only vs WARNING)
 

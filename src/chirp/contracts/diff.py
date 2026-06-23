@@ -28,29 +28,61 @@ class ContractDiff:
     def summary_lines(self) -> list[str]:
         """Human-readable diff summary for terminal output."""
         lines = ["Hypermedia surface change:"]
-        for issue in self.added:
-            sev = issue.get("severity", "?")
-            loc = ""
-            if issue.get("template"):
-                loc = f" in {issue['template']}"
-            elif issue.get("route"):
-                loc = f" on {issue['route']}"
-            lines.append(
-                f"  + [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}"
-            )
-        for issue in self.removed:
-            sev = issue.get("severity", "?")
-            loc = ""
-            if issue.get("template"):
-                loc = f" in {issue['template']}"
-            elif issue.get("route"):
-                loc = f" on {issue['route']}"
-            lines.append(
-                f"  - [{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}"
-            )
+        lines.extend(f"  + {self._format_issue_line(issue)}" for issue in self.added)
+        lines.extend(f"  - {self._format_issue_line(issue)}" for issue in self.removed)
         if not self.has_changes:
             lines.append("  (no issue changes)")
         return lines
+
+    @staticmethod
+    def _format_issue_line(issue: dict[str, Any]) -> str:
+        sev = issue.get("severity", "?")
+        loc = ""
+        if issue.get("template"):
+            loc = f" in {issue['template']}"
+        elif issue.get("route"):
+            loc = f" on {issue['route']}"
+        return f"[{sev}] {issue.get('category', '?')}: {issue.get('message', '')}{loc}"
+
+    def markdown_comment(
+        self,
+        *,
+        app: str,
+        base_ref: str,
+        issue_number: int = 344,
+    ) -> str:
+        """GitHub PR comment body for a hypermedia contract diff."""
+        marker = "<!-- chirp-contract-diff -->"
+        lines = [
+            marker,
+            f"## Hypermedia surface change (`{app}` vs `{base_ref}`)",
+            "",
+        ]
+        if not self.has_changes:
+            lines.append("_No contract issue changes._")
+        else:
+            if self.added:
+                lines.append("**Added**")
+                lines.extend(f"- `{self._format_issue_line(issue)}`" for issue in self.added)
+                lines.append("")
+            if self.removed:
+                lines.append("**Removed**")
+                lines.extend(f"- `{self._format_issue_line(issue)}`" for issue in self.removed)
+                lines.append("")
+        if self.added_errors:
+            lines.append(
+                f"> **{len(self.added_errors)} new contract error(s).** Review before merge."
+            )
+        elif self.added_warnings:
+            lines.append(f"> {len(self.added_warnings)} new contract warning(s).")
+        lines.extend(
+            [
+                "",
+                f"_Automated by [`chirp diff`](https://github.com/lbliii/chirp/issues/{issue_number}). "
+                "Merge-blocking policy is advisory until steward sign-off._",
+            ]
+        )
+        return "\n".join(lines)
 
 
 def _issue_key(issue: dict[str, Any]) -> tuple[str, str, str, str, str]:

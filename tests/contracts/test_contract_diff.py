@@ -63,6 +63,32 @@ def test_diff_reports_added_and_removed_issues() -> None:
 
 
 @pytest.mark.issue(344)
+def test_markdown_comment_lists_added_errors() -> None:
+    diff = diff_contract_dicts(
+        {"issues": []},
+        {
+            "issues": [
+                {
+                    "severity": "error",
+                    "category": "sse",
+                    "message": "no signal() binding",
+                    "template": "tasks.html",
+                    "route": None,
+                    "details": None,
+                }
+            ]
+        },
+    )
+    body = diff.markdown_comment(
+        app="examples.chirpui.forum_shell.app:app",
+        base_ref="origin/main",
+    )
+    assert "<!-- chirp-contract-diff -->" in body
+    assert "no signal() binding" in body
+    assert "1 new contract error(s)" in body
+
+
+@pytest.mark.issue(344)
 def test_forum_shell_baseline_roundtrip(tmp_path: Path) -> None:
     pytest.importorskip("chirp_ui")
     import importlib.util
