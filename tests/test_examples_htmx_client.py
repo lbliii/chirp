@@ -62,11 +62,7 @@ def _tests_cover_htmx(example_dir: Path) -> bool:
         parts.extend(path.read_text() for path in tests_dir.glob("*.py"))
     combined = "\n".join(parts)
     # TestClient.fragment() sets HX-Request; explicit headers count too.
-    return (
-        "HX-Request" in combined
-        or "hx-request" in combined.lower()
-        or ".fragment(" in combined
-    )
+    return "HX-Request" in combined or "hx-request" in combined.lower() or ".fragment(" in combined
 
 
 @pytest.mark.parametrize("app_path", _APP_FILES, ids=_IDS)
