@@ -21,6 +21,32 @@ PASSKEY_CONFIG = PasskeyConfig(
 )
 
 
+def _request_proto(request: Request) -> str:
+    """Best-effort scheme for origin derivation behind reverse proxies."""
+    forwarded = request.headers.get("x-forwarded-proto")
+    if forwarded:
+        proto = forwarded.split(",", 1)[0].strip().lower()
+        if proto in ("http", "https"):
+            return proto
+
+    # RFC 7239 Forwarded: proto=https;host=example.com
+    raw = request.headers.get("forwarded")
+    if raw:
+        for segment in raw.split(","):
+            for part in segment.split(";"):
+                part = part.strip()
+                if part.lower().startswith("proto="):
+                    proto = part.split("=", 1)[1].strip().strip('"').lower()
+                    if proto in ("http", "https"):
+                        return proto
+
+    if os.environ.get("CHIRP_ENV", "").lower() in ("production", "staging"):
+        return "https"
+    if os.environ.get("RAILWAY_ENVIRONMENT_ID") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
+        return "https"
+    return "http"
+
+
 def _origin_from_request(request: Request) -> str:
     """Derive the browser origin from the incoming request."""
     current = request.headers.get("hx-current-url")
@@ -29,11 +55,12 @@ def _origin_from_request(request: Request) -> str:
         if parsed.scheme and parsed.netloc:
             return f"{parsed.scheme}://{parsed.netloc}"
 
+    railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    if railway_domain:
+        return f"https://{railway_domain}"
+
     host = request.headers.get("host", "localhost:8000")
-    proto = request.headers.get("x-forwarded-proto", "http").split(",", 1)[0].strip()
-    if proto not in ("http", "https"):
-        proto = "http"
-    return f"{proto}://{host}"
+    return f"{_request_proto(request)}://{host}"
 
 
 def config_for_request(request: Request) -> PasskeyConfig:
@@ -44,7 +71,7 @@ def config_for_request(request: Request) -> PasskeyConfig:
     URL. Otherwise derive from the request so ``localhost`` vs ``127.0.0.1`` and
     dev ports match what the browser actually uses (a common local footgun).
     """
-    env_origin = os.environ.get("CHIRP_PASSKEY_ORIGIN")
+    env_origin = (os.environ.get("CHIRP_PASSKEY_ORIGIN") or "").strip().rstrip("/")
     if env_origin:
         rp_id = (
             os.environ.get("CHIRP_PASSKEY_RP_ID") or urlparse(env_origin).hostname or "localhost"

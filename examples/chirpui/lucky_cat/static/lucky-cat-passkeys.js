@@ -37,6 +37,7 @@
     try {
       var begin = await fetch("/auth/passkey/login/begin", {
         method: "POST",
+        credentials: "same-origin",
         headers: csrf ? { "X-CSRF-Token": csrf } : {},
       });
       if (!begin.ok) throw new Error("Could not start passkey sign-in.");
@@ -44,6 +45,7 @@
       var credential = await window.chirp.passkeys.authenticate(opts);
       var finish = await fetch("/auth/passkey/login/finish", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           ...(csrf ? { "X-CSRF-Token": csrf } : {}),
@@ -70,6 +72,7 @@
     try {
       var begin = await fetch("/auth/passkey/register/begin", {
         method: "POST",
+        credentials: "same-origin",
         headers: csrf ? { "X-CSRF-Token": csrf } : {},
       });
       if (!begin.ok) throw new Error("Could not start passkey enrollment.");
@@ -77,6 +80,7 @@
       var credential = await window.chirp.passkeys.register(opts);
       var finish = await fetch("/auth/passkey/register/finish", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           ...(csrf ? { "X-CSRF-Token": csrf } : {}),
