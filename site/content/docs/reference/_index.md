@@ -18,9 +18,18 @@ Reach for this section when you need an exact answer — a function signature, a
 error type, or a config field — not a tutorial. Each page is a lookup surface,
 not a narrative: arrive via search, find the symbol, leave.
 
+Site-wide machine-readable index: [`/chirp/llms.txt`](/chirp/llms.txt).
+
 :::{cards}
 :columns: 2
 :gap: medium
+
+:::{card} Glossary
+:icon: book-open
+:link: /chirp/docs/reference/glossary/
+:description: Fragment, Page, OOB, Suspense, Signal, Shape, Contract, …
+Hypermedia and Chirp terminology.
+:::{/card}
 
 :::{card} API Reference
 :icon: code

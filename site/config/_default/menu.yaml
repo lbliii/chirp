@@ -5,7 +5,7 @@
 
 menu:
   extra:
-    - name: "Forum"
-      url: "https://bengal.discourse.group/"
+    - name: "Live demo"
+      url: "https://luckycat-production.up.railway.app"
       weight: 100
-      icon: chat-circle
+      icon: rocket

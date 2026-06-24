@@ -126,7 +126,8 @@ and the message as the concrete fix target.
 That makes the build loop mechanical: write a route, run `chirp check`, read the
 named fix, apply it. An agent (or a human) builds correct Chirp apps from two
 things — the public-API surface and the contract errors, which describe the
-failure *and* the remedy — instead of memorized community lore.
+failure *and* the remedy — instead of memorized community lore. The published
+docs site also emits [`/chirp/llms.txt`](/chirp/llms.txt) on build for machine-readable navigation.
 
 :::{since} 0.8.0
 Accessibility is one of those contracts. Chirp ships five

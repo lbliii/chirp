@@ -18,23 +18,38 @@ Chirp is a Python framework for hypermedia-native apps: you return HTML — page
 fragments, streams, and Server-Sent Events — and
 [[docs/about/core-concepts/return-values|the return type expresses the intent]].
 
-New here? Start with **Get Started**. Sizing it up? Read **About**. Already
-building? Jump to **Build Apps** or the **Reference**.
+New here? Start with **Get Started** ([[docs/get-started/learning-path|learning path]]).
+Sizing it up? Read **About**. Already building? Jump to **Build Apps** or the
+**Reference**.
+
+## How this site is organized
+
+| Lane | Use when |
+|------|----------|
+| [Get Started](/chirp/docs/get-started/) | First hour — install, quickstart, [learning path](/chirp/docs/get-started/learning-path/) |
+| [About](/chirp/docs/about/) | Why Chirp, mental model, comparison, non-goals |
+| [Build Apps](/chirp/docs/build-apps/) | Implementing a feature (routing, forms, SSE, …) |
+| [Tutorials](/chirp/docs/tutorials/) | Guided multi-step builds (Flask migration, auth, patterns) |
+| [Examples](/chirp/docs/examples/) | Copy runnable code — tier 1 → 2 → 3 |
+| [Quality & Operations](/chirp/docs/quality/) | `chirp check`, tests, deployment |
+| [Reference](/chirp/docs/reference/) | Symbol lookup, [glossary](/chirp/docs/reference/glossary/), CLI |
+
+Machine-readable doc index: [`/chirp/llms.txt`](/chirp/llms.txt) (generated on site build).
 
 :::{cards}
 :columns: 2
 :gap: medium
 
+:::{card} Get Started
+:icon: rocket
+:link: /chirp/docs/get-started/
+Install Chirp, follow the learning path, and build your first fragment app.
+:::{/card}
+
 :::{card} About
 :icon: info
 :link: /chirp/docs/about/
 What Chirp is, why it is different, and how the return-type model works.
-:::{/card}
-
-:::{card} Get Started
-:icon: rocket
-:link: /chirp/docs/get-started/
-Install Chirp, build the first fragment app, and learn the default project layout.
 :::{/card}
 
 :::{card} Build Apps
@@ -62,13 +77,13 @@ Contracts, debugging, tests, deployment, and production operations.
 :::{card} Reference
 :icon: file-text
 :link: /chirp/docs/reference/
-Complete API reference, error codes, and configuration.
+API reference, glossary, errors, and CLI.
 :::{/card}
 
 :::{card} Examples
 :icon: cube
 :link: /chirp/docs/examples/
-Full-featured apps: contacts, dashboards, RAG, streaming, fragments, and SSE.
+Runnable apps by tier — contacts, shell, Lucky Cat capstone.
 :::{/card}
 
 :::{card} Applied Tutorials

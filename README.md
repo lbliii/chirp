@@ -7,7 +7,36 @@
 
 **A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events.**
 
-> 🐱 **Live demo — [Lucky Cat](https://luckycat-production.up.railway.app):** a flagship ChirpUI crypto-exchange built entirely on server-owned signals, SSE, Suspense, and OOB swaps — no client framework. ([source](examples/chirpui/lucky_cat/))
+Routes return intent — `Page`, `Fragment`, `EventStream`, `Suspense`, and friends — and Chirp
+handles content negotiation, layout composition, and htmx awareness. Install as
+**`bengal-chirp`**, import as **`chirp`**. Requires Python 3.14+.
+
+Chirp ships routing, templates, forms, validation, sessions, auth, streaming HTML, SSE,
+static files, security middleware, testing tools, and hypermedia contract checks in one
+framework. JSON routes and explicit `Response` objects are supported when you need them.
+Database access uses [Shapes](https://lbliii.github.io/chirp/docs/build-apps/forms-data/shapes/)
+and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email delivery
+integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
+
+Status: **alpha** (0.8.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+
+📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
+
+---
+
+## Quick start
+
+```bash
+pip install 'bengal-chirp[ui]'   # [ui] optional but recommended for new projects
+chirp new myapp && cd myapp
+python app.py                      # http://127.0.0.1:8000
+chirp check myapp:app              # validate hypermedia wiring
+```
+
+The scaffold includes routes, templates, and (with `[ui]`) ChirpUI layouts. No npm, no build step.
+
+<details>
+<summary><strong>Minimal example</strong> (no scaffold)</summary>
 
 ```python
 from chirp import App
@@ -21,37 +50,75 @@ def index():
 app.run()
 ```
 
+For the smallest complete htmx loop (Page, Fragment, forms, tests), follow
+[First Fragment App](https://lbliii.github.io/chirp/docs/get-started/first-fragment-app/).
+
+</details>
+
 ---
 
-## What is Chirp?
+## The core idea
 
-Chirp is a Python web framework built for the modern web platform: browser-native UI, HTML over the wire, streaming responses, and Server-Sent Events. Routes return intent — `Page`, `Fragment`, `OOB`, `EventStream`, `Suspense` — and the framework handles content negotiation, layout composition, and htmx awareness automatically. One template with named blocks serves as a full page, a fragment endpoint, an SSE payload, and a Suspense deferred block. No `make_response()`. No `jsonify()`. The type *is* the intent.
+One template, many access patterns. The return type expresses intent; Chirp negotiates the response:
 
 ```python
+from chirp import App, Page, Request
+
+app = App()
+
 @app.route("/search")
 async def search(request: Request):
     results = await db.search(request.query.get("q", ""))
     return Page("search.html", "results", results=results)
-    # Full page for browsers. Fragment for htmx. Same template, same data.
+    # Browser navigation → full page. htmx request → just the "results" block.
 ```
 
-- **Browser-native UI** — `<dialog>`, `popover`, View Transitions, container queries. Let the browser be the framework.
-- **HTML over the wire** — Full pages, fragments, streaming HTML, and SSE. Built for htmx.
-- **Streaming HTML** — Shell first, content fills in as data arrives. No loading spinners.
-- **Server-Sent Events** — Real-time updates over plain HTTP. No WebSocket upgrade required.
-- **MCP tools** — Register functions as tools callable by LLMs and MCP clients.
+No `make_response()`. No separate partials directory. The type *is* the intent.
 
-Read the [Philosophy](docs/philosophy.md) for the full picture.
-See [Public API](docs/public-api.md) for the stable/provisional import surface.
+Read [Philosophy](docs/philosophy.md) and [Return values](https://lbliii.github.io/chirp/docs/about/core-concepts/return-values/)
+for the full model.
 
-## Use Chirp For
+---
 
-- **HTMX-driven web apps** — Server-rendered UI with fragment swaps and progressive enhancement
-- **Server-rendered applications** — Full pages plus partial updates from the same templates
-- **Streaming interfaces** — Progressive HTML delivery and token-by-token responses
-- **Real-time dashboards** — SSE-powered updates without WebSocket complexity
-- **Teams avoiding heavy frontend stacks** — HTML, CSS, templates, and browser-native features
-- **AI-assisted development** — `app.check()` contracts name the fix (stable category + concrete message), so apps stay buildable from the public API and contract errors
+## Where to go next
+
+| I want to… | Start here |
+|------------|------------|
+| Learn step by step | [Learning path](https://lbliii.github.io/chirp/docs/get-started/learning-path/) · [Get Started](https://lbliii.github.io/chirp/docs/get-started/) |
+| Understand the architecture | [About](https://lbliii.github.io/chirp/docs/about/) · [Core concepts](https://lbliii.github.io/chirp/docs/about/core-concepts/) |
+| Build features | [Build Apps](https://lbliii.github.io/chirp/docs/build-apps/) |
+| Run runnable examples | [Examples index](examples/README.md) |
+| Compare to other stacks | [When to use Chirp](https://lbliii.github.io/chirp/docs/about/comparison/) |
+| See what's intentionally out of scope | [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/) |
+| Look up exports and stability | [Public API](docs/public-api.md) · [Reference](https://lbliii.github.io/chirp/docs/reference/) · [Glossary](https://lbliii.github.io/chirp/docs/reference/glossary/) |
+| Contracts, tests, deployment | [Quality & Operations](https://lbliii.github.io/chirp/docs/quality/) |
+
+---
+
+## Learn Chirp (examples)
+
+Follow the [learning path](https://lbliii.github.io/chirp/docs/get-started/learning-path/) on the docs site. Examples are tiered on purpose. **Do them in order.**
+
+| Tier | Example | You will learn |
+|------|---------|----------------|
+| **1 — Basics** | [`standalone/hello`](examples/standalone/hello/), [`standalone/contacts`](examples/standalone/contacts/) | Routes, forms, `Page` / `Fragment`, validation |
+| **2 — App shell** | [`chirpui/contacts_shell`](examples/chirpui/contacts_shell/) | ChirpUI shell, `_actions.py`, `_context.py`, boosted nav |
+| **3 — Capstone** | [`chirpui/lucky_cat`](examples/chirpui/lucky_cat/) | Signals, Suspense, SSE, OOB, secure stack |
+
+<details>
+<summary><strong>Capstone demo — Lucky Cat</strong> (tier 3, not the on-ramp)</summary>
+
+**Live:** [luckycat-production.up.railway.app](https://luckycat-production.up.railway.app) ·
+**Source:** [`examples/chirpui/lucky_cat/`](examples/chirpui/lucky_cat/)
+
+A simulated trading-floor UI built on server-owned signals, SSE, Suspense, and OOB swaps — no
+client framework. Complete tiers 1–2 first.
+
+</details>
+
+Most day-to-day apps use a small set: `App`, `@app.route`, `Template`, `Page`, forms,
+`ValidationError`, and `chirp check`. Streaming, signals, and filesystem routing are the next
+layer — the tiered examples introduce them in order.
 
 ---
 
@@ -65,165 +132,101 @@ pip install bengal-chirp
 uv add bengal-chirp
 ```
 
-Requires Python 3.14+.
+<details>
+<summary><strong>Optional extras</strong></summary>
 
-Chirp works on its own with plain templates. For new projects, install with the
-**`[ui]` extra** so `chirp new` scaffolds the **chirp-ui** no-build CSS layer by
-default — components, tokens, and Alpine wiring without a frontend build step.
-The UI package remains optional and is not part of the framework core.
+| Extra | Adds |
+|-------|------|
+| `[ui]` | [chirp-ui](https://github.com/lbliii/chirp-ui) components and themes (`chirp new` emits ChirpUI layouts) |
+| `[forms]` | Multipart form parsing |
+| `[sessions]` | Signed cookie sessions |
+| `[auth]` | Argon2 password hashing |
+| `[passkeys]` | WebAuthn / passkeys |
+| `[ai]` | LLM streaming (`httpx`) |
+| `[data-pg]` | PostgreSQL via in-tree driver (no extra deps) |
+| `[testing]` | `httpx` test client transport |
+| `[redis]` | Redis-backed sessions and rate limiting |
+| `[markdown]` | Patitas + Rosettes markdown rendering |
+| `[config]` | `python-dotenv` for `.env` loading |
+| `[all]` / `[full]` | Common optional features bundled |
 
 ```bash
 pip install 'bengal-chirp[ui]'
 # or: uv add 'bengal-chirp[ui]'
 ```
 
-When chirp-ui is installed, `chirp new` emits ChirpUI layouts automatically and
-`chirp check` verifies that `chirpui-*` classes resolve to backing styles.
+When chirp-ui is installed, `chirp check` verifies that `chirpui-*` classes resolve to backing styles.
+
+</details>
 
 ---
 
-## Quick Start
+## Reference
 
-```bash
-chirp new myapp && cd myapp && python app.py
-```
+<details>
+<summary><strong>CLI</strong></summary>
 
-| Function | Description |
-|----------|-------------|
+| Command | Description |
+|---------|-------------|
 | `chirp new <name>` | Scaffold an auth-ready project |
 | `chirp new <name> --shell` | Scaffold with a persistent app shell (topbar + sidebar) |
 | `chirp new <name> --stream` | Simulated token streaming (`TemplateStream` + `EventStream`) |
 | `chirp new <name> --sse` | Scaffold with SSE boilerplate (`EventStream`, `sse_scope`) |
 | `chirp new <name> --ai` | Scaffold AI chat with tools, SSE activity feed, and secure stack |
 | `chirp run <app>` | Start the dev server from an import string |
+| `chirp dev <app>` | Dev server with Chirp DevTools |
 | `chirp check <app>` | Validate hypermedia contracts |
 | `chirp check <app> --warnings-as-errors` | Fail CI on contract warnings |
 | `chirp check <app> --coverage` | Show contract coverage counters |
-| `chirp check <app> --deploy` | Deploy preflight: production-posture severity (implies `--warnings-as-errors`) |
+| `chirp check <app> --deploy` | Deploy preflight (implies `--warnings-as-errors`) |
 | `chirp routes <app>` | Print the registered route table |
 | `chirp --version` | Print chirp, kida, pounce, and Python versions |
-| `App()` | Create an application |
-| `@app.route(path)` | Register a route handler |
-| `Template(name, **ctx)` | Render a full template |
-| `Template.inline(src, **ctx)` | Render from string (prototyping) |
-| `Page(name, block, **ctx)` | Auto Fragment or Template based on request |
-| `PageComposition(template, fragment_block, ...)` | Python-first composition with regions |
-| `Fragment(name, block, **ctx)` | Render a named template block |
-| `Stream(name, **ctx)` | Stream HTML progressively |
-| `Suspense(name, **ctx)` | Shell first, OOB swaps for deferred data |
-| `EventStream(gen)` | Server-Sent Events stream |
-| `hx_redirect(url)` | Redirect helper for htmx and full-page requests |
-| `app.run()` | Start the development server |
-
----
-
-## Streaming: `Stream` vs `Suspense` vs `EventStream`
-
-Picking the wrong one is the most common return-type mistake. Use this table:
-
-| Type | Shell first? | Transport | Use for | Not for |
-|------|--------------|-----------|---------|---------|
-| `Stream` | No — flush blocks as they complete | Single chunked HTTP response | Slow first-byte pages with independent sections (SEO-friendly progressive render) | Post-load updates |
-| `Suspense` | Yes — shell renders, deferred blocks stream as OOB swaps | Single chunked HTTP response | Dashboards / detail pages with multiple slow data sources, one round trip | Post-load updates |
-| `EventStream` | N/A — pure event channel | SSE (`text/event-stream`, long-lived) | Notifications, tickers, chat tails *after* the page loads | Initial page render |
-
-**Rule of thumb**: initial render that streams → `Suspense` (or `Stream` for SEO-heavy sections); updates after the page loads → `EventStream` for page-local regions, `signal()` for cross-page chrome. Multi-target mutations → `OOB` / `FormAction`. See the [realtime decision tree](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/realtime-decision-tree/) (with a Lucky Cat feature map).
-
----
-
-## Learning path
-
-Chirp examples are tiered on purpose. Start small; Lucky Cat is the capstone, not
-the on-ramp.
-
-| Tier | Example | Teaches |
-|------|---------|---------|
-| **1 — Basics** | [`standalone/hello`](examples/standalone/hello/), [`standalone/contacts`](examples/standalone/contacts/) | Routes, forms, `Page` / `Fragment`, validation |
-| **2 — App shell** | [`chirpui/contacts_shell`](examples/chirpui/contacts_shell/) | ChirpUI shell, `_actions.py`, `_context.py`, boosted nav |
-| **3 — Capstone** | [`chirpui/lucky_cat`](examples/chirpui/lucky_cat/) | Signals, Suspense, SSE, OOB, secure stack |
-
-Full runnable index: [examples/README.md](examples/README.md) and [Examples on the site](https://lbliii.github.io/chirp/docs/examples/).
-
----
-
-## Features
-
-| Feature | Description | Docs |
-|---------|-------------|------|
-| **HTMX Patterns** | Search, inline edit, infinite scroll, modal, and fragment workflows | [htmx Patterns →](https://lbliii.github.io/chirp/docs/tutorials/htmx-patterns/) |
-| **Comparison** | When Chirp fits compared with Flask, FastAPI, and Django | [When to Use Chirp →](https://lbliii.github.io/chirp/docs/about/comparison/) |
-| **Routing** | Pattern matching, path params, method dispatch | [Routing →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/) |
-| **Filesystem routing** | Route discovery from `pages/` with layouts | [Filesystem →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/filesystem-routing/) |
-| **Route directory contract** | `_meta.py`, `_context.py`, `_actions.py`, sections, shell context, and route validation | [Route Directory →](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/route-directory/) |
-| **Route introspection** | Reserved files, inheritance rules, debug headers, and route explorer | [Route Contract →](https://lbliii.github.io/chirp/docs/quality/contracts-debugging/route-contract/) |
-| **Templates** | Kida integration, rendering, filters | [Templates →](https://lbliii.github.io/chirp/docs/build-apps/html-fragments/) |
-| **Fragments** | Render named template blocks independently | [Fragments →](https://lbliii.github.io/chirp/docs/build-apps/html-fragments/fragments/) |
-| **Forms** | `form_or_errors`, form macros, validation | [Forms →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/forms-validation/) |
-| **Validation** | `chirp.validation` — composable rules (`required`, `email`, `max_length`, …) returning a `ValidationResult` | [Forms →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/forms-validation/) |
-| **Streaming** | Progressive HTML rendering via Kida | [Streaming →](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/) |
-| **SSE** | Server-Sent Events for real-time updates | [SSE →](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/server-sent-events/) |
-| **Middleware** | CORS, sessions, static files, security headers, custom | [Middleware →](https://lbliii.github.io/chirp/docs/build-apps/request-pipeline/) |
-| **Contracts** | Validate htmx attrs, form actions, and route-bearing dialog args | [Contracts →](https://lbliii.github.io/chirp/docs/quality/contracts-debugging/) |
-| **Testing** | Test client, assertions, isolation utilities | [Testing →](https://lbliii.github.io/chirp/docs/quality/testing/) |
-| **Data** | Database integration and form validation | [Data →](https://lbliii.github.io/chirp/docs/build-apps/forms-data/) |
-| **Optional UI layer** | `chirp-ui` companion components and styles | [chirp-ui →](https://github.com/lbliii/chirp-ui) |
-
-📚 **Full documentation**: [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
-
----
-
-## Benchmarks
-
-Chirp now ships a synthetic benchmark suite for comparing Chirp, FastAPI, and Flask across JSON and CPU workloads, plus Chirp-specific fused sync and mixed JSON+SSE scenarios.
-
-```bash
-uv sync --extra benchmark
-uv run poe benchmark
-```
-
-See [`benchmarks/README.md`](benchmarks/README.md) for how the benchmarks work, their caveats, and the available runners.
-
----
-
-## Production Deployment
-
-Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling. Use `chirp check myapp:app --warnings-as-errors` for Chirp hypermedia contracts and `pounce check --app myapp:app` for server preflight. `pounce.toml` is Pounce-native today; `app.run()` and `chirp run` use `AppConfig` plus CLI flags. See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/) for details.
-
----
-
-## Usage
-
-<details>
-<summary><strong>Return Values</strong> — Type-driven content negotiation</summary>
-
-Route functions return *values*. The framework handles content negotiation based on the type:
-
-```python
-return "Hello"                                  # -> 200, text/html
-return {"users": [...]}                         # -> 200, application/json
-return Template("page.html", title="Home")      # -> 200, rendered via Kida
-return Page("search.html", "results", items=x)  # -> Fragment or Template (auto)
-return Fragment("page.html", "results", items=x) # -> 200, rendered block
-return Stream("dashboard.html", **async_ctx)    # -> 200, streamed HTML
-return Suspense("dashboard.html", stats=...)    # -> shell + OOB swaps
-return EventStream(generator())                 # -> SSE stream
-return hx_redirect("/dashboard")                # -> Location + HX-Redirect
-return Response(body=b"...", status=201)         # -> explicit control
-return Redirect("/login")                       # -> 302
-```
-
-No `make_response()`. No `jsonify()`. The type *is* the intent.
-
-For htmx-driven form posts or mutations that should trigger a full-page
-navigation, prefer `hx_redirect()` so both plain browser and htmx requests
-follow the redirect correctly.
 
 </details>
 
 <details>
-<summary><strong>Fragments and htmx</strong> — Render template blocks independently</summary>
+<summary><strong>Return types</strong> — type-driven content negotiation</summary>
 
-Kida can render a named block from a template independently, without rendering the whole page:
+```python
+return "Hello"                                   # -> 200, text/html
+return {"users": [...]}                          # -> 200, application/json
+return Template("page.html", title="Home")        # -> 200, rendered via Kida
+return Page("search.html", "results", items=x)   # -> Fragment or Template (auto)
+return Fragment("page.html", "results", items=x) # -> 200, rendered block
+return Stream("dashboard.html", **async_ctx)     # -> 200, streamed HTML
+return Suspense("dashboard.html", stats=...)     # -> shell + OOB swaps
+return EventStream(generator())                  # -> SSE stream
+return hx_redirect("/dashboard")                 # -> Location + HX-Redirect
+return Response(body=b"...", status=201)          # -> explicit control
+return Redirect("/login")                        # -> 302
+```
+
+For htmx-driven form posts that should trigger full-page navigation, prefer `hx_redirect()`
+so both plain browser and htmx requests follow the redirect correctly.
+
+</details>
+
+<details>
+<summary><strong>Stream vs Suspense vs EventStream</strong></summary>
+
+Picking the wrong one is the most common return-type mistake:
+
+| Type | Shell first? | Transport | Use for | Not for |
+|------|--------------|-----------|---------|---------|
+| `Stream` | No — flush blocks as they complete | Single chunked HTTP response | Slow first-byte pages with independent sections | Post-load updates |
+| `Suspense` | Yes — shell renders, deferred blocks stream as OOB swaps | Single chunked HTTP response | Dashboards with multiple slow data sources, one round trip | Post-load updates |
+| `EventStream` | N/A — pure event channel | SSE (`text/event-stream`, long-lived) | Notifications, tickers, chat tails *after* the page loads | Initial page render |
+
+**Rule of thumb:** initial render that streams → `Suspense` (or `Stream` for SEO-heavy sections);
+updates after the page loads → `EventStream` for page-local regions, `signal()` for cross-page
+chrome. Multi-target mutations → `OOB` / `FormAction`.
+
+See the [realtime decision tree](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/realtime-decision-tree/).
+
+</details>
+
+<details>
+<summary><strong>Fragments and htmx</strong></summary>
 
 ```html
 {# templates/search.html #}
@@ -250,17 +253,10 @@ async def search(request: Request):
     return Template("search.html", results=results)
 ```
 
-Full page request renders everything. htmx request renders just the `results_list` block.
-Same template, same data, different scope. No separate "partials" directory.
-
 </details>
 
 <details>
-<summary><strong>Forms and validation</strong> — <code>chirp.validation</code> + <code>ValidationError</code></summary>
-
-`chirp.validation` is a small, composable rule library. Validators are plain
-callables (`(str) -> str | None`); rules compose into a dict; `validate()`
-returns a `ValidationResult` that's truthy iff the form is clean.
+<summary><strong>Forms and validation</strong></summary>
 
 ```python
 from chirp import Page, ValidationError
@@ -279,33 +275,13 @@ async def create_contact(request: Request):
     return Page("contacts.html", "list", contacts=contacts)
 ```
 
-`ValidationError` returns a 422 with the re-rendered form fragment so htmx
-swaps the error inline; non-htmx requests get the full page back.
+`ValidationError` returns 422 with the re-rendered form fragment for htmx; non-htmx requests get
+the full page back.
 
 </details>
 
 <details>
-<summary><strong>Streaming HTML</strong> — Progressive rendering</summary>
-
-Kida renders template sections as they complete. The browser receives the shell immediately
-and content fills in progressively:
-
-```python
-@app.route("/dashboard")
-async def dashboard(request: Request):
-    return Stream("dashboard.html",
-        header=site_header(),
-        stats=await load_stats(),
-        activity=await load_activity(),
-    )
-```
-
-</details>
-
-<details>
-<summary><strong>Server-Sent Events</strong> — Real-time HTML updates</summary>
-
-Push Kida-rendered HTML fragments to the browser in real-time:
+<summary><strong>Server-Sent Events</strong></summary>
 
 ```python
 @app.route("/notifications")
@@ -316,13 +292,12 @@ async def notifications(request: Request):
     return EventStream(stream())
 ```
 
-Combined with htmx's SSE support, this enables real-time UI updates with zero client-side
-JavaScript. The server renders HTML, the browser swaps it in.
+Combined with htmx's SSE support, the server renders HTML and the browser swaps it in.
 
 </details>
 
 <details>
-<summary><strong>Middleware</strong> — Composable request/response pipeline</summary>
+<summary><strong>Middleware</strong></summary>
 
 No base class. No inheritance. A middleware is anything that matches the protocol:
 
@@ -336,55 +311,89 @@ async def timing(request: Request, next: Next) -> Response:
 app.add_middleware(timing)
 ```
 
-Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions, SecurityHeaders.
+Built-in middleware: CORS, StaticFiles, HTMLInject, Sessions, SecurityHeaders, CSRF, Auth, and more.
+See [Request pipeline](https://lbliii.github.io/chirp/docs/build-apps/request-pipeline/).
 
 </details>
 
 <details>
-<summary><strong>Typed Contracts</strong> — Compile-time hypermedia validation</summary>
-
-Chirp validates the server-client boundary at startup:
+<summary><strong>Contracts</strong> — static hypermedia validation</summary>
 
 ```python
-# Prints a contract report and exits non-zero on errors.
-app.check()
-
-# Optional strict mode: treat warnings as failures too.
-app.check(warnings_as_errors=True)
+app.check()                        # report and exit non-zero on errors
+app.check(warnings_as_errors=True) # strict mode
 ```
 
-Every `hx-get`, `hx-post`, and `action` attribute in your templates is checked against the
-registered route table. Every `Fragment` and `SSE` return type is checked against available
-template blocks. SSE safety checks catch broken `sse-connect` / `sse-swap` structures and
-unsafe inherited target scopes before runtime.
-
-For strict CI:
+Every `hx-get`, `hx-post`, and `action` attribute in templates is checked against the route table.
+Every `Fragment` and SSE return type is checked against available template blocks.
 
 ```bash
 chirp check myapp:app --warnings-as-errors
 ```
 
+See [Contracts](https://lbliii.github.io/chirp/docs/quality/contracts-debugging/).
+
 </details>
 
 <details>
-<summary><strong>Debug DevTools</strong> — Browser-side diagnostics for htmx and hypermedia</summary>
-
-Run the app in debug mode:
+<summary><strong>DevTools</strong></summary>
 
 ```bash
 chirp dev myapp:app
 ```
 
-Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools. The drawer
-shows htmx activity, effective `hx-*` inheritance, render plans, native Chirp
-EventStream traces, View Transitions, DOM diffs, and Swap Doctor warnings.
-
-Browser-capable agents can discover and export diagnostics with:
+Open the app in a browser and press `Ctrl+Shift+D` for Chirp DevTools — htmx activity, effective
+`hx-*` inheritance, render plans, EventStream traces, View Transitions, and Swap Doctor warnings.
 
 ```javascript
 window.ChirpHtmxDebug.help()
 window.ChirpHtmxDebug.exportRecordsJson()
 ```
+
+</details>
+
+<details>
+<summary><strong>Features index</strong></summary>
+
+| Topic | Docs |
+|-------|------|
+| HTMX patterns | [htmx Patterns](https://lbliii.github.io/chirp/docs/tutorials/htmx-patterns/) |
+| Routing & filesystem layout | [Pages & navigation](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/) |
+| Templates & fragments | [HTML fragments](https://lbliii.github.io/chirp/docs/build-apps/html-fragments/) |
+| Forms & data | [Forms & validation](https://lbliii.github.io/chirp/docs/build-apps/forms-data/) |
+| Streaming & SSE | [Streaming updates](https://lbliii.github.io/chirp/docs/build-apps/streaming-updates/) |
+| Middleware | [Request pipeline](https://lbliii.github.io/chirp/docs/build-apps/request-pipeline/) |
+| Contracts & debugging | [Quality](https://lbliii.github.io/chirp/docs/quality/) |
+| Testing | [Testing](https://lbliii.github.io/chirp/docs/quality/testing/) |
+| Optional UI layer | [chirp-ui](https://github.com/lbliii/chirp-ui) |
+
+</details>
+
+---
+
+## Production
+
+Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with
+HTTP/2, graceful shutdown, Prometheus metrics, rate limiting, and multi-worker scaling.
+
+```bash
+chirp check myapp:app --warnings-as-errors   # hypermedia contracts
+pounce check --app myapp:app                 # server preflight
+```
+
+See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deployment/production/).
+
+<details>
+<summary><strong>Benchmarks</strong></summary>
+
+Synthetic benchmarks comparing Chirp, FastAPI, Flask, Starlette, and Litestar:
+
+```bash
+uv sync --extra benchmark
+uv run poe benchmark
+```
+
+See [`benchmarks/README.md`](benchmarks/README.md) for caveats and runners.
 
 </details>
 
@@ -399,16 +408,15 @@ uv sync --group dev
 uv run pytest -q --tb=short
 ```
 
-Run uv commands from the Chirp repository root. Chirp is developed as a
-standalone project and resolves development dependencies the same way CI does.
-If an ancestor directory still has old multi-repo dependency overrides, clone
-or move Chirp outside that parent before running `uv sync`.
+Run uv commands from the repository root. If an ancestor directory has old multi-repo dependency
+overrides, clone Chirp outside that parent before running `uv sync`.
 
 ---
 
 ## The Bengal Ecosystem
 
-A structured reactive stack written in pure Python for 3.14t free-threading. Chirp is the framework; packages like `chirp-ui` sit on top as optional companions.
+Python-native stack for 3.14t free-threading. Chirp is the web framework; packages like
+`chirp-ui` sit on top as optional companions.
 
 | | | | |
 |--:|---|---|---|
@@ -421,8 +429,6 @@ A structured reactive stack written in pure Python for 3.14t free-threading. Chi
 | **ฅᨐฅ** | [Patitas](https://github.com/lbliii/patitas) | Markdown parser | [Docs](https://lbliii.github.io/patitas/) |
 | **⌾⌾⌾** | [Rosettes](https://github.com/lbliii/rosettes) | Syntax highlighter | [Docs](https://lbliii.github.io/rosettes/) |
 | **⚡** | [Zoomies](https://github.com/lbliii/zoomies) | QUIC / HTTP/3 | — |
-
-Python-native. Free-threading ready. No npm required.
 
 ---
 

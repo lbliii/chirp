@@ -46,7 +46,8 @@ When this domain changes, check:
 - **Source/generated clarity.** PRs should say whether generated site artifacts
   were intentionally updated or skipped.
 - **Navigation parity.** Site IA should reflect current docs organization and
-  public API maturity.
+  public API maturity. Top nav **Live demo** points at Lucky Cat production;
+  doc curriculum starts at Get Started → learning path.
 - **Search proof.** Search changes should include tests or build receipts.
 - **Release-page consistency.** Release pages should not drift from changelog.
 

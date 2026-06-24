@@ -10,10 +10,12 @@ keywords: [install, pip, uv, extras, forms, sessions, auth, testing]
 category: onboarding
 ---
 
-Get Chirp installed, add the optional extras your app needs, and scaffold a
-running project. Chirp is a small core — the [[docs/build-apps/html-fragments/kida-integration|Kida template engine]]
-plus an async runtime — and every other capability (forms, sessions, auth, a
-database, UI components) is an opt-in extra you add when you reach for it.
+Get Chirp installed, add optional extras when you need them, and scaffold a
+running project. Chirp ships routing, templates (Kida), return-type content
+negotiation, middleware, forms, validation, sessions, auth helpers, streaming
+HTML, SSE, static files, testing tools, and hypermedia contract checks in one
+framework. Optional PyPI extras add multipart parsing, argon2, chirp-ui,
+PostgreSQL access, LLM streaming, and Redis — see the table below.
 
 ## Prerequisites
 
@@ -65,8 +67,9 @@ Open `http://127.0.0.1:8000` in your browser.
 
 ## Optional extras
 
-The core install pulls in just the template engine and async runtime. Everything
-else is an opt-in extra. Most apps reach for a handful first:
+Most new apps start with `chirp new`, which expects forms, sessions, and often
+`[ui]`. The table below lists PyPI extras you add when a feature is not already
+pulled in by your scaffold or deployment image:
 
 | Extra | Provides | Install |
 |-------|----------|---------|
