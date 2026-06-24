@@ -102,6 +102,8 @@ app would fare in production without changing your config, use `chirp check
 | `select_inheritance` | WARNING | Override inherited broad `hx-select` with an explicit selector or `hx-select="unset"` on the mutating element. `hx-disinherit` only affects descendants, not the element itself. |
 | `swap_safety` | INFO / WARNING | Add explicit local targets or isolate SSE swaps from broad inherited `hx-target`/`hx-swap`. |
 | `template_stream_client_shape` | WARNING | Use plain form POST for `TemplateStream` routes, or return `Fragment`/`EventStream` when htmx swaps into `#target`. |
+| `sse_token_swap_mode` | WARNING | Append per-token SSE Fragments with `hx-swap="beforeend"` instead of replace swaps. |
+| `sse_eager_connect` | INFO | Prefer POST → Fragment with parametric `sse-connect` when streaming should start after user action. |
 | `fragment_island` | INFO | Add `hx-disinherit` or a fragment-island wrapper around local mutation targets. |
 | `view_transition_scope` | WARNING | Scope View Transitions to navigation-only elements, not broad OOB/SSE live-update containers. |
 | `oob_registry` | ERROR / WARNING | Add the registered OOB block/target, fix a typo, or make the region optional only when absence is legitimate. See [[docs/quality/contracts-debugging/oob-registry|the OOB registry]]. |

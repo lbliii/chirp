@@ -92,6 +92,7 @@ chirp new myapp && cd myapp && python app.py
 |----------|-------------|
 | `chirp new <name>` | Scaffold an auth-ready project |
 | `chirp new <name> --shell` | Scaffold with a persistent app shell (topbar + sidebar) |
+| `chirp new <name> --stream` | Simulated token streaming (`TemplateStream` + `EventStream`) |
 | `chirp new <name> --sse` | Scaffold with SSE boilerplate (`EventStream`, `sse_scope`) |
 | `chirp new <name> --ai` | Scaffold AI chat with tools, SSE activity feed, and secure stack |
 | `chirp run <app>` | Start the dev server from an import string |

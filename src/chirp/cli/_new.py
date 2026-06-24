@@ -32,6 +32,12 @@ from chirp.cli.templates import (
     SHELL_PAGE_PY,
     SSE_APP_PY,
     SSE_INDEX_HTML,
+    STREAM_APP_PY,
+    STREAM_CONFTEST_PY,
+    STREAM_INDEX_HTML,
+    STREAM_RESPONSE_HTML,
+    STREAM_SSE_PANEL_HTML,
+    STREAM_TEST_APP_PY,
     STYLE_CSS,
     TEST_APP_PY,
     THEME_CSS_STUB,
@@ -105,6 +111,8 @@ def create_project(args: argparse.Namespace) -> None:
         _create_minimal(project_dir, args.name)
     elif getattr(args, "ai", False):
         _create_ai(project_dir, args.name)
+    elif getattr(args, "stream", False):
+        _create_stream(project_dir, args.name)
     elif getattr(args, "sse", False):
         _create_sse(project_dir, args.name)
     elif getattr(args, "shell", False):
@@ -113,7 +121,12 @@ def create_project(args: argparse.Namespace) -> None:
         _create_v2(project_dir, args.name)
 
     print(f"Created project '{args.name}'")
-    if not args.minimal and not getattr(args, "sse", False) and not getattr(args, "shell", False):
+    if (
+        not args.minimal
+        and not getattr(args, "sse", False)
+        and not getattr(args, "stream", False)
+        and not getattr(args, "shell", False)
+    ):
         print()
         print(f"  cd {args.name} && python app.py")
         print()
@@ -222,6 +235,22 @@ def _create_ai(project_dir: Path, name: str) -> None:
     (templates_dir / "chat.html").write_text(AI_CHAT_HTML)
     (project_dir / ".env.example").write_text(AI_ENV_EXAMPLE)
     (tests_dir / "test_app.py").write_text(AI_TEST_APP_PY.format(name=name))
+    _write_scaffold_extras(project_dir, name)
+
+
+def _create_stream(project_dir: Path, name: str) -> None:
+    """Generate simulated token streaming demo (TemplateStream + EventStream)."""
+    templates_dir = project_dir / "templates"
+    tests_dir = project_dir / "tests"
+    templates_dir.mkdir(parents=True)
+    tests_dir.mkdir(parents=True)
+
+    (project_dir / "app.py").write_text(STREAM_APP_PY.format(name=name), encoding="utf-8")
+    (templates_dir / "index.html").write_text(STREAM_INDEX_HTML, encoding="utf-8")
+    (templates_dir / "response.html").write_text(STREAM_RESPONSE_HTML, encoding="utf-8")
+    (templates_dir / "sse_panel.html").write_text(STREAM_SSE_PANEL_HTML, encoding="utf-8")
+    (tests_dir / "conftest.py").write_text(STREAM_CONFTEST_PY, encoding="utf-8")
+    (tests_dir / "test_app.py").write_text(STREAM_TEST_APP_PY.format(name=name), encoding="utf-8")
     _write_scaffold_extras(project_dir, name)
 
 

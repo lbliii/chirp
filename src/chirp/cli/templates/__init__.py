@@ -36,6 +36,14 @@ from chirp.cli.templates.sse import (
     STYLE_CSS,
     TEST_APP_PY,
 )
+from chirp.cli.templates.stream import (
+    STREAM_APP_PY,
+    STREAM_CONFTEST_PY,
+    STREAM_INDEX_HTML,
+    STREAM_RESPONSE_HTML,
+    STREAM_SSE_PANEL_HTML,
+    STREAM_TEST_APP_PY,
+)
 from chirp.cli.templates.v2 import (
     V2_APP_CHIRPUI_PY,
     V2_APP_PY,
@@ -78,6 +86,12 @@ __all__ = [
     "SHELL_PAGE_PY",
     "SSE_APP_PY",
     "SSE_INDEX_HTML",
+    "STREAM_APP_PY",
+    "STREAM_CONFTEST_PY",
+    "STREAM_INDEX_HTML",
+    "STREAM_RESPONSE_HTML",
+    "STREAM_SSE_PANEL_HTML",
+    "STREAM_TEST_APP_PY",
     "STYLE_CSS",
     "TEST_APP_PY",
     "THEME_CSS_STUB",

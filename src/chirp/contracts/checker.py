@@ -99,6 +99,7 @@ from .rules_sse import (
     check_sse_event_crossref,
     check_sse_self_swap,
 )
+from .rules_sse_client_shape import check_sse_eager_connect, check_sse_token_swap_mode
 from .rules_static_dom import check_duplicate_static_ids, check_oob_fragment_producers
 from .rules_suspense_defer import (
     SUSPENSE_DEFER_BLOCKS,
@@ -646,6 +647,8 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         result.issues.extend(check_sse_connect_scope(template_sources, broad_targets))
         result.issues.extend(check_sse_event_crossref(template_sources, router))
         result.issues.extend(check_template_stream_client_shape(template_sources, router))
+        result.issues.extend(check_sse_token_swap_mode(template_sources, router))
+        result.issues.extend(check_sse_eager_connect(template_sources))
         result.issues.extend(check_signal_bindings(template_sources, snapshot.signal_names))
         result.issues.extend(check_signal_scope(middleware_list, _session_signal_names(app)))
         result.issues.extend(check_signal_connect_budget(template_sources))

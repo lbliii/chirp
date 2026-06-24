@@ -31,6 +31,8 @@
       background: #1e293b; padding: 1rem; border-radius: 0.5rem;
       min-height: 4rem; margin-top: 0.5rem; white-space: pre-wrap;
     }
+    .prompt { color: #94a3b8; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    #sse-section { margin-top: 0.5rem; }
   </style>
 </head>
 <body>
@@ -40,17 +42,21 @@
   <h2>TemplateStream (full-page chunked HTML)</h2>
   <p class="hint">Plain form POST — navigates to a streaming response page (no htmx swap).</p>
   <form action="/ask" method="post">
-    <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
+    <input name="prompt" placeholder="What is Chirp?" autocomplete="off">
     <button type="submit">Stream</button>
   </form>
 
   <h2>EventStream (SSE, one Fragment per token)</h2>
   <p class="hint">htmx POST returns a panel that connects to SSE with your prompt.</p>
-  <form hx-post="/stream/start" hx-target="#sse-section" hx-swap="innerHTML" method="post">
-    <input name="prompt" placeholder="Ask something..." value="What is Chirp?">
+  <form hx-post="/stream/start"
+        hx-target="#sse-section"
+        hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset()"
+        method="post">
+    <input name="prompt" placeholder="What is Chirp?" autocomplete="off">
     <button type="submit">Stream SSE</button>
   </form>
-  <div id="sse-section" class="response">
+  <div id="sse-section">
     <p class="hint">Submit to connect and stream tokens here.</p>
   </div>
 </body>

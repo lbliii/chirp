@@ -199,6 +199,21 @@ class TestChirpNewAI:
         compile(source, "app.py", "exec")
 
 
+class TestChirpNewStream:
+    def test_creates_stream_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--stream"])
+
+        project = tmp_path / "myapp"
+        assert (project / "app.py").is_file()
+        assert (project / "templates" / "index.html").is_file()
+        assert (project / "templates" / "response.html").is_file()
+        assert (project / "templates" / "sse_panel.html").is_file()
+        assert (project / "tests" / "conftest.py").is_file()
+        assert (project / "tests" / "test_app.py").is_file()
+        compile((project / "app.py").read_text(), "app.py", "exec")
+
+
 class TestChirpNewSSE:
     def test_creates_sse_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)

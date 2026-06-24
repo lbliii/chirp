@@ -56,8 +56,8 @@ It is not a fragment return type. Pair transport with the client wiring:
 | **SSE (`EventStream`)** | rare | `Fragment` scaffold + parametric `sse-connect` |
 
 Chirp warns on the bad pairing via the `template_stream_client_shape` contract.
-See [[docs/examples/llm-minimal|LLM Minimal]] and
-[[docs/hypermedia-footguns|Hypermedia footguns]].
+See [[docs/build-apps/streaming-updates/streaming-answers|Streaming answers]]
+for the three safe recipes and [[docs/hypermedia-footguns|Hypermedia footguns]].
 
 See also [[docs/about/core-concepts/return-values|Return values]] for the full
 type reference and [[docs/build-apps/streaming-updates/html-streaming|Streaming
