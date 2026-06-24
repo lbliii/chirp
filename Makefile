@@ -1,64 +1,71 @@
 # Chirp Makefile
-# Wraps uv/poe commands for Python 3.14t
+# Worktree onboarding: make install (uses .python-version + config/python.env)
 
-PYTHON_VERSION ?= 3.14t
 VENV_DIR ?= .venv
+ENV_FILE ?= config/python.env
+UV_RUN = uv run --env-file $(ENV_FILE)
 
-.PHONY: all help setup install test lint format ty preflight clean build publish release gh-release changelog changelog-draft changelog-check
+.PHONY: all help install test lint format ty preflight site-serve site-build bengal clean build publish release gh-release changelog changelog-draft changelog-check
 
 all: help
 
 help:
 	@echo "Chirp Development CLI"
 	@echo "====================="
-	@echo "Python Version: $(PYTHON_VERSION)"
+	@echo "Python pin: $$(cat .python-version 2>/dev/null || echo '3.14t (missing .python-version)')"
+	@echo "Runtime env: $(ENV_FILE)"
 	@echo ""
-	@echo "Available commands:"
-	@echo "  make setup      - Create virtual environment with Python $(PYTHON_VERSION)"
-	@echo "  make install    - Install dependencies in development mode"
-	@echo "  make test       - Run the test suite"
-	@echo "  make lint       - Run ruff linter"
-	@echo "  make format     - Run ruff formatter"
-	@echo "  make ty         - Run ty type checker"
-	@echo "  make preflight  - Fast pre-push: cheap whole-repo invariants (no full suite)"
-	@echo "  make changelog  - Compile changelog.d fragments into CHANGELOG.md"
-	@echo "  make changelog-draft - Preview changelog from fragments (stdout)"
-	@echo "  make changelog-check - Verify branch adds a fragment (vs main)"
-	@echo "  make build      - Build distribution packages"
-	@echo "  make publish    - Publish to PyPI (uses .env for token)"
-	@echo "  make release    - Compile changelog, build, and publish"
-	@echo "  make gh-release - Create GitHub release (triggers PyPI via workflow), uses site release notes"
-	@echo "  make clean      - Remove venv, build artifacts, and caches"
+	@echo "New worktree / fresh clone:"
+	@echo "  make install     - create .venv from .python-version and sync dev + docs deps"
+	@echo ""
+	@echo "Daily commands:"
+	@echo "  make test        - run the test suite"
+	@echo "  make lint        - run ruff linter"
+	@echo "  make format      - run ruff formatter"
+	@echo "  make ty          - run ty type checker"
+	@echo "  make preflight   - fast pre-push invariants"
+	@echo "  make site-serve  - Bengal dev server (http://127.0.0.1:5173)"
+	@echo "  make site-build  - build docs site locally"
+	@echo "  make bengal s    - any Bengal subcommand (e.g. make bengal ARGS='s')"
+	@echo ""
+	@echo "Release:"
+	@echo "  make changelog / changelog-draft / changelog-check"
+	@echo "  make build / publish / release / gh-release"
+	@echo ""
+	@echo "  make clean       - remove venv, build artifacts, and caches"
 
-setup:
-	@echo "Creating virtual environment with Python $(PYTHON_VERSION)..."
-	uv venv --python $(PYTHON_VERSION) $(VENV_DIR)
-
+# One command for every new Conductor worktree or fresh clone.
+# .python-version selects 3.14t; config/python.env is applied by site/bengal wrappers.
 install:
-	@echo "Installing dependencies..."
-	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Error: $(VENV_DIR) not found. Run 'make setup' first."; \
-		exit 1; \
-	fi
-	@bash -c 'source "$(VENV_DIR)/bin/activate" && uv sync --active --group dev'
+	@echo "Syncing dependencies (Python pin: $$(cat .python-version))..."
+	uv sync --group dev --group docs
+	@echo "✓ Ready. Run: make site-serve  (or: cd site && ./bengal s)"
 
 test:
-	uv run pytest -q --tb=short
+	$(UV_RUN) pytest -q --tb=short
 
 lint:
-	uv run ruff check .
+	$(UV_RUN) ruff check .
 
 format:
-	uv run ruff format .
+	$(UV_RUN) ruff format .
 
 ty:
-	uv run ty check src/chirp/
+	$(UV_RUN) ty check src/chirp/
 
-# Fast invariants check before pushing: lint + format-check + ty + repo-wide
-# invariant tests (public-API snapshot, docs coverage). Does NOT run the full
-# pytest suite — completes in seconds, not the full ~8-minute CI test job.
 preflight:
-	uv run poe preflight
+	$(UV_RUN) poe preflight
+
+site-serve:
+	./scripts/bengal-site serve --environment local
+
+site-build:
+	./scripts/bengal-site build --environment local
+
+# Usage: make bengal ARGS="s"   or   make bengal ARGS="build --environment local"
+bengal:
+	@test -n "$(ARGS)" || (echo "Usage: make bengal ARGS='s'"; exit 1)
+	./scripts/bengal-site $(ARGS)
 
 # =============================================================================
 # Build & Release
@@ -66,13 +73,13 @@ preflight:
 
 changelog:
 	@echo "Compiling changelog from fragments..."
-	uv run towncrier build --yes
+	$(UV_RUN) towncrier build --yes
 
 changelog-draft:
-	uv run towncrier build --draft
+	$(UV_RUN) towncrier build --draft
 
 changelog-check:
-	uv run towncrier check --compare-with origin/main
+	$(UV_RUN) towncrier check --compare-with origin/main
 
 build:
 	@echo "Building distribution packages..."
@@ -93,9 +100,6 @@ publish:
 release: changelog build publish
 	@echo "✓ Release complete"
 
-# Create GitHub release from site release notes; triggers python-publish workflow → PyPI
-# Strips YAML frontmatter (--- ... ---) from notes before passing to gh
-# Filters out release note type headers (### Added, ### Changed, etc.) from the body
 gh-release:
 	@VERSION=$$(grep -m1 '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
 	PROJECT=$$(grep -m1 '^name = ' pyproject.toml | sed 's/name = "\(.*\)"/\1/'); \

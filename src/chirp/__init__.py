@@ -15,7 +15,7 @@ Basic usage::
 
     app.run()
 
-Data access (``pip install chirp[data]``)::
+Data access (``pip install 'bengal-chirp[data-pg]'``)::
 
     from chirp.data import Database
     db = Database("sqlite:///app.db")

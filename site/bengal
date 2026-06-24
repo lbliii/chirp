@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Committed entry point for Bengal in this worktree.
+# Applies config/python.env (PYTHON_GIL=0) and uses the repo's 3.14t pin.
+set -euo pipefail
+
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/bengal-site" "$@"

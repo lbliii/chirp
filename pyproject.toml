@@ -121,6 +121,9 @@ Changelog = "https://github.com/lbliii/chirp/blob/main/CHANGELOG.md"
 # No tool.uv.sources table: Chirp is developed as a standalone uv project.
 # Local development, CI, and external installs resolve dependencies from PyPI.
 
+[tool.uv]
+python-preference = "only-managed"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -367,10 +370,12 @@ preflight = { sequence = [
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build --out-dir dist/ && ls -la dist/", help = "Build distribution" }
 
-# Docs site (always uses project venv Bengal, not a global `bengal` install)
-site-build = { cwd = "site", cmd = "uv run bengal build --environment local", help = "Build docs site locally (Bengal from docs group)" }
-site-build-prod = { cwd = "site", cmd = "uv run bengal build --environment production", help = "Build docs site for production (/chirp baseurl)" }
-site-serve = { cwd = "site", cmd = "uv run bengal serve --environment local", help = "Serve docs site with hot reload (http://127.0.0.1:5173)" }
+# Docs site (always uses project venv Bengal, not a global `bengal` install).
+# env/python.env sets PYTHON_GIL=0; .python-version pins 3.14t (see config/python.env).
+site-build = { cwd = "site", cmd = "uv run --group docs bengal build --environment local", envfile = "config/python.env", help = "Build docs site locally (Bengal from docs group)" }
+site-build-prod = { cwd = "site", cmd = "uv run --group docs bengal build --environment production", envfile = "config/python.env", help = "Build docs site for production (/chirp baseurl)" }
+site-serve = { cwd = "site", cmd = "uv run --group docs bengal serve --environment local", envfile = "config/python.env", help = "Serve docs site with hot reload (http://127.0.0.1:5173)" }
+bengal = { cwd = "site", cmd = "uv run --group docs bengal", envfile = "config/python.env", help = "Run Bengal in site/ with free-threaded defaults (e.g. poe bengal s)" }
 
 # Changelog (towncrier)
 changelog = { cmd = "towncrier build --version 0.8.0 --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }

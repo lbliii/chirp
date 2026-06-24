@@ -1,6 +1,6 @@
 ---
 title: Lucky Cat
-description: Flagship ChirpUI simulated trading-floor demo on server-owned signals
+description: Tier 3 ChirpUI capstone — simulated trading-floor demo on server-owned signals
 draft: false
 weight: 15
 lang: en
@@ -12,7 +12,7 @@ category: examples
 
 ## What it is
 
-Lucky Cat is the flagship showcase: **$MEOW**, a simulated Maneki-neko trading
+Lucky Cat is the **tier 3 capstone** example: **$MEOW**, a simulated Maneki-neko trading
 floor built entirely on Chirp and [[docs/build-apps/ui-extensions/chirp-ui|ChirpUI]].
 Full pages, HTML fragments, a streaming portfolio dashboard, and a live
 cross-page ticker — with no client-side framework and no build step. Prices,
