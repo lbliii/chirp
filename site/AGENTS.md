@@ -58,6 +58,29 @@ When this domain changes, check:
 - Tell `src/chirp/docs` when site search or metadata exposes docs-tooling gaps.
 - Tell `examples` when site examples drift from executable examples.
 
+## Local dev (Bengal)
+
+Committed config (survives new Conductor worktrees):
+
+- **`.python-version`** — pins Python 3.14t for `uv sync` / `make install`
+- **`config/python.env`** — `PYTHON_GIL=0` (matches CI)
+- **`site/bengal`** — wrapper that applies both (use from this directory)
+- **`Makefile`** — `make install`, `make site-serve`, `make bengal`
+
+**Every new worktree** (only `.venv` is local; everything else is in git):
+
+```bash
+make install      # once per worktree
+make site-serve   # or: cd site && ./bengal s
+```
+
+Do not rely on `direnv allow` or shell `PYTHON_GIL` exports — those are
+per-machine and do not carry across worktrees.
+
+Pounce should report **`nogil`**, not **`GIL`**. If you see
+`Disabling the GIL is not supported by this build`, run `make install` again
+(the venv was created on regular 3.14 instead of 3.14t).
+
 ## Do Not
 
 - Hand-edit `site/public/` as source prose.

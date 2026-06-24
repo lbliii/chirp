@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run Bengal in site/ with the repo's free-threaded Python defaults.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+exec uv run \
+  --directory "$ROOT/site" \
+  --env-file "$ROOT/config/python.env" \
+  --group docs \
+  bengal "$@"

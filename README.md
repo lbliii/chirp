@@ -404,12 +404,19 @@ See [`benchmarks/README.md`](benchmarks/README.md) for caveats and runners.
 ```bash
 git clone https://github.com/lbliii/chirp.git
 cd chirp
-uv sync --group dev
-uv run pytest -q --tb=short
+make install          # once per worktree (.python-version → 3.14t, docs deps)
+make test
+make site-serve     # docs site at http://127.0.0.1:5173
 ```
 
-Run uv commands from the repository root. If an ancestor directory has old multi-repo dependency
-overrides, clone Chirp outside that parent before running `uv sync`.
+New Conductor worktree? Same flow: **`make install`** then **`make site-serve`**
+(or `cd site && ./bengal s`). Python pin and free-threading env live in git
+(`.python-version`, `config/python.env`, `site/bengal`); only `.venv` is recreated.
+
+Run commands from the repository root. If an ancestor directory has old multi-repo dependency
+overrides, clone Chirp outside that parent before running `make install`.
+
+Docs-site details: `site/AGENTS.md`.
 
 ---
 
