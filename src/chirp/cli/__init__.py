@@ -320,7 +320,6 @@ def main(argv: list[str] | None = None) -> None:
         help="Migrations directory (reserved for future incremental codegen output)",
     )
 
-
     args = parser.parse_args(argv)
 
     if args.command is None:

@@ -185,7 +185,9 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
 
     stack = ctx.get("template_stack")
     if stack:
-        parts.append('<div class="request-line"><span class="label">Template stack</span><span class="val">')
+        parts.append(
+            '<div class="request-line"><span class="label">Template stack</span><span class="val">'
+        )
         for entry in stack:
             if isinstance(entry, tuple) and len(entry) >= 2:
                 parts.append(f"{_esc(entry[0])}:{entry[1]}<br>")
