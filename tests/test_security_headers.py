@@ -142,6 +142,12 @@ class TestDefaultCSPAllowsFrameworkScripts:
         cfg = SecurityHeadersConfig()
         assert "'unsafe-inline'" not in (cfg.content_security_policy or "")
 
+    def test_config_default_allows_data_uri_images(self) -> None:
+        """Theme CSS uses inline SVG data URIs for small icons (select chevrons)."""
+        cfg = SecurityHeadersConfig()
+        assert cfg.content_security_policy is not None
+        assert "img-src 'self' data:" in cfg.content_security_policy
+
 
 # --- Static HTML FileResponse must keep security headers (issue #178) ---
 

@@ -78,8 +78,7 @@ class TestMarkdownRenderer:
         md = MarkdownRenderer()
         html = md.render("[x](javascript:alert(1))")
         assert "javascript:" not in html
-        assert "<a" in html
-        assert "href=" not in html
+        assert "x" not in html or "<p></p>" in html
 
     def test_merges_rel_tokens_for_blank_target_links(self) -> None:
         from chirp.markdown import MarkdownRenderer

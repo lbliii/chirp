@@ -69,7 +69,7 @@ ai = ["httpx>=0.27.0"]
 ai-bedrock = ["botocore>=1.34", "httpx>=0.27.0"]
 
 # Markdown rendering (patitas + rosettes syntax highlighting — same ecosystem)
-markdown = ["patitas[syntax]>=0.3.5"]
+markdown = ["patitas[syntax]>=0.4.0"]
 
 # chirp-ui component library (CSS, themes, layout macros)
 ui = ["chirp-ui>=0.11.0"]
@@ -86,7 +86,7 @@ all = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "patitas[syntax]>=0.3.5",
+    "patitas[syntax]>=0.4.0",
 ]
 
 # Benchmark suite (Chirp vs FastAPI vs Flask vs Starlette vs Litestar)
@@ -106,7 +106,7 @@ full = [
     "itsdangerous>=2.2.0",
     "argon2-cffi>=23.1.0",
     "httpx>=0.27.0",
-    "patitas[syntax]>=0.3.5",
+    "patitas[syntax]>=0.4.0",
 ]
 
 [project.scripts]
@@ -288,9 +288,10 @@ exclude_lines = [
 
 [dependency-groups]
 docs = [
-    "bengal>=0.5.0", # Static site generator for documentation
+    "bengal>=0.5.0", # Legacy static site path (deprecated for Pages deploy)
     "lunr>=0.7.0",   # Pre-built search index
     "chirp-ui>=0.11.0", # Bengal chirp-theme package (bengal.themes entry point)
+    "jsonschema>=4.0.0", # DCP catalog.json validation
 ]
 dev = [
     # Testing
@@ -314,7 +315,7 @@ dev = [
     "httpx>=0.27.0",
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
-    "patitas[syntax]>=0.3.5",   # Markdown + syntax highlighting for ollama example tests
+    "patitas[syntax]>=0.4.0",   # Markdown + syntax highlighting for ollama example tests
     "chirp-ui>=0.11.0",         # Layout macros for llm_playground example tests
 ]
 browser = [

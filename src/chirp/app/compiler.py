@@ -81,6 +81,7 @@ def _collect_builtin_middleware(
         eval_directive = " 'unsafe-eval'" if needs_eval else ""
         csp = (
             "default-src 'self'; "
+            "img-src 'self' data:; "
             f"script-src 'self'{eval_directive}"
             " https://unpkg.com https://cdn.jsdelivr.net; "
             "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"

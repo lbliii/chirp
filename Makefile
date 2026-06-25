@@ -24,7 +24,7 @@ help:
 	@echo "  make format      - run ruff formatter"
 	@echo "  make ty          - run ty type checker"
 	@echo "  make preflight   - fast pre-push invariants"
-	@echo "  make site-serve  - Bengal dev server (http://127.0.0.1:5173)"
+	@echo "  make site-serve  - Bengal dev server"
 	@echo "  make site-build  - build docs site locally"
 	@echo "  make bengal s    - any Bengal subcommand (e.g. make bengal ARGS='s')"
 	@echo ""

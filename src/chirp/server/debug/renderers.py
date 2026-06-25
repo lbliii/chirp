@@ -18,6 +18,7 @@ from chirp.server.debug.render_plan_snapshot import (
 from chirp.server.debug.request_context import _extract_request_context
 from chirp.server.debug.styles import _CSS, _TOGGLE_JS
 from chirp.server.debug.template_context import _extract_template_context
+from chirp.server.terminal_errors import _html_error_message
 
 
 def _esc(text: object) -> str:
@@ -172,6 +173,25 @@ def _render_template_panel(ctx: dict[str, Any]) -> str:
     suggestion = ctx.get("suggestion")
     if suggestion:
         parts.append(f'<div class="template-suggestion">💡 {_esc(suggestion)}</div>')
+
+    hints = ctx.get("hints")
+    if hints:
+        parts.append('<div class="template-hints">')
+        for hint in hints:
+            if suggestion and hint == f"Did you mean '{suggestion}'?":
+                continue
+            parts.append(f'<div class="template-suggestion">💡 {_esc(hint)}</div>')
+        parts.append("</div>")
+
+    stack = ctx.get("template_stack")
+    if stack:
+        parts.append('<div class="request-line"><span class="label">Template stack</span><span class="val">')
+        for entry in stack:
+            if isinstance(entry, tuple) and len(entry) >= 2:
+                parts.append(f"{_esc(entry[0])}:{entry[1]}<br>")
+            else:
+                parts.append(f"{_esc(entry)}<br>")
+        parts.append("</span></div>")
 
     # Docs link
     docs_url = ctx.get("docs_url")
@@ -353,7 +373,6 @@ def render_debug_page(
     exc_type = type(exc).__name__
     exc_module = type(exc).__module__ or ""
     qualified = f"{exc_module}.{exc_type}" if exc_module and exc_module != "builtins" else exc_type
-    exc_message = str(exc)
 
     # Extract traceback frames
     tb = exc.__traceback__
@@ -378,6 +397,8 @@ def render_debug_page(
             template_ctx = cause_ctx
     if template_ctx is None and context:
         template_ctx = _extract_template_context(context)
+
+    exc_message = _html_error_message(exc, structured_panel=template_ctx is not None)
 
     # Build content sections
     sections: list[str] = []

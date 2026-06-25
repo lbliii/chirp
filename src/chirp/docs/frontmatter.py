@@ -14,11 +14,6 @@ from kida.template import Markup
 
 from chirp.docs.models import DocBlock, DocMetadata, DocPage, DocSource, TocEntry
 
-_FRONTMATTER_RE = re.compile(
-    r"\A---\s*\n(.*?)\n---\s*\n",
-    re.DOTALL,
-)
-
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.+)", re.MULTILINE)
 
 _HTML_HEADING_RE = re.compile(
@@ -36,39 +31,12 @@ def parse_frontmatter(text: str) -> tuple[dict[str, object], str]:
         A (metadata_dict, body) tuple.  If no frontmatter is found
         the metadata dict is empty and body is the full text.
     """
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
-        return {}, text
+    from patitas.frontmatter import parse_frontmatter as patitas_parse_frontmatter
 
-    import tomllib as _  # noqa: F401 — check stdlib availability
-
-    try:
-        import yaml
-    except ImportError:  # pragma: no cover
-        # Fallback: try simple key: value parsing for basic cases
-        return _parse_simple(m.group(1)), text[m.end() :]
-
-    meta = yaml.safe_load(m.group(1))
+    meta, body = patitas_parse_frontmatter(text)
     if not isinstance(meta, dict):
-        return {}, text
-    return meta, text[m.end() :]
-
-
-def _parse_simple(raw: str) -> dict[str, object]:
-    """Minimal key: value parser when PyYAML is unavailable."""
-    result: dict[str, object] = {}
-    for line in raw.strip().splitlines():
-        if ":" not in line:
-            continue
-        key, _, value = line.partition(":")
-        value = value.strip()
-        if value.lower() in ("true", "false"):
-            result[key.strip()] = value.lower() == "true"
-        elif value.isdigit():
-            result[key.strip()] = int(value)
-        else:
-            result[key.strip()] = value
-    return result
+        return {}, body
+    return meta, body
 
 
 def _meta_from_dict(d: dict[str, object]) -> DocMetadata:
@@ -82,7 +50,12 @@ def _meta_from_dict(d: dict[str, object]) -> DocMetadata:
         tags = frozenset()
 
     order_val = d.get("order", 999)
-    order = order_val if isinstance(order_val, int) else int(str(order_val))
+    if isinstance(order_val, float) and order_val.is_integer():
+        order = int(order_val)
+    elif isinstance(order_val, int):
+        order = order_val
+    else:
+        order = int(str(order_val))
     return DocMetadata(
         order=order,
         category=str(d.get("category", "")),

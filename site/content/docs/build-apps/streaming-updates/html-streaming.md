@@ -155,15 +155,15 @@ When some data sources are slow and you want the page shell on screen *immediate
 
 - [[docs/about/core-concepts/return-values|Return Values]] — `Suspense` semantics and the full return-type decision tree.
 - [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]] — `TemplateStream` and post-load realtime push.
-- [[examples/standalone/suspense_dashboard|suspense_dashboard example]] — minimal one-panel Suspense (start here).
-- [[examples/chirpui/lucky_cat|Lucky Cat `/portfolio`]] — **advanced**: six deferred panels, explicit `defer_blocks` / `defer_map`.
+- [[examples/suspense-dashboard|suspense_dashboard example]] — minimal one-panel Suspense (start here).
+- [[examples/lucky-cat|Lucky Cat `/portfolio`]] — **advanced**: six deferred panels, explicit `defer_blocks` / `defer_map`.
 :::
 
 ### Start here vs Lucky Cat advanced
 
 | Tier | Where | When |
 |------|-------|------|
-| **Start here** | [[examples/standalone/suspense_dashboard|suspense_dashboard]] or the 4-line snippet in Lucky Cat `pages/portfolio/page.py` | One deferred panel; auto-discovery handles block wiring |
+| **Start here** | [[examples/suspense-dashboard|suspense_dashboard]] or the 4-line snippet in Lucky Cat `pages/portfolio/page.py` | One deferred panel; auto-discovery handles block wiring |
 | **Advanced** | Lucky Cat `GET /portfolio` | Six panels, macro-nested keys, hyphenated section ids — needs `defer_blocks` + `defer_map` |
 
 ## Next steps
