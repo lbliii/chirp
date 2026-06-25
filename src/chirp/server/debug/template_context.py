@@ -16,7 +16,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
     if "kida" not in module:
         return None
 
-    from chirp.server.terminal_errors import _plain_error_message
+    from chirp.server.terminal_errors import _html_error_message, _plain_error_message
 
     ctx: dict[str, Any] = {"type": cls_name}
 
@@ -38,7 +38,7 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
             start = max(0, ln - 3)
             end = min(len(lines), ln + 2)
             ctx["source_lines"] = [(i + 1, lines[i]) for i in range(start, end)]
-        ctx["message"] = _plain_error_message(exc)
+        ctx["message"] = _html_error_message(exc, structured_panel=True)
         return ctx
 
     if cls_name in ("TemplateRuntimeError", "RequiredValueError", "NoneComparisonError"):
@@ -47,24 +47,33 @@ def _extract_template_context(exc: BaseException) -> dict[str, Any] | None:
         ctx["expression"] = getattr(exc, "expression", None)
         ctx["values"] = getattr(exc, "values", {})
         ctx["suggestion"] = getattr(exc, "suggestion", None)
-        ctx["message"] = _plain_error_message(exc)
-        # Extract source snippet (new: runtime errors now have source context)
         snippet = getattr(exc, "source_snippet", None)
         if snippet is not None:
             ctx["source_lines"] = list(getattr(snippet, "lines", ()))
             ctx["snippet_error_line"] = getattr(snippet, "error_line", None)
+        ctx["message"] = _html_error_message(exc, structured_panel=bool(snippet))
         return ctx
 
     if cls_name == "UndefinedError":
         ctx["template"] = getattr(exc, "template", None)
         ctx["lineno"] = getattr(exc, "lineno", None)
         ctx["variable"] = getattr(exc, "name", None)
-        ctx["message"] = _plain_error_message(exc)
-        # Extract source snippet (new: UndefinedError now has source context)
+        suggestion = getattr(exc, "suggestion", None)
+        if suggestion:
+            ctx["suggestion"] = suggestion
+        stack = getattr(exc, "template_stack", None)
+        if stack:
+            ctx["template_stack"] = list(stack)
+        to_diag = getattr(exc, "to_diagnostic", None)
+        if to_diag is not None:
+            hints = to_diag().hints
+            if hints:
+                ctx["hints"] = list(hints)
         snippet = getattr(exc, "source_snippet", None)
         if snippet is not None:
             ctx["source_lines"] = list(getattr(snippet, "lines", ()))
             ctx["snippet_error_line"] = getattr(snippet, "error_line", None)
+        ctx["message"] = _html_error_message(exc, structured_panel=True)
         return ctx
 
     if cls_name == "TemplateNotFoundError":

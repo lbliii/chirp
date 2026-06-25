@@ -1,0 +1,7 @@
+# Legacy deploy URL prefixes → Chirp Docs app routes (Wave E).
+# No Bengal dependency — plain prefix map consumed by catalog/rewrites.py.
+prefixes:
+  - from: /chirp/docs/
+    to: /docs/
+  - from: /chirp/
+    to: /

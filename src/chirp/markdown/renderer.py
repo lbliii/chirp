@@ -106,6 +106,7 @@ class MarkdownRenderer:
         sanitize: bool = True,
     ) -> None:
         self._md: Markdown = _get_markdown(plugins=plugins, highlight=highlight)
+        self._highlight = highlight
         self._sanitize = sanitize
 
     def render(self, source: str) -> Markup:
@@ -123,7 +124,15 @@ class MarkdownRenderer:
         """
         if not source:
             return Markup("")
-        html = str(self._md(source))
+        document = self._md.parse(source)
+        if self._sanitize:
+            from patitas import sanitize
+            from patitas.sanitize import normalize_unicode, strip_dangerous_urls
+
+            document = sanitize(document, policy=strip_dangerous_urls | normalize_unicode)
+        from patitas.renderers.html import HtmlRenderer
+
+        html = HtmlRenderer(highlight=self._highlight, source=source).render(document)
         if self._sanitize:
             html = _sanitize_html(html)
         return Markup(html)

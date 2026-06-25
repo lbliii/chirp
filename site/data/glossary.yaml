@@ -1,0 +1,19 @@
+terms:
+  - term: Hypermedia
+    definition: A style of application where the server sends HTML that includes controls and links, and the client swaps fragments instead of owning application state.
+    tags: [architecture, concepts]
+  - term: DocCatalog
+    definition: The in-memory documentation graph built from markdown under `site/content/`, with one `DocNode` per page.
+    tags: [docs, architecture]
+  - term: Fragment
+    definition: A Chirp return type that renders a partial HTML response, typically for htmx swaps.
+    tags: [chirp, hypermedia]
+  - term: Boosted navigation
+    definition: htmx-enhanced link following that swaps a selected fragment into a persistent shell without a full page reload.
+    tags: [htmx, navigation]
+  - term: Patitas
+    definition: The markdown engine used to parse MyST-style directives and render documentation content.
+    tags: [markdown, directives]
+  - term: Rosettes
+    definition: The syntax highlighter integrated with Patitas for code blocks in documentation.
+    tags: [markdown, code]

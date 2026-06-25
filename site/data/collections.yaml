@@ -1,0 +1,12 @@
+# Catalog collections — ordered node groups for ``layout: collection`` views.
+#
+# A collection view stitches multiple catalog nodes into one reading surface
+# (hypermedia pillar page). Reference slugs from the live graph.
+
+get-started:
+  title: Get Started
+  description: Install Chirp and build your first hypermedia app.
+  nodes:
+    - docs/get-started
+    - docs/get-started/installation
+    - docs/get-started/project-layout

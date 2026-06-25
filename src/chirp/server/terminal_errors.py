@@ -63,6 +63,26 @@ def _plain_error_message(exc: BaseException) -> str:
     return msg
 
 
+def _html_error_message(exc: BaseException, *, structured_panel: bool = False) -> str:
+    """Error message safe for HTML display (no ANSI escape codes).
+
+    When *structured_panel* is True, the debug page renders source snippets,
+    stacks, and hints separately — so return a one-line summary instead of
+    ``format_compact()``'s full terminal-style block.
+    """
+    if not _is_kida_error(exc):
+        return str(exc)
+
+    to_diag = getattr(exc, "to_diagnostic", None)
+    if structured_panel and to_diag is not None:
+        return to_diag().message
+
+    plain = _plain_error_message(exc)
+    if structured_panel and plain:
+        return plain.splitlines()[0]
+    return plain
+
+
 def _is_app_frame(filename: str) -> bool:
     """True if the frame is from the application (not stdlib/site-packages)."""
     if "site-packages" in filename:

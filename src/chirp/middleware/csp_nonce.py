@@ -94,7 +94,9 @@ class CSPNonceMiddleware:
         style_unsafe_inline: bool = False,
     ) -> None:
         self._base_csp = base_csp or (
-            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+            "default-src 'self'; "
+            "img-src 'self' data:; "
+            "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
         )
         self._script_origins = "https://unpkg.com https://cdn.jsdelivr.net"
         self._unsafe_eval = unsafe_eval

@@ -12,6 +12,8 @@ category: explanation
 
 This page is the mental map of how Chirp is built — the three layers a request passes through, where each module lives, and how a template becomes rendered HTML. It's for contributors and anyone evaluating the design; you never need to read it to *use* Chirp.
 
+Chirp is a {gterm}`Hypermedia` framework: the server sends HTML with controls and links, and the client swaps fragments instead of owning application state.
+
 If you just want to build something, start with [[docs/get-started/quickstart|the quickstart]].
 
 :::{note}
@@ -74,6 +76,13 @@ flowchart TD
 :::
 
 The frozen/slots design and the `ContextVar` request state are what make Chirp safe under free-threading. See [[docs/about/thread-safety|free-threading and frozen state]] for why.
+
+:::{glossary}
+:tags: architecture, concepts, docs
+:sorted:
+:show-tags:
+:collapsed:
+:::
 
 ## Module Layout
 

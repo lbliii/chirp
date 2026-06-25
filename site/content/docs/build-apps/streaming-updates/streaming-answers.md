@@ -39,7 +39,7 @@ Chirp warns on the bad pairings at freeze:
 - `sse_token_swap_mode` — many small SSE Fragments with replace swaps
 - `sse_eager_connect` — static `sse-connect` on a GET page (INFO)
 
-See [[docs/hypermedia-footguns|Hypermedia footguns]] and
+See [[docs/quality/contracts-debugging/categories|Contract categories]] and
 [[docs/build-apps/streaming-updates/realtime-decision-tree|Realtime decision tree]].
 
 ## Recipe 1 — TemplateStream (full page)

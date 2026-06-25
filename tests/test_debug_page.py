@@ -16,7 +16,7 @@ from chirp.server.debug_page import (
     _is_app_frame,
     render_debug_page,
 )
-from chirp.server.terminal_errors import _plain_error_message
+from chirp.server.terminal_errors import _html_error_message, _plain_error_message
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -535,6 +535,29 @@ class TestPlainErrorMessage:
         plain = _plain_error_message(exc)
         assert plain == "something went wrong"
 
+    def test_html_error_message_strips_ansi(self) -> None:
+        from kida.environment.exceptions import UndefinedError, build_source_snippet
+
+        snippet = build_source_snippet(
+            '<a href="{{ build_search_url(query=q) }}">x</a>',
+            1,
+        )
+        exc = UndefinedError(
+            "build_search_url",
+            template="partials/search_facet_nav.html",
+            lineno=1,
+            available_names=frozenset(["search_hit_url"]),
+            source_snippet=snippet,
+            template_stack=[("shell.html", 11)],
+        )
+        msg = _html_error_message(exc, structured_panel=True)
+        assert "build_search_url" in msg
+        assert "partials/search_facet_nav.html" in msg
+        assert "\033[" not in msg
+        assert "\x1b[" not in msg
+        assert "[36m" not in msg
+        assert "[0m" not in msg
+
 
 # ---------------------------------------------------------------------------
 # Template error rendering
@@ -560,6 +583,31 @@ class TestRenderDebugPageTemplateErrors:
         html = render_debug_page(exc, _make_request())
         assert "Template Error" in html
         assert "UndefinedError" in html
+
+    def test_undefined_error_html_has_no_ansi(self) -> None:
+        from kida.environment.exceptions import UndefinedError, build_source_snippet
+
+        snippet = build_source_snippet(
+            '<a href="{{ build_search_url(query=current_query) }}">x</a>',
+            1,
+        )
+        exc = UndefinedError(
+            "build_search_url",
+            template="partials/search_facet_nav.html",
+            lineno=1,
+            available_names=frozenset(["search_hit_url"]),
+            source_snippet=snippet,
+            template_stack=[("shell.html", 11), ("partials/search_facets.html", 11)],
+        )
+        html = render_debug_page(exc, _make_request())
+        assert "\033[" not in html
+        assert "\x1b[" not in html
+        assert "[36m" not in html
+        assert "[91m" not in html
+        assert "build_search_url" in html
+        assert "search_hit_url" in html
+        assert "shell.html" in html
+        assert "Template stack" in html
 
     def test_runtime_error_shows_suggestion(self) -> None:
         from kida.environment.exceptions import TemplateRuntimeError

@@ -57,7 +57,7 @@ It is not a fragment return type. Pair transport with the client wiring:
 
 Chirp warns on the bad pairing via the `template_stream_client_shape` contract.
 See [[docs/build-apps/streaming-updates/streaming-answers|Streaming answers]]
-for the three safe recipes and [[docs/hypermedia-footguns|Hypermedia footguns]].
+for the three safe recipes and [[docs/quality/contracts-debugging/categories|Contract categories]].
 
 See also [[docs/about/core-concepts/return-values|Return values]] for the full
 type reference and [[docs/build-apps/streaming-updates/html-streaming|Streaming
