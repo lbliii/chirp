@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bengal-chirp"
-version = "0.8.1"
+version = "0.8.2"
 description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -379,8 +379,8 @@ site-serve = { cwd = "site", cmd = "uv run --group docs bengal serve --environme
 bengal = { cwd = "site", cmd = "uv run --group docs bengal", envfile = "config/python.env", help = "Run Bengal in site/ with free-threaded defaults (e.g. poe bengal s)" }
 
 # Changelog (towncrier)
-changelog = { cmd = "towncrier build --version 0.8.0 --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
-changelog-draft = { cmd = "towncrier build --version 0.8.0 --draft", help = "Preview changelog from fragments (stdout)" }
+changelog = { cmd = "towncrier build --version 0.8.2 --yes", help = "Compile changelog.d fragments into CHANGELOG.md" }
+changelog-draft = { cmd = "towncrier build --version 0.8.2 --draft", help = "Preview changelog from fragments (stdout)" }
 changelog-check = { cmd = "towncrier check --compare-with origin/main", help = "Verify branch adds a fragment (vs main)" }
 
 # Benchmarks
