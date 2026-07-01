@@ -1,10 +1,39 @@
 # Chirp Roadmap
 
 **Status**: Active roadmap synthesis  
-**Updated**: 2026-05-30
-**Source**: `plan/drafted/`, release-readiness notes, code/test audit, ELBYSODIC consumer research, and affected steward guidance
+**Updated**: 2026-07-01
+**Source**: `plan/drafted/`, release-readiness notes, code/test audit, live GitHub issues queried 2026-07-01, Furatena consumer research, and affected steward guidance
 
 ---
+
+## Current Execution: 0.8.2 Ground Truth
+
+Chirp is currently at `0.8.2`. Maintainer work should start from this ranked
+set, while the older release snapshots below remain historical receipts:
+
+The north-star synthesis is [saga #503](https://github.com/lbliii/chirp/issues/503):
+make Chirp a full-stack Python hypermedia framework with a built-in application
+contract compiler. The canonical strategy is
+[`docs/hypermedia-application-compiler.md`](../docs/hypermedia-application-compiler.md),
+and the execution plan is
+[`plan/drafted/epic-hypermedia-application-compiler.md`](drafted/epic-hypermedia-application-compiler.md).
+Live database-backed applications remain primary; `chirp freeze` static export
+is an optional target for compatible routes.
+
+| Rank | Work | Why now |
+| --- | --- | --- |
+| 1 | [#497 boosted-navigation route smoke](https://github.com/lbliii/chirp/issues/497) | Prevent full documents from reaching narrow htmx targets. |
+| 2 | [#498 dynamic template/view reachability](https://github.com/lbliii/chirp/issues/498) | Let registry-driven consumers remain inspectable without fake source references. |
+| 3 | [#499 complete example test environment](https://github.com/lbliii/chirp/issues/499) | Make the documented contributor path match the suite it promises to run. |
+| 4 | [#500 pinned Furatena compatibility canary](https://github.com/lbliii/chirp/issues/500) | Turn a substantial downstream consumer into release evidence. |
+| 5 | [#501 self-validating example inventory](https://github.com/lbliii/chirp/issues/501) | Stop example catalog and capability drift. |
+| 6 | [#502 backlog taxonomy reconciliation](https://github.com/lbliii/chirp/issues/502) | Keep current execution distinct from research and historical plans. |
+
+Epic #446 and children #447-#458 remain reserved for external contributors and
+must not be absorbed into maintainer batches. Horizon issues under #335 are
+research candidates, not release commitments. Chirp-ui-owned work should move
+to or be mirrored in that repository before implementation. SignalBus-dependent
+items remain blocked until its external contract is ready.
 
 ## Current Read
 
@@ -27,7 +56,7 @@ true open work is narrower:
 | `epic-downstream-product-success.md` | Active product-research roadmap | ELBYSODIC shows reusable framework needs: mounted contracts, tenant URL support, forms/CSRF, shell/OOB/SSE hardening, and diagnostics |
 | `epic-extension-contract-maturity.md` | Draft follow-up from ChirpUI 0.9 steward review | Optional extensions need explicit installed/configured/runtime-ready contracts without becoming core dependencies |
 
-## Next Release Execution: 0.7.1 Candidate
+## Historical Snapshot: 0.7.1 Candidate
 
 Research pass on 2026-05-30 (open-issue/PR counts below are a point-in-time
 snapshot; the live GitHub backlog at <https://github.com/lbliii/chirp/issues>
@@ -60,7 +89,7 @@ Deferred from this patch release:
 - Fragment/SSE browser smoke remains the next large follow-through item after
   the patch release.
 
-## Ranked Roadmap
+## Historical Ranked Roadmap (2026-05-30)
 
 ### 0. Planning Hygiene And Release Ground Truth
 

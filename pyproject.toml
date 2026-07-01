@@ -315,12 +315,12 @@ dev = [
     "httpx>=0.27.0",
     "python-multipart>=0.0.18",
     "itsdangerous>=2.2.0",
+    "webauthn>=2.8,<3",         # Lucky Cat passkey tests are part of the example suite
     "patitas[syntax]>=0.4.0",   # Markdown + syntax highlighting for ollama example tests
     "chirp-ui>=0.11.0",         # Layout macros for llm_playground example tests
 ]
 browser = [
     "playwright>=1.49.0",       # Lucky Cat browser smoke — install with: uv sync --group dev --group browser
-    "webauthn>=2.8,<3",         # Lucky Cat passkeys showcase (browser-smoke boots the full app)
 ]
 
 # =============================================================================

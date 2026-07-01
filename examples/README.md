@@ -187,14 +187,13 @@ pytest examples/chirpui/pages_shell/
 | Dict/JSON returns | x | | | | | | | | | | | | | | | | | | | x | | | | x | | | | |
 | `Response` chaining | x | | | | | | | | | | | | | | | | | | | | | | | | | | | |
 | `@app.error()` | x | | | | | | | | | | | | | | | | | | | x | | | | x | | | | |
-| `Template` | | x | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | | x | | | |
+| `Template` | | | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | | x | | | |
 | `Fragment` | | x | x | x | x | x | x | x | | | | | x | x | x | | | | | x | | | | | | | | |
-| `Page` | | | x | | | | x | | | | | x | | | | | | x | | x | | | | | | | | |
+| `Page` | | x | x | | | | x | | | | | x | | | | | | x | | x | | | | | | | | |
 | `ValidationError` | | x | x | | | | | | | | | x | | | x | x | x | x | | | | | x | | | | | |
 | `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | | | | | |
 | `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | | | | | |
 | `TemplateStream` | | | | | | x | | | | | | | | | | | | | | | | | | | | | | |
-| `request.is_htmx` | | x | | | | | x | | | | | | | | | | | | | | | | | | | | | |
 | `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x | | | | |
 | `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | x | | x | | x | | | | | | |
 | `request.json()` | | | | | | | | | | | | | | | | | | | | | | | | x | | | | |
