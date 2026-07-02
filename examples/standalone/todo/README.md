@@ -1,8 +1,9 @@
 # Todo
 
-A persistent todo list backed by `chirp.data` and SQLite. The same template
-renders as a full page or an htmx fragment, so add, toggle, and delete actions
-work with partial page updates and inline validation.
+A persistent todo list backed by `chirp.data` and SQLite. `Page` negotiates the
+same template into a full page for normal navigation or the `todo_list` block
+for htmx navigation, while mutations return focused fragments with inline
+validation.
 
 ## Run
 

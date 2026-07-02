@@ -14,7 +14,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Request, Template, ValidationError
+from chirp import App, AppConfig, Fragment, Page, Request, ValidationError
 from chirp.data import Query
 from chirp.middleware.csrf import CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
@@ -61,12 +61,10 @@ app.add_middleware(CSRFMiddleware())
 
 
 @app.route("/")
-async def index(request: Request):
-    """Full page or fragment depending on htmx request."""
+async def index():
+    """Render a full page or the todo-list block through Page negotiation."""
     todos = await ALL_TODOS.fetch(app.db)
-    if request.is_htmx:
-        return Fragment("index.html", "todo_list", todos=todos)
-    return Template("index.html", todos=todos)
+    return Page("index.html", "todo_list", todos=todos)
 
 
 @app.route("/todos", methods=["POST"], name="todos.add")
