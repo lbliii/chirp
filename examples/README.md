@@ -179,79 +179,79 @@ pytest examples/chirpui/pages_shell/
 
 ## What Each Example Exercises
 
-| Feature | hello | todo | contacts | sse | streaming | llm_streaming_kida | dashboard | dashboard_live | hackernews | rag_demo | static_site | theming | auth | kanban | ollama | llm_playground | tools | signup | upload | survey | wizard | search | chat | pokedex | production | custom_middleware | accessibility | api |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `@app.route()` | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | x | | |
-| Path parameters | x | x | x | | | | x | | | | | | | | | | x | | x | | | x | | | | x | | |
-| String returns | x | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| Dict/JSON returns | x | | | | | | | | | | | | | | | | | | | x | | | | x | | | | |
-| `Response` chaining | x | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| `@app.error()` | x | | | | | | | | | | | | | | | | | | | x | | | | x | | | | |
-| `Template` | | | | x | | x | x | x | | x | x | x | x | x | x | x | x | | x | x | x | | x | | x | | | |
-| `Fragment` | | x | x | x | x | x | x | x | | | | | x | x | x | | | | | x | | | | | | | | |
-| `Page` | | x | x | | | | x | | | | | x | | | | | | x | | x | | | | | | | | |
-| `ValidationError` | | x | x | | | | | | | | | x | | | x | x | x | x | | | | | x | | | | | |
-| `OOB` | | | x | | | | | | | | x | | | | | | | | | | | | | | | | | |
-| `Stream` | | | | | x | | | | | | | | | | | | | | | | | | | | | | | |
-| `TemplateStream` | | | | | | x | | | | | | | | | | | | | | | | | | | | | | |
-| `request.query` | | | | | | | | | | | | | | | | | | x | | x | | | | x | | | | |
-| `request.form()` | | | x | | | | | | | x | x | x | x | x | x | x | x | x | | x | | x | | | | | | |
-| `request.json()` | | | | | | | | | | | | | | | | | | | | | | | | x | | | | |
-| `@app.template_filter()` | | x | | | x | | x | | | | | | x | x | x | | | | | x | | | | | | | | |
-| `EventStream` | | | | x | x | x | x | x | x | | x | x | x | x | | | | | x | | | | | | | | | |
-| `SSEEvent` | | | | x | | | | | | | | | | x | | | | | | | | | | | | | | |
-| `{% cache %}` | | | | | x | | x | | | | | | | | | | | | | | | | | | | | | |
-| `hx-swap-oob` | | | x | | x | x | x | | | | x | | | | | | | | | | | | | | | | | |
-| `with_hx_*()` headers | | | x | | | | | | | | | | | | | | | | | | | | | | | | | |
-| `assert_hx_*` test helpers | | | x | | | | | | | | | | | | | | | | | | | | | | | | | |
-| Multi-worker Pounce | | | | | x | | x | x | | | | | | x | | | | | | | | | | | | | | |
-| `TestClient.fragment()` | | x | | | | | x | | | | | | x | | | | | x | | x | | | | | | | | |
-| `TestClient.sse()` | | | | x | x | x | x | | x | | | | | x | | | | | x | | | | | | | | | |
-| `@app.on_startup` | | | | | | x | x | x | | | | | | | | | | | | | | | | | | | | |
-| `@app.on_worker_startup` | | | | | | | x | x | | | | | | | | | | | | | | | | | | | | |
-| `@app.on_worker_shutdown` | | | | | | | x | x | | | | | | | | | | | | | | | | | | | | |
-| `httpx` (real API) | | | | | | | x | | | | | | x | | | | | | | | | | | | | | | |
-| `chirp.data` (SQLite) | | x | | | | x | | x | | | | | | | | | | | x | | | | | | | | | |
-| `App(db=..., migrations=...)` | | x | | | | x | | | | | | | | | | | | | x | | | | | | | | | |
-| `Query` builder | | x | | | | x | | | | | | | | | | | | | x | | | | | | | | | |
-| `db.transaction()` | | | | | | x | | | | | | | | | | | | | | | | | | | | | | |
-| `db.execute_many()` | | | | | | x | | | | | | | | | | | | | | | | | | | | | | |
-| `db.fetch_val()` | | | | | | x | | | | | | | | | | | | | x | | | | | | | | | |
-| `migrate()` (auto-migration) | | | | | | x | | | | | | | | | | | | | x | | | | | | | | | |
-| `chirp.ai` (LLM streaming) | | | | | | | | x | | | x | | | x | | | | | | | | | | | | | | |
-| `ContextVar` per-worker | | | | | | | x | x | | | | | | | | | | | | | | | | | | | | |
-| Recursive `{% def %}` | | | | | | | x | | | | | | | | | | | | | | | | | | | | | |
-| View Transitions | | | | | | | x | | | | | | | | | | | | | | | | | | | | | |
-| `StaticFiles` (root prefix) | | | | | | | | | x | | | | | x | x | | | | | | | | | | | | | |
-| `HTMLInject` | | | | | | | | | x | | | | | | | | | | | | | | | | | | | |
-| Custom 404 page | | | | | | | | | x | | | | | | | | | | | | | | | | | | | |
-| `SecurityHeadersMiddleware` | | | | | | | | | | | | | | | | | | | | | x | | | | | | | |
-| `SessionMiddleware` | | | | | | | x | | | x | x | | x | | | x | | x | | x | | | | | | | | |
-| `AuthMiddleware` | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `@login_required` | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `login()` / `logout()` | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `current_user()` template global | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `hash_password` / `verify_password` | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `is_safe_url()` | | | | | | | | | | x | x | | | | | | | | | | | | | | | | | |
-| `Redirect` | | | | | | | | | | x | x | | x | x | | x | | x | | x | | | | | | | | |
-| `validate()` + built-in rules | | | | | | | | | | | | | x | | x | x | x | | | | | x | | | | | | |
-| `CSRFMiddleware` + `csrf_field()` | | | | | | | x | | | | x | | x | | x | | | | | x | | | | | | | | |
+The table below is generated from [`inventory.toml`](inventory.toml). It is the
+authoritative catalog for lane, support status, learning tier, required extras,
+network access, capabilities, README coverage, and test entrypoints. Run
+`python -m examples.inventory` after editing the manifest.
 
-See `docs/hypermedia-footguns.md` for the running matrix of example patterns
-that Chirp now protects with return types, helpers, and startup contracts.
-| `UploadFile` / multipart | | | | | | | | | | | | | | | x | | | | | | | | | | | | | |
-| `form.files` / `file.save()` | | | | | | | | | | | | | | | x | | | | | | | | | | | | | |
-| `form.get_list()` (multi-value) | | | | | | | | | | | | | | | | x | | | | | | | | | | | | |
-| `one_of` validator | | | | | | | | | | | | | | | | x | | | | | | | | | | | | |
-| `integer` / `number` validator | | | | | | | | | | | | | | | | x | | | | | | | | | | | | |
-| `matches` validator | | | | | | | | | | | | x | | | x | | | | | | | | | | | | | |
-| Session-persisted form flow | | | | | | | | | | | | | | | | | x | | | | | | | | | | | |
-| `get_session()` | | | | | | | | | | | | | x | | | x | | x | | x | | | | | | | | |
-| GET query-param forms | | | | | | | | | | | | | | | | | | x | | | | | | | | | | |
-| `hx-push-url` search | | | | | | | | | | | | | | | | | | x | | | | | | | | | | |
-| `@app.tool()` (MCP tools) | | | | | | | | | | | | | x | | | | | | | | | | | | | | | |
-| `app.tool_events.subscribe()` | | | | | | | | | | | | | x | | | | | | | | | | | | | | | |
-| `CORSMiddleware` | | | | | | | | | | | | | | | | | | | x | | | | x | | | | | |
-| Custom API key middleware | | | | | | | | | | | | | | | | | | | x | | | | | | | | | |
-| Custom middleware (function + class) | | | | | | | | | | | | | | | | | | | | | x | | | | | | | |
-| Pub-sub broadcast (ChatBus) | | | | | | | | | | | | | | | | | | | x | | | | | | | | | |
+- **canonical** examples are recommended reference implementations for their
+  capability set.
+- **supporting** examples are maintained, focused demonstrations rather than the
+  default learning path.
+- **experimental** examples prove provisional or advanced patterns and should
+  not be treated as framework defaults.
+
+`Network` describes the runnable app: `none` is offline, `optional` has an
+offline default with an opt-in integration, and `required` needs an external or
+local service. `Extras` names installable `bengal-chirp[...]` extras and is
+checked against `pyproject.toml`. A missing README is recorded explicitly so it
+cannot disappear from the catalog while its documentation debt remains visible.
+
+<!-- example-inventory:catalog:start -->
+| Example | Lane | Status | Tier | Extras | Network | Capabilities | README | Tests |
+| --- | --- | --- | :---: | --- | --- | --- | :---: | --- |
+| [`chirpui/contacts_shell`](chirpui/contacts_shell/) | chirpui | canonical | 2 | `sessions`, `ui` | none | `app-shell`, `chirpui`, `csrf`, `forms`, `fragments`, `pages`, `sessions` | yes | [`contacts_shell`](../examples/chirpui/contacts_shell) |
+| [`chirpui/forum_shell`](chirpui/forum_shell/) | chirpui | canonical | 3 | `ui` | none | `app-shell`, `chirpui`, `contracts`, `forms`, `oob`, `pages` | yes | [`forum_shell`](../examples/chirpui/forum_shell) |
+| [`chirpui/islands_shell`](chirpui/islands_shell/) | chirpui | supporting | 2 | `ui` | none | `app-shell`, `chirpui`, `islands` | yes | [`islands_shell`](../examples/chirpui/islands_shell) |
+| [`chirpui/kanban_shell`](chirpui/kanban_shell/) | chirpui | canonical | 3 | `auth`, `sessions`, `ui` | none | `app-shell`, `auth`, `chirpui`, `csrf`, `forms`, `fragments`, `oob`, `sessions`, `sse`, `validation` | yes | [`kanban_shell`](../examples/chirpui/kanban_shell) |
+| [`chirpui/llm_playground`](chirpui/llm_playground/) | chirpui | supporting | 3 | `ai`, `markdown`, `ui` | required | `ai`, `app-shell`, `chirpui`, `fragments`, `sse`, `streaming` | yes | [`llm_playground`](../examples/chirpui/llm_playground) |
+| [`chirpui/lucky_cat`](chirpui/lucky_cat/) | chirpui | canonical | 3 | `auth`, `passkeys`, `sessions`, `ui` | none | `app-shell`, `auth`, `chirpui`, `csrf`, `data`, `forms`, `fragments`, `mutations`, `oob`, `pages`, `passkeys`, `reactive`, `sessions`, `sse`, `suspense`, `validation` | yes | [`lucky_cat`](../examples/chirpui/lucky_cat) |
+| [`chirpui/pages_shell`](chirpui/pages_shell/) | chirpui | canonical | 2 | `ui` | none | `app-shell`, `chirpui`, `pages`, `routing` | yes | [`pages_shell`](../examples/chirpui/pages_shell) |
+| [`chirpui/rag_demo`](chirpui/rag_demo/) | chirpui | canonical | 3 | `ai`, `markdown`, `sessions`, `ui` | required | `ai`, `app-shell`, `chirpui`, `data`, `fragments`, `sessions`, `sse`, `streaming` | yes | [`rag_demo`](../examples/chirpui/rag_demo) |
+| [`chirpui/shell_oob`](chirpui/shell_oob/) | chirpui | canonical | 2 | `ui` | none | `app-shell`, `chirpui`, `oob`, `pages` | missing | [`shell_oob`](../examples/chirpui/shell_oob) |
+| [`chirpui/sortable_reorder`](chirpui/sortable_reorder/) | chirpui | supporting | 2 | `sessions`, `ui` | none | `app-shell`, `chirpui`, `csrf`, `fragments`, `mutations`, `sessions` | yes | [`sortable_reorder`](../examples/chirpui/sortable_reorder) |
+| [`standalone/accessibility`](standalone/accessibility/) | standalone | supporting | 2 | — | none | `accessibility`, `forms`, `validation` | yes | [`accessibility`](../examples/standalone/accessibility) |
+| [`standalone/api`](standalone/api/) | standalone | supporting | 1 | — | none | `api`, `middleware`, `routing` | yes | [`api`](../examples/standalone/api) |
+| [`standalone/auth`](standalone/auth/) | standalone | canonical | 2 | `auth`, `sessions` | none | `auth`, `forms`, `pages`, `security`, `sessions` | yes | [`auth`](../examples/standalone/auth) |
+| [`standalone/chat`](standalone/chat/) | standalone | supporting | 2 | `sessions` | none | `fragments`, `sessions`, `sse` | yes | [`chat`](../examples/standalone/chat) |
+| [`standalone/contacts`](standalone/contacts/) | standalone | canonical | 1 | — | none | `forms`, `fragments`, `mutations`, `oob`, `pages`, `validation` | yes | [`contacts`](../examples/standalone/contacts) |
+| [`standalone/custom_middleware`](standalone/custom_middleware/) | standalone | supporting | 2 | — | none | `middleware`, `routing` | yes | [`custom_middleware`](../examples/standalone/custom_middleware) |
+| [`standalone/dashboard`](standalone/dashboard/) | standalone | supporting | 2 | — | none | `fragments`, `sse`, `suspense` | yes | [`dashboard`](../examples/standalone/dashboard) |
+| [`standalone/dashboard_live`](standalone/dashboard_live/) | standalone | supporting | 3 | — | none | `data`, `fragments`, `sse`, `suspense` | yes | [`dashboard_live`](../examples/standalone/dashboard_live) |
+| [`standalone/docs_site`](standalone/docs_site/) | standalone | canonical | 2 | `markdown` | none | `docs`, `routing`, `tools` | missing | [`docs_site`](../examples/standalone/docs_site) |
+| [`standalone/form_get`](standalone/form_get/) | standalone | supporting | 1 | — | none | `forms`, `routing` | yes | [`form_get`](../examples/standalone/form_get) |
+| [`standalone/freeze_site`](standalone/freeze_site/) | standalone | canonical | 2 | `markdown` | none | `docs`, `freeze`, `pages` | missing | [`freeze_site`](../examples/standalone/freeze_site) |
+| [`standalone/hackernews`](standalone/hackernews/) | standalone | supporting | 3 | `testing` | required | `fragments`, `sse`, `view-transitions` | yes | [`hackernews`](../examples/standalone/hackernews) |
+| [`standalone/hello`](standalone/hello/) | standalone | canonical | 1 | — | none | `routing` | yes | [`hello`](../examples/standalone/hello) |
+| [`standalone/htmx_managed`](standalone/htmx_managed/) | standalone | experimental | 2 | — | none | `contracts`, `fragments` | yes | [`htmx_managed`](../examples/standalone/htmx_managed) |
+| [`standalone/islands`](standalone/islands/) | standalone | supporting | 2 | — | none | `islands` | yes | [`islands`](../examples/standalone/islands) |
+| [`standalone/islands_swap`](standalone/islands_swap/) | standalone | experimental | 2 | — | none | `fragments`, `islands` | yes | [`islands_swap`](../examples/standalone/islands_swap) |
+| [`standalone/kanban`](standalone/kanban/) | standalone | canonical | 3 | `auth`, `sessions` | none | `auth`, `csrf`, `forms`, `fragments`, `oob`, `sessions`, `sse`, `validation` | yes | [`kanban`](../examples/standalone/kanban) |
+| [`standalone/llm_minimal`](standalone/llm_minimal/) | standalone | canonical | 1 | — | optional | `ai`, `fragments`, `sse`, `streaming` | yes | [`llm_minimal`](../examples/standalone/llm_minimal) |
+| [`standalone/llm_streaming_kida`](standalone/llm_streaming_kida/) | standalone | supporting | 2 | — | optional | `ai`, `streaming` | yes | [`llm_streaming_kida`](../examples/standalone/llm_streaming_kida) |
+| [`standalone/mutation_result`](standalone/mutation_result/) | standalone | supporting | 2 | — | none | `fragments`, `mutations`, `pages` | yes | [`mutation_result`](../examples/standalone/mutation_result) |
+| [`standalone/nojs_floor`](standalone/nojs_floor/) | standalone | canonical | 2 | — | none | `forms`, `fragments`, `mutations`, `no-js`, `pages`, `validation` | yes | [`nojs_floor`](../examples/standalone/nojs_floor) |
+| [`standalone/ollama`](standalone/ollama/) | standalone | canonical | 3 | `ai`, `markdown` | required | `ai`, `fragments`, `sse`, `streaming`, `tools` | yes | [`ollama`](../examples/standalone/ollama) |
+| [`standalone/oob_layout_chain`](standalone/oob_layout_chain/) | standalone | experimental | 3 | — | none | `contracts`, `oob`, `pages` | yes | [`oob_layout_chain`](../examples/standalone/oob_layout_chain) |
+| [`standalone/optimistic_apply`](standalone/optimistic_apply/) | standalone | experimental | 3 | — | none | `fragments`, `islands`, `mutations` | yes | [`optimistic_apply`](../examples/standalone/optimistic_apply) |
+| [`standalone/passkeys_minimal`](standalone/passkeys_minimal/) | standalone | supporting | 3 | `auth`, `passkeys`, `sessions` | none | `auth`, `csrf`, `forms`, `passkeys`, `security`, `sessions` | yes | [`passkeys_minimal`](../examples/standalone/passkeys_minimal) |
+| [`standalone/pokedex`](standalone/pokedex/) | standalone | supporting | 2 | — | none | `api`, `data`, `middleware`, `pages` | yes | [`pokedex`](../examples/standalone/pokedex) |
+| [`standalone/production`](standalone/production/) | standalone | canonical | 3 | `sessions` | none | `csrf`, `forms`, `security`, `sessions` | yes | [`production`](../examples/standalone/production) |
+| [`standalone/reactive_tasks`](standalone/reactive_tasks/) | standalone | canonical | 3 | — | none | `fragments`, `reactive`, `sse`, `validation` | yes | [`reactive_tasks`](../examples/standalone/reactive_tasks) |
+| [`standalone/returns_gallery`](standalone/returns_gallery/) | standalone | canonical | 2 | — | none | `fragments`, `mutations`, `oob`, `pages`, `sse`, `streaming`, `suspense`, `validation` | yes | [`returns_gallery`](../examples/standalone/returns_gallery) |
+| [`standalone/search`](standalone/search/) | standalone | supporting | 1 | — | none | `forms`, `pages`, `routing` | yes | [`search`](../examples/standalone/search) |
+| [`standalone/shapes_workspaces`](standalone/shapes_workspaces/) | standalone | experimental | 3 | — | none | `contracts`, `data`, `forms`, `pages` | yes | [`shapes_workspaces`](../examples/standalone/shapes_workspaces) |
+| [`standalone/signup`](standalone/signup/) | standalone | supporting | 2 | `sessions` | none | `csrf`, `forms`, `sessions`, `validation` | yes | [`signup`](../examples/standalone/signup) |
+| [`standalone/sse`](standalone/sse/) | standalone | canonical | 2 | — | none | `fragments`, `sse` | yes | [`sse`](../examples/standalone/sse) |
+| [`standalone/sse_reconnect`](standalone/sse_reconnect/) | standalone | supporting | 3 | — | none | `fragments`, `sse` | yes | [`sse_reconnect`](../examples/standalone/sse_reconnect) |
+| [`standalone/static_site`](standalone/static_site/) | standalone | supporting | 2 | — | none | `sse`, `static-files` | yes | [`static_site`](../examples/standalone/static_site) |
+| [`standalone/streaming`](standalone/streaming/) | standalone | canonical | 2 | — | none | `streaming` | yes | [`streaming`](../examples/standalone/streaming) |
+| [`standalone/survey`](standalone/survey/) | standalone | supporting | 2 | — | none | `forms`, `validation` | yes | [`survey`](../examples/standalone/survey) |
+| [`standalone/suspense_dashboard`](standalone/suspense_dashboard/) | standalone | supporting | 2 | — | none | `suspense` | yes | [`suspense_dashboard`](../examples/standalone/suspense_dashboard) |
+| [`standalone/theming`](standalone/theming/) | standalone | supporting | 1 | — | none | `pages` | yes | [`theming`](../examples/standalone/theming) |
+| [`standalone/todo`](standalone/todo/) | standalone | canonical | 2 | `sessions` | none | `csrf`, `data`, `forms`, `fragments`, `pages`, `sessions`, `validation` | yes | [`todo`](../examples/standalone/todo) |
+| [`standalone/tools`](standalone/tools/) | standalone | supporting | 2 | — | none | `fragments`, `sse`, `tools` | yes | [`tools`](../examples/standalone/tools) |
+| [`standalone/tools_hitl`](standalone/tools_hitl/) | standalone | experimental | 3 | `ai`, `sessions` | none | `ai`, `csrf`, `fragments`, `sessions`, `sse`, `tools` | yes | [`tools_hitl`](../examples/standalone/tools_hitl) |
+| [`standalone/upload`](standalone/upload/) | standalone | supporting | 2 | `forms`, `sessions` | none | `csrf`, `forms`, `sessions`, `uploads`, `validation` | yes | [`upload`](../examples/standalone/upload) |
+| [`standalone/wizard`](standalone/wizard/) | standalone | supporting | 2 | `sessions` | none | `forms`, `pages`, `sessions`, `validation` | yes | [`wizard`](../examples/standalone/wizard) |
+<!-- example-inventory:catalog:end -->

@@ -38,16 +38,18 @@ PYTHONPATH=src python examples/chirpui/pages_shell/app.py
 
 ## Inventory
 
-- `contacts_shell`
-- `forum_shell`
-- `islands_shell`
-- `kanban_shell`
-- `llm_playground`
-- `lucky_cat`
-- `pages_shell`
-- `rag_demo`
-- `shell_oob`
-- `sortable_reorder`
+<!-- example-inventory:chirpui:start -->
+- [`contacts_shell`](contacts_shell/) — canonical, tier 2
+- [`forum_shell`](forum_shell/) — canonical, tier 3
+- [`islands_shell`](islands_shell/) — supporting, tier 2
+- [`kanban_shell`](kanban_shell/) — canonical, tier 3
+- [`llm_playground`](llm_playground/) — supporting, tier 3
+- [`lucky_cat`](lucky_cat/) — canonical, tier 3
+- [`pages_shell`](pages_shell/) — canonical, tier 2
+- [`rag_demo`](rag_demo/) — canonical, tier 3
+- [`shell_oob`](shell_oob/) — canonical, tier 2
+- [`sortable_reorder`](sortable_reorder/) — supporting, tier 2
+<!-- example-inventory:chirpui:end -->
 
 ## Validation Expectation
 
