@@ -1240,4 +1240,5 @@ class App:
                 else ()
             ),
             schema=schema,
+            _hypermedia_program=self._runtime_state.hypermedia_program,
         )

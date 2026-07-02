@@ -24,6 +24,11 @@ against late registration and half-frozen reads.
   splits setup state from compiled runtime state.
 - **Contract snapshots are stable read models.** `src/chirp/app/state.py:135`
   defines `ContractCheckSnapshot`; checks should not inspect half-built state.
+- **The hypermedia program publishes once.**
+  `src/chirp/app/hypermedia_program.py` defines frozen internal graph records;
+  `AppCompiler.freeze()` compiles and assigns the complete program before
+  runtime publication. It describes render relationships but never replaces
+  `RenderPlan`.
 - **Late mutation fails.** Registration helpers call `_check_not_frozen()`; do
   not add runtime registration escape hatches.
 - **OOB registration is a contract.** `src/chirp/app/__init__.py:286-317`

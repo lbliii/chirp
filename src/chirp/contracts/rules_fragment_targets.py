@@ -26,57 +26,41 @@ Apps can demote globally via
 ``app.override_contract_severity("fragment_target_orphan", Severity.WARNING)``.
 """
 
-from kida import Environment
-
-from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+from chirp.app.hypermedia_program import HypermediaProgram
 
 from .types import ContractIssue, Severity
 
 
 def check_fragment_target_orphans(
-    fragment_target_registry: FragmentTargetRegistry,
-    page_templates: set[str],
-    kida_env: Environment | None,
+    program: HypermediaProgram | None,
 ) -> list[ContractIssue]:
     """Emit ERROR/WARNING issues for targets whose block no template defines."""
-    if kida_env is None or not page_templates:
+    if program is None or not program.page_leaf_templates:
+        return []
+    if not program.targets:
         return []
 
-    registered = fragment_target_registry.registered_targets
-    if not registered:
-        return []
+    issues = [
+        ContractIssue(
+            severity=Severity.ERROR,
+            category="fragment_target_scan",
+            message=(
+                f"Could not inspect template '{template.name}' while checking "
+                f"fragment target registrations: {template.load_error}"
+            ),
+            template=template.name,
+        )
+        for template in program.page_leaf_templates
+        if template.load_error is not None
+    ]
 
-    defined_blocks: set[str] = set()
-    issues: list[ContractIssue] = []
-    for template_name in page_templates:
-        try:
-            template = kida_env.get_template(template_name)
-            blocks = template.block_metadata()
-        except Exception as exc:
-            issues.append(
-                ContractIssue(
-                    severity=Severity.ERROR,
-                    category="fragment_target_scan",
-                    message=(
-                        f"Could not inspect template '{template_name}' while checking "
-                        f"fragment target registrations: {type(exc).__name__}: {exc}"
-                    ),
-                    template=template_name,
-                )
-            )
+    for target in program.targets:
+        transitions = program.target_block_transitions(target_id=target.target_id)
+        if any(edge.resolved for edge in transitions):
             continue
-        if blocks is not None:
-            defined_blocks.update(blocks)
-
-    for target_id in sorted(registered):
-        config = fragment_target_registry.get(target_id)
-        if config is None:
-            continue
-        if config.fragment_block in defined_blocks:
-            continue
-        severity = Severity.ERROR if config.required else Severity.WARNING
-        contract_label = f" (contract '{config.contract_name}')" if config.contract_name else ""
-        if config.required:
+        severity = Severity.ERROR if target.required else Severity.WARNING
+        contract_label = f" (contract '{target.contract_name}')" if target.contract_name else ""
+        if target.required:
             remedy = (
                 "Define the block in a page template, fix the fragment_block "
                 "argument, or drop required=True if the target is legitimately "
@@ -92,8 +76,8 @@ def check_fragment_target_orphans(
                 severity=severity,
                 category="fragment_target_orphan",
                 message=(
-                    f"Fragment target '#{target_id}'{contract_label} maps to block "
-                    f"'{config.fragment_block}' but no page template defines that block. "
+                    f"Fragment target '#{target.target_id}'{contract_label} maps to block "
+                    f"'{target.fragment_block}' but no page template defines that block. "
                     f"{remedy}"
                 ),
             )

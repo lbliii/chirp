@@ -86,13 +86,14 @@ This direction doubles down on existing architecture rather than replacing it:
 - `chirp freeze` can already render compatible application routes into static
   output without creating a separate template system.
 
-These are compiler ingredients. What does not yet exist is one authoritative,
-stable artifact connecting all of them.
+These are compiler ingredients. Issue #509 begins connecting them through one
+authoritative internal artifact; later increments still need to migrate the
+remaining consumers onto it.
 
-## The Missing Center
+## The Compiled Center
 
-The target is a frozen, inspectable internal read model, provisionally called
-`HypermediaProgram`:
+Issue #509 establishes the first internal increment of a frozen read model
+called `HypermediaProgram`:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -102,13 +103,16 @@ class HypermediaProgram:
     blocks: tuple[BlockNode, ...]
     targets: tuple[TargetNode, ...]
     transitions: tuple[TransitionEdge, ...]
-    origins: tuple[SourceOrigin, ...]
 ```
 
-This sketch is directional. Names and public exposure require design review.
-The important decision is that one immutable model becomes the shared source
-for checks, runtime trace correlation, DevTools, testing, documentation, and
-static export analysis.
+The shipped internal increment covers stable route, template, block, target,
+and transition records, with source origin and provenance stored on each
+record. Page-shell and fragment-target
+contract rules are its first consumers. It is not a public inspection API, and
+public names or serialized shapes still require design review. The important
+decision is that this one immutable model becomes the shared source for checks,
+runtime trace correlation, DevTools, testing, documentation, and static export
+analysis as each consumer migrates.
 
 ```text
 routes + return declarations + template metadata + registries
@@ -275,6 +279,7 @@ The vision is credible when:
 
 ## Related Work
 
+- `docs/rfcs/008-internal-hypermedia-program.md`
 - `docs/philosophy.md`
 - `docs/devtools.md`
 - `docs/rfcs/002-resolution-as-data.md`
