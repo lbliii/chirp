@@ -1,6 +1,12 @@
 """Tests for the contacts shell example."""
 
-from chirp.testing import TestClient, assert_hx_trigger, assert_no_full_document
+from chirp.testing import (
+    RouteSmokeCase,
+    TestClient,
+    assert_hx_trigger,
+    assert_no_full_document,
+    assert_route_smoke,
+)
 from tests.helpers.auth import extract_csrf_token, extract_session_cookie
 
 _FORM_CT = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -30,11 +36,19 @@ class TestContactsShell:
 
     async def test_boosted_contacts_page_renders_selectable_shell_outlet(self, example_app) -> None:
         async with TestClient(example_app) as client:
-            response = await client.fragment(
-                "/contacts",
-                target="main",
-                headers={"HX-Boosted": "true"},
+            responses = await assert_route_smoke(
+                client,
+                [
+                    RouteSmokeCase(
+                        "/contacts",
+                        mode="boosted",
+                        template="contacts/page.html",
+                        block="page_root",
+                        target="main",
+                    )
+                ],
             )
+            response = responses[("/contacts", "boosted")]
             assert response.status == 200
             assert 'id="page-content"' in response.text
             assert 'id="contacts-page"' in response.text

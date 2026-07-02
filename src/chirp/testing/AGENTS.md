@@ -20,6 +20,10 @@ browser or htmx request would see.
   routing, negotiation, middleware, and rendering rather than private shortcuts.
 - **Fragment assertions catch full documents.** `assert_no_full_document` and
   fragment helpers protect the hypermedia contract.
+- **Boosted smoke follows typed render intent.** `TestClient.boosted()` models
+  the shell target headers. A raw `Template` with `full_page` intent fails;
+  a negotiated `Page` may carry a shell document with `fragment` intent when
+  the outlet uses `hx-select`.
 - **SSE helpers cross-check markup.** `assert_sse_wired` should verify stream
   events against `sse-swap` attrs.
 - **Assertions stay actionable.** Failure messages should name status, header,

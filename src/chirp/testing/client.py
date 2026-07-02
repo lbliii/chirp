@@ -206,6 +206,39 @@ class TestClient:
             fragment_headers.update(headers)
         return await self.request(method, path, headers=fragment_headers, body=body)
 
+    async def boosted(
+        self,
+        path: str,
+        *,
+        target: str,
+        method: str = "GET",
+        trigger: str | None = None,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+    ) -> Response:
+        """Send an htmx boosted-navigation request to a shell target.
+
+        Sets ``HX-Request: true``, ``HX-Boosted: true``, and ``HX-Target``.
+        Use :meth:`fragment` for a narrow, non-boosted htmx request.
+
+        Args:
+            path: The URL path to request.
+            target: Element ID sent in ``HX-Target`` (for example, ``"main"``).
+            method: HTTP method (default GET).
+            trigger: Optional element ID sent in ``HX-Trigger``.
+            headers: Additional headers to include.
+            body: Request body bytes (for POST/PUT).
+        """
+        boosted_headers = {"HX-Boosted": "true", **(headers or {})}
+        return await self.fragment(
+            path,
+            method=method,
+            target=target,
+            trigger=trigger,
+            headers=boosted_headers,
+            body=body,
+        )
+
     async def sse(
         self,
         path: str,

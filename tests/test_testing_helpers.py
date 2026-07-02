@@ -153,6 +153,7 @@ class TestHxHeaders:
 class _FakeSmokeClient:
     def __init__(self) -> None:
         self.fragment_targets: list[str | None] = []
+        self.boosted_targets: list[str] = []
 
     async def get(self, path: str) -> Response:
         if path == "/plain":
@@ -163,9 +164,13 @@ class _FakeSmokeClient:
         self.fragment_targets.append(target)
         return Response(body=f'<div id="{path.strip("/") or "root"}">ok</div>', status=200)
 
+    async def boosted(self, path: str, *, target: str) -> Response:
+        self.boosted_targets.append(target)
+        return Response(body=f'<main id="{target}">{path}</main>', status=200)
+
 
 class TestAssertRouteSmoke:
-    def test_accepts_full_fragment_both_and_status_cases(self) -> None:
+    def test_accepts_full_fragment_boosted_both_and_status_cases(self) -> None:
         async def run() -> None:
             client = _FakeSmokeClient()
             responses = await assert_route_smoke(
@@ -173,31 +178,76 @@ class TestAssertRouteSmoke:
                 [
                     "/",
                     RouteSmokeCase("/widget", mode="fragment", block="widget", target="widget"),
+                    RouteSmokeCase("/projects", mode="boosted", block="page_root", target="main"),
                     RouteSmokeCase("/dashboard", mode="both", template="dashboard.html"),
                     RouteSmokeCase("/plain", mode="status", status=204),
                 ],
             )
             assert responses[("/", "full_page")].status == 200
             assert responses[("/widget", "fragment")].status == 200
+            assert responses[("/projects", "boosted")].status == 200
             assert responses[("/dashboard", "full_page")].status == 200
             assert responses[("/dashboard", "fragment")].status == 200
             assert responses[("/plain", "status")].status == 204
             assert client.fragment_targets == ["widget", None]
+            assert client.boosted_targets == ["main"]
 
         asyncio.run(run())
 
     def test_failure_names_route_context(self) -> None:
         async def run() -> None:
             with pytest.raises(
-                AssertionError, match=r"intent=fragment.*name='home'.*block='content'"
+                AssertionError,
+                match=(
+                    r"path='/', intent=fragment.*name='home'.*block='content'.*"
+                    r"target='content'.*observed_shape='html_fragment'.*status=200"
+                ),
             ):
                 await assert_route_smoke(
                     _FakeSmokeClient(),
                     [
                         RouteSmokeCase(
-                            "/", mode="fragment", name="home", block="content", status=201
+                            "/",
+                            mode="fragment",
+                            name="home",
+                            block="content",
+                            target="content",
+                            status=201,
                         )
                     ],
+                )
+
+        asyncio.run(run())
+
+    def test_boosted_full_document_failure_names_target_and_shape(self) -> None:
+        class _FullDocumentClient(_FakeSmokeClient):
+            async def boosted(self, path: str, *, target: str) -> Response:
+                return Response(
+                    body="<!doctype html><html lang='en'><body>wrong</body></html>",
+                    status=200,
+                )
+
+        async def run() -> None:
+            with pytest.raises(
+                AssertionError,
+                match=(
+                    r"path='/search', intent=boosted.*target='main'.*"
+                    r"observed_shape='full_document'"
+                ),
+            ):
+                await assert_route_smoke(
+                    _FullDocumentClient(),
+                    [RouteSmokeCase("/search", mode="boosted", target="main")],
+                )
+
+        asyncio.run(run())
+
+    def test_boosted_mode_requires_target(self) -> None:
+        async def run() -> None:
+            with pytest.raises(ValueError, match="Boosted route smoke requires a target"):
+                await assert_route_smoke(
+                    _FakeSmokeClient(),
+                    [RouteSmokeCase("/projects", mode="boosted")],
                 )
 
         asyncio.run(run())

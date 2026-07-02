@@ -59,7 +59,7 @@ async def test_search_negotiates():
         assert_is_fragment(fragment)
 ```
 
-`assert_is_fragment` checks three things: the status is `200` (override with `status=`), the body has no `<html>`/`</html>` wrapper, and the body is non-empty. `assert_is_full_page` checks for an `<html>` tag or a doctype. `client.fragment(...)` sets the `HX-Request` header for you — see the [[docs/quality/testing/test-client|TestClient]] guide.
+`assert_is_fragment` checks three things: the status is `200` (override with `status=`), the body has no `<html>`/`</html>` wrapper, and the body is non-empty. `assert_is_full_page` checks for an `<html>` tag or a doctype. `client.fragment(...)` sets the `HX-Request` header for a narrow swap; use `client.boosted(..., target="main")` for shell navigation — see the [[docs/quality/testing/test-client|TestClient]] guide.
 
 ## Common patterns
 

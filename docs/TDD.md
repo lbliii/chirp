@@ -1113,6 +1113,11 @@ class TestClient:
     # Fragment request (sets HX-Request: true)
     async def fragment(path, *, method="GET", headers=None) -> Response: ...
 
+    # Boosted navigation (sets HX-Request, HX-Boosted, and required HX-Target)
+    async def boosted(
+        path, *, target, method="GET", trigger=None, headers=None, body=None
+    ) -> Response: ...
+
     # SSE endpoint testing
     async def sse(
         path, *, headers=None, max_events=10, disconnect_after=None
