@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>htmx 2.0.10 browser baseline</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" data-chirp="htmx"></script>
+  <script defer src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+</head>
+<body>
+  <h1>htmx 2.0.10 browser baseline</h1>
+  {% block counter %}
+  <section id="counter">
+    <span class="count">{{ count }}</span>
+    <button id="increment" hx-post="/baseline/increment" hx-target="#counter" hx-swap="outerHTML">Increment</button>
+  </section>
+  {% if status_oob %}<p id="status" hx-swap-oob="innerHTML">{{ status_oob }}</p>{% end %}
+  {% endblock %}
+  <p id="status">{{ status }}</p>
+
+  <a id="boost" href="/baseline/boosted" hx-boost="true" hx-target="#panel">Boosted</a>
+  {% block panel %}<section id="panel">{{ panel }}</section>{% endblock %}
+
+  <section id="sse" hx-ext="sse" sse-connect="/baseline/events" hx-disinherit="hx-target hx-swap">
+    <span id="sse-output" sse-swap="message" hx-target="this">waiting</span>
+  </section>
+</body>
+</html>

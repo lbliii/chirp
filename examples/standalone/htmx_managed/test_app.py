@@ -27,7 +27,7 @@ class TestInjection:
             response = await client.get("/")
             assert response.status == 200
             # Chirp injected the htmx runtime (jsDelivr build) with the dedup marker.
-            assert "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" in response.text
+            assert "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" in response.text
             assert 'data-chirp="htmx"' in response.text
             # The page uses hx-* attributes (Mode A provisioning).
             assert 'hx-post="/increment"' in response.text
@@ -47,6 +47,22 @@ class TestSwap:
             second = await client.post("/increment")
             # State advanced across requests.
             assert ">2<" in second.text.replace(" ", "").replace("\n", "")
+
+
+class TestBrowserBaseline:
+    async def test_baseline_page_renders(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/baseline")
+        assert response.status == 200, response.text
+        assert "htmx.org@2.0.10/dist/htmx.min.js" in response.text
+        assert 'hx-ext="sse"' in response.text
+
+    async def test_baseline_sse_event_matches_listener(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            result = await client.sse("/baseline/events", max_events=1)
+        assert result.status == 200
+        assert result.events[0].event == "message"
+        assert 'id="sse-connected"' in result.events[0].data
 
 
 class TestContract:

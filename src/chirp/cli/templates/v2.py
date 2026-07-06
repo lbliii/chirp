@@ -275,7 +275,7 @@ V2_LAYOUT_CHIRPUI_HTML = """\
     <link rel="stylesheet" href="/static/style.css">
     <!-- htmx is the core hypermedia transport; this layout's dashboard uses
          hx-* and the SSE extension, so both scripts ship here. -->
-    <script src="https://unpkg.com/htmx.org@2.0.4" data-chirp="htmx"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" data-chirp="htmx"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 </head>
 <body>

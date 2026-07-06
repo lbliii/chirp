@@ -19,8 +19,8 @@ from chirp.testing import TestClient
 
 class TestHtmxSnippet:
     def test_builds_script_tag(self) -> None:
-        s = htmx_snippet("2.0.4")
-        assert 'src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"' in s
+        s = htmx_snippet("2.0.10")
+        assert 'src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"' in s
         assert 'data-chirp="htmx"' in s
         assert "defer" in s
 
@@ -29,11 +29,11 @@ class TestHtmxSnippet:
         convention (same explicit-/dist rule enforced for Alpine). htmx's bare
         package main is browser-safe (unlike Alpine's CJS module), so for htmx
         this pins the minified browser bundle for consistency."""
-        s = htmx_snippet("2.0.4")
-        assert "htmx.org@2.0.4/dist/htmx.min.js" in s
+        s = htmx_snippet("2.0.10")
+        assert "htmx.org@2.0.10/dist/htmx.min.js" in s
 
     def test_no_bare_package_url(self) -> None:
-        s = htmx_snippet("2.0.4")
+        s = htmx_snippet("2.0.10")
         bare = re.findall(r'src="[^"]+@[0-9.]+"', s)
         assert not bare, f"Bare package script URL (no /dist/...): {bare}"
 
@@ -42,11 +42,11 @@ class TestHtmxSnippet:
         assert "htmx.org@2.1.0/dist/htmx.min.js" in s
 
     def test_no_nonce_by_default(self) -> None:
-        s = htmx_snippet("2.0.4")
+        s = htmx_snippet("2.0.10")
         assert "nonce=" not in s
 
     def test_carries_nonce_when_given(self) -> None:
-        s = htmx_snippet("2.0.4", nonce="ABC123")
+        s = htmx_snippet("2.0.10", nonce="ABC123")
         assert 'nonce="ABC123"' in s
 
 
@@ -67,7 +67,7 @@ class TestHtmxInjection:
             response = await client.get("/")
             assert response.status == 200
             assert 'data-chirp="htmx"' in response.text
-            assert "cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" in response.text
+            assert "cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" in response.text
 
     async def test_not_injected_when_htmx_disabled(self) -> None:
         """htmx=False (default) does not inject."""
@@ -134,7 +134,7 @@ class TestHtmxInjectDedup:
         def index():
             return (
                 "<html><body>"
-                '<script src="https://unpkg.com/htmx.org@2.0.4" data-chirp="htmx"></script>'
+                '<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" data-chirp="htmx"></script>'
                 "</body></html>"
             )
 
@@ -171,7 +171,7 @@ class TestHtmxStreamingInject:
             is_htmx = False
 
         mw = StreamingHTMLInject(
-            lambda nonce: htmx_snippet("2.0.4", nonce=nonce),
+            lambda nonce: htmx_snippet("2.0.10", nonce=nonce),
             full_page_only=True,
             dedup_marker='data-chirp="htmx"',
         )
@@ -187,7 +187,7 @@ class TestHtmxStreamingInject:
         assert isinstance(resp, StreamingResponse)
         text = "".join([chunk async for chunk in resp.chunks])
         assert 'data-chirp="htmx"' in text
-        assert "htmx.org@2.0.4/dist/htmx.min.js" in text
+        assert "htmx.org@2.0.10/dist/htmx.min.js" in text
         # Snippet lands before the first </body>.
         assert text.index('data-chirp="htmx"') < text.index("</body>")
 
@@ -199,7 +199,7 @@ class TestHtmxStreamingInject:
             is_htmx = False
 
         mw = StreamingHTMLInject(
-            lambda nonce: htmx_snippet("2.0.4", nonce=nonce),
+            lambda nonce: htmx_snippet("2.0.10", nonce=nonce),
             full_page_only=True,
             dedup_marker='data-chirp="htmx"',
         )
@@ -225,7 +225,7 @@ class TestHtmxStreamingInject:
 class TestHtmxInjectNonce:
     @staticmethod
     def _factory():
-        return lambda nonce: htmx_snippet("2.0.4", nonce=nonce)
+        return lambda nonce: htmx_snippet("2.0.10", nonce=nonce)
 
     async def test_buffered_carries_live_nonce(self) -> None:
         from chirp.http.response import Response
@@ -285,7 +285,7 @@ class TestHtmxInjectNonce:
 
         text = "".join(parts)
         assert 'nonce="STREAM-NONCE-456"' in text
-        assert "htmx.org@2.0.4/dist/htmx.min.js" in text
+        assert "htmx.org@2.0.10/dist/htmx.min.js" in text
 
     async def test_no_nonce_when_disabled(self) -> None:
         from chirp.http.response import Response

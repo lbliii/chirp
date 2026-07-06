@@ -275,7 +275,7 @@ wire the secure-by-default stack, see
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine.js CDN version |
 | `alpine_csp` | `bool` | `False` | Use the CSP-safe Alpine build |
 | `htmx` | `bool` | `False` | Enable opt-in htmx core script injection |
-| `htmx_version` | `str` | `"2.0.4"` | Pinned htmx CDN version |
+| `htmx_version` | `str` | `"2.0.10"` | Pinned htmx CDN version |
 ::::{/dropdown}
 
 ::::{dropdown} Cache & environment

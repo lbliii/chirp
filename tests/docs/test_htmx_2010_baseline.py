@@ -1,0 +1,40 @@
+"""Repository-wide source contract for the verified htmx 2.0.10 baseline."""
+
+import re
+from pathlib import Path
+
+import pytest
+
+from chirp import AppConfig
+
+ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOTS = ("src", "tests", "examples", "site/content")
+CORE_URL = re.compile(r"https://[^\"' ]+/htmx\.org@[0-9.]+[^\"' ]*")
+EXPECTED_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+
+
+@pytest.mark.issue(543)
+def test_default_is_verified_htmx_2010() -> None:
+    assert AppConfig().htmx_version == "2.0.10"
+
+
+@pytest.mark.issue(543)
+def test_authored_sources_have_no_old_baseline_or_noncanonical_core_url() -> None:
+    old_version = "2.0." + "4"
+    stale: list[str] = []
+    noncanonical: list[str] = []
+    for root_name in SOURCE_ROOTS:
+        for path in (ROOT / root_name).rglob("*"):
+            if not path.is_file() or path.suffix not in {".html", ".md", ".py"}:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if old_version in text:
+                stale.append(str(path.relative_to(ROOT)))
+            noncanonical.extend(
+                f"{path.relative_to(ROOT)}: {url}"
+                for url in CORE_URL.findall(text)
+                if url != EXPECTED_URL
+            )
+
+    assert stale == []
+    assert noncanonical == []

@@ -228,7 +228,7 @@ class AppConfig:
     # Default off — never global default-on; templates that hardcode htmx
     # (chirp-ui shell/boost, the v2 scaffold) keep working unchanged.
     htmx: bool = False
-    htmx_version: str = "2.0.4"  # Pinned for reproducibility (matches templates)
+    htmx_version: str = "2.0.10"  # Pinned for reproducibility (matches templates)
 
     # Islands runtime — framework-agnostic high-state mount lifecycle
     islands: bool = False

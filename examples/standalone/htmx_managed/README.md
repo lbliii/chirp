@@ -30,7 +30,7 @@ PYTHONPATH=src python examples/standalone/htmx_managed/app.py
 
 Open the page and click Increment — the count updates with no full page reload.
 View source on the served page and you will see the Chirp-injected
-`<script defer src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" data-chirp="htmx"></script>`
+`<script defer src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" data-chirp="htmx"></script>`
 that the template never declared.
 
 ## Test

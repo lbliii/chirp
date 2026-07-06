@@ -217,7 +217,7 @@ To make the fragment swap fire, include htmx in `templates/base.html`:
 <html>
 <head>
   <title>{{ title }}</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
 </head>
 <body>
   {% block content %}{% endblock %}
