@@ -42,9 +42,12 @@ def test_release_canary_is_pinned_artifact_based_and_advisory() -> None:
     assert "import_path.is_relative_to(environment)" in workflow
     assert "working-directory: furatena" in workflow
     assert all(node_id in workflow for node_id in CANARY_TESTS)
+    step_marker = "      - name: Run focused Furatena compatibility tests"
+    assert step_marker in workflow
+    compatibility_step = workflow.split(step_marker, 1)[1].split("\n      - name:", 1)[0]
     node_ids = tuple(
         line.strip().removesuffix(" \\")
-        for line in workflow.splitlines()
+        for line in compatibility_step.splitlines()
         if line.lstrip().startswith("tests/")
     )
     assert node_ids == CANARY_TESTS

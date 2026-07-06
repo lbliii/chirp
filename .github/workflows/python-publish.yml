@@ -93,7 +93,11 @@ jobs:
           fi
           gh repo clone lbliii/furatena furatena -- --no-checkout
           git -C furatena checkout --detach "$FURATENA_REVISION"
-          test "$(git -C furatena rev-parse HEAD)" = "$FURATENA_REVISION"
+          actual_revision="$(git -C furatena rev-parse HEAD)"
+          if [ "$actual_revision" != "$FURATENA_REVISION" ]; then
+            echo "::error::Furatena revision mismatch: expected $FURATENA_REVISION, got $actual_revision"
+            exit 1
+          fi
 
       - name: Install Furatena locked dependencies
         id: dependencies
@@ -104,7 +108,10 @@ jobs:
         id: candidate
         run: |
           wheel="$(find "$GITHUB_WORKSPACE/dist" -name '*.whl' -print -quit)"
-          test -n "$wheel"
+          if [ -z "$wheel" ]; then
+            echo "::error::No Chirp wheel found under $GITHUB_WORKSPACE/dist"
+            exit 1
+          fi
           uv pip install \
             --python "$GITHUB_WORKSPACE/furatena/.venv/bin/python" \
             --force-reinstall \
