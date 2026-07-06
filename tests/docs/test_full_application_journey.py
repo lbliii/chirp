@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from examples.inventory import load_inventory, validate_inventory  # noqa: E402
 
 JOURNEY = ROOT / "site/content/docs/tutorials/full-application-journey.md"
+FURATENA_CANARY_REVISION = "da584bf9fe19ec1376fdc0b23c7fb1b657b026b8"
 
 REQUIRED_CAPABILITIES = {
     "standalone/todo": {
@@ -116,3 +117,13 @@ def test_contract_drills_remain_tied_to_precise_regression_proofs() -> None:
         path = ROOT / relative_path
         assert path.is_file()
         assert expected_tests <= _test_functions(path)
+
+
+def test_journey_links_to_pinned_furatena_canary_evidence() -> None:
+    text = JOURNEY.read_text(encoding="utf-8")
+
+    assert "https://github.com/lbliii/chirp/pull/556" in text
+    assert "https://github.com/lbliii/chirp/issues/500" in text
+    assert FURATENA_CANARY_REVISION in text
+    assert "built Chirp wheel" in text
+    assert "Furatena lockfile" in text

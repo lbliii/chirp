@@ -228,9 +228,13 @@ git restore examples/chirpui/kanban_shell/pages/page.py \
 
 The in-repository path is necessary but not sufficient. Furatena exercises the
 same contracts through a substantially larger registry-driven application. The
-pinned wheel-based compatibility canary is tracked in
-[#500](https://github.com/lbliii/chirp/issues/500); once its release workflow is
-enabled, that run is the downstream evidence paired with this journey.
+pinned wheel-based compatibility canary in
+[#556](https://github.com/lbliii/chirp/pull/556) checks out revision
+`da584bf9fe19ec1376fdc0b23c7fb1b657b026b8`, installs the Furatena lockfile,
+force-installs the built Chirp wheel, and runs the framework-facing integration
+slice. Its advisory release result is the downstream evidence paired with this
+journey; [#500](https://github.com/lbliii/chirp/issues/500) owns the canary's
+release policy and update cadence.
 
 :::{related}
 :limit: 4
