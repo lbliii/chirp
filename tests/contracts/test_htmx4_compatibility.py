@@ -84,13 +84,13 @@ def test_version_specific_sse_markup_is_checked() -> None:
         {"page.html": '<div hx-sse:connect="/events"></div>'},
         stable,
     )
-    assert any("htmx 4 hx-sse:*" in issue.message for issue in stable_issues)
+    assert any("'hx-sse:connect'" in issue.message for issue in stable_issues)
 
     preview_issues = check_htmx_compatibility(
         {"page.html": '<div sse-connect="/events" sse-swap="message"></div>'},
         _preview_manifest(),
     )
-    assert any("removed sse-*" in issue.message for issue in preview_issues)
+    assert any("'sse-connect'" in issue.message for issue in preview_issues)
 
 
 def _app(tmp_path: Path, template: str) -> App:
