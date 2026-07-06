@@ -85,6 +85,24 @@ def test_unknown_declared_template_is_actionable_error_with_origin(tmp_path) -> 
 
 
 @pytest.mark.issue(498)
+def test_declared_template_load_error_preserves_loader_details(tmp_path) -> None:
+    (tmp_path / "broken.html").write_text("{% block", encoding="utf-8")
+    app = App(AppConfig(template_dir=tmp_path))
+    app.declare_template("broken.html")
+
+    result = check_hypermedia_surface(app)
+    issue = next(
+        issue for issue in result.errors if issue.category == "template_declaration"
+    )
+    program = app._runtime_state.hypermedia_program
+    assert program is not None
+    template = program.template("broken.html")
+    assert template is not None
+    assert template.load_error is not None
+    assert template.load_error in issue.message
+
+
+@pytest.mark.issue(498)
 def test_unknown_declared_block_lists_available_blocks(tmp_path) -> None:
     (tmp_path / "search.html").write_text(
         "{% block results %}ok{% endblock %}",

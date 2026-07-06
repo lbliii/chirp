@@ -28,7 +28,7 @@ def check_template_declarations(program: HypermediaProgram | None) -> list[Contr
         if template is None:
             error_kind = "not compiled"
         elif template.load_error is not None:
-            error_kind = template.load_error.partition(":")[0]
+            error_kind = template.load_error
         else:
             error_kind = None
         if error_kind is not None:
