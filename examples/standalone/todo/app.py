@@ -14,9 +14,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Page, Request, ValidationError
+from chirp import App, AppConfig, FormAction, Fragment, Page, Request, ValidationError
 from chirp.data import Query
 from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -51,6 +52,7 @@ _secret = os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
 
 app.add_middleware(SessionMiddleware(SessionConfig(secret_key=_secret)))
 app.add_middleware(CSRFMiddleware())
+app.add_middleware(SecurityHeadersMiddleware())
 
 # No custom filter needed — using inline ternary in the template instead:
 #   class="{{ 'done' if todo.done else '' }}"
@@ -67,9 +69,9 @@ async def index():
     return Page("index.html", "todo_list", todos=todos)
 
 
-@app.route("/todos", methods=["POST"], name="todos.add")
+@app.route("/todos", methods=["POST"], name="todos.add", referenced=True)
 async def add_todo(request: Request):
-    """Add a todo item — returns the list fragment or a 422 validation error."""
+    """Add a todo with an htmx fragment and a plain-POST redirect fallback."""
     form = await request.form()
     text = (form.get("text") or "").strip()
     if not text:
@@ -82,23 +84,23 @@ async def add_todo(request: Request):
         )
     await app.db.execute("INSERT INTO todos (text, done) VALUES (?, ?)", text, False)
     todos = await ALL_TODOS.fetch(app.db)
-    return Fragment("index.html", "todo_list", todos=todos)
+    return FormAction("/", Fragment("index.html", "todo_list", todos=todos))
 
 
 @app.route("/todos/{todo_id}/toggle", methods=["POST"], name="todos.toggle")
 async def toggle_todo(todo_id: int):
-    """Toggle a todo's completion state — returns the list fragment."""
+    """Toggle completion with fragment and redirect response modes."""
     await app.db.execute("UPDATE todos SET done = NOT done WHERE id = ?", todo_id)
     todos = await ALL_TODOS.fetch(app.db)
-    return Fragment("index.html", "todo_list", todos=todos)
+    return FormAction("/", Fragment("index.html", "todo_list", todos=todos))
 
 
 @app.route("/todos/{todo_id}", methods=["DELETE"], name="todos.delete")
 async def delete_todo(todo_id: int):
-    """Delete a todo — returns the list fragment."""
+    """Delete a todo with fragment and redirect response modes."""
     await app.db.execute("DELETE FROM todos WHERE id = ?", todo_id)
     todos = await ALL_TODOS.fetch(app.db)
-    return Fragment("index.html", "todo_list", todos=todos)
+    return FormAction("/", Fragment("index.html", "todo_list", todos=todos))
 
 
 if __name__ == "__main__":

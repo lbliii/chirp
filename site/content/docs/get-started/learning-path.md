@@ -81,6 +81,10 @@ When you want ChirpUI layouts and boosted navigation:
 
 Complete tiers 1–2 first. Lucky Cat is the composed product demo, not the on-ramp.
 
+Follow the [[docs/tutorials/full-application-journey|full-application journey]]
+when you want one tested path from SQLite and dual-mode forms through boosted
+shell navigation, Suspense, SSE, contract diagnostics, and deployment posture.
+
 ## 9. Ship
 
 When you deploy:

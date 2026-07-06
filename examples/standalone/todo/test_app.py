@@ -2,6 +2,8 @@
 
 import re
 
+import pytest
+
 from chirp.testing import (
     TestClient,
     assert_fragment_contains,
@@ -20,7 +22,7 @@ def _extract_cookie(response, name: str = "chirp_session") -> str | None:
     return None
 
 
-async def _csrf_headers(client) -> dict[str, str]:
+async def _csrf_headers(client, *, htmx: bool = True) -> dict[str, str]:
     """GET / to establish a session and extract the CSRF token + cookie."""
     page = await client.get("/")
     cookie = _extract_cookie(page)
@@ -31,6 +33,8 @@ async def _csrf_headers(client) -> dict[str, str]:
         headers["Cookie"] = f"chirp_session={cookie}"
     if token:
         headers["X-CSRF-Token"] = token
+    if htmx:
+        headers["HX-Request"] = "true"
     return headers
 
 
@@ -43,14 +47,14 @@ class TestTodoFullPage:
             assert response.status == 200
             assert "<html>" in response.text
             assert "<h1>Todos</h1>" in response.text
-            assert '<ul id="todo-list">' in response.text
+            assert '<ul id="todo-list"' in response.text
 
     async def test_index_fragment(self, example_app) -> None:
         """HX-Request header triggers fragment response (just the list)."""
         async with TestClient(example_app) as client:
             response = await client.fragment("/")
             assert_is_fragment(response)
-            assert_fragment_contains(response, '<ul id="todo-list">')
+            assert_fragment_contains(response, '<ul id="todo-list"')
             assert_fragment_not_contains(response, "<h1>Todos</h1>")
 
 
@@ -67,6 +71,22 @@ class TestTodoOperations:
             )
             assert_is_fragment(response)
             assert_fragment_contains(response, "Buy milk")
+
+    @pytest.mark.issue(512)
+    async def test_plain_add_redirects_after_persisting(self, example_app) -> None:
+        """The same form works without htmx and redirects after committing."""
+        async with TestClient(example_app) as client:
+            auth = await _csrf_headers(client, htmx=False)
+            response = await client.post(
+                "/todos",
+                body=b"text=Plain+browser",
+                headers={**_FORM_CT, **auth},
+            )
+            assert response.status == 303
+            assert response.header("location") == "/"
+
+            page = await client.get("/", headers=auth)
+            assert "Plain browser" in page.text
 
     async def test_add_and_toggle(self, example_app) -> None:
         async with TestClient(example_app) as client:

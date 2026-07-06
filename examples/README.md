@@ -15,6 +15,9 @@ Examples are organized by runtime layer so the support matrix is obvious:
 
 > **Featured:** [`chirpui/lucky_cat`](chirpui/lucky_cat/README.md) — flagship ChirpUI demo (tier 3). Not your first Chirp app — complete tiers 1–2 first.
 
+For a database-backed path across the maintained examples, follow the
+[full-application journey](../site/content/docs/tutorials/full-application-journey.md).
+
 ### AI curious
 
 Branch off after tier 1 if you want to stream LLM tokens to the browser:
@@ -249,7 +252,7 @@ cannot disappear from the catalog while its documentation debt remains visible.
 | [`standalone/survey`](standalone/survey/) | standalone | supporting | 2 | — | none | `forms`, `validation` | yes | [`survey`](../examples/standalone/survey) |
 | [`standalone/suspense_dashboard`](standalone/suspense_dashboard/) | standalone | supporting | 2 | — | none | `suspense` | yes | [`suspense_dashboard`](../examples/standalone/suspense_dashboard) |
 | [`standalone/theming`](standalone/theming/) | standalone | supporting | 1 | — | none | `pages` | yes | [`theming`](../examples/standalone/theming) |
-| [`standalone/todo`](standalone/todo/) | standalone | canonical | 2 | `sessions` | none | `csrf`, `data`, `forms`, `fragments`, `pages`, `sessions`, `validation` | yes | [`todo`](../examples/standalone/todo) |
+| [`standalone/todo`](standalone/todo/) | standalone | canonical | 2 | `sessions` | none | `csrf`, `data`, `forms`, `fragments`, `mutations`, `no-js`, `pages`, `security`, `sessions`, `validation` | yes | [`todo`](../examples/standalone/todo) |
 | [`standalone/tools`](standalone/tools/) | standalone | supporting | 2 | — | none | `fragments`, `sse`, `tools` | yes | [`tools`](../examples/standalone/tools) |
 | [`standalone/tools_hitl`](standalone/tools_hitl/) | standalone | experimental | 3 | `ai`, `sessions` | none | `ai`, `csrf`, `fragments`, `sessions`, `sse`, `tools` | yes | [`tools_hitl`](../examples/standalone/tools_hitl) |
 | [`standalone/upload`](standalone/upload/) | standalone | supporting | 2 | `forms`, `sessions` | none | `csrf`, `forms`, `sessions`, `uploads`, `validation` | yes | [`upload`](../examples/standalone/upload) |
