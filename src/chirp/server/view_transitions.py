@@ -22,11 +22,13 @@ Three modes controlled by ``AppConfig.view_transitions``:
 
 **Script snippet** (``"htmx"`` and ``"full"``, before ``</body>``):
 
-- Sets ``htmx.config.globalViewTransitions = true`` so every htmx swap
-  automatically uses the View Transitions API when available.
+- Sets htmx 2's ``htmx.config.globalViewTransitions`` and htmx 4's
+  ``htmx.config.transitions`` so swaps use the View Transitions API when
+  available.
 - Idempotent guard (``window.__chirpViewTransitions``) prevents double-init.
-- Deferred listener (``htmx:load``) handles the case where htmx loads
-  after the script (e.g., ``<script defer>``).
+- Deferred listeners for htmx 2 (``htmx:load``) and htmx 4
+  (``htmx:after:process``) handle the case where htmx loads after the script
+  (e.g., ``<script defer>``).
 
 Injected into full-page HTML responses via ``HTMLInject`` middleware.
 """
@@ -49,10 +51,14 @@ VIEW_TRANSITIONS_JS = """\
   if(window.__chirpViewTransitions)return;
   window.__chirpViewTransitions=true;
   function enable(){
-    if(typeof htmx!=="undefined"){htmx.config.globalViewTransitions=true;}
+    if(typeof htmx!=="undefined"){
+      if("globalViewTransitions" in htmx.config){htmx.config.globalViewTransitions=true;}
+      if("transitions" in htmx.config){htmx.config.transitions=true;}
+    }
   }
   enable();
   document.addEventListener("htmx:load",enable,{once:true});
+  document.addEventListener("htmx:after:process",enable,{once:true});
 })();
 """
 

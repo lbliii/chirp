@@ -130,11 +130,41 @@ def test_htmx_debug_js_swap_doctor() -> None:
 
 
 def test_htmx_debug_js_request_correlation() -> None:
-    """Overlapping htmx requests are correlated by XHR when available."""
+    """Overlapping htmx requests are correlated by XHR or fetch context."""
     assert "recordByXhr" in HTMX_DEBUG_BOOT_JS
+    assert "recordByContext" in HTMX_DEBUG_BOOT_JS
+    assert "recordByRequest" in HTMX_DEBUG_BOOT_JS
     assert "WeakMap" in HTMX_DEBUG_BOOT_JS
     assert "getRecordForDetail" in HTMX_DEBUG_BOOT_JS
     assert "rememberRecordForDetail" in HTMX_DEBUG_BOOT_JS
+
+
+@pytest.mark.issue(542)
+def test_htmx_debug_js_maps_htmx2_and_htmx4_lifecycle_events() -> None:
+    """The browser runtime supports fetch-era events without dropping htmx 2."""
+    event_pairs = (
+        ("htmx:configRequest", "htmx:config:request"),
+        ("htmx:beforeRequest", "htmx:before:request"),
+        ("htmx:afterRequest", "htmx:after:request"),
+        ("htmx:beforeSwap", "htmx:before:swap"),
+        ("htmx:afterSwap", "htmx:after:swap"),
+        ("htmx:responseError", "htmx:response:error"),
+        ("htmx:pushedIntoHistory", "htmx:after:history:push"),
+        ("htmx:historyRestore", "htmx:before:history:restore"),
+    )
+    for legacy, fetch_era in event_pairs:
+        assert legacy in HTMX_DEBUG_BOOT_JS
+        assert fetch_era in HTMX_DEBUG_BOOT_JS
+
+    assert "detail.ctx" in HTMX_DEBUG_BOOT_JS
+    assert "request.action" in HTMX_DEBUG_BOOT_JS
+    assert "response.headers" in HTMX_DEBUG_BOOT_JS
+    assert "copyRequestHeaders" in HTMX_DEBUG_BOOT_JS
+    assert "readRequestHeader" in HTMX_DEBUG_BOOT_JS
+    assert 'onHtmxEvents(["htmx:error"]' in HTMX_DEBUG_BOOT_JS
+    assert "historyEvents" in HTMX_DEBUG_BOOT_JS
+    assert "recordOobSwap" in HTMX_DEBUG_BOOT_JS
+    assert "Array.isArray(d.tasks)" in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:

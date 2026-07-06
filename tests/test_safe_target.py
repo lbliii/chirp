@@ -35,6 +35,8 @@ class TestSafeTargetConstants:
 
     def test_js_uses_htmx_onload(self) -> None:
         assert "htmx.onLoad" in SAFE_TARGET_JS
+        assert "htmx:after:process" in SAFE_TARGET_JS
+        assert "scan(document)" in SAFE_TARGET_JS
 
     def test_js_targets_from_trigger_without_explicit_target(self) -> None:
         """The selector matches hx-trigger*=from: with hx-get/post/etc but :not(hx-target)."""

@@ -77,6 +77,29 @@ The exported records include htmx requests, errors, SSE connections and events,
 View Transition events, render plans, and Swap Doctor diagnostics. Reach for this
 when the visual symptom is vague but the request, target, and render intent
 should be precise.
+
+The same diagnosis surface works with htmx 2 and htmx 4. Fetch-era request
+records come from `event.detail.ctx`; htmx 2 records continue to use the XHR.
+When `htmx-2-compat` emits both lifecycle names for one action, DevTools
+deduplicates them by request context. `historyEvents` in the exported state
+shows deduplicated push, replace, update, and restore activity.
+
+For app-owned process hooks, prefer `htmx.onLoad(callback)`: htmx maps it to the
+correct process event in both versions. For other hooks, register both names and
+deduplicate the shared context:
+
+```javascript
+const seen = new WeakSet();
+for (const name of ["htmx:afterSwap", "htmx:after:swap"]) {
+  document.addEventListener(name, (event) => {
+    const token = event.detail?.ctx || event.detail;
+    if (token && seen.has(token)) return;
+    if (token) seen.add(token);
+    const target = event.detail?.ctx?.target || event.detail?.target;
+    initializeWidgets(target);
+  });
+}
+```
 :::{/step}
 ::::{/steps}
 

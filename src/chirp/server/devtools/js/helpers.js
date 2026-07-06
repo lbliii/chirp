@@ -105,10 +105,24 @@ function shellQuote(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
-function parseResponseHeaders(xhr) {
-  var raw = xhr.getAllResponseHeaders && xhr.getAllResponseHeaders();
-  if (!raw) return {};
+function readResponseHeader(response, name) {
+  if (!response) return null;
+  if (response.headers && typeof response.headers.get === "function") {
+    return response.headers.get(name);
+  }
+  return response.getResponseHeader ? response.getResponseHeader(name) : null;
+}
+
+function parseResponseHeaders(response) {
   var out = {};
+  if (response && response.headers && typeof response.headers.forEach === "function") {
+    response.headers.forEach(function(value, name) {
+      out[String(name).toLowerCase()] = String(value);
+    });
+    return out;
+  }
+  var raw = response && response.getAllResponseHeaders && response.getAllResponseHeaders();
+  if (!raw) return out;
   raw.trim().split(/[\r\n]+/).forEach(function(line) {
     var idx = line.indexOf(":");
     if (idx === -1) return;
@@ -117,6 +131,31 @@ function parseResponseHeaders(xhr) {
     out[name] = val;
   });
   return out;
+}
+
+function copyRequestHeaders(headers) {
+  var out = {};
+  if (!headers) return out;
+  if (typeof headers.forEach === "function") {
+    headers.forEach(function(value, name) { out[name] = value; });
+    return out;
+  }
+  for (var name in headers) {
+    if (Object.prototype.hasOwnProperty.call(headers, name)) out[name] = headers[name];
+  }
+  return out;
+}
+
+function readRequestHeader(headers, name) {
+  if (!headers) return null;
+  if (headers[name] != null) return headers[name];
+  var wanted = String(name).toLowerCase();
+  for (var key in headers) {
+    if (Object.prototype.hasOwnProperty.call(headers, key) && String(key).toLowerCase() === wanted) {
+      return headers[key];
+    }
+  }
+  return null;
 }
 
 function filterHxAndChirpHeaders(rh) {

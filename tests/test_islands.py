@@ -147,8 +147,17 @@ class TestOptimisticApplyGuardrail:
         assert src.count(self._END) == 1
 
         # Correlated via the htmx request lifecycle the adapter actually uses.
-        for token in ("htmx:beforeRequest", "htmx:afterSwap", "htmx:afterRequest"):
+        for token in (
+            "htmx:beforeRequest",
+            "htmx:before:request",
+            "htmx:afterSwap",
+            "htmx:after:swap",
+            "htmx:afterRequest",
+            "htmx:after:request",
+        ):
             assert token in src, f"runtime missing {token!r}"
+        assert "onHtmxLifecycle" in src
+        assert "detail.ctx" in src
         # Runtime-owned correlation registry, keyed by the htmx request object.
         assert "optimisticInflight" in src
 

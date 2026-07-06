@@ -30,11 +30,11 @@ _OPTIMISTIC_ADAPTER_JS = """
   // never sent over any transport; the server is never told an optimistic
   // apply happened. Reconciliation is the ordinary authoritative-fragment swap
   // (last-write-wins). All logic is document-level and correlated by the htmx
-  // request object (evt.detail.xhr); arming reads the element's props FRESH on
-  // each request, so it never depends on per-mount listener state that the
-  // runtime tears down on a swap.
+  // request identity (XHR in htmx 2, request context in htmx 4); arming reads
+  // the element's props FRESH on each request, so it never depends on per-mount
+  // listener state that the runtime tears down on a swap.
   var OPTIMISTIC_ALLOWED = ["addClass", "removeClass", "toggleClass", "setText", "setAttr", "removeAttr", "disable"];
-  var optimisticInflight = new Map();    // htmx request object -> { regionEl }
+  var optimisticInflight = new Map();    // request identity -> { regionEl }
   var optimisticRegions = new WeakMap(); // regionEl -> baseline entry (tab-local)
 
   function optimisticTargets(regionEl, op) {
@@ -109,8 +109,9 @@ _OPTIMISTIC_ADAPTER_JS = """
     try { return JSON.parse(raw); } catch (err) { return null; }
   }
 
-  function optimisticArm(triggerEl, xhr) {
+  function optimisticArm(triggerEl, requestKey) {
     if (triggerEl.getAttribute("data-island-primitive") !== "optimistic_apply") return;
+    if (optimisticInflight.has(requestKey)) return;
     var props = optimisticReadProps(triggerEl);
     if (!props) return;
     var ops = props.ops;
@@ -143,8 +144,8 @@ _OPTIMISTIC_ADAPTER_JS = """
       optimisticRegions.set(regionEl, entry);
       regionEl.classList.remove(errorClass);
     }
-    entry.inflight.add(xhr);
-    optimisticInflight.set(xhr, { regionEl: regionEl });
+    entry.inflight.add(requestKey);
+    optimisticInflight.set(requestKey, { regionEl: regionEl });
 
     ops.forEach(function(op) {
       if (!op || typeof op.op !== "string") return;
@@ -163,12 +164,12 @@ _OPTIMISTIC_ADAPTER_JS = """
     emitAction(info, "apply", "optimistic", {});
   }
 
-  function optimisticConfirm(xhr) {
+  function optimisticConfirm(requestKey) {
     // htmx:afterSwap fires ONLY when htmx actually swapped (a 2xx, or an error
     // response the app explicitly opted into swapping). It is the authoritative
     // signal that the server fragment landed — NOT htmx:beforeSwap, which also
     // fires for non-swapping error responses.
-    var record = optimisticInflight.get(xhr);
+    var record = optimisticInflight.get(requestKey);
     if (!record) return;
     var entry = optimisticRegions.get(record.regionEl);
     if (!entry) return;
@@ -178,14 +179,14 @@ _OPTIMISTIC_ADAPTER_JS = """
     emitAction({ name: entry.info.name, id: entry.info.id, version: entry.info.version }, "confirm", "confirmed", {});
   }
 
-  function optimisticSettle(xhr) {
-    var record = optimisticInflight.get(xhr);
+  function optimisticSettle(requestKey, httpStatus) {
+    var record = optimisticInflight.get(requestKey);
     if (!record) return;             // idempotent: already settled
-    optimisticInflight.delete(xhr);
+    optimisticInflight.delete(requestKey);
     var regionEl = record.regionEl;
     var entry = optimisticRegions.get(regionEl);
     if (!entry) return;
-    entry.inflight.delete(xhr);
+    entry.inflight.delete(requestKey);
     if (entry.inflight.size > 0) return;  // wait for the last in-flight request
     regionEl.classList.remove(entry.pendingClass);
     var payload = { name: entry.info.name, id: entry.info.id, version: entry.info.version };
@@ -206,7 +207,7 @@ _OPTIMISTIC_ADAPTER_JS = """
         emit(ERROR_EVENT, { name: payload.name, id: payload.id, version: payload.version, error: "revert_fallback", reason: String(err && err.message || err) });
       }
       regionEl.classList.add(entry.errorClass);
-      emitAction(payload, "revert", "reverted", { httpStatus: xhr && xhr.status });
+      emitAction(payload, "revert", "reverted", { httpStatus: httpStatus });
     }
     optimisticRegions.delete(regionEl);
   }
@@ -216,27 +217,34 @@ _OPTIMISTIC_ADAPTER_JS = """
   // below (which read props fresh), so they never depend on this mount state.
   register("optimistic_apply", { mount: function() {} });
 
-  document.addEventListener("htmx:beforeRequest", function(evt) {
-    var detail = evt && evt.detail;
-    if (!detail || !detail.xhr) return;
-    var el = detail.elt || evt.target;
-    if (el instanceof Element) optimisticArm(el, detail.xhr);
+  function optimisticDetail(evt) { return (evt && evt.detail) || {}; }
+  function optimisticContext(detail) { return detail.ctx || detail; }
+  function optimisticRequestKey(detail) {
+    var ctx = optimisticContext(detail);
+    return detail.xhr || ctx.request || ctx;
+  }
+  function optimisticStatus(detail) {
+    var ctx = optimisticContext(detail);
+    return (ctx.response && ctx.response.status) || (detail.xhr && detail.xhr.status);
+  }
+  onHtmxLifecycle(["htmx:beforeRequest", "htmx:before:request"], function(evt) {
+    var detail = optimisticDetail(evt);
+    var ctx = optimisticContext(detail);
+    var el = ctx.sourceElement || detail.elt || evt.target;
+    var key = optimisticRequestKey(detail);
+    if (el instanceof Element && key) optimisticArm(el, key);
   });
-  document.addEventListener("htmx:afterSwap", function(evt) {
-    var xhr = evt && evt.detail && evt.detail.xhr;
-    if (xhr) optimisticConfirm(xhr);
+  onHtmxLifecycle(["htmx:afterSwap", "htmx:after:swap"], function(evt) {
+    var detail = optimisticDetail(evt);
+    optimisticConfirm(optimisticRequestKey(detail));
   });
-  document.addEventListener("htmx:afterRequest", function(evt) {
-    var xhr = evt && evt.detail && evt.detail.xhr;
-    if (xhr) optimisticSettle(xhr);
+  onHtmxLifecycle(["htmx:afterRequest", "htmx:after:request"], function(evt) {
+    var detail = optimisticDetail(evt);
+    optimisticSettle(optimisticRequestKey(detail), optimisticStatus(detail));
   });
-  document.addEventListener("htmx:sendError", function(evt) {
-    var xhr = evt && evt.detail && evt.detail.xhr;
-    if (xhr) optimisticSettle(xhr);
-  });
-  document.addEventListener("htmx:timeout", function(evt) {
-    var xhr = evt && evt.detail && evt.detail.xhr;
-    if (xhr) optimisticSettle(xhr);
+  onHtmxLifecycle(["htmx:sendError", "htmx:timeout", "htmx:error"], function(evt) {
+    var detail = optimisticDetail(evt);
+    optimisticSettle(optimisticRequestKey(detail), optimisticStatus(detail));
   });
   // <<< optimistic_apply adapter
 """
@@ -293,6 +301,21 @@ def islands_snippet(version: str, *, nonce: str = "") -> str:
       }});
     }}
     emit(ACTION_EVENT, detail);
+  }}
+
+  function onHtmxLifecycle(names, handler) {{
+    const seen = typeof WeakSet !== "undefined" ? new WeakSet() : null;
+    names.forEach(function(name) {{
+      document.addEventListener(name, function(event) {{
+        const detail = (event && event.detail) || {{}};
+        const token = detail.ctx || detail;
+        if (seen && token && typeof token === "object") {{
+          if (seen.has(token)) return;
+          seen.add(token);
+        }}
+        handler(event);
+      }});
+    }});
   }}
 
   function parseProps(el) {{
@@ -520,15 +543,21 @@ def islands_snippet(version: str, *, nonce: str = "") -> str:
     void scan(document);
   }});
 
-  document.addEventListener("htmx:beforeSwap", function(event) {{
-    if (event && event.target instanceof Element) {{
-      unmountWithin(event.target);
+  onHtmxLifecycle(["htmx:beforeSwap", "htmx:before:swap"], function(event) {{
+    const detail = (event && event.detail) || {{}};
+    const ctx = detail.ctx || detail;
+    const target = ctx.target || event.target;
+    if (target instanceof Element) {{
+      unmountWithin(target);
     }}
   }});
 
-  document.addEventListener("htmx:afterSwap", function(event) {{
-    if (event && event.target instanceof Element) {{
-      void scan(event.target);
+  onHtmxLifecycle(["htmx:afterSwap", "htmx:after:swap"], function(event) {{
+    const detail = (event && event.detail) || {{}};
+    const ctx = detail.ctx || detail;
+    const target = ctx.target || event.target;
+    if (target instanceof Element) {{
+      void scan(target);
     }} else {{
       void scan(document);
     }}

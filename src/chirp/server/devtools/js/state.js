@@ -38,6 +38,7 @@ var state = {
   records: [],
   errors: [],
   oobRecords: [],
+  historyEvents: [],
   pinnedScroll: false,
   sseConnections: [],
   sseEvents: [],
