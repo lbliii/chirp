@@ -58,3 +58,28 @@ uv run towncrier build --version <version> --yes
 The benchmark artifact is release evidence, not a marketing claim. Public release notes should
 say "synthetic benchmarks" or "internal regression workloads" unless they are backed by a
 separate production-like benchmark plan.
+
+## Furatena Compatibility Canary
+
+Published releases also run an advisory downstream canary against private repository
+`lbliii/furatena` at revision `da584bf9fe19ec1376fdc0b23c7fb1b657b026b8`. The release workflow
+installs Furatena from its committed `uv.lock`, force-installs the built Chirp wheel without
+dependency resolution, verifies Chirp imports from that environment, and runs an 11-test slice
+covering navigation, search, narrow htmx/OOB responses, SSE, static assets and mounts, static
+export, and structured checks.
+
+The canary runs alongside PyPI publication and is deliberately non-blocking. Its result is release
+evidence: a failure must be triaged and recorded, but it does not stop the already-published release.
+The workflow summary separates the likely ownership boundary:
+
+- Checkout, missing secret, or revision mismatch: Chirp release-harness owner.
+- Locked dependency installation: Furatena owner, with the pinned lockfile as evidence.
+- Wheel installation or provenance assertion: Chirp packaging owner.
+- Compatibility-test failure: Chirp and Furatena owners compare the pinned suite with the last
+  released Chirp wheel before assigning the regression.
+
+`FURATENA_CANARY_TOKEN` must be a fine-grained token with read-only Contents access to the private
+Furatena repository. Rotate it under the normal repository-secret policy. Review the pin and test
+slice before every Chirp minor release, whenever Furatena changes its lockfile or framework-facing
+test surface, and at least quarterly. Pin updates should be isolated, explain the compatibility
+delta, and pass once with the current released wheel before becoming release evidence.
