@@ -19,7 +19,7 @@ from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry
 
-from .hypermedia_program import HypermediaProgram
+from .hypermedia_program import HypermediaProgram, TemplateDeclaration
 
 if TYPE_CHECKING:
     from chirp.data.database import Database
@@ -182,6 +182,7 @@ class MutableAppState:
     page_route_paths: set[str] = field(default_factory=set)
     page_leaf_templates: set[str] = field(default_factory=set)
     page_templates: set[str] = field(default_factory=set)
+    template_declarations: list[TemplateDeclaration] = field(default_factory=list)
     pending_domains: list[object] = field(default_factory=list)
     providers: dict[type, Callable[..., Any]] = field(default_factory=dict)
     reload_dirs_extra: list[str] = field(default_factory=list)

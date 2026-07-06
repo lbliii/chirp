@@ -12,6 +12,7 @@ from .hypermedia_program import (
     RouteNode,
     SourceOrigin,
     TargetNode,
+    TemplateDeclaration,
     TemplateNode,
     TransitionEdge,
     TransitionKind,
@@ -52,7 +53,28 @@ def _route_template_references(route: Any) -> tuple[tuple[str, str | None], ...]
     return tuple(sorted(references))
 
 
-def _reachable_template_names(router: Any, page_templates: set[str]) -> tuple[str, ...]:
+def _normalize_declarations(
+    declarations: list[TemplateDeclaration],
+) -> tuple[TemplateDeclaration, ...]:
+    """Return exact declarations once in deterministic semantic order."""
+    return tuple(
+        sorted(
+            set(declarations),
+            key=lambda declaration: (
+                declaration.template,
+                declaration.blocks,
+                declaration.origin.identifier,
+                declaration.origin.line if declaration.origin.line is not None else -1,
+            ),
+        )
+    )
+
+
+def _reachable_template_names(
+    router: Any,
+    page_templates: set[str],
+    declarations: tuple[TemplateDeclaration, ...],
+) -> tuple[str, ...]:
     """Collect templates proven reachable from registration and route contracts.
 
     Loader-wide inventory remains in the dead-template checker until that rule
@@ -62,11 +84,11 @@ def _reachable_template_names(router: Any, page_templates: set[str]) -> tuple[st
     names = set(page_templates)
     for route in router.routes:
         names.update(template for template, _block in _route_template_references(route))
-    return tuple(
-        sorted(
-            name for name in names if isinstance(name, str) and name.endswith(_TEMPLATE_SUFFIXES)
-        )
-    )
+    inferred = {
+        name for name in names if isinstance(name, str) and name.endswith(_TEMPLATE_SUFFIXES)
+    }
+    inferred.update(declaration.template for declaration in declarations)
+    return tuple(sorted(inferred))
 
 
 def _compile_templates(
@@ -278,10 +300,12 @@ def compile_hypermedia_program(
     page_templates: set[str],
     page_leaf_templates: set[str],
     fragment_target_registry: Any,
+    template_declarations: list[TemplateDeclaration],
 ) -> HypermediaProgram:
     """Compile existing runtime inputs into one immutable internal model."""
     routes = _compile_routes(router)
-    names = _reachable_template_names(router, page_templates)
+    declarations = _normalize_declarations(template_declarations)
+    names = _reachable_template_names(router, page_templates, declarations)
     templates, blocks = _compile_templates(
         names,
         kida_env,
@@ -290,4 +314,11 @@ def compile_hypermedia_program(
     )
     targets = _compile_targets(fragment_target_registry)
     transitions = _compile_transitions(router, routes, templates, blocks, targets)
-    return HypermediaProgram(routes, templates, blocks, targets, transitions)
+    return HypermediaProgram(
+        routes=routes,
+        templates=templates,
+        blocks=blocks,
+        targets=targets,
+        transitions=transitions,
+        template_declarations=declarations,
+    )

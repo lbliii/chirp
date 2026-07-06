@@ -9,6 +9,7 @@ from typing import Any
 from chirp.http.request import Request
 from chirp.pages.types import Section
 
+from .hypermedia_program import TemplateDeclaration
 from .state import MutableAppState, PendingRoute, PendingTool
 
 
@@ -43,6 +44,11 @@ class AppRegistry:
     def provide(self, annotation: type, factory: Callable[..., Any]) -> None:
         self._ensure_mutable()
         self._state.providers[annotation] = factory
+
+    def declare_template(self, declaration: TemplateDeclaration) -> None:
+        """Record a validated dynamic template declaration during setup."""
+        self._ensure_mutable()
+        self._state.template_declarations.append(declaration)
 
     def register_domain(self, domain: object) -> None:
         self._ensure_mutable()

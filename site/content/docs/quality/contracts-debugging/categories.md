@@ -70,9 +70,10 @@ app would fare in production without changing your config, use `chirp check
 
 | Category | Default severity | Fix target |
 |---|---|---|
-| `dead` | WARNING | Remove unused templates or add a route, include, import, layout, or explicit docs/tool reference. |
+| `dead` | WARNING | Remove unused templates or add a route, include, import, layout, explicit docs/tool reference, or a precise `app.declare_template()` entry for a runtime registry. |
 | `orphan` | INFO | Reference the route from a template, mark it explicitly referenced, or accept that static analysis cannot see dynamic navigation. |
 | `fragment` | ERROR | Fix `FragmentContract` declarations that point at missing templates or blocks. |
+| `template_declaration` | ERROR | Fix a template or block named by `app.declare_template()`; the message includes the setup call site and available blocks. |
 | `fragment_scope` | WARNING | Move imports or bindings into the fragment block when direct block rendering would skip ancestor scope. |
 | `fragment_target_orphan` | ERROR / WARNING | Register the missing block for a required fragment target, or mark legitimately absent regions optional. |
 | `fragment_target_scan` | ERROR | Fix the template parse/load error that prevented fragment target orphan checks from completing. |
@@ -90,6 +91,23 @@ app would fare in production without changing your config, use `chirp check
 | `i18n_missing_key` | WARNING | Add the `t("…")` key to the locale JSON catalog(s) under the i18n directory, or remove the `t()` call. |
 | `macro_css` | WARNING | Activate chirp-ui (`use_chirp_ui(app)`) or ship your own CSS for the core-macro classes (`chirp-dropdown`, `chirp-modal`, `field--error`, …) when neither is present. |
 | `chirpui_css_verify` | WARNING | Fix typoed or stale `chirpui-*` class tokens in literal `class=` attributes so they resolve to classes in the installed chirp-ui CSS. Only runs when chirp-ui is active. |
+
+### Dynamic template registries
+
+Static source analysis cannot prove a template chosen from a plugin or view
+registry in another module. Declare that exact setup-time surface instead of
+adding an unreachable reference stub:
+
+```python
+for view in view_registry.values():
+    app.declare_template(view.template, blocks=view.blocks)
+```
+
+The declaration makes only `view.template` reachable for the `dead` check.
+Chirp still loads the template, validates every named block, and reports an
+ERROR with the declaration's `module:qualname` and line when either name is
+wrong. Call it before freeze; declarations mounted from a sub-app retain their
+original origin.
 
 ## HTMX And Swaps
 

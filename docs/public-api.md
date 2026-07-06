@@ -64,6 +64,7 @@ shape may still evolve before 1.0:
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
+| Dynamic template reachability | App method `app.declare_template(template, *, blocks=())`; surrounding name whitespace is normalized, template_declaration errors validate names, and the dead-template check treats only declared templates as reachable |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
@@ -88,6 +89,7 @@ hardens and documents that surface:
 | Suspense sentinels | Keep provisional | They expose render-pipeline internals for templates and checkers. |
 | HTMX details and `STOP_POLLING` | Keep provisional | Header parsing and polling semantics need their own public contract before stabilization. |
 | Reactive pages | Keep provisional | The free-threaded event story is tested, but the app-author API and examples are still settling. |
+| Dynamic template reachability | Keep provisional | The setup declaration is validated and immutable, but registry patterns may broaden before 1.0. |
 | Signals (server reactive values) | Keep provisional | The single-node `signal()`/`@app.derived` surface ships, but the multi-worker `SignalBus` backplane + the pure-derived contract are still in design (see `plan/drafted/rfc-live-sse-topics.md` §12). |
 | Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
 | Tool registry/events | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): MCP server surface, event bus, OTel spans, and integration tests meet the stable bar. |

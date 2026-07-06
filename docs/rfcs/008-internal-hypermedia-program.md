@@ -87,10 +87,11 @@ checks share one read-only object without a new lock or post-freeze mutation.
 
 ## Extension boundary
 
-This increment deliberately has no public extension protocol. Issue #498 may
-add validated dynamic reachability declarations as setup-time inputs to this
-same compiler. Issues #510 and #511 may design stable public inspection and
-trace views, but they must not expose these internal dataclasses by accident.
+The first increment had no public extension protocol. Issue #498 adds
+`app.declare_template(...)` as a validated setup-time input to this same
+compiler; its frozen declaration records remain internal. Issues #510 and #511
+may design stable public inspection and trace views, but they must not expose
+these internal dataclasses by accident.
 
 Future consumers migrate one relationship family at a time. The old input is
 removed from each migrated rule so the program becomes the shared source of
