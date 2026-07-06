@@ -245,6 +245,20 @@ class TestAppE2E:
             response = await client.fragment("/search", target="#results")
             assert "target=#results" in response.text
 
+    async def test_boosted_request(self) -> None:
+        app = App()
+
+        @app.route("/projects")
+        def projects(request: Request):
+            return (
+                f"htmx={request.is_htmx};boosted={request.is_boosted};target={request.htmx_target}"
+            )
+
+        async with TestClient(app) as client:
+            response = await client.boosted("/projects", target="main")
+
+        assert response.text == "htmx=True;boosted=True;target=main"
+
     async def test_fragment_with_trigger(self) -> None:
         app = App()
 

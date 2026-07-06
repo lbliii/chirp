@@ -1,6 +1,12 @@
 """Tests for the search example — GET forms, query params, filtering, htmx."""
 
-from chirp.testing import TestClient, assert_fragment_contains, assert_is_fragment
+from chirp.testing import (
+    RouteSmokeCase,
+    TestClient,
+    assert_fragment_contains,
+    assert_is_fragment,
+    assert_route_smoke,
+)
 
 
 class TestSearchPage:
@@ -23,7 +29,11 @@ class TestSearchPage:
     async def test_fragment_request(self, example_app) -> None:
         """htmx request returns just the results fragment."""
         async with TestClient(example_app) as client:
-            response = await client.fragment("/")
+            responses = await assert_route_smoke(
+                client,
+                [RouteSmokeCase("/", mode="fragment", block="results", target="results")],
+            )
+            response = responses[("/", "fragment")]
             assert_is_fragment(response)
             assert "15 books found" in response.text
             # Fragment should not include the full page shell

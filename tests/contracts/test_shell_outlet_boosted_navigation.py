@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from chirp import App, AppConfig, use_chirp_ui
-from chirp.testing import TestClient
+from chirp import App, AppConfig, Template, use_chirp_ui
+from chirp.testing import RouteSmokeCase, TestClient, assert_route_smoke
 
 
 def _write_shell_outlet_app(pages: Path, *, outlet: bool = True) -> None:
@@ -40,6 +40,7 @@ def _write_shell_outlet_app(pages: Path, *, outlet: bool = True) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.issue(497)
 async def test_boosted_navigation_to_shell_outlet_includes_selectable_page_content(
     tmp_path: Path,
 ) -> None:
@@ -52,11 +53,19 @@ async def test_boosted_navigation_to_shell_outlet_includes_selectable_page_conte
     app.mount_pages(str(pages))
 
     async with TestClient(app) as client:
-        response = await client.fragment(
-            "/",
-            target="main",
-            headers={"HX-Boosted": "true"},
+        responses = await assert_route_smoke(
+            client,
+            [
+                RouteSmokeCase(
+                    "/",
+                    mode="boosted",
+                    template="page.html",
+                    block="page_root",
+                    target="main",
+                )
+            ],
         )
+        response = responses[("/", "boosted")]
 
     assert response.status == 200
     assert 'id="page-content"' in response.text
@@ -97,13 +106,38 @@ async def test_chirpui_app_shell_extends_infers_main_outlet_for_boosted_navigati
     app.mount_pages(str(pages))
 
     async with TestClient(app) as client:
-        response = await client.fragment(
-            "/",
-            target="main",
-            headers={"HX-Boosted": "true"},
-        )
+        response = await client.boosted("/", target="main")
 
     assert response.status == 200
     assert 'id="page-content"' in response.text
     assert 'id="page-root"' in response.text
     assert "Ready" in response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.issue(497)
+async def test_boosted_route_smoke_rejects_full_template_with_actionable_shape(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "search.html").write_text(
+        "<!doctype html><html lang='en'><body><main>Search</main></body></html>",
+        encoding="utf-8",
+    )
+    app = App(AppConfig(template_dir=tmp_path))
+
+    @app.route("/search")
+    def search() -> Template:
+        return Template("search.html")
+
+    async with TestClient(app) as client:
+        with pytest.raises(
+            AssertionError,
+            match=(
+                r"path='/search', intent=boosted.*target='main'.*"
+                r"observed_shape='full_document'"
+            ),
+        ):
+            await assert_route_smoke(
+                client,
+                [RouteSmokeCase("/search", mode="boosted", target="main")],
+            )

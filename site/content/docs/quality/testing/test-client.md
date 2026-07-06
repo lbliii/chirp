@@ -82,6 +82,32 @@ async def test_fragment():
 
 Use the [[docs/quality/testing/assertions|fragment and SSE assertions]] (`assert_is_fragment`, `assert_is_full_page`, ...) to check fragment-vs-full-page rendering without hand-writing `<html>` string checks.
 
+## Boosted navigation requests
+
+Boosted shell navigation is not the same request shape as a narrow fragment
+swap. Use `boosted()` to send the headers htmx sends for a boosted link:
+`HX-Request: true`, `HX-Boosted: true`, and the required `HX-Target` outlet.
+Pass the target element ID as htmx sends it in the header, without a CSS `#`.
+
+```python
+async def test_boosted_project_navigation():
+    async with TestClient(app) as client:
+        response = await client.boosted("/projects/apollo", target="main")
+        assert response.status == 200
+        assert 'id="page-content"' in response.text
+```
+
+| Request | Helper | Intended response |
+| --- | --- | --- |
+| Browser page load | `client.get(...)` | Full page |
+| Narrow htmx target | `client.fragment(..., target="results")` | Target block only |
+| Boosted shell outlet | `client.boosted(..., target="main")` | `Page` / mounted-page outlet negotiation |
+
+For shell outlets that use `hx-select`, a negotiated `Page` response can carry
+the full shell document with fragment render intent so the browser selects the
+declared outlet. A raw `Template` still has full-page intent and is unsafe for a
+boosted target. `RouteSmokeCase(mode="boosted")` distinguishes those cases.
+
 ## Cookies and sessions
 
 :::{warning}
@@ -139,7 +165,8 @@ async def test_homepage(client):
 :::{dropdown} Smoke-test a whole route set
 When you want one test to prove a set of routes still renders (in CI, after a
 refactor), `assert_route_smoke` runs each route through the client and checks its
-render mode -- full page, fragment, status-only, or `both`:
+render mode -- full page, narrow fragment, boosted outlet, status-only, or
+`both` (full page plus narrow fragment):
 
 ```python
 from chirp.testing import RouteSmokeCase, TestClient, assert_route_smoke
@@ -148,14 +175,18 @@ async def test_showcase_routes(app):
     async with TestClient(app) as client:
         await assert_route_smoke(client, [
             RouteSmokeCase("/", mode="full_page", name="home"),
-            RouteSmokeCase("/islands/remount", mode="both",
-                           template="islands/remount.html", block="island_mount"),
+            RouteSmokeCase("/search?q=chirp", mode="fragment",
+                           block="results", target="results"),
+            RouteSmokeCase("/projects/apollo", mode="boosted",
+                           block="page_root", target="main"),
             RouteSmokeCase("/health", mode="status"),
         ])
 ```
 
-Failures include the path, render intent, and any supplied route name, template,
-or block, so a template render error points straight back to the broken route.
+Failures include the path, request intent, observed response shape, status, and
+any supplied target, route name, template, or block. A full-page `Template`
+returned to a boosted shell target therefore identifies the route and target
+instead of silently passing as a valid outlet response.
 :::
 
 :::{note} See also
