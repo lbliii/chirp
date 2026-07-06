@@ -10,6 +10,22 @@ connection, it is not an SSE job yet.
 Place long-lived SSE listeners in stable shell or layout regions, not inside
 boosted content that navigation will replace:
 
+For the exact htmx 4 preview, use native fetch-stream markup with an explicit
+stable target:
+
+```html
+<div hx-sse:connect="{{ url_for('notifications.stream') }}"
+     hx-target="#notification-count">
+  <span id="notification-count">{{ initial_count }}</span>
+</div>
+```
+
+An untargeted yielded `Fragment` follows that normal target. A targeted
+`Fragment(..., target="notification-count")` arrives as an unnamed
+`<hx-partial>` update. Named `SSEEvent`s are application DOM events, not swaps.
+
+The htmx 2 rollback tier keeps its legacy listener shape:
+
 ```html
 <body>
   <main id="main" hx-boost="true" hx-target="#main" hx-select="#page-content">
@@ -24,7 +40,7 @@ boosted content that navigation will replace:
 </body>
 ```
 
-`hx-disinherit` matters when a parent shell sets broad `hx-target` or
+On htmx 2, `hx-disinherit` matters when a parent shell sets broad `hx-target` or
 `hx-swap`. Without it, an SSE payload can inherit navigation swap policy and
 replace the wrong node.
 
@@ -91,6 +107,10 @@ cursor (see *Event Identity And Replay* below), where your store is the backplan
 Production-critical streams need a replay policy before launch. Browsers send
 `Last-Event-ID` after reconnect when the stream yields events with `id:`. Chirp
 supports `SSEEvent(id=...)`; the product owns the cursor.
+
+The htmx 4 fetch extension sends `Last-Event-ID` on reconnect and background
+resume. Chirp captures the selected SSE dialect once per connection; reconnect
+creates a new request and a fresh request-scoped context.
 
 Good event ids are domain cursors:
 

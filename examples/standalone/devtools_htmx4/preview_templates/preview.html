@@ -46,6 +46,16 @@
 
     <button id="timing-load" hx-get="/timing" hx-target="#timing-result" hx-swap="outerHTML">Lifecycle data</button>
     {% block timing_result %}<div id="timing-result"{% if after_swap_event %} data-after-swap-event="{{ after_swap_event }}"{% endif %}{% if after_settle_event %} data-after-settle-event="{{ after_settle_event }}"{% endif %}>Timing marker</div>{% endblock %}
+
+    <section id="sse-source" hx-sse:connect="/events" hx-sse:close="done" hx-target="#sse-main">
+      <div id="sse-main">{% block sse_main %}<span>{{ sse_message ?? "SSE seed" }}</span>{% endblock %}</div>
+    </section>
+    <ul id="sse-feed">{% block sse_feed_item %}{% if item_id %}<li id="{{ item_id }}">{{ item }}</li>{% endif %}{% endblock %}</ul>
+    <div id="sse-status">SSE status seed</div>
+
+    <section id="sse-hold-source" hx-sse:connect="/events/hold" hx-target="#sse-hold">
+      <div id="sse-hold">{% block sse_hold %}<span>{{ hold_message ?? "Hold seed" }}</span>{% endblock %}</div>
+    </section>
   </main>
   <script>
     window.__swapOrder = [];

@@ -1,10 +1,12 @@
 """Tests for native debug runtime wiring."""
 
 import json
+from pathlib import Path
 
 import pytest
 
-from chirp import App, AppConfig
+from chirp import App, AppConfig, Fragment
+from chirp.app.htmx_manifest import HTMX4_PREVIEW_VERSION
 from chirp.errors import ConfigurationError
 from chirp.realtime.events import EventStream
 from chirp.server.debug_runtime import DEBUG_MANIFEST_PATH, DEBUG_TRACES_PATH
@@ -98,6 +100,53 @@ async def test_native_sse_traces_capture_user_eventstream() -> None:
     assert "event" in phases
     assert "closed" in phases
     assert {record["internal"] for record in payload["records"]} == {False}
+
+
+@pytest.mark.issue(553)
+async def test_native_sse_traces_classify_htmx4_partial_without_payload() -> None:
+    app = App(
+        AppConfig(
+            debug=True,
+            htmx=True,
+            htmx_version=HTMX4_PREVIEW_VERSION,
+            template_dir=Path(__file__).parent / "templates",
+            skip_contract_checks=True,
+        )
+    )
+
+    @app.route("/events")
+    def events():
+        async def gen():
+            yield Fragment(
+                "dashboard.html",
+                "stats",
+                target="stats",
+                swap="beforeend",
+                stats=["secret payload"],
+            )
+
+        return EventStream(gen())
+
+    async with TestClient(app) as client:
+        await client.sse("/events", request_type="partial", max_events=1)
+        response = await client.get(DEBUG_TRACES_PATH)
+
+    payload = json.loads(response.text)
+    start = next(record for record in payload["records"] if record["phase"] == "start")
+    event = next(record for record in payload["records"] if record["phase"] == "event")
+    assert start["data"]["dialect"] == "htmx4"
+    assert event["data"] == {
+        "data_lines": 1,
+        "dialect": "htmx4",
+        "event": None,
+        "id": None,
+        "message_class": "targeted-partial",
+        "retry": None,
+        "swap": "beforeend",
+        "target": "#stats",
+        "value_type": "Fragment",
+    }
+    assert "secret payload" not in response.text
 
 
 async def test_internal_dev_reload_sse_traces_are_hidden_by_default() -> None:

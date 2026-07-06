@@ -1,6 +1,6 @@
 # RFC 010: htmx 4 SSE and Chirp `EventStream`
 
-**Status:** Draft — implementation requires maintainer acceptance
+**Status:** Implemented for the explicit preview lane
 
 **Issue:** [#550](https://github.com/lbliii/chirp/issues/550)
 
@@ -17,10 +17,10 @@ pipeline. A targeted `Fragment` is wrapped after rendering in an
 events remain application DOM events and are never silently reinterpreted as
 rendered swaps.
 
-This RFC does not change runtime behavior. It selects the intended migration
-contract for the implementation issues under epic #540. The current htmx 2
-wire and markup remain the default until the htmx 4 preview lane is separately
-approved and enabled.
+The version-aware `EventStream` formatter, native `sse_scope()` markup,
+testing-helper parity, cache variation, DevTools metadata, and maintained
+browser proof are implemented. The current htmx 2 wire and markup remain the
+default until the htmx 4 preview lane is separately selected.
 
 ## Context
 

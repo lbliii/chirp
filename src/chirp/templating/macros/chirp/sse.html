@@ -13,7 +13,13 @@
 -#}
 
 {% def sse_scope(url, swap="message", wrapper_class="", sink_class="sse-sink") %}
+{% if (__chirp_htmx_tier__ | default("2-managed")) == "4-preview" %}
+<div hx-sse:connect="{{ url }}" hx-target="#{{ __chirp_sse_target__(swap) }}"{{ wrapper_class | attr("class") }}>
+  <div id="{{ __chirp_sse_target__(swap) }}" class="{{ sink_class }}"></div>
+</div>
+{% else %}
 <div hx-ext="sse" sse-connect="{{ url }}" hx-disinherit="hx-target hx-swap"{{ wrapper_class | attr("class") }}>
   <div sse-swap="{{ swap }}" hx-target="this" class="{{ sink_class }}"></div>
 </div>
+{% end %}
 {% end %}

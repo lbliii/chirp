@@ -1,9 +1,20 @@
 """Chirp DevTools lifecycle compatibility proof for htmx 2 and htmx 4."""
 
 import asyncio
+import threading
 from pathlib import Path
 
-from chirp import OOB, App, AppConfig, Fragment, Request, Response, Template
+from chirp import (
+    OOB,
+    App,
+    AppConfig,
+    EventStream,
+    Fragment,
+    Request,
+    Response,
+    SSEEvent,
+    Template,
+)
 from chirp.middleware.csp_nonce import CSPNonceMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -30,7 +41,16 @@ document.addEventListener("htmx:after:settle", function (event) {
     phase: "after-settle", event: marker.dataset.afterSettleEvent, target: marker.id
   });
 });
+document.addEventListener("DOMContentLoaded", function () {
+  var source = document.getElementById("sse-source");
+  if (!source) return;
+  source.addEventListener("notice", function (event) {
+    document.body.dataset.sseNotice = event.detail.data;
+  });
+});
 """
+
+SSE_HOLD_CLEANED = threading.Event()
 
 # Each page provisions its selected htmx build explicitly. Chirp still owns the
 # debug runtime and every server response remains a typed HTML return value.
@@ -50,6 +70,7 @@ preview_app = App(
         htmx=True,
         htmx_version="4.0.0-beta5",
         debug=True,
+        sse_retry_ms=100,
     )
 )
 preview_app.add_middleware(CSPNonceMiddleware(style_unsafe_inline=True))
@@ -125,6 +146,8 @@ def preview_index():
         result="Ready",
         after_swap_event="",
         after_settle_event="",
+        item_id="",
+        item="",
     )
 
 
@@ -207,6 +230,60 @@ def preview_timing():
 @preview_app.route("/timing.js")
 def preview_timing_js():
     return Response(TIMING_LISTENER_JS, content_type="application/javascript; charset=utf-8")
+
+
+@preview_app.route("/events", referenced=True)
+def preview_events(request: Request):
+    async def generate():
+        if request.headers.get("last-event-id") == "3":
+            yield Fragment(
+                "preview.html",
+                "sse_feed_item",
+                target="sse-feed",
+                swap="beforeend",
+                item_id="sse-feed-two",
+                item="feed two",
+            )
+            yield SSEEvent(data="complete", event="done")
+            return
+        yield Fragment("preview.html", "sse_main", sse_message="main one")
+        yield Fragment(
+            "preview.html",
+            "sse_feed_item",
+            target="sse-feed",
+            swap="beforeend",
+            item_id="sse-feed-one",
+            item="feed one",
+        )
+        yield SSEEvent(
+            data='<div id="sse-status" hx-swap-oob="innerHTML">OOB one</div>',
+            id="2",
+        )
+        yield SSEEvent(data="named payload", event="notice")
+        yield SSEEvent(data="cursor", event="cursor", id="3")
+        # Browser contract: a failed connection still reconnects from id 3.
+        raise RuntimeError("intentional SSE reconnect proof")
+
+    return EventStream(generate())
+
+
+@preview_app.route("/events/hold", referenced=True)
+def preview_hold_events():
+    SSE_HOLD_CLEANED.clear()
+
+    async def generate():
+        try:
+            yield Fragment("preview.html", "sse_hold", hold_message="connected")
+            await asyncio.Event().wait()
+        finally:
+            SSE_HOLD_CLEANED.set()
+
+    return EventStream(generate())
+
+
+@preview_app.route("/events/hold-state", referenced=True)
+def preview_hold_state():
+    return Response("closed" if SSE_HOLD_CLEANED.is_set() else "open")
 
 
 if __name__ == "__main__":

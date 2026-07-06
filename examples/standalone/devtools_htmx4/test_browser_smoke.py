@@ -441,7 +441,9 @@ def test_managed_preview_default_contracts(
         page.reload(wait_until="load")
         page.wait_for_function("() => !!window.htmx")
         page.locator("#delete-with-fields").click()
-        page.wait_for_timeout(250)
+        page.wait_for_function(
+            "() => document.querySelector('#delete-result')?.textContent.trim() === '42'"
+        )
         assert page.locator("#delete-result").inner_text().strip() == "42", delete_payloads
 
         page.locator("#slow-load").click()
@@ -508,5 +510,63 @@ def test_preview_timing_migration_uses_rendered_data_and_target_lifecycle(
                 "target": "timing-result",
             },
         ]
+    finally:
+        page.close()
+
+
+@pytest.mark.issue(553)
+def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
+    preview_base_url: str,
+    browser,
+) -> None:
+    page = browser.new_page()
+    try:
+        page.goto(preview_base_url, wait_until="load", timeout=_TIMEOUT_MS)
+        page.locator("#sse-feed-two").wait_for(timeout=_TIMEOUT_MS)
+        page.wait_for_function(
+            """() => document.body.dataset.sseNotice === 'named payload' &&
+              document.querySelector('#sse-hold')?.textContent.trim() === 'connected'""",
+            timeout=_TIMEOUT_MS,
+        )
+
+        assert page.locator("#sse-main").inner_text() == "main one"
+        assert page.locator("#sse-status").inner_text() == "OOB one"
+        assert page.locator("#sse-feed li").all_inner_texts() == ["feed one", "feed two"]
+        assert page.locator("#sse-source").count() == 1
+
+        page.wait_for_function(
+            """async () => {
+              const response = await fetch('/__chirp/debug/traces.json', {cache: 'no-store'});
+              const payload = await response.json();
+              const records = payload.records.filter(record => record.path === '/events');
+              return records.some(record => record.phase === 'start' &&
+                record.data.dialect === 'htmx4') &&
+                records.some(record => record.phase === 'event' &&
+                  record.data.message_class === 'targeted-partial' &&
+                  record.data.target === '#sse-feed') &&
+                records.some(record => record.phase === 'event' &&
+                  record.data.message_class === 'oob-html' && record.data.id === '2') &&
+                records.some(record => record.phase === 'event' &&
+                  record.data.message_class === 'named-dom-event') &&
+                records.some(record => record.phase === 'generator_error');
+            }""",
+            timeout=_TIMEOUT_MS,
+        )
+        traces = page.evaluate(
+            """async () => {
+              const response = await fetch('/__chirp/debug/traces.json', {cache: 'no-store'});
+              return (await response.json()).records.filter(record => record.path === '/events');
+            }"""
+        )
+        assert all("named payload" not in str(record["data"]) for record in traces)
+
+        page.locator("#sse-hold-source").evaluate("element => element.remove()")
+        page.wait_for_function(
+            """async () => {
+              const response = await fetch('/events/hold-state', {cache: 'no-store'});
+              return (await response.text()) === 'closed';
+            }""",
+            timeout=_TIMEOUT_MS,
+        )
     finally:
         page.close()
