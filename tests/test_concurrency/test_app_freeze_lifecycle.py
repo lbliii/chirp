@@ -2,6 +2,8 @@
 
 import threading
 
+import pytest
+
 from chirp import App
 
 from .conftest import STRESS_TIMEOUT, ThreadStressResult, run_threads_synchronized
@@ -40,6 +42,29 @@ class TestAppFreezeLifecycle:
         assert not result.errors
         assert result.results == ["/"] * 40
         assert domain.calls == 1
+
+    @pytest.mark.issue(509)
+    def test_concurrent_freeze_publishes_one_immutable_program(self) -> None:
+        app = App()
+
+        @app.route("/", name="home")
+        def home():
+            return "ok"
+
+        def worker(_idx: int, barrier: threading.Barrier, result: ThreadStressResult) -> None:
+            barrier.wait()
+            try:
+                app.freeze()
+                program = app._runtime_state.hypermedia_program
+                result.record(id(program))
+            except Exception as exc:
+                result.record_error(exc)
+
+        result = run_threads_synchronized(40, worker, timeout=STRESS_TIMEOUT)
+
+        assert not result.errors
+        assert len(set(result.results)) == 1
+        assert app._runtime_state.hypermedia_program is not None
 
     def test_freeze_setup_apis_reject_threaded_post_freeze_mutation(self) -> None:
         app = App()

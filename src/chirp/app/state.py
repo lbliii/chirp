@@ -19,6 +19,8 @@ from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.events import ToolEventBus
 from chirp.tools.registry import ToolRegistry
 
+from .hypermedia_program import HypermediaProgram
+
 if TYPE_CHECKING:
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
@@ -279,6 +281,7 @@ class RuntimeAppState:
     routes_by_name: Any = None
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
+    hypermedia_program: HypermediaProgram | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,3 +340,5 @@ class ContractCheckSnapshot:
     #: or ``None`` for HTML-only / db-less apps. Source for the ``data`` shape
     #: contract; keeps the typed-SQL column-mapping check no-op without a db.
     schema: SchemaSnapshot | None = None
+    #: Internal compiled application model. Not a public inspection API.
+    _hypermedia_program: HypermediaProgram | None = None

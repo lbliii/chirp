@@ -692,6 +692,20 @@ class AppCompiler:
                     optional=True,
                 ),
             )
+
+        from chirp.app.hypermedia_program_compiler import compile_hypermedia_program
+
+        router = self._runtime.router
+        if router is None:
+            raise RuntimeError("Cannot compile hypermedia program before router publication.")
+        self._runtime.hypermedia_program = compile_hypermedia_program(
+            router=router,
+            kida_env=self._runtime.kida_env,
+            page_templates=self._mutable.page_templates,
+            page_leaf_templates=self._mutable.page_leaf_templates,
+            fragment_target_registry=self._mutable.fragment_target_registry,
+        )
+
         self._mutable.oob_registry.freeze()
         self._runtime.oob_registry = self._mutable.oob_registry
 

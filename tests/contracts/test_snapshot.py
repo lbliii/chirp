@@ -23,6 +23,7 @@ class TestContractCheckSnapshot:
         assert snapshot.fragment_target_registry is not None
         assert snapshot.page_leaf_templates == set()
         assert snapshot.islands_contract_strict == app.config.islands_contract_strict
+        assert snapshot._hypermedia_program is app._runtime_state.hypermedia_program
 
 
 class TestCheckResult:

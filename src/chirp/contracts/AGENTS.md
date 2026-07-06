@@ -28,6 +28,10 @@ You defend actionable startup feedback against noisy lint.
   rejects Flask-style route params with a docs pointer.
 - **Coverage is part of output.** `src/chirp/contracts/checker.py:114-141`
   builds counters for forms, mounted pages, shells, targets, and OOB regions.
+- **Migrated relationships come from one program.** Page-shell and fragment
+  target orphan checks query the private frozen `HypermediaProgram` carried by
+  `ContractCheckSnapshot`; do not reintroduce independent Kida scans for those
+  relationships.
 - **OOB regressions are known risk.**
   `docs/plan-contract-tests-reliability.md:38-60` names escaped OOB bugs and
   missing end-to-end coverage.

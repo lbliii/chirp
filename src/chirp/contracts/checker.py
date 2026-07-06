@@ -415,6 +415,7 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         extras=dict(getattr(app._mutable_state, "contract_check_data", {})),
         signal_names=_signal_names(app),
         schema=schema,
+        _hypermedia_program=getattr(app._runtime_state, "hypermedia_program", None),
     )
 
 
@@ -676,16 +677,12 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
         result.issues.extend(check_landmarks(layout_sources))
         result.issues.extend(
             check_page_shell_contracts(
-                snapshot.page_leaf_templates,
-                snapshot.fragment_target_registry,
-                kida_env,
+                snapshot._hypermedia_program,
             )
         )
         result.issues.extend(
             check_fragment_target_orphans(
-                snapshot.fragment_target_registry,
-                snapshot.page_leaf_templates,
-                kida_env,
+                snapshot._hypermedia_program,
             )
         )
         result.issues.extend(
