@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Send
-from chirp.realtime.events import EventStream, SSEEvent
+from chirp.realtime.events import EventStream, SSEEvent, _SignalUpdate
 from chirp.templating.returns import Fragment
 
 if TYPE_CHECKING:
@@ -462,6 +462,13 @@ def _format_event(
     if isinstance(value, SSEEvent):
         return value.encode()
 
+    if isinstance(value, _SignalUpdate):
+        if dialect == "htmx4":
+            selector = f'[data-chirp-signal="{escape(value.name, quote=True)}"]'
+            partial = f"<hx-partial hx-target='{selector}'>{value.data}</hx-partial>"
+            return SSEEvent(data=partial).encode()
+        return SSEEvent(data=value.data, event=value.name).encode()
+
     if isinstance(value, Fragment):
         if kida_env is None:
             raise RuntimeError("Fragment events require kida integration.")
@@ -535,6 +542,10 @@ def _trace_event_payload(
         else:
             message_class = "named-fragment" if value.target else "html-swap"
             target = value.target
+    elif isinstance(value, _SignalUpdate):
+        message_class = "signal-partial" if dialect == "htmx4" else "named-signal"
+        target = f'[data-chirp-signal="{value.name}"]' if dialect == "htmx4" else value.name
+        swap = "innerHTML"
     elif event_name is None and "hx-swap-oob" in sse_text:
         message_class = "oob-html"
     return {
@@ -582,5 +593,16 @@ def _format_error_event(
                 return SSEEvent(data=partial).encode()
             return SSEEvent(data=detail, event="error").encode()
         return SSEEvent(data=html, event=value.target).encode()
+
+    if isinstance(value, _SignalUpdate):
+        if dialect == "htmx4":
+            selector = f'[data-chirp-signal="{escape(value.name, quote=True)}"]'
+            partial = (
+                f"<hx-partial hx-target='{selector}'>"
+                f'<span class="chirp-signal-error">{escape(detail)}</span>'
+                "</hx-partial>"
+            )
+            return SSEEvent(data=partial).encode()
+        return SSEEvent(data=detail, event=value.name).encode()
 
     return SSEEvent(data=detail, event="error").encode()

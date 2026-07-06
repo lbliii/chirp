@@ -2,15 +2,15 @@
 
 One framework route, auto-registered at freeze when any signal exists, returns
 an :class:`~chirp.realtime.events.EventStream` whose generator **merges** every
-signal source + every imperative ``app.emit`` into one named-event stream. A
-binding ``{{ signal('x') }}`` listens on ``sse-swap="x"``; this stream yields
-``SSEEvent(event="x", data=<rendered>)`` whenever ``x`` changes.
+signal source + every imperative ``app.emit`` into one typed update stream.
+The SSE boundary frames each update as a named event for htmx 2 or as an
+unnamed targeted ``<hx-partial>`` for htmx 4.
 
 Two producer paths feed the one stream:
 
 1. **Push / derived** — :meth:`SignalRegistry.emit` (and the derived cascade) fan
    a marker ``ChangeEvent`` onto the bus. The merge generator drains the bus,
-   reads the latest cached value, renders it, and yields one ``SSEEvent``.
+   reads the latest cached value, renders it, and yields one typed update.
 2. **Async sources** — a ``@app.signal(source=...)`` async generator is pumped by
    a per-source background task that calls ``registry.emit`` for each yielded
    value, so it rides the exact same bus + cache path (coalescing-latest, derived
@@ -32,7 +32,7 @@ from collections.abc import AsyncIterator
 
 from chirp.app.state import PendingRoute
 from chirp.http.request import Request
-from chirp.realtime.events import EventStream, SSEEvent
+from chirp.realtime.events import EventStream, _SignalUpdate
 from chirp.realtime.signals import SignalRegistry, _bus_scope
 
 logger = logging.getLogger("chirp.signals")
@@ -56,12 +56,12 @@ def make_signal_stream(
     """Build the ``/_chirp/live`` merge ``EventStream`` for *names*.
 
     Subscribes to every requested signal's bus scope, pumps each primary
-    signal's async ``source`` as a background task, and yields an ``SSEEvent``
-    per change. The :func:`chirp.realtime.sse.handle_sse` per-event boundary
+    signal's async ``source`` as a background task, and yields one client-neutral
+    update per change. The :func:`chirp.realtime.sse.handle_sse` per-event boundary
     isolates render failures; cleanup unsubscribes + cancels source tasks.
     """
 
-    async def generate() -> AsyncIterator[SSEEvent]:
+    async def generate() -> AsyncIterator[_SignalUpdate]:
         # One asyncio.Queue fans in every subscribed scope's ChangeEvents.
         merged: asyncio.Queue[str] = asyncio.Queue()
         subscriber_tasks: list[asyncio.Task[None]] = []
@@ -136,7 +136,7 @@ def make_signal_stream(
                 rendered = registry.render_for_emit(name, value)
                 if rendered is None:
                     continue
-                yield SSEEvent(data=rendered, event=name)
+                yield _SignalUpdate(name=name, data=rendered)
         finally:
             for task in (*subscriber_tasks, *source_tasks):
                 task.cancel()

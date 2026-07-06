@@ -146,6 +146,15 @@ class TestSignalBind:
         bind = make_signal_globals(reg)["signal_bind"]
         assert 'sse-swap="x"' in str(bind("x"))
 
+    @pytest.mark.issue(544)
+    def test_htmx4_signal_bind_emits_marker_without_wrapper(self) -> None:
+        from chirp.realtime.signals import SignalRegistry
+
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="x"))
+        bind = make_signal_globals(reg, htmx4=True)["signal_bind"]
+        assert str(bind("x")) == 'data-chirp-signal="x"'
+
 
 class TestSignalEmit:
     @pytest.mark.issue(395)

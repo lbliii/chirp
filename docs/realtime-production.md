@@ -68,10 +68,16 @@ once with `@app.signal(name, ...)` (or `@app.derived(name, on=(...))`), push wit
 binding stays in sync from a single `/_chirp/live` connection, so an SSE-heavy
 shell holds **one** connection instead of N.
 
+The helpers follow the frozen client tier. Htmx 2 renders named `sse-swap`
+listeners. The exact htmx 4 preview renders one `hx-sse:connect` plus stable
+`data-chirp-signal="name"` markers; each unnamed `<hx-partial>` targets that
+selector, so repeated sinks update together without an extra wrapper or
+client-side state store.
+
 Production rules:
 
 - **Place `signal_connect()` in the stable shell, outside boosted content.** Every
-  sink must be a descendant (htmx binds `sse-swap` via `querySelectorAll`). Keep
+  sink must be a descendant. Keep
   the connect element outside `#main` so a boosted swap leaves the connection
   intact and htmx re-binds freshly-swapped sinks to the ancestor.
 - **A `derived` must be a pure function of its input signal values.** Never read a

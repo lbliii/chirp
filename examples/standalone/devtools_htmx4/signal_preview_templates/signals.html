@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Managed htmx 4 signal preview</title>
+</head>
+<body>
+  <main>
+    <h1>Managed htmx 4 signals</h1>
+    {{ signal_connect() }}
+      <section id="signal-region">
+        {{ signal_block("preview_balance") }}
+        <strong {{ signal_bind("preview_balance") }}>0</strong>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

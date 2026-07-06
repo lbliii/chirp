@@ -10,6 +10,14 @@ from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
+class _SignalUpdate:
+    """One rendered signal value awaiting client-dialect framing."""
+
+    name: str
+    data: str
+
+
+@dataclass(frozen=True, slots=True)
 class SSEEvent:
     """A single Server-Sent Event."""
 
