@@ -279,3 +279,60 @@ function firePlugin(name, arg) {
   if (!ch || typeof ch[name] !== "function") return;
   try { ch[name](arg); } catch (e) {}
 }
+
+function collectHtmxCompatibility() {
+  var assets = [];
+  var counts = {};
+  Array.prototype.forEach.call(document.scripts || [], function(script) {
+    if (script.hasAttribute("data-chirp-debug")) return;
+    var src = script.getAttribute("src") || "";
+    var marker = script.getAttribute("data-chirp") || "";
+    var role = script.getAttribute("data-chirp-htmx-extension") || "";
+    if (!role && (marker === "htmx" || /(?:^|\/)htmx(?:\.min)?\.js(?:$|[?#])/.test(src))) {
+      role = "core";
+    } else if (!role && /htmx-2-compat(?:\.min)?\.js(?:$|[?#])/.test(src)) {
+      role = "compat";
+    } else if (!role && /hx-sse(?:\.min)?\.js(?:$|[?#])/.test(src)) {
+      role = "sse";
+    }
+    if (!role) return;
+    counts[role] = (counts[role] || 0) + 1;
+    assets.push({
+      role: role,
+      src: src,
+      marker: marker || null,
+      tier: script.getAttribute("data-chirp-htmx-tier"),
+      version: script.getAttribute("data-chirp-htmx-version"),
+    });
+  });
+  var core = assets.filter(function(asset) { return asset.role === "core"; })[0] || null;
+  var configuredCore = document.querySelector('script[data-chirp="htmx"]');
+  var liveVersion = window.htmx && window.htmx.version ? String(window.htmx.version) : null;
+  var configuredVersion = configuredCore ?
+    configuredCore.getAttribute("data-chirp-htmx-version") : core && core.version;
+  var configuredTier = configuredCore ?
+    configuredCore.getAttribute("data-chirp-htmx-tier") : core && core.tier;
+  var duplicates = Object.keys(counts).filter(function(role) { return counts[role] > 1; });
+  var extensionRoles = Object.keys(counts).filter(function(role) { return role !== "core"; });
+  var compatibilityState = "unmanaged";
+  if (configuredTier || configuredVersion) {
+    compatibilityState = "matched";
+    if (!liveVersion) compatibilityState = "not-loaded";
+    else if (configuredVersion && configuredVersion !== liveVersion) compatibilityState = "mismatch";
+    else if (duplicates.length) compatibilityState = "duplicate";
+    else if (configuredTier === "4-preview" &&
+             (counts.core !== 1 || counts.compat !== 1 || counts.sse !== 1)) {
+      compatibilityState = "incomplete";
+    }
+  }
+  return {
+    configuredTier: configuredTier || null,
+    configuredVersion: configuredVersion || null,
+    liveVersion: liveVersion,
+    extensionRoles: extensionRoles,
+    sources: assets,
+    roleCounts: counts,
+    duplicates: duplicates,
+    compatibilityState: compatibilityState,
+  };
+}

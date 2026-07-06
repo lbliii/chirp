@@ -45,6 +45,7 @@ var state = {
   transitionTraces: [],
   nativeTraceKeys: {},
   vtEvents: [],
+  htmxCompatibility: null,
 };
 
 function loadState() {

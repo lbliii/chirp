@@ -48,6 +48,7 @@ from .rules_htmx import (
     check_hx_target_selectors,
     check_selector_syntax,
 )
+from .rules_htmx_compatibility import check_htmx_compatibility
 from .rules_htmx_provisioned import check_htmx_provisioned
 from .rules_inline import check_inline_templates
 from .rules_islands import check_island_mounts
@@ -832,6 +833,10 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 htmx_config_enabled=bool(app.config.htmx),
             )
         )
+        if snapshot._htmx_manifest is not None:
+            result.issues.extend(
+                check_htmx_compatibility(template_sources, snapshot._htmx_manifest)
+            )
         result.issues.extend(check_defer_falsy_conditionals(template_sources))
         result.issues.extend(
             check_suspense_undiscoverable(

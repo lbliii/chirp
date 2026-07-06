@@ -3,8 +3,10 @@
 from pathlib import Path
 
 from chirp import OOB, App, AppConfig, Fragment, Request, Response, Template
+from chirp.middleware.csp_nonce import CSPNonceMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+PREVIEW_TEMPLATES_DIR = Path(__file__).parent / "preview_templates"
 
 # Each page provisions its selected htmx build explicitly. Chirp still owns the
 # debug runtime and every server response remains a typed HTML return value.
@@ -17,6 +19,16 @@ app = App(
         view_transitions=True,
     )
 )
+
+preview_app = App(
+    config=AppConfig(
+        template_dir=PREVIEW_TEMPLATES_DIR,
+        htmx=True,
+        htmx_version="4.0.0-beta5",
+        debug=True,
+    )
+)
+preview_app.add_middleware(CSPNonceMiddleware(style_unsafe_inline=True))
 
 
 def _page_context(*, version: str, compat: bool) -> dict[str, object]:
@@ -80,6 +92,16 @@ def swap():
 @app.route("/failure", methods=["POST"])
 def failure():
     return Response(b'<p id="failed">Server failed</p>', status=503, content_type="text/html")
+
+
+@preview_app.route("/")
+def preview_index():
+    return Template("preview.html", result="Ready")
+
+
+@preview_app.route("/swap", methods=["POST"])
+def preview_swap():
+    return Fragment("preview.html", "result", result="Swapped")
 
 
 if __name__ == "__main__":

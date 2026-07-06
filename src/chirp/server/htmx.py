@@ -1,4 +1,4 @@
-"""htmx script injection — opt-in single-authority htmx for Chirp apps.
+"""htmx script injection from Chirp's frozen provisioning manifest.
 
 Mirrors the Alpine injection path (``src/chirp/server/alpine.py``). When
 ``AppConfig(htmx=True)`` Chirp injects the htmx core ``<script>`` before
@@ -17,11 +17,33 @@ external ``<script src>`` without the nonce is blocked, so the snippet factory
 threads the nonce onto the tag the same way the Alpine bootstrap does.
 """
 
-_CDN = "https://cdn.jsdelivr.net/npm"
+import html
+
+from chirp.app.htmx_manifest import HtmxProvisioningManifest, compile_htmx_manifest
+
+
+def htmx_manifest_snippet(manifest: HtmxProvisioningManifest, *, nonce: str = "") -> str:
+    """Render an ordered managed bundle from a freeze-time manifest."""
+    nonce_attr = f' nonce="{html.escape(nonce, quote=True)}"' if nonce else ""
+    tags: list[str] = []
+    for asset in manifest.assets:
+        marker = "htmx" if asset.role == "core" else "htmx-extension"
+        role_attr = (
+            ' data-chirp-htmx-role="core"'
+            if asset.role == "core"
+            else f' data-chirp-htmx-extension="{asset.role}"'
+        )
+        tags.append(
+            f'<script defer src="{html.escape(asset.url, quote=True)}"{nonce_attr}'
+            f' data-chirp="{marker}"{role_attr}'
+            f' data-chirp-htmx-tier="{manifest.tier}"'
+            f' data-chirp-htmx-version="{html.escape(manifest.version, quote=True)}"></script>'
+        )
+    return "\n".join(tags)
 
 
 def htmx_snippet(version: str, *, nonce: str = "") -> str:
-    """Build the htmx core injection ``<script>`` tag.
+    """Build the managed htmx injection bundle for an exact version.
 
     The script URL uses the explicit ``/dist/htmx.min.js`` path — the framework's
     CDN convention (the same explicit-``/dist`` rule ``rules_alpine_cdn`` enforces
@@ -38,11 +60,8 @@ def htmx_snippet(version: str, *, nonce: str = "") -> str:
             ``'unsafe-inline'`` / loads only nonced scripts.
 
     Returns:
-        The htmx core ``<script defer src=...>`` tag marked
-        ``data-chirp="htmx"`` for dedup.
+        The ordered managed bundle. Htmx 2 contains only core; the allowlisted
+        htmx 4 preview also contains compatibility and SSE extensions.
     """
-    nonce_attr = f' nonce="{nonce}"' if nonce else ""
-    return (
-        f'<script defer src="{_CDN}/htmx.org@{version}/dist/htmx.min.js"'
-        f'{nonce_attr} data-chirp="htmx"></script>'
-    )
+    manifest = compile_htmx_manifest(enabled=True, version=version)
+    return htmx_manifest_snippet(manifest, nonce=nonce)

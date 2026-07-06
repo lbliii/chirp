@@ -183,6 +183,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "commandfor": "HTMX",
     "alpine_cdn_url": "HTMX",
     "htmx_provisioned": "HTMX",
+    "htmx_compatibility": "HTMX",
     "islands": "HTMX",
     "fragment_island": "HTMX",
     # Streaming / OOB

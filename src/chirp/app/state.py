@@ -22,6 +22,7 @@ from chirp.tools.registry import ToolRegistry
 from .hypermedia_program import HypermediaProgram, TemplateDeclaration
 
 if TYPE_CHECKING:
+    from chirp.app.htmx_manifest import HtmxProvisioningManifest
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
     from chirp.health import HealthCheck
@@ -284,6 +285,7 @@ class RuntimeAppState:
     route_name_collisions: dict[str, list[Route]] = field(default_factory=dict)
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     hypermedia_program: HypermediaProgram | None = None
+    htmx_manifest: HtmxProvisioningManifest | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,3 +346,5 @@ class ContractCheckSnapshot:
     schema: SchemaSnapshot | None = None
     #: Internal compiled application model. Not a public inspection API.
     _hypermedia_program: HypermediaProgram | None = None
+    #: Internal frozen htmx provisioning decision. Not a public inspection API.
+    _htmx_manifest: HtmxProvisioningManifest | None = None

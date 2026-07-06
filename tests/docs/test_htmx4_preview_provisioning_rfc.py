@@ -12,7 +12,7 @@ SPIKE = ROOT / "tests" / "spikes" / "test_htmx4_preview_provisioning.py"
 @pytest.mark.issue(545)
 def test_rfc_012_records_the_preview_contract() -> None:
     text = RFC.read_text(encoding="utf-8")
-    assert "**Status:** Draft" in text
+    assert "**Status:** Implemented" in text
     assert 'AppConfig(htmx=True, htmx_version="4.0.0-beta5")' in text
     assert "htmx-2-compat" in text
     assert "hx-sse" in text

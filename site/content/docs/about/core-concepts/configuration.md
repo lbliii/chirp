@@ -274,9 +274,21 @@ wire the secure-by-default stack, see
 | `alpine` | `bool` | `False` | Enable Alpine.js script injection |
 | `alpine_version` | `str` | `"3.15.8"` | Pinned Alpine.js CDN version |
 | `alpine_csp` | `bool` | `False` | Use the CSP-safe Alpine build |
-| `htmx` | `bool` | `False` | Enable opt-in htmx core script injection |
-| `htmx_version` | `str` | `"2.0.10"` | Pinned htmx CDN version |
+| `htmx` | `bool` | `False` | Enable opt-in managed htmx bundle injection |
+| `htmx_version` | `str` | `"2.0.10"` | Exact htmx pin; `"4.0.0-beta5"` selects the provisional preview bundle |
 ::::{/dropdown}
+
+The preview opt-in is intentionally exact and reversible:
+
+```python
+config = AppConfig(htmx=True, htmx_version="4.0.0-beta5")
+```
+
+It injects htmx core, `htmx-2-compat`, and `hx-sse` in that order with the
+same live CSP nonce. Unknown htmx 4 pins fail during app freeze. Roll back with
+`htmx_version="2.0.10"`; the default and generated scaffolds remain on that
+verified htmx 2 baseline. See [[docs/build-apps/ui-extensions/htmx4-preview|the
+htmx 4 preview and rollback guide]].
 
 ::::{dropdown} Cache & environment
 :icon: database

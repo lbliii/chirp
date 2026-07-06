@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Managed htmx 4 preview</title>
+</head>
+<body>
+  <main>
+    <h1>Managed htmx 4 preview</h1>
+    <button id="preview-swap" hx-post="/swap" hx-target="#result" hx-swap="outerHTML">
+      Swap fragment
+    </button>
+    {% block result %}<div id="result">{{ result }}</div>{% endblock %}
+  </main>
+</body>
+</html>

@@ -189,6 +189,7 @@ CH.help = function() {
     exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, transition, SSE, View Transition, render-plan, and Swap Doctor records.",
     transitionCoverage: "Call window.ChirpHtmxDebug.transitionCoverage(['normal', 'boosted', 'targeted']) to report observed and intentionally untested request modes.",
     getState: "Call window.ChirpHtmxDebug.getState() for the live in-browser state object.",
+    getHtmxCompatibility: "Call window.ChirpHtmxDebug.getHtmxCompatibility() for configured/live htmx tier, version, assets, and duplicate diagnostics.",
     verboseBootLog: "Set localStorage['chirp-debug-verbose']='1' before reload to log boot.",
   };
 };
@@ -202,14 +203,20 @@ CH.exportRecordsJson = function() {
     transitionTraces: state.transitionTraces,
     transitionCoverage: buildTransitionCoverage([]),
     vtEvents: state.vtEvents,
+    htmxCompatibility: state.htmxCompatibility,
   }, null, 2);
 };
 CH.getSSEConnections = function() { return state.sseConnections; };
 CH.getViewTransitions = function() { return state.vtEvents; };
 CH.transitionCoverage = function(expectedModes) { return buildTransitionCoverage(expectedModes || []); };
+CH.getHtmxCompatibility = function() {
+  state.htmxCompatibility = collectHtmxCompatibility();
+  return state.htmxCompatibility;
+};
 
 // --- Boot ---
 function boot() {
+  state.htmxCompatibility = collectHtmxCompatibility();
   renderPanel();
   if (state.open) drawer.classList.add("open");
   updatePill();

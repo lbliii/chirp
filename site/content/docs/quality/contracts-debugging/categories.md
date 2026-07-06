@@ -129,6 +129,7 @@ original origin.
 | `duplicate_id` | WARNING | Remove or rename repeated static `id="..."` values in the same template — duplicate ids break targeting and accessibility. |
 | `oob_fragment_orphan` | WARNING | Wire a route, EventStream, or signal render callback that yields the OOB fragment block, or remove the dead swap target. |
 | `htmx_provisioned` | WARNING | Provision htmx with `AppConfig(htmx=True)` or an htmx `<script>` in the layout chain when a template emits `hx-*`/`sse-*` attributes. |
+| `htmx_compatibility` | ERROR | Align the selected htmx tier, exact version metadata, core/compat/SSE roles, and script order; remove duplicate or mixed bundles. |
 
 ## SSE And Reactive
 
