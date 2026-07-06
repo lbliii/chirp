@@ -123,18 +123,18 @@ jobs:
       - name: Install dependencies (with Playwright)
         run: uv sync --no-sources --group dev --group browser
 
-      # Lucky Cat's browser contract is currently verified against the public
-      # chirp-ui compatibility floor. The separate compatibility matrix still
-      # exercises the latest release at the framework boundary.
-      - name: Pin Lucky Cat browser compatibility floor
-        run: uv pip install "chirp-ui==0.10.0"
-
       - name: Install Chromium
         run: uv run playwright install chromium --with-deps
 
+      # Pin after the last syncing uv command so the browser smoke cannot
+      # silently restore a newer chirp-ui release from project resolution.
+      # The separate compatibility matrix still exercises the latest release.
+      - name: Pin Lucky Cat browser compatibility floor
+        run: uv pip install "chirp-ui==0.10.0"
+
       - name: Browser smoke
         run: >-
-          uv run pytest
+          uv run --no-sync pytest
           examples/chirpui/lucky_cat/test_browser_smoke.py
           examples/standalone/htmx_managed/test_browser_smoke.py
           -q --tb=short --timeout=120

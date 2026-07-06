@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOTS = ("src", "tests", "examples", "site/content")
 CORE_URL = re.compile(r"https://[^\"' ]+/htmx\.org@[0-9.]+[^\"' ]*")
 EXPECTED_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 
 
 @pytest.mark.issue(543)
@@ -38,3 +39,15 @@ def test_authored_sources_have_no_old_baseline_or_noncanonical_core_url() -> Non
 
     assert stale == []
     assert noncanonical == []
+
+
+@pytest.mark.issue(543)
+def test_browser_smoke_preserves_chirp_ui_floor_after_final_sync() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    chromium = workflow.index("      - name: Install Chromium")
+    floor = workflow.index("      - name: Pin Lucky Cat browser compatibility floor")
+    smoke = workflow.index("      - name: Browser smoke")
+
+    assert chromium < floor < smoke
+    assert "uv run --no-sync pytest" in workflow[floor : smoke + 200]
