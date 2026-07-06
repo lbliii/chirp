@@ -133,6 +133,8 @@ def _serve(assets: _Assets):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+        if thread.is_alive():
+            raise RuntimeError("htmx trigger spike server did not stop within 5 seconds")
 
 
 def _asset(env_name: str, relative: str, expected_sha256: str) -> Path:
@@ -140,7 +142,14 @@ def _asset(env_name: str, relative: str, expected_sha256: str) -> Path:
     if not source_root:
         pytest.fail(f"{env_name} must point to the pinned htmx checkout")
     path = Path(source_root) / relative
-    assert _sha256(path) == expected_sha256
+    if not path.is_file():
+        pytest.fail(f"{env_name} is missing required asset: {path}")
+    actual_sha256 = _sha256(path)
+    if actual_sha256 != expected_sha256:
+        pytest.fail(
+            f"{env_name} asset digest mismatch for {path}: "
+            f"expected {expected_sha256}, got {actual_sha256}"
+        )
     return path
 
 
@@ -164,7 +173,10 @@ def test_removed_trigger_headers_cannot_be_losslessly_remapped() -> None:
             page.goto(f"{base_url}/v{version}")
             page.locator("#load").click()
             page.locator("#replacement").wait_for(timeout=10_000)
-            page.wait_for_timeout(150)
+            page.wait_for_function(
+                "() => window.proof.some(({ name }) => name === 'core-after-swap')",
+                timeout=10_000,
+            )
             proofs[version] = page.evaluate("window.proof")
             page.close()
         browser.close()
