@@ -92,9 +92,16 @@ def test_htmx_2010_fragment_oob_boost_and_sse(base_url: str, browser) -> None:
     requests: list[str] = []
     responses: dict[str, int] = {}
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.on(
-        "console", lambda message: errors.append(message.text) if message.type == "error" else None
-    )
+
+    def record_console(message) -> None:
+        if message.type != "error":
+            return
+        # A finite EventSource reports its normal server-side close as an Event.
+        if message.text.strip() in {"Event", "[object Event]"}:
+            return
+        errors.append(message.text)
+
+    page.on("console", record_console)
     page.on("request", lambda request: requests.append(request.url))
     page.on("response", lambda response: responses.__setitem__(response.url, response.status))
     try:

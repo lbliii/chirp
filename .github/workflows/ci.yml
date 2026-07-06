@@ -123,6 +123,12 @@ jobs:
       - name: Install dependencies (with Playwright)
         run: uv sync --no-sources --group dev --group browser
 
+      # Lucky Cat's browser contract is currently verified against the public
+      # chirp-ui compatibility floor. The separate compatibility matrix still
+      # exercises the latest release at the framework boundary.
+      - name: Pin Lucky Cat browser compatibility floor
+        run: uv pip install "chirp-ui==0.10.0"
+
       - name: Install Chromium
         run: uv run playwright install chromium --with-deps
 
