@@ -199,6 +199,11 @@ def test_devtools_records_htmx4_synchronization_owner_and_strategy() -> None:
     assert 'message.toLowerCase().indexOf("timeout")' in HTMX_DEBUG_BOOT_JS
 
 
+def test_devtools_labels_removed_timing_headers_unsupported_in_htmx4() -> None:
+    assert 'support: triggerTier === "4-preview"' in HTMX_DEBUG_BOOT_JS
+    assert "[unsupported by htmx 4]" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:
     """Inspector records whether hx-* values are direct, inherited, blocked, or default."""
     assert "getEffectiveConfigDetails" in HTMX_DEBUG_BOOT_JS

@@ -17,6 +17,10 @@ Its second browser contract proves the frozen defaults: implicit compatibility
 inheritance, local 422 swaps, broad 500 suppression, main-first OOB processing,
 explicit DELETE query data, timeout cancellation, serialized `hx-sync`
 requests, and server-authoritative history refetch.
+The timing migration proof renders server-derived event names into the target
+block, then external nonce-safe JavaScript reads that exact target during
+`htmx:before:settle` and `htmx:after:settle`; no removed response header or
+JSON side channel is used.
 
 Run the server from this directory:
 

@@ -127,6 +127,10 @@ def assert_hx_trigger(
 ) -> None:
     """Assert the response triggers an htmx client-side event.
 
+    Timing variants are htmx 2/generic wire assertions only. Htmx 4 removed
+    both ``After`` response headers, so a passing assertion does not prove
+    browser delivery under the htmx 4 preview; use a browser lifecycle test.
+
     Args:
         response: The HTTP response to check.
         event: The event name (string) or event dict to match.
@@ -142,7 +146,15 @@ def assert_hx_trigger(
         header_name = "HX-Trigger"
 
     headers = hx_headers(response)
-    assert header_name in headers, f"Response has no {header_name} header.\nHX headers: {headers}"
+    timing_note = (
+        " This is an htmx 2/generic wire header; htmx 4 behavior requires a "
+        "browser lifecycle assertion."
+        if after in {"settle", "swap"}
+        else ""
+    )
+    assert header_name in headers, (
+        f"Response has no {header_name} header.{timing_note}\nHX headers: {headers}"
+    )
     raw = headers[header_name]
 
     if isinstance(event, str):

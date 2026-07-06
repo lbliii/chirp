@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Managed htmx 4 preview</title>
+  <script defer nonce="{{ csp_nonce() }}" src="/timing.js"></script>
 </head>
 <body>
   <main id="shell" hx-history-elt>
@@ -42,6 +43,9 @@
 
     <a id="history-next" href="/history/next" hx-get="/history/next" hx-push-url="true" hx-target="#history" hx-swap="outerHTML">History next</a>
     {% block history %}<div id="history">{{ result ?? "History initial" }}</div>{% endblock %}
+
+    <button id="timing-load" hx-get="/timing" hx-target="#timing-result" hx-swap="outerHTML">Lifecycle data</button>
+    {% block timing_result %}<div id="timing-result"{% if after_swap_event %} data-after-swap-event="{{ after_swap_event }}"{% endif %}{% if after_settle_event %} data-after-settle-event="{{ after_settle_event }}"{% endif %}>Timing marker</div>{% endblock %}
   </main>
   <script>
     window.__swapOrder = [];

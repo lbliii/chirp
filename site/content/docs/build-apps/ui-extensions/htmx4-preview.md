@@ -73,6 +73,12 @@ The preview does not inherit material upstream defaults accidentally:
 | Timeout | Ordinary requests time out after 60 seconds. Use `Stream`, `Suspense`, or `EventStream` for long-lived work, or a local `hx-config` timeout. |
 | Queueing | `queue:*` trigger modifiers are errors. Use `hx-sync` with an explicit queue strategy. |
 
+The preview also rejects `HX-Trigger-After-Swap` and
+`HX-Trigger-After-Settle` before send because htmx 4 ignores them. Keep
+`HX-Trigger` for receipt-phase events. For post-mutation timing, render escaped
+data in the target block and read it from an external
+`htmx:before:settle`/`htmx:after:settle` listener.
+
 Managed injection emits the marked policy metadata before core. A self-hosted
 preview must copy that exact meta tag before its three scripts; `app.check()`
 rejects a missing, late, duplicated, or mismatched policy.

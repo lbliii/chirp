@@ -54,6 +54,13 @@ policy before core: 4xx responses swap, broad 5xx responses do not, timeout is
 request queueing uses `hx-sync`. No `AppConfig` field or public policy type is
 added.
 
+`Response.with_hx_trigger_after_swap()` and
+`Response.with_hx_trigger_after_settle()` remain public htmx 2/generic wire
+builders with unchanged encoding and merge behavior. The htmx 4 preview
+rejects those removed headers before send; use rendered target data and the
+corresponding per-target settle lifecycle instead. `assert_hx_trigger(...,
+after=...)` likewise asserts wire shape, not htmx 4 browser execution.
+
 ### Request notes
 
 The experimental RFC 10008 route keyword is an additive API, but it tightens

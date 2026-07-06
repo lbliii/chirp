@@ -165,6 +165,19 @@ return (
 )
 ```
 
+`with_hx_trigger_after_settle()` and `with_hx_trigger_after_swap()` are htmx 2
+and generic wire helpers. Htmx 4 removed both response headers. When the exact
+preview tier serves an htmx request containing either header, Chirp rejects the
+response before send with the unsupported header, helper, selected version,
+and lifecycle migration.
+
+For htmx 4, render the event payload into the same target block as escaped
+`data-*` attributes. External application JavaScript reads that marker from
+the target's `htmx:before:settle` (old after-swap intent) or
+`htmx:after:settle` (old after-settle intent) event. Do not map either header
+to receipt-phase `HX-Trigger` or request-level `htmx:after:swap`; both change
+the timing contract.
+
 ### Chainable methods
 
 | Method | Description |
@@ -204,7 +217,7 @@ return (
     Response("OK")
     .with_hx_location("/new-page")                  # HX-Location
     .with_hx_trigger("item-added")                  # HX-Trigger
-    .with_hx_trigger_after_settle("refresh-count")  # HX-Trigger-After-Settle
+    .with_hx_trigger_after_settle("refresh-count")  # htmx 2/generic only
 )
 ```
 

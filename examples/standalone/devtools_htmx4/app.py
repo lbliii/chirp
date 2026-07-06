@@ -9,6 +9,29 @@ from chirp.middleware.csp_nonce import CSPNonceMiddleware
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 PREVIEW_TEMPLATES_DIR = Path(__file__).parent / "preview_templates"
 
+TIMING_LISTENER_JS = b"""window.__timingEvents = [];
+function timingMarker(event, attribute) {
+  var target = event.target;
+  if (!target || !target.matches) return null;
+  if (target.matches("#timing-result[" + attribute + "]")) return target;
+  return target.querySelector("#timing-result[" + attribute + "]");
+}
+document.addEventListener("htmx:before:settle", function (event) {
+  var marker = timingMarker(event, "data-after-swap-event");
+  if (!marker) return;
+  window.__timingEvents.push({
+    phase: "before-settle", event: marker.dataset.afterSwapEvent, target: marker.id
+  });
+});
+document.addEventListener("htmx:after:settle", function (event) {
+  var marker = timingMarker(event, "data-after-settle-event");
+  if (!marker) return;
+  window.__timingEvents.push({
+    phase: "after-settle", event: marker.dataset.afterSettleEvent, target: marker.id
+  });
+});
+"""
+
 # Each page provisions its selected htmx build explicitly. Chirp still owns the
 # debug runtime and every server response remains a typed HTML return value.
 app = App(
@@ -97,7 +120,12 @@ def failure():
 
 @preview_app.route("/")
 def preview_index():
-    return Template("preview.html", result="Ready")
+    return Template(
+        "preview.html",
+        result="Ready",
+        after_swap_event="",
+        after_settle_event="",
+    )
 
 
 @preview_app.route("/swap", methods=["POST"])
@@ -164,6 +192,21 @@ async def preview_queue():
 @preview_app.route("/history/next")
 def preview_history():
     return Fragment("preview.html", "history", result="History next")
+
+
+@preview_app.route("/timing")
+def preview_timing():
+    return Fragment(
+        "preview.html",
+        "timing_result",
+        after_swap_event="dom-updated",
+        after_settle_event="ui-settled",
+    )
+
+
+@preview_app.route("/timing.js")
+def preview_timing_js():
+    return Response(TIMING_LISTENER_JS, content_type="application/javascript; charset=utf-8")
 
 
 if __name__ == "__main__":

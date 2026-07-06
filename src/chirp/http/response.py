@@ -239,18 +239,22 @@ class Response:
         return self._merge_hx_trigger("HX-Trigger", event)
 
     def with_hx_trigger_after_settle(self, event: str | dict[str, Any]) -> Response:
-        """Trigger a client-side event after the settle step.
+        """Build the htmx 2/generic after-settle wire header.
 
         Sets the ``HX-Trigger-After-Settle`` response header.
-        Multiple calls are merged into a single JSON header.
+        Multiple calls are merged into a single JSON header. Htmx 4 removed
+        this header; provisioned preview htmx requests fail before send and
+        migrate to rendered data plus an ``htmx:after:settle`` listener.
         """
         return self._merge_hx_trigger("HX-Trigger-After-Settle", event)
 
     def with_hx_trigger_after_swap(self, event: str | dict[str, Any]) -> Response:
-        """Trigger a client-side event after the swap step.
+        """Build the htmx 2/generic after-swap wire header.
 
         Sets the ``HX-Trigger-After-Swap`` response header.
-        Multiple calls are merged into a single JSON header.
+        Multiple calls are merged into a single JSON header. Htmx 4 removed
+        this header; provisioned preview htmx requests fail before send and
+        migrate to rendered data plus an ``htmx:before:settle`` listener.
         """
         return self._merge_hx_trigger("HX-Trigger-After-Swap", event)
 

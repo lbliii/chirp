@@ -355,6 +355,10 @@ class TestAssertHxTrigger:
         r = Response().with_hx_trigger_after_swap("scrollTop")
         assert_hx_trigger(r, "scrollTop", after="swap")
 
+    def test_timing_failure_explains_wire_only_scope(self) -> None:
+        with pytest.raises(AssertionError, match="htmx 2/generic wire header"):
+            assert_hx_trigger(Response(), "missing", after="settle")
+
     def test_fails_when_missing(self) -> None:
         r = Response()
         with pytest.raises(AssertionError, match="no HX-Trigger"):
