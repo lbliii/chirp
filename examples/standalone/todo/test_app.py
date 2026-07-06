@@ -1,6 +1,7 @@
 """Tests for the todo example — htmx fragment rendering with CSRF."""
 
 import re
+from urllib.parse import urlencode
 
 import pytest
 
@@ -76,10 +77,19 @@ class TestTodoOperations:
     async def test_plain_add_redirects_after_persisting(self, example_app) -> None:
         """The same form works without htmx and redirects after committing."""
         async with TestClient(example_app) as client:
-            auth = await _csrf_headers(client, htmx=False)
+            form = await client.get("/")
+            cookie = _extract_cookie(form)
+            hidden = re.search(
+                r'<input type="hidden" name="([^"]+)" value="([^"]+)">',
+                form.text,
+            )
+            assert cookie is not None
+            assert hidden is not None
+            field_name, token = hidden.groups()
+            auth = {"Cookie": f"chirp_session={cookie}"}
             response = await client.post(
                 "/todos",
-                body=b"text=Plain+browser",
+                body=urlencode({field_name: token, "text": "Plain browser"}).encode(),
                 headers={**_FORM_CT, **auth},
             )
             assert response.status == 303

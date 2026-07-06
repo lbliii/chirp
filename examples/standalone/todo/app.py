@@ -69,7 +69,7 @@ async def index():
     return Page("index.html", "todo_list", todos=todos)
 
 
-@app.route("/todos", methods=["POST"], name="todos.add", referenced=True)
+@app.route("/todos", methods=["POST"], name="todos.add")
 async def add_todo(request: Request):
     """Add a todo with an htmx fragment and a plain-POST redirect fallback."""
     form = await request.form()
