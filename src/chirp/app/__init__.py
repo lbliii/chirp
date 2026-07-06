@@ -1,5 +1,6 @@
 """Chirp application facade."""
 
+import inspect
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal
@@ -17,6 +18,7 @@ from chirp.templating.returns import Fragment, InlineTemplate, Template
 
 from .compiler import AppCompiler
 from .diagnostics import ContractCheckRunner
+from .hypermedia_program import SourceOrigin, TemplateDeclaration
 from .lifecycle import LifecycleCoordinator
 from .registry import AppRegistry
 from .runtime import ASGIRuntime
@@ -231,6 +233,61 @@ class App:
 
     def provide(self, annotation: type, factory: Callable[..., Any]) -> None:
         self._registry.provide(annotation, factory)
+
+    def declare_template(self, template: str, *, blocks: Iterable[str] = ()) -> None:
+        """Declare a template selected dynamically by application code.
+
+        Use this setup-only seam when a registry or plugin chooses the template
+        at runtime and static handler-source analysis cannot see the relationship.
+        Declared templates count as reachable for the ``dead`` contract check;
+        declared template and block names are still validated by ``app.check()``.
+
+        The declaration origin is captured automatically as a public-safe
+        ``module:qualname`` plus source line. Call before the app freezes.
+        """
+        self._check_not_frozen()
+        if not isinstance(template, str):
+            msg = f"template must be a string, got {type(template).__name__}"
+            raise TypeError(msg)
+        if not template.strip():
+            raise ConfigurationError("Declared template name cannot be empty.")
+        if isinstance(blocks, str):
+            raise TypeError(
+                "blocks must be an iterable of block names, not a string; "
+                "use blocks=('content',) for one block"
+            )
+        try:
+            block_values = tuple(blocks)
+        except TypeError as exc:
+            raise TypeError("blocks must be an iterable of block-name strings") from exc
+        for block in block_values:
+            if not isinstance(block, str):
+                msg = f"block names must be strings, got {type(block).__name__}"
+                raise TypeError(msg)
+            if not block.strip():
+                raise ConfigurationError(
+                    f"Declared block name for template {template!r} cannot be empty."
+                )
+
+        frame = inspect.currentframe()
+        try:
+            caller = frame.f_back if frame is not None else None
+            if caller is None:
+                origin = SourceOrigin("registry", "<unknown>:<module>")
+            else:
+                module = str(caller.f_globals.get("__name__", "<unknown>"))
+                qualname = getattr(caller.f_code, "co_qualname", caller.f_code.co_name)
+                origin = SourceOrigin("registry", f"{module}:{qualname}", caller.f_lineno)
+        finally:
+            del frame
+
+        self._registry.declare_template(
+            TemplateDeclaration(
+                template=template,
+                blocks=tuple(sorted(set(block_values))),
+                origin=origin,
+            )
+        )
 
     def mount_pages(self, pages_dir: str | None = None) -> None:
         self._registry.mount_pages(pages_dir, lazy_pages=self.config.lazy_pages)

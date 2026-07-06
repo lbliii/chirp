@@ -704,6 +704,7 @@ class AppCompiler:
             page_templates=self._mutable.page_templates,
             page_leaf_templates=self._mutable.page_leaf_templates,
             fragment_target_registry=self._mutable.fragment_target_registry,
+            template_declarations=self._mutable.template_declarations,
         )
 
         self._mutable.oob_registry.freeze()

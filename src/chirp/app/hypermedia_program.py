@@ -34,6 +34,15 @@ class SourceOrigin:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateDeclaration:
+    """Setup-time declaration for a dynamically selected template surface."""
+
+    template: str
+    blocks: tuple[str, ...]
+    origin: SourceOrigin
+
+
+@dataclass(frozen=True, slots=True)
 class RouteNode:
     """One method-specific route identity."""
 
@@ -107,6 +116,7 @@ class HypermediaProgram:
     blocks: tuple[BlockNode, ...] = ()
     targets: tuple[TargetNode, ...] = ()
     transitions: tuple[TransitionEdge, ...] = ()
+    template_declarations: tuple[TemplateDeclaration, ...] = ()
 
     def __post_init__(self) -> None:
         collections = (
@@ -129,6 +139,11 @@ class HypermediaProgram:
         """Return discovered block names for *template_name*."""
         template_id = stable_identity("template", template_name)
         return frozenset(node.name for node in self.blocks if node.template_id == template_id)
+
+    @property
+    def declared_template_names(self) -> frozenset[str]:
+        """Return templates made reachable through explicit declarations."""
+        return frozenset(declaration.template for declaration in self.template_declarations)
 
     @property
     def page_leaf_templates(self) -> tuple[TemplateNode, ...]:

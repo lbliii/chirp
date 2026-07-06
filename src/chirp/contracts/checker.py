@@ -106,6 +106,7 @@ from .rules_suspense_defer import (
     check_suspense_undiscoverable,
 )
 from .rules_swap import check_swap_safety, check_view_transition_safety, collect_broad_targets
+from .rules_template_declarations import check_template_declarations
 from .rules_template_stream import check_template_stream_client_shape
 from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
@@ -501,6 +502,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     result.issues.extend(check_mount_app_merge(snapshot.mount_app_skips))
     result.issues.extend(check_plugin_quarantine(snapshot.plugin_quarantines))
     result.issues.extend(check_debug_wiring(snapshot.debug_wiring))
+    result.issues.extend(check_template_declarations(snapshot._hypermedia_program))
 
     referenced_templates_from_routes, referenced_route_paths = _route_prepass(
         router, kida_env, result
@@ -871,6 +873,11 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             referenced_templates_from_routes
             | referenced_templates_from_sources
             | snapshot.page_templates
+            | (
+                snapshot._hypermedia_program.declared_template_names
+                if snapshot._hypermedia_program is not None
+                else frozenset()
+            )
         )
 
         dead = sorted(all_template_names - referenced_templates)

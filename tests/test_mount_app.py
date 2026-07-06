@@ -184,6 +184,28 @@ def test_sub_app_template_globals_merge(tmp_path: Path) -> None:
     assert rendered == "dark"
 
 
+@pytest.mark.issue(498)
+def test_sub_app_template_declarations_hoist_with_origin(tmp_path: Path) -> None:
+    (tmp_path / "dynamic.html").write_text(
+        "{% block content %}mounted{% endblock %}",
+        encoding="utf-8",
+    )
+    parent = App(AppConfig(template_dir=tmp_path, debug=False, skip_contract_checks=True))
+    sub = App(AppConfig(debug=False, skip_contract_checks=True))
+    sub.declare_template("dynamic.html", blocks=("content",))
+
+    parent.mount_app("/console", sub)
+    parent.freeze()
+
+    program = parent._runtime_state.hypermedia_program
+    assert program is not None
+    assert program.declared_template_names == frozenset({"dynamic.html"})
+    declaration = program.template_declarations[0]
+    assert declaration.origin.identifier.endswith(
+        ":test_sub_app_template_declarations_hoist_with_origin"
+    )
+
+
 def test_template_global_collision_parent_wins(tmp_path: Path) -> None:
     parent = App(AppConfig(template_dir=str(tmp_path), debug=False, skip_contract_checks=True))
     parent.template_global("theme")(lambda: "parent-wins")

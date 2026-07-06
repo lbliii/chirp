@@ -145,6 +145,7 @@ def hoist(parent_state: MutableAppState, sub_state: MutableAppState, prefix: str
     parent_state.worker_shutdown_hooks.extend(sub_state.worker_shutdown_hooks)
     parent_state.plugin_loaders.extend(sub_state.plugin_loaders)
     parent_state.contract_checks.extend(sub_state.contract_checks)
+    parent_state.template_declarations.extend(sub_state.template_declarations)
 
     for path in sub_state.reload_dirs_extra:
         if path not in parent_state.reload_dirs_extra:
