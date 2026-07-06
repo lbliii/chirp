@@ -38,6 +38,10 @@ Set `htmx=False` and own all three local files. Mark their roles so
 mixed client:
 
 ```html
+<meta name="htmx-config"
+  content='{"noSwap":[204,304,"5xx"],"defaultTimeout":60000,"compat":{"swapErrorResponseCodes":true}}'
+  data-chirp="htmx-config" data-chirp-htmx-tier="4-preview"
+  data-chirp-htmx-version="4.0.0-beta5">
 <script defer src="/static/htmx.min.js"
   data-chirp="htmx" data-chirp-htmx-role="core"
   data-chirp-htmx-tier="4-preview"
@@ -54,6 +58,24 @@ mixed client:
 
 Local artifact integrity remains your deployment responsibility. Chirp does
 not add a configurable CDN base or infer extension versions.
+
+## Browser-default contract
+
+The preview does not inherit material upstream defaults accidentally:
+
+| Surface | Chirp preview contract |
+| --- | --- |
+| Inheritance | `htmx-2-compat` temporarily restores implicit inheritance; `app.check()` warns so templates can move to `:inherited`. |
+| Error swaps | 4xx HTML swaps, including `ValidationError` 422 fragments. 5xx does not swap unless a local `hx-status:5xx` target opts in. |
+| OOB | Main content swaps first, then OOB/partial tasks in document order. Regions must be independent. |
+| DELETE | Enclosing form fields are excluded. Use `hx-include="closest form"`; beta 5 sends included DELETE values as query parameters. |
+| History | Back/forward refetches server HTML. Declare one stable `hx-history-elt` shell boundary when pushing URLs. |
+| Timeout | Ordinary requests time out after 60 seconds. Use `Stream`, `Suspense`, or `EventStream` for long-lived work, or a local `hx-config` timeout. |
+| Queueing | `queue:*` trigger modifiers are errors. Use `hx-sync` with an explicit queue strategy. |
+
+Managed injection emits the marked policy metadata before core. A self-hosted
+preview must copy that exact meta tag before its three scripts; `app.check()`
+rejects a missing, late, duplicated, or mismatched policy.
 
 ## Fail before the browser
 
@@ -82,8 +104,10 @@ upstream inventory command is documented in
 it does not add Node to Chirp's runtime dependencies.
 
 In debug mode, `window.ChirpHtmxDebug.getHtmxCompatibility()` reports configured
-and live versions, extension roles, source URLs, duplicates, and the resulting
-compatibility state. Request headers alone do not prove the browser version.
+and live versions, extension roles, source URLs, duplicates, the declared/live
+client policy, and the resulting compatibility state. Request records include
+the resolved `hx-sync` owner and strategy. Request headers alone do not prove
+the browser version.
 
 ## Roll back
 

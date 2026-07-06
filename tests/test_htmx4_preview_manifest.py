@@ -1,5 +1,7 @@
 """Freeze-time provisioning proof for the explicit htmx 4 preview (#545)."""
 
+import html
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
@@ -58,6 +60,15 @@ def test_preview_manifest_is_exact_ordered_and_immutable() -> None:
     ]
     assert all(f"htmx.org@{HTMX4_PREVIEW_VERSION}/dist/" in asset.url for asset in manifest.assets)
     assert all(asset.sha256 for asset in manifest.assets)
+    assert manifest.client_policy is not None
+    assert manifest.client_policy.no_swap_statuses == (204, 304, "5xx")
+    assert manifest.client_policy.default_timeout_ms == 60_000
+    assert manifest.client_policy.inheritance == "implicit-compat"
+    assert manifest.client_policy.history == "refetch"
+    assert manifest.client_policy.oob_order == "main-first"
+    assert manifest.client_policy.delete_form_data == "explicit"
+    assert manifest.client_policy.queue == "hx-sync"
+    assert manifest.client_policy.compat_swap_error_responses is True
     with pytest.raises(FrozenInstanceError):
         # Deliberately violate the frozen contract to prove runtime enforcement.
         manifest.version = "4.0.0"  # type: ignore[misc]
@@ -80,9 +91,18 @@ def test_preview_snippet_carries_order_metadata_and_shared_nonce() -> None:
     snippet = htmx_manifest_snippet(manifest, nonce="PREVIEW-NONCE")
 
     assert snippet.count("<script") == 3
+    assert snippet.count('<meta name="htmx-config"') == 1
+    config_match = re.search(r'<meta name="htmx-config" content="([^"]+)"', snippet)
+    assert config_match is not None
+    assert json.loads(html.unescape(config_match.group(1))) == {
+        "noSwap": [204, 304, "5xx"],
+        "defaultTimeout": 60_000,
+        "compat": {"swapErrorResponseCodes": True},
+    }
+    assert snippet.index("htmx-config") < snippet.index("htmx.min.js")
     assert snippet.count('nonce="PREVIEW-NONCE"') == 3
-    assert snippet.count('data-chirp-htmx-tier="4-preview"') == 3
-    assert snippet.count(f'data-chirp-htmx-version="{HTMX4_PREVIEW_VERSION}"') == 3
+    assert snippet.count('data-chirp-htmx-tier="4-preview"') == 4
+    assert snippet.count(f'data-chirp-htmx-version="{HTMX4_PREVIEW_VERSION}"') == 4
     assert snippet.index("htmx.min.js") < snippet.index("htmx-2-compat.min.js")
     assert snippet.index("htmx-2-compat.min.js") < snippet.index("hx-sse.min.js")
 
@@ -100,7 +120,7 @@ async def test_freeze_publishes_manifest_used_by_buffered_injection() -> None:
     manifest = app._runtime_state.htmx_manifest
     assert manifest is not None
     assert manifest.tier == "4-preview"
-    assert response.text.count(f'data-chirp-htmx-version="{HTMX4_PREVIEW_VERSION}"') == 3
+    assert response.text.count(f'data-chirp-htmx-version="{HTMX4_PREVIEW_VERSION}"') == 4
     assert [response.text.index(asset.url) for asset in manifest.assets] == sorted(
         response.text.index(asset.url) for asset in manifest.assets
     )
@@ -169,7 +189,7 @@ async def test_preview_bundle_rewrites_streaming_html_in_order(tmp_path) -> None
     async with TestClient(app) as client:
         response = await client.get("/")
 
-    assert response.text.count('data-chirp-htmx-tier="4-preview"') == 3
+    assert response.text.count('data-chirp-htmx-tier="4-preview"') == 4
     assert response.text.index("htmx.min.js") < response.text.index("htmx-2-compat.min.js")
     assert response.text.index("htmx-2-compat.min.js") < response.text.index("hx-sse.min.js")
     assert response.text.index("hx-sse.min.js") < response.text.index("</body>")

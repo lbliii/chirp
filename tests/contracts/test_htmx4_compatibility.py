@@ -19,7 +19,14 @@ def _preview_bundle(*, order: tuple[str, ...] = ("core", "compat", "sse")) -> st
         "compat": "/assets/htmx-2-compat.js",
         "sse": "/assets/hx-sse.js",
     }
-    return "".join(
+    policy = (
+        '<meta name="htmx-config" '
+        'content=\'{"noSwap":[204,304,"5xx"],"defaultTimeout":60000,'
+        '"compat":{"swapErrorResponseCodes":true}}\' '
+        'data-chirp="htmx-config" data-chirp-htmx-tier="4-preview" '
+        f'data-chirp-htmx-version="{HTMX4_PREVIEW_VERSION}">'
+    )
+    return policy + "".join(
         (
             f'<script src="{sources[role]}" '
             f'data-chirp="{"htmx" if role == "core" else "htmx-extension"}" '
@@ -68,6 +75,26 @@ def test_missing_duplicate_mismatched_and_misordered_assets_are_errors() -> None
     assert "4.0.0-beta6" in messages
     assert "source is the 'sse' asset" in messages
     assert all(issue.template in sources for issue in issues)
+
+
+def test_self_hosted_preview_policy_is_required_exact_and_before_core() -> None:
+    disabled = compile_htmx_manifest(enabled=False, version="2.0.10")
+    complete = _preview_bundle()
+    scripts = complete[complete.index("<script") :]
+    policy = complete[: complete.index("<script")]
+    sources = {
+        "missing.html": scripts,
+        "mismatch.html": complete.replace("60000", "0", 1),
+        "order.html": scripts + policy,
+    }
+    issues = check_htmx_compatibility(sources, disabled)
+    messages = "\n".join(issue.message for issue in issues)
+    assert "missing its htmx-config policy" in messages
+    assert "disagrees with Chirp's accepted defaults" in messages
+    assert "appears after a preview script" in messages
+
+    with_extra = complete.replace('{"noSwap"', '{"logAll":false,"noSwap"', 1)
+    assert check_htmx_compatibility({"extra.html": with_extra}, disabled) == []
 
 
 def test_managed_injection_rejects_unmarked_manual_core() -> None:

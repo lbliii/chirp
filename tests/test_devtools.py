@@ -188,6 +188,15 @@ def test_devtools_reports_configured_and_live_htmx_compatibility() -> None:
     assert "liveVersion" in HTMX_DEBUG_BOOT_JS
     assert "extensionRoles" in HTMX_DEBUG_BOOT_JS
     assert "compatibilityState" in HTMX_DEBUG_BOOT_JS
+    assert "clientPolicy" in HTMX_DEBUG_BOOT_JS
+    assert "defaultTimeout" in HTMX_DEBUG_BOOT_JS
+
+
+def test_devtools_records_htmx4_synchronization_owner_and_strategy() -> None:
+    assert "synchronization" in HTMX_DEBUG_BOOT_JS
+    assert 'elt.getAttribute("hx-sync")' in HTMX_DEBUG_BOOT_JS
+    assert "lastIndexOf" in HTMX_DEBUG_BOOT_JS
+    assert 'message.toLowerCase().indexOf("timeout")' in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:

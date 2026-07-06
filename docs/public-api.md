@@ -48,6 +48,11 @@ htmx_version="4.0.0-beta5")</code>. Chirp then owns one ordered core,
 <code>htmx-2-compat</code>, and <code>hx-sse</code> bundle. Other htmx 4 pins
 fail during freeze; rollback selects <code>"2.0.10"</code>. The compiled
 manifest and its asset records are internal, not new public exports.
+For that preview pin, managed injection also emits an internal frozen client
+policy before core: 4xx responses swap, broad 5xx responses do not, timeout is
+60 seconds, history refetches, OOB is main-first, DELETE data is explicit, and
+request queueing uses `hx-sync`. No `AppConfig` field or public policy type is
+added.
 
 ### Request notes
 

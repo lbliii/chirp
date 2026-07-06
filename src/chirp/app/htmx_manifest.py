@@ -22,6 +22,20 @@ class HtmxAsset:
 
 
 @dataclass(frozen=True, slots=True)
+class HtmxClientPolicy:
+    """Immutable browser-default contract for one managed htmx tier."""
+
+    no_swap_statuses: tuple[int | str, ...]
+    default_timeout_ms: int
+    inheritance: Literal["implicit-compat", "explicit"]
+    history: Literal["cache", "refetch"]
+    oob_order: Literal["oob-first", "main-first"]
+    delete_form_data: Literal["implicit", "explicit"]
+    queue: Literal["trigger-modifier", "hx-sync"]
+    compat_swap_error_responses: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class HtmxProvisioningManifest:
     """One freeze-time htmx provisioning decision published to runtime readers."""
 
@@ -31,6 +45,7 @@ class HtmxProvisioningManifest:
     assets: tuple[HtmxAsset, ...]
     compatibility_features: tuple[str, ...] = ()
     rollback_version: str = HTMX_ROLLBACK_VERSION
+    client_policy: HtmxClientPolicy | None = None
 
 
 def _asset(version: str, role: Literal["core", "compat", "sse"], path: str) -> HtmxAsset:
@@ -70,6 +85,16 @@ def compile_htmx_manifest(*, enabled: bool, version: str) -> HtmxProvisioningMan
                 ),
             ),
             compatibility_features=("htmx-2-compat", "native-sse"),
+            client_policy=HtmxClientPolicy(
+                no_swap_statuses=(204, 304, "5xx"),
+                default_timeout_ms=60_000,
+                inheritance="implicit-compat",
+                history="refetch",
+                oob_order="main-first",
+                delete_form_data="explicit",
+                queue="hx-sync",
+                compat_swap_error_responses=True,
+            ),
         )
 
     lowered = version.lower()

@@ -113,7 +113,7 @@ Add an error container to your base layout:
 <div id="chirp-error"></div>
 ```
 
-Optionally configure htmx response handling:
+With htmx 2, optionally configure response handling:
 
 ```javascript
 htmx.config.responseHandling = [
@@ -123,6 +123,12 @@ htmx.config.responseHandling = [
     {code: "[45]..", swap: false, error: true},
 ];
 ```
+
+The exact htmx 4 preview configures this policy for you: bounded 4xx HTML,
+including `ValidationError` 422 fragments, swaps into the requested target;
+5xx HTML does not swap by default, so an unhandled failure cannot replace a
+broad shell. Opt a 5xx into swapping only with a statically present local
+`hx-status:5xx` target. `app.check()` rejects broad or unresolved 5xx targets.
 
 Listen for the `chirpError` event for custom behavior:
 

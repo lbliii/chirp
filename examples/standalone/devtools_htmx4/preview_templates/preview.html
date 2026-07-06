@@ -6,12 +6,51 @@
   <title>Managed htmx 4 preview</title>
 </head>
 <body>
-  <main>
+  <main id="shell" hx-history-elt>
     <h1>Managed htmx 4 preview</h1>
     <button id="preview-swap" hx-post="/swap" hx-target="#result" hx-swap="outerHTML">
       Swap fragment
     </button>
     {% block result %}<div id="result">{{ result }}</div>{% endblock %}
+
+    <section hx-target="#inherited">
+      <button id="inherit-load" hx-get="/inherit" hx-swap="outerHTML">Implicit compatibility inheritance</button>
+    </section>
+    {% block inherited %}<div id="inherited">{{ inherited ?? "Before inheritance" }}</div>{% endblock %}
+
+    <button id="validation-load" hx-get="/validation" hx-target="#validation" hx-swap="outerHTML">422 validation</button>
+    <div id="validation">Before validation</div>
+
+    <button id="failure-load" hx-get="/failure" hx-target="#shell">500 shell safety</button>
+
+    <button id="oob-load" hx-get="/oob" hx-target="#main-result" hx-swap="innerHTML">Main plus OOB</button>
+    <div id="main-result">{% block main_result %}{{ result ?? "Before main" }}{% endblock %}</div>
+    <div id="oob-result">{% block oob_result %}{{ result ?? "Before OOB" }}{% endblock %}</div>
+
+    <form>
+      <input name="item" value="42">
+      <button id="delete-no-fields" hx-delete="/delete" hx-target="#delete-result" hx-swap="outerHTML">DELETE no fields</button>
+      <button id="delete-with-fields" hx-delete="/delete" hx-include="closest form" hx-target="#delete-result" hx-swap="outerHTML">DELETE fields</button>
+    </form>
+    {% block delete_result %}<div id="delete-result">{{ item ?? "Before DELETE" }}</div>{% endblock %}
+
+    <button id="slow-load" hx-get="/slow" hx-config="timeout:50" hx-target="#slow-result" hx-swap="outerHTML">Timeout</button>
+    {% block slow_result %}<div id="slow-result">{{ result ?? "Before timeout" }}</div>{% endblock %}
+
+    <button id="queue-load" hx-post="/queue" hx-sync="this:queue all" hx-target="#queue-result" hx-swap="outerHTML">Queue</button>
+    {% block queue_result %}<div id="queue-result">{{ result ?? "Before queue" }}</div>{% endblock %}
+
+    <a id="history-next" href="/history/next" hx-get="/history/next" hx-push-url="true" hx-target="#history" hx-swap="outerHTML">History next</a>
+    {% block history %}<div id="history">{{ result ?? "History initial" }}</div>{% endblock %}
   </main>
+  <script>
+    window.__swapOrder = [];
+    new MutationObserver(function () { window.__swapOrder.push("main"); }).observe(
+      document.getElementById("main-result"), {childList: true, subtree: true}
+    );
+    new MutationObserver(function () { window.__swapOrder.push("oob"); }).observe(
+      document.getElementById("oob-result"), {childList: true, subtree: true}
+    );
+  </script>
 </body>
 </html>

@@ -51,15 +51,14 @@ def _serve_app(app_name: str) -> Iterator[str]:
         ["uv", "run", "python", "-c", runner],  # noqa: S607
         cwd=str(_EXAMPLE_DIR),
         env=env,
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
     )
     deadline = time.monotonic() + 40
     try:
         while time.monotonic() < deadline:
             if proc.poll() is not None:
-                output = proc.stdout.read().decode() if proc.stdout else ""
-                raise RuntimeError(f"server exited early code={proc.returncode}\n{output}")
+                raise RuntimeError(f"server exited early code={proc.returncode}")
             try:
                 with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310
                     if response.status == 200:
@@ -363,5 +362,124 @@ def test_managed_preview_bundle_csp_sse_and_devtools(
         mismatch = page.evaluate("() => window.ChirpHtmxDebug.getHtmxCompatibility()")
         assert mismatch["compatibilityState"] == "mismatch"
         assert not errors, errors
+    finally:
+        page.close()
+
+
+@pytest.mark.issue(548)
+def test_managed_preview_default_contracts(
+    preview_base_url: str,
+    browser,
+) -> None:
+    page = browser.new_page()
+    page.set_default_timeout(_TIMEOUT_MS)
+    queue_order: list[str] = []
+    delete_payloads: list[str | None] = []
+
+    def record_request(request) -> None:
+        if request.url.endswith("/queue"):
+            queue_order.append("request")
+        if "/delete" in request.url:
+            delete_payloads.append(request.post_data)
+
+    def record_response(response) -> None:
+        if response.url.endswith("/queue"):
+            queue_order.append("response")
+
+    page.on("request", record_request)
+    page.on("response", record_response)
+    try:
+        page.goto(preview_base_url, wait_until="load")
+        page.wait_for_function("() => !!window.htmx")
+
+        policy = page.evaluate(
+            """() => ({
+              noSwap: window.htmx.config.noSwap,
+              timeout: window.htmx.config.defaultTimeout,
+              inheritance: window.htmx.config.implicitInheritance,
+            })"""
+        )
+        assert policy == {
+            "noSwap": [204, 304, "5xx"],
+            "timeout": 60_000,
+            "inheritance": True,
+        }
+        compatibility = page.evaluate("() => window.ChirpHtmxDebug.getHtmxCompatibility()")
+        assert compatibility["clientPolicy"]["declared"] == {
+            "noSwap": [204, 304, "5xx"],
+            "defaultTimeout": 60_000,
+            "compat": {"swapErrorResponseCodes": True},
+        }
+        assert compatibility["clientPolicy"]["live"]["queue"] == "hx-sync"
+
+        page.locator("#inherit-load").click()
+        page.wait_for_function(
+            "() => document.querySelector('#inherited')?.textContent.includes('Inherited')"
+        )
+
+        page.locator("#validation-load").click()
+        page.wait_for_function(
+            "() => document.querySelector('#validation')?.textContent === 'Validation failed'"
+        )
+
+        page.locator("#failure-load").click()
+        page.wait_for_timeout(100)
+        assert page.locator("#shell").count() == 1
+        assert page.locator("#shell").inner_text().startswith("Managed htmx 4 preview")
+
+        page.locator("#oob-load").click()
+        page.wait_for_function(
+            """() => document.querySelector('#main-result')?.textContent.includes('Main updated') &&
+              document.querySelector('#oob-result')?.textContent.includes('OOB updated')"""
+        )
+        assert page.evaluate("() => window.__swapOrder.slice(0, 2)") == ["main", "oob"]
+
+        page.locator("#delete-no-fields").click()
+        page.wait_for_function(
+            "() => document.querySelector('#delete-result')?.textContent.includes('missing')"
+        )
+        page.reload(wait_until="load")
+        page.wait_for_function("() => !!window.htmx")
+        page.locator("#delete-with-fields").click()
+        page.wait_for_timeout(250)
+        assert page.locator("#delete-result").inner_text().strip() == "42", delete_payloads
+
+        page.locator("#slow-load").click()
+        page.wait_for_timeout(300)
+        assert page.locator("#slow-result").inner_text() == "Ready"
+        timeout_errors = page.evaluate("() => window.ChirpHtmxDebug.getState().errors.slice()")
+        assert "Timeout" in [error["title"] for error in timeout_errors], timeout_errors
+
+        page.evaluate(
+            """() => {
+              document.querySelector('#queue-load').click();
+              document.querySelector('#queue-load').click();
+            }"""
+        )
+        page.wait_for_function(
+            "() => document.querySelector('#queue-result')?.textContent.includes('Queued')"
+        )
+        page.wait_for_timeout(250)
+        assert queue_order == ["request", "response", "request", "response"]
+        queue_records = page.evaluate(
+            """() => window.ChirpHtmxDebug.getState().records
+              .filter(record => record.path.includes('/queue'))"""
+        )
+        assert len(queue_records) == 2
+        assert all(
+            record["synchronization"] == {"owner": "this", "strategy": "queue all"}
+            for record in queue_records
+        )
+
+        page.locator("#history-next").click()
+        page.wait_for_function("() => window.location.pathname === '/history/next'")
+        page.go_back(wait_until="load")
+        assert page.url.rstrip("/") == preview_base_url.rstrip("/")
+        assert page.locator("#shell").count() == 1
+        history_kinds = page.evaluate(
+            "() => window.ChirpHtmxDebug.getState().historyEvents.map(event => event.kind)"
+        )
+        assert "push" in history_kinds
+        assert "restore" in history_kinds
     finally:
         page.close()
