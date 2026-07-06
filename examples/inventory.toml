@@ -549,7 +549,7 @@ status = "canonical"
 tier = 2
 extras = ["sessions"]
 network = "none"
-capabilities = ["csrf", "data", "forms", "fragments", "pages", "sessions", "validation"]
+capabilities = ["csrf", "data", "forms", "fragments", "mutations", "no-js", "pages", "security", "sessions", "validation"]
 readme = "present"
 test_entrypoint = "examples/standalone/todo"
 
