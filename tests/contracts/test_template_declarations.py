@@ -91,9 +91,7 @@ def test_declared_template_load_error_preserves_loader_details(tmp_path) -> None
     app.declare_template("broken.html")
 
     result = check_hypermedia_surface(app)
-    issue = next(
-        issue for issue in result.errors if issue.category == "template_declaration"
-    )
+    issue = next(issue for issue in result.errors if issue.category == "template_declaration")
     program = app._runtime_state.hypermedia_program
     assert program is not None
     template = program.template("broken.html")
