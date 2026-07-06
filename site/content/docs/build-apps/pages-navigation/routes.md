@@ -57,6 +57,37 @@ async def user(request: Request, id: int):
 If a request matches a path but not the method, Chirp returns `405 Method Not Allowed` with an `Allow` header listing the valid methods — you don't write that fallback yourself.
 :::
 
+### HEAD requests
+
+Every `GET` route also answers `HEAD`. Chirp selects the same handler and keeps
+`request.method == "HEAD"`, so middleware and handlers can inspect the real
+method while returning the same representation metadata as `GET`. The HTTP
+server sends the resulting status and headers, including the `Content-Length`
+the `GET` body would have, but sends zero body bytes.
+
+Register an explicit `HEAD` route only when its metadata needs different
+application logic. It takes precedence over the automatic `GET` fallback:
+
+```python
+@app.route("/report", methods=["GET"])
+def report():
+    return Page("report.html", "report_body")
+
+@app.route("/report", methods=["HEAD"])
+def report_metadata():
+    return Response("").with_header("X-Report-State", "building")
+```
+
+A route allowing `GET` advertises both `GET` and `HEAD` in a `405` response
+`Allow` header. Other methods remain exact matches. Built-in `/health` and
+`/ready` probes follow the same metadata-without-body wire behavior, making
+them safe for uptime monitors and deployment probes.
+
+!!! note "Compatibility"
+    Before Chirp 0.4.0, a `GET`-only route rejected `HEAD` with `405 Method Not
+    Allowed`. Applications that relied on that rejection should register an
+    explicit `HEAD` route and return the response their policy requires.
+
 ## Path Parameters
 
 Dynamic segments are defined with curly braces:

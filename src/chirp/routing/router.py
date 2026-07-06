@@ -288,6 +288,10 @@ class Router:
     def match(self, method: str, path: str) -> RouteMatch:
         """Match a request path and method against compiled routes.
 
+        An explicitly registered ``HEAD`` route wins. Otherwise ``HEAD``
+        selects the matching ``GET`` route, while the request itself retains
+        its original method for handler and middleware inspection.
+
         Returns a ``RouteMatch`` on success.
         Raises ``NotFound`` if no route matches the path.
         Raises ``MethodNotAllowed`` if the path matches but the method doesn't.
@@ -303,10 +307,15 @@ class Router:
         # Check for catch-all at this node (if we consumed all parts)
         if method in node.routes_by_method:
             return RouteMatch(route=node.routes_by_method[method], path_params=params)
+        if method == "HEAD" and "GET" in node.routes_by_method:
+            return RouteMatch(route=node.routes_by_method["GET"], path_params=params)
 
         # Method not allowed?
         if node.routes_by_method:
-            all_methods = frozenset(node.routes_by_method)
+            effective_methods = set(node.routes_by_method)
+            if "GET" in effective_methods:
+                effective_methods.add("HEAD")
+            all_methods = frozenset(effective_methods)
             allow_value = ", ".join(sorted(all_methods))
             raise MethodNotAllowed(
                 all_methods,
