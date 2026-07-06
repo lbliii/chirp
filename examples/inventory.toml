@@ -1,0 +1,598 @@
+version = 1
+
+# This is the source of truth for runnable examples. Keep entries sorted by path.
+# Refresh the human-facing tables with: python -m examples.inventory
+
+[[examples]]
+path = "chirpui/contacts_shell"
+lane = "chirpui"
+status = "canonical"
+tier = 2
+extras = ["sessions", "ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "csrf", "forms", "fragments", "pages", "sessions"]
+readme = "present"
+test_entrypoint = "examples/chirpui/contacts_shell"
+
+[[examples]]
+path = "chirpui/forum_shell"
+lane = "chirpui"
+status = "canonical"
+tier = 3
+extras = ["ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "contracts", "forms", "oob", "pages"]
+readme = "present"
+test_entrypoint = "examples/chirpui/forum_shell"
+
+[[examples]]
+path = "chirpui/islands_shell"
+lane = "chirpui"
+status = "supporting"
+tier = 2
+extras = ["ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "islands"]
+readme = "present"
+test_entrypoint = "examples/chirpui/islands_shell"
+
+[[examples]]
+path = "chirpui/kanban_shell"
+lane = "chirpui"
+status = "canonical"
+tier = 3
+extras = ["auth", "sessions", "ui"]
+network = "none"
+capabilities = ["app-shell", "auth", "chirpui", "csrf", "forms", "fragments", "oob", "sessions", "sse", "validation"]
+readme = "present"
+test_entrypoint = "examples/chirpui/kanban_shell"
+
+[[examples]]
+path = "chirpui/llm_playground"
+lane = "chirpui"
+status = "supporting"
+tier = 3
+extras = ["ai", "markdown", "ui"]
+network = "required"
+capabilities = ["ai", "app-shell", "chirpui", "fragments", "sse", "streaming"]
+readme = "present"
+test_entrypoint = "examples/chirpui/llm_playground"
+
+[[examples]]
+path = "chirpui/lucky_cat"
+lane = "chirpui"
+status = "canonical"
+tier = 3
+extras = ["auth", "passkeys", "sessions", "ui"]
+network = "none"
+capabilities = ["app-shell", "auth", "chirpui", "csrf", "data", "forms", "fragments", "mutations", "oob", "pages", "passkeys", "reactive", "sessions", "sse", "suspense", "validation"]
+readme = "present"
+test_entrypoint = "examples/chirpui/lucky_cat"
+
+[[examples]]
+path = "chirpui/pages_shell"
+lane = "chirpui"
+status = "canonical"
+tier = 2
+extras = ["ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "pages", "routing"]
+readme = "present"
+test_entrypoint = "examples/chirpui/pages_shell"
+
+[[examples]]
+path = "chirpui/rag_demo"
+lane = "chirpui"
+status = "canonical"
+tier = 3
+extras = ["ai", "markdown", "sessions", "ui"]
+network = "required"
+capabilities = ["ai", "app-shell", "chirpui", "data", "fragments", "sessions", "sse", "streaming"]
+readme = "present"
+test_entrypoint = "examples/chirpui/rag_demo"
+
+[[examples]]
+path = "chirpui/shell_oob"
+lane = "chirpui"
+status = "canonical"
+tier = 2
+extras = ["ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "oob", "pages"]
+readme = "missing"
+test_entrypoint = "examples/chirpui/shell_oob"
+
+[[examples]]
+path = "chirpui/sortable_reorder"
+lane = "chirpui"
+status = "supporting"
+tier = 2
+extras = ["sessions", "ui"]
+network = "none"
+capabilities = ["app-shell", "chirpui", "csrf", "fragments", "mutations", "sessions"]
+readme = "present"
+test_entrypoint = "examples/chirpui/sortable_reorder"
+
+[[examples]]
+path = "standalone/accessibility"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["accessibility", "forms", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/accessibility"
+
+[[examples]]
+path = "standalone/api"
+lane = "standalone"
+status = "supporting"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["api", "middleware", "routing"]
+readme = "present"
+test_entrypoint = "examples/standalone/api"
+
+[[examples]]
+path = "standalone/auth"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = ["auth", "sessions"]
+network = "none"
+capabilities = ["auth", "forms", "pages", "security", "sessions"]
+readme = "present"
+test_entrypoint = "examples/standalone/auth"
+
+[[examples]]
+path = "standalone/chat"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = ["sessions"]
+network = "none"
+capabilities = ["fragments", "sessions", "sse"]
+readme = "present"
+test_entrypoint = "examples/standalone/chat"
+
+[[examples]]
+path = "standalone/contacts"
+lane = "standalone"
+status = "canonical"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["forms", "fragments", "mutations", "oob", "pages", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/contacts"
+
+[[examples]]
+path = "standalone/custom_middleware"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["middleware", "routing"]
+readme = "present"
+test_entrypoint = "examples/standalone/custom_middleware"
+
+[[examples]]
+path = "standalone/dashboard"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "sse", "suspense"]
+readme = "present"
+test_entrypoint = "examples/standalone/dashboard"
+
+[[examples]]
+path = "standalone/dashboard_live"
+lane = "standalone"
+status = "supporting"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["data", "fragments", "sse", "suspense"]
+readme = "present"
+test_entrypoint = "examples/standalone/dashboard_live"
+
+[[examples]]
+path = "standalone/docs_site"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = ["markdown"]
+network = "none"
+capabilities = ["docs", "routing", "tools"]
+readme = "missing"
+test_entrypoint = "examples/standalone/docs_site"
+
+[[examples]]
+path = "standalone/form_get"
+lane = "standalone"
+status = "supporting"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["forms", "routing"]
+readme = "present"
+test_entrypoint = "examples/standalone/form_get"
+
+[[examples]]
+path = "standalone/freeze_site"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = ["markdown"]
+network = "none"
+capabilities = ["docs", "freeze", "pages"]
+readme = "missing"
+test_entrypoint = "examples/standalone/freeze_site"
+
+[[examples]]
+path = "standalone/hackernews"
+lane = "standalone"
+status = "supporting"
+tier = 3
+extras = ["testing"]
+network = "required"
+capabilities = ["fragments", "sse", "view-transitions"]
+readme = "present"
+test_entrypoint = "examples/standalone/hackernews"
+
+[[examples]]
+path = "standalone/hello"
+lane = "standalone"
+status = "canonical"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["routing"]
+readme = "present"
+test_entrypoint = "examples/standalone/hello"
+
+[[examples]]
+path = "standalone/htmx_managed"
+lane = "standalone"
+status = "experimental"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["contracts", "fragments"]
+readme = "present"
+test_entrypoint = "examples/standalone/htmx_managed"
+
+[[examples]]
+path = "standalone/islands"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["islands"]
+readme = "present"
+test_entrypoint = "examples/standalone/islands"
+
+[[examples]]
+path = "standalone/islands_swap"
+lane = "standalone"
+status = "experimental"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "islands"]
+readme = "present"
+test_entrypoint = "examples/standalone/islands_swap"
+
+[[examples]]
+path = "standalone/kanban"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = ["auth", "sessions"]
+network = "none"
+capabilities = ["auth", "csrf", "forms", "fragments", "oob", "sessions", "sse", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/kanban"
+
+[[examples]]
+path = "standalone/llm_minimal"
+lane = "standalone"
+status = "canonical"
+tier = 1
+extras = []
+network = "optional"
+capabilities = ["ai", "fragments", "sse", "streaming"]
+readme = "present"
+test_entrypoint = "examples/standalone/llm_minimal"
+
+[[examples]]
+path = "standalone/llm_streaming_kida"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "optional"
+capabilities = ["ai", "streaming"]
+readme = "present"
+test_entrypoint = "examples/standalone/llm_streaming_kida"
+
+[[examples]]
+path = "standalone/mutation_result"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "mutations", "pages"]
+readme = "present"
+test_entrypoint = "examples/standalone/mutation_result"
+
+[[examples]]
+path = "standalone/nojs_floor"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["forms", "fragments", "mutations", "no-js", "pages", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/nojs_floor"
+
+[[examples]]
+path = "standalone/ollama"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = ["ai", "markdown"]
+network = "required"
+capabilities = ["ai", "fragments", "sse", "streaming", "tools"]
+readme = "present"
+test_entrypoint = "examples/standalone/ollama"
+
+[[examples]]
+path = "standalone/oob_layout_chain"
+lane = "standalone"
+status = "experimental"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["contracts", "oob", "pages"]
+readme = "present"
+test_entrypoint = "examples/standalone/oob_layout_chain"
+
+[[examples]]
+path = "standalone/optimistic_apply"
+lane = "standalone"
+status = "experimental"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["fragments", "islands", "mutations"]
+readme = "present"
+test_entrypoint = "examples/standalone/optimistic_apply"
+
+[[examples]]
+path = "standalone/passkeys_minimal"
+lane = "standalone"
+status = "supporting"
+tier = 3
+extras = ["auth", "passkeys", "sessions"]
+network = "none"
+capabilities = ["auth", "csrf", "forms", "passkeys", "security", "sessions"]
+readme = "present"
+test_entrypoint = "examples/standalone/passkeys_minimal"
+
+[[examples]]
+path = "standalone/pokedex"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["api", "data", "middleware", "pages"]
+readme = "present"
+test_entrypoint = "examples/standalone/pokedex"
+
+[[examples]]
+path = "standalone/production"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = ["sessions"]
+network = "none"
+capabilities = ["csrf", "forms", "security", "sessions"]
+readme = "present"
+test_entrypoint = "examples/standalone/production"
+
+[[examples]]
+path = "standalone/reactive_tasks"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["fragments", "reactive", "sse", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/reactive_tasks"
+
+[[examples]]
+path = "standalone/returns_gallery"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "mutations", "oob", "pages", "sse", "streaming", "suspense", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/returns_gallery"
+
+[[examples]]
+path = "standalone/search"
+lane = "standalone"
+status = "supporting"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["forms", "pages", "routing"]
+readme = "present"
+test_entrypoint = "examples/standalone/search"
+
+[[examples]]
+path = "standalone/shapes_workspaces"
+lane = "standalone"
+status = "experimental"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["contracts", "data", "forms", "pages"]
+readme = "present"
+test_entrypoint = "examples/standalone/shapes_workspaces"
+
+[[examples]]
+path = "standalone/signup"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = ["sessions"]
+network = "none"
+capabilities = ["csrf", "forms", "sessions", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/signup"
+
+[[examples]]
+path = "standalone/sse"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "sse"]
+readme = "present"
+test_entrypoint = "examples/standalone/sse"
+
+[[examples]]
+path = "standalone/sse_reconnect"
+lane = "standalone"
+status = "supporting"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["fragments", "sse"]
+readme = "present"
+test_entrypoint = "examples/standalone/sse_reconnect"
+
+[[examples]]
+path = "standalone/static_site"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["sse", "static-files"]
+readme = "present"
+test_entrypoint = "examples/standalone/static_site"
+
+[[examples]]
+path = "standalone/streaming"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["streaming"]
+readme = "present"
+test_entrypoint = "examples/standalone/streaming"
+
+[[examples]]
+path = "standalone/survey"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["forms", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/survey"
+
+[[examples]]
+path = "standalone/suspense_dashboard"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["suspense"]
+readme = "present"
+test_entrypoint = "examples/standalone/suspense_dashboard"
+
+[[examples]]
+path = "standalone/theming"
+lane = "standalone"
+status = "supporting"
+tier = 1
+extras = []
+network = "none"
+capabilities = ["pages"]
+readme = "present"
+test_entrypoint = "examples/standalone/theming"
+
+[[examples]]
+path = "standalone/todo"
+lane = "standalone"
+status = "canonical"
+tier = 2
+extras = ["sessions"]
+network = "none"
+capabilities = ["csrf", "data", "forms", "fragments", "pages", "sessions", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/todo"
+
+[[examples]]
+path = "standalone/tools"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["fragments", "sse", "tools"]
+readme = "present"
+test_entrypoint = "examples/standalone/tools"
+
+[[examples]]
+path = "standalone/tools_hitl"
+lane = "standalone"
+status = "experimental"
+tier = 3
+extras = ["ai", "sessions"]
+network = "none"
+capabilities = ["ai", "csrf", "fragments", "sessions", "sse", "tools"]
+readme = "present"
+test_entrypoint = "examples/standalone/tools_hitl"
+
+[[examples]]
+path = "standalone/upload"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = ["forms", "sessions"]
+network = "none"
+capabilities = ["csrf", "forms", "sessions", "uploads", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/upload"
+
+[[examples]]
+path = "standalone/wizard"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = ["sessions"]
+network = "none"
+capabilities = ["forms", "pages", "sessions", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/wizard"
