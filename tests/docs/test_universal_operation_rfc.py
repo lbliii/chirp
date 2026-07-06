@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).parents[2]
 RFC = ROOT / "docs" / "rfcs" / "014-universal-operation.md"
+pytestmark = pytest.mark.issue(339)
 
 
 def _rfc() -> str:
