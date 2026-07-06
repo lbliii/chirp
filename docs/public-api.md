@@ -58,6 +58,19 @@ header. In production Chirp's ASGI server (pounce) applies the trusted-proxy mod
 trusted-derived IP; under a non-pounce server that leaves `scope["client"]` as the
 raw peer, this is only as trustworthy as that server.
 
+`Request` exposes an <code>htmx</code> namespace that normalizes both supported
+htmx request-header generations. <code>target</code> / <code>source</code>
+preserve raw metadata; <code>target_id</code>, <code>target_tag</code>,
+<code>source_id</code>, and <code>source_tag</code> expose parsed element
+identity; <code>request_type</code> is the validated htmx 4
+<code>"full"</code> / <code>"partial"</code> value. The flat
+<code>htmx_target_*</code>, <code>htmx_source_*</code>, and
+<code>htmx_request_type</code> properties delegate to that namespace.
+<code>htmx_trigger</code> returns the htmx 2 <code>HX-Trigger</code> id or falls
+back to the htmx 4 <code>HX-Source</code> id. <code>htmx_trigger_name</code>
+remains a legacy-only value because htmx 4 does not transmit an element
+<code>name</code>.
+
 ## Provisional Extension Surface
 
 These names are public because extension authors and serious apps need them, but their exact

@@ -36,6 +36,12 @@ automatically.
 | Boosted link click | `true` | the wide `page_block_name` (e.g. `page_root`) |
 | Narrow fragment (form post, search input) | absent; `HX-Request: true` | the narrow `block_name` (e.g. `page_content`) |
 
+Htmx 4 also sends `HX-Request-Type`. A `partial` request whose target matches a
+layout outlet starts rendering below that matched layout, so the response owns
+the target's page block without duplicating its surrounding shell. Htmx 2 keeps
+the existing full-layout response plus `hx-select` behavior. Both versions use
+the same `Page(...)` return value and named blocks.
+
 ## Minimal working example
 
 Return `Page(...)` with two block names. The first is the narrow block for
@@ -173,19 +179,21 @@ to cross. You don't configure this branch; the one thing you act on is reading
 the normalized target via `request.htmx_target_id` in any custom code path.
 
 :::{dropdown} Advanced: HX-Target normalization and how redirects are decided
-The `HX-Target` header arrives as `#main` or `main`, depending on how the sending
-element was declared. Chirp strips the leading `#` once, at the request layer:
+The `HX-Target` header arrives as htmx 4 `tag#id`, htmx 2 `#id`, or legacy bare
+`id`. Chirp normalizes all three at the request layer while preserving the raw
+header:
 
 ```python
-request.htmx.target          # → "#main"   (raw header)
-request.htmx.target_id       # → "main"    (normalized)
-request.htmx_target_id       # → "main"    (convenience alias)
+request.htmx.target          # → "main#app-content" (raw htmx 4 header)
+request.htmx.target_tag      # → "main"
+request.htmx.target_id       # → "app-content"
+request.htmx_target_id       # → "app-content" (convenience alias)
 ```
 
 All framework code — fragment target resolution, render-plan building,
 cross-shell redirect logic — consumes the normalized form, and so should your
-code. The raw `.target` is kept only for logging. The registries normalize
-defensively, so you can pass either form when registering or looking up.
+code. The raw `.target` is kept for logging. Selector-like and malformed values
+normalize to `None`, so they cannot accidentally match a layout or registry.
 
 The redirect is decided in three places:
 

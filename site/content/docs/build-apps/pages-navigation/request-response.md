@@ -93,8 +93,10 @@ which is truthy when the `HX-Request` header is present:
 @app.route("/results")
 def results(request: Request):
     if request.htmx:                 # any htmx request
-        target = request.htmx.target  # HX-Target value (e.g. "#results")
-        trigger = request.htmx.trigger
+        target = request.htmx.target       # raw: "#results" or "div#results"
+        target_id = request.htmx.target_id # canonical: "results"
+        source_id = request.htmx.source_id # htmx 4 HX-Source id
+        trigger = request.htmx.trigger     # htmx 2 id, or source_id fallback
     ...
 ```
 
@@ -108,7 +110,8 @@ Two convenience properties cover the common questions:
 | Property | True when |
 |----------|-----------|
 | `request.is_htmx` | Any htmx request (`HX-Request` present) |
-| `request.is_narrow_fragment` | A narrow swap -- excludes boosted navigations and history restores, which still need full page content |
+| `request.is_narrow_fragment` | A narrow swap -- excludes boosted navigations, history restores, and htmx 4 body-level `full` requests |
+| `request.htmx.request_type` | Valid htmx 4 `HX-Request-Type` (`"full"` / `"partial"`), otherwise `None` |
 
 :::{deprecated} request.is_fragment
 `request.is_fragment` is ambiguous for boosted navigations and emits a
@@ -121,7 +124,10 @@ The flat `request.htmx_target` / `request.htmx_trigger` properties are
 convenience shims that delegate to `request.htmx`. Prefer the typed namespace --
 `request.htmx.target`, `request.htmx.boosted`, `request.htmx.history_restore`,
 `request.htmx.target_id` (the bare DOM id used throughout the framework's
-request pipeline).
+request pipeline), and `request.htmx.source_id` / `source_tag` for htmx 4.
+Htmx 4 removed `HX-Trigger-Name`; if a handler needs an application name rather
+than a stable source id, send an explicit application header with `hx-headers`
+and read it from `request.headers`.
 :::
 
 ### QueryParams and Headers

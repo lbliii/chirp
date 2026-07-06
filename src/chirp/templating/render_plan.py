@@ -107,8 +107,13 @@ def _resolve_fragment_block(
             config = fragment_target_registry.get(partial_name)
             if config is not None:
                 return config.fragment_block
-    if request and request.htmx_target and fragment_target_registry:
-        config = fragment_target_registry.get(request.htmx_target)
+    target_id = (
+        getattr(request, "htmx_target_id", getattr(request, "htmx_target", None))
+        if request
+        else None
+    )
+    if target_id and fragment_target_registry:
+        config = fragment_target_registry.get(target_id)
         if config is not None:
             return config.fragment_block
         registered_targets = sorted(fragment_target_registry.registered_targets)
@@ -117,7 +122,7 @@ def _resolve_fragment_block(
             "Register with app.register_fragment_target() or "
             "app.register_page_shell_contract() if this target expects a "
             "different block. Registered targets: %s",
-            request.htmx_target,
+            getattr(request, "htmx_target", None),
             composition.page_block or "page_content",
             registered_targets,
         )
@@ -133,7 +138,12 @@ def _fragment_block_for_request(
     fragment_target_registry: FragmentTargetRegistry | None = None,
 ) -> str:
     """Choose block for htmx fragment response."""
-    if request is None or not request.is_boosted:
+    is_narrow = (
+        getattr(request, "is_narrow_fragment", not getattr(request, "is_boosted", False))
+        if request is not None
+        else True
+    )
+    if request is None or is_narrow:
         return _resolve_fragment_block(
             composition, request, fragment_target_registry=fragment_target_registry
         )
@@ -171,7 +181,7 @@ def _should_render_page_block(request: Request | None) -> bool:
         return True
     if request.is_history_restore or not request.is_htmx:
         return True
-    return request.is_boosted
+    return not request.is_narrow_fragment
 
 
 def _compute_layout_start_index(
@@ -180,6 +190,7 @@ def _compute_layout_start_index(
     is_history_restore: bool,
     *,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    force_partial: bool = False,
 ) -> int:
     """Compute layout start index for HX-Target-aware depth.
 
@@ -193,12 +204,14 @@ def _compute_layout_start_index(
     if is_history_restore or htmx_target is None:
         return 0
     omit_targets: frozenset[str] = frozenset()
+    if force_partial:
+        omit_targets = frozenset({htmx_target.lstrip("#")})
     if fragment_target_registry is not None:
         config = fragment_target_registry.get(htmx_target)
         if config is not None and config.omit_outer_layouts:
             # LayoutChain.start_index_for_htmx_target matches omit_targets
             # in bare-id form; normalize here defensively for either input.
-            omit_targets = frozenset({htmx_target.lstrip("#")})
+            omit_targets = omit_targets | {htmx_target.lstrip("#")}
     idx = layout_chain.start_index_for_htmx_target(
         htmx_target,
         omit_outer_layout_targets=omit_targets,
@@ -265,6 +278,7 @@ def build_render_plan(
             htmx_target,
             is_history_restore,
             fragment_target_registry=fragment_target_registry,
+            force_partial=(request.htmx_request_type == "partial" if request else False),
         )
         block = _fragment_block_for_request(
             composition,

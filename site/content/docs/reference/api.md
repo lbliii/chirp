@@ -155,7 +155,7 @@ from chirp import (
 * - Name
   - Job
 * - `Request`
-  - Frozen dataclass for an incoming request. Properties: `method`, `path`, `query`, `headers`, `cookies`, `content_type`. htmx-awareness: `is_htmx`, `is_narrow_fragment`, `is_boosted`, `is_history_restore`, `htmx_target`, `htmx_trigger`. Async body access: `body()`, `text()`, `json()`, `form()`, `stream()`.
+  - Frozen dataclass for an incoming request. Properties: `method`, `path`, `query`, `headers`, `cookies`, `content_type`. htmx-awareness: `is_htmx`, `is_narrow_fragment`, `is_boosted`, `is_history_restore`, normalized `htmx_target_id` / `htmx_target_tag`, `htmx_source_id` / `htmx_source_tag`, unified `htmx_trigger`, and `htmx_request_type`. Async body access: `body()`, `text()`, `json()`, `form()`, `stream()`.
 * - `Response`
   - HTTP response with a chainable `.with_*()` API (`with_status`, `with_header`, `with_cookie`, `with_hx_redirect`, `with_hx_trigger`, …).
 * - `Redirect`

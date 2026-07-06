@@ -30,6 +30,26 @@ async def test_htmx_fragment_contains_primary_and_oob_updates(example_app) -> No
     assert response.header("x-chirp-render-intent") == "fragment"
 
 
+async def test_htmx4_metadata_normalizes_target_and_source(example_app) -> None:
+    async with TestClient(example_app) as client:
+        response = await client.fragment(
+            "/inspect",
+            method="POST",
+            target="div#metadata",
+            source="button#inspect-button",
+            request_type="partial",
+        )
+
+    assert response.status == 200
+    assert 'data-target-raw="div#metadata"' in response.text
+    assert 'data-target-id="metadata"' in response.text
+    assert 'data-source-id="inspect-button"' in response.text
+    assert 'data-source-tag="button"' in response.text
+    assert 'data-trigger="inspect-button"' in response.text
+    assert 'data-request-type="partial"' in response.text
+    assert 'data-accept="text/html"' in response.text
+
+
 async def test_htmx_failure_remains_html_and_actionable(example_app) -> None:
     async with TestClient(example_app) as client:
         response = await client.fragment(

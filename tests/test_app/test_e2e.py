@@ -271,6 +271,31 @@ class TestAppE2E:
             response = await client.fragment("/search", trigger="search-btn")
             assert "trigger=search-btn" in response.text
 
+    async def test_fragment_with_htmx4_request_metadata(self) -> None:
+        app = App()
+
+        @app.route("/search")
+        def search(request: Request):
+            return "|".join(
+                (
+                    request.htmx_target_id or "none",
+                    request.htmx_source_id or "none",
+                    request.htmx_trigger or "none",
+                    request.htmx_request_type or "none",
+                    request.headers.get("accept", "none"),
+                )
+            )
+
+        async with TestClient(app) as client:
+            response = await client.fragment(
+                "/search",
+                target="div#results",
+                source="button#search-btn",
+                request_type="partial",
+            )
+
+        assert response.text == "results|search-btn|search-btn|partial|text/html"
+
     async def test_fragment_with_history_restore(self) -> None:
         app = App()
 

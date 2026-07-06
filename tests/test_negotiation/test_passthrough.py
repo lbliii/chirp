@@ -113,14 +113,14 @@ class TestNegotiateTemplateTypes:
             kida_env=kida_env,
             request=request,
         )
-        assert result.header("Vary") == "HX-Request"
+        assert result.header("Vary") == "HX-Request, HX-Request-Type"
 
     def test_page_sets_vary_hx_request_on_full_page(self, kida_env: Environment) -> None:
         result = negotiate(
             Page("search.html", "results_list", results=["one"]),
             kida_env=kida_env,
         )
-        assert result.header("Vary") == "HX-Request"
+        assert result.header("Vary") == "HX-Request, HX-Request-Type"
 
     def test_page_composition_renders_fragment(self, kida_env: Environment) -> None:
         async def _receive():

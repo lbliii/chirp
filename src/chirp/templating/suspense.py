@@ -434,7 +434,11 @@ async def render_suspense(
             return page_html
         from chirp.pages.renderer import render_with_layouts
 
-        htmx_target = getattr(request, "htmx_target", None) if request else None
+        htmx_target = (
+            getattr(request, "htmx_target_id", getattr(request, "htmx_target", None))
+            if request
+            else None
+        )
         is_history_restore = getattr(request, "is_history_restore", False) if request else False
         # render_with_layouts is a discrete, complete sync render (one
         # template.render_with_blocks per layout) — the same CPU-bound shape

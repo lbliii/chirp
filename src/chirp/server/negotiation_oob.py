@@ -57,9 +57,9 @@ def _triggers_shell_update(
         return False
     if request.is_boosted:
         return True
-    if not request.htmx_target or not fragment_target_registry:
+    if not request.htmx_target_id or not fragment_target_registry:
         return False
-    config = fragment_target_registry.get(request.htmx_target)
+    config = fragment_target_registry.get(request.htmx_target_id)
     return config is not None and config.triggers_shell_update
 
 
@@ -78,9 +78,9 @@ def resolve_oob_scope(
         return None
     if request.is_boosted:
         return None
-    if not request.htmx_target or not fragment_target_registry:
+    if not request.htmx_target_id or not fragment_target_registry:
         return None
-    config = fragment_target_registry.get(request.htmx_target)
+    config = fragment_target_registry.get(request.htmx_target_id)
     if config is None:
         return None
     return config.scope_name
