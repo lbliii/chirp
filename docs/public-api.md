@@ -64,7 +64,7 @@ shape may still evolve before 1.0:
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
-| Dynamic template reachability | App method `app.declare_template(template, *, blocks=())`; template_declaration errors validate names and the dead-template check treats only declared templates as reachable |
+| Dynamic template reachability | App method `app.declare_template(template, *, blocks=())`; surrounding name whitespace is normalized, template_declaration errors validate names, and the dead-template check treats only declared templates as reachable |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |

@@ -144,8 +144,12 @@ def test_duplicate_blocks_and_exact_declarations_compile_once(tmp_path) -> None:
     )
     app = App(AppConfig(template_dir=tmp_path))
 
-    for _ in range(2):
-        app.declare_template("page.html", blocks=("beta", "alpha", "beta"))
+    declarations = (
+        ("page.html", ("beta", "alpha", "beta")),
+        (" page.html ", (" beta ", " alpha ", " beta ")),
+    )
+    for template, blocks in declarations:
+        app.declare_template(template, blocks=blocks)
     app.freeze()
 
     program = app._runtime_state.hypermedia_program

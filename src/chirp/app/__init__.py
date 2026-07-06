@@ -241,6 +241,7 @@ class App:
         at runtime and static handler-source analysis cannot see the relationship.
         Declared templates count as reachable for the ``dead`` contract check;
         declared template and block names are still validated by ``app.check()``.
+        Surrounding whitespace in template and block names is ignored.
 
         The declaration origin is captured automatically as a public-safe
         ``module:qualname`` plus source line. Call before the app freezes.
@@ -249,7 +250,8 @@ class App:
         if not isinstance(template, str):
             msg = f"template must be a string, got {type(template).__name__}"
             raise TypeError(msg)
-        if not template.strip():
+        template_name = template.strip()
+        if not template_name:
             raise ConfigurationError("Declared template name cannot be empty.")
         if isinstance(blocks, str):
             raise TypeError(
@@ -260,14 +262,17 @@ class App:
             block_values = tuple(blocks)
         except TypeError as exc:
             raise TypeError("blocks must be an iterable of block-name strings") from exc
+        normalized_blocks: list[str] = []
         for block in block_values:
             if not isinstance(block, str):
                 msg = f"block names must be strings, got {type(block).__name__}"
                 raise TypeError(msg)
-            if not block.strip():
+            block_name = block.strip()
+            if not block_name:
                 raise ConfigurationError(
-                    f"Declared block name for template {template!r} cannot be empty."
+                    f"Declared block name for template {template_name!r} cannot be empty."
                 )
+            normalized_blocks.append(block_name)
 
         frame = inspect.currentframe()
         try:
@@ -283,8 +288,8 @@ class App:
 
         self._registry.declare_template(
             TemplateDeclaration(
-                template=template,
-                blocks=tuple(sorted(set(block_values))),
+                template=template_name,
+                blocks=tuple(sorted(set(normalized_blocks))),
                 origin=origin,
             )
         )
