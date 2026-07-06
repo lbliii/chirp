@@ -282,6 +282,65 @@ class TestRouterMethods:
         allow_headers = dict(err.headers)
         assert "GET" in allow_headers["Allow"]
 
+    @pytest.mark.issue(554)
+    def test_head_falls_back_to_get_route(self) -> None:
+        r = Router()
+        get_route = _route("/users/{id}", frozenset({"GET"}))
+        r.add(get_route)
+        r.compile()
+
+        match = r.match("HEAD", "/users/42")
+
+        assert match.route is get_route
+        assert match.path_params == {"id": "42"}
+
+    @pytest.mark.issue(554)
+    def test_explicit_head_route_takes_precedence(self) -> None:
+        r = Router()
+        get_route = _route("/users", frozenset({"GET"}))
+        head_route = _route("/users", frozenset({"HEAD"}))
+        r.add(get_route)
+        r.add(head_route)
+        r.compile()
+
+        assert r.match("GET", "/users").route is get_route
+        assert r.match("HEAD", "/users").route is head_route
+
+    @pytest.mark.issue(554)
+    def test_get_implies_head_in_allow_header(self) -> None:
+        r = Router()
+        r.add(_route("/users", frozenset({"GET"})))
+        r.add(_route("/users", frozenset({"POST"})))
+        r.compile()
+
+        with pytest.raises(MethodNotAllowed) as exc_info:
+            r.match("DELETE", "/users")
+
+        assert dict(exc_info.value.headers)["Allow"] == "GET, HEAD, POST"
+
+    @pytest.mark.issue(554)
+    def test_head_does_not_fall_back_to_unrelated_method(self) -> None:
+        r = Router()
+        r.add(_route("/users", frozenset({"POST"})))
+        r.compile()
+
+        with pytest.raises(MethodNotAllowed) as exc_info:
+            r.match("HEAD", "/users")
+
+        assert dict(exc_info.value.headers)["Allow"] == "POST"
+
+    @pytest.mark.issue(554)
+    def test_head_fallback_works_for_catch_all_route(self) -> None:
+        r = Router()
+        get_route = _route("/files/{path:path}", frozenset({"GET"}))
+        r.add(get_route)
+        r.compile()
+
+        match = r.match("HEAD", "/files/docs/index.html")
+
+        assert match.route is get_route
+        assert match.path_params == {"path": "docs/index.html"}
+
 
 class TestRouterErrors:
     def test_not_found(self) -> None:
