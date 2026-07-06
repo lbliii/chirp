@@ -7,9 +7,9 @@ on ``data-chirp="htmx"`` so a document that already ships htmx (chirp-ui
 ``shell.html``/``boost.html``, the v2 scaffold) is left untouched.
 
 CDN footgun (mirrors Alpine): the script ``src`` **must** use the explicit
-jsDelivr ``/dist/htmx.min.js`` path. The framework convention is jsDelivr; the
-hardcoded chirp-ui/scaffold tags use unpkg, which is why dedup matters once a
-template ships its own tag.
+jsDelivr ``/dist/htmx.min.js`` path. Managed injection, first-party layouts,
+scaffolds, examples, and docs use that same minified browser bundle. Dedup still
+matters when an application template ships its own marked tag.
 
 The htmx core is an external ``src=`` script, but it still accepts the live
 per-request CSP nonce: under a strict nonce-only ``script-src 'nonce-...'`` an
@@ -32,7 +32,7 @@ def htmx_snippet(version: str, *, nonce: str = "") -> str:
     the explicit minified browser bundle.
 
     Args:
-        version: htmx version (e.g. "2.0.4").
+        version: htmx version (e.g. "2.0.10").
         nonce: When non-empty, the ``<script>`` carries a ``nonce="..."``
             attribute so it survives a nonce-based CSP that no longer ships
             ``'unsafe-inline'`` / loads only nonced scripts.

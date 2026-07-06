@@ -58,7 +58,7 @@ class TestHtmxProvisioningRule:
     def test_silent_when_htmx_org_cdn_script_present(self) -> None:
         # Negative control: layout ships its own htmx <script> from the CDN.
         sources = {
-            "layout.html": '<script src="https://unpkg.com/htmx.org@2.0.4"></script>',
+            "layout.html": '<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>',
             "page.html": '<button hx-get="/data">Load</button>',
         }
         assert check_htmx_provisioned(sources, htmx_config_enabled=False) == []

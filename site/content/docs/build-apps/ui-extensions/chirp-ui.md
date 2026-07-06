@@ -167,7 +167,7 @@ without a full reload.
 <head>
   <meta charset="utf-8">
   <title>My Dashboard</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
   <link rel="stylesheet" href="/static/chirpui.css">
 </head>
 <body>

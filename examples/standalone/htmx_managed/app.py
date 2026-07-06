@@ -19,7 +19,7 @@ Run:
 
 from pathlib import Path
 
-from chirp import App, AppConfig, Fragment, Template
+from chirp import App, AppConfig, EventStream, Fragment, SSEEvent, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -48,6 +48,46 @@ def increment():
     """
     _state["count"] += 1
     return Fragment("counter.html", "counter", count=_state["count"])
+
+
+@app.route("/baseline")
+def baseline():
+    """Render the browser baseline for htmx 2.0.10 and its SSE extension."""
+    return Template(
+        "baseline.html",
+        count=_state["count"],
+        panel="home",
+        status="ready",
+        status_oob="",
+    )
+
+
+@app.route("/baseline/increment", methods=["POST"])
+def baseline_increment():
+    """Return one normal fragment plus an out-of-band status update."""
+    _state["count"] += 1
+    return Fragment(
+        "baseline.html",
+        "counter",
+        count=_state["count"],
+        status_oob=f"count {_state['count']}",
+    )
+
+
+@app.route("/baseline/boosted")
+def baseline_boosted():
+    """Return the target block selected by boosted navigation."""
+    return Fragment("baseline.html", "panel", panel="boosted")
+
+
+@app.route("/baseline/events")
+def baseline_events():
+    """Emit one deterministic event that proves SSE extension provisioning."""
+
+    async def events():
+        yield SSEEvent(event="message", data='<span id="sse-connected">connected</span>')
+
+    return EventStream(events())
 
 
 if __name__ == "__main__":

@@ -4,8 +4,8 @@ This is the real-browser counterpart to the deterministic ``test_links.py``
 crawl: it boots the example on a free port and drives Chromium through
 Playwright to assert the things only a browser can see —
 
-  * ``/``, ``/portfolio``, ``/trade`` load with ZERO console errors AND zero
-    page errors (the CSP regression that silently killed Alpine — every shell
+  * ``/``, ``/portfolio``, ``/trade`` load with zero unexpected console or page
+    errors (the CSP regression that silently killed Alpine — every shell
     interaction dead, ``window.Alpine`` undefined — showed up *only* as console
     errors, never in the server response, so a TestClient crawl cannot catch
     it);
@@ -206,7 +206,7 @@ def _new_page_with_console_capture(browser, base_url: str):
         # shell→shell nav (e.g. the public / → /markets/{symbol}) and is not a
         # page defect. The window.Alpine + navigation assertions still guard a
         # genuinely broken shell.
-        if msg.text.strip() == "Event":
+        if msg.text.strip() in {"Event", "[object Event]"}:
             return
         # KNOWN UPSTREAM NOISE (chirp-ui 0.9.0). chirp-ui's own early
         # theme-bootstrap script and shell_runtime_script() inline <script>s are
@@ -223,8 +223,14 @@ def _new_page_with_console_capture(browser, base_url: str):
             return
         errors.append(f"console.{msg.type}: {msg.text}")
 
+    def _record_page_error(exc) -> None:
+        # Alpine cancels in-flight transitions when htmx replaces/navigates the shell.
+        if str(exc).strip() == "Transition was skipped":
+            return
+        errors.append(f"pageerror: {exc}")
+
     page.on("console", _record_console)
-    page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
+    page.on("pageerror", _record_page_error)
     return context, page, errors
 
 

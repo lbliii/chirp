@@ -48,7 +48,10 @@ class TestAlpineCdnRule:
 
     def test_non_alpine_jsdelivr_url_is_ignored(self) -> None:
         sources = {
-            "layout.html": ('<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4"></script>'),
+            "layout.html": (
+                '<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js">'
+                "</script>"
+            ),
         }
         assert check_alpine_cdn_urls(sources) == []
 
