@@ -190,7 +190,9 @@ The helpers derive names, descriptions, requiredness, scalar defaults, and
 supported native constraints from the dataclass. The first preview supports
 text, email, search, telephone, URL, and number inputs. File, select, textarea,
 checkbox, radio, callable defaults, missing descriptions, and incompatible
-Python types fail during app freeze with a concrete field-level error.
+Python types produce a `webmcp` ERROR with the operation, route, template,
+block, field, and concrete fix. Normal debug startup fails on that diagnostic;
+`skip_contract_checks=True` retains it for an explicit later `app.check()`.
 
 `toolautosubmit` is closed by default and is rejected on mutation routes.
 Browsers without WebMCP ignore the extra attributes and retain the complete
@@ -221,3 +223,13 @@ negotiation on the server exactly as they were before projection.
 - `form`: a declared `FormContract` disagrees with the template's fields.
 - `form_contract`: a static mutating form targets a POST route without a
   declared `FormContract`.
+- `webmcp`: an opted-in browser-agent form has malformed or duplicate
+  operation metadata, disagrees with its typed controls, lacks its native
+  route/template/block/submit fallback, enables mutation auto-submit, or omits
+  CSRF/security wiring. These are ERRORs because the malformed surface is
+  agent-visible; the rule emits no style-only warnings.
+
+`chirp check myapp:app --json --coverage` includes declared/compiled WebMCP
+projection and parameter counters. `chirp diff` carries those counters in its
+structured coverage diff, so removing projection proof is visible in CI even
+when the issue list stays unchanged.

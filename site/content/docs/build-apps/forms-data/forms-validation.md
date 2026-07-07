@@ -356,3 +356,10 @@ The helpers emit escaped `toolname`, `tooldescription`,
 They do not register JavaScript tools or bypass the server. Mutation forms
 cannot enable `toolautosubmit`, unsupported controls fail during startup, and
 browsers without WebMCP continue to use the same complete form.
+
+`app.check()` reports malformed or duplicate operation metadata, control/helper
+drift, missing native submission fallback, missing route/template/block, and
+mutation CSRF/security gaps as `webmcp` ERRORs. Each error names the operation
+and source location plus the concrete repair; there are no WebMCP style-only
+warnings. Run `chirp check myapp:app --json --coverage` to include declared and
+compiled projection/parameter counters in CI baselines and contract diffs.

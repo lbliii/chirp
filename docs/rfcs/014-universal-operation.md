@@ -474,8 +474,8 @@ the reviewed migration.
 ## 14. Contract checks and diagnostics
 
 The adapter adds startup diagnostics where setup-time evidence exists. The
-proposed severity policy is part of this RFC and still requires implementation
-tests before activation.
+WebMCP form slice activates this policy through the ERROR-only `webmcp`
+category; other projection rows remain design requirements until implemented.
 
 | Condition | Severity | Required message context |
 | --- | --- | --- |

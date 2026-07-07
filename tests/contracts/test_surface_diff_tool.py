@@ -58,6 +58,9 @@ def test_chirp_surface_diff_tool_returns_json_payload() -> None:
     assert "baseline" in payload
     assert "current" in payload
     assert "diff" in payload
+    assert "coverage" in payload["baseline"]
+    assert "coverage" in payload["current"]
+    assert "coverage" in payload["diff"]
     assert "summary_lines" in payload
 
 
@@ -76,7 +79,7 @@ async def test_chirp_surface_diff_tool_dispatch() -> None:
         "app_import": "examples.chirpui.forum_shell.app:app",
         "baseline": {"issues": []},
         "current": {"issues": []},
-        "diff": {"added": [], "removed": []},
+        "diff": {"added": [], "removed": [], "coverage": []},
         "summary_lines": ["Hypermedia surface change:", "  (no issue changes)"],
     }
     with patch(

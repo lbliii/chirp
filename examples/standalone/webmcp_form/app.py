@@ -4,6 +4,7 @@ Run with ``PYTHONPATH=src python examples/standalone/webmcp_form/app.py``.
 The same handler owns human-browser, htmx, and browser-agent submissions.
 """
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,9 +19,19 @@ from chirp import (
     form_or_errors,
 )
 from chirp.contracts import FormContract, contract
+from chirp.middleware.csrf import CSRFMiddleware
+from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 TEMPLATES = Path(__file__).parent / "templates"
 app = App(AppConfig(template_dir=TEMPLATES, htmx=True))
+app.add_middleware(
+    SessionMiddleware(
+        SessionConfig(
+            secret_key=os.environ.get("SESSION_SECRET_KEY", "dev-only-not-for-production")
+        )
+    )
+)
+app.add_middleware(CSRFMiddleware())
 
 
 @dataclass(frozen=True, slots=True)

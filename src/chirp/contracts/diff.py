@@ -12,10 +12,11 @@ class ContractDiff:
 
     added: tuple[dict[str, Any], ...]
     removed: tuple[dict[str, Any], ...]
+    coverage_changes: tuple[dict[str, Any], ...] = ()
 
     @property
     def has_changes(self) -> bool:
-        return bool(self.added or self.removed)
+        return bool(self.added or self.removed or self.coverage_changes)
 
     @property
     def added_errors(self) -> tuple[dict[str, Any], ...]:
@@ -30,6 +31,10 @@ class ContractDiff:
         lines = ["Hypermedia surface change:"]
         lines.extend(f"  + {self._format_issue_line(issue)}" for issue in self.added)
         lines.extend(f"  - {self._format_issue_line(issue)}" for issue in self.removed)
+        lines.extend(
+            f"  ~ coverage {item['name']}: {item['baseline']} -> {item['current']}"
+            for item in self.coverage_changes
+        )
         if not self.has_changes:
             lines.append("  (no issue changes)")
         return lines
@@ -69,6 +74,13 @@ class ContractDiff:
                 lines.append("**Removed**")
                 lines.extend(f"- `{self._format_issue_line(issue)}`" for issue in self.removed)
                 lines.append("")
+            if self.coverage_changes:
+                lines.append("**Coverage**")
+                lines.extend(
+                    f"- `{item['name']}: {item['baseline']} -> {item['current']}`"
+                    for item in self.coverage_changes
+                )
+                lines.append("")
         if self.added_errors:
             lines.append(
                 f"> **{len(self.added_errors)} new contract error(s).** Review before merge."
@@ -106,4 +118,19 @@ def diff_contract_dicts(
     removed_keys = set(base_issues) - set(curr_issues)
     added = tuple(curr_issues[k] for k in sorted(added_keys))
     removed = tuple(base_issues[k] for k in sorted(removed_keys))
-    return ContractDiff(added=added, removed=removed)
+    baseline_coverage = baseline.get("coverage", {})
+    current_coverage = current.get("coverage", {})
+    coverage_changes = tuple(
+        {
+            "name": name,
+            "baseline": baseline_coverage.get(name, 0),
+            "current": current_coverage.get(name, 0),
+        }
+        for name in sorted(set(baseline_coverage) | set(current_coverage))
+        if baseline_coverage.get(name, 0) != current_coverage.get(name, 0)
+    )
+    return ContractDiff(
+        added=added,
+        removed=removed,
+        coverage_changes=coverage_changes,
+    )

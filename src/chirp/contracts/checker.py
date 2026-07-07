@@ -1,6 +1,7 @@
 """Hypermedia contracts checker orchestration."""
 
 import copy
+import dataclasses
 import inspect
 import logging
 import re
@@ -110,6 +111,7 @@ from .rules_template_declarations import check_template_declarations
 from .rules_template_stream import check_template_stream_client_shape
 from .rules_unreachable_blocks import check_unreachable_blocks
 from .rules_vary import check_vary_coverage
+from .rules_webmcp import check_webmcp_contracts
 from .template_scan import (
     extract_fragment_island_ids,
     extract_href_references,
@@ -147,6 +149,8 @@ def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
     post_routes_with_form_contract = 0
     mounted_page_routes = 0
     mounted_page_routes_with_contract = 0
+    webmcp_projections_declared = 0
+    webmcp_parameters_declared = 0
     for route in routes:
         contract = getattr(route.handler, "_chirp_contract", None)
         if "POST" in getattr(route, "methods", frozenset()):
@@ -157,6 +161,12 @@ def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
             mounted_page_routes += 1
             if contract is not None:
                 mounted_page_routes_with_contract += 1
+        form_contract = getattr(contract, "form", None)
+        if getattr(form_contract, "webmcp", None) is not None:
+            webmcp_projections_declared += 1
+            datacls = getattr(form_contract, "datacls", None)
+            if dataclasses.is_dataclass(datacls):
+                webmcp_parameters_declared += len(dataclasses.fields(datacls))
     fragment_registry = snapshot.fragment_target_registry
     oob_registry = snapshot.oob_registry
     return ContractCoverage(
@@ -168,6 +178,9 @@ def _build_coverage(snapshot: ContractCheckSnapshot) -> ContractCoverage:
         page_shell_required_blocks=len(fragment_registry.required_fragment_blocks),
         fragment_targets_registered=len(fragment_registry.registered_targets),
         oob_regions_registered=len(oob_registry.registered_blocks) if oob_registry else 0,
+        webmcp_projections_declared=webmcp_projections_declared,
+        webmcp_projections_compiled=len(snapshot.extras.get("webmcp_valid_tools", ())),
+        webmcp_parameters_declared=webmcp_parameters_declared,
     )
 
 
@@ -761,6 +774,15 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             result.issues.extend(check_heading_order(source, template_name))
 
         result.issues.extend(validate_form_contracts(result, router, template_sources))
+        result.issues.extend(
+            check_webmcp_contracts(
+                router,
+                template_sources,
+                middleware_list,
+                snapshot.extras.get("webmcp_compile_diagnostics", ()),
+                snapshot.extras.get("webmcp_valid_tools", ()),
+            )
+        )
         result.issues.extend(check_oob_targets(template_sources, all_ids))
         result.issues.extend(check_duplicate_static_ids(template_sources))
         signal_registry = getattr(app._mutable_state, "signal_registry", None)

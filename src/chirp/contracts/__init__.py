@@ -5,7 +5,7 @@ from chirp.webmcp import WebMCPForm
 from .checker import check_hypermedia_surface
 from .declarations import FormContract, FragmentContract, RouteContract, SSEContract, contract
 from .diff import ContractDiff, diff_contract_dicts
-from .serialize import issue_fingerprint, issue_to_dict, result_to_dict
+from .serialize import coverage_to_dict, issue_fingerprint, issue_to_dict, result_to_dict
 from .surface_diff import (
     check_at_git_ref,
     collect_check_json,
@@ -33,6 +33,7 @@ __all__ = [
     "collect_check_payload",
     "collect_surface_diff",
     "contract",
+    "coverage_to_dict",
     "diff_contract_dicts",
     "find_git_root",
     "issue_fingerprint",

@@ -602,9 +602,9 @@ path = "standalone/webmcp_form"
 lane = "standalone"
 status = "experimental"
 tier = 2
-extras = []
+extras = ["sessions"]
 network = "none"
-capabilities = ["forms", "fragments", "mutations", "validation", "webmcp"]
+capabilities = ["csrf", "forms", "fragments", "mutations", "sessions", "validation", "webmcp"]
 readme = "present"
 test_entrypoint = "examples/standalone/webmcp_form"
 

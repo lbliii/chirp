@@ -203,6 +203,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "form": "Forms",
     "form_contract": "Forms",
     "csrf_form": "Forms",
+    "webmcp": "Forms",
     "layout_chain": "Layouts",
     "layout_outlet": "Layouts",
     "layout_frame": "Layouts",
@@ -354,6 +355,12 @@ def _format_coverage(result: CheckResult, c: _Palette) -> list[str]:
     lines.append(
         f"  OOB regions: {c.bold}{coverage.oob_regions_registered}{c.reset}"
         f" {c.dim}registered{c.reset}"
+    )
+    lines.append(
+        f"  WebMCP projections: {c.bold}{coverage.webmcp_projections_compiled}/"
+        f"{coverage.webmcp_projections_declared}{c.reset}"
+        f" {c.dim}compiled ({coverage.webmcp_parameters_declared} parameter"
+        f"{'s' if coverage.webmcp_parameters_declared != 1 else ''}){c.reset}"
     )
     return lines
 

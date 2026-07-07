@@ -214,3 +214,4 @@ class TestFormatterConcernGroups:
         assert "Coverage" not in without
         assert "Coverage" in with_coverage
         assert "POST FormContract" in with_coverage
+        assert "WebMCP projections" in with_coverage

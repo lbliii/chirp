@@ -45,6 +45,7 @@ def _run_structured_check(app, args: argparse.Namespace) -> None:
         app,
         deploy=args.deploy,
         include_info=args.include_info,
+        include_coverage=args.coverage,
     )
 
     if args.baseline:
@@ -62,6 +63,7 @@ def _run_structured_check(app, args: argparse.Namespace) -> None:
                         "diff": {
                             "added": list(diff.added),
                             "removed": list(diff.removed),
+                            "coverage": list(diff.coverage_changes),
                         },
                     },
                     indent=2,

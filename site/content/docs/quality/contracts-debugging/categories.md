@@ -160,6 +160,7 @@ original origin.
 | `form` | ERROR / WARNING | Align `FormContract` fields with actual `<input>`, `<select>`, and `<textarea>` names. |
 | `form_contract` | INFO | Add a `FormContract` to POST routes targeted by static forms, or accept the informational gap. |
 | `csrf_form` | WARNING | Add `{{ csrf_field() }}`, `csrf_token()`, or `_csrf_token` to static mutating forms when `CSRFMiddleware` is active. |
+| `webmcp` | ERROR | Fix malformed/duplicate operation metadata, compiled-control drift, native form fallback, route/template/block references, mutation auto-submit, or CSRF/security wiring before exposing the form to browser agents. WebMCP emits no style-only warnings. |
 | `command` | WARNING | Fix command declarations, route handlers, or command metadata. |
 | `commandfor` | WARNING | Fix command target references that cannot be resolved. |
 | `vary` | WARNING | Add required `Vary` behavior for cache-sensitive htmx or middleware paths. |

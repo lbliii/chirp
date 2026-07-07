@@ -9,6 +9,7 @@
     <form id="task-form" method="post" action="/tasks"
           hx-post="/tasks" hx-target="#task-form" hx-swap="outerHTML"
           {{ webmcp_form_attrs("tasks.create") }}>
+      {{ csrf_field() }}
       <label>Title <input{{ webmcp_control_attrs("tasks.create", "title") }}></label>
       {% for message in errors | field_errors("title") %}<p>{{ message }}</p>{% end %}
       <label>Priority <input{{ webmcp_control_attrs("tasks.create", "priority") }}></label>
