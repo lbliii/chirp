@@ -189,8 +189,15 @@ function looksLikeFullDocument(html) {
   return /<!doctype\s+html\b|<html[\s>]/i.test(String(html));
 }
 
+function classifyMethod(method) {
+  var normalized = String(method || "").toUpperCase();
+  if (/^(GET|HEAD|OPTIONS|TRACE|QUERY)$/.test(normalized)) return "safe";
+  if (/^(POST|PUT|PATCH|DELETE)$/.test(normalized)) return "mutation";
+  return "other";
+}
+
 function isMutatingMethod(method) {
-  return /^(POST|PUT|PATCH|DELETE)$/i.test(String(method || ""));
+  return classifyMethod(method) === "mutation";
 }
 
 function detailLine(label, value, source) {

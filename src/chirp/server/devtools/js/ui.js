@@ -567,7 +567,8 @@ function renderActivityLog() {
       var dc = document.createElement("div");
       dc.style.cssText = "width:100%";
 
-      var coreLines = ["Path: " + r.path, "Method: " + r.method, "Target: " + r.target, "Swap: " + r.swap];
+      var methodLabel = r.method + (r.methodSemantics ? " (" + r.methodSemantics + ")" : "");
+      var coreLines = ["Path: " + r.path, "Method: " + methodLabel, "Target: " + r.target, "Swap: " + r.swap];
       if (r.requestId) coreLines.push("X-Request-Id: " + r.requestId);
       if (r.elt) coreLines.push("Trigger: " + desc(r.elt));
       var coreDetail = document.createElement("div");

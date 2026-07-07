@@ -44,6 +44,10 @@ Open the app in a browser:
 - Expanded htmx request rows include Swap Doctor diagnostics for broad
   inherited targets, missing `hx-select` matches, no-op swaps, full-page
   documents returned to fragments, missing targets, and render-plan clues.
+- Request rows use htmx's reported verb, show whether the method is safe or
+  mutating, and preserve response timing and error-body evidence. RFC 10008
+  `QUERY` is classified as safe even when issued programmatically with
+  `htmx.ajax("QUERY", ...)`.
 
 The SSE tab shows native Chirp `EventStream` traces. It does not replace
 `window.EventSource`. Framework streams such as browser reload are hidden by
@@ -123,7 +127,7 @@ fields:
 
 - `records`: htmx request records with request/response headers, render intent,
   typed return traces, render-plan data, effective `hx-*`, Swap Doctor evidence,
-  and body previews.
+  method semantics, timing phases, response content type, and body previews.
 - `errors`: htmx and DevTools warnings/errors.
 - `historyEvents`: deduplicated push, replace, update, and restore events.
 - `sseConnections`: native Chirp EventStream connection summaries.
@@ -142,7 +146,9 @@ When the response comes through the frozen app runtime, the trace also carries
 the route's compiled ID, a stable observation ID, request-mode tags, and the
 relevant compiled transition IDs/descriptions. Dynamic path values and context
 values are not included. The header is diagnostic metadata only; it does not
-change response negotiation.
+change response negotiation. It also records the request method and request
+content type so a QUERY trace can be distinguished from the same render branch
+reached by GET or a mutation.
 
 ## Test Evidence
 

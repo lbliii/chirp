@@ -204,6 +204,17 @@ def test_devtools_labels_removed_timing_headers_unsupported_in_htmx4() -> None:
     assert "[unsupported by htmx 4]" in HTMX_DEBUG_BOOT_JS
 
 
+@pytest.mark.issue(529)
+def test_htmx_debug_js_records_query_as_a_safe_method() -> None:
+    """Programmatic htmx QUERY requests use event verbs and stay non-mutating."""
+    assert "request.method || d.verb ||" in HTMX_DEBUG_BOOT_JS
+    assert 'if (/^(GET|HEAD|OPTIONS|TRACE|QUERY)$/.test(normalized)) return "safe"' in (
+        HTMX_DEBUG_BOOT_JS
+    )
+    assert "r.methodSemantics = classifyMethod(r.method)" in HTMX_DEBUG_BOOT_JS
+    assert "if (!isMutatingMethod(method)) return" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:
     """Inspector records whether hx-* values are direct, inherited, blocked, or default."""
     assert "getEffectiveConfigDetails" in HTMX_DEBUG_BOOT_JS

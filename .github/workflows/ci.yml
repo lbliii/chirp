@@ -139,6 +139,7 @@ jobs:
           examples/standalone/htmx_managed/test_browser_smoke.py
           examples/standalone/devtools_htmx4/test_browser_smoke.py
           examples/standalone/webmcp_form/test_browser_smoke.py
+          tests/contracts/test_query_devtools_browser.py
           -q --tb=short --timeout=120
 
   # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded

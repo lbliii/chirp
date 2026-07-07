@@ -283,6 +283,7 @@ function createRecord() {
     path: "",
     method: "GET",
     source: "",
+    methodSemantics: "safe",
     target: "",
     swap: "innerHTML",
     status: null,
@@ -332,13 +333,14 @@ function collectConfigRequest(evt) {
   var elt = htmxSource(d) || evt.target;
   var r = createRecord();
   r.path = htmxAction(d, elt);
-  r.method = String(request.method || (d.parameters && d.parameters["_method"]) || (elt && (
+  r.method = String(request.method || d.verb || (d.parameters && d.parameters["_method"]) || (elt && (
     elt.getAttribute("hx-post") ? "POST" :
     elt.getAttribute("hx-put") ? "PUT" :
     elt.getAttribute("hx-patch") ? "PATCH" :
     elt.getAttribute("hx-delete") ? "DELETE" : "GET"
   )));
   r.method = r.method.toUpperCase();
+  r.methodSemantics = classifyMethod(r.method);
   r.elt = elt;
   r.source = elt ? desc(elt) : "";
   var target = ctx.target || d.target;

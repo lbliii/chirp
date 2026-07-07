@@ -29,6 +29,8 @@ class ReturnTrace:
     return_type: str
     category: str
     is_htmx: bool
+    method: str | None = None
+    request_content_type: str | None = None
     render_intent: str = "unknown"
     status: int | None = None
     template: str | None = None

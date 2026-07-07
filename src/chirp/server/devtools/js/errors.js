@@ -159,12 +159,12 @@ onHtmxEventPair(["htmx:configRequest", "htmx:config:request"], function(evt) {
     toast("Load-trigger targets #main", "hx-trigger=\"load\" will replace the page on load. Use fragment_island or hx-target=\"this\".", COLORS.warning);
   }
 
-  var method = (elt.getAttribute && elt.getAttribute("hx-post")) ? "post" :
+  var method = d.verb || ((elt.getAttribute && elt.getAttribute("hx-post")) ? "post" :
     (elt.getAttribute && elt.getAttribute("hx-put")) ? "put" :
     (elt.getAttribute && elt.getAttribute("hx-patch")) ? "patch" :
     (elt.getAttribute && elt.getAttribute("hx-delete")) ? "delete" :
-    (elt.getAttribute && elt.getAttribute("method")) === "post" ? "post" : null;
-  if (!method || method === "get") return;
+    (elt.getAttribute && elt.getAttribute("method")) === "post" ? "post" : null);
+  if (!isMutatingMethod(method)) return;
   var hasExplicitTarget = elt.getAttribute && elt.getAttribute("hx-target");
   if (!hasExplicitTarget) {
     var ancestor = elt.closest && elt.closest("[hx-target]");

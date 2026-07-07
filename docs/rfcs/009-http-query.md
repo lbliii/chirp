@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -17,9 +17,11 @@ validation, request `Content-Type` enforcement, configured body-limit parity,
 post-negotiation `Accept` enforcement, protocol error headers, and ASGI-only
 sync fallback; path-scoped `Allow`/`Accept-Query` and automatic `OPTIONS`
 discovery; exact redirect status preservation; equivalent-resource headers;
-and shared GET/QUERY ETag and Last-Modified evaluation. Client and page
-ergonomics, render-surface proof, caching, deployment, and promotion remain
-owned by #527-#535. This advances the #525 receipt's original #526-#535
+and shared GET/QUERY ETag and Last-Modified evaluation. Issue #529 proves the
+existing Page, Fragment, OOB, Stream, Suspense, validation, redirect, and
+DevTools paths without adding a QUERY-specific render surface. Client and page
+ergonomics, caching, deployment, and promotion remain owned by #527-#535. This
+advances the #525 receipt's original #526-#535
 delivery range without changing its request-contract claim. Discovery/`OPTIONS`
 and the response semantics described below are now executable behavior.
 
@@ -243,6 +245,32 @@ The implementation must not edit `templating/render_plan.py`,
 `templating/returns.py`, or `templating/suspense.py` merely to recognize the
 method. If proof exposes a real render-pipeline gap, that change gets its own
 design check-in.
+
+### 6.1 Executable rendering and diagnostics receipt (#529)
+
+The existing return-type pipeline requires no QUERY branch. End-to-end tests
+now exercise synchronous and asynchronous handlers through these paths:
+
+- non-htmx `Page` renders the complete document, while the same route with
+  `HX-Request` and `HX-Target` renders only its named content block;
+- direct `Fragment` and OOB responses retain their named-block and wrapper
+  behavior;
+- a missing OOB block fails with `500` and never emits an empty swap wrapper;
+- `Stream` retains progressive ASGI framing, while `Suspense` sends its shell
+  before the resolved htmx OOB block; and
+- malformed input, `ValidationError`, and `Redirect` keep their existing typed
+  status and header behavior.
+
+In debug mode, the typed return trace includes the HTTP method and request
+content type. Chirp DevTools reads the authoritative
+`htmx:configRequest.detail.verb`, classifies `QUERY` as safe rather than
+mutating, and records response content type, target, selected block, render
+intent, timing phases, streamed return metadata, and error bodies. A real
+Chromium smoke drives both a fragment and a stream with
+`htmx.ajax("QUERY", ...)`, plus a `422` validation response.
+
+This receipt did not modify `templating/render_plan.py`,
+`templating/returns.py`, or `templating/suspense.py`.
 
 ## 7. Discovery and `Accept-Query`
 

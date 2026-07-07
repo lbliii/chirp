@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<body>
+  <main id="suspense-shell">
+    {% block result %}<section id="result">
+      {% if result is deferred %}
+        <span class="pending">query-pending</span>
+      {% else %}
+        <span class="resolved">{{ result }}</span>
+      {% end %}
+    </section>{% end %}
+  </main>
+</body>
+</html>

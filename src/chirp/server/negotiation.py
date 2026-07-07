@@ -113,6 +113,14 @@ def _is_htmx(request: Request | None) -> bool:
     return bool(request and request.is_htmx)
 
 
+def _trace_request_content_type(request: Request | None) -> str | None:
+    """Return bounded request media metadata for a debug response header."""
+    if request is None or request.content_type is None:
+        return None
+    value = request.content_type
+    return value if len(value) <= 256 else value[:253] + "..."
+
+
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
 
@@ -160,6 +168,8 @@ def _trace_return(
             return_type=return_type,
             category=category,
             is_htmx=_is_htmx(request),
+            method=request.method if request is not None else None,
+            request_content_type=_trace_request_content_type(request),
             render_intent=render_intent,
             status=status,
             template=template,
