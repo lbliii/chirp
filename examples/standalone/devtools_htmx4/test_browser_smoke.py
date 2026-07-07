@@ -367,7 +367,10 @@ def test_managed_preview_bundle_csp_sse_and_devtools(
         )
         mismatch = page.evaluate("() => window.ChirpHtmxDebug.getHtmxCompatibility()")
         assert mismatch["compatibilityState"] == "mismatch"
-        assert not errors, errors
+        # htmx 4's fetch-backed SSE reader can surface this Chromium message
+        # when hx-sse:close aborts the body after the expected `done` event.
+        unexpected_errors = [error for error in errors if error != "BodyStreamBuffer was aborted"]
+        assert not unexpected_errors, errors
     finally:
         page.close()
 
@@ -467,7 +470,9 @@ def test_managed_preview_default_contracts(
         page.wait_for_function(
             "() => document.querySelector('#queue-result')?.textContent.includes('Queued')"
         )
-        page.wait_for_timeout(250)
+        queue_deadline = time.monotonic() + (_TIMEOUT_MS / 1_000)
+        while len(queue_order) < 4 and time.monotonic() < queue_deadline:
+            page.wait_for_timeout(50)
         assert queue_order == ["request", "response", "request", "response"]
         queue_records = page.evaluate(
             """() => window.ChirpHtmxDebug.getState().records
@@ -520,6 +525,7 @@ def test_preview_timing_migration_uses_rendered_data_and_target_lifecycle(
         page.close()
 
 
+@pytest.mark.slow
 @pytest.mark.issue(553)
 def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
     preview_base_url: str,
@@ -540,12 +546,25 @@ def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
         assert page.locator("#sse-feed li").all_inner_texts() == ["feed one", "feed two"]
         assert page.locator("#sse-source").count() == 1
 
+        page.evaluate(
+            """() => {
+              window.__sseGeneratorErrorObserved = false;
+              const source = new EventSource('/events/error');
+              source.addEventListener('error', () => {
+                window.__sseGeneratorErrorObserved = true;
+                source.close();
+              });
+            }"""
+        )
         page.wait_for_function(
             """async () => {
               const response = await fetch('/__chirp/debug/traces.json', {cache: 'no-store'});
               const payload = await response.json();
               const records = payload.records.filter(record => record.path === '/events');
-              return records.some(record => record.phase === 'start' &&
+              const errorRecords = payload.records.filter(
+                record => record.path === '/events/error');
+              return window.__sseGeneratorErrorObserved &&
+                records.some(record => record.phase === 'start' &&
                 record.data.dialect === 'htmx4') &&
                 records.some(record => record.phase === 'event' &&
                   record.data.message_class === 'targeted-partial' &&
@@ -554,7 +573,7 @@ def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
                   record.data.message_class === 'oob-html' && record.data.id === '2') &&
                 records.some(record => record.phase === 'event' &&
                   record.data.message_class === 'named-dom-event') &&
-                records.some(record => record.phase === 'generator_error');
+                errorRecords.some(record => record.phase === 'generator_error');
             }""",
             timeout=_TIMEOUT_MS,
         )
@@ -584,6 +603,12 @@ def test_preview_signals_repeat_replace_and_reconnect_without_duplicate_updates(
     browser,
 ) -> None:
     page = browser.new_page()
+    page.add_init_script(
+        """window.__signalSseConnected = false;
+        document.addEventListener('htmx:after:sse:connection', () => {
+          window.__signalSseConnected = true;
+        });"""
+    )
     try:
         page.goto(signal_preview_base_url, wait_until="load", timeout=_TIMEOUT_MS)
         sinks = page.locator('[data-chirp-signal="preview_balance"]')
@@ -597,7 +622,7 @@ def test_preview_signals_repeat_replace_and_reconnect_without_duplicate_updates(
             }""",
             timeout=_TIMEOUT_MS,
         )
-        page.wait_for_timeout(100)
+        page.wait_for_function("() => window.__signalSseConnected", timeout=_TIMEOUT_MS)
 
         page.evaluate("() => fetch('/signals/set?value=9', {method: 'POST'})")
         page.wait_for_function(
