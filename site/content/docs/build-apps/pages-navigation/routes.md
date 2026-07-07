@@ -125,6 +125,18 @@ shortcut, response caching, or a new return type. Use
 `TestClient.request("QUERY", ...)` for tests; ordinary HTML needs a separately
 designed GET fallback because native forms cannot submit QUERY.
 
+QUERY uses the same typed HTML return pipeline as every other method. A
+non-htmx request returning `Page` gets the full document; an htmx request to
+the same route gets the selected named block. `Fragment`, OOB, `Stream`, and
+`Suspense` keep their existing rendering and fail-loud behavior, including a
+hard failure rather than an empty swap when a required block is missing.
+
+With `debug=True`, Chirp DevTools reports QUERY as a safe method and captures
+its request and response content types, htmx target, selected block, render
+intent, timing, streaming metadata, and errors. Programmatic clients can use
+`htmx.ajax("QUERY", path, context)` while declarative QUERY transport remains a
+separate compatibility gate.
+
 See [RFC 009](https://github.com/lbliii/chirp/blob/main/docs/rfcs/009-http-query.md)
 for the compatibility tier and remaining promotion gates.
 

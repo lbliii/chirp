@@ -1,0 +1,14 @@
+{% block page_root %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>QUERY rendering proof</title>
+</head>
+<body>
+  <button id="query-source" type="button">Run QUERY</button>
+  <main id="query-target">
+    {% block content %}<section class="query-result">{{ message }}</section>{% end %}
+  </main>
+  {% block notice %}<aside id="notice">{{ notice }}</aside>{% end %}
+</body>
+</html>{% end %}
