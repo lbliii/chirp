@@ -1,6 +1,8 @@
 """Smoke tests for the core benchmark harness."""
 
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -26,6 +28,17 @@ assert _WORKLOADS_SPEC is not None
 assert _WORKLOADS_SPEC.loader is not None
 _WORKLOADS = importlib.util.module_from_spec(_WORKLOADS_SPEC)
 _WORKLOADS_SPEC.loader.exec_module(_WORKLOADS)
+
+
+def test_core_benchmark_imports_in_a_clean_process() -> None:
+    """The release benchmark must not depend on pytest's import order."""
+    subprocess.run(
+        [sys.executable, "-c", "from chirp.server.negotiation import negotiate"],
+        cwd=_CORE_PATH.parents[1],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 @pytest.mark.asyncio

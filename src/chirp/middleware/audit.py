@@ -45,7 +45,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode
 
-from chirp.contracts.rules_security_stack import MUTATING_METHODS
 from chirp.http.response import FileResponse, SSEResponse, StreamingResponse
 from chirp.security.audit import emit_security_event
 
@@ -63,6 +62,13 @@ _VALID_LEVELS = frozenset({_LEVEL_NONE, _LEVEL_METADATA, _LEVEL_REQUEST, _LEVEL_
 # urlencode-safe sentinel: survives application/x-www-form-urlencoded
 # re-encoding without percent-escaping (stays readable in audit logs).
 _REDACTED = "REDACTED"
+
+
+def _default_audited_methods() -> frozenset[str]:
+    """Load the canonical mutating-method set without an import-time cycle."""
+    from chirp.contracts.rules_security_stack import MUTATING_METHODS
+
+    return MUTATING_METHODS
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +94,7 @@ class AuditConfig:
 
     level: str = _LEVEL_NONE
     max_body_bytes: int = 4096
-    audited_methods: frozenset[str] = MUTATING_METHODS
+    audited_methods: frozenset[str] = field(default_factory=_default_audited_methods)
     redact_keys: tuple[str, ...] = ("password", "token", "secret", "csrf_token")
     redact_patterns: tuple[str, ...] = ()
     # Precompiled redaction patterns — derived once at construction so the

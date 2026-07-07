@@ -1,3 +1,58 @@
+## [0.9.0] — 2026-07-07
+
+### Added
+
+- Published the universal-operation design boundary for projecting one typed Milo command across Chirp HTTP, htmx, CLI, MCP, WebMCP, and MCP Apps without adding automatic exposure, a parallel renderer, or a generic JSON path. ([#339](https://github.com/lbliii/chirp/issues/339))
+- Added `TestClient.boosted()` and boosted route-smoke coverage that distinguishes negotiated `Page` shell outlets from unsafe full-page `Template` responses. ([#497](https://github.com/lbliii/chirp/issues/497))
+- Added a self-validating example inventory that records support status, dependencies, network needs, capabilities, README coverage, and test entrypoints for every runnable example. ([#501](https://github.com/lbliii/chirp/issues/501))
+- Published the structured application-inspection design for one immutable result shared by Python consumers, terminal checks, versioned JSON, and contract diff tooling while preserving the existing CLI JSON contract. ([#510](https://github.com/lbliii/chirp/issues/510))
+- Added stable compiled-transition IDs and public-safe descriptions to debug return traces, DevTools exports, and testing coverage helpers so normal, boosted, targeted, mutation, OOB, Suspense, and SSE paths can share runtime evidence. ([#511](https://github.com/lbliii/chirp/issues/511))
+- **Full-application journey** — connect the maintained Todo, Kanban Shell, Dashboard Live, Lucky Cat, and Freeze Site examples into one tested path from SQLite and dual-mode forms through boosted navigation, OOB, Suspense, SSE, contract diagnostics, deployment, and optional static projection. ([#512](https://github.com/lbliii/chirp/issues/512))
+- Added experimental RFC 10008 QUERY request enforcement for explicit routes through `App.route(..., methods=["QUERY"], query_media_types=(...))`, with freeze-time media-range validation, ASGI-only dispatch, body-limit parity, and actionable 400/406/413/415/422 behavior. Existing bare `methods=["QUERY"]` routes must add a non-empty media declaration before freeze. ([#525](https://github.com/lbliii/chirp/issues/525))
+- Added path-scoped HTTP QUERY discovery and response semantics: generated 405/OPTIONS responses advertise `Allow` and structured `Accept-Query`, existing Redirect/Response headers represent opaque equivalent resources, and ordinary GET/QUERY responses share ETag and Last-Modified evaluation without introducing new public helpers. ([#526](https://github.com/lbliii/chirp/issues/526))
+- Added executable HTTP QUERY rendering and DevTools proof across Page, Fragment, OOB, Stream, Suspense, validation, and redirects. Debug traces now include the request method and content type, while DevTools identifies programmatic QUERY requests as safe and records their selected render path, timing, and errors. ([#529](https://github.com/lbliii/chirp/issues/529))
+- Added a collision-safe provisional HTTP QUERY cache-key design that hashes exact request bodies and representation metadata without exposing raw content, preserves handler body reads and private-request bypass, and leaves QUERY cache reads and writes disabled pending the separate opt-in gate. ([#530](https://github.com/lbliii/chirp/issues/530))
+- Added explicit HTTP QUERY response caching through `CacheMiddleware(query_key_func=...)`, with default-off behavior, private and streaming bypass, preserved render metadata, conditional-hit validators, backend fail-open handling, and actionable optional Redis installation guidance. ([#531](https://github.com/lbliii/chirp/issues/531))
+- An exact, reversible htmx 4.0.0-beta5 preview now provisions core, htmx-2-compat, and hx-sse in nonce-safe order, with fail-loud compatibility checks and DevTools diagnostics; htmx 2.0.10 remains the default and rollback baseline. ([#545](https://github.com/lbliii/chirp/issues/545))
+- `app.check()` now reports line-aware htmx 2/4 provisioning and template drift, including version-specific attributes, lifecycle events, configuration keys, extension dialects, and implicit inheritance. A pinned optional upstream inventory command retains migration evidence without adding a runtime dependency. ([#547](https://github.com/lbliii/chirp/issues/547))
+- Added a machine-verified CLI compatibility contract covering every command,
+  flag, default, output channel, exit policy, structured mode, lazy-import
+  boundary, and agent-exposure decision before the planned Milo migration. ([#571](https://github.com/lbliii/chirp/issues/571))
+- Add an explicit experimental `WebMCPForm` projection that renders safely escaped declarative browser-tool attributes from frozen dataclass form contracts while preserving ordinary HTTP, htmx, validation, and CSRF behavior. ([#574](https://github.com/lbliii/chirp/issues/574))
+- Add ERROR-only `app.check()` diagnostics and structured coverage/diff counters for malformed, drifting, or unsafe experimental WebMCP form projections. ([#575](https://github.com/lbliii/chirp/issues/575))
+- Add a Chrome 149 progressive-enhancement lane and authenticated, unauthorized, expired-session, CSRF, adversarial-input, confirmation, and htmx parity proof for experimental WebMCP forms. ([#576](https://github.com/lbliii/chirp/issues/576))
+- **Dynamic template reachability** — use `app.declare_template(template, blocks=(...))` during setup when a registry selects templates or named blocks at runtime. Chirp normalizes surrounding name whitespace, `app.check()` validates every declared name, and the declaration records the call-site origin without suppressing unrelated dead-template warnings.
+
+    **Migration** — replace unreachable `if False: Page(...)` or `Fragment(...)` reference stubs with the matching `app.declare_template(...)` call.
+- Release CI now reports an advisory compatibility canary that installs the built Chirp wheel into a pinned, locked Furatena checkout and exercises its framework-facing integration paths.
+
+### Changed
+
+- Pelt now drains failed query exchanges through `ReadyForQuery` before raising, so pooled connections reliably roll back failed transactions before reuse. Its free-threading contract also has no-GIL contention and decode-overlap gates, live PostgreSQL pool/cache proof, and an auditable evidence map; current database docs identify the in-tree pure-Python driver instead of the retired asyncpg backend. ([#259](https://github.com/lbliii/chirp/issues/259))
+- Added reproducible browser, Pounce HTTP/1.1/2/3, Uvicorn, Nginx, retry, redirect, body-limit, and body-redacted access-log, metric, and trace evidence for experimental HTTP QUERY deployments. ([#532](https://github.com/lbliii/chirp/issues/532))
+- Published the experimental HTTP QUERY adoption guide, compatibility matrix, GET-first guidance, deployment and cache boundaries, migration notes, and release decision: controlled early-adopter use is documented, while stable promotion remains gated on client/pages ergonomics, static diagnostics, and the canonical example. ([#535](https://github.com/lbliii/chirp/issues/535))
+- Chirp DevTools, islands, safe-target processing, and View Transitions now consume both htmx 2 lifecycle events and htmx 4 fetch-era events. Request-context correlation prevents duplicate diagnostics and island effects when the `htmx-2-compat` extension emits both event names. ([#542](https://github.com/lbliii/chirp/issues/542))
+- The verified htmx 2.x baseline is now 2.0.10. AppConfig.htmx_version, managed injection, first-party layouts, scaffolds, examples, tests, and source-site docs now use the explicit jsDelivr /dist/htmx.min.js browser bundle. ([#543](https://github.com/lbliii/chirp/issues/543))
+- Signals now follow the selected htmx client tier: htmx 2 retains named SSE
+  events and `sse-swap`, while the exact htmx 4 preview uses one native
+  `hx-sse:connect` and unnamed `<hx-partial>` updates targeting every matching
+  `data-chirp-signal` sink. ([#544](https://github.com/lbliii/chirp/issues/544))
+- Request htmx metadata now normalizes htmx 4 `tag#id` targets and sources alongside htmx 2 headers, exposes validated `HX-Request-Type`, varies negotiated pages by request type, and extends `TestClient` with htmx 4 request metadata helpers. ([#546](https://github.com/lbliii/chirp/issues/546))
+- The exact htmx 4 preview now declares safe browser defaults before core: 4xx fragments swap, broad 5xx responses do not, requests time out after 60 seconds, history refetches server HTML, OOB updates are main-first, DELETE form data is explicit, and queues use `hx-sync`. `app.check()` and DevTools diagnose dangerous drift with browser regression proof. ([#548](https://github.com/lbliii/chirp/issues/548))
+- Htmx 4 preview requests now fail before send when a response contains removed `HX-Trigger-After-Swap` or `HX-Trigger-After-Settle` headers. Htmx 2 and generic wire behavior remains unchanged; preview applications migrate to rendered target data and per-target settle lifecycle events. ([#549](https://github.com/lbliii/chirp/issues/549))
+- The exact htmx 4 preview now gives `EventStream` a native, connection-fixed SSE dialect: rendered fragments use unnamed HTML and validated `<hx-partial>` targets, named `SSEEvent` values remain DOM events, `sse_scope()` emits `hx-sse:connect`, and tests and DevTools expose the selected wire contract. Htmx 2 and generic SSE behavior remains available during migration. ([#553](https://github.com/lbliii/chirp/issues/553))
+- Newly generated projects now require `bengal-chirp>=0.9.0`, keeping scaffold dependency metadata aligned with the framework version that produced it.
+- Raised the required `kida-templates` version to `>=0.11.0`, the framework-integration checkpoint with unchanged runtime API and template syntax, so Chirp releases against Kida's current tested component and free-threading baseline.
+
+### Fixed
+
+- The documented development environment now installs the passkey dependency needed to collect and run the complete example test suite.
+
+  The todo example now uses `Page` return-type negotiation instead of manually branching on htmx request state. ([#499](https://github.com/lbliii/chirp/issues/499))
+- HEAD requests now select explicit HEAD routes or fall back to GET routes, advertise HEAD wherever GET is allowed, and require bengal-pounce 0.8.2 so dynamic responses retain GET-equivalent metadata while sending no body bytes. Applications that relied on GET-only routes rejecting HEAD with 405 should register an explicit HEAD route for their policy. ([#554](https://github.com/lbliii/chirp/issues/554))
+- Fixed a circular import that prevented direct imports of the server negotiator and clean-process runs of the core benchmark.
+
+
 ## [0.8.2] — 2026-06-25
 
 ### Added
