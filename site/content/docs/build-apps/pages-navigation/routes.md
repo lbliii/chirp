@@ -88,6 +88,46 @@ them safe for uptime monitors and deployment probes.
     Allowed`. Applications that relied on that rejection should register an
     explicit `HEAD` route and return the response their policy requires.
 
+### Experimental HTTP QUERY routes
+
+Chirp supports the RFC 10008 `QUERY` method on explicitly registered routes.
+Declare every request media range the resource understands:
+
+```python
+@app.route(
+    "/search",
+    methods=["QUERY"],
+    query_media_types=("application/x-www-form-urlencoded",),
+)
+async def search(request: Request):
+    form = await request.form()
+    return Page("search.html", q=form.get("q", ""))
+```
+
+`query_media_types` is required for a `QUERY` route and is rejected on routes
+that do not include `QUERY`. Chirp validates and normalizes the tuple when the
+app freezes. Invalid values, duplicate ranges, unsupported wildcard shapes,
+and empty declarations fail startup with the route name and repair guidance.
+
+On the ASGI path, Chirp rejects a missing or malformed `Content-Type` with
+`400`, an undeclared media type with `415`, an oversized body with `413` when
+the handler reads it, and a negotiated response that cannot satisfy `Accept`
+with `406`. QUERY error responses advertise the declared formats through the
+RFC 9651 Structured Field `Accept-Query` header. Format parsers and application
+validation remain responsible for distinguishing malformed content (`400`)
+from a syntactically valid but unprocessable query (`422`). Chirp never sniffs
+the body or replaces its declared media type.
+
+This support is experimental and explicit-route-only. QUERY falls through the
+fused sync path to ASGI even for a synchronous handler. It does not add a
+filesystem `query()` convention, native form transport, a `TestClient.query()`
+shortcut, response caching, or a new return type. Use
+`TestClient.request("QUERY", ...)` for tests; ordinary HTML needs a separately
+designed GET fallback because native forms cannot submit QUERY.
+
+See [RFC 009](https://github.com/lbliii/chirp/blob/main/docs/rfcs/009-http-query.md)
+for the compatibility tier and remaining promotion gates.
+
 ## Path Parameters
 
 Dynamic segments are defined with curly braces:

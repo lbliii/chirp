@@ -31,11 +31,21 @@ class AppRegistry:
         referenced: bool,
         template: str | None,
         inline: bool,
+        query_media_types: tuple[str, ...] | None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._ensure_mutable()
             self._state.pending_routes.append(
-                PendingRoute(path, func, methods, name, referenced, template, inline)
+                PendingRoute(
+                    path=path,
+                    handler=func,
+                    methods=methods,
+                    name=name,
+                    referenced=referenced,
+                    template=template,
+                    inline=inline,
+                    query_media_types=query_media_types,
+                )
             )
             return func
 

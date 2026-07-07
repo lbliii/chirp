@@ -125,7 +125,7 @@ from chirp import (
 
 * - Decorator / method
   - Job
-* - `@app.route(path, methods=...)`
+* - `@app.route(path, methods=..., query_media_types=...)`
   - Register a route handler.
 * - `@app.error(code_or_type)`
   - Register an error handler.

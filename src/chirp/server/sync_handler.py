@@ -29,6 +29,8 @@ def handle_sync(
         return None
 
     method = raw.method.decode("ascii")
+    if method == "QUERY":
+        return None
     path = raw.path.split(b"?", 1)[0].decode("ascii")
 
     try:

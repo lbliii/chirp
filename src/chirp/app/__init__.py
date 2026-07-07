@@ -221,6 +221,7 @@ class App:
         referenced: bool = False,
         template: str | None = None,
         inline: bool = False,
+        query_media_types: tuple[str, ...] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         return self._registry.route(
             path,
@@ -229,6 +230,7 @@ class App:
             referenced=referenced,
             template=template,
             inline=inline,
+            query_media_types=query_media_types,
         )
 
     def provide(self, annotation: type, factory: Callable[..., Any]) -> None:
