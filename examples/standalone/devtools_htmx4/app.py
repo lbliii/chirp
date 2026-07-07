@@ -281,9 +281,20 @@ def preview_events(request: Request):
             id="2",
         )
         yield SSEEvent(data="named payload", event="notice")
-        yield SSEEvent(data="cursor", event="cursor", id="3")
-        # Browser contract: a failed connection still reconnects from id 3.
-        raise RuntimeError("intentional SSE reconnect proof")
+        # Keep native EventSource reconnect proof fast on loaded CI runners.
+        yield SSEEvent(data="cursor", event="cursor", id="3", retry=100)
+        # A clean EOF makes reconnect behavior independent from the separate
+        # generator-error event below.
+        return
+
+    return EventStream(generate())
+
+
+@preview_app.route("/events/error", referenced=True)
+def preview_error_events():
+    async def generate():
+        yield SSEEvent(data="before error", event="probe")
+        raise RuntimeError("intentional SSE generator error proof")
 
     return EventStream(generate())
 
