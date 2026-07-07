@@ -25,6 +25,7 @@ from chirp.logging import request_id_var
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.routing.route import RouteMatch
 from chirp.routing.router import Router
+from chirp.server.conditional import evaluate_conditional_response
 from chirp.server.debug_runtime import (
     DEBUG_MANIFEST_PATH,
     DEBUG_TRACES_PATH,
@@ -51,7 +52,11 @@ from chirp.server.fragment_targets_debug import (
 )
 from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.negotiation import negotiate
-from chirp.server.query_protocol import validate_query_request, validate_query_response
+from chirp.server.query_protocol import (
+    prepare_query_discovery,
+    validate_query_request,
+    validate_query_response,
+)
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_file_response, send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -360,6 +365,9 @@ def create_request_handler(
             from chirp.tools.handler import handle_mcp_request
 
             return await handle_mcp_request(req, tool_registry)
+        query_discovery = prepare_query_discovery(router, req)
+        if query_discovery is not None:
+            return query_discovery
         fragment_target = req._cache.get(FRAGMENT_DISPATCH_CACHE_KEY)
         if isinstance(fragment_target, FragmentDispatchTarget):
             match = fragment_target.match
@@ -669,6 +677,8 @@ async def _invoke_handler(
         suspense_error_block=suspense_error_block,
     )
     validate_query_response(match.route, request, response)
+    if isinstance(response, Response):
+        response = evaluate_conditional_response(request, response)
     if hypermedia_program is not None:
         return_trace = get_return_trace(request)
         if return_trace is not None:

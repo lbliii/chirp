@@ -143,6 +143,15 @@ class _CatchAllEdge:
     route_by_method: dict[str, Route]
 
 
+@dataclass(frozen=True, slots=True)
+class _PathDiscovery:
+    """Immutable path-scoped method metadata for protocol discovery."""
+
+    allowed_methods: frozenset[str]
+    query_media_types: tuple[str, ...] | None
+    explicit_options: bool
+
+
 class Router:
     """Compiled router with trie-based path matching.
 
@@ -312,10 +321,7 @@ class Router:
 
         # Method not allowed?
         if node.routes_by_method:
-            effective_methods = set(node.routes_by_method)
-            if "GET" in effective_methods:
-                effective_methods.add("HEAD")
-            all_methods = frozenset(effective_methods)
+            all_methods = self._effective_methods(node.routes_by_method)
             allow_value = ", ".join(sorted(all_methods))
             raise MethodNotAllowed(
                 all_methods,
@@ -326,6 +332,30 @@ class Router:
             )
 
         raise NotFound(f"No route matches {method} {path!r}")
+
+    @staticmethod
+    def _effective_methods(routes_by_method: dict[str, Route]) -> frozenset[str]:
+        methods = set(routes_by_method)
+        if "GET" in methods:
+            methods.add("HEAD")
+        query_route = routes_by_method.get("QUERY")
+        if query_route is not None and query_route.query_media_types:
+            methods.add("OPTIONS")
+        return frozenset(methods)
+
+    def _discover_path(self, path: str) -> _PathDiscovery | None:
+        """Return method and QUERY metadata for a matched path, ignoring method."""
+        parts = [part for part in path.strip("/").split("/") if part]
+        result = self._match_node(self._root, parts, 0, {})
+        if result is None:
+            return None
+        node, _ = result
+        query_route = node.routes_by_method.get("QUERY")
+        return _PathDiscovery(
+            allowed_methods=self._effective_methods(node.routes_by_method),
+            query_media_types=(query_route.query_media_types if query_route is not None else None),
+            explicit_options="OPTIONS" in node.routes_by_method,
+        )
 
     def _match_node(
         self,

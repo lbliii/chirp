@@ -9,7 +9,9 @@ from chirp.http.query_media import (
     serialize_accept_query,
 )
 from chirp.http.request import Request
+from chirp.http.response import Response
 from chirp.routing.route import Route
+from chirp.routing.router import Router
 
 QUERY_ACCEPT_HEADER_CACHE_KEY = "_chirp_query_accept"
 
@@ -17,6 +19,23 @@ QUERY_ACCEPT_HEADER_CACHE_KEY = "_chirp_query_accept"
 def _accept_query_header(route: Route) -> tuple[tuple[str, str], ...]:
     supported = route.query_media_types or ()
     return (("Accept-Query", serialize_accept_query(supported)),)
+
+
+def prepare_query_discovery(router: Router, request: Request) -> Response | None:
+    """Cache path metadata and synthesize OPTIONS for declared QUERY routes."""
+    discovery = router._discover_path(request.path)
+    if discovery is None or not discovery.query_media_types:
+        return None
+    accept_query = serialize_accept_query(discovery.query_media_types)
+    request._cache[QUERY_ACCEPT_HEADER_CACHE_KEY] = accept_query
+    if request.method != "OPTIONS" or discovery.explicit_options:
+        return None
+    allow = ", ".join(sorted(discovery.allowed_methods))
+    return (
+        Response(body="", status=204)
+        .with_header("Allow", allow)
+        .with_header("Accept-Query", accept_query)
+    )
 
 
 def validate_query_request(route: Route, request: Request) -> None:

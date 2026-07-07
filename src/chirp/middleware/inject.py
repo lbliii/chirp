@@ -22,7 +22,8 @@ from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.csp_nonce import csp_nonce
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.middleware.streaming_html import async_stream_inject_before_body
-from chirp.server.sender import _etag_matches, _format_http_date, _parse_http_date
+from chirp.server.conditional import etag_matches, parse_http_date
+from chirp.server.sender import _format_http_date
 
 _LOG = logging.getLogger("chirp.middleware.inject")
 
@@ -146,9 +147,9 @@ def _finalize_html(
     not_modified = False
     if inm is not None:
         # If-None-Match takes precedence over If-Modified-Since (RFC 9110).
-        not_modified = _etag_matches(inm, etag)
+        not_modified = etag_matches(inm, etag)
     elif ims is not None:
-        ims_ts = _parse_http_date(ims)
+        ims_ts = parse_http_date(ims)
         # HTTP-date has whole-second resolution; truncate mtime so a file last
         # modified at e.g. 12:00:00.53 still matches a 12:00:00 header.
         if ims_ts is not None and int(mtime) <= int(ims_ts):

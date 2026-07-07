@@ -128,6 +128,40 @@ designed GET fallback because native forms cannot submit QUERY.
 See [RFC 009](https://github.com/lbliii/chirp/blob/main/docs/rfcs/009-http-query.md)
 for the compatibility tier and remaining promotion gates.
 
+#### Discovery, redirects, and validators
+
+For a path with a declared QUERY route, a framework-generated `405` includes
+`QUERY` and `OPTIONS` in `Allow` plus the structured `Accept-Query` value.
+Chirp also answers `OPTIONS` with a bodyless `204` carrying those headers unless
+you registered an explicit `OPTIONS` route, which always wins.
+
+Use existing response headers for retrievable results and equivalent resources:
+
+```python
+return (
+    Response(rendered_results)
+    .with_header("Content-Location", "/results/r_54a59b9f")
+    .with_header("Location", "/searches/q_7f83b165")
+    .with_header("ETag", 'W/"search-v1"')
+)
+```
+
+Identifiers are application-owned and must be opaque; never copy sensitive
+QUERY content into a temporary URI. Ordinary GET and QUERY `Response` values
+share `If-None-Match` and `If-Modified-Since` evaluation when the application
+supplies `ETag` or `Last-Modified`, producing a bodyless `304` on a match.
+
+`Redirect` also remains the only redirect primitive. Chirp preserves `301`,
+`302`, `307`, and `308` so an RFC-compliant client can repeat QUERY, while
+`303` hands the client off to GET. Test the actual client in your deployment;
+when method retention is critical, prefer `307` or `308` because common client
+compatibility around custom methods and `301`/`302` varies.
+
+Range behavior is unchanged: range-capable responses such as the existing file
+sender retain GET semantics for QUERY, while generic HTML responses make no
+byte-range promise. Query formats should generally expose their own paging or
+limit controls instead.
+
 ## Path Parameters
 
 Dynamic segments are defined with curly braces:

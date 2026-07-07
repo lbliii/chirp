@@ -13,6 +13,7 @@ from chirp._internal.asgi import Send
 from chirp.context import request_var
 from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.logging import request_id_var
+from chirp.server.conditional import etag_matches, parse_http_date
 
 logger = logging.getLogger("chirp.server")
 
@@ -355,34 +356,6 @@ def _format_http_date(timestamp: float) -> str:
     return formatdate(timestamp, usegmt=True)
 
 
-def _parse_http_date(value: str) -> float | None:
-    """Parse an HTTP-date header into a POSIX timestamp, or None if invalid."""
-    from email.utils import parsedate_to_datetime
-
-    try:
-        return parsedate_to_datetime(value).timestamp()
-    except TypeError, ValueError, IndexError, OverflowError:
-        return None
-
-
-def _etag_matches(if_none_match: str, etag: str) -> bool:
-    """Return True if *etag* is matched by an ``If-None-Match`` header value.
-
-    Handles the ``*`` wildcard and a comma-separated list of (possibly weak)
-    entity-tags. Weak comparison is used for ``If-None-Match`` per RFC 9110.
-    """
-    if_none_match = if_none_match.strip()
-    if if_none_match == "*":
-        return True
-    bare = etag[2:] if etag.startswith("W/") else etag
-    for candidate in if_none_match.split(","):
-        candidate = candidate.strip()
-        cand_bare = candidate[2:] if candidate.startswith("W/") else candidate
-        if cand_bare == bare:
-            return True
-    return False
-
-
 def _if_range_matches(if_range: str, etag: str, last_modified: str) -> bool:
     """Return True if an ``If-Range`` validator still matches the representation.
 
@@ -402,7 +375,7 @@ def _if_range_matches(if_range: str, etag: str, last_modified: str) -> bool:
             return False
         return if_range == etag
     # HTTP-date form: must equal the current Last-Modified exactly.
-    parsed = _parse_http_date(if_range)
+    parsed = parse_http_date(if_range)
     if parsed is None:
         return False
     return if_range == last_modified
@@ -544,9 +517,9 @@ async def send_file_response(
         not_modified = False
         if inm is not None:
             # If-None-Match takes precedence over If-Modified-Since (RFC 9110).
-            not_modified = _etag_matches(inm, etag)
+            not_modified = etag_matches(inm, etag)
         elif ims is not None:
-            ims_ts = _parse_http_date(ims)
+            ims_ts = parse_http_date(ims)
             # HTTP-date has whole-second resolution; truncate mtime so a file
             # last modified at e.g. 12:00:00.53 still matches a 12:00:00 header.
             if ims_ts is not None and int(st.st_mtime) <= int(ims_ts):
