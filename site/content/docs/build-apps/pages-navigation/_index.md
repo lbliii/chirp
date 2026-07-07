@@ -22,6 +22,10 @@ a `pages/` directory straight onto URLs. Already building? Jump to
 [[docs/build-apps/pages-navigation/request-response|Request & Response]] for the
 immutable request and chainable response API.
 
+Evaluating a safe body-bearing search? Read
+[[docs/build-apps/pages-navigation/http-query|Experimental HTTP QUERY]] for the
+GET-first decision rule and compatibility boundary.
+
 :::{cards}
 :columns: 2
 :gap: medium

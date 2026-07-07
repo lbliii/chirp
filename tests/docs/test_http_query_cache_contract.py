@@ -18,11 +18,11 @@ def test_query_rfc_records_key_inputs_lifecycle_and_measurement() -> None:
     assert "This is a synthetic implementation receipt" in rfc
 
 
-def test_query_user_docs_do_not_claim_cache_opt_in() -> None:
+def test_query_user_docs_keep_cache_default_off() -> None:
     routes = (
         _ROOT / "site" / "content" / "docs" / "build-apps" / "pages-navigation" / "routes.md"
     ).read_text()
     forum = (_ROOT / "docs" / "deployment" / "forum-production.md").read_text()
     assert "`CacheMiddleware` still bypasses QUERY" in routes
     assert "it does not enable cache reads or writes" in routes
-    assert "`CacheMiddleware` does not cache QUERY responses" in forum
+    assert "`CacheMiddleware` bypasses QUERY responses by default" in forum

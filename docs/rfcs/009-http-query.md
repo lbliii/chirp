@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; #531 explicit cache opt-in implemented; #532 interoperability proof implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; #531 explicit cache opt-in implemented; #532 interoperability proof implemented; #535 experimental release decision documented; stable promotion gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -21,8 +21,10 @@ and shared GET/QUERY ETag and Last-Modified evaluation. Issue #529 proves the
 existing Page, Fragment, OOB, Stream, Suspense, validation, redirect, and
 DevTools paths without adding a QUERY-specific render surface. Issue #530 adds
 the collision-safe request key and body-reuse proof while leaving cache reads
-and writes disabled until #531. Client and page ergonomics, cache opt-in,
-deployment, and promotion remain owned by #527-#535. This advances the #525
+and writes disabled until #531. Client and page ergonomics, static contracts,
+the canonical example, and stable promotion remain owned by
+#527/#528/#533/#534. Issue #535 records the experimental release decision and
+canonical adoption guidance. This advances the #525
 receipt's original #526-#535
 delivery range without changing its request-contract claim. Discovery/`OPTIONS`
 and the response semantics described below are now executable behavior.
@@ -113,8 +115,22 @@ Promotion requires all of the following:
 - documentation, release notes, and a release-gate decision.
 
 Until that convergence, documentation must say “experimental explicit-route
-support,” not “native form support,” “htmx support,” “cacheable by Chirp,” or
-“production-ready QUERY.”
+support,” not “native form support,” “declarative htmx support,” “cached by
+default,” or “production-ready QUERY.”
+
+### 3.3 Experimental release decision (#535)
+
+The experimental release gate is met. Chirp may describe the shipped surface
+as **experimental early-adopter HTTP QUERY support** because request/response
+enforcement, typed rendering, explicit body-aware cache opt-in, and the tested
+browser/server/proxy matrix are executable.
+
+Stable or first-class promotion is not approved. Filesystem/test-client
+ergonomics (#527), declarative htmx plus a native GET fallback (#528), complete
+static wiring diagnostics (#533), and the canonical complex-search example
+(#534) remain open. The canonical adoption guide is
+[`docs/http-query.md`](../http-query.md). It preserves the deployment caveats,
+GET-first decision rule, and exact release checklist.
 
 ## 4. Route declaration
 
@@ -425,15 +441,15 @@ workload.
 ## 10. Caching
 
 Although RFC 10008 permits QUERY responses to be cached, the cache key must
-include request content and related metadata. Chirp's current key includes
-method, path, URI query, and htmx shape, but not the body or content metadata.
+include request content and related metadata. Chirp keeps QUERY caching
+default-off and requires an explicit body-aware key callback.
 
 Therefore:
 
-- `CacheMiddleware` continues to bypass every non-GET request;
-- the asynchronous, provisional `chirp.cache.key.query_cache_key()` design is
-  safe to evaluate for eligible QUERY requests, but is not yet wired into
-  middleware;
+- `CacheMiddleware` bypasses QUERY unless it is manually registered with a
+  `query_key_func`; configuration-managed caching remains GET-only;
+- the asynchronous, provisional `chirp.cache.key.query_cache_key()` is the
+  supplied opt-in key for eligible QUERY requests;
 - its versioned SHA-256 input uses length-framed exact body bytes, content type
   and parameters, content encoding, target path/query, `Accept`, configured
   vary inputs, htmx/full-page/boost/history shape, target ID, and htmx partial
@@ -615,7 +631,7 @@ IMF-fixdate values.
 | §2.4 | `Location` on 2xx may identify the equivalent resource. | Existing response header API; app owns lifetime/auth. | #526 direct-result tests |
 | §2.5 | `301`/`302`/`307`/`308` repeat QUERY; `303` hands off to GET. | Preserve status/Location; no POST rewrite; distinguish `HX-Redirect`. | #526 client and Pounce transport tests |
 | §2.6 | Conditional fields apply to the selected equivalent representation. | Shared GET/QUERY validators; no validator invented for streams. | #526 ETag/date/precondition tests |
-| §2.7 | QUERY responses may be cached. | Deferred and bypassed by default. | #531 opt-in cache tests |
+| §2.7 | QUERY responses may be cached. | Explicit opt-in implemented; bypassed by default. | #531 opt-in cache tests |
 | §2.7 | Cache key must include content and related metadata. | Required before opt-in; exact bytes by default. | #530 collision/property/body-reuse tests |
 | §2.7 | Semantic normalization may affect only the key. | Deferred; media-type-specific proof required; raw request unchanged. | Explicit future RFC/check-in |
 | §2.8 | Range has GET semantics; query-native paging is preferred. | Existing range-capable responses only; no generic dynamic range claim. | #526 documentation/protocol test |
@@ -664,7 +680,8 @@ same issue named in the matrix rather than a second QUERY-only abstraction.
 | #531 cache opt-in | `src/chirp/cache/middleware.py`, backends | explicit opt-in, stream/validator/backend-failure/contention tests; complete middleware measurement |
 | #532 deployment | CORS middleware and external Pounce/ASGI/intermediary harnesses | browser preflight, available HTTP versions, retry and proxy behavior; deployment fallback docs |
 | #533 contracts | `src/chirp/contracts/`, route explorer, autodoc, surface diff, freeze/speculation | `tests/contracts/`, freeze/speculation non-execution tests, existing-severity regression tests; contract docs and changelog |
-| #534/#535 adoption | executable complex-search example and canonical docs/site sources | example smoke/browser tests, docs link checks, release gate and compatibility statement |
+| #534 example | executable complex-search example | example smoke/browser tests, GET fallback, `app.check()`, and public-safe content sweep |
+| #535 adoption | canonical docs/site sources | docs drift/link checks, experimental release decision, compatibility statement, and release checklist |
 
 ## 16. Delivery order and implementation gates
 

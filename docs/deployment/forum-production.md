@@ -48,15 +48,15 @@ not collide. `CacheMiddleware` also bypasses requests carrying `Cookie` or
 feature flags, or other app-specific variants. Include those in a custom key for
 scoped pages, or leave those pages uncached.
 
-`CacheMiddleware` does not cache QUERY responses. Chirp's provisional QUERY
-key design covers exact body bytes and request metadata, but cache reads and
-writes remain disabled until the explicit opt-in, validator, streaming, and
-backend-failure contracts are complete. Do not treat the presence of a key
-builder as permission to cache body-bearing requests globally. Experimental
-opt-in is available only by manually passing `query_key_func=query_cache_key`
-to `CacheMiddleware`; configuration-managed caching remains GET-only. Use a
-shared backend, short TTLs, explicit invalidation, and application-specific vary
-headers before considering it for public, repeatable searches.
+`CacheMiddleware` bypasses QUERY responses by default. Chirp's provisional
+QUERY key covers exact body bytes and request metadata, but it does not opt
+body-bearing requests into caching globally. Experimental opt-in is available
+only by manually passing `query_key_func=query_cache_key` to
+`CacheMiddleware`; configuration-managed caching remains GET-only. Private,
+streaming, SSE, `Set-Cookie`, non-200, and key/backend-failure paths bypass.
+Use a shared backend, short TTLs, explicit invalidation, and
+application-specific vary headers before considering it for public, repeatable
+searches.
 
 ## SSE
 

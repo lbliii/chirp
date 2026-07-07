@@ -10,7 +10,8 @@ def test_rfc_records_query_response_matrix_and_remaining_gates() -> None:
     assert "#526 response contract implemented" in text
     assert "Executable response matrix (#526)" in text
     assert "test_chirp_preserves_query_redirect_status_and_location" in text
-    assert "owned by #527-#535" in text
+    assert "#527/#528/#533/#534" in text
+    assert "#535 records the experimental release decision" in text
 
 
 def test_site_documents_discovery_opaque_urls_and_client_boundary() -> None:
