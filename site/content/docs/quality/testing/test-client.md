@@ -189,6 +189,30 @@ returned to a boosted shell target therefore identifies the route and target
 instead of silently passing as a valid outlet response.
 :::
 
+:::{dropdown} Report compiled-transition evidence
+With `AppConfig(debug=True)`, typed responses include a bounded return trace
+correlated to the frozen application program. Use `transition_coverage` to
+compare real `TestClient` responses with request modes or compiled transition
+IDs that the test deliberately expects:
+
+```python
+from chirp.testing import transition_coverage
+
+responses = await assert_route_smoke(client, [
+    RouteSmokeCase("/projects", mode="full_page"),
+    RouteSmokeCase("/projects", mode="boosted", target="main"),
+])
+report = transition_coverage(
+    responses,
+    expected_modes=("normal", "boosted", "targeted"),
+)
+assert report.untested_modes == ("targeted",)
+```
+
+This is runtime response evidence, not a browser substitute. Keep Playwright
+coverage for DOM swaps, history, focus, and View Transition behavior.
+:::
+
 :::{note} See also
 - [[docs/quality/testing/assertions|Assertions]] -- fragment, OOB, and SSE assertion helpers
 - [[docs/build-apps/html-fragments/fragments|Fragments]] -- how fragment rendering works

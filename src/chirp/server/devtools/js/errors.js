@@ -186,7 +186,8 @@ CH.help = function() {
     enabledBy: "AppConfig(debug=True) or chirp dev app:app",
     drawer: "Press Ctrl+Shift+D to toggle the Chirp DevTools drawer.",
     inspector: "Press Ctrl+Shift+K to inspect effective hx-* attributes.",
-    exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, SSE, View Transition, render-plan, and Swap Doctor records.",
+    exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, transition, SSE, View Transition, render-plan, and Swap Doctor records.",
+    transitionCoverage: "Call window.ChirpHtmxDebug.transitionCoverage(['normal', 'boosted', 'targeted']) to report observed and intentionally untested request modes.",
     getState: "Call window.ChirpHtmxDebug.getState() for the live in-browser state object.",
     verboseBootLog: "Set localStorage['chirp-debug-verbose']='1' before reload to log boot.",
   };
@@ -198,11 +199,14 @@ CH.exportRecordsJson = function() {
     historyEvents: state.historyEvents,
     sseConnections: state.sseConnections,
     sseEvents: state.sseEvents,
+    transitionTraces: state.transitionTraces,
+    transitionCoverage: buildTransitionCoverage([]),
     vtEvents: state.vtEvents,
   }, null, 2);
 };
 CH.getSSEConnections = function() { return state.sseConnections; };
 CH.getViewTransitions = function() { return state.vtEvents; };
+CH.transitionCoverage = function(expectedModes) { return buildTransitionCoverage(expectedModes || []); };
 
 // --- Boot ---
 function boot() {

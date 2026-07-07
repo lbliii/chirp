@@ -21,6 +21,8 @@ Features (v3):
 - **View Transition tracking**: Hooks ``document.startViewTransition`` lifecycle.
 - **DOM diff**: Before/after swap snapshots with unified diff view.
 - **Render plan inspector**: Decodes ``X-Chirp-Render-Plan`` header into detail panel.
+- **Compiled transition evidence**: Correlates bounded return traces with
+  public-safe compiler edge descriptions and reports explicitly expected mode gaps.
 
 The JavaScript is split into modules under ``devtools/js/`` and concatenated at
 import time into a single IIFE. No build step required.

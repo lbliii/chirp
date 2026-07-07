@@ -71,12 +71,14 @@ For browser-capable agents, export records straight from the page:
 ```javascript
 window.ChirpHtmxDebug.help()
 window.ChirpHtmxDebug.exportRecordsJson()
+window.ChirpHtmxDebug.transitionCoverage(["normal", "boosted", "targeted"])
 ```
 
 The exported records include htmx requests, errors, SSE connections and events,
-View Transition events, render plans, and Swap Doctor diagnostics. Reach for this
-when the visual symptom is vague but the request, target, and render intent
-should be precise.
+View Transition events, render plans, compiled-transition evidence, and Swap
+Doctor diagnostics. `transitionCoverage()` reports which explicitly expected
+request modes have no runtime observation. Reach for this when the visual
+symptom is vague but the request, target, and render intent should be precise.
 
 The same diagnosis surface works with htmx 2 and htmx 4. Fetch-era request
 records come from `event.detail.ctx`; htmx 2 records continue to use the XHR.

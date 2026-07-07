@@ -80,11 +80,15 @@ the app, evaluate these commands in the browser context:
 ```javascript
 window.ChirpHtmxDebug.help()
 window.ChirpHtmxDebug.exportRecordsJson()
+window.ChirpHtmxDebug.transitionCoverage(["normal", "boosted", "targeted"])
 ```
 
 `help()` describes the available API. `exportRecordsJson()` returns htmx
 requests, errors, SSE connections and events, View Transition events, render
-plans, and Swap Doctor records in a machine-readable form.
+plans, compiled-transition evidence, and Swap Doctor records in a
+machine-readable form. `transitionCoverage()` compares the modes you explicitly
+expect with the bounded observations captured by the server. It reports gaps;
+it does not claim that a static route graph proves browser behavior.
 
 For application lifecycle hooks during the transition, register both event
 names and deduplicate by request context:
@@ -124,9 +128,37 @@ fields:
 - `historyEvents`: deduplicated push, replace, update, and restore events.
 - `sseConnections`: native Chirp EventStream connection summaries.
 - `sseEvents`: native Chirp EventStream lifecycle and event trace records.
+- `transitionTraces`: bounded server observations that correlate a route and
+  request mode with opaque compiled transition IDs and public-safe
+  descriptions.
+- `transitionCoverage`: the observed mode, observation-ID, and compiled-ID
+  summary at export time.
 - `vtEvents`: View Transition lifecycle records.
 
 `X-Chirp-Return-Trace` is a compact debug header that records the typed return
 branch Chirp negotiated, such as `Template`, `Fragment`, `PageComposition`,
 `OOB`, `Suspense`, `Stream`, `EventStream`, `Action`, or `ValidationError`.
-It is diagnostic metadata only; it does not change response negotiation.
+When the response comes through the frozen app runtime, the trace also carries
+the route's compiled ID, a stable observation ID, request-mode tags, and the
+relevant compiled transition IDs/descriptions. Dynamic path values and context
+values are not included. The header is diagnostic metadata only; it does not
+change response negotiation.
+
+## Test Evidence
+
+Use the testing helpers with responses from a debug app when a contract test
+needs to name intentionally untested request modes:
+
+```python
+from chirp.testing import transition_coverage
+
+report = transition_coverage(
+    responses,
+    expected_modes=("normal", "boosted", "targeted"),
+)
+assert report.untested_modes == ()
+```
+
+`transition_coverage()` can also compare explicit compiled transition IDs. It
+only reports evidence from real `TestClient` responses; DOM swap and history
+behavior still require the browser lane.

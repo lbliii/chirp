@@ -65,8 +65,50 @@ class DebugTraceStore:
         data: dict[str, Any] | None = None,
     ) -> None:
         """Record an SSE lifecycle event without mutating stream output."""
-        record = DebugTraceRecord(
+        self._record(
             channel="sse",
+            phase=phase,
+            path=path,
+            request_id=request_id,
+            internal=internal,
+            owner=owner,
+            data=data,
+        )
+
+    def record_http(
+        self,
+        *,
+        phase: str,
+        path: str,
+        request_id: str,
+        internal: bool,
+        owner: str,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record one bounded HTTP render observation."""
+        self._record(
+            channel="http",
+            phase=phase,
+            path=path,
+            request_id=request_id,
+            internal=internal,
+            owner=owner,
+            data=data,
+        )
+
+    def _record(
+        self,
+        *,
+        channel: str,
+        phase: str,
+        path: str,
+        request_id: str,
+        internal: bool,
+        owner: str,
+        data: dict[str, Any] | None,
+    ) -> None:
+        record = DebugTraceRecord(
+            channel=channel,
             phase=phase,
             path=path,
             request_id=request_id,

@@ -11,6 +11,16 @@ from chirp.http.request import Request
 
 RETURN_TRACE_CACHE_KEY = "_chirp_return_trace"
 
+_MAX_CONTEXT_KEYS = 48
+_MAX_NOTES = 16
+_MAX_NOTE_LENGTH = 240
+_MAX_TRANSITIONS = 16
+_MAX_ID_LENGTH = 512
+
+
+def _bounded(value: str, limit: int) -> str:
+    return value if len(value) <= limit else value[: limit - 3] + "..."
+
 
 @dataclass(frozen=True, slots=True)
 class ReturnTrace:
@@ -29,12 +39,41 @@ class ReturnTrace:
     streaming: bool = False
     sse: bool = False
     notes: tuple[str, ...] = ()
+    route_id: str | None = None
+    route_path: str | None = None
+    observation_id: str | None = None
+    request_mode: str | None = None
+    mode_tags: tuple[str, ...] = ()
+    compiled_transition_ids: tuple[str, ...] = ()
+    transition_descriptions: tuple[str, ...] = ()
 
     def payload(self) -> dict[str, Any]:
         """Return a JSON-serializable payload."""
         data = asdict(self)
-        data["context_keys"] = list(self.context_keys)
-        data["notes"] = list(self.notes)
+        for name in (
+            "template",
+            "block",
+            "target",
+            "route_id",
+            "route_path",
+            "observation_id",
+        ):
+            value = data[name]
+            if isinstance(value, str):
+                data[name] = _bounded(value, _MAX_ID_LENGTH)
+        data["context_keys"] = [
+            _bounded(key, _MAX_NOTE_LENGTH) for key in self.context_keys[:_MAX_CONTEXT_KEYS]
+        ]
+        data["notes"] = [_bounded(note, _MAX_NOTE_LENGTH) for note in self.notes[:_MAX_NOTES]]
+        data["mode_tags"] = [_bounded(tag, _MAX_NOTE_LENGTH) for tag in self.mode_tags[:_MAX_NOTES]]
+        data["compiled_transition_ids"] = [
+            _bounded(value, _MAX_ID_LENGTH)
+            for value in self.compiled_transition_ids[:_MAX_TRANSITIONS]
+        ]
+        data["transition_descriptions"] = [
+            _bounded(value, _MAX_NOTE_LENGTH)
+            for value in self.transition_descriptions[:_MAX_TRANSITIONS]
+        ]
         return data
 
 

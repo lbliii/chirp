@@ -59,6 +59,7 @@ class ASGIRuntime:
                 health_path=self._config.health_path,
                 ready_path=self._config.ready_path,
                 probe_state=self._mutable,
+                hypermedia_program=self._runtime.hypermedia_program,
             )
         return self._compiled_handler
 

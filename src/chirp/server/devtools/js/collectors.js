@@ -68,6 +68,44 @@ function ingestNativeSseTrace(rec) {
   refreshSsePanel();
 }
 
+function ingestNativeHttpTrace(rec) {
+  if (!rec || rec.channel !== "http" || !rec.data || !rec.data.observation_id) return;
+  var key = rec.channel + ":" + rec.request_id + ":" + rec.data.observation_id;
+  if (state.nativeTraceKeys[key]) return;
+  state.nativeTraceKeys[key] = true;
+  state.transitionTraces.unshift({
+    requestId: rec.request_id,
+    ts: rec.ts_ms,
+    routePath: rec.path,
+    observationId: rec.data.observation_id,
+    routeId: rec.data.route_id,
+    requestMode: rec.data.request_mode,
+    modeTags: rec.data.mode_tags || [],
+    compiledTransitionIds: rec.data.compiled_transition_ids || [],
+    transitionDescriptions: rec.data.transition_descriptions || [],
+  });
+  if (state.transitionTraces.length > BUFFER_SIZE) state.transitionTraces.pop();
+}
+
+function buildTransitionCoverage(expectedModes) {
+  var modes = {};
+  var transitions = {};
+  var observations = {};
+  state.transitionTraces.forEach(function(trace) {
+    observations[trace.observationId] = true;
+    (trace.modeTags || []).forEach(function(mode) { modes[mode] = true; });
+    (trace.compiledTransitionIds || []).forEach(function(id) { transitions[id] = true; });
+  });
+  var expected = expectedModes || [];
+  var untested = expected.filter(function(mode) { return !modes[mode]; });
+  return {
+    observationIds: Object.keys(observations).sort(),
+    observedModes: Object.keys(modes).sort(),
+    untestedModes: untested.slice().sort(),
+    compiledTransitionIds: Object.keys(transitions).sort(),
+  };
+}
+
 function refreshNativeSseTraces(includeInternal) {
   if (!window.fetch) return;
   var url = DEBUG_TRACES_PATH + (includeInternal ? "?internal=1" : "");
@@ -75,7 +113,10 @@ function refreshNativeSseTraces(includeInternal) {
     .then(function(res) { return res.ok ? res.json() : null; })
     .then(function(payload) {
       if (!payload || !payload.records) return;
-      payload.records.forEach(ingestNativeSseTrace);
+      payload.records.forEach(function(rec) {
+        ingestNativeSseTrace(rec);
+        ingestNativeHttpTrace(rec);
+      });
     })
     .catch(function() {});
 }

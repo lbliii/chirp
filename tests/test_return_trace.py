@@ -4,6 +4,8 @@ import base64
 import json
 from pathlib import Path
 
+import pytest
+
 from chirp import (
     OOB,
     Action,
@@ -17,6 +19,7 @@ from chirp import (
     Template,
     ValidationError,
 )
+from chirp.templating.trace import ReturnTrace
 from chirp.testing import TestClient
 
 
@@ -39,6 +42,26 @@ def _decode_trace(value: str | None) -> dict:
 def _debug_app(tmp_path: Path) -> App:
     _write_templates(tmp_path)
     return App(AppConfig(debug=True, skip_contract_checks=True, template_dir=tmp_path))
+
+
+@pytest.mark.issue(511)
+def test_return_trace_payload_bounds_compiler_evidence() -> None:
+    trace = ReturnTrace(
+        return_type="Page",
+        category="page",
+        is_htmx=False,
+        context_keys=tuple(f"context-{index}" for index in range(80)),
+        notes=("n" * 500,) * 30,
+        compiled_transition_ids=tuple(f"transition:{index}" for index in range(30)),
+        transition_descriptions=("d" * 500,) * 30,
+    )
+
+    payload = trace.payload()
+    assert len(payload["context_keys"]) == 48
+    assert len(payload["notes"]) == 16
+    assert len(payload["compiled_transition_ids"]) == 16
+    assert len(payload["transition_descriptions"]) == 16
+    assert max(map(len, payload["transition_descriptions"])) <= 240
 
 
 async def test_template_return_trace_header(tmp_path: Path) -> None:

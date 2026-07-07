@@ -42,6 +42,7 @@ var state = {
   pinnedScroll: false,
   sseConnections: [],
   sseEvents: [],
+  transitionTraces: [],
   nativeTraceKeys: {},
   vtEvents: [],
 };
