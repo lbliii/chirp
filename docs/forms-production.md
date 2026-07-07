@@ -131,6 +131,72 @@ types do that work:
 Branch only when the page truly has different product behavior for htmx and
 non-htmx clients.
 
+## Experimental Declarative WebMCP Forms
+
+`WebMCPForm` can project an explicitly opted-in `FormContract` into the
+declarative WebMCP preview without adding another route, handler, schema, or
+JavaScript registry. The browser still submits the same real form through the
+normal HTTP/htmx path.
+
+```python
+from dataclasses import dataclass, field
+
+from chirp import WebMCPForm
+from chirp.contracts import FormContract, contract
+
+
+@dataclass(frozen=True, slots=True)
+class TaskForm:
+    title: str = field(metadata={
+        "webmcp_control": "text",
+        "webmcp_description": "Short task title",
+        "webmcp_min_length": 1,
+        "webmcp_max_length": 80,
+    })
+    priority: int = field(default=2, metadata={
+        "webmcp_control": "number",
+        "webmcp_description": "Priority from one to three",
+        "webmcp_min": 1,
+        "webmcp_max": 3,
+    })
+
+
+@app.route("/tasks", methods=["POST"])
+@contract(form=FormContract(
+    TaskForm,
+    "tasks.html",
+    "task_form",
+    webmcp=WebMCPForm("tasks.create", "Create a task"),
+))
+async def create_task(request):
+    form = await form_from(request, TaskForm)
+    ...
+```
+
+Render the compiled attributes on the existing form and controls:
+
+```html
+{% block task_form %}
+<form method="post" action="/tasks"{{ webmcp_form_attrs("tasks.create") }}>
+  {{ csrf_field() }}
+  <input{{ webmcp_control_attrs("tasks.create", "title") }}>
+  <input{{ webmcp_control_attrs("tasks.create", "priority") }}>
+  <button type="submit">Create</button>
+</form>
+{% end %}
+```
+
+The helpers derive names, descriptions, requiredness, scalar defaults, and
+supported native constraints from the dataclass. The first preview supports
+text, email, search, telephone, URL, and number inputs. File, select, textarea,
+checkbox, radio, callable defaults, missing descriptions, and incompatible
+Python types fail during app freeze with a concrete field-level error.
+
+`toolautosubmit` is closed by default and is rejected on mutation routes.
+Browsers without WebMCP ignore the extra attributes and retain the complete
+human form. Keep CSRF, authorization, validation, `FormAction`, and htmx
+negotiation on the server exactly as they were before projection.
+
 ## Production Checklist
 
 - Add `SessionMiddleware` before `CSRFMiddleware`.
@@ -140,6 +206,8 @@ non-htmx clients.
 - Declare `FormContract` for mounted POST page handlers.
 - Use explicit `intent`/`_action` fields for multi-intent forms.
 - Test full-page and htmx fragment paths for validation failures.
+- Keep experimental WebMCP mutation forms human-confirmed; never enable
+  `toolautosubmit` on POST/PUT/PATCH/DELETE routes.
 - Keep redirects local and safe; preserve scoped `next` values deliberately.
 
 ## Startup Diagnostics

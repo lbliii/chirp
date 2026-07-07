@@ -44,6 +44,13 @@ class TestExtractFormFieldNames:
     def test_empty_source(self):
         assert extract_form_field_names("") == set()
 
+    def test_webmcp_control_helper_declares_native_field_name(self):
+        html = (
+            '<input{{ webmcp_control_attrs("tasks.create", "title") }}>'
+            '<input{{ webmcp_control_attrs("tasks.create", "priority") }}>'
+        )
+        assert extract_form_field_names(html) == {"priority", "title"}
+
 
 class TestExtractTemplateBlockSource:
     """Unit tests for block-aware template source extraction."""

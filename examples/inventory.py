@@ -49,6 +49,7 @@ CAPABILITIES = frozenset(
         "uploads",
         "validation",
         "view-transitions",
+        "webmcp",
     }
 )
 

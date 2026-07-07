@@ -598,6 +598,17 @@ readme = "present"
 test_entrypoint = "examples/standalone/upload"
 
 [[examples]]
+path = "standalone/webmcp_form"
+lane = "standalone"
+status = "experimental"
+tier = 2
+extras = []
+network = "none"
+capabilities = ["forms", "fragments", "mutations", "validation", "webmcp"]
+readme = "present"
+test_entrypoint = "examples/standalone/webmcp_form"
+
+[[examples]]
 path = "standalone/wizard"
 lane = "standalone"
 status = "supporting"

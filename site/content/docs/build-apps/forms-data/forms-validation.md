@@ -312,3 +312,47 @@ if errors:
 
 :::{related}
 :::
+## Experimental WebMCP form projection
+
+An existing typed form can opt into the declarative WebMCP preview while
+keeping its normal browser and htmx submission path:
+
+```python
+from dataclasses import dataclass, field
+
+from chirp import WebMCPForm
+from chirp.contracts import FormContract, contract
+
+@dataclass(frozen=True, slots=True)
+class SearchForm:
+    query: str = field(metadata={
+        "webmcp_control": "search",
+        "webmcp_description": "Words to search for",
+        "webmcp_min_length": 2,
+    })
+
+@app.route("/search", methods=["POST"])
+@contract(form=FormContract(
+    SearchForm,
+    "search.html",
+    "search_form",
+    webmcp=WebMCPForm("search.run", "Search the catalog"),
+))
+async def search(request):
+    form = await form_from(request, SearchForm)
+    ...
+```
+
+```html
+<form method="post" action="/search"{{ webmcp_form_attrs("search.run") }}>
+  {{ csrf_field() }}
+  <input{{ webmcp_control_attrs("search.run", "query") }}>
+  <button type="submit">Search</button>
+</form>
+```
+
+The helpers emit escaped `toolname`, `tooldescription`,
+`toolparamdescription`, and native input attributes from the frozen contract.
+They do not register JavaScript tools or bypass the server. Mutation forms
+cannot enable `toolautosubmit`, unsupported controls fail during startup, and
+browsers without WebMCP continue to use the same complete form.

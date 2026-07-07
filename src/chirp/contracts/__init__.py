@@ -1,5 +1,7 @@
 """Typed hypermedia contracts package."""
 
+from chirp.webmcp import WebMCPForm
+
 from .checker import check_hypermedia_surface
 from .declarations import FormContract, FragmentContract, RouteContract, SSEContract, contract
 from .diff import ContractDiff, diff_contract_dicts
@@ -24,6 +26,7 @@ __all__ = [
     "RouteContract",
     "SSEContract",
     "Severity",
+    "WebMCPForm",
     "check_at_git_ref",
     "check_hypermedia_surface",
     "collect_check_json",

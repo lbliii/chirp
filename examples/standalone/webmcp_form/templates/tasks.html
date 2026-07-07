@@ -1,0 +1,21 @@
+{% block page_root %}
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Declarative WebMCP form</title></head>
+<body>
+  <main>
+    <h1>Create a task</h1>
+    {% block task_form %}
+    <form id="task-form" method="post" action="/tasks"
+          hx-post="/tasks" hx-target="#task-form" hx-swap="outerHTML"
+          {{ webmcp_form_attrs("tasks.create") }}>
+      <label>Title <input{{ webmcp_control_attrs("tasks.create", "title") }}></label>
+      {% for message in errors | field_errors("title") %}<p>{{ message }}</p>{% end %}
+      <label>Priority <input{{ webmcp_control_attrs("tasks.create", "priority") }}></label>
+      <button type="submit">Create</button>
+    </form>
+    {% end %}
+  </main>
+</body>
+</html>
+{% end %}

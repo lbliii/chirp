@@ -1,6 +1,6 @@
 # RFC 014: Universal Operation Projections
 
-**Status:** Proposed — no runtime behavior implemented
+**Status:** Accepted — declarative WebMCP form preview implemented; other projections pending
 **Issue:** [#339](https://github.com/lbliii/chirp/issues/339)
 **Parent epic:** [#568](https://github.com/lbliii/chirp/issues/568)
 **Saga:** [#566](https://github.com/lbliii/chirp/issues/566)
@@ -9,8 +9,10 @@
 This RFC decides how one typed Python operation can be projected into browser
 HTTP, htmx, a human and programmatic CLI, ordinary MCP tools, WebMCP, and MCP
 Apps without giving Chirp a REST serialization layer or giving Milo ownership
-of HTML rendering. Merging this document accepts the design. It does not add a
-public API, dependency, exposure, route, template, or compatibility claim.
+of HTML rendering. The declarative WebMCP form slice is now implemented by
+issue #574 through an explicit `FormContract` projection. The Milo, ordinary
+MCP, and MCP Apps projections remain design-only; this document does not claim
+that those pending surfaces ship.
 
 The external evidence used for this decision is pinned to:
 

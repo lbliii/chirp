@@ -555,6 +555,30 @@ class AppCompiler:
         self._runtime.router = router
         self._runtime.discovered_routes = list(self._mutable.discovered_routes)
 
+        from chirp.webmcp import compile_webmcp_registry
+
+        webmcp_registry = compile_webmcp_registry(router.routes)
+        if webmcp_registry is not None:
+            webmcp_globals = {
+                "webmcp_form_attrs": webmcp_registry.form_attrs,
+                "webmcp_control_attrs": webmcp_registry.control_attrs,
+            }
+            custom_env_globals = (
+                self._mutable.custom_kida_env.globals
+                if self._mutable.custom_kida_env is not None
+                else {}
+            )
+            for name, helper in webmcp_globals.items():
+                if name in self._mutable.template_globals or name in custom_env_globals:
+                    from chirp.errors import ConfigurationError
+
+                    raise ConfigurationError(
+                        f"Template global {name!r} is reserved by an opted-in "
+                        "WebMCP FormContract. Remove the custom registration so "
+                        "Chirp can render the verified declarative attributes."
+                    )
+                self._mutable.template_globals[name] = helper
+
         from chirp.app.url_for import build_routes_by_name
 
         routes_by_name, name_collisions = build_routes_by_name(router.routes)

@@ -78,6 +78,12 @@ shape may still evolve before 1.0:
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
 | Secure-by-default stack | `secure_stack` (optional `auth=AuthConfig(...)` and `audit=AuditConfig(...)` legs) |
 | Optional UI bridge | `use_chirp_ui` |
+| Experimental browser-agent forms | `WebMCPForm`; opt in through `FormContract.webmcp`, then render the frozen `webmcp_form_attrs()` and `webmcp_control_attrs()` template globals |
+
+`WebMCPForm` implements only the declarative form vocabulary pinned to WebMCP
+proposal commit `0b676d27a08aafd3b4f8a709756eeeab342fd9bd`. It is provisional,
+adds no imperative JavaScript registry, and never changes the ordinary form
+submission path. Mutation forms cannot enable the toolautosubmit attribute.
 
 ## 1.0 Audit Decisions
 
