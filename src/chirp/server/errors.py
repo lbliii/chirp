@@ -24,7 +24,7 @@ logger = logging.getLogger("chirp.server")
 def _error_headers(exc: HTTPError, request: Request) -> tuple[tuple[str, str], ...]:
     """Return exception headers plus route-scoped QUERY discovery metadata."""
     headers = list(exc.headers)
-    if request.method == "QUERY" and not any(name.lower() == "accept-query" for name, _ in headers):
+    if not any(name.lower() == "accept-query" for name, _ in headers):
         from chirp.server.query_protocol import QUERY_ACCEPT_HEADER_CACHE_KEY
 
         accept_query = request._cache.get(QUERY_ACCEPT_HEADER_CACHE_KEY)

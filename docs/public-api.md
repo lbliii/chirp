@@ -46,7 +46,9 @@ previously generic method-token behavior: an existing route registered with
 `methods=["QUERY"]` must now add a non-empty `query_media_types=(...)`
 declaration or freeze fails with migration guidance. Routes for every other
 method are unchanged. QUERY remains provisional and ASGI-only while the
-remaining RFC 009 promotion gates are open.
+remaining RFC 009 promotion gates are open. Discovery and response semantics
+reuse existing `Response`, `Redirect`, `HTTPError`, and header APIs: Chirp adds
+no equivalent-resource, redirect, conditional, or Range helper.
 
 `Request.trusted_client_ip` is the blessed accessor for the trusted-proxy-corrected
 client IP — use it for rate-limit and audit keying. It returns `client[0]` (falling

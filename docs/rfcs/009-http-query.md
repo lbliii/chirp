@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -12,12 +12,16 @@ change. The public route keyword, protocol enforcement, contract rules, cache
 behavior, filesystem convention, client integration, and sync-path work remain
 separate review units with the proof named below.
 
-Issue #525 implements the public route declaration, freeze-time media-range
+Issues #525-#526 implement the public route declaration, freeze-time media-range
 validation, request `Content-Type` enforcement, configured body-limit parity,
 post-negotiation `Accept` enforcement, protocol error headers, and ASGI-only
-sync fallback. Discovery/`OPTIONS`, redirects and validators, client and page
+sync fallback; path-scoped `Allow`/`Accept-Query` and automatic `OPTIONS`
+discovery; exact redirect status preservation; equivalent-resource headers;
+and shared GET/QUERY ETag and Last-Modified evaluation. Client and page
 ergonomics, render-surface proof, caching, deployment, and promotion remain
-owned by #526-#535.
+owned by #527-#535. This advances the #525 receipt's original #526-#535
+delivery range without changing its request-contract claim. Discovery/`OPTIONS`
+and the response semantics described below are now executable behavior.
 
 ## 1. Context
 
@@ -297,6 +301,10 @@ their identity, authorization, lifetime, and storage.
 Existing `Response.with_header()` is sufficient. No public equivalent-resource
 helper is added.
 
+Temporary equivalent-resource and result URIs use opaque application-owned
+identifiers. They must not copy or encode sensitive request content into the
+path or URI query component.
+
 ### 8.2 Redirects
 
 Existing `Redirect(url, status=...)` remains the HTTP primitive:
@@ -312,17 +320,29 @@ navigation instruction and normally initiates GET; it is not evidence that an
 HTTP QUERY redirect preserved the method. `FormAction` and `MutationResult`
 remain mutation-oriented and are not QUERY redirect helpers.
 
+Chirp emits each application-selected redirect status and `Location` unchanged.
+RFC-compliant clients repeat QUERY for `301`, `302`, `307`, and `308`, while
+`303` hands off to GET. Client implementations can still vary: compatibility
+proof must test the actual deployment client rather than assuming POST redirect
+behavior applies to QUERY. When method retention is operationally critical,
+prefer `307` or `308`, whose semantics are unambiguous across common clients.
+
 ### 8.3 Conditional requests
 
 The selected representation for QUERY is the selected representation of its
 equivalent GET resource. Application code supplies consistent `ETag` and/or
 `Last-Modified` validators on both surfaces.
 
-Issue #526 will add protocol proof for `If-None-Match`, `If-Modified-Since`,
-`If-Match`, and `If-Unmodified-Since`. Any generic dynamic-response evaluator
-must be shared by QUERY and GET rather than copied from the file sender, must
-preserve htmx/full-page variance, and must not buffer `Stream` merely to invent
-a validator. Responses without a validator process normally.
+The #526 implementation evaluates application-supplied `ETag` and
+`Last-Modified` headers on ordinary `Response` values through one shared
+GET/HEAD/QUERY path. `If-None-Match` uses weak comparison and takes precedence
+over `If-Modified-Since`; matching validators produce a bodyless `304` while
+preserving representation metadata. `FileResponse` retains its existing sender
+evaluation. Stream and EventStream validator proof remains with #529; Chirp
+does not buffer a stream to invent a validator. `If-Match` uses strong
+comparison and `If-Unmodified-Since` uses the same shared HTTP-date evaluator;
+failed preconditions return bodyless `412` responses. Responses without a
+validator process normally.
 
 ### 8.4 Range
 
@@ -331,6 +351,17 @@ Chirp's current generic HTML responses do not promise byte-range support, and
 this RFC does not add it. `FileResponse` keeps its existing behavior. Query
 formats should prefer their own paging/limiting semantics. This is an explicit
 initial deferral, not a claim that QUERY changes Range semantics.
+
+### 8.5 Executable response matrix (#526)
+
+| Shape | Chirp behavior | Executable proof |
+| --- | --- | --- |
+| Direct result | Existing `Response` carries the representation and optional opaque `Content-Location`. | `test_equivalent_resource_headers_are_opaque_and_multi_value_safe` |
+| Equivalent resource | Existing `Response` carries an opaque `Location`; Chirp never derives it from request content. | `test_equivalent_resource_headers_are_opaque_and_multi_value_safe` |
+| Indirect result | Existing `Redirect` preserves application-selected `301`, `302`, `307`, `308`, or `303` and `Location`. | `test_chirp_preserves_query_redirect_status_and_location` |
+| GET handoff | A real ASGI HTTP client follows `303` with GET. | `test_303_hands_an_http_client_off_to_get` |
+| Conditional result | Ordinary GET and QUERY responses share weak ETag and HTTP-date evaluation; matching validators return `304`. | `test_get_and_query_share_weak_etag_conditional_semantics`, `test_query_if_modified_since` |
+| Range-capable result | The existing file sender applies QUERY Range and conditional fields exactly as GET; generic HTML responses make no byte-range promise. | `test_query_file_response_retains_conditional_and_range_semantics` |
 
 ## 9. Async and sync execution
 
