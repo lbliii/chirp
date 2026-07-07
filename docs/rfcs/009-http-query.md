@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; #531 explicit cache opt-in implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; #531 explicit cache opt-in implemented; #532 interoperability proof implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -551,6 +551,20 @@ DevTools may show method, declared/received media type, byte count, target,
 selected block, render intent, timing, validator/cache decision, and errors. It
 must redact or omit the raw body unless an existing explicit debug policy says
 otherwise.
+
+### 12.1 Executable deployment receipt (#532)
+
+The [interoperability report](../http-query-interoperability.md) maps real-wire
+tests for Pounce HTTP/1.1, HTTP/2, and HTTP/3, Uvicorn, Nginx, redirects,
+connection-failure retry, body limits, and access-log redaction. Real Chromium
+tests prove same-origin Fetch and cross-origin CORS preflight behavior. The
+matrix fingerprints request bytes instead of echoing them and asserts that the
+read path never invokes the mutation route.
+
+This is bounded evidence, not universal proxy or CDN certification. Pounce
+keeps HTTP/3 0-RTT disabled by default; enabling it accepts replay risk for
+safe/idempotent operations. Operators must verify their exact intermediary and
+retain a direct-origin or ordinary GET fallback when QUERY is unsupported.
 
 ## 13. Contracts, inspection, freeze, and speculation
 
