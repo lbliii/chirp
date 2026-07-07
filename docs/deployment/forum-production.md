@@ -52,7 +52,11 @@ scoped pages, or leave those pages uncached.
 key design covers exact body bytes and request metadata, but cache reads and
 writes remain disabled until the explicit opt-in, validator, streaming, and
 backend-failure contracts are complete. Do not treat the presence of a key
-builder as permission to cache body-bearing requests globally.
+builder as permission to cache body-bearing requests globally. Experimental
+opt-in is available only by manually passing `query_key_func=query_cache_key`
+to `CacheMiddleware`; configuration-managed caching remains GET-only. Use a
+shared backend, short TTLs, explicit invalidation, and application-specific vary
+headers before considering it for public, repeatable searches.
 
 ## SSE
 
