@@ -220,7 +220,7 @@ chirp[forms]      → python-multipart  (form/multipart parsing)
 chirp[sessions]   → itsdangerous      (signed session cookies)
 chirp[auth]       → argon2-cffi       (password hashing)
 chirp[testing]    → httpx             (test client)
-chirp[data-pg]    → asyncpg           (PostgreSQL)
+chirp[data-pg]    → in-tree pelt      (pure-Python PostgreSQL driver)
 chirp[markdown]   → patitas[syntax]   (markdown rendering)
 chirp[ai]         → httpx             (LLM streaming)
 chirp[all]        → everything above

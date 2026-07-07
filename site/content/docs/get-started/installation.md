@@ -90,7 +90,7 @@ uv add "bengal-chirp[forms,sessions,testing]"
 | `sessions` | Signed cookie sessions | `itsdangerous` |
 | `auth` | Argon2 password hashing | `argon2-cffi` |
 | `testing` | Test client transport | `httpx` |
-| `data-pg` | [[docs/build-apps/forms-data/database|PostgreSQL access]] | `asyncpg` |
+| `data-pg` | [[docs/build-apps/forms-data/database|PostgreSQL access]] | In-tree pure-Python pelt driver (no extra dependency) |
 | `ai` | LLM streaming over raw HTTP | `httpx` |
 | `markdown` | Markdown rendering with syntax highlighting | `patitas[syntax]` |
 | `ui` | [[docs/build-apps/ui-extensions/chirp-ui|chirp-ui component library]] | `chirp-ui` |

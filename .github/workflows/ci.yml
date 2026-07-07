@@ -187,12 +187,10 @@ jobs:
           tests/interop/test_query_wire.py
           -q --tb=short --timeout=120
 
-  # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded
-  # 3.14t and does not ship asyncpg (a C-extension dependency), so live Postgres
-  # coverage is isolated here on the standard 3.14 build against a real Postgres
-  # service. This closes the "round-trip on sqlite AND postgres in CI" gap for
-  # the makemigrations pipeline (issue #143) without putting asyncpg on the
-  # free-threaded critical path.
+  # Dedicated live-PostgreSQL backend job. The in-tree pure-Python pelt driver
+  # also runs in the free-threaded gate below; this service-backed job proves
+  # wire-level round trips, pool reuse, and failed-transaction recovery against
+  # PostgreSQL 17 (issues #143, #258, and #259).
   test-postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -235,9 +233,10 @@ jobs:
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
         run: uv run pytest tests/test_schema_introspect.py tests/test_pelt/test_connection_integration.py -q --tb=short --timeout=60
 
-  # Free-threaded GIL gate for the data-pg backend (pelt E0.2, issue #262).
-  # Imports asyncpg on 3.14t with PYTHONWARNINGS=error so a dependency that
-  # re-enables the GIL fails the build instead of silently regressing.
+  # Free-threaded GIL gate for the in-tree data-pg backend (pelt E0.2/E6,
+  # issues #262 and #259). PYTHONWARNINGS=error turns an import that silently
+  # re-enables the GIL into a build failure; stress tests prove shared-state
+  # snapshots, decode overlap, and exclusive pool ownership.
   data-pg-gil-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
