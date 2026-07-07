@@ -2588,6 +2588,46 @@ class TestFreeThreadingPanel:
         not hasattr(__import__("sys"), "_is_gil_enabled") or __import__("sys")._is_gil_enabled(),
         reason="requires free-threaded build (python3.14t with GIL disabled)",
     )
+    def test_parallel_advance_overlaps_symbol_work(self, monkeypatch) -> None:
+        """The fan-out keeps at least two symbol advances in flight."""
+        import sys
+        import threading
+
+        from feed import SimFeed
+
+        assert hasattr(sys, "_is_gil_enabled")
+        assert not sys._is_gil_enabled()
+
+        original = SimFeed._advance_symbol
+        lock = threading.Lock()
+        overlapped = threading.Event()
+        in_flight = 0
+        peak_in_flight = 0
+
+        def tracked_advance(feed, symbol):
+            nonlocal in_flight, peak_in_flight
+            with lock:
+                in_flight += 1
+                peak_in_flight = max(peak_in_flight, in_flight)
+                if in_flight >= 2:
+                    overlapped.set()
+            try:
+                assert overlapped.wait(timeout=5), "symbol advances never overlapped"
+                return original(feed, symbol)
+            finally:
+                with lock:
+                    in_flight -= 1
+
+        monkeypatch.setattr(SimFeed, "_advance_symbol", tracked_advance)
+        SimFeed(seed=1, tick_interval=0)._advance_all()
+
+        assert peak_in_flight >= 2
+
+    @pytest.mark.slow
+    @pytest.mark.skipif(
+        not hasattr(__import__("sys"), "_is_gil_enabled") or __import__("sys")._is_gil_enabled(),
+        reason="requires free-threaded build (python3.14t with GIL disabled)",
+    )
     def test_parallel_advance_beats_serial_baseline(self, monkeypatch) -> None:
         """On a GIL-off build, pool fan-out must overlap — not just architecture
         by inspection. Skipped (not silently passed) on GIL-bound interpreters."""
