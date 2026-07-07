@@ -39,6 +39,16 @@ from chirp import App, AppConfig, Page, Fragment, Template
 | Auth and session wiring | `SessionMiddleware`, `SessionConfig`, `SessionSignalMiddleware`, `SessionSignalConfig`, `get_session`, `regenerate_session`, `AuthMiddleware`, `AuthConfig` |
 | Markdown | `MarkdownRenderer` |
 
+### Managed htmx preview
+
+`AppConfig` keeps htmx 2.0.10 as its verified default. The provisional htmx 4
+preview reuses the existing <code>htmx</code> and <code>htmx_version</code>
+fields: select exactly <code>AppConfig(htmx=True,
+htmx_version="4.0.0-beta5")</code>. Chirp then owns one ordered core,
+<code>htmx-2-compat</code>, and <code>hx-sse</code> bundle. Other htmx 4 pins
+fail during freeze; rollback selects <code>"2.0.10"</code>. The compiled
+manifest and its asset records are internal, not new public exports.
+
 ### Request notes
 
 The experimental RFC 10008 route keyword is an additive API, but it tightens

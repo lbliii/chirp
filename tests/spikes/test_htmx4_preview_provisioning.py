@@ -22,8 +22,8 @@ NONCE = "CHIRP-PREVIEW-NONCE"
 PAGE = f"""<!doctype html>
 <html><head>
 <script defer nonce="{NONCE}" src="/core.js" data-chirp="htmx" data-chirp-htmx-tier="4-preview" data-chirp-htmx-version="4.0.0-beta5"></script>
-<script defer nonce="{NONCE}" src="/compat.js" data-chirp="htmx-extension" data-chirp-htmx-extension="compat" data-chirp-htmx-version="4.0.0-beta5"></script>
-<script defer nonce="{NONCE}" src="/sse.js" data-chirp="htmx-extension" data-chirp-htmx-extension="sse" data-chirp-htmx-version="4.0.0-beta5"></script>
+<script defer nonce="{NONCE}" src="/compat.js" data-chirp="htmx-extension" data-chirp-htmx-extension="compat" data-chirp-htmx-tier="4-preview" data-chirp-htmx-version="4.0.0-beta5"></script>
+<script defer nonce="{NONCE}" src="/sse.js" data-chirp="htmx-extension" data-chirp-htmx-extension="sse" data-chirp-htmx-tier="4-preview" data-chirp-htmx-version="4.0.0-beta5"></script>
 </head><body>
 <button id="load" hx-get="/swap" hx-target="#output">Load</button>
 <div id="output">before</div>

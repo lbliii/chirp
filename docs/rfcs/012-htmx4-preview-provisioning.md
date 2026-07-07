@@ -1,6 +1,6 @@
 # RFC 012: Explicit htmx 4 Preview Provisioning
 
-**Status:** Draft — implementation requires maintainer acceptance
+**Status:** Implemented by issue #545
 
 **Issue:** [#545](https://github.com/lbliii/chirp/issues/545)
 
@@ -15,16 +15,16 @@ and hx-sse in that order. Every script receives the live CSP nonce and exact
 tier/version metadata. No new config field, helper, CLI flag, environment
 variable, or scaffold default is introduced.
 
-This RFC changes no runtime behavior. htmx 2 remains the default; #543 owns
-the verified 2.0.10 baseline and #551 owns a future default flip.
+The implementation keeps htmx 2 as the default; #543 owns the verified 2.0.10
+baseline and #551 owns a future default flip.
 
 ## Current surface and goals
 
-The current injection path emits one explicit jsDelivr core URL, handles
-buffered and streaming pages, carries nonces, and deduplicates on the core
+Before this implementation, the injection path emitted one explicit jsDelivr core URL, handled
+buffered and streaming pages, carried nonces, and deduplicated on the core
 data-chirp marker. The htmx_provisioned rule checks presence but not version,
 extension set, load order, or markup dialect. Setting the current version to
-4 today would therefore create a silent mixed client.
+4 would therefore have created a silent mixed client.
 
 The preview must be exact, reversible, no-build, CSP-safe, and observable by
 app.check and DevTools. Beta or RC assets must never become default through a
@@ -207,4 +207,5 @@ Rejected: a preview boolean, public helper, loose range, configurable CDN base,
 implicit extension discovery, and automatic template rewrites.
 
 Implementation changes version validation, injected asset shape, runtime state,
-contract defaults, and DevTools. Maintainers must approve those exact choices.
+contract defaults, and DevTools. Maintainers approved those exact choices for
+issue #545.

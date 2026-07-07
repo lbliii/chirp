@@ -724,8 +724,11 @@ deduplication) for you.
   HTML, and registers the `alpine_json_config` template global. Details:
   [[docs/build-apps/ui-extensions/alpine|Alpine.js injection]].
 - **htmx** — set `AppConfig(htmx=True)`. **Opt-in, default off.** Chirp injects the
-  htmx core script (explicit jsDelivr `/dist/htmx.min.js` path, per-request CSP
-  nonce), dedups on `data-chirp="htmx"`, and mirrors the Alpine injector.
+  exact managed htmx bundle (explicit jsDelivr `/dist` paths, per-request CSP
+  nonce), dedups the complete bundle on `data-chirp="htmx"`, and mirrors the
+  Alpine injector. The default `2.0.10` bundle is core-only. Exact pin
+  `4.0.0-beta5` selects the provisional core → `htmx-2-compat` → `hx-sse`
+  preview; other htmx 4 pins fail during freeze.
   `use_chirp_ui(app)` does not auto-enable it because the chirp-ui layouts already
   ship their own htmx tag.
 
@@ -742,8 +745,10 @@ full-page injector also adds `chirpui-alpine.js` for named chirp-ui controllers,
 including on streaming HTML.
 
 The htmx injector mirrors `AlpineInject` exactly: buffered + `StreamingResponse`
-HTML, the explicit jsDelivr `/dist/htmx.min.js` path, a live per-request CSP nonce,
-`data-chirp="htmx"` dedup, and the same render-intent gating.
+HTML, explicit jsDelivr `/dist` paths, one live per-request CSP nonce across the
+bundle, `data-chirp="htmx"` whole-bundle dedup, and the same render-intent gating.
+See [[docs/build-apps/ui-extensions/htmx4-preview|htmx 4 preview provisioning]]
+for self-host markers and rollback.
 
 `HTMLInject` does not run on streaming bodies; Alpine and htmx streaming are handled
 only by their dedicated injectors.

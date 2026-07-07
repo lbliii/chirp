@@ -222,13 +222,15 @@ class AppConfig:
     alpine_csp: bool = False  # Use CSP-safe build when True
 
     # htmx — hypermedia transport. Opt-in injection mirroring ``alpine`` above:
-    # when ``htmx=True`` Chirp injects the htmx core script before ``</body>``
-    # (with a per-request CSP nonce) and dedups on ``data-chirp="htmx"`` so a
-    # template that already ships its own htmx <script> is left untouched.
+    # when ``htmx=True`` Chirp compiles one exact managed bundle and injects it
+    # before ``</body>`` (with a per-request CSP nonce). The verified 2.0.10
+    # baseline is core-only; exact pin 4.0.0-beta5 selects the provisional
+    # core -> htmx-2-compat -> hx-sse bundle. ``data-chirp="htmx"`` dedups the
+    # complete bundle when a template explicitly owns it.
     # Default off — never global default-on; templates that hardcode htmx
     # (chirp-ui shell/boost, the v2 scaffold) keep working unchanged.
     htmx: bool = False
-    htmx_version: str = "2.0.10"  # Pinned for reproducibility (matches templates)
+    htmx_version: str = "2.0.10"  # Exact pin; 4.0.0-beta5 is the preview allowlist
 
     # Islands runtime — framework-agnostic high-state mount lifecycle
     islands: bool = False

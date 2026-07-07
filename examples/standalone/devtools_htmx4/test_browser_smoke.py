@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import socket
 import subprocess
@@ -32,13 +33,13 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-@pytest.fixture(scope="module")
-def base_url() -> Iterator[str]:
+@contextlib.contextmanager
+def _serve_app(app_name: str) -> Iterator[str]:
     port = _free_port()
     url = f"http://127.0.0.1:{port}"
     runner = (
         "import sys; sys.argv = ['app.py']; import app as _a; "
-        f"_a.app.run(host='127.0.0.1', port={port})"
+        f"_a.{app_name}.run(host='127.0.0.1', port={port})"
     )
     env = {
         **os.environ,
@@ -78,6 +79,18 @@ def base_url() -> Iterator[str]:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+
+
+@pytest.fixture(scope="module")
+def base_url() -> Iterator[str]:
+    with _serve_app("app") as url:
+        yield url
+
+
+@pytest.fixture(scope="module")
+def preview_base_url() -> Iterator[str]:
+    with _serve_app("preview_app") as url:
+        yield url
 
 
 @pytest.fixture(scope="module")
@@ -255,5 +268,100 @@ def test_devtools_records_one_success_and_failure_per_action(
     try:
         _exercise(page, base_url + path)
         assert not page_errors, page_errors
+    finally:
+        page.close()
+
+
+@pytest.mark.issue(545)
+def test_managed_preview_bundle_csp_sse_and_devtools(
+    preview_base_url: str,
+    browser,
+) -> None:
+    page = browser.new_page()
+    page.set_default_timeout(5_000)
+    errors: list[str] = []
+    requests: list[str] = []
+    swap_headers: dict[str, str] = {}
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on(
+        "console",
+        lambda message: errors.append(message.text) if message.type == "error" else None,
+    )
+
+    def record_request(request) -> None:
+        requests.append(request.url)
+        if request.url.endswith("/swap"):
+            swap_headers.update(request.headers)
+
+    page.on("request", record_request)
+    page.add_init_script(
+        """window.__previewEvents = {legacy: 0, native: 0};
+        function recordsResult(event) {
+          const detail = event.detail || {};
+          const target = detail.target || (detail.ctx && detail.ctx.target);
+          return target && target.id === "result";
+        }
+        document.addEventListener("htmx:afterSwap", (event) => {
+          if (recordsResult(event)) window.__previewEvents.legacy++;
+        });
+        document.addEventListener("htmx:after:swap", (event) => {
+          if (recordsResult(event)) window.__previewEvents.native++;
+        });"""
+    )
+    try:
+        response = page.goto(preview_base_url, wait_until="load", timeout=_TIMEOUT_MS)
+        assert response is not None
+        assert response.status == 200
+        page.wait_for_function(
+            "() => !!window.htmx && !!window.ChirpHtmxDebug",
+            timeout=_TIMEOUT_MS,
+        )
+
+        compatibility = page.evaluate("() => window.ChirpHtmxDebug.getHtmxCompatibility()")
+        scripts = page.locator("script").evaluate_all(
+            "items => items.map(item => ({src: item.src, chirp: item.dataset.chirp, "
+            "tier: item.dataset.chirpHtmxTier, version: item.dataset.chirpHtmxVersion}))"
+        )
+        assert compatibility["configuredTier"] == "4-preview", {
+            "compatibility": compatibility,
+            "scripts": scripts,
+        }
+        assert compatibility["configuredVersion"] == "4.0.0-beta5"
+        assert compatibility["liveVersion"] == "4.0.0-beta5"
+        assert compatibility["extensionRoles"] == ["compat", "sse"]
+        assert compatibility["duplicates"] == []
+        assert compatibility["compatibilityState"] == "matched"
+        assert [asset["role"] for asset in compatibility["sources"]] == [
+            "core",
+            "compat",
+            "sse",
+        ]
+
+        csp = response.headers.get("content-security-policy", "")
+        nonce = csp.split("'nonce-", 1)[1].split("'", 1)[0]
+        script_nonces = page.locator('script[data-chirp-htmx-tier="4-preview"]').evaluate_all(
+            "scripts => scripts.map(script => script.nonce)"
+        )
+        assert script_nonces == [nonce, nonce, nonce]
+
+        page.locator("#preview-swap").click()
+        page.wait_for_function(
+            "() => document.querySelector('#result')?.textContent === 'Swapped'",
+            timeout=_TIMEOUT_MS,
+        )
+        assert "text/event-stream" in swap_headers.get("accept", "")
+        events = page.evaluate("() => window.__previewEvents")
+        assert events["legacy"] == 1
+        assert events["native"] == 1
+
+        assert len([url for url in requests if "htmx.org@4.0.0-beta5" in url]) == 3
+
+        page.evaluate(
+            """() => document.querySelector('[data-chirp="htmx"]')
+              .setAttribute('data-chirp-htmx-version', '4.0.0-beta6')"""
+        )
+        mismatch = page.evaluate("() => window.ChirpHtmxDebug.getHtmxCompatibility()")
+        assert mismatch["compatibilityState"] == "mismatch"
+        assert not errors, errors
     finally:
         page.close()

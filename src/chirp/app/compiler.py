@@ -14,6 +14,7 @@ from chirp.templating.integration import create_environment
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.registry import compile_tools
 
+from .htmx_manifest import HtmxProvisioningManifest, compile_htmx_manifest
 from .registry import AppRegistry
 from .state import MutableAppState, RuntimeAppState, RuntimeDebugWiring
 
@@ -28,6 +29,7 @@ def _collect_builtin_middleware(
     router: object | None = None,
     oob_registry: OOBRegistry | None = None,
     debug_wiring: RuntimeDebugWiring | None = None,
+    htmx_manifest: HtmxProvisioningManifest | None = None,
 ) -> list:
     """Append builtin middleware (static, safe_target, sse_lifecycle, etc.) to list."""
     # AllowedHostsMiddleware — reject bad hosts first
@@ -156,7 +158,7 @@ def _collect_builtin_middleware(
         )
     if config.htmx:
         from chirp.middleware.inject import StreamingHTMLInject
-        from chirp.server.htmx import htmx_snippet
+        from chirp.server.htmx import htmx_manifest_snippet
 
         # Mirror the Alpine path: dedup on ``data-chirp="htmx"`` so a template
         # that already ships its own htmx <script> (chirp-ui shell/boost, the v2
@@ -166,10 +168,11 @@ def _collect_builtin_middleware(
         # survives a strict nonce-only CSP. ``StreamingHTMLInject`` already
         # implements both the buffered and streaming branches plus dedup, so no
         # bespoke injection subclass is needed.
-        htmx_version = config.htmx_version
+        if htmx_manifest is None:
+            raise RuntimeError("htmx middleware requires a compiled provisioning manifest")
         middleware_list.append(
             StreamingHTMLInject(
-                lambda nonce: htmx_snippet(htmx_version, nonce=nonce),
+                lambda nonce: htmx_manifest_snippet(htmx_manifest, nonce=nonce),
                 full_page_only=True,
                 dedup_marker='data-chirp="htmx"',
             )
@@ -488,6 +491,11 @@ class AppCompiler:
                 HealthCheck("database", check=probe, message="database: probe failed")
             )
 
+        self._runtime.htmx_manifest = compile_htmx_manifest(
+            enabled=self._config.htmx,
+            version=self._config.htmx_version,
+        )
+
         from chirp.server.debug_runtime import build_runtime_debug_wiring
 
         debug_wiring = build_runtime_debug_wiring(self._config)
@@ -626,6 +634,7 @@ class AppCompiler:
             router=router,
             oob_registry=self._mutable.oob_registry,
             debug_wiring=debug_wiring,
+            htmx_manifest=self._runtime.htmx_manifest,
         )
         # Resolve SessionConfig.secure="auto" -> concrete bool using config.env
         # (production/staging -> Secure cookies, local dev -> off). Must run

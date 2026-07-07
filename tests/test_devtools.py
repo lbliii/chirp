@@ -179,6 +179,17 @@ def test_htmx_debug_js_maps_htmx2_and_htmx4_lifecycle_events() -> None:
     assert "ctx.text != null ? ctx.text : response.responseText" not in HTMX_DEBUG_BOOT_JS
 
 
+@pytest.mark.issue(545)
+def test_devtools_reports_configured_and_live_htmx_compatibility() -> None:
+    assert "collectHtmxCompatibility" in HTMX_DEBUG_BOOT_JS
+    assert "getHtmxCompatibility" in HTMX_DEBUG_BOOT_JS
+    assert "configuredTier" in HTMX_DEBUG_BOOT_JS
+    assert "configuredVersion" in HTMX_DEBUG_BOOT_JS
+    assert "liveVersion" in HTMX_DEBUG_BOOT_JS
+    assert "extensionRoles" in HTMX_DEBUG_BOOT_JS
+    assert "compatibilityState" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:
     """Inspector records whether hx-* values are direct, inherited, blocked, or default."""
     assert "getEffectiveConfigDetails" in HTMX_DEBUG_BOOT_JS

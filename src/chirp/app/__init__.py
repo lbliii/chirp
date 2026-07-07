@@ -1305,4 +1305,5 @@ class App:
             ),
             schema=schema,
             _hypermedia_program=self._runtime_state.hypermedia_program,
+            _htmx_manifest=self._runtime_state.htmx_manifest,
         )
