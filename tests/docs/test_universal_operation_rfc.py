@@ -19,10 +19,10 @@ def _prose() -> str:
     return " ".join(_rfc().split())
 
 
-def test_rfc_is_a_proposal_and_pins_external_evidence() -> None:
+def test_rfc_records_implemented_slice_and_pins_external_evidence() -> None:
     text = _rfc()
 
-    assert "**Status:** Proposed — no runtime behavior implemented" in text
+    assert "**Status:** Accepted — declarative WebMCP form preview implemented" in text
     assert "1f5370861fa38bc7942111a623fa2cb5a7f567b9" in text
     assert "0b676d27a08aafd3b4f8a709756eeeab342fd9bd" in text
     assert "Milo's open MCP Apps boundary issue" in text

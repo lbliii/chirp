@@ -1,7 +1,12 @@
 """Route-level contract declaration types."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from chirp.webmcp import WebMCPForm
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +32,7 @@ class FormContract:
     datacls: type
     template: str
     block: str | None = None
+    webmcp: WebMCPForm | None = None
 
 
 @dataclass(frozen=True, slots=True)

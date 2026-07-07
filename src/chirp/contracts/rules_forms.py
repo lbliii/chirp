@@ -10,6 +10,10 @@ _FORM_FIELD_PATTERN = re.compile(
     r"<(?:input|select|textarea)\b[^>]*?\bname\s*=\s*[\"']([^\"']+)[\"']",
     re.IGNORECASE,
 )
+_WEBMCP_CONTROL_PATTERN = re.compile(
+    r"webmcp_control_attrs\(\s*[\"'][^\"']+[\"']\s*,\s*[\"']([^\"']+)[\"']\s*\)",
+    re.IGNORECASE,
+)
 _TEMPLATE_TAG_PATTERN = re.compile(r"\{%-?\s*(.*?)\s*-?%\}", re.DOTALL)
 _FORM_EXCLUDED_FIELDS = frozenset({"_csrf_token", "csrf_token", "_method"})
 _BLOCK_OPENERS = frozenset(
@@ -99,6 +103,10 @@ def extract_form_field_names(source: str) -> set[str]:
         if name in _FORM_EXCLUDED_FIELDS:
             continue
         names.add(name)
+    for match in _WEBMCP_CONTROL_PATTERN.finditer(source):
+        name = match.group(1).strip()
+        if name and name not in _FORM_EXCLUDED_FIELDS:
+            names.add(name)
     return names
 
 

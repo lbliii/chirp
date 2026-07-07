@@ -158,6 +158,7 @@ _API_STATUS: dict[str, str] = {
     "reactive_stream": "provisional",
     "secure_stack": "provisional",
     "use_chirp_ui": "provisional",
+    "WebMCPForm": "provisional",
     # Debug / advanced introspection
     "PageComposition": "debug",
     "RegionUpdate": "debug",
@@ -245,6 +246,7 @@ __all__ = [
     "ToolRegistry",
     "ValidationError",
     "ViewRef",
+    "WebMCPForm",
     "cache_view",
     "current_user",
     "form_from",
@@ -285,6 +287,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "CheckResult": ("chirp.contracts.types", "CheckResult"),
     "ContractIssue": ("chirp.contracts.types", "ContractIssue"),
     "Severity": ("chirp.contracts.types", "Severity"),
+    "WebMCPForm": ("chirp.webmcp", "WebMCPForm"),
     # HTTP
     "HtmxDetails": ("chirp.http.request", "HtmxDetails"),
     "Request": ("chirp.http.request", "Request"),

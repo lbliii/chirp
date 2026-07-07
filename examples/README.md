@@ -257,5 +257,6 @@ cannot disappear from the catalog while its documentation debt remains visible.
 | [`standalone/tools`](standalone/tools/) | standalone | supporting | 2 | — | none | `fragments`, `sse`, `tools` | yes | [`tools`](../examples/standalone/tools) |
 | [`standalone/tools_hitl`](standalone/tools_hitl/) | standalone | experimental | 3 | `ai`, `sessions` | none | `ai`, `csrf`, `fragments`, `sessions`, `sse`, `tools` | yes | [`tools_hitl`](../examples/standalone/tools_hitl) |
 | [`standalone/upload`](standalone/upload/) | standalone | supporting | 2 | `forms`, `sessions` | none | `csrf`, `forms`, `sessions`, `uploads`, `validation` | yes | [`upload`](../examples/standalone/upload) |
+| [`standalone/webmcp_form`](standalone/webmcp_form/) | standalone | experimental | 2 | — | none | `forms`, `fragments`, `mutations`, `validation`, `webmcp` | yes | [`webmcp_form`](../examples/standalone/webmcp_form) |
 | [`standalone/wizard`](standalone/wizard/) | standalone | supporting | 2 | `sessions` | none | `forms`, `pages`, `sessions`, `validation` | yes | [`wizard`](../examples/standalone/wizard) |
 <!-- example-inventory:catalog:end -->

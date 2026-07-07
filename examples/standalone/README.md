@@ -78,6 +78,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - [`tools`](tools/) — supporting, tier 2
 - [`tools_hitl`](tools_hitl/) — experimental, tier 3
 - [`upload`](upload/) — supporting, tier 2
+- [`webmcp_form`](webmcp_form/) — experimental, tier 2
 - [`wizard`](wizard/) — supporting, tier 2
 <!-- example-inventory:standalone:end -->
 

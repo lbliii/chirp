@@ -81,6 +81,7 @@ EXPECTED_PUBLIC_API = [
     "ToolRegistry",
     "ValidationError",
     "ViewRef",
+    "WebMCPForm",
     "cache_view",
     "current_user",
     "form_from",
