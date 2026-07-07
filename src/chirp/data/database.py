@@ -18,7 +18,7 @@ Concurrency model:
     - SQLite uses a small bounded pool (sized by ``pool_size``) of WAL-mode
       connections. Readers acquire any free connection and run concurrently;
       write transactions serialize behind ``_sqlite_lock`` (single-writer).
-    - PostgreSQL uses asyncpg's native pool with transaction-level isolation.
+    - PostgreSQL uses the in-tree pelt pool with transaction-level isolation.
 """
 
 import asyncio
@@ -720,7 +720,7 @@ async def _execute_fetch_all(
         columns = [desc[0] for desc in cursor.description]
         return [dict(zip(columns, row, strict=True)) for row in rows]
 
-    # PostgreSQL (asyncpg returns Records)
+    # PostgreSQL (pelt returns Records)
     rows = await conn.fetch(sql, *params)
     return [dict(row) for row in rows]
 
@@ -777,7 +777,7 @@ async def _execute_many(
         cursor = await conn.executemany(sql, params_seq)
         return cursor.rowcount
 
-    # PostgreSQL — asyncpg's executemany returns None, count manually
+    # PostgreSQL — pelt's executemany returns None, count manually
     await conn.executemany(sql, params_seq)
     return len(params_seq)
 
@@ -789,7 +789,7 @@ async def _execute_statement(driver: str, conn: Any, sql: str, params: tuple[Any
 
     # PostgreSQL
     result = await conn.execute(sql, *params)
-    # asyncpg returns "INSERT 0 1" style strings
+    # PostgreSQL returns "INSERT 0 1" style command tags
     parts = result.split()
     if len(parts) >= 3:
         return int(parts[-1])

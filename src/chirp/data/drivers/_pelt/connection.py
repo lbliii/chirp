@@ -34,7 +34,7 @@ from chirp.data.drivers._pelt._protocol import (
     SimpleQueryProtocol,
     TransactionStatus,
 )
-from chirp.data.drivers._pelt.errors import PeltConnectionError
+from chirp.data.drivers._pelt.errors import PeltConnectionError, PostgresError
 from chirp.data.drivers._pelt.types import ConnectionConfig
 
 _IdentRe = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -344,15 +344,25 @@ class Connection:
             await self._flush_pending_closes()
         await self._stream.send(outbound)
         events: list[Any] = []
+        pending_error: PostgresError | None = None
         ready = False
+
+        def record(new: Sequence[Any]) -> bool:
+            nonlocal pending_error
+            self._dispatch_sideband(new)
+            events.extend(new)
+            if pending_error is None:
+                pending_error = next(
+                    (event.error for event in new if isinstance(event, ErrorEvent)),
+                    None,
+                )
+            return any(isinstance(event, ReadyEvent) for event in new)
+
         while not ready:
             new = engine.receive_bytes(b"")
-            if new:
-                self._dispatch_sideband(new)
-                events.extend(new)
-                if any(isinstance(e, ReadyEvent) for e in new):
-                    ready = True
-                    continue
+            if new and record(new):
+                ready = True
+                continue
             try:
                 chunk = await self._stream.stream.receive(65536)
             except EndOfStream:
@@ -363,16 +373,13 @@ class Connection:
                 msg = "connection closed by server"
                 raise PeltConnectionError(msg)
             new = engine.receive_bytes(chunk)
-            self._dispatch_sideband(new)
-            for event in new:
-                if isinstance(event, ErrorEvent):
-                    raise event.error
-            events.extend(new)
-            if any(isinstance(e, ReadyEvent) for e in new):
-                ready = True
+            ready = record(new)
         if protocol is None and isinstance(engine, ExtendedQueryProtocol):
             self._protocol.state = engine.state
+        if engine.transaction_status is not None:
             self._protocol.transaction_status = engine.transaction_status
+        if pending_error is not None:
+            raise pending_error
         return events
 
     async def _flush_pending_closes(self) -> None:

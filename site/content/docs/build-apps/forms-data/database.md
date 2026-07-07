@@ -6,7 +6,7 @@ weight: 10
 lang: en
 type: doc
 tags: [database, sqlite, postgresql, async]
-keywords: [database, sqlite, postgresql, asyncpg, query, row-mapping, transactions, migrations]
+keywords: [database, sqlite, postgresql, pelt, query, row-mapping, transactions, migrations]
 category: guide
 ---
 
@@ -358,7 +358,7 @@ app = App(db="postgresql://user:pass@localhost/mydb", pool_size=10)
 ::::
 
 :::{note}
-**Pick one:** SQLite gives you concurrent readers and a single serialized writer — a property of WAL, not Postgres-grade write concurrency. It is the right default for development, single-writer workloads, and small apps. Reach for PostgreSQL when multiple writers must proceed in parallel: its `asyncpg` pool runs transactions concurrently rather than behind one write lock.
+**Pick one:** SQLite gives you concurrent readers and a single serialized writer — a property of WAL, not Postgres-grade write concurrency. It is the right default for development, single-writer workloads, and small apps. Reach for PostgreSQL when multiple writers must proceed in parallel: pelt's bounded connection pool runs transactions concurrently rather than behind one write lock.
 :::
 
 ### Parameter style
@@ -409,17 +409,17 @@ For a **file-backed** SQLite database, Chirp opens a small bounded pool of WAL-m
 
 **In-memory** SQLite (`sqlite:///:memory:`) is a development/test convenience and behaves differently. A private `:memory:` connection is isolated to whichever connection opened it, and shared-cache mode raises lock errors under concurrent reader/writer access. So in-memory databases use a single shared connection and serialize all access — reads included. For concurrent-reader throughput, use a file database (WAL) or PostgreSQL.
 
-PostgreSQL has the strongest concurrency: `asyncpg` provides a real connection pool with per-transaction isolation, so reads and writes run concurrently up to `pool_size`.
+PostgreSQL has the strongest concurrency: Chirp's in-tree pelt driver provides a bounded connection pool with per-transaction isolation, so reads and writes run concurrently up to `pool_size`.
 
 For Chirp's broader free-threading posture, see [[docs/about/thread-safety|Thread Safety]].
 :::{/dropdown}
 
-:::{dropdown} Advanced: asyncpg on free-threaded Python (3.14t)
-:icon: warning
+:::{dropdown} Advanced: pelt on free-threaded Python (3.14t)
+:icon: cpu
 
-Chirp's `data-pg` backend is **asyncpg** today — a Cython extension, not pure Python. Chirp talks to asyncpg directly through its own anyio-based pool shim, so Chirp does not route Postgres access through a third-party ORM or greenlet bridge. asyncpg's free-threading status remains a caveat for anyone running `bengal-chirp[data-pg]` on free-threaded builds.
+Chirp's `data-pg` backend is **pelt**, an in-tree pure-Python PostgreSQL driver with no runtime dependency behind the `data-pg` extra. A connection and its prepared-statement cache have one checked-out owner; the shared codec registry publishes immutable snapshots under a short lock. Pool reset I/O completes before a connection becomes available again.
 
-Treat asyncpg-on-3.14t as best-effort: fine for development and typical OLTP workloads, but verify against the current asyncpg release notes before relying on it under heavy Postgres concurrency in production. See [[docs/about/thread-safety|Thread Safety]] for Chirp's broader free-threading posture.
+CI imports the backend with `PYTHON_GIL=0` and warnings promoted to errors, then runs contention and decode-overlap stress tests. A separate PostgreSQL 17 job proves wire-level queries, concurrent checked-out caches, and failed-transaction rollback before reuse. These are correctness gates, not a production throughput benchmark; measure your own workload before choosing pool size. The auditable evidence map lives in `docs/pelt-free-threading.md` in the source repository. See [[docs/about/thread-safety|Thread Safety]] for Chirp's broader free-threading posture.
 :::{/dropdown}
 
 ## Real-time updates with LISTEN / NOTIFY
@@ -481,7 +481,7 @@ except QueryError as e:
 | `DataError` | Base class for all data errors |
 | `QueryError` | SQL execution fails |
 | `DatabaseConnectionError` | Cannot connect to the database |
-| `DriverNotInstalledError` | `asyncpg` is missing (install `bengal-chirp[data-pg]`) |
+| `DriverNotInstalledError` | An optional third-party database driver is unavailable; pelt itself needs no extra dependency |
 | `MigrationError` | A migration file is invalid or fails |
 
 ## Next Steps

@@ -5,11 +5,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import anyio
 import pytest
 
 from chirp.data.database import Database
 from chirp.data.drivers._pelt import connection as pelt_connection
 from chirp.data.drivers._pelt import pool as pelt_pool
+from chirp.data.drivers._pelt.errors import PostgresError
+from chirp.data.drivers._pelt.types import PoolConfig
 
 PG_DSN = os.environ.get("CHIRP_TEST_PG_DSN")
 requires_pg = pytest.mark.skipif(
@@ -99,3 +102,67 @@ async def test_standalone_connect_and_close() -> None:
 def test_record_is_dictable() -> None:
     rec = pelt_connection.Record(("a", "b"), (1, "x"))
     assert dict(rec) == {"a": 1, "b": "x"}
+
+
+@requires_pg
+@pytest.mark.issue(259)
+async def test_pool_rolls_back_failed_transaction_before_reuse() -> None:
+    assert PG_DSN is not None
+    pool = await pelt_pool.create_pool(PoolConfig.from_dsn(PG_DSN, max_size=1))
+    conn = await pool.acquire()
+    try:
+        await conn.execute("BEGIN")
+        with pytest.raises(PostgresError) as caught:
+            await conn.execute("SELECT 1 / 0")
+        assert caught.value.sqlstate == "22012"
+    finally:
+        await pool.release(conn)
+
+    try:
+        reused = await pool.acquire()
+        try:
+            assert reused is conn
+            row = await reused.fetchrow("SELECT 1 AS recovered")
+            assert dict(row) == {"recovered": 1}
+        finally:
+            await pool.release(reused)
+    finally:
+        await pool.close()
+
+
+@requires_pg
+@pytest.mark.issue(259)
+async def test_parallel_checkouts_keep_statement_caches_single_owner() -> None:
+    """Each checked-out connection prepares a repeated query exactly once."""
+    assert PG_DSN is not None
+    pool = await pelt_pool.create_pool(PoolConfig.from_dsn(PG_DSN, max_size=4))
+    connections = [await pool.acquire() for _ in range(pool.size)]
+    statement_names: list[str] = []
+    names_lock = anyio.Lock()
+    sql = "SELECT $1::int4 AS value"
+
+    async def exercise(conn: pelt_connection.Connection, value: int) -> None:
+        first_row = await conn.fetchrow(sql, value)
+        first = conn._protocol.cache.get(sql, ())
+        second_row = await conn.fetchrow(sql, value + 10)
+        second = conn._protocol.cache.get(sql, ())
+
+        assert dict(first_row) == {"value": value}
+        assert dict(second_row) == {"value": value + 10}
+        assert first is not None
+        assert second is first
+        assert len(conn._protocol.cache) == 1
+        async with names_lock:
+            statement_names.append(first.name)
+
+    try:
+        async with anyio.create_task_group() as task_group:
+            for index, conn in enumerate(connections):
+                task_group.start_soon(exercise, conn, index)
+    finally:
+        for conn in connections:
+            await pool.release(conn)
+        await pool.close()
+
+    assert len(statement_names) == 4
+    assert set(statement_names) == {"pelt_stmt_1"}
