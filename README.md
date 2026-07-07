@@ -293,6 +293,10 @@ async def notifications(request: Request):
 ```
 
 Combined with htmx's SSE support, the server renders HTML and the browser swaps it in.
+The managed htmx 4 preview uses native `hx-sse:connect`: rendered `Fragment`
+updates are unnamed HTML frames, and `Fragment(target="feed")` becomes an
+unnamed `<hx-partial hx-target="#feed">` update. Named `SSEEvent`s remain DOM
+events. Htmx 2 keeps its existing `sse-connect` / `sse-swap` channels.
 
 </details>
 

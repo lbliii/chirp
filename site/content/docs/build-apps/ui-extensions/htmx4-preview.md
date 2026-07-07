@@ -72,6 +72,7 @@ The preview does not inherit material upstream defaults accidentally:
 | History | Back/forward refetches server HTML. Declare one stable `hx-history-elt` shell boundary when pushing URLs. |
 | Timeout | Ordinary requests time out after 60 seconds. Use `Stream`, `Suspense`, or `EventStream` for long-lived work, or a local `hx-config` timeout. |
 | Queueing | `queue:*` trigger modifiers are errors. Use `hx-sync` with an explicit queue strategy. |
+| SSE | `hx-sse:connect` uses one fetch stream. Rendered `Fragment`s are unnamed HTML; explicit targets use validated `<hx-partial>` envelopes. Named `SSEEvent`s are DOM events. |
 
 The preview also rejects `HX-Trigger-After-Swap` and
 `HX-Trigger-After-Settle` before send because htmx 4 ignores them. Keep

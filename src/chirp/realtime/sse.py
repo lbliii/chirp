@@ -9,9 +9,11 @@ import asyncio
 import contextlib
 import json as json_module
 import logging
+import re
 from collections.abc import Callable
 from contextvars import Token
-from typing import TYPE_CHECKING, Any
+from html import escape
+from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
 
@@ -24,17 +26,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("chirp.server")
 
+_SSEDialect = Literal["legacy", "htmx4"]
+_HTMX4_PARTIAL_TARGET = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")
+
+
+def _validate_htmx4_sse_target(target: str) -> str:
+    """Return a selector-safe DOM id or fail with migration guidance."""
+    if _HTMX4_PARTIAL_TARGET.fullmatch(target) is None:
+        msg = (
+            f"SSE target {target!r} is not a safe htmx 4 DOM id; use letters, "
+            "digits, underscores, or hyphens and start with a letter or underscore."
+        )
+        raise ValueError(msg)
+    return target
+
 
 async def handle_sse(
     event_stream: EventStream,
     send: Send,
     receive: Receive,
     *,
+    dialect: _SSEDialect = "legacy",
     kida_env: Environment | None = None,
     debug: bool = False,
     retry_ms: int | None = None,
     close_event: str | None = None,
     allow_origin: str | None = None,
+    vary_client_dialect: bool = False,
     trace_sink: Callable[[str, dict[str, Any]], None] | None = None,
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
     captured_context: _CapturedRequestContext | None = None,
@@ -78,11 +96,14 @@ async def handle_sse(
         (b"connection", b"keep-alive"),
         (b"x-accel-buffering", b"no"),
     ]
+    vary_fields: list[str] = []
     if allow_origin is not None:
         sse_headers.append((b"access-control-allow-origin", allow_origin.encode("latin-1")))
-        # Responses vary by Origin once CORS is in play, so caches must not
-        # serve a cross-origin-allowed body to a different origin.
-        sse_headers.append((b"vary", b"Origin"))
+        vary_fields.append("Origin")
+    if vary_client_dialect:
+        vary_fields.extend(("Accept", "HX-Request-Type"))
+    if vary_fields:
+        sse_headers.append((b"vary", ", ".join(vary_fields).encode("ascii")))
     sse_headers.extend(extra_headers)
     await send(
         {
@@ -92,7 +113,13 @@ async def handle_sse(
         }
     )
     if trace_sink is not None:
-        trace_sink("start", {"heartbeat_interval": event_stream.heartbeat_interval})
+        trace_sink(
+            "start",
+            {
+                "dialect": dialect,
+                "heartbeat_interval": event_stream.heartbeat_interval,
+            },
+        )
 
     if retry_ms is not None:
         retry_event = SSEEvent(data="sse-retry", event="chirp:sse:meta", retry=retry_ms)
@@ -229,9 +256,13 @@ async def handle_sse(
                         value,
                         default_event=event_stream.event_type,
                         kida_env=kida_env,
+                        dialect=dialect,
                     )
                     if trace_sink is not None:
-                        trace_sink("event", _trace_event_payload(value, sse_text))
+                        trace_sink(
+                            "event",
+                            _trace_event_payload(value, sse_text, dialect=dialect),
+                        )
                 except Exception as render_exc:
                     from chirp.server.terminal_errors import log_error
 
@@ -249,7 +280,7 @@ async def handle_sse(
                     # was lost.  In debug mode, include targeted block info;
                     # in production, send a generic error event.
                     if debug:
-                        sse_text = _format_error_event(value, render_exc)
+                        sse_text = _format_error_event(value, render_exc, dialect=dialect)
                     else:
                         sse_text = SSEEvent(
                             data="Event rendering failed",
@@ -418,12 +449,13 @@ def _format_event(
     *,
     default_event: str | None = None,
     kida_env: Environment | None = None,
+    dialect: _SSEDialect = "legacy",
 ) -> str:
     """Convert a yielded value to SSE wire format.
 
     Dispatch:
         - ``SSEEvent`` -> encode as-is
-        - ``Fragment`` -> render via kida, using its target as event name when set
+        - ``Fragment`` -> render via kida, then use the selected client envelope
         - ``str`` -> wrap as data
         - ``dict`` -> JSON-serialize as data
     """
@@ -436,12 +468,23 @@ def _format_event(
         from chirp.templating.integration import render_fragment
 
         html = render_fragment(kida_env, value).strip()
-        # Use the Fragment's target as the SSE event name when specified.
-        # This allows sse-swap="target_id" on DOM elements to receive
-        # updates for specific blocks (reactive templates pattern).
-        # Note: no OOB wrapper — sse-swap matches on event name alone,
-        # and OOB would replace the target element, destroying the
-        # sse-swap attribute and breaking subsequent updates.
+        if not html:
+            msg = (
+                f"SSE Fragment {value.template_name!r}:{value.block_name!r} "
+                "rendered empty HTML; refusing to send a visible empty swap."
+            )
+            raise RuntimeError(msg)
+        if dialect == "htmx4" and value.target is not None:
+            target = escape(_validate_htmx4_sse_target(value.target), quote=True)
+            swap_attr = f' hx-swap="{escape(value.swap, quote=True)}"' if value.swap else ""
+            html = f'<hx-partial hx-target="#{target}"{swap_attr}>{html}</hx-partial>'
+            return SSEEvent(data=html).encode()
+        if dialect == "htmx4":
+            return SSEEvent(data=html).encode()
+
+        # Legacy htmx uses the Fragment target as a named SSE channel. No OOB
+        # wrapper is added because replacing the listener would break later
+        # events on the same connection.
         event_name = value.target or default_event
         event = SSEEvent(data=html, event=event_name)
         return event.encode()
@@ -459,7 +502,12 @@ def _format_event(
     return event.encode()
 
 
-def _trace_event_payload(value: Any, sse_text: str) -> dict[str, Any]:
+def _trace_event_payload(
+    value: Any,
+    sse_text: str,
+    *,
+    dialect: _SSEDialect = "legacy",
+) -> dict[str, Any]:
     """Return bounded metadata about a formatted SSE event."""
     event_name = None
     event_id = None
@@ -474,8 +522,27 @@ def _trace_event_payload(value: Any, sse_text: str) -> dict[str, Any]:
             retry = line[7:]
         elif line.startswith("data: "):
             data_lines += 1
+    message_class = "named-dom-event" if event_name is not None else "unnamed-data"
+    target = None
+    swap = None
+    if isinstance(value, Fragment):
+        if dialect == "htmx4" and value.target:
+            message_class = "targeted-partial"
+            target = f"#{value.target}"
+            swap = value.swap or "innerHTML"
+        elif dialect == "htmx4":
+            message_class = "html-swap"
+        else:
+            message_class = "named-fragment" if value.target else "html-swap"
+            target = value.target
+    elif event_name is None and "hx-swap-oob" in sse_text:
+        message_class = "oob-html"
     return {
+        "dialect": dialect,
         "value_type": type(value).__name__,
+        "message_class": message_class,
+        "target": target,
+        "swap": swap,
         "event": event_name,
         "id": event_id,
         "retry": retry,
@@ -483,17 +550,20 @@ def _trace_event_payload(value: Any, sse_text: str) -> dict[str, Any]:
     }
 
 
-def _format_error_event(value: Any, exc: Exception) -> str:
+def _format_error_event(
+    value: Any,
+    exc: Exception,
+    *,
+    dialect: _SSEDialect = "legacy",
+) -> str:
     """Format an error as an SSE event for a failed render.
 
-    For ``Fragment`` values, uses the fragment's target as the SSE event
-    name so the error replaces the specific block in the DOM.  This lets
-    the developer see exactly which block broke, inline where it should be.
+    For targeted ``Fragment`` values, htmx 2 uses the named event and htmx 4
+    uses an unnamed partial so the error replaces the specific block in the
+    DOM. This keeps the broken block visible without changing render surfaces.
 
     For other value types, sends a generic ``error`` event.
     """
-    from html import escape
-
     from chirp.server.terminal_errors import _is_kida_error, _plain_error_message
 
     detail = _plain_error_message(exc) if _is_kida_error(exc) else f"{type(exc).__name__}: {exc}"
@@ -505,6 +575,12 @@ def _format_error_event(value: Any, exc: Exception) -> str:
             f"<strong>{escape(type(exc).__name__)}</strong>: {escape(plain_msg)}"
             f"</div>"
         )
+        if dialect == "htmx4":
+            if _HTMX4_PARTIAL_TARGET.fullmatch(value.target):
+                target = escape(value.target, quote=True)
+                partial = f'<hx-partial hx-target="#{target}">{html}</hx-partial>'
+                return SSEEvent(data=partial).encode()
+            return SSEEvent(data=detail, event="error").encode()
         return SSEEvent(data=html, event=value.target).encode()
 
     return SSEEvent(data=detail, event="error").encode()

@@ -26,6 +26,13 @@ If you are new to the SSE wire format (`sse-connect`, `sse-swap`, event names), 
 first — this page assumes it. For a single value bound in many places, see
 [[docs/build-apps/streaming-updates/signals|signals]].
 
+:::{note} Client dialects
+The legacy markup examples below describe the htmx 2 rollback tier. The exact
+htmx 4 preview uses `hx-sse:connect`, unnamed rendered messages, and
+`<hx-partial>` targets. `sse_scope()` selects the right connection shape; do
+not mix both dialects on one source element.
+:::
+
 ## Which pattern?
 
 ::::{list-table}
@@ -59,7 +66,8 @@ Use for status badges, counters, presence lists, dashboards — any element wher
 server is the sole rendering authority and the client is a passive display.
 
 :::{tip} Reach for
-A `Fragment` yielded over SSE. Its `target` becomes the SSE event name.
+A `Fragment` yielded over SSE. On htmx 2 its `target` becomes the named event;
+on htmx 4 it becomes the validated DOM id in an unnamed partial envelope.
 :::
 
 ```python
@@ -83,13 +91,25 @@ async def stream():
 
 The rules that make this work:
 
-- `Fragment.target` becomes the SSE event name; a target-less `Fragment` emits an
+- On htmx 2, `Fragment.target` becomes the SSE event name; a target-less `Fragment` emits an
   unnamed frame that the default `sse-swap="message"` listener receives.
 - `sse-swap` must be on a **child** of `sse-connect`, never the same element.
 - `hx-disinherit="hx-target hx-swap"` on the `sse-connect` element stops a
   layout-level `hx-target` from bleeding into SSE swaps.
 - `hx-target="this"` on each `sse-swap` element targets the swap correctly once
   inheritance is broken.
+
+The same server generator under the htmx 4 preview pairs with native markup:
+
+```html
+<div hx-sse:connect="/stream" hx-target="#status">
+  <span id="status">{% block status_block %}v{{ stats.version }}{% endblock %}</span>
+</div>
+```
+
+Chirp sends the targeted `Fragment` as unnamed
+`<hx-partial hx-target="#status">…</hx-partial>` data. A named `SSEEvent` is
+instead a DOM event and never a rendered swap.
 
 `chirp check myapp:app` validates all four rules at startup. See
 [Compile-time validation](#compile-time-validation) below.

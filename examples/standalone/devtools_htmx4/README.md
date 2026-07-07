@@ -21,6 +21,9 @@ The timing migration proof renders server-derived event names into the target
 block, then external nonce-safe JavaScript reads that exact target during
 `htmx:before:settle` and `htmx:after:settle`; no removed response header or
 JSON side channel is used.
+The native SSE proof covers unnamed main HTML, targeted partials, OOB-only
+updates, named DOM events, `Last-Event-ID` reconnect, source-element cleanup,
+and bounded DevTools metadata on the exact preview bundle.
 
 Run the server from this directory:
 

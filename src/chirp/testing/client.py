@@ -260,6 +260,7 @@ class TestClient:
         self,
         path: str,
         *,
+        request_type: Literal["full", "partial"] | None = None,
         headers: dict[str, str] | None = None,
         max_events: int = 10,
         disconnect_after: float | None = None,
@@ -273,7 +274,9 @@ class TestClient:
         - ``disconnect_after`` (or ``timeout``) seconds have elapsed, or
         - the server closes the stream (generator exhausted).
 
-        ``timeout`` is an alias for ``disconnect_after``.
+        ``timeout`` is an alias for ``disconnect_after``. Pass
+        ``request_type`` to model the managed htmx 4 SSE fetch dialect;
+        omitting it models a generic or legacy EventSource connection.
 
         Returns an ``SSETestResult`` with parsed events and metadata.
 
@@ -299,6 +302,13 @@ class TestClient:
         raw_headers: list[tuple[bytes, bytes]] = [
             (b"accept", b"text/event-stream"),
         ]
+        if request_type is not None:
+            raw_headers.extend(
+                (
+                    (b"hx-request", b"true"),
+                    (b"hx-request-type", request_type.encode("ascii")),
+                )
+            )
         for name, value in (headers or {}).items():
             raw_headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
 

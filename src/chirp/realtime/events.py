@@ -56,8 +56,9 @@ class EventStream:
 
     - ``str``: sent as data
     - ``dict``: JSON-serialized as data
-    - ``Fragment``: rendered via kida, sent on the htmx ``message`` channel
-      unless the fragment has a target
+    - ``Fragment``: rendered via kida; htmx 2 uses its target as a named
+      channel, while the managed htmx 4 SSE fetch uses unnamed HTML and an
+      ``<hx-partial>`` envelope for an explicit DOM target
     - ``SSEEvent``: sent as-is
 
     Usage::

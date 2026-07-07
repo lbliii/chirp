@@ -27,6 +27,10 @@ class TestAttrToMethod:
     def test_hx_patch(self):
         assert attr_to_method("hx-patch") == "PATCH"
 
+    def test_sse_connect_dialects_use_get(self):
+        assert attr_to_method("sse-connect") == "GET"
+        assert attr_to_method("hx-sse:connect") == "GET"
+
     def test_form_action_default(self):
         assert attr_to_method("action") == "GET"
 

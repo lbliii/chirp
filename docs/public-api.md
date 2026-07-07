@@ -61,6 +61,15 @@ rejects those removed headers before send; use rendered target data and the
 corresponding per-target settle lifecycle instead. `assert_hx_trigger(...,
 after=...)` likewise asserts wire shape, not htmx 4 browser execution.
 
+`EventStream` and `SSEEvent` remain stable public return types. For the exact
+htmx 4 preview SSE request, yielded `Fragment`s use unnamed HTML frames;
+explicit `Fragment.target` values become validated DOM IDs inside
+`<hx-partial>` envelopes, while named `SSEEvent`s remain literal DOM events.
+Htmx 2 and generic SSE clients retain their existing wire. `sse_scope()` and
+`assert_sse_wired()` select and verify the corresponding client dialect.
+`extract_sse_attrs()` includes both connection URL attributes while retaining
+its legacy named-swap set as the second return value.
+
 ### Request notes
 
 The experimental RFC 10008 route keyword is an additive API, but it tightens

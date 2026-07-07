@@ -82,11 +82,11 @@ if __name__ == "__main__":
 *Source: [`examples/standalone/sse/app.py`](https://github.com/lbliii/chirp/blob/main/examples/standalone/sse/app.py).*
 
 Set `worker_mode="async"` — the stream holds a connection open and awaits between
-events. The `/events` route is marked `referenced=True` because htmx reaches it
-through an `sse-connect` attribute, not a link the contract checker can see, so
-the flag keeps it out of the orphan-route report. A `Fragment`'s target becomes
-the SSE event name, so an `sse-swap="notification"` element receives only those
-updates.
+events. This maintained example follows Chirp's htmx 2 default: a `Fragment`'s
+target becomes the named event consumed by `sse-swap`. The exact htmx 4 preview
+instead emits `hx-sse:connect`; its rendered fragments are unnamed HTML and an
+explicit target becomes a DOM id inside `<hx-partial>`. Named `SSEEvent`s remain
+literal DOM events. See the SSE guide for the side-by-side migration contract.
 
 ## Run it
 

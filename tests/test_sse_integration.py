@@ -5,13 +5,16 @@ EventStream, content negotiation wraps it in SSEResponse, the ASGI handler
 dispatches to handle_sse(), and the TestClient collects structured events.
 """
 
+import asyncio
 import json
 import re
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
 from chirp import App
+from chirp.app.htmx_manifest import HTMX4_PREVIEW_VERSION
 from chirp.config import AppConfig
 from chirp.middleware.csp_nonce import get_csp_nonce
 from chirp.realtime.events import EventStream, SSEEvent
@@ -339,6 +342,172 @@ class TestFragmentSSE:
 
         evt = result.events[0]
         assert "hx-swap-oob" not in evt.data
+
+    @pytest.mark.issue(553)
+    async def test_htmx4_targeted_fragment_uses_unnamed_partial_envelope(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment(
+                    "dashboard.html",
+                    "stats",
+                    target="stats",
+                    swap="beforeend",
+                    stats=["a", "b"],
+                )
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", request_type="partial", max_events=1)
+
+        event = result.events[0]
+        assert result.headers["vary"] == "Accept, HX-Request-Type"
+        assert event.event is None
+        assert event.data.startswith('<hx-partial hx-target="#stats" hx-swap="beforeend">')
+        assert event.data.endswith("</hx-partial>")
+        assert "a" in event.data
+        assert "b" in event.data
+
+    @pytest.mark.issue(553)
+    async def test_htmx4_unnamed_fragment_uses_normal_html_swap_frame(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment("search.html", "results_list", results=["x"])
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", request_type="partial", max_events=1)
+
+        event = result.events[0]
+        assert event.event is None
+        assert event.data.startswith('<div id="results">')
+        assert "hx-partial" not in event.data
+
+    @pytest.mark.issue(553)
+    async def test_preview_generic_client_keeps_legacy_fragment_wire(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment("dashboard.html", "stats", target="stats", stats=["x"])
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", max_events=1)
+
+        event = result.events[0]
+        assert result.headers["vary"] == "Accept, HX-Request-Type"
+        assert event.event == "stats"
+        assert "hx-partial" not in event.data
+
+    @pytest.mark.issue(553)
+    async def test_htmx4_named_sse_event_remains_a_named_dom_event(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield SSEEvent(data="payload", event="notification", id="42")
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", request_type="partial", max_events=1)
+
+        assert result.events == (SSEEvent(data="payload", event="notification", id="42"),)
+
+    @pytest.mark.issue(553)
+    async def test_htmx4_rejects_unsafe_partial_target_without_empty_swap(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment(
+                    "dashboard.html",
+                    "stats",
+                    target="stats panel",
+                    stats=["x"],
+                )
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", request_type="partial", max_events=1)
+
+        assert len(result.events) == 1
+        assert result.events[0].event == "error"
+        assert result.events[0].data == "Event rendering failed"
+
+    @pytest.mark.issue(553)
+    async def test_htmx4_rejects_empty_rendered_fragment_without_empty_swap(self) -> None:
+        app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        @app.route("/events")
+        def events():
+            async def gen():
+                yield Fragment("base.html", "content", target="stats")
+
+            return EventStream(gen())
+
+        async with TestClient(app) as client:
+            result = await client.sse("/events", request_type="partial", max_events=1)
+
+        assert result.events == (SSEEvent(data="Event rendering failed", event="error"),)
+
+    @pytest.mark.issue(553)
+    async def test_simultaneous_legacy_and_htmx4_connections_keep_dialects_isolated(
+        self,
+    ) -> None:
+        legacy_app = _app(htmx=True, htmx_version="2.0.10")
+        preview_app = _app(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION)
+
+        def register(app: App) -> None:
+            @app.route("/events")
+            def events():
+                async def gen():
+                    yield Fragment(
+                        "dashboard.html",
+                        "stats",
+                        target="stats",
+                        stats=["x"],
+                    )
+
+                return EventStream(gen())
+
+        register(legacy_app)
+        register(preview_app)
+
+        async def collect(
+            app: App,
+            *,
+            request_type: Literal["full", "partial"] | None,
+        ):
+            async with TestClient(app) as client:
+                return await client.sse(
+                    "/events",
+                    request_type=request_type,
+                    max_events=1,
+                )
+
+        legacy, preview = await asyncio.gather(
+            collect(legacy_app, request_type=None),
+            collect(preview_app, request_type="partial"),
+        )
+
+        assert legacy.events[0].event == "stats"
+        assert "hx-partial" not in legacy.events[0].data
+        assert preview.events[0].event is None
+        assert preview.events[0].data.startswith('<hx-partial hx-target="#stats">')
 
 
 # ---------------------------------------------------------------------------
@@ -695,6 +864,33 @@ class TestFormatErrorEvent:
         assert "chirp-block-error" in result
         assert "ValueError" in result
         assert "bad data" in result
+
+    @pytest.mark.issue(553)
+    def test_htmx4_fragment_error_produces_unnamed_targeted_partial(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        result = _format_error_event(
+            Fragment("tpl.html", "sidebar", target="sidebar"),
+            ValueError("bad data"),
+            dialect="htmx4",
+        )
+
+        assert "event:" not in result
+        assert '<hx-partial hx-target="#sidebar">' in result
+        assert "chirp-block-error" in result
+
+    @pytest.mark.issue(553)
+    def test_htmx4_unsafe_fragment_error_stays_generic_named_error(self) -> None:
+        from chirp.realtime.sse import _format_error_event
+
+        result = _format_error_event(
+            Fragment("tpl.html", "sidebar", target="sidebar panel"),
+            ValueError("bad data"),
+            dialect="htmx4",
+        )
+
+        assert "event: error" in result
+        assert "event: sidebar panel" not in result
 
     def test_non_fragment_produces_generic_error_event(self) -> None:
         from chirp.realtime.sse import _format_error_event

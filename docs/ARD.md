@@ -322,8 +322,9 @@ via task cancellation.
 
 **Event formatting:** `_format_event()` handles multiple yield types:
 - `SSEEvent` → full SSE wire format with optional `event:`, `id:`, `retry:` fields
-- `Fragment` → rendered via kida; untargeted fragments use the htmx `message`
-  channel, while targeted fragments use the target as the SSE event name
+- `Fragment` → rendered via Kida once; the legacy/generic dialect keeps the
+  target-as-event contract, while the exact htmx 4 fetch dialect sends unnamed
+  HTML and wraps explicit DOM targets in `<hx-partial>`
 - `str` → sent as `data: <string>`
 - `dict` → JSON-serialized, sent as `data: {"json": ...}`
 

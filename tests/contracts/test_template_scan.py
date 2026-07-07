@@ -22,6 +22,12 @@ class TestExtractTargets:
         targets = extract_targets_from_source(html)
         assert targets[0] == ("hx-post", "/submit", None)
 
+    def test_sse_connect_dialects(self):
+        html = '<div sse-connect="/legacy"></div><div hx-sse:connect="/native"></div>'
+        targets = extract_targets_from_source(html)
+        assert ("sse-connect", "/legacy", None) in targets
+        assert ("hx-sse:connect", "/native", None) in targets
+
     def test_form_action_post(self):
         html = '<form action="/login" method="post"></form>'
         targets = extract_targets_from_source(html)

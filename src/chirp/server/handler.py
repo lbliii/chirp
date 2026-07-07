@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from contextvars import Token
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from kida import Environment
 
@@ -74,6 +74,22 @@ if TYPE_CHECKING:
     from chirp.app.htmx_manifest import HtmxProvisioningManifest
     from chirp.app.hypermedia_program import HypermediaProgram
     from chirp.app.state import RuntimeDebugWiring
+
+
+def _select_sse_dialect(
+    request: Request,
+    manifest: HtmxProvisioningManifest | None,
+) -> Literal["legacy", "htmx4"]:
+    """Select one immutable SSE wire dialect for the connection."""
+    if manifest is None or manifest.tier != "4-preview":
+        return "legacy"
+    accept = request.headers.get("accept", "")
+    accepts_sse = any(
+        item.partition(";")[0].strip().lower() == "text/event-stream" for item in accept.split(",")
+    )
+    if accepts_sse and request.htmx_request_type is not None:
+        return "htmx4"
+    return "legacy"
 
 
 def compile_middleware_chain(
@@ -584,11 +600,15 @@ async def handle_request(
                 stream,
                 send,
                 receive,
+                dialect=_select_sse_dialect(request, htmx_manifest),
                 kida_env=response.kida_env,
                 debug=debug,
                 retry_ms=sse_retry_ms,
                 close_event=sse_close_event,
                 allow_origin=stream.allow_origin,
+                vary_client_dialect=(
+                    htmx_manifest is not None and htmx_manifest.tier == "4-preview"
+                ),
                 trace_sink=trace_sink,
                 extra_headers=extra_headers,
                 captured_context=captured_context,

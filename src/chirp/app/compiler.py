@@ -698,6 +698,18 @@ class AppCompiler:
                 plugin_loaders=self._mutable.plugin_loaders,
             )
 
+        if self._runtime.kida_env is not None:
+            from chirp.realtime.sse import _validate_htmx4_sse_target
+
+            self._runtime.kida_env.add_global(
+                "__chirp_htmx_tier__",
+                self._runtime.htmx_manifest.tier,
+            )
+            self._runtime.kida_env.add_global(
+                "__chirp_sse_target__",
+                _validate_htmx4_sse_target,
+            )
+
         signal_registry = self._mutable.signal_registry
         if (
             signal_registry is not None

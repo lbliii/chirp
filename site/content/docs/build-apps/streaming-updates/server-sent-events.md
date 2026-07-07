@@ -44,9 +44,9 @@ async def events():
 ```
 
 The generator yields values. Chirp formats them as SSE wire protocol and sends
-them to the client. Mark SSE routes with `referenced=True` — they are reached by
-a `sse-connect` attribute, not a link the contract checker can see, so the flag
-keeps them out of the orphan-route report.
+them to the client. Mark dynamically referenced SSE routes with
+`referenced=True`; static `sse-connect` and `hx-sse:connect` URLs are discovered
+by `app.check()`.
 
 ::::{dropdown} New to SSE? How it compares to WebSockets
 Server-Sent Events are a standard browser API for receiving a stream of events
@@ -75,9 +75,9 @@ async def stream():
     # Dict -- JSON-serialized as the SSE data field
     yield {"count": 42, "status": "ok"}
 
-    # Fragment -- rendered via kida, sent as a named SSE event.
-    # target= becomes the SSE event name; without a target the event
-    # has no name and htmx routes it to the default "message" channel.
+    # Fragment -- rendered via Kida from the same named block.
+    # htmx 2 treats target= as a named SSE channel. The managed htmx 4
+    # client treats target= as a DOM id in an unnamed <hx-partial> frame.
     yield Fragment("components/notification.html", "alert",
                    target="notification", message="New alert")
 
@@ -85,9 +85,14 @@ async def stream():
     yield SSEEvent(data="custom", event="ping", id="1")
 ```
 
-Yielding a `Fragment` covers the common case: the rendered HTML is the data and
-`target` becomes the event name a `sse-swap` attribute can match on. Most apps
-never construct `SSEEvent` directly.
+Yielding a `Fragment` covers the common case. The rendered HTML is always the
+data; only its client envelope changes. Htmx 2 maps `target` to a named
+`sse-swap` channel. The exact htmx 4 preview sends unnamed HTML and maps an
+explicit `target` to a validated `<hx-partial hx-target="#...">`. Most apps
+construct `SSEEvent` only for literal named DOM events, ids, or retry metadata.
+Likewise, `EventStream(generator, event_type="notice")` names plain string and
+dict frames; under htmx 4 those are DOM events, not rendered swaps. Yield a
+`Fragment` for server-rendered HTML delivery.
 
 ::::{dropdown} SSEEvent: full field reference
 
@@ -109,7 +114,7 @@ async def stream():
 | Field | Type | Notes |
 |-------|------|-------|
 | `data` | `str` | Required. The event payload. |
-| `event` | `str \| None` | Event name; `sse-swap` and `addEventListener` filter on it. Single-line only. |
+| `event` | `str \| None` | Literal event name. Htmx 2 `sse-swap` and application listeners can consume it; htmx 4 dispatches it as a DOM event and does not swap its data. Single-line only. |
 | `id` | `str \| None` | Echoed in the `Last-Event-ID` header on reconnect. Single-line only. |
 | `retry` | `int \| None` | Reconnection interval in milliseconds. Must be non-negative. |
 
@@ -154,6 +159,43 @@ clients may need to reload the page.
 
 ## Real-Time HTML with htmx
 
+### Htmx 4 preview
+
+The managed preview provisions the version-matched `hx-sse` extension. Use
+native connection markup; do not mix the removed htmx 2 attributes into the
+same connection:
+
+```html
+<section hx-sse:connect="/notifications" hx-target="#notification-feed">
+  <div id="notification-feed">Server-rendered seed</div>
+</section>
+```
+
+An untargeted yielded `Fragment` is an unnamed HTML message and follows the
+connection's normal `hx-target` / `hx-swap` context. A targeted fragment such
+as `Fragment(..., target="notification-feed", swap="beforeend")` is rendered
+once and sent as:
+
+```html
+<hx-partial hx-target="#notification-feed" hx-swap="beforeend">
+  <!-- rendered named block -->
+</hx-partial>
+```
+
+Partial-only and OOB-only messages preserve the main connection target. Empty
+rendered fragments and selector-unsafe targets fail loudly instead of clearing
+visible HTML. A named `SSEEvent(event="notification", ...)` is a DOM event on
+the connection source; it is not an HTML swap.
+
+Preview SSE responses remain `Cache-Control: no-cache` and add
+`Vary: Accept, HX-Request-Type` because the same route can serve the native
+fetch dialect or a generic/legacy SSE client.
+
+`sse_scope()` selects this markup automatically for the exact preview and keeps
+the htmx 2 shape below for the rollback tier.
+
+### Htmx 2 rollback tier
+
 The killer pattern: combine SSE with htmx to push rendered HTML fragments in real-time.
 
 Server:
@@ -181,7 +223,7 @@ Client (using htmx SSE extension):
 </div>
 ```
 
-:::{warning} sse-swap must be on a child element
+:::{warning} Htmx 2 only: sse-swap must be on a child element
 `sse-swap` must sit on a **child** of the `sse-connect` element, not the same
 element. htmx uses `querySelectorAll` internally, which does not include the
 root element itself — put the swap target one level in.
@@ -205,8 +247,7 @@ async def live_stats():
     async def stream():
         while True:
             stats = await get_current_stats()
-            # Fragment.target becomes the SSE event name.
-            # No need to wrap in SSEEvent -- chirp handles it.
+            # Htmx 2: target is a named event. Htmx 4: target is this DOM id.
             yield Fragment("dashboard.html", "stats_panel",
                            target="stats-update", stats=stats)
             await asyncio.sleep(5)
@@ -226,7 +267,7 @@ async def live_stats():
 </section>
 ```
 
-:::{warning} Stop layout `hx-target` from bleeding into SSE swaps
+:::{warning} Htmx 2: stop layout `hx-target` from bleeding into SSE swaps
 A layout-level `hx-target` (for example, one set by `hx-boost`) can override where
 SSE events land — the swap lands in the inherited target and wipes the page. The
 fix is explicit: set `hx-disinherit="hx-target hx-swap"` on the `sse-connect`
@@ -250,8 +291,8 @@ Chirp isolates rendering failures per-event so one bad block doesn't crash the e
 
 If a `Fragment` fails to render:
 
-- **Production** (`debug=False`): the event is silently skipped, the stream continues
-- **Debug** (`debug=True`): an error event targets the specific block, replacing it with inline error HTML
+- **Production** (`debug=False`): a generic named error event is sent and the stream continues.
+- **Debug** (`debug=True`): a targeted error update replaces the specific block with actionable inline HTML. Htmx 4 uses an unnamed partial; htmx 2 uses the legacy named channel.
 
 ```html
 <!-- In debug mode, a failed "presence" block becomes: -->

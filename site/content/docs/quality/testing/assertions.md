@@ -146,6 +146,13 @@ async def test_notifications():
         assert "notification" in result.events[0].data
 ```
 
+Pass `request_type="partial"` to model the managed htmx 4 fetch-stream
+request. Omitting it models the legacy/generic SSE client. For an end-to-end
+markup check, `assert_sse_wired(client, page_path, sse_path)` detects
+`sse-connect` versus `hx-sse:connect`, selects the matching request dialect,
+and validates legacy event names or htmx 4 connection/partial/OOB targets
+against rendered page IDs.
+
 :::{warning} Bound every SSE test
 A long-lived stream never closes on its own. Always pass `max_events` (collect *N* data events) or `disconnect_after` (collect for *N* seconds), or the test will hang. `client.sse()` defaults to `max_events=10`; `timeout` is an alias for `disconnect_after`, and passing both raises `TypeError`.
 :::

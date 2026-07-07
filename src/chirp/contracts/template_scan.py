@@ -11,7 +11,7 @@ from .patterns import ID_ATTR as _ID_PATTERN
 from .patterns import METHOD_POST
 
 # \baction\b avoids matching "action" inside form_action, data-action, etc.
-_ACTION_OR_HX = r"(hx-(?:get|post|put|patch|delete)|\baction\b)"
+_ACTION_OR_HX = r"(hx-(?:get|post|put|patch|delete)|hx-sse:connect|sse-connect|\baction\b)"
 _ATTR_PATTERN_DOUBLE = re.compile(
     rf'{_ACTION_OR_HX}\s*=\s*"([^"]*)"',
 )

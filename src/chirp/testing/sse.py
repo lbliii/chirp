@@ -92,8 +92,21 @@ class _SseAttrExtractor(HTMLParser):
         super().__init__()
         self.sse_connects: list[str] = []
         self.sse_swaps: set[str] = set()
+        self.htmx4_connects: list[str] = []
+        self.htmx4_targets: set[str] = set()
+        self.ids: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr_map = {name.lower(): value for name, value in attrs}
+        element_id = attr_map.get("id")
+        if element_id:
+            self.ids.add(element_id)
+        connect = attr_map.get("hx-sse:connect")
+        if connect:
+            self.htmx4_connects.append(connect)
+            target = attr_map.get("hx-target")
+            if target:
+                self.htmx4_targets.add(target)
         for name, value in attrs:
             if name == "sse-connect" and value:
                 self.sse_connects.append(value)
@@ -105,14 +118,31 @@ class _SseAttrExtractor(HTMLParser):
 
 
 def extract_sse_attrs(html: str) -> tuple[list[str], set[str]]:
-    """Return ``(sse-connect values, sse-swap event names)`` from rendered HTML.
+    """Return ``(connection URLs, legacy sse-swap event names)`` from HTML.
 
-    Used by :func:`assert_sse_wired` to cross-check wiring against the
-    actual event names a stream emits.
+    Connection URLs include both htmx 2 ``sse-connect`` and htmx 4
+    ``hx-sse:connect`` values. The second item remains the legacy named-swap
+    set for backward compatibility; htmx 4 uses unnamed HTML and partials.
     """
     parser = _SseAttrExtractor()
     parser.feed(html)
-    return parser.sse_connects, parser.sse_swaps
+    return [*parser.sse_connects, *parser.htmx4_connects], parser.sse_swaps
+
+
+class _SsePayloadExtractor(HTMLParser):
+    """Collect bounded htmx 4 target metadata from one SSE data payload."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.partial_targets: set[str] = set()
+        self.oob_targets: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr_map = {name.lower(): value for name, value in attrs}
+        if tag.lower() == "hx-partial" and attr_map.get("hx-target"):
+            self.partial_targets.add(attr_map["hx-target"] or "")
+        if "hx-swap-oob" in attr_map and attr_map.get("id"):
+            self.oob_targets.add(attr_map["id"] or "")
 
 
 async def assert_sse_wired(
@@ -122,19 +152,61 @@ async def assert_sse_wired(
     *,
     max_events: int = 5,
 ) -> None:
-    """Cross-check SSE wiring between the page and the stream.
+    """Cross-check version-aware SSE wiring between the page and the stream.
 
-    Fails if the page has ``sse-connect`` but no ``sse-swap``, or if a
-    listener in the page waits for an event name the stream never emits
-    (the class of silent failure you would otherwise only catch in a
-    browser).
+    Htmx 2 checks named ``sse-swap`` listeners against emitted event names.
+    Htmx 4 selects the fetch-stream request dialect and checks connection,
+    partial, and OOB targets against rendered page IDs.
 
     Stream-emitted events that no listener consumes are allowed — streams
     may emit ``status``/``close`` metadata that is not a swap target.
     """
     page = await client.get(page_path)
-    connects, swaps = extract_sse_attrs(page.text)
-    assert connects, f"Page {page_path!r} has no sse-connect attribute; cannot verify SSE wiring."
+    wiring = _SseAttrExtractor()
+    wiring.feed(page.text)
+    connects = [*wiring.sse_connects, *wiring.htmx4_connects]
+    swaps = wiring.sse_swaps
+    assert connects, (
+        f"Page {page_path!r} has no sse-connect or hx-sse:connect attribute; "
+        "cannot verify SSE wiring."
+    )
+    if wiring.htmx4_connects:
+        assert not wiring.sse_connects, (
+            f"Page {page_path!r} mixes htmx 4 hx-sse:connect with legacy sse-connect attributes."
+        )
+        assert not wiring.sse_swaps, (
+            f"Page {page_path!r} mixes htmx 4 hx-sse:connect with legacy sse-swap attributes."
+        )
+        result = await client.sse(sse_path, request_type="partial", max_events=max_events)
+        for target in wiring.htmx4_targets:
+            assert target.startswith("#"), (
+                f"htmx 4 SSE connection target {target!r} is not an id selector."
+            )
+            assert target[1:] in wiring.ids, (
+                f"htmx 4 SSE connection target {target!r} does not resolve to a rendered page id."
+            )
+        for event in result.events:
+            if event.event is not None:
+                continue
+            payload = _SsePayloadExtractor()
+            payload.feed(event.data)
+            for target in payload.partial_targets:
+                assert target.startswith("#"), (
+                    f"htmx 4 SSE partial target {target!r} is not an id selector."
+                )
+                assert target[1:] in wiring.ids, (
+                    f"htmx 4 SSE partial target {target!r} does not resolve to a rendered page id."
+                )
+            for target in payload.oob_targets:
+                assert target in wiring.ids, (
+                    f"htmx 4 SSE OOB target #{target} does not resolve to a rendered page id."
+                )
+            if not payload.partial_targets and not payload.oob_targets:
+                assert wiring.htmx4_targets, (
+                    "htmx 4 SSE emitted unnamed main HTML, but the connection has no explicit "
+                    "hx-target. The source element could replace itself and close the stream."
+                )
+        return
     assert swaps, (
         f"Page {page_path!r} has sse-connect={connects!r} but no sse-swap= "
         "attribute. htmx-sse will not wire up any listener without it."

@@ -13,7 +13,7 @@ SPIKE = ROOT / "tests" / "spikes" / "test_htmx4_sse_preview.py"
 def test_rfc_010_records_the_complete_htmx4_sse_contract() -> None:
     text = RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Draft" in text
+    assert "**Status:** Implemented for the explicit preview lane" in text
     assert "4.0.0-beta5" in text
     assert "5300af9e7af8b196f9fbf806cab79a5780b62291" in text
     assert "Unnamed htmx 4 messages are the only automatic HTML swap messages" in text
