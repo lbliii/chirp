@@ -597,6 +597,7 @@ def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
         page.close()
 
 
+@pytest.mark.slow
 @pytest.mark.issue(544)
 def test_preview_signals_repeat_replace_and_reconnect_without_duplicate_updates(
     signal_preview_base_url: str,
