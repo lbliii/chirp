@@ -409,6 +409,7 @@ function renderPanel() {
           exportedAt: new Date().toISOString(),
           records: state.records,
           errors: state.errors,
+          historyEvents: state.historyEvents,
           sseConnections: state.sseConnections,
           sseEvents: state.sseEvents,
           vtEvents: state.vtEvents,
@@ -625,11 +626,13 @@ function renderActivityLog() {
 
       if (r.requestHeaders && typeof r.requestHeaders === "object") {
         var hxReqLines = [];
-        var hxReqKeys = ["HX-Request", "HX-Target", "HX-Trigger", "HX-Trigger-Name",
-          "HX-Boosted", "HX-History-Restore-Request", "HX-Current-URL", "HX-Prompt"];
+        var hxReqKeys = ["HX-Request", "HX-Request-Type", "HX-Target", "HX-Source",
+          "HX-Trigger", "HX-Trigger-Name", "HX-Boosted", "HX-History-Restore-Request",
+          "HX-Current-URL", "HX-Prompt", "HX-Partial", "Accept"];
         for (var ki = 0; ki < hxReqKeys.length; ki++) {
           var hk = hxReqKeys[ki];
-          if (r.requestHeaders[hk]) hxReqLines.push(hk + ": " + r.requestHeaders[hk]);
+          var hv = readRequestHeader(r.requestHeaders, hk);
+          if (hv) hxReqLines.push(hk + ": " + hv);
         }
         if (hxReqLines.length) {
           dc.appendChild(hlSection("htmx Request Headers", hlHeaders(hxReqLines.join("\n")), false));

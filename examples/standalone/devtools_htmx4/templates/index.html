@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevTools htmx {{ version }}</title>
+  {% if version == "4" %}
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@4.0.0-beta5/dist/htmx.min.js"></script>
+  {% if compat %}
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@4.0.0-beta5/dist/ext/htmx-2-compat.min.js"></script>
+  {% endif %}
+  {% else %}
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
+  {% endif %}
+</head>
+<body>
+  <script>
+    window.__islandCounts = {mount: 0, unmount: 0};
+    document.addEventListener("chirp:islands:ready", function () {
+      window.chirpIslands.register("lifecycle-probe", {
+        mount: function () { window.__islandCounts.mount += 1; },
+        unmount: function () { window.__islandCounts.unmount += 1; }
+      });
+    });
+  </script>
+  <main>
+    <h1>DevTools htmx {{ version }}{% if compat %} compatibility mode{% endif %}</h1>
+    <button id="swap-button" hx-post="/swap" hx-target="#result" hx-swap="outerHTML" hx-push-url="true">
+      Swap fragment
+    </button>
+    <button id="failure-button" hx-post="/failure" hx-target="#result" hx-swap="outerHTML">
+      Trigger failure
+    </button>
+    <span id="safe-target-probe" hx-post="/swap" hx-trigger="probe from:body">Safe target</span>
+
+    {% block result %}<div id="result" data-island="lifecycle-probe"><p>{{ result }}</p></div>{% endblock %}
+    {% block counter %}<p id="counter">OOB count: {{ count }}</p>{% endblock %}
+  </main>
+</body>
+</html>

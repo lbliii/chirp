@@ -137,6 +137,7 @@ jobs:
           uv run --no-sync pytest
           examples/chirpui/lucky_cat/test_browser_smoke.py
           examples/standalone/htmx_managed/test_browser_smoke.py
+          examples/standalone/devtools_htmx4/test_browser_smoke.py
           -q --tb=short --timeout=120
 
   # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded

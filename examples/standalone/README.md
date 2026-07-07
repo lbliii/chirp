@@ -42,6 +42,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - [`custom_middleware`](custom_middleware/) — supporting, tier 2
 - [`dashboard`](dashboard/) — supporting, tier 2
 - [`dashboard_live`](dashboard_live/) — supporting, tier 3
+- [`devtools_htmx4`](devtools_htmx4/) — supporting, tier 2
 - [`docs_site`](docs_site/) — canonical, tier 2
 - [`form_get`](form_get/) — supporting, tier 1
 - [`freeze_site`](freeze_site/) — canonical, tier 2

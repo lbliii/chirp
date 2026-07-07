@@ -202,6 +202,17 @@ readme = "present"
 test_entrypoint = "examples/standalone/dashboard_live"
 
 [[examples]]
+path = "standalone/devtools_htmx4"
+lane = "standalone"
+status = "supporting"
+tier = 2
+extras = []
+network = "required"
+capabilities = ["contracts", "fragments", "islands", "oob", "view-transitions"]
+readme = "present"
+test_entrypoint = "examples/standalone/devtools_htmx4"
+
+[[examples]]
 path = "standalone/docs_site"
 lane = "standalone"
 status = "canonical"

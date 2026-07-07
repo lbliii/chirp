@@ -123,6 +123,68 @@ if (document.startViewTransition) {
 
 // --- HTMX Event Collector ---
 var recordByXhr = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+var recordByContext = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+var recordByRequest = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+function htmxContext(detail) {
+  return detail && detail.ctx ? detail.ctx : (detail || {});
+}
+
+function htmxSource(detail) {
+  detail = detail || {};
+  var ctx = htmxContext(detail);
+  return ctx.sourceElement || detail.elt ||
+    (detail.requestConfig && detail.requestConfig.elt) || null;
+}
+
+function htmxRequest(detail) {
+  detail = detail || {};
+  var ctx = htmxContext(detail);
+  return ctx.request || {};
+}
+
+function htmxResponse(detail) {
+  detail = detail || {};
+  var ctx = htmxContext(detail);
+  return (ctx.response && (ctx.response.raw || ctx.response)) || detail.xhr || null;
+}
+
+function htmxAction(detail, source) {
+  detail = detail || {};
+  var request = htmxRequest(detail);
+  var requestConfig = detail.requestConfig || {};
+  if (request.action || requestConfig.path || detail.path) {
+    return String(request.action || requestConfig.path || detail.path);
+  }
+  if (detail.pathInfo && detail.pathInfo.requestPath) {
+    return String(detail.pathInfo.requestPath);
+  }
+  if (!source || !source.getAttribute) return "";
+  var attrs = ["hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete", "hx-action"];
+  for (var i = 0; i < attrs.length; i++) {
+    var value = source.getAttribute(attrs[i]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function mappedRecordForDetail(detail) {
+  if (!detail) return null;
+  var ctx = htmxContext(detail);
+  var req = htmxRequest(detail);
+  try {
+    if (detail.xhr && recordByXhr && recordByXhr.has(detail.xhr)) {
+      return recordByXhr.get(detail.xhr);
+    }
+    if (req && typeof req === "object" && recordByRequest && recordByRequest.has(req)) {
+      return recordByRequest.get(req);
+    }
+    if (ctx && typeof ctx === "object" && recordByContext && recordByContext.has(ctx)) {
+      return recordByContext.get(ctx);
+    }
+  } catch (e) {}
+  return null;
+}
 
 function findPendingRecord(hasSent, hasResponse) {
   for (var i = 0; i < state.records.length; i++) {
@@ -135,17 +197,19 @@ function findPendingRecord(hasSent, hasResponse) {
 }
 
 function rememberRecordForDetail(detail, record) {
-  if (!detail || !detail.xhr || !recordByXhr || !record) return;
-  try { recordByXhr.set(detail.xhr, record); } catch (e) {}
+  if (!detail || !record) return;
+  var ctx = htmxContext(detail);
+  var req = htmxRequest(detail);
+  try {
+    if (detail.xhr && recordByXhr) recordByXhr.set(detail.xhr, record);
+    if (req && typeof req === "object" && recordByRequest) recordByRequest.set(req, record);
+    if (ctx && typeof ctx === "object" && recordByContext) recordByContext.set(ctx, record);
+  } catch (e) {}
 }
 
 function getRecordForDetail(detail, hasSent, hasResponse) {
-  if (detail && detail.xhr && recordByXhr) {
-    try {
-      var existing = recordByXhr.get(detail.xhr);
-      if (existing) return existing;
-    } catch (e) {}
-  }
+  var existing = mappedRecordForDetail(detail);
+  if (existing) return existing;
   var r = findPendingRecord(hasSent, hasResponse);
   if (!r && hasSent && !hasResponse) r = findPendingRecord(false, false);
   if (!r && hasSent && hasResponse) r = findPendingRecord(true, false) || findPendingRecord(false, false);
@@ -153,11 +217,31 @@ function getRecordForDetail(detail, hasSent, hasResponse) {
   return r;
 }
 
+function onHtmxEvents(names, handler) {
+  for (var i = 0; i < names.length; i++) {
+    document.addEventListener(names[i], handler);
+  }
+}
+
+function onHtmxEventPair(names, handler) {
+  var seen = typeof WeakSet !== "undefined" ? new WeakSet() : null;
+  onHtmxEvents(names, function(evt) {
+    var detail = evt.detail || {};
+    var token = htmxContext(detail);
+    if (seen && token && typeof token === "object") {
+      if (seen.has(token)) return;
+      seen.add(token);
+    }
+    handler(evt);
+  });
+}
+
 function createRecord() {
   var r = {
     id: "req-" + Date.now() + "-" + Math.random().toString(36).slice(2),
     path: "",
     method: "GET",
+    source: "",
     target: "",
     swap: "innerHTML",
     status: null,
@@ -196,67 +280,76 @@ function createRecord() {
   return r;
 }
 
-document.body.addEventListener("htmx:configRequest", function(evt) {
+function collectConfigRequest(evt) {
   if (state.paused) return;
   var d = evt.detail || {};
+  var existing = mappedRecordForDetail(d);
+  if (existing && existing.timing.config) return;
+  var ctx = htmxContext(d);
+  var request = htmxRequest(d);
+  var elt = htmxSource(d) || evt.target;
   var r = createRecord();
-  r.path = (d.pathInfo && d.pathInfo.requestPath) || "";
-  r.method = (d.parameters && d.parameters["_method"]) || (d.elt && (
-    d.elt.getAttribute("hx-post") ? "POST" :
-    d.elt.getAttribute("hx-put") ? "PUT" :
-    d.elt.getAttribute("hx-patch") ? "PATCH" :
-    d.elt.getAttribute("hx-delete") ? "DELETE" : "GET"
-  ));
-  r.elt = d.elt;
-  r.effectiveConfigDetails = getEffectiveConfigDetails(d.elt);
+  r.path = htmxAction(d, elt);
+  r.method = String(request.method || (d.parameters && d.parameters["_method"]) || (elt && (
+    elt.getAttribute("hx-post") ? "POST" :
+    elt.getAttribute("hx-put") ? "PUT" :
+    elt.getAttribute("hx-patch") ? "PATCH" :
+    elt.getAttribute("hx-delete") ? "DELETE" : "GET"
+  )));
+  r.method = r.method.toUpperCase();
+  r.elt = elt;
+  r.source = elt ? desc(elt) : "";
+  var target = ctx.target || d.target;
+  r.target = target ? desc(target) : "";
+  r.effectiveConfigDetails = getEffectiveConfigDetails(elt);
   r.timing.config = Date.now();
   try {
-    r.requestHeaders = {};
-    if (d.headers && typeof d.headers === "object") {
-      for (var hk in d.headers) {
-        if (Object.prototype.hasOwnProperty.call(d.headers, hk)) {
-          r.requestHeaders[hk] = d.headers[hk];
-        }
-      }
-    }
+    r.requestHeaders = copyRequestHeaders(request.headers || d.headers);
   } catch (e) {
     r.requestHeaders = {};
   }
+  rememberRecordForDetail(d, r);
   firePlugin("onRequest", r);
-});
+}
+onHtmxEvents(["htmx:configRequest", "htmx:config:request"], collectConfigRequest);
 
-document.body.addEventListener("htmx:beforeRequest", function(evt) {
+function collectBeforeRequest(evt) {
   var d = evt.detail || {};
   var r = getRecordForDetail(d, false, false);
-  if (r) r.timing.sent = Date.now();
-});
+  if (!r || r.timing.sent) return;
+  r.timing.sent = Date.now();
+  rememberRecordForDetail(d, r);
+}
+onHtmxEvents(["htmx:beforeRequest", "htmx:before:request"], collectBeforeRequest);
 
-document.body.addEventListener("htmx:afterRequest", function(evt) {
+function collectAfterRequest(evt) {
   var d = evt.detail || {};
   var r = getRecordForDetail(d, true, false);
-  if (!r) return;
-  var xhr = d.xhr;
-  if (xhr) {
-    r.status = xhr.status;
+  if (!r || r.timing.response) return;
+  var ctx = htmxContext(d);
+  var response = htmxResponse(d);
+  if (response || ctx.response) {
+    r.status = Number((ctx.response && ctx.response.status) || response.status || 0);
     r.timing.response = Date.now();
+    rememberRecordForDetail(d, r);
     if (r.status >= 400) {
       r.failed = true;
       state.errorCount++;
     }
-    var routeKind = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Route-Kind");
+    var routeKind = readResponseHeader(response, "X-Chirp-Route-Kind");
     if (routeKind) {
       r.route = {
         kind: routeKind,
-        meta: xhr.getResponseHeader("X-Chirp-Route-Meta") || "",
-        files: xhr.getResponseHeader("X-Chirp-Route-Files") || "",
-        section: xhr.getResponseHeader("X-Chirp-Route-Section") || "",
-        contextChain: xhr.getResponseHeader("X-Chirp-Context-Chain") || "",
-        shellContext: xhr.getResponseHeader("X-Chirp-Shell-Context") || "",
+        meta: readResponseHeader(response, "X-Chirp-Route-Meta") || "",
+        files: readResponseHeader(response, "X-Chirp-Route-Files") || "",
+        section: readResponseHeader(response, "X-Chirp-Route-Section") || "",
+        contextChain: readResponseHeader(response, "X-Chirp-Context-Chain") || "",
+        shellContext: readResponseHeader(response, "X-Chirp-Shell-Context") || "",
       };
     }
-    var layoutChain = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Chain");
-    var layoutMatch = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Match");
-    var layoutMode = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Layout-Mode");
+    var layoutChain = readResponseHeader(response, "X-Chirp-Layout-Chain");
+    var layoutMatch = readResponseHeader(response, "X-Chirp-Layout-Match");
+    var layoutMode = readResponseHeader(response, "X-Chirp-Layout-Mode");
     if (layoutChain || layoutMatch || layoutMode) {
       r.layout = {
         chain: layoutChain || "",
@@ -264,23 +357,23 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
         mode: layoutMode || "",
       };
     }
-    var reqId = xhr.getResponseHeader && xhr.getResponseHeader("X-Request-Id");
+    var reqId = readResponseHeader(response, "X-Request-Id");
     if (reqId) r.requestId = reqId;
-    var rh = parseResponseHeaders(xhr);
+    var rh = parseResponseHeaders(response);
     r.responseHeaders = rh;
     r.contentType = rh["content-type"] || "";
     r.renderIntent = rh["x-chirp-render-intent"] || "";
     r.hxPairs = filterHxAndChirpHeaders(rh);
 
-    var rpHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Render-Plan");
+    var rpHeader = readResponseHeader(response, "X-Chirp-Render-Plan");
     if (rpHeader) {
       r.renderPlan = decodeRenderPlan(rpHeader);
     }
-    var rtHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Return-Trace");
+    var rtHeader = readResponseHeader(response, "X-Chirp-Return-Trace");
     if (rtHeader) {
       r.returnTrace = decodeRenderPlan(rtHeader);
     }
-    var seHeader = xhr.getResponseHeader && xhr.getResponseHeader("X-Chirp-Signal-Emits");
+    var seHeader = readResponseHeader(response, "X-Chirp-Signal-Emits");
     if (seHeader) {
       r.signalEmits = decodeRenderPlan(seHeader);
     }
@@ -289,7 +382,7 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     var triggerHeaders = ["HX-Trigger", "HX-Trigger-After-Settle", "HX-Trigger-After-Swap"];
     var triggerEvents = [];
     for (var ti = 0; ti < triggerHeaders.length; ti++) {
-      var tv = xhr.getResponseHeader && xhr.getResponseHeader(triggerHeaders[ti]);
+      var tv = readResponseHeader(response, triggerHeaders[ti]);
       if (tv) {
         try {
           var parsed = JSON.parse(tv);
@@ -308,8 +401,9 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     }
     if (triggerEvents.length) r.hxTriggerEvents = triggerEvents;
 
-    if (xhr.responseText) {
-      var txt = String(xhr.responseText);
+    var responseText = ctx.text != null ? ctx.text : (d.xhr && d.xhr.responseText);
+    if (responseText) {
+      var txt = String(responseText);
       r.bodyPreview =
         txt.length > 4096
           ? txt.slice(0, 4096) + "\n\u2026 (truncated, " + txt.length + " bytes total)"
@@ -317,63 +411,112 @@ document.body.addEventListener("htmx:afterRequest", function(evt) {
     }
     firePlugin("onResponse", r);
   }
-});
+}
+onHtmxEvents(["htmx:afterRequest", "htmx:after:request"], collectAfterRequest);
 
-document.body.addEventListener("htmx:beforeSwap", function(evt) {
+function collectBeforeSwap(evt) {
   var d = evt.detail || {};
   var r = getRecordForDetail(d, true, true);
-  if (!r) return;
-  var t = d.target;
+  if (!r || r.timing.beforeSwap) return;
+  var ctx = htmxContext(d);
+  var t = ctx.target || d.target;
   r.target = (t && t.id) ? "#" + t.id : (t && t.className && String(t.className).trim()) ? "." + String(t.className).split(/\s+/)[0] : (t ? "this" : "");
-  r.swap = (d.swapStyle && d.swapStyle) || "innerHTML";
+  var configuredSwap = r.effectiveConfigDetails && r.effectiveConfigDetails["hx-swap"];
+  r.swap = (typeof ctx.swap === "string" && ctx.swap) || d.swapStyle ||
+    (configuredSwap && configuredSwap.value !== "(default)" ? configuredSwap.value : "innerHTML");
   r.timing.beforeSwap = Date.now();
   r.targetExistsBefore = !!t;
   r.targetBefore = t ? desc(t) : "";
 
   var cfg = r.effectiveConfigDetails || (r.elt ? getEffectiveConfigDetails(r.elt) : {});
   var select = cfg["hx-select"] && cfg["hx-select"].value;
-  var xhr = d.xhr;
-  if (select && select !== "(default)" && xhr && xhr.responseText) {
+  var responseText = ctx.text != null ? ctx.text : (d.xhr && d.xhr.responseText);
+  if (select && select !== "(default)" && responseText) {
     r.select = select;
-    r.selectMatched = responseContainsSelector(xhr.responseText, select);
+    r.selectMatched = responseContainsSelector(responseText, select);
   }
 
   if (t) {
     try { r.domBefore = t.innerHTML.slice(0, 8192); } catch (e) {}
   }
-});
+  if (Array.isArray(d.tasks)) {
+    for (var taskIndex = 1; taskIndex < d.tasks.length; taskIndex++) {
+      var task = d.tasks[taskIndex] || {};
+      recordOobSwap(task.target || task.elt, task.swap || task.swapStyle, r);
+    }
+    for (var markedIndex = 0; markedIndex < d.tasks.length; markedIndex++) {
+      var marked = d.tasks[markedIndex] || {};
+      if (marked.oob || marked.isOob) {
+        recordOobSwap(marked.target || marked.elt, marked.swap || marked.swapStyle, r);
+      }
+    }
+  }
+}
+onHtmxEvents(["htmx:beforeSwap", "htmx:before:swap"], collectBeforeSwap);
 
-document.body.addEventListener("htmx:afterSwap", function(evt) {
+function collectAfterSwap(evt) {
   var d = evt.detail || {};
   var r = getRecordForDetail(d, true, true);
-  if (!r) return;
+  if (!r || r.timing.afterSwap) return;
+  var ctx = htmxContext(d);
+  var target = ctx.target || d.target;
   r.timing.afterSwap = Date.now();
-  if (state.flash && d.target) flashTarget(d.target, r.failed ? "error" : "normal");
+  if (state.flash && target) flashTarget(target, r.failed ? "error" : "normal");
 
-  if (d.target && r.domBefore != null) {
+  if (target && r.domBefore != null) {
     try {
-      r.domAfter = d.target.innerHTML.slice(0, 8192);
+      r.domAfter = target.innerHTML.slice(0, 8192);
       if (r.domBefore !== r.domAfter) {
         r.domDiff = diffLines(r.domBefore, r.domAfter);
       }
     } catch (e) {}
   }
-});
+}
+onHtmxEvents(["htmx:afterSwap", "htmx:after:swap"], collectAfterSwap);
 
-document.body.addEventListener("htmx:afterSettle", function(evt) {
+function collectAfterSettle(evt) {
   var d = evt.detail || {};
   var r = getRecordForDetail(d, true, true);
-  if (r) r.timing.settle = Date.now();
-});
+  if (r && !r.timing.settle) r.timing.settle = Date.now();
+}
+onHtmxEvents(["htmx:afterSettle", "htmx:after:settle"], collectAfterSettle);
 
-document.body.addEventListener("htmx:oobBeforeSwap", function(evt) {
-  var d = evt.detail || {};
+function collectHistoryEvent(kind, names) {
+  onHtmxEventPair(names, function(evt) {
+    var detail = evt.detail || {};
+    var record = {
+      kind: kind,
+      path: htmxAction(detail, htmxSource(detail)) || String(detail.path || location.pathname),
+      ts: Date.now(),
+    };
+    state.historyEvents.unshift(record);
+    if (state.historyEvents.length > BUFFER_SIZE) state.historyEvents.pop();
+  });
+}
+
+collectHistoryEvent("update", ["htmx:beforeHistorySave", "htmx:before:history:update"]);
+collectHistoryEvent("push", ["htmx:pushedIntoHistory", "htmx:after:history:push"]);
+collectHistoryEvent("replace", ["htmx:replacedInHistory", "htmx:after:history:replace"]);
+collectHistoryEvent("restore", [
+  "htmx:historyCacheMiss",
+  "htmx:historyRestore",
+  "htmx:before:history:restore",
+]);
+
+function recordOobSwap(target, swapStyle, parentRecord) {
+  var targetName = (target && target.id) ? "#" + target.id : (target ? desc(target) : "");
+  var key = targetName + ":" + (swapStyle || "innerHTML");
+  if (parentRecord) {
+    parentRecord._oobKeys = parentRecord._oobKeys || {};
+    if (parentRecord._oobKeys[key]) return;
+    parentRecord._oobKeys[key] = true;
+  }
   var r = {
     id: "oob-" + Date.now() + "-" + Math.random().toString(36).slice(2),
     path: "OOB",
     method: "OOB",
-    target: (d.target && d.target.id) ? "#" + d.target.id : "",
-    swap: (d.swapStyle && d.swapStyle) || "innerHTML",
+    target: targetName,
+    swap: swapStyle || "innerHTML",
     status: null,
     timing: { config: Date.now() },
     failed: false,
@@ -384,6 +527,12 @@ document.body.addEventListener("htmx:oobBeforeSwap", function(evt) {
   if (state.oobRecords.length > 50) state.oobRecords.pop();
   state.requestCount++;
   updatePill();
+}
+
+document.body.addEventListener("htmx:oobBeforeSwap", function(evt) {
+  var d = evt.detail || {};
+  var swap = d.swapStyle || (d.elt && d.elt.getAttribute && d.elt.getAttribute("hx-swap-oob"));
+  recordOobSwap(d.target, swap, getRecordForDetail(d, true, true));
 });
 
 document.body.addEventListener("htmx:oobAfterSwap", function(evt) {
@@ -393,6 +542,5 @@ document.body.addEventListener("htmx:oobAfterSwap", function(evt) {
 
 document.body.addEventListener("htmx:oobErrorNoTarget", function(evt) {
   state.errorCount++;
-  addError("OOB Error", "OOB swap had no target");
   toast("OOB Error", "OOB swap had no target", COLORS.error);
 });

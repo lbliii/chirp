@@ -1,12 +1,24 @@
 // --- errors.js — Error handlers, pattern warnings, shortcuts, API, boot ---
 
-// DRY: register an HTMX error event handler
-function htmxErrorHandler(evtName, titleText, color, bodyFn, useCfg) {
-  document.body.addEventListener(evtName, function(evt) {
+var seenHtmxErrors = typeof WeakSet !== "undefined" ? new WeakSet() : null;
+
+function firstHtmxError(detail) {
+  var token = (detail && (detail.ctx || detail.xhr)) || detail;
+  if (!seenHtmxErrors || !token || typeof token !== "object") return true;
+  if (seenHtmxErrors.has(token)) return false;
+  seenHtmxErrors.add(token);
+  return true;
+}
+
+// DRY: register an HTMX 2/4 error event handler
+function htmxErrorHandler(evtNames, titleText, color, bodyFn, useCfg) {
+  if (typeof evtNames === "string") evtNames = [evtNames];
+  onHtmxEvents(evtNames, function(evt) {
     var d = evt.detail || {};
-    var cfg = useCfg && d.elt ? formatConfig(getEffectiveConfig(d.elt)) : "";
+    if (!firstHtmxError(d)) return;
+    var source = htmxSource(d);
+    var cfg = useCfg && source ? formatConfig(getEffectiveConfig(source)) : "";
     var body = bodyFn(d);
-    addError(titleText, body, cfg);
     toast(titleText, body, color, cfg);
   });
 }
@@ -19,9 +31,11 @@ htmxErrorHandler("htmx:targetError", "Target Not Found", COLORS.error, function(
     "Co-locate the target with the mutating element (e.g. put the result div inside the same HTMX-loaded content).";
 }, true);
 
-htmxErrorHandler("htmx:responseError", "Response Error", COLORS.error, function(d) {
-  var xhr = d.xhr || {};
-  return (xhr.status || "?") + " " + ((d.pathInfo && d.pathInfo.requestPath) || "");
+htmxErrorHandler(["htmx:responseError", "htmx:response:error"], "Response Error", COLORS.error, function(d) {
+  var ctx = htmxContext(d);
+  var response = htmxResponse(d) || {};
+  var status = (ctx.response && ctx.response.status) || response.status || "?";
+  return status + " " + (htmxRequest(d).action || (d.pathInfo && d.pathInfo.requestPath) || "");
 }, true);
 
 htmxErrorHandler("htmx:sendError", "Network Error", COLORS.error, function(d) {
@@ -40,6 +54,31 @@ htmxErrorHandler("htmx:onLoadError", "Load Handler Error", COLORS.warning, funct
   return String(d.error || "(unknown)");
 }, false);
 
+onHtmxEvents(["htmx:error"], function(evt) {
+  var d = evt.detail || {};
+  if (!firstHtmxError(d)) return;
+  var ctx = htmxContext(d);
+  var error = d.error || ctx.error || {};
+  var message = String(error.message || error || "Request failed");
+  var lower = message.toLowerCase();
+  var title = "Network Error";
+  var color = COLORS.error;
+  if (lower.indexOf("timeout") >= 0) {
+    title = "Timeout";
+    color = COLORS.warning;
+  } else if (lower.indexOf("target") >= 0 || lower.indexOf("selector") >= 0) {
+    title = "Target Not Found";
+  } else if (lower.indexOf("swap") >= 0 || lower.indexOf("dom") >= 0) {
+    title = "Swap Error";
+    color = COLORS.warning;
+  }
+  var source = htmxSource(d);
+  var cfg = source ? formatConfig(getEffectiveConfig(source)) : "";
+  var path = htmxRequest(d).action || "";
+  var body = message + (path ? "\n" + path : "");
+  toast(title, body, color, cfg);
+});
+
 // --- Pattern warnings ---
 function getEffectiveSelect(startElt) {
   var node = startElt;
@@ -53,12 +92,13 @@ function getEffectiveSelect(startElt) {
   return null;
 }
 
-document.body.addEventListener("htmx:beforeSwap", function(evt) {
+onHtmxEventPair(["htmx:beforeSwap", "htmx:before:swap"], function(evt) {
   var d = evt.detail || {};
-  var xhr = d.xhr;
-  var swapTarget = d.elt;
-  var trigger = (d.requestConfig && d.requestConfig.elt) || swapTarget;
-  if (!xhr || !xhr.responseText || !trigger) return;
+  var ctx = htmxContext(d);
+  var responseText = ctx.text != null ? ctx.text : (d.xhr && d.xhr.responseText);
+  var swapTarget = ctx.target || d.elt;
+  var trigger = htmxSource(d) || swapTarget;
+  if (!responseText || !trigger) return;
   var sel = getEffectiveSelect(trigger);
   if (!sel || typeof sel !== "string") return;
   sel = sel.trim();
@@ -66,15 +106,15 @@ document.body.addEventListener("htmx:beforeSwap", function(evt) {
   var id = sel.slice(1);
   if (!id) return;
   var re = new RegExp("id\\s*=\\s*[\"']" + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\"']");
-  if (!re.test(xhr.responseText)) {
+  if (!re.test(responseText)) {
     toast("Empty hx-select", "Response has no element matching " + sel + ". Inherited hx-select may yield blank swap.", COLORS.warning);
   }
 });
 
-document.body.addEventListener("htmx:configRequest", function(evt) {
+onHtmxEventPair(["htmx:configRequest", "htmx:config:request"], function(evt) {
   var d = evt.detail || {};
-  var elt = d.elt;
-  var path = (d.pathInfo && d.pathInfo.requestPath) || "";
+  var elt = htmxSource(d);
+  var path = htmxRequest(d).action || (d.pathInfo && d.pathInfo.requestPath) || "";
   if (!elt) return;
 
   function getEffectiveTarget() {
@@ -155,6 +195,7 @@ CH.exportRecordsJson = function() {
   return JSON.stringify({
     records: state.records,
     errors: state.errors,
+    historyEvents: state.historyEvents,
     sseConnections: state.sseConnections,
     sseEvents: state.sseEvents,
     vtEvents: state.vtEvents,

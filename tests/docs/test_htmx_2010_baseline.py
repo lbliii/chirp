@@ -9,7 +9,7 @@ from chirp import AppConfig
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOTS = ("src", "tests", "examples", "site/content")
-CORE_URL = re.compile(r"https://[^\"' ]+/htmx\.org@[0-9.]+[^\"' ]*")
+HTMX2_CORE_URL = re.compile(r"https://[^\"' ]+/htmx\.org@2\.[0-9.]+/dist/htmx(?:\.min)?\.js")
 EXPECTED_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
 CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 
@@ -33,7 +33,7 @@ def test_authored_sources_have_no_old_baseline_or_noncanonical_core_url() -> Non
                 stale.append(str(path.relative_to(ROOT)))
             noncanonical.extend(
                 f"{path.relative_to(ROOT)}: {url}"
-                for url in CORE_URL.findall(text)
+                for url in HTMX2_CORE_URL.findall(text)
                 if url != EXPECTED_URL
             )
 

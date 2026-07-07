@@ -221,6 +221,7 @@ cannot disappear from the catalog while its documentation debt remains visible.
 | [`standalone/custom_middleware`](standalone/custom_middleware/) | standalone | supporting | 2 | — | none | `middleware`, `routing` | yes | [`custom_middleware`](../examples/standalone/custom_middleware) |
 | [`standalone/dashboard`](standalone/dashboard/) | standalone | supporting | 2 | — | none | `fragments`, `sse`, `suspense` | yes | [`dashboard`](../examples/standalone/dashboard) |
 | [`standalone/dashboard_live`](standalone/dashboard_live/) | standalone | supporting | 3 | — | none | `data`, `fragments`, `sse`, `suspense` | yes | [`dashboard_live`](../examples/standalone/dashboard_live) |
+| [`standalone/devtools_htmx4`](standalone/devtools_htmx4/) | standalone | supporting | 2 | — | required | `contracts`, `fragments`, `islands`, `oob`, `view-transitions` | yes | [`devtools_htmx4`](../examples/standalone/devtools_htmx4) |
 | [`standalone/docs_site`](standalone/docs_site/) | standalone | canonical | 2 | `markdown` | none | `docs`, `routing`, `tools` | missing | [`docs_site`](../examples/standalone/docs_site) |
 | [`standalone/form_get`](standalone/form_get/) | standalone | supporting | 1 | — | none | `forms`, `routing` | yes | [`form_get`](../examples/standalone/form_get) |
 | [`standalone/freeze_site`](standalone/freeze_site/) | standalone | canonical | 2 | `markdown` | none | `docs`, `freeze`, `pages` | missing | [`freeze_site`](../examples/standalone/freeze_site) |

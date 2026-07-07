@@ -49,10 +49,12 @@ class TestViewTransitionsConstants:
 
     def test_js_enables_global_view_transitions(self) -> None:
         assert "globalViewTransitions=true" in VIEW_TRANSITIONS_JS
+        assert "transitions=true" in VIEW_TRANSITIONS_JS
 
     def test_js_handles_deferred_htmx(self) -> None:
-        """Listener for htmx:load handles the case where htmx loads after the script."""
+        """Deferred loading works through the htmx 2 and htmx 4 event names."""
         assert "htmx:load" in VIEW_TRANSITIONS_JS
+        assert "htmx:after:process" in VIEW_TRANSITIONS_JS
 
     def test_builder_default_is_unnonced_and_matches_constant(self) -> None:
         assert view_transitions_script_snippet() == VIEW_TRANSITIONS_SCRIPT_SNIPPET

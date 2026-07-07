@@ -10,6 +10,12 @@ internal wiring and validated by `app.check()`. Browser code listens to public
 htmx lifecycle events, but Chirp-owned facts such as render intent, render-plan
 metadata, and EventStream lifecycle traces come from the server.
 
+DevTools accepts both htmx 2's camel-case lifecycle events and htmx 4's
+colon-separated fetch-era events. It correlates htmx 2 through the XHR and
+htmx 4 through `detail.ctx` / `detail.ctx.request`. When the
+`htmx-2-compat` extension emits both names for one action, the shared request
+context suppresses duplicate request, history, OOB, and error records.
+
 ## Enable It
 
 Use the development CLI when possible:
@@ -80,6 +86,32 @@ window.ChirpHtmxDebug.exportRecordsJson()
 requests, errors, SSE connections and events, View Transition events, render
 plans, and Swap Doctor records in a machine-readable form.
 
+For application lifecycle hooks during the transition, register both event
+names and deduplicate by request context:
+
+```javascript
+function onHtmxLifecycle(names, handler) {
+  const seen = new WeakSet();
+  for (const name of names) {
+    document.addEventListener(name, (event) => {
+      const token = event.detail?.ctx || event.detail;
+      if (token && seen.has(token)) return;
+      if (token) seen.add(token);
+      handler(event);
+    });
+  }
+}
+
+onHtmxLifecycle(["htmx:afterSwap", "htmx:after:swap"], (event) => {
+  const detail = event.detail || {};
+  const target = detail.ctx?.target || detail.target;
+  initializeWidgets(target);
+});
+```
+
+Use `htmx.onLoad(callback)` for process hooks when possible. The public helper
+maps to htmx 2's load lifecycle and htmx 4's `htmx:after:process` event.
+
 ## Export Shape
 
 `window.ChirpHtmxDebug.exportRecordsJson()` returns JSON with these top-level
@@ -89,6 +121,7 @@ fields:
   typed return traces, render-plan data, effective `hx-*`, Swap Doctor evidence,
   and body previews.
 - `errors`: htmx and DevTools warnings/errors.
+- `historyEvents`: deduplicated push, replace, update, and restore events.
 - `sseConnections`: native Chirp EventStream connection summaries.
 - `sseEvents`: native Chirp EventStream lifecycle and event trace records.
 - `vtEvents`: View Transition lifecycle records.

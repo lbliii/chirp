@@ -7,8 +7,8 @@ elements (counters, badges, live regions) that use ``hx-trigger`` with
 and silently swap their tiny fragment response into the main content
 area, wiping the page.
 
-This script fixes the footgun automatically.  On every ``htmx:load``
-(initial page load + after each swap), it finds elements that:
+This script fixes the footgun automatically.  On every ``htmx.onLoad`` callback
+(htmx 2 load and htmx 4 ``htmx:after:process``), it finds elements that:
 
 1. Listen for events from elsewhere (``hx-trigger`` contains ``from:``)
 2. Make an HTTP request (``hx-get``, ``hx-post``, etc.)
@@ -27,7 +27,7 @@ middleware.  Disabled with ``AppConfig(safe_target=False)``.
 
 SAFE_TARGET_JS = """\
 (function(){
-  if(typeof htmx==="undefined"||window.__chirpSafeTarget)return;
+  if(window.__chirpSafeTarget)return;
   window.__chirpSafeTarget=true;
   var SEL=[
     '[hx-trigger*="from:"][hx-get]:not([hx-target])',
@@ -36,10 +36,22 @@ SAFE_TARGET_JS = """\
     '[hx-trigger*="from:"][hx-patch]:not([hx-target])',
     '[hx-trigger*="from:"][hx-delete]:not([hx-target])'
   ].join(",");
-  htmx.onLoad(function(root){
+  function scan(root){
+    root=root&&root.querySelectorAll?root:document;
     var els=root.querySelectorAll?root.querySelectorAll(SEL):[];
     for(var i=0;i<els.length;i++){els[i].setAttribute("hx-target","this")}
-  });
+  }
+  scan(document);
+  if(typeof htmx!=="undefined"){
+    htmx.onLoad(scan);
+  }else{
+    ["htmx:load","htmx:after:process"].forEach(function(name){
+      document.addEventListener(name,function(event){
+        var detail=(event&&event.detail)||{};
+        scan(detail.elt||(detail.ctx&&detail.ctx.target)||event.target);
+      });
+    });
+  }
 })();
 """
 
