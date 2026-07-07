@@ -463,10 +463,11 @@ def test_nginx_reverse_proxy_preserves_query_method_and_body(tmp_path: Path) -> 
         config.write_text(
             "\n".join(
                 [
+                    f"pid {tmp_path / 'nginx.pid'};",
+                    "error_log stderr warn;",
                     "events { worker_connections 32; }",
                     "http {",
                     "  access_log off;",
-                    "  error_log stderr warn;",
                     "  server {",
                     f"    listen 127.0.0.1:{proxy_port};",
                     "    client_max_body_size 1m;",
@@ -487,7 +488,15 @@ def test_nginx_reverse_proxy_preserves_query_method_and_body(tmp_path: Path) -> 
             stderr=subprocess.STDOUT,
         )
         try:
-            _wait_for_tcp(proxy_port)
+            try:
+                _wait_for_tcp(proxy_port)
+            except AssertionError as exc:
+                if proc.poll() is not None:
+                    output = proc.stdout.read().decode(errors="replace") if proc.stdout else ""
+                    raise AssertionError(
+                        f"Nginx exited with code {proc.returncode} before serving: {output}"
+                    ) from exc
+                raise
             response = httpx.request(
                 "QUERY",
                 f"http://127.0.0.1:{proxy_port}/query",
@@ -496,8 +505,9 @@ def test_nginx_reverse_proxy_preserves_query_method_and_body(tmp_path: Path) -> 
                 trust_env=False,
             )
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            if proc.poll() is None:
+                proc.terminate()
+                proc.wait(timeout=5)
 
     assert response.status_code == 200
     _assert_fingerprint(response.text, _BODY, version="1.1")
