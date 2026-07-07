@@ -171,6 +171,7 @@ def _query_app(*, max_body_size: int = 1024) -> tuple[App, list[bytes]]:
     return app, calls
 
 
+@pytest.mark.issue(525)
 @pytest.mark.parametrize(
     ("headers", "expected_status"),
     [
