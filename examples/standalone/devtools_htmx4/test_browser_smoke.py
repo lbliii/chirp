@@ -93,6 +93,12 @@ def preview_base_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
+def signal_preview_base_url() -> Iterator[str]:
+    with _serve_app("signal_preview_app") as url:
+        yield url
+
+
+@pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
         try:
@@ -565,6 +571,93 @@ def test_preview_native_sse_reconnect_partials_oob_named_events_and_cleanup(
             """async () => {
               const response = await fetch('/events/hold-state', {cache: 'no-store'});
               return (await response.text()) === 'closed';
+            }""",
+            timeout=_TIMEOUT_MS,
+        )
+    finally:
+        page.close()
+
+
+@pytest.mark.issue(544)
+def test_preview_signals_repeat_replace_and_reconnect_without_duplicate_updates(
+    signal_preview_base_url: str,
+    browser,
+) -> None:
+    page = browser.new_page()
+    try:
+        page.goto(signal_preview_base_url, wait_until="load", timeout=_TIMEOUT_MS)
+        sinks = page.locator('[data-chirp-signal="preview_balance"]')
+        assert sinks.count() == 2
+        assert page.locator('[hx-sse\\:connect^="/_chirp/live"]').count() == 1
+        page.wait_for_function(
+            """async () => {
+              const response = await fetch('/__chirp/debug/traces.json', {cache: 'no-store'});
+              return (await response.json()).records.some(record =>
+                record.path.startsWith('/_chirp/live') && record.phase === 'start');
+            }""",
+            timeout=_TIMEOUT_MS,
+        )
+        page.wait_for_timeout(100)
+
+        page.evaluate("() => fetch('/signals/set?value=9', {method: 'POST'})")
+        page.wait_for_function(
+            """() => [...document.querySelectorAll('[data-chirp-signal="preview_balance"]')]
+              .every(element => element.textContent === '9')""",
+            timeout=_TIMEOUT_MS,
+        )
+
+        sinks.first.evaluate("element => element.remove()")
+        page.evaluate("() => fetch('/signals/set', {method: 'POST'})")
+        page.wait_for_function(
+            """() => document.querySelector('[data-chirp-signal="preview_balance"]')
+              ?.textContent === ''""",
+            timeout=_TIMEOUT_MS,
+        )
+
+        page.locator("#signal-region").evaluate(
+            """element => {
+              element.innerHTML = '<em id="replacement-signal" '
+                + 'data-chirp-signal="preview_balance">seed</em>';
+            }"""
+        )
+        page.evaluate("() => fetch('/signals/set?value=12', {method: 'POST'})")
+        page.wait_for_function(
+            "() => document.querySelector('#replacement-signal')?.textContent === '12'",
+            timeout=_TIMEOUT_MS,
+        )
+
+        page.evaluate(
+            """() => {
+              const oldConnection = document.querySelector('[hx-sse\\\\:connect^="/_chirp/live"]');
+              oldConnection.outerHTML = '<div id="replacement-signal-connection" '
+                + 'hx-sse:connect="/_chirp/live?topics=preview_balance">'
+                + '<span id="reconnected-signal" data-chirp-signal="preview_balance">seed</span>'
+                + '</div>';
+              const connection = document.querySelector('#replacement-signal-connection');
+              window.htmx.process(connection);
+              window.__signalMutations = 0;
+              new MutationObserver(() => { window.__signalMutations += 1; }).observe(
+                document.querySelector('#reconnected-signal'), {childList: true, subtree: true}
+              );
+            }"""
+        )
+        page.wait_for_timeout(250)
+        page.evaluate("() => fetch('/signals/set?value=13', {method: 'POST'})")
+        page.wait_for_function(
+            """() => document.querySelector('#reconnected-signal')?.textContent === '13' &&
+              window.__signalMutations >= 1""",
+            timeout=_TIMEOUT_MS,
+        )
+        page.wait_for_timeout(200)
+        assert page.evaluate("() => window.__signalMutations") == 1
+
+        page.wait_for_function(
+            """async () => {
+              const response = await fetch('/__chirp/debug/traces.json', {cache: 'no-store'});
+              const records = (await response.json()).records;
+              return records.some(record => record.path.startsWith('/_chirp/live') &&
+                record.phase === 'event' && record.data.message_class === 'signal-partial' &&
+                record.data.target === '[data-chirp-signal="preview_balance"]');
             }""",
             timeout=_TIMEOUT_MS,
         )

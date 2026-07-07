@@ -95,12 +95,16 @@ class _SseAttrExtractor(HTMLParser):
         self.htmx4_connects: list[str] = []
         self.htmx4_targets: set[str] = set()
         self.ids: set[str] = set()
+        self.signal_names: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attr_map = {name.lower(): value for name, value in attrs}
         element_id = attr_map.get("id")
         if element_id:
             self.ids.add(element_id)
+        signal_name = attr_map.get("data-chirp-signal")
+        if signal_name:
+            self.signal_names.add(signal_name)
         connect = attr_map.get("hx-sse:connect")
         if connect:
             self.htmx4_connects.append(connect)
@@ -191,11 +195,21 @@ async def assert_sse_wired(
             payload = _SsePayloadExtractor()
             payload.feed(event.data)
             for target in payload.partial_targets:
-                assert target.startswith("#"), (
-                    f"htmx 4 SSE partial target {target!r} is not an id selector."
+                if target.startswith("#"):
+                    assert target[1:] in wiring.ids, (
+                        f"htmx 4 SSE partial target {target!r} does not resolve to a rendered page id."
+                    )
+                    continue
+                prefix = '[data-chirp-signal="'
+                assert target.startswith(prefix), (
+                    f"htmx 4 SSE partial target {target!r} is neither an id nor a signal selector."
                 )
-                assert target[1:] in wiring.ids, (
-                    f"htmx 4 SSE partial target {target!r} does not resolve to a rendered page id."
+                assert target.endswith('"]'), (
+                    f"htmx 4 SSE signal target {target!r} is not a bounded attribute selector."
+                )
+                signal_name = target[len(prefix) : -2]
+                assert signal_name in wiring.signal_names, (
+                    f"htmx 4 SSE signal target {target!r} has no rendered data-chirp-signal sink."
                 )
             for target in payload.oob_targets:
                 assert target in wiring.ids, (

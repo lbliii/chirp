@@ -43,6 +43,14 @@ SIGNAL_STREAM_PATH = "/_chirp/live"
 _SIGNAL_CALL_PATTERN = re.compile(r"""\bsignal(?:_block|_bind|_attrs)?\s*\(\s*["']([^"']+)["']""")
 #: ``sse_scope(url)`` opens a dedicated non-signal SSE stream (see chirp/sse.html).
 _SSE_SCOPE_PATTERN = re.compile(r"\bsse_scope\s*\(")
+_HTMX4_SIGNAL_CONNECT_PATTERN = re.compile(
+    r"\bhx-sse:connect\s*=\s*[\"'](?P<url>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
+_SIGNAL_MARKER_PATTERN = re.compile(
+    r"\bdata-chirp-signal\s*=\s*[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
 
 
 def _signal_call_names(source: str) -> set[str]:
@@ -54,6 +62,10 @@ def _count_signal_stream_connects(source: str) -> int:
     """Count ``/_chirp/live`` connect sites in *source*."""
     count = source.count("signal_connect()") + source.count("signal_connect ()")
     for match in _SSE_CONNECT_TAG_PATTERN.finditer(source):
+        url = normalize_sse_url(match.group("url"))
+        if url == SIGNAL_STREAM_PATH or url.startswith(SIGNAL_STREAM_PATH + "?"):
+            count += 1
+    for match in _HTMX4_SIGNAL_CONNECT_PATTERN.finditer(source):
         url = normalize_sse_url(match.group("url"))
         if url == SIGNAL_STREAM_PATH or url.startswith(SIGNAL_STREAM_PATH + "?"):
             count += 1
@@ -73,6 +85,10 @@ def _connects_to_signal_stream(source: str) -> bool:
         url = normalize_sse_url(match.group("url"))
         if url == SIGNAL_STREAM_PATH or url.startswith(SIGNAL_STREAM_PATH + "?"):
             return True
+    for match in _HTMX4_SIGNAL_CONNECT_PATTERN.finditer(source):
+        url = normalize_sse_url(match.group("url"))
+        if url == SIGNAL_STREAM_PATH or url.startswith(SIGNAL_STREAM_PATH + "?"):
+            return True
     return False
 
 
@@ -84,12 +100,21 @@ def _has_competing_sse_connect(source: str) -> bool:
         url = normalize_sse_url(match.group("url"))
         if url != SIGNAL_STREAM_PATH and not url.startswith(SIGNAL_STREAM_PATH + "?"):
             return True
+    for match in _HTMX4_SIGNAL_CONNECT_PATTERN.finditer(source):
+        url = normalize_sse_url(match.group("url"))
+        if url != SIGNAL_STREAM_PATH and not url.startswith(SIGNAL_STREAM_PATH + "?"):
+            return True
     return False
 
 
 def _raw_sse_swap_names(source: str) -> set[str]:
     """Hand-written ``sse-swap`` values, excluding ``signal*()`` helper bindings."""
     return extract_sse_swap_values(source) - _signal_call_names(source)
+
+
+def _raw_signal_marker_names(source: str) -> set[str]:
+    """Hand-written htmx 4 signal markers outside the template helpers."""
+    return {match.group(1) for match in _SIGNAL_MARKER_PATTERN.finditer(source)}
 
 
 def check_signal_bindings(
@@ -129,12 +154,19 @@ def check_signal_bindings(
         names = _signal_call_names(source)
         connects_here = _connects_to_signal_stream(source)
         raw_sse = _raw_sse_swap_names(source)
+        raw_markers = _raw_signal_marker_names(source)
         if connects_here:
             names |= extract_sse_swap_values(source)
-        elif signal_stream_active and not _has_competing_sse_connect(source) and raw_sse:
+            names |= raw_markers
+        elif (
+            signal_stream_active
+            and not _has_competing_sse_connect(source)
+            and (raw_sse or raw_markers)
+        ):
             # Composed page under a layout's signal_connect() (#316): the layout
             # owns the /_chirp/live connect, so validate hand-written sse-swap here.
             names |= raw_sse
+            names |= raw_markers
             issues.extend(
                 ContractIssue(
                     severity=Severity.INFO,
@@ -147,6 +179,19 @@ def check_signal_bindings(
                     template=template_name,
                 )
                 for name in sorted(raw_sse)
+            )
+            issues.extend(
+                ContractIssue(
+                    severity=Severity.INFO,
+                    category="signal_raw_marker",
+                    message=(
+                        f'Raw data-chirp-signal="{name}" in a template composed under '
+                        "signal_connect() — prefer "
+                        f"{{{{ signal_bind({name!r}) }}}} so topic scoping stays exact."
+                    ),
+                    template=template_name,
+                )
+                for name in sorted(raw_markers)
             )
         if not names:
             continue

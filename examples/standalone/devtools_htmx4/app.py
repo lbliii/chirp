@@ -19,6 +19,7 @@ from chirp.middleware.csp_nonce import CSPNonceMiddleware
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 PREVIEW_TEMPLATES_DIR = Path(__file__).parent / "preview_templates"
+SIGNAL_PREVIEW_TEMPLATES_DIR = Path(__file__).parent / "signal_preview_templates"
 
 TIMING_LISTENER_JS = b"""window.__timingEvents = [];
 function timingMarker(event, attribute) {
@@ -74,6 +75,21 @@ preview_app = App(
     )
 )
 preview_app.add_middleware(CSPNonceMiddleware(style_unsafe_inline=True))
+
+signal_preview_app = App(
+    config=AppConfig(
+        template_dir=SIGNAL_PREVIEW_TEMPLATES_DIR,
+        htmx=True,
+        htmx_version="4.0.0-beta5",
+        debug=True,
+    )
+)
+
+
+@signal_preview_app.signal("preview_balance", initial=lambda: 0)
+async def preview_balance():
+    if False:
+        yield 0
 
 
 def _page_context(*, version: str, compat: bool) -> dict[str, object]:
@@ -149,6 +165,11 @@ def preview_index():
         item_id="",
         item="",
     )
+
+
+@signal_preview_app.route("/")
+def preview_signals():
+    return Template("signals.html")
 
 
 @preview_app.route("/swap", methods=["POST"])
@@ -284,6 +305,14 @@ def preview_hold_events():
 @preview_app.route("/events/hold-state", referenced=True)
 def preview_hold_state():
     return Response("closed" if SSE_HOLD_CLEANED.is_set() else "open")
+
+
+@signal_preview_app.route("/signals/set", methods=["POST"], referenced=True)
+def preview_signal_set(request: Request):
+    raw = request.query.get("value")
+    value: object = "" if raw is None else int(raw)
+    signal_preview_app.emit("preview_balance", value)
+    return Response(b"", status=204)
 
 
 if __name__ == "__main__":

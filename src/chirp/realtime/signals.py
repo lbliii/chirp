@@ -3,16 +3,17 @@
 A *signal* is a server-owned named value, declared once, that fans out over a
 single shared SSE connection to **every** template binding that listens for it.
 ``{{ signal('balance') }}`` in the topbar and ``{{ signal('balance') }}`` in a
-modal both swap together from one ``event: balance`` on the wire — a cardinality
-plain OOB cannot express (htmx's ``sse-swap`` matches with ``querySelectorAll``).
+modal both swap together from one update on the wire — a cardinality plain OOB
+cannot express. Htmx 2 uses a named event; htmx 4 uses one targeted partial whose
+``data-chirp-signal`` selector matches every sink.
 
 This module is the framework substrate behind the public ``@app.signal`` /
 ``@app.derived`` / ``app.emit`` surface and the ``signal()`` / ``signal_block()``
 / ``signal_connect()`` template globals. It is intentionally a *thin* layer over
 existing transport:
 
-- :class:`~chirp.realtime.events.SSEEvent` already emits named ``event:`` lines —
-  the exact wire format htmx ``sse-swap="<name>"`` matches.
+- The private signal update remains client-neutral until the SSE response
+  boundary chooses the frozen htmx 2 or htmx 4 dialect.
 - :class:`~chirp.pages.reactive.bus.ReactiveBus` provides the free-threaded
   (``threading.Lock`` + per-subscriber ``asyncio.Queue`` + ``call_soon_threadsafe``
   + bounded back-pressure) fan-out. Here the bus *scope* is the signal name.

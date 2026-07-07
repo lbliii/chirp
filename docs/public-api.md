@@ -70,6 +70,12 @@ Htmx 2 and generic SSE clients retain their existing wire. `sse_scope()` and
 `extract_sse_attrs()` includes both connection URL attributes while retaining
 its legacy named-swap set as the second return value.
 
+Signal helpers use that same frozen tier without changing their public names:
+htmx 2 keeps named `sse-swap` events, while the exact htmx 4 preview uses one
+native `hx-sse:connect` and repeated `data-chirp-signal` sinks targeted by an
+unnamed `<hx-partial>`. Topic scoping, session audience keys, SSR seeds, and
+`signal_bind()`'s no-wrapper contract are unchanged.
+
 ### Request notes
 
 The experimental RFC 10008 route keyword is an additive API, but it tightens
@@ -116,7 +122,7 @@ shape may still evolve before 1.0:
 | HTTP/request helpers | `RequestUrlScope` |
 | HTMX details | `HtmxDetails`, `STOP_POLLING` |
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
-| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
+| Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; version-aware template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
 | Dynamic template reachability | App method `app.declare_template(template, *, blocks=())`; surrounding name whitespace is normalized, template_declaration errors validate names, and the dead-template check treats only declared templates as reachable |
 | Experimental HTTP QUERY | App method `app.route(..., methods=["QUERY"], query_media_types=(...))`; declarations freeze as normalized immutable media ranges and the ASGI path enforces Content-Type, body limits, and response Accept negotiation |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |

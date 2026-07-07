@@ -550,7 +550,10 @@ class AppCompiler:
 
             _reject_reserved_prefix_collisions(self._mutable.pending_routes, SIGNAL_STREAM_PREFIX)
             self._mutable.pending_routes.append(make_signal_pending_route(signal_registry))
-            for name, fn in make_signal_globals(signal_registry).items():
+            for name, fn in make_signal_globals(
+                signal_registry,
+                htmx4=self._runtime.htmx_manifest.tier == "4-preview",
+            ).items():
                 self._mutable.template_globals.setdefault(name, fn)
             from chirp.realtime.emit_bridge import register_emit_impl
 

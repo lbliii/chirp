@@ -1,6 +1,11 @@
 """Template globals for the ``signal()`` primitive.
 
-Three request-aware globals, registered at freeze **only when** signals exist:
+Request-aware globals, registered at freeze **only when** signals exist, emit
+client-tier markup from the frozen htmx manifest. Htmx 2 uses ``sse-swap`` and
+``sse-connect``. The exact htmx 4 preview uses stable
+``data-chirp-signal`` sinks and one native ``hx-sse:connect``.
+
+Legacy behavior:
 
 - ``signal(name)`` — an SSR-seeded scalar sink:
   ``<span sse-swap="name" hx-target="this">{seed}</span>``. The seed is the
@@ -47,6 +52,7 @@ SIGNAL_STREAM_PATH = "/_chirp/live"
 _SIGNAL_CONNECT_OPEN = (
     '<div hx-ext="sse" data-chirp-signal-connect="" hx-disinherit="hx-target hx-swap">'
 )
+_SIGNAL_CONNECT_OPEN_HTMX4 = '<div data-chirp-signal-connect="" data-chirp-htmx4="">'
 
 #: Per-render set of signal names referenced by ``signal()`` / ``signal_block()``.
 #: ``signal_connect()`` reads it to scope the stream. Request-scoped so concurrent
@@ -143,8 +149,12 @@ def apply_signal_connect(html: str) -> str:
     if "data-chirp-signal-connect" not in html:
         return html
     url = f"{SIGNAL_STREAM_PATH}{_connect_query()}"
-    replacement = f'<div hx-ext="sse" sse-connect="{url}" hx-disinherit="hx-target hx-swap">'
-    return html.replace(_SIGNAL_CONNECT_OPEN, replacement)
+    legacy = f'<div hx-ext="sse" sse-connect="{url}" hx-disinherit="hx-target hx-swap">'
+    preview = f'<div hx-sse:connect="{url}">'
+    return html.replace(_SIGNAL_CONNECT_OPEN, legacy).replace(
+        _SIGNAL_CONNECT_OPEN_HTMX4,
+        preview,
+    )
 
 
 def render_with_signal_finalize(render: Callable[[], str]) -> str:
@@ -170,21 +180,22 @@ def current_signal_audience() -> str:
     return _signal_audience.get()
 
 
-def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
-    """Build the ``signal`` / ``signal_block`` / ``signal_connect`` globals."""
+def make_signal_globals(registry: SignalRegistry, *, htmx4: bool = False) -> dict[str, Any]:
+    """Build version-aware signal sink and connection globals."""
 
     def signal(name: str) -> Markup:
         """Emit an SSR-seeded scalar sink bound to signal *name*.
 
-        ``<span sse-swap="name" hx-target="this">{seed}</span>`` — the seed is
-        the current rendered value so the binding paints immediately, then every
-        ``event: name`` ``innerHTML``-swaps it. Bind the same name in many places;
-        they all stay in sync from the one shared connection.
+        The seed is the current rendered value so the binding paints immediately.
+        Htmx 2 emits ``sse-swap``; htmx 4 emits ``data-chirp-signal``. Bind the
+        same name in many places; one shared connection updates them all.
         """
         validate_signal_name(name)
         _record(name)
         seed = registry.current_rendered(name, audience_key=current_signal_audience())
         inner = escape(seed) if seed is not None else ""
+        if htmx4:
+            return Markup(f'<span data-chirp-signal="{escape(name, quote=True)}">{inner}</span>')
         return Markup(f'<span sse-swap="{escape(name)}" hx-target="this">{inner}</span>')
 
     def signal_block(name: str) -> Markup:
@@ -197,13 +208,15 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         _record(name)
         seed = registry.current_rendered(name, audience_key=current_signal_audience())
         inner = seed if seed is not None else ""
+        if htmx4:
+            return Markup(f'<div data-chirp-signal="{escape(name, quote=True)}">{inner}</div>')
         return Markup(f'<div sse-swap="{escape(name)}" hx-target="this">{inner}</div>')
 
     def signal_bind(name: str) -> Markup:
         """Emit binding attrs for an existing element bound to signal *name*.
 
-        Returns ``sse-swap="name" hx-target="this"`` (no element, no wrapper) for
-        placement inside an existing tag::
+        Returns the selected tier's binding attribute (no element, no wrapper)
+        for placement inside an existing tag::
 
             <ul id="notif-list" {{ signal_bind('notifications') }}>
               {{ notification_list_body(notes) }}
@@ -218,12 +231,14 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         """
         validate_signal_name(name)
         _record(name)
+        if htmx4:
+            return Markup(f'data-chirp-signal="{escape(name, quote=True)}"')
         return Markup(f'sse-swap="{escape(name)}" hx-target="this"')
 
     signal_attrs = signal_bind
 
     def signal_connect() -> Markup:
-        """Emit the one shared ``sse-connect`` wrapper for all page signals.
+        """Emit the one shared, version-aware connection wrapper.
 
         Emits a deferred connect marker; :func:`apply_signal_connect` patches it
         at end-of-render with ``?topics=`` scoped to every
@@ -237,7 +252,7 @@ def make_signal_globals(registry: SignalRegistry) -> dict[str, Any]:
         signal sink must live as a descendant — htmx ``sse-swap`` binds via
         ``querySelectorAll``, which excludes the connect element itself.
         """
-        return Markup(_SIGNAL_CONNECT_OPEN)
+        return Markup(_SIGNAL_CONNECT_OPEN_HTMX4 if htmx4 else _SIGNAL_CONNECT_OPEN)
 
     return {
         "signal": signal,

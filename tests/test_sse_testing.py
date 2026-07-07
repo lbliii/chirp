@@ -52,3 +52,23 @@ async def test_assert_sse_wired_fails_for_missing_htmx4_partial_target() -> None
     async with TestClient(_htmx4_app(partial_target="#missing")) as client:
         with pytest.raises(AssertionError, match="partial target '#missing'"):
             await assert_sse_wired(client, "/", "/events", max_events=1)
+
+
+@pytest.mark.issue(544)
+async def test_assert_sse_wired_accepts_repeated_signal_selector_targets() -> None:
+    app = App(AppConfig(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION))
+
+    @app.route("/")
+    def index():
+        return (
+            '<div hx-sse:connect="/_chirp/live?topics=balance">'
+            '<span data-chirp-signal="balance">1</span>'
+            '<strong data-chirp-signal="balance">1</strong></div>'
+        )
+
+    @app.signal("balance")
+    async def balance():
+        yield 2
+
+    async with TestClient(app) as client:
+        await assert_sse_wired(client, "/", "/_chirp/live?topics=balance", max_events=1)

@@ -18,9 +18,10 @@ events remain application DOM events and are never silently reinterpreted as
 rendered swaps.
 
 The version-aware `EventStream` formatter, native `sse_scope()` markup,
-testing-helper parity, cache variation, DevTools metadata, and maintained
-browser proof are implemented. The current htmx 2 wire and markup remain the
-default until the htmx 4 preview lane is separately selected.
+one-to-many signal sinks, testing-helper parity, cache variation, DevTools
+metadata, and maintained browser proof are implemented. The current htmx 2
+wire and markup remain the default until the htmx 4 preview lane is separately
+selected.
 
 ## Context
 
@@ -64,7 +65,7 @@ targeted `Fragment` and every signal update into a DOM event with no swap.
 - No framework replay buffer or automatic event IDs.
 - No new return type, `AppConfig` field, helper, or CLI flag in this RFC.
 - No htmx 4 default flip; issue #551 owns that release decision.
-- No implementation of signal markup or `EventStream` formatting here.
+- No new public signal or `EventStream` type.
 
 ## Decision
 

@@ -160,6 +160,12 @@ same cascade. Derived-of-a-derived propagates too.
 
 Three template globals, registered automatically when any signal exists:
 
+The examples below describe the default htmx 2 tier. On the exact htmx 4
+preview, the same helpers emit `data-chirp-signal="name"` on each sink and one
+`hx-sse:connect` wrapper. An unnamed `<hx-partial>` targets all matching markers,
+so repeated sinks, SSR seeds, topic scoping, and `signal_bind()`'s wrapper-free
+layout contract stay the same.
+
 - `{{ signal('name') }}` — an SSR-seeded **scalar** sink:
   `<span sse-swap="name" hx-target="this">{seed}</span>`. The default `sse-swap`
   swap is `innerHTML`.
@@ -193,15 +199,16 @@ Three template globals, registered automatically when any signal exists:
 </div>{# close the signal_connect() wrapper #}
 ```
 
-Prefer `{{ signal_attrs('name') }}` for binding an existing element: its call-site
+Prefer `{{ signal_bind('name') }}` (`signal_attrs` remains an alias) for binding an existing element: its call-site
 is recorded for topic scoping and recognised by the contract, so the binding is
 validated even though the `sse-swap` is produced at render time. A hand-written
 `sse-swap="name"` attribute also works, but it is only contract-validated when the
 template either opens the connect itself or is composed under a layout that does.
 
 :::{dropdown} Inside `signal_connect()` — the markup and the subscribe-all rule
-`signal_connect()` emits an opening
+`signal_connect()` emits an opening legacy
 `<div hx-ext="sse" sse-connect="/_chirp/live" hx-disinherit="hx-target hx-swap">`
+(or `<div hx-sse:connect="/_chirp/live">` on the exact htmx 4 preview)
 (session-scoped signals append `?aud=<key>` — see below). htmx binds `sse-swap`
 via `querySelectorAll`, which excludes the connect element itself, so every sink
 must be a *descendant* of the wrapper.
@@ -234,7 +241,8 @@ async def deposit(request: Request):
 ```
 
 `emit` takes an `audience_key` (the visitor's session store key) for session
-signals; `signal_connect()` renders `sse-connect="/_chirp/live?aud=<key>"` so the
+signals; `signal_connect()` renders the tier's connection attribute with
+`/_chirp/live?aud=<key>` so the
 bus fans that emit only to the matching connection.
 
 :::{note}

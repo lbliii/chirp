@@ -16,7 +16,7 @@ import threading
 
 import pytest
 
-from chirp import App
+from chirp import App, Template
 from chirp.config import AppConfig
 from chirp.contracts.rules_signals import (
     check_signal_bindings,
@@ -28,7 +28,9 @@ from chirp.realtime.signal_globals import (
     apply_signal_connect,
     make_signal_globals,
     reset_referenced,
+    reset_signal_audience,
     restore_referenced,
+    set_signal_audience,
 )
 from chirp.realtime.signal_stream import make_signal_stream
 from chirp.realtime.signals import (
@@ -270,7 +272,7 @@ class TestDerived:
         try:
             for _ in range(2):
                 event = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
-                seen[event.event] = event.data
+                seen[event.name] = event.data
         finally:
             await gen.aclose()
         # BOTH the source signal AND its derived must surface on the wire.
@@ -450,6 +452,27 @@ class TestGlobals:
         assert 'hx-target="this"' in html
         assert "1,234" in html  # seeded, no flash
 
+    @pytest.mark.issue(544)
+    def test_htmx4_globals_emit_native_connection_and_stable_markers(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance", initial=lambda: 1234))
+        globals_ = make_signal_globals(reg, htmx4=True)
+        token = reset_referenced()
+        try:
+            connect = str(globals_["signal_connect"]())
+            scalar = str(globals_["signal"]("balance"))
+            block = str(globals_["signal_block"]("balance"))
+            attrs = str(globals_["signal_bind"]("balance"))
+            html = apply_signal_connect(connect)
+        finally:
+            restore_referenced(token)
+
+        assert html == '<div hx-sse:connect="/_chirp/live?topics=balance">'
+        assert scalar == '<span data-chirp-signal="balance">1234</span>'
+        assert block == '<div data-chirp-signal="balance">1234</div>'
+        assert attrs == 'data-chirp-signal="balance"'
+        assert "sse-swap" not in scalar + block + attrs
+
     def test_signal_global_no_seed_when_unset(self) -> None:
         reg = SignalRegistry()
         reg.register(SignalSpec(name="ticker"))  # no initial
@@ -495,6 +518,82 @@ class TestGlobals:
             assert "topics=" not in html
         finally:
             restore_referenced(token)
+
+    @pytest.mark.issue(544)
+    async def test_concurrent_htmx4_finalization_does_not_leak_topics_or_audiences(
+        self,
+    ) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="alpha"))
+        reg.register(SignalSpec(name="beta"))
+        globals_ = make_signal_globals(reg, htmx4=True)
+
+        async def render(name: str, audience: str) -> str:
+            referenced_token = reset_referenced()
+            audience_token = set_signal_audience(audience)
+            try:
+                connect = str(globals_["signal_connect"]())
+                await asyncio.sleep(0)
+                str(globals_["signal"](name))
+                await asyncio.sleep(0)
+                return apply_signal_connect(connect)
+            finally:
+                reset_signal_audience(audience_token)
+                restore_referenced(referenced_token)
+
+        alpha, beta = await asyncio.gather(
+            render("alpha", "visitor-a"),
+            render("beta", "visitor-b"),
+        )
+        assert alpha == '<div hx-sse:connect="/_chirp/live?topics=alpha&aud=visitor-a">'
+        assert beta == '<div hx-sse:connect="/_chirp/live?topics=beta&aud=visitor-b">'
+
+    @pytest.mark.issue(544)
+    async def test_htmx4_page_has_no_js_ssr_seed_and_one_scoped_connection(
+        self,
+        tmp_path,
+    ) -> None:
+        template = tmp_path / "page.html"
+        template.write_text(
+            "{{ signal_connect() }}"
+            "{{ signal('balance') }}"
+            "<strong {{ signal_bind('balance') }}>seed</strong>"
+            "{{ signal_block('alerts') }}"
+            "</div>"
+        )
+        from chirp.app.htmx_manifest import HTMX4_PREVIEW_VERSION
+
+        app = App(
+            AppConfig(
+                template_dir=tmp_path,
+                htmx=True,
+                htmx_version=HTMX4_PREVIEW_VERSION,
+            )
+        )
+
+        @app.signal("balance", initial=lambda: 7)
+        async def balance():
+            if False:
+                yield 0
+
+        @app.signal("alerts", initial=lambda: "<b>ready</b>")
+        async def alerts():
+            if False:
+                yield ""
+
+        @app.route("/")
+        def index():
+            return Template("page.html")
+
+        async with TestClient(app) as client:
+            response = await client.get("/")
+
+        assert response.status == 200
+        assert response.text.count("hx-sse:connect=") == 1
+        assert "topics=alerts,balance" in response.text
+        assert response.text.count('data-chirp-signal="balance"') == 2
+        assert '<span data-chirp-signal="balance">7</span>' in response.text
+        assert '<div data-chirp-signal="alerts"><b>ready</b></div>' in response.text
 
     def test_signal_attrs_emits_bare_attrs_no_wrapper(self) -> None:
         """signal_attrs binds an EXISTING element: it emits only the attributes
@@ -546,7 +645,7 @@ class TestLiveStream:
         task = asyncio.create_task(_emit_later())
         event = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
         await task
-        assert event.event == "balance"
+        assert event.name == "balance"
         assert event.data == "777"
         await gen.aclose()
 
@@ -562,9 +661,28 @@ class TestLiveStream:
         stream = make_signal_stream(reg, ("ticks",))
         gen = stream.generator.__aiter__()
         first = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
-        assert first.event == "ticks"
+        assert first.name == "ticks"
         assert first.data in {"1", "2"}
         await gen.aclose()
+
+    @pytest.mark.issue(544)
+    async def test_session_streams_receive_only_their_audience(self) -> None:
+        reg = SignalRegistry()
+        reg.register(SignalSpec(name="balance", audience="session"))
+        alice = make_signal_stream(reg, ("balance",), audience_key="alice").generator.__aiter__()
+        bob = make_signal_stream(reg, ("balance",), audience_key="bob").generator.__aiter__()
+        alice_next = asyncio.create_task(alice.__anext__())
+        bob_next = asyncio.create_task(bob.__anext__())
+        await asyncio.sleep(0.02)
+        reg.emit("balance", 10, audience_key="alice")
+        reg.emit("balance", 20, audience_key="bob")
+        try:
+            alice_event, bob_event = await asyncio.gather(alice_next, bob_next)
+            assert (alice_event.name, alice_event.data) == ("balance", "10")
+            assert (bob_event.name, bob_event.data) == ("balance", "20")
+        finally:
+            await alice.aclose()
+            await bob.aclose()
 
     @pytest.mark.issue(317)
     async def test_stream_skips_unbound_async_sources(self) -> None:
@@ -588,7 +706,7 @@ class TestLiveStream:
         gen = stream.generator.__aiter__()
         event = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
         await gen.aclose()
-        assert event.event == "balance"
+        assert event.name == "balance"
         assert pumped == {"balance"}
 
     @pytest.mark.issue(355)
@@ -610,7 +728,7 @@ class TestLiveStream:
         gen = stream.generator.__aiter__()
         # First source() raised; the pump re-invokes source() and the retry yields.
         event = await asyncio.wait_for(gen.__anext__(), timeout=3.0)
-        assert event.event == "ticks"
+        assert event.name == "ticks"
         assert event.data == "ok"
         assert calls["n"] >= 2, "source was not re-invoked after the transient failure"
         await gen.aclose()
@@ -690,6 +808,36 @@ class TestLiveStream:
         events = [e for e in result.events if e.event == "balance"]
         assert events, f"no balance events in {result.events!r}"
         assert {e.data for e in events} <= {"10", "20", "30"}
+
+    @pytest.mark.issue(544)
+    async def test_htmx4_live_route_targets_all_signal_sinks_and_keeps_falsy_values(
+        self,
+    ) -> None:
+        from chirp.app.htmx_manifest import HTMX4_PREVIEW_VERSION
+
+        app = App(config=AppConfig(htmx=True, htmx_version=HTMX4_PREVIEW_VERSION))
+
+        @app.signal("status", initial=lambda: "seed")
+        async def status():
+            for value in (0, "", []):
+                yield value
+                await asyncio.sleep(0.03)
+
+        app.freeze()
+        async with TestClient(app) as client:
+            result = await client.sse(
+                "/_chirp/live?topics=status",
+                request_type="partial",
+                max_events=3,
+            )
+
+        assert result.headers["vary"] == "Accept, HX-Request-Type"
+        assert [event.event for event in result.events] == [None, None, None]
+        assert [event.data for event in result.events] == [
+            "<hx-partial hx-target='[data-chirp-signal=\"status\"]'>0</hx-partial>",
+            "<hx-partial hx-target='[data-chirp-signal=\"status\"]'></hx-partial>",
+            "<hx-partial hx-target='[data-chirp-signal=\"status\"]'>[]</hx-partial>",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +928,30 @@ class TestDeadBindingCheck:
         }
         issues = check_signal_bindings(sources, frozenset({"balance"}))
         assert not [i for i in issues if i.category == "signal_dead_binding"]
+
+    @pytest.mark.issue(544)
+    def test_htmx4_marker_dead_binding_is_error(self) -> None:
+        sources = {
+            "page.html": (
+                '<div hx-sse:connect="/_chirp/live"><span data-chirp-signal="typo">0</span></div>'
+            )
+        }
+        issues = check_signal_bindings(sources, frozenset({"balance"}))
+        dead = [issue for issue in issues if issue.category == "signal_dead_binding"]
+        assert len(dead) == 1
+        assert dead[0].severity is Severity.ERROR
+        assert "typo" in dead[0].message
+
+    @pytest.mark.issue(544)
+    def test_composed_htmx4_raw_marker_gets_topic_scoping_nudge(self) -> None:
+        sources = {
+            "_layout.html": "{{ signal_connect() }}",
+            "page.html": '<span data-chirp-signal="balance">0</span>',
+        }
+        issues = check_signal_bindings(sources, frozenset({"balance"}))
+        nudges = [issue for issue in issues if issue.category == "signal_raw_marker"]
+        assert len(nudges) == 1
+        assert "signal_bind" in nudges[0].message
 
     def test_signal_connect_global_recognized(self) -> None:
         sources = {
