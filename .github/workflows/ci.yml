@@ -140,7 +140,52 @@ jobs:
           examples/standalone/devtools_htmx4/test_browser_smoke.py
           examples/standalone/webmcp_form/test_browser_smoke.py
           tests/contracts/test_query_devtools_browser.py
+          tests/contracts/test_query_cors_browser.py
           -q --tb=short --timeout=120 -m "not slow"
+
+  # Real-wire RFC 10008 interoperability proof (issue #532). The main job
+  # covers core H1 behavior; this lane installs optional protocol clients and
+  # a representative reverse proxy so H2/H3/proxy paths cannot silently skip.
+  query-interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-query-interop-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-query-interop-
+            uv-${{ runner.os }}-
+
+      - name: Install project and protocol clients
+        run: |
+          uv sync --no-sources --group dev
+          uv pip install "bengal-pounce[h2,h3]==0.8.2" "httpx[http2]>=0.27.0" "uvicorn==0.32.0"
+
+      - name: Install Nginx interoperability proxy
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes nginx
+
+      - name: Record interoperability environment
+        run: |
+          uv run --no-sync python -c "import importlib.metadata as m, platform; print(platform.platform()); print(platform.python_version()); print('pounce', m.version('bengal-pounce')); print('httpx', m.version('httpx')); print('uvicorn', m.version('uvicorn')); print('zoomies', m.version('zoomies'))"
+          nginx -v
+
+      - name: QUERY wire, retry, redirect, limit, log, and proxy proof
+        run: >-
+          uv run --no-sync pytest
+          tests/interop/test_query_wire.py
+          -q --tb=short --timeout=120
 
   # Dedicated PostgreSQL backend job. The main `test` job runs on free-threaded
   # 3.14t and does not ship asyncpg (a C-extension dependency), so live Postgres
