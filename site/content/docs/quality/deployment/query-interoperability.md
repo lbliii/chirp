@@ -16,6 +16,10 @@ Chirp handler through Pounce HTTP/1.1, HTTP/2, and HTTP/3, Uvicorn, and a local
 Nginx reverse proxy. Real Chromium tests cover same-origin Fetch and a
 cross-origin CORS preflight.
 
+Start with [[docs/build-apps/pages-navigation/http-query|Experimental HTTP
+QUERY]] for GET-vs-QUERY guidance, route setup, response semantics, cache
+opt-in, and the current release-gate decision.
+
 The evidence does **not** mean every CDN or proxy accepts QUERY. Verify your
 exact production path and keep a direct-origin or ordinary GET fallback.
 

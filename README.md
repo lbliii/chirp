@@ -207,6 +207,26 @@ so both plain browser and htmx requests follow the redirect correctly.
 </details>
 
 <details>
+<summary><strong>Experimental HTTP QUERY</strong> — safe body-bearing searches</summary>
+
+Chirp supports RFC 10008 `QUERY` on explicit ASGI routes for controlled
+early-adopter use. Choose it only when a read-only query is too large or
+structured for a practical URI; ordinary bookmarkable searches and native HTML
+forms should stay GET.
+
+The route declares accepted request media types, while the handler keeps using
+Chirp's normal typed HTML returns and one-template/named-block render surface.
+Browser, Pounce, Uvicorn, and Nginx proof exists, but stable promotion and
+universal proxy/CDN support are **not** claimed. Keep a GET fallback and verify
+the exact deployment path.
+
+See the [HTTP QUERY adoption guide](https://lbliii.github.io/chirp/docs/build-apps/pages-navigation/http-query/)
+for request failures, CORS, redirects, conditional responses, explicit cache
+opt-in, compatibility evidence, and the remaining release gates.
+
+</details>
+
+<details>
 <summary><strong>Stream vs Suspense vs EventStream</strong></summary>
 
 Picking the wrong one is the most common return-type mistake:

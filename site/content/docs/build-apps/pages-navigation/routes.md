@@ -150,8 +150,9 @@ buffered responses are stored; Cookie, Authorization, `Set-Cookie`, streaming,
 and SSE paths bypass. Cached QUERY hits preserve response headers and render
 intent and re-evaluate ETag/Last-Modified conditions.
 
-See [RFC 009](https://github.com/lbliii/chirp/blob/main/docs/rfcs/009-http-query.md)
-for the compatibility tier and remaining promotion gates.
+See [[docs/build-apps/pages-navigation/http-query|Experimental HTTP QUERY]] for
+GET-vs-QUERY guidance, deployment constraints, cache opt-in, compatibility
+evidence, and the remaining promotion gates.
 
 #### Discovery, redirects, and validators
 
