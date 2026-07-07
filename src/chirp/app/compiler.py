@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from chirp._internal.invoke_plan import compile_invoke_plan
 from chirp.config import AppConfig
+from chirp.errors import ConfigurationError
+from chirp.http.query_media import normalize_query_media_types
 from chirp.routing.route import Route
 from chirp.routing.router import Router, parse_path
 from chirp.templating.integration import create_environment
@@ -289,6 +291,26 @@ def _compile_routes(
     router = Router()
     for pending in pending_routes:
         methods = frozenset(m.upper() for m in (pending.methods or ["GET"]))
+        declared_query_media_types = pending.query_media_types
+        has_query = "QUERY" in methods
+        if has_query and not declared_query_media_types:
+            raise ConfigurationError(
+                f"QUERY route {pending.path!r} must declare at least one media range "
+                "with query_media_types=(...)."
+            )
+        if not has_query and declared_query_media_types is not None:
+            raise ConfigurationError(
+                f"Route {pending.path!r} declares query_media_types but does not "
+                "include 'QUERY' in methods."
+            )
+        query_media_types: tuple[str, ...] | None = None
+        if declared_query_media_types is not None:
+            try:
+                query_media_types = normalize_query_media_types(declared_query_media_types)
+            except (TypeError, ValueError) as exc:
+                raise ConfigurationError(
+                    f"Invalid query_media_types for route {pending.path!r}: {exc}"
+                ) from exc
         segments = parse_path(pending.path)
         path_param_names = frozenset(s.param_name for s in segments if s.is_param and s.param_name)
         invoke_plan = compile_invoke_plan(
@@ -306,6 +328,7 @@ def _compile_routes(
             template=pending.template,
             invoke_plan=invoke_plan,
             inline=pending.inline,
+            query_media_types=query_media_types,
             page_source_handler=pending.page_source_handler,
         )
         router.add(route)

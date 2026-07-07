@@ -129,6 +129,7 @@ def hoist(parent_state: MutableAppState, sub_state: MutableAppState, prefix: str
                 referenced=pending.referenced,
                 template=pending.template,
                 inline=pending.inline,
+                query_media_types=pending.query_media_types,
                 page_source_handler=pending.page_source_handler,
             )
         )

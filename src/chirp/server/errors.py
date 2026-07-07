@@ -21,6 +21,18 @@ from chirp.templating.oob_registry import OOBRegistry
 logger = logging.getLogger("chirp.server")
 
 
+def _error_headers(exc: HTTPError, request: Request) -> tuple[tuple[str, str], ...]:
+    """Return exception headers plus route-scoped QUERY discovery metadata."""
+    headers = list(exc.headers)
+    if request.method == "QUERY" and not any(name.lower() == "accept-query" for name, _ in headers):
+        from chirp.server.query_protocol import QUERY_ACCEPT_HEADER_CACHE_KEY
+
+        accept_query = request._cache.get(QUERY_ACCEPT_HEADER_CACHE_KEY)
+        if isinstance(accept_query, str):
+            headers.append(("Accept-Query", accept_query))
+    return tuple(headers)
+
+
 def default_fragment_error(status: int, detail: str) -> str:
     """Minimal HTML snippet for fragment error responses."""
     return f'<div class="chirp-error" data-status="{status}">{detail}</div>'
@@ -90,6 +102,7 @@ async def handle_http_error(
 ) -> Response | StreamingResponse | SSEResponse:
     """Map an HTTPError to a Response using registered error handlers."""
     logger.debug("%d %s %s — %s", exc.status, request.method, request.path, exc.detail)
+    error_headers = _error_headers(exc, request)
 
     # Try exact exception type, then status code
     handler = error_handlers.get(type(exc)) or error_handlers.get(exc.status)
@@ -107,6 +120,8 @@ async def handle_http_error(
         # SSEResponse has no status attr; its with_status is a no-op.
         if isinstance(response, (Response, StreamingResponse)) and response.status == 200:
             response = response.with_status(exc.status)
+        for name, value in error_headers:
+            response = response.with_header(name, value)
         return response
 
     # Default error response
@@ -118,7 +133,7 @@ async def handle_http_error(
     body = default_fragment_error(exc.status, detail) if request.is_htmx else detail
 
     resp = Response(body=body).with_status(exc.status)
-    for name, value in exc.headers:
+    for name, value in error_headers:
         resp = resp.with_header(name, value)
     return _with_htmx_error_headers(resp, request)
 

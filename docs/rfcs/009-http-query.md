@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Proposed — no runtime behavior implemented
+**Status:** Accepted — #525 request contract implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -11,6 +11,13 @@ method. Merging this document accepts the design, not every implementation
 change. The public route keyword, protocol enforcement, contract rules, cache
 behavior, filesystem convention, client integration, and sync-path work remain
 separate review units with the proof named below.
+
+Issue #525 implements the public route declaration, freeze-time media-range
+validation, request `Content-Type` enforcement, configured body-limit parity,
+post-negotiation `Accept` enforcement, protocol error headers, and ASGI-only
+sync fallback. Discovery/`OPTIONS`, redirects and validators, client and page
+ergonomics, render-surface proof, caching, deployment, and promotion remain
+owned by #526-#535.
 
 ## 1. Context
 
@@ -342,6 +349,17 @@ Before that change lands, the implementation PR must record:
 Fused QUERY support is a later optimization. It requires body access,
 media-type enforcement, error/header parity, and its own measurement plan; it
 must not become an independent protocol implementation.
+
+### #525 sync-guard receipt
+
+On 2026-07-06, a focused in-process synthetic measurement on arm64 macOS with
+CPython 3.14.2t compared the frozen GET fused path before and after the early
+`method == "QUERY"` guard. Across nine repeats of 200,000 calls, the median was
+1125.6 ns/call before and 1134.6 ns/call after (+0.8%); the best samples were
+1069.1 and 1065.6 ns/call respectively. This is within run-to-run noise and is
+not evidence about production throughput; it records that the required QUERY
+escape did not produce a material GET fast-path regression in this focused
+workload.
 
 ## 10. Caching
 

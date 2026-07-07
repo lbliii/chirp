@@ -50,6 +50,7 @@ from chirp.server.fragment_targets_debug import (
 )
 from chirp.server.handler_kwargs import build_handler_kwargs
 from chirp.server.negotiation import negotiate
+from chirp.server.query_protocol import validate_query_request, validate_query_response
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_file_response, send_response, send_streaming_response
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
@@ -582,6 +583,8 @@ async def _invoke_handler(
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
 
+    validate_query_request(match.route, request)
+
     # Inject path_params into Request; skip clone when already identical
     if request.path_params != match.path_params:
         request = replace(request, path_params=match.path_params)
@@ -628,7 +631,7 @@ async def _invoke_handler(
     if fragment_block is not None:
         result = _coerce_to_fragment(result, fragment_block)
 
-    return negotiate(
+    response = negotiate(
         result,
         kida_env=kida_env,
         request=request,
@@ -638,6 +641,8 @@ async def _invoke_handler(
         suspense_error_template=suspense_error_template,
         suspense_error_block=suspense_error_block,
     )
+    validate_query_response(match.route, request, response)
+    return response
 
 
 async def _read_body_if_needed_from_plan(
