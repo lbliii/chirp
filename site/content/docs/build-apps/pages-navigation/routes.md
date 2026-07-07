@@ -137,11 +137,11 @@ intent, timing, streaming metadata, and errors. Programmatic clients can use
 `htmx.ajax("QUERY", path, context)` while declarative QUERY transport remains a
 separate compatibility gate.
 
-`CacheMiddleware` bypasses QUERY unless an explicit query key callback is
-provided. Chirp's collision-safe key hashes the exact request body, media
+`CacheMiddleware` still bypasses QUERY by default; an explicit query key
+callback enables eligible response snapshots. Chirp's collision-safe key hashes the exact request body, media
 metadata, target URI, `Accept`, configured vary headers, and htmx render shape
 without exposing raw request content. Building the key retains the body for the
-handler and uses the normal request-body limit.
+handler and uses the normal request-body limit. By itself, it does not enable cache reads or writes.
 
 To opt in explicitly, manually register `CacheMiddleware` with
 `query_key_func=query_cache_key`. The default `None` and
