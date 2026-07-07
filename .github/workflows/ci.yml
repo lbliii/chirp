@@ -178,7 +178,7 @@ jobs:
 
       - name: Record interoperability environment
         run: |
-          uv run --no-sync python -c "import importlib.metadata as m, platform; print(platform.platform()); print(platform.python_version()); print('pounce', m.version('bengal-pounce')); print('httpx', m.version('httpx')); print('uvicorn', m.version('uvicorn')); print('zoomies', m.version('zoomies'))"
+          uv run --no-sync python -c "import importlib.metadata as m, platform; print(platform.platform()); print(platform.python_version()); print('pounce', m.version('bengal-pounce')); print('httpx', m.version('httpx')); print('uvicorn', m.version('uvicorn')); print('zoomies', m.version('bengal-zoomies'))"
           nginx -v
 
       - name: QUERY wire, retry, redirect, limit, log, and proxy proof
