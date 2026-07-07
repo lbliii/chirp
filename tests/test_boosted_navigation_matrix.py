@@ -137,6 +137,7 @@ def _boosted_request(
     current_url: str,
     hx_target: bytes | None,
     include_hx_request: bool = True,
+    request_type: bytes | None = None,
 ) -> Request:
     async def _receive():
         return {"type": "http.request", "body": b"", "more_body": False}
@@ -147,6 +148,9 @@ def _boosted_request(
     headers.append((b"hx-current-url", current_url.encode()))
     if hx_target is not None:
         headers.append((b"hx-target", hx_target))
+    if request_type is not None:
+        headers.append((b"hx-request-type", request_type))
+        headers.append((b"accept", b"text/html"))
 
     return Request.from_asgi(
         {
@@ -210,6 +214,7 @@ class MatrixCase:
     expects_redirect: bool
     expected_body_contains: str | None = None
     include_hx_request: bool = True
+    request_type: bytes | None = None
 
 
 SITE = "site-content"
@@ -236,6 +241,17 @@ CASES: tuple[MatrixCase, ...] = (
         expected_status=200,
         expects_redirect=False,
         expected_body_contains="in-shell-a-2",
+    ),
+    MatrixCase(
+        id="02b_happy_same_shell_htmx4_tagged",
+        scenario="full",
+        current_url="http://127.0.0.1:8000/a",
+        dest_path="/a2",
+        hx_target=b"main#site-content",
+        expected_status=200,
+        expects_redirect=False,
+        expected_body_contains="in-shell-a-2",
+        request_type=b"partial",
     ),
     # --- Same-shell, client sent an unsatisfiable target → mismatch redirect ---
     MatrixCase(
@@ -403,6 +419,7 @@ async def test_boosted_navigation_matrix(case: MatrixCase) -> None:
         current_url=case.current_url,
         hx_target=case.hx_target,
         include_hx_request=case.include_hx_request,
+        request_type=case.request_type,
     )
     response = await handler(request)
 

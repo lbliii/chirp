@@ -4,9 +4,10 @@ Frozen metadata with async body access. The request is honest about
 what it is: received data that doesn't change.
 """
 
+import re
 from collections.abc import AsyncGenerator, Callable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 from urllib.parse import unquote, urlparse
 
 from chirp._internal.asgi import Receive, Scope
@@ -17,6 +18,30 @@ from chirp.http.query import QueryParams
 if TYPE_CHECKING:
     from chirp.http.forms import FormData
     from chirp.middleware.auth import User
+
+
+_HTMX_TAG_RE = re.compile(r"[A-Za-z][A-Za-z0-9:-]*\Z")
+
+
+def _valid_htmx_element_id(value: str) -> bool:
+    """Return whether *value* is safe to use as a canonical DOM id."""
+    if not value or value != value.strip() or "#" in value:
+        return False
+    return not any(char.isspace() or ord(char) < 0x20 or char in "<>\"'" for char in value)
+
+
+def _parse_htmx_element_ref(value: str | None) -> tuple[str | None, str | None]:
+    """Parse htmx 4 ``tag#id`` metadata without treating selectors as ids."""
+    if value is None or value != value.strip() or value.count("#") > 1:
+        return None, None
+    if "#" not in value:
+        return (value, None) if _HTMX_TAG_RE.fullmatch(value) else (None, None)
+    tag, element_id = value.split("#", 1)
+    if tag and _HTMX_TAG_RE.fullmatch(tag) is None:
+        return None, None
+    if not _valid_htmx_element_id(element_id):
+        return None, None
+    return tag or None, element_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,21 +137,54 @@ class HtmxDetails:
 
     @property
     def target_id(self) -> str | None:
-        """HX-Target normalized to a bare DOM id (no leading ``#``).
+        """HX-Target normalized to a bare DOM id.
 
-        Canonical form for registry lookups and layout-chain matching.
-        Returns ``None`` when HX-Target is absent or reduces to empty
-        after stripping (e.g. a bare ``#``).
+        Accepts htmx 4 ``tag#id``, htmx 2 ``#id``, and legacy bare ``id``.
+        Selector-like, malformed, and htmx 4 tag-only values return ``None``.
         """
         raw = self.target
         if raw is None:
             return None
-        return raw.lstrip("#") or None
+        _tag, element_id = _parse_htmx_element_ref(raw)
+        if "#" in raw:
+            return element_id
+        if self._get("hx-request-type") is not None:
+            return None
+        return raw if _valid_htmx_element_id(raw) else None
+
+    @property
+    def target_tag(self) -> str | None:
+        """The htmx 4 target tag parsed from ``HX-Target`` when present."""
+        raw = self.target
+        if raw is None:
+            return None
+        tag, _element_id = _parse_htmx_element_ref(raw)
+        if "#" in raw or self._get("hx-request-type") is not None:
+            return tag
+        return None
+
+    @property
+    def source(self) -> str | None:
+        """Raw htmx 4 ``HX-Source`` element metadata."""
+        return self._get("hx-source")
+
+    @property
+    def source_id(self) -> str | None:
+        """The source element id parsed from htmx 4 ``HX-Source``."""
+        _tag, element_id = _parse_htmx_element_ref(self.source)
+        return element_id
+
+    @property
+    def source_tag(self) -> str | None:
+        """The source element tag parsed from htmx 4 ``HX-Source``."""
+        tag, _element_id = _parse_htmx_element_ref(self.source)
+        return tag
 
     @property
     def trigger(self) -> str | None:
-        """The trigger element ID from HX-Trigger header."""
-        return self._get("hx-trigger")
+        """The source id from htmx 2 ``HX-Trigger`` or htmx 4 ``HX-Source``."""
+        legacy = self._get("hx-trigger")
+        return legacy if legacy is not None else self.source_id
 
     @property
     def trigger_name(self) -> str | None:
@@ -182,6 +240,19 @@ class HtmxDetails:
         Set when the request originates from an ``<htmx-partial>`` element.
         """
         return self._get("hx-partial")
+
+    @property
+    def request_type(self) -> Literal["full", "partial"] | None:
+        """Normalized htmx 4 ``HX-Request-Type`` (``full`` or ``partial``)."""
+        value = self._get("hx-request-type")
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized == "full":
+            return "full"
+        if normalized == "partial":
+            return "partial"
+        return None
 
 
 class _LazyQueryParams(Mapping[str, str]):
@@ -436,7 +507,17 @@ class Request:
         False for boosted navigations and history restores, which need
         full page content despite using htmx transport.
         """
-        return bool(self.htmx) and not self.htmx.boosted and not self.htmx.history_restore
+        if not self.htmx or self.htmx.boosted or self.htmx.history_restore:
+            return False
+        if self.htmx.request_type == "full":
+            raw_target = self.htmx.target
+            if raw_target is None:
+                return False
+            if raw_target.lower() in {"body", "html"}:
+                return False
+            if self.htmx.target_tag in {"body", "html"}:
+                return False
+        return True
 
     @property
     def is_fragment(self) -> bool:
@@ -483,8 +564,28 @@ class Request:
         return self.htmx.target_id
 
     @property
+    def htmx_target_tag(self) -> str | None:
+        """The htmx 4 target tag parsed from ``HX-Target``."""
+        return self.htmx.target_tag
+
+    @property
+    def htmx_source(self) -> str | None:
+        """Raw htmx 4 ``HX-Source`` element metadata."""
+        return self.htmx.source
+
+    @property
+    def htmx_source_id(self) -> str | None:
+        """The source id parsed from htmx 4 ``HX-Source``."""
+        return self.htmx.source_id
+
+    @property
+    def htmx_source_tag(self) -> str | None:
+        """The source tag parsed from htmx 4 ``HX-Source``."""
+        return self.htmx.source_tag
+
+    @property
     def htmx_trigger(self) -> str | None:
-        """The trigger element ID from HX-Trigger header."""
+        """The htmx 2 trigger id or htmx 4 source id."""
         return self.htmx.trigger
 
     @property
@@ -506,6 +607,11 @@ class Request:
     def htmx_partial(self) -> str | None:
         """The partial element name from HX-Partial header (htmx 4.0+)."""
         return self.htmx.partial
+
+    @property
+    def htmx_request_type(self) -> Literal["full", "partial"] | None:
+        """Normalized htmx 4 ``HX-Request-Type`` value."""
+        return self.htmx.request_type
 
     @property
     def content_type(self) -> str | None:

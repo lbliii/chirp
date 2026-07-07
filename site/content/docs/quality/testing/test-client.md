@@ -70,7 +70,7 @@ async def test_methods():
 
 ## Fragment Requests
 
-To simulate an htmx request, send the `HX-Request` header so your handler renders a [[docs/build-apps/html-fragments/fragments|fragment]] instead of a full page. The `fragment()` convenience method sets that header for you and exposes `target=`, `trigger=`, and `history_restore=`:
+To simulate an htmx request, send the `HX-Request` header so your handler renders a [[docs/build-apps/html-fragments/fragments|fragment]] instead of a full page. The `fragment()` convenience method sets that header for you and exposes `target=`, `trigger=`, and `history_restore=`. For htmx 4, pass `source=` and `request_type=`; the latter also defaults `Accept` to `text/html`:
 
 ```python
 async def test_fragment():
@@ -78,6 +78,14 @@ async def test_fragment():
         response = await client.fragment("/search?q=test", target="#results")
         assert response.status == 200
         assert '<div id="results">' in response.text
+
+        htmx4 = await client.fragment(
+            "/search?q=test",
+            target="div#results",
+            source="input#search",
+            request_type="partial",
+        )
+        assert htmx4.status == 200
 ```
 
 Use the [[docs/quality/testing/assertions|fragment and SSE assertions]] (`assert_is_fragment`, `assert_is_full_page`, ...) to check fragment-vs-full-page rendering without hand-writing `<html>` string checks.
@@ -101,6 +109,7 @@ async def test_boosted_project_navigation():
 | --- | --- | --- |
 | Browser page load | `client.get(...)` | Full page |
 | Narrow htmx target | `client.fragment(..., target="results")` | Target block only |
+| Htmx 4 narrow target | `client.fragment(..., target="div#results", source="button#go", request_type="partial")` | Target block only |
 | Boosted shell outlet | `client.boosted(..., target="main")` | `Page` / mounted-page outlet negotiation |
 
 For shell outlets that use `hx-select`, a negotiated `Page` response can carry

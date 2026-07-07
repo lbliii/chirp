@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from chirp import OOB, App, AppConfig, Fragment, Response, Template
+from chirp import OOB, App, AppConfig, Fragment, Request, Response, Template
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -19,19 +19,54 @@ app = App(
 )
 
 
+def _page_context(*, version: str, compat: bool) -> dict[str, object]:
+    return {
+        "version": version,
+        "compat": compat,
+        "result": "Ready",
+        "count": 0,
+        "target_raw": "",
+        "target_id": "",
+        "source_raw": "",
+        "source_id": "",
+        "source_tag": "",
+        "trigger": "",
+        "trigger_name": "",
+        "request_type": "",
+        "accept": "",
+    }
+
+
 @app.route("/")
 def index():
-    return Template("index.html", version="2", compat=False, result="Ready", count=0)
+    return Template("index.html", **_page_context(version="2", compat=False))
 
 
 @app.route("/v4")
 def htmx4():
-    return Template("index.html", version="4", compat=False, result="Ready", count=0)
+    return Template("index.html", **_page_context(version="4", compat=False))
 
 
 @app.route("/v4-compat")
 def htmx4_compat():
-    return Template("index.html", version="4", compat=True, result="Ready", count=0)
+    return Template("index.html", **_page_context(version="4", compat=True))
+
+
+@app.route("/inspect", methods=["POST"])
+def inspect(request: Request):
+    return Fragment(
+        "index.html",
+        "metadata",
+        target_raw=request.htmx_target or "",
+        target_id=request.htmx_target_id or "",
+        source_raw=request.htmx_source or "",
+        source_id=request.htmx_source_id or "",
+        source_tag=request.htmx_source_tag or "",
+        trigger=request.htmx_trigger or "",
+        trigger_name=request.htmx_trigger_name or "",
+        request_type=request.htmx_request_type or "",
+        accept=request.headers.get("accept", ""),
+    )
 
 
 @app.route("/swap", methods=["POST"])

@@ -13,7 +13,7 @@ import asyncio
 import contextlib
 import inspect
 from collections.abc import Mapping, MutableMapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from chirp.app import App
 from chirp.http.response import Response
@@ -179,6 +179,8 @@ class TestClient:
         method: str = "GET",
         target: str | None = None,
         trigger: str | None = None,
+        source: str | None = None,
+        request_type: Literal["full", "partial"] | None = None,
         history_restore: bool = False,
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
@@ -190,6 +192,10 @@ class TestClient:
             method: HTTP method (default GET).
             target: Sets the ``HX-Target`` header (element ID being targeted).
             trigger: Sets the ``HX-Trigger`` header (element that triggered).
+            source: Sets htmx 4 ``HX-Source`` metadata (for example,
+                ``"button#save"``).
+            request_type: Sets htmx 4 ``HX-Request-Type`` and defaults
+                ``Accept`` to ``text/html``.
             history_restore: If True, sets ``HX-History-Restore-Request: true``
                 to simulate a back/forward navigation cache miss.
             headers: Additional headers to include.
@@ -200,6 +206,11 @@ class TestClient:
             fragment_headers["HX-Target"] = target
         if trigger is not None:
             fragment_headers["HX-Trigger"] = trigger
+        if source is not None:
+            fragment_headers["HX-Source"] = source
+        if request_type is not None:
+            fragment_headers["HX-Request-Type"] = request_type
+            fragment_headers["Accept"] = "text/html"
         if history_restore:
             fragment_headers["HX-History-Restore-Request"] = "true"
         if headers:
@@ -213,6 +224,8 @@ class TestClient:
         target: str,
         method: str = "GET",
         trigger: str | None = None,
+        source: str | None = None,
+        request_type: Literal["full", "partial"] | None = None,
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
     ) -> Response:
@@ -226,6 +239,8 @@ class TestClient:
             target: Element ID sent in ``HX-Target`` (for example, ``"main"``).
             method: HTTP method (default GET).
             trigger: Optional element ID sent in ``HX-Trigger``.
+            source: Optional htmx 4 ``HX-Source`` metadata.
+            request_type: Optional htmx 4 ``HX-Request-Type`` metadata.
             headers: Additional headers to include.
             body: Request body bytes (for POST/PUT).
         """
@@ -235,6 +250,8 @@ class TestClient:
             method=method,
             target=target,
             trigger=trigger,
+            source=source,
+            request_type=request_type,
             headers=boosted_headers,
             body=body,
         )
@@ -509,6 +526,8 @@ class TestClient:
         method: str = "GET",
         target: str | None = None,
         trigger: str | None = None,
+        source: str | None = None,
+        request_type: Literal["full", "partial"] | None = None,
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
     ) -> CapturedStream:
@@ -522,6 +541,11 @@ class TestClient:
             fragment_headers["HX-Target"] = target
         if trigger is not None:
             fragment_headers["HX-Trigger"] = trigger
+        if source is not None:
+            fragment_headers["HX-Source"] = source
+        if request_type is not None:
+            fragment_headers["HX-Request-Type"] = request_type
+            fragment_headers["Accept"] = "text/html"
         if headers:
             fragment_headers.update(headers)
         return await self.request_chunks(method, path, headers=fragment_headers, body=body)

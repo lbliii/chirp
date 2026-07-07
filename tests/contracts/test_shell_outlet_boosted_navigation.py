@@ -41,6 +41,7 @@ def _write_shell_outlet_app(pages: Path, *, outlet: bool = True) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.issue(497)
+@pytest.mark.issue(546)
 async def test_boosted_navigation_to_shell_outlet_includes_selectable_page_content(
     tmp_path: Path,
 ) -> None:
@@ -66,11 +67,21 @@ async def test_boosted_navigation_to_shell_outlet_includes_selectable_page_conte
             ],
         )
         response = responses[("/", "boosted")]
+        htmx4_response = await client.boosted(
+            "/",
+            target="main#main",
+            source="a#sidebar-home",
+            request_type="partial",
+        )
 
     assert response.status == 200
     assert 'id="page-content"' in response.text
     assert 'id="page-root"' in response.text
     assert "Ready" in response.text
+    assert htmx4_response.status == 200
+    assert 'id="page-root"' in htmx4_response.text
+    assert 'id="page-content"' not in htmx4_response.text
+    assert "<!DOCTYPE" not in htmx4_response.text
 
 
 @pytest.mark.asyncio

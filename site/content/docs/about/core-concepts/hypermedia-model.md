@@ -90,8 +90,9 @@ def search(request: Request):
 
 A browser hitting `/search` gets `search.html` rendered in full. An htmx request
 swapping `#results` gets only the `results` block — same handler, same template,
-same data. Chirp adds a `Vary: HX-Request` response header so a cache never serves
-a fragment to a browser or a full page to htmx.
+same data. Chirp adds `Vary: HX-Request, HX-Request-Type` so a cache never serves
+a fragment to a browser, replays the wrong htmx 4 fragment width, or serves a
+full page to a narrow target.
 
 :::{tip}
 `Page` is the negotiating type; `Template` is the always-full-page type. If you

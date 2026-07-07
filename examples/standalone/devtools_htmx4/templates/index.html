@@ -31,10 +31,25 @@
     <button id="failure-button" hx-post="/failure" hx-target="#result" hx-swap="outerHTML">
       Trigger failure
     </button>
+    <button id="inspect-button" name="inspect-action" hx-post="/inspect" hx-target="#metadata" hx-swap="outerHTML">
+      Inspect request metadata
+    </button>
     <span id="safe-target-probe" hx-post="/swap" hx-trigger="probe from:body">Safe target</span>
 
     {% block result %}<div id="result" data-island="lifecycle-probe"><p>{{ result }}</p></div>{% endblock %}
     {% block counter %}<p id="counter">OOB count: {{ count }}</p>{% endblock %}
+    {% block metadata %}<div
+      id="metadata"
+      data-target-raw="{{ target_raw }}"
+      data-target-id="{{ target_id }}"
+      data-source-raw="{{ source_raw }}"
+      data-source-id="{{ source_id }}"
+      data-source-tag="{{ source_tag }}"
+      data-trigger="{{ trigger }}"
+      data-trigger-name="{{ trigger_name }}"
+      data-request-type="{{ request_type }}"
+      data-accept="{{ accept }}"
+    >Request metadata</div>{% endblock %}
   </main>
 </body>
 </html>

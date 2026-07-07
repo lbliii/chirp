@@ -79,9 +79,13 @@ The `Request` object exposes typed properties for reacting to htmx requests. Use
 * - `request.is_htmx`
   - Any htmx request (`HX-Request` header present).
 * - `request.is_narrow_fragment`
-  - A narrow htmx swap — excludes boosted navigations and history restores.
+  - A narrow htmx swap — excludes boosted navigations, history restores, and htmx 4 body-level `full` requests.
 * - `request.htmx_target_id`
-  - Returns the target element id (no leading `#`), or `None`.
+  - Normalizes `div#results`, `#results`, or legacy `results` to `results`; malformed or tag-only values return `None`.
+* - `request.htmx_source_id`
+  - Returns the id parsed from htmx 4 `HX-Source: tag#id`, or `None`.
+* - `request.htmx_request_type`
+  - Validated htmx 4 `full` / `partial` metadata, or `None`.
 * - `request.is_history_restore`
   - htmx is restoring from history (cache miss on back/forward).
 :::

@@ -230,10 +230,10 @@ def _render_composition(
 ) -> Response:
     """Shared 5-step pipeline: shell updates → plan → execute → serialize → response.
 
-    Sets ``Vary: HX-Request`` because the response varies depending on
-    whether the request is a full-page load or an htmx fragment request.
-    Without this, HTTP caches may serve a cached fragment to a full-page
-    request (or vice versa).
+    Sets ``Vary: HX-Request, HX-Request-Type`` because the response varies by
+    htmx transport and by htmx 4 full/partial intent. Without this, HTTP caches
+    may replay the wrong fragment width or serve a fragment to a full-page
+    request.
     """
     shell_updates = compute_shell_region_updates(composition, request, fragment_target_registry)
     plan = build_render_plan(
@@ -264,7 +264,7 @@ def _render_composition(
         context_keys=_context_keys(plan.main_view.context),
         notes=(f"plan_intent={plan.intent}",),
     )
-    return _html_response(html, intent=intent).with_vary("HX-Request")
+    return _html_response(html, intent=intent).with_vary("HX-Request", "HX-Request-Type")
 
 
 def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:

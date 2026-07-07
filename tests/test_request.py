@@ -253,6 +253,21 @@ class TestRequestProperties:
         req = Request.from_asgi(scope, _make_receive())
         assert req.htmx_target_id == "results"
 
+    @pytest.mark.issue(546)
+    def test_htmx_target_id_tagged_htmx4(self) -> None:
+        scope = _make_scope(
+            headers=[
+                (b"hx-request", b"true"),
+                (b"hx-request-type", b"partial"),
+                (b"hx-target", b"div#results"),
+            ]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+
+        assert req.htmx_target == "div#results"
+        assert req.htmx_target_id == "results"
+        assert req.htmx_target_tag == "div"
+
     def test_htmx_target_id_missing(self) -> None:
         req = Request.from_asgi(_make_scope(), _make_receive())
         assert req.htmx_target_id is None
@@ -266,13 +281,70 @@ class TestRequestProperties:
     def test_htmx_target_id_double_hash(self) -> None:
         scope = _make_scope(headers=[(b"hx-target", b"##panel")])
         req = Request.from_asgi(scope, _make_receive())
-        assert req.htmx_target_id == "panel"
+        assert req.htmx_target_id is None
+
+    @pytest.mark.issue(546)
+    @pytest.mark.parametrize(
+        "raw",
+        [b"#main child", b"div##main", b"<div>#main", b"div#", b"   "],
+    )
+    def test_htmx_target_id_rejects_malformed_or_selector_values(self, raw: bytes) -> None:
+        scope = _make_scope(headers=[(b"hx-target", raw)])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target_id is None
+
+    @pytest.mark.issue(546)
+    def test_htmx4_tag_only_target_is_targetless(self) -> None:
+        scope = _make_scope(headers=[(b"hx-request-type", b"partial"), (b"hx-target", b"div")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_target == "div"
+        assert req.htmx_target_id is None
+        assert req.htmx_target_tag == "div"
 
     def test_htmx_trigger(self) -> None:
         scope = _make_scope(headers=[(b"hx-trigger", b"search-input")])
         req = Request.from_asgi(scope, _make_receive())
 
         assert req.htmx_trigger == "search-input"
+
+    @pytest.mark.issue(546)
+    def test_htmx_source_metadata_and_trigger_fallback(self) -> None:
+        scope = _make_scope(headers=[(b"hx-source", b"button#search-input")])
+        req = Request.from_asgi(scope, _make_receive())
+
+        assert req.htmx_source == "button#search-input"
+        assert req.htmx_source_tag == "button"
+        assert req.htmx_source_id == "search-input"
+        assert req.htmx_trigger == "search-input"
+
+    @pytest.mark.issue(546)
+    def test_legacy_trigger_wins_when_compat_sends_both(self) -> None:
+        scope = _make_scope(
+            headers=[
+                (b"hx-trigger", b"legacy-trigger"),
+                (b"hx-source", b"button#fetch-source"),
+            ]
+        )
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_trigger == "legacy-trigger"
+        assert req.htmx_source_id == "fetch-source"
+
+    @pytest.mark.issue(546)
+    def test_source_without_id_preserves_tag_but_has_no_id(self) -> None:
+        scope = _make_scope(headers=[(b"hx-source", b"form")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_source_tag == "form"
+        assert req.htmx_source_id is None
+        assert req.htmx_trigger is None
+
+    @pytest.mark.issue(546)
+    def test_malformed_source_fails_safely(self) -> None:
+        scope = _make_scope(headers=[(b"hx-source", b"button##submit")])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_source == "button##submit"
+        assert req.htmx_source_tag is None
+        assert req.htmx_source_id is None
+        assert req.htmx_trigger is None
 
     def test_htmx_trigger_name(self) -> None:
         scope = _make_scope(headers=[(b"hx-trigger-name", b"search-field")])
@@ -283,6 +355,67 @@ class TestRequestProperties:
     def test_htmx_trigger_name_missing(self) -> None:
         req = Request.from_asgi(_make_scope(), _make_receive())
         assert req.htmx_trigger_name is None
+
+    @pytest.mark.issue(546)
+    @pytest.mark.parametrize(("raw", "expected"), [(b"partial", "partial"), (b"FULL", "full")])
+    def test_htmx_request_type(self, raw: bytes, expected: str) -> None:
+        scope = _make_scope(headers=[(b"hx-request-type", raw)])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_request_type == expected
+
+    @pytest.mark.issue(546)
+    @pytest.mark.parametrize("raw", [b"", b"fragment", b"full-page"])
+    def test_malformed_htmx_request_type_returns_none(self, raw: bytes) -> None:
+        scope = _make_scope(headers=[(b"hx-request-type", raw)])
+        req = Request.from_asgi(scope, _make_receive())
+        assert req.htmx_request_type is None
+
+    @pytest.mark.issue(546)
+    def test_full_request_type_is_wide_only_for_body_level_target(self) -> None:
+        body = Request.from_asgi(
+            _make_scope(
+                headers=[
+                    (b"hx-request", b"true"),
+                    (b"hx-request-type", b"full"),
+                    (b"hx-target", b"body"),
+                ]
+            ),
+            _make_receive(),
+        )
+        narrow = Request.from_asgi(
+            _make_scope(
+                headers=[
+                    (b"hx-request", b"true"),
+                    (b"hx-request-type", b"full"),
+                    (b"hx-target", b"div#results"),
+                ]
+            ),
+            _make_receive(),
+        )
+        malformed = Request.from_asgi(
+            _make_scope(
+                headers=[
+                    (b"hx-request", b"true"),
+                    (b"hx-request-type", b"full"),
+                    (b"hx-target", b"#results child"),
+                ]
+            ),
+            _make_receive(),
+        )
+        narrow_body_id = Request.from_asgi(
+            _make_scope(
+                headers=[
+                    (b"hx-request", b"true"),
+                    (b"hx-request-type", b"full"),
+                    (b"hx-target", b"div#body"),
+                ]
+            ),
+            _make_receive(),
+        )
+        assert body.is_narrow_fragment is False
+        assert narrow.is_narrow_fragment is True
+        assert malformed.is_narrow_fragment is True
+        assert narrow_body_id.is_narrow_fragment is True
 
     def test_is_history_restore_true(self) -> None:
         scope = _make_scope(headers=[(b"hx-history-restore-request", b"true")])

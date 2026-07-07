@@ -157,6 +157,47 @@ def _exercise(page: Page, url: str) -> None:
     history = page.evaluate("() => window.ChirpHtmxDebug.getState().historyEvents.slice()")
     assert len([event for event in history if event["kind"] == "push"]) == 1
 
+    page.locator("#inspect-button").click()
+    page.wait_for_function(
+        """() => {
+          const metadata = document.querySelector('#metadata');
+          const records = window.ChirpHtmxDebug.getState().records;
+          return metadata?.dataset.targetId === 'metadata' &&
+            metadata?.dataset.trigger === 'inspect-button' &&
+            records.some(record => record.path.includes('/inspect') && record.status === 200);
+        }""",
+        timeout=_TIMEOUT_MS,
+    )
+    metadata = page.locator("#metadata")
+    inspect_records = page.evaluate(
+        """() => window.ChirpHtmxDebug.getState().records
+          .filter(record => record.path.includes('/inspect'))"""
+    )
+    assert len(inspect_records) == 1, inspect_records
+    headers = {name.lower(): value for name, value in inspect_records[0]["requestHeaders"].items()}
+    assert metadata.get_attribute("data-target-id") == "metadata"
+    assert metadata.get_attribute("data-trigger") == "inspect-button"
+    if "/v4" in url:
+        assert metadata.get_attribute("data-target-raw") == "div#metadata"
+        assert metadata.get_attribute("data-source-raw") == "button#inspect-button"
+        assert metadata.get_attribute("data-source-id") == "inspect-button"
+        assert metadata.get_attribute("data-source-tag") == "button"
+        assert metadata.get_attribute("data-trigger-name") == ""
+        assert metadata.get_attribute("data-request-type") == "partial"
+        assert metadata.get_attribute("data-accept") == "text/html"
+        assert headers["hx-target"] == "div#metadata"
+        assert headers["hx-source"] == "button#inspect-button"
+        assert headers["hx-request-type"] == "partial"
+        assert headers["accept"] == "text/html"
+    else:
+        assert metadata.get_attribute("data-target-raw") == "metadata"
+        assert metadata.get_attribute("data-source-raw") == ""
+        assert metadata.get_attribute("data-source-id") == ""
+        assert metadata.get_attribute("data-trigger-name") == "inspect-action"
+        assert metadata.get_attribute("data-request-type") == ""
+        assert headers["hx-target"] == "metadata"
+        assert headers["hx-trigger"] == "inspect-button"
+
     page.locator("#failure-button").click()
     page.wait_for_function(
         """() => window.ChirpHtmxDebug.getState().records.some(
