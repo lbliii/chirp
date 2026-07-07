@@ -320,7 +320,7 @@ dev = [
     "chirp-ui>=0.11.0",         # Layout macros for llm_playground example tests
 ]
 browser = [
-    "playwright>=1.49.0",       # Lucky Cat browser smoke — install with: uv sync --group dev --group browser
+    "playwright==1.61.0",       # Chrome for Testing 149 WebMCP/fallback lane; install with: uv sync --group dev --group browser
 ]
 
 # =============================================================================

@@ -139,6 +139,10 @@ submission path. Mutation forms cannot enable the toolautosubmit attribute.
 The webmcp startup contract category validates the projection and its native
 fallback as ERROR-only safety diagnostics. `chirp check --json --coverage` and
 contract diffs include declared/compiled projection and parameter counters.
+Compatibility is limited to the pinned declarative vocabulary. Chrome 149's
+origin trial/local testing flag is experimental; newer select and
+`SubmitEvent.agentInvoked`/`respondWith()` behavior is not supported. Mutation
+projection never changes server auth, CSRF, validation, or confirmation.
 
 ## 1.0 Audit Decisions
 
