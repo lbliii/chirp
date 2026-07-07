@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -19,9 +19,11 @@ sync fallback; path-scoped `Allow`/`Accept-Query` and automatic `OPTIONS`
 discovery; exact redirect status preservation; equivalent-resource headers;
 and shared GET/QUERY ETag and Last-Modified evaluation. Issue #529 proves the
 existing Page, Fragment, OOB, Stream, Suspense, validation, redirect, and
-DevTools paths without adding a QUERY-specific render surface. Client and page
-ergonomics, caching, deployment, and promotion remain owned by #527-#535. This
-advances the #525 receipt's original #526-#535
+DevTools paths without adding a QUERY-specific render surface. Issue #530 adds
+the collision-safe request key and body-reuse proof while leaving cache reads
+and writes disabled until #531. Client and page ergonomics, cache opt-in,
+deployment, and promotion remain owned by #527-#535. This advances the #525
+receipt's original #526-#535
 delivery range without changing its request-contract claim. Discovery/`OPTIONS`
 and the response semantics described below are now executable behavior.
 
@@ -429,19 +431,53 @@ method, path, URI query, and htmx shape, but not the body or content metadata.
 Therefore:
 
 - `CacheMiddleware` continues to bypass every non-GET request;
-- built-in key functions are not advertised as safe for QUERY;
-- no QUERY response is stored until #530 lands a deterministic key including
-  exact body bytes, content type and parameters, content encoding, target
-  path/query, response `Accept`, configured vary inputs, htmx/full-page shape,
-  target, authorization/cookie bypass, and other selected-representation
-  metadata; and
+- the asynchronous, provisional `chirp.cache.key.query_cache_key()` design is
+  safe to evaluate for eligible QUERY requests, but is not yet wired into
+  middleware;
+- its versioned SHA-256 input uses length-framed exact body bytes, content type
+  and parameters, content encoding, target path/query, `Accept`, configured
+  vary inputs, htmx/full-page/boost/history shape, target ID, and htmx partial
+  name;
+- the returned `chirp:query:v1:<digest>` string exposes none of the raw URI,
+  body, or header values;
+- Cookie and Authorization requests are rejected as ineligible, preserving the
+  existing private-request bypass; and
 - #531 may add explicit opt-in caching only after collision, body-reuse,
   privacy, streaming bypass, validator, backend-failure, and contention proof.
 
-Semantic normalization is off by default. A future normalization hook must be
+`query_cache_key()` reads through `Request.body()`. The application's existing
+`max_request_body_size` is therefore the only body-buffer limit, and the bytes
+remain in the request-local body cache for the handler. The key must be built
+before any direct iteration of `request.stream()`; #531 owns that middleware
+lifecycle placement. The hash has no shared mutable state, so independent
+requests remain isolated under free-threaded execution.
+
+Semantic normalization is off. Media-type spelling, parameters, encodings, and
+body bytes are keyed exactly, accepting safe false misses instead of unsafe
+equivalence. A future normalization hook must be
 media-type-specific, affect only the key, honor `no-transform` as required by
 the accepted policy, and prove it cannot collapse semantically distinct
 queries. Raw sensitive content must never appear in cache key strings or logs.
+
+### #530 synthetic cost and memory receipt
+
+On 2026-07-07, a focused in-process measurement on arm64 macOS used CPython
+3.14.2t with the GIL disabled. Each median covers seven repeats. “Warm” rehashes
+an already request-cached body; “cold fragmented” constructs a request with
+16 KiB ASGI chunks, buffers it through `Request.body()`, then hashes it.
+`tracemalloc` reports peak additional traced memory during one cold key call
+after the request and its input chunks are constructed.
+
+| Exact body size | Warm median | Cold fragmented median | Cold peak extra |
+| ---: | ---: | ---: | ---: |
+| 1 KiB | 9.6 µs | 19.2 µs | 1.8 KiB |
+| 64 KiB | 30.3 µs | 42.2 µs | 65.4 KiB |
+| 1 MiB | 345.7 µs | 401.8 µs | 1.01 MiB |
+
+This is a synthetic implementation receipt, not a production throughput
+claim. The result shows the expected linear hashing cost and, on the cold path,
+one request-lifetime body buffer bounded by `max_request_body_size`. #531 must
+measure the complete middleware hit/miss path before enabling QUERY caching.
 
 ## 11. Browser and progressive-enhancement boundary
 
@@ -579,7 +615,8 @@ same issue named in the matrix rather than a second QUERY-only abstraction.
 | #526 response semantics | `src/chirp/routing/router.py`, `src/chirp/server/`, `src/chirp/http/response.py` | 405/OPTIONS/header tests; redirect transport matrix; conditional response tests; protocol docs and changelog |
 | #527/#528 ergonomics | `src/chirp/testing/`, `src/chirp/pages/`, approved client integration | helper and discovery tests; browser test with GET fallback; testing/pages/client docs and changelog |
 | #529 render proof | existing negotiation, DevTools, and contract surfaces; render pipeline only after a separate check-in | `tests/contracts/` through `TestClient`; htmx/non-htmx, missing-block, stream, sync/async, and browser DevTools proof |
-| #530/#531 cache | `src/chirp/cache/key.py`, `src/chirp/cache/middleware.py`, backends | collision/property/body-reuse/private-request/stream/concurrency tests; cost measurement; cache docs and changelog |
+| #530 cache key | `src/chirp/cache/key.py` | collision/property/body-reuse/private-request/process-stability tests; focused cost/memory measurement; cache docs and changelog |
+| #531 cache opt-in | `src/chirp/cache/middleware.py`, backends | explicit opt-in, stream/validator/backend-failure/contention tests; complete middleware measurement |
 | #532 deployment | CORS middleware and external Pounce/ASGI/intermediary harnesses | browser preflight, available HTTP versions, retry and proxy behavior; deployment fallback docs |
 | #533 contracts | `src/chirp/contracts/`, route explorer, autodoc, surface diff, freeze/speculation | `tests/contracts/`, freeze/speculation non-execution tests, existing-severity regression tests; contract docs and changelog |
 | #534/#535 adoption | executable complex-search example and canonical docs/site sources | example smoke/browser tests, docs link checks, release gate and compatibility statement |
