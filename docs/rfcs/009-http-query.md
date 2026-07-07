@@ -1,6 +1,6 @@
 # RFC 009: HTTP QUERY Contract And Compatibility Tier
 
-**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design implemented; remaining delivery gates pending
+**Status:** Accepted — #525 request contract implemented; #526 response contract implemented; #529 render/DevTools proof implemented; #530 cache-key design and #531 explicit cache opt-in implemented; remaining delivery gates pending
 **Issue:** [#524](https://github.com/lbliii/chirp/issues/524)
 **Saga:** [#519](https://github.com/lbliii/chirp/issues/519)
 **Standard:** [RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)
@@ -442,8 +442,14 @@ Therefore:
   body, or header values;
 - Cookie and Authorization requests are rejected as ineligible, preserving the
   existing private-request bypass; and
-- #531 may add explicit opt-in caching only after collision, body-reuse,
-  privacy, streaming bypass, validator, backend-failure, and contention proof.
+- `CacheMiddleware(query_key_func=...)` is the sole experimental opt-in; `None`
+  and the `AppConfig`-managed middleware remain GET-only;
+- eligible 200 buffered responses retain content type, headers, render intent,
+  and htmx variance, while streaming/SSE and `Set-Cookie` responses bypass;
+- cached hits re-evaluate ETag and Last-Modified preconditions, preserving
+  bodyless 304/412 behavior and representation headers; and
+- backend failures log and fail open, while the optional Redis backend gives an
+  actionable `bengal-chirp[redis]` install command when its extra is absent.
 
 `query_cache_key()` reads through `Request.body()`. The application's existing
 `max_request_body_size` is therefore the only body-buffer limit, and the bytes
@@ -478,6 +484,31 @@ This is a synthetic implementation receipt, not a production throughput
 claim. The result shows the expected linear hashing cost and, on the cold path,
 one request-lifetime body buffer bounded by `max_request_body_size`. #531 must
 measure the complete middleware hit/miss path before enabling QUERY caching.
+
+### #531 cache lifecycle receipt
+
+Applications opt in manually while QUERY remains experimental:
+
+```python
+from chirp.cache.backends.memory import MemoryCacheBackend
+from chirp.cache.key import query_cache_key
+from chirp.cache.middleware import CacheMiddleware
+
+app.add_middleware(
+    CacheMiddleware(
+        MemoryCacheBackend(),
+        ttl=60,
+        query_key_func=query_cache_key,
+    )
+)
+```
+
+Supplying a wrapper around `query_cache_key()` can add configured vary headers.
+TTL expiry and backend `delete()`/`clear()` remain the invalidation mechanisms;
+cache entries are response snapshots, not durable query resources. Equivalent
+GET resources continue using the ordinary GET key and the same validator
+evaluator. No `AppConfig` field was added, so global config-managed caching
+does not silently opt experimental QUERY routes in.
 
 ## 11. Browser and progressive-enhancement boundary
 

@@ -1,4 +1,4 @@
-"""Cache middleware — site-wide GET response caching.
+"""Cache middleware — site-wide GET and explicit QUERY response caching.
 
 Opt-in via ``cache_middleware_enabled = True`` in config.
 Only caches GET requests that return 200 with no Set-Cookie header.
@@ -8,10 +8,11 @@ Requests carrying Cookie or Authorization bypass the cache entirely.
 import base64
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from chirp.http.request import Request
-from chirp.http.response import Response
+from chirp.http.response import RenderIntent, Response
 from chirp.middleware.protocol import AnyResponse, Next
 
 from .key import default_cache_key
@@ -38,10 +39,11 @@ class _CachedResponse:
     body: bytes
     content_type: str
     headers: tuple[tuple[str, str], ...]
+    render_intent: RenderIntent = "unknown"
 
 
 class CacheMiddleware:
-    """Site-wide cache for GET 200 responses.
+    """Site-wide cache for GET and explicitly opted-in QUERY 200 responses.
 
     Skips caching for:
     - Non-GET requests
@@ -51,20 +53,37 @@ class CacheMiddleware:
     - Streaming/SSE responses
     """
 
-    __slots__ = ("_backend", "_key_func", "_ttl")
+    __slots__ = ("_backend", "_key_func", "_query_key_func", "_ttl")
 
-    def __init__(self, backend, ttl: int = 300, key_func=None) -> None:
+    def __init__(
+        self,
+        backend,
+        ttl: int = 300,
+        key_func=None,
+        *,
+        query_key_func: Callable[[Request], Awaitable[str]] | None = None,
+    ) -> None:
         self._backend = backend
         self._ttl = ttl
         self._key_func = key_func or default_cache_key
+        self._query_key_func = query_key_func
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
-        if request.method != "GET":
+        query_key_func = self._query_key_func
+        if request.method == "QUERY":
+            if query_key_func is None:
+                return await next(request)
+        elif request.method != "GET":
             return await next(request)
         if _has_private_request_headers(request):
             return await next(request)
 
-        key = self._key_func(request)
+        if request.method == "QUERY":
+            if query_key_func is None:
+                return await next(request)
+            key = await query_key_func(request)
+        else:
+            key = self._key_func(request)
 
         # Try cache
         try:
@@ -76,12 +95,16 @@ class CacheMiddleware:
         if cached is not None:
             try:
                 cached_response = _decode_cached_response(cached)
-                return Response(
+                response = Response(
                     cached_response.body,
                     status=200,
                     content_type=cached_response.content_type,
                     headers=cached_response.headers,
+                    render_intent=cached_response.render_intent,
                 )
+                from chirp.server.conditional import evaluate_conditional_response
+
+                return evaluate_conditional_response(request, response)
             except Exception:
                 logger.warning("Cache decode error for %s", key, exc_info=True)
 
@@ -107,6 +130,7 @@ class CacheMiddleware:
                     body=body,
                     content_type=response.content_type,
                     headers=_cacheable_response_headers(response.headers),
+                    render_intent=response.render_intent,
                 )
                 await self._backend.set(key, _encode_cached_response(cached_response), self._ttl)
             except Exception:
@@ -117,7 +141,7 @@ class CacheMiddleware:
 
 def _has_private_request_headers(request: Request) -> bool:
     """Return True for request headers that commonly vary per user."""
-    return bool(request.headers.get("cookie") or request.headers.get("authorization"))
+    return any(request.headers.get_list("cookie")) or any(request.headers.get_list("authorization"))
 
 
 def _cacheable_response_headers(
@@ -139,6 +163,7 @@ def _encode_cached_response(response: _CachedResponse) -> bytes:
         "body": base64.b64encode(response.body).decode("ascii"),
         "content_type": response.content_type,
         "headers": list(response.headers),
+        "render_intent": response.render_intent,
     }
     return _CACHE_ENTRY_PREFIX + json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
@@ -149,6 +174,7 @@ def _decode_cached_response(value: bytes) -> _CachedResponse:
             body=value,
             content_type="text/html; charset=utf-8",
             headers=(),
+            render_intent="unknown",
         )
     payload = json.loads(value[len(_CACHE_ENTRY_PREFIX) :].decode("utf-8"))
     return _CachedResponse(
@@ -157,4 +183,13 @@ def _decode_cached_response(value: bytes) -> _CachedResponse:
         headers=_cacheable_response_headers(
             tuple((str(name), str(header_value)) for name, header_value in payload["headers"])
         ),
+        render_intent=_decode_render_intent(payload.get("render_intent")),
     )
+
+
+def _decode_render_intent(value: object) -> RenderIntent:
+    if value == "full_page":
+        return "full_page"
+    if value == "fragment":
+        return "fragment"
+    return "unknown"

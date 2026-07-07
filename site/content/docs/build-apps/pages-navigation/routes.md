@@ -137,12 +137,18 @@ intent, timing, streaming metadata, and errors. Programmatic clients can use
 `htmx.ajax("QUERY", path, context)` while declarative QUERY transport remains a
 separate compatibility gate.
 
-`CacheMiddleware` still bypasses QUERY. Chirp has a collision-safe internal key
-design that hashes the exact request body, media metadata, target URI, `Accept`,
-configured vary headers, and htmx render shape without exposing raw request
-content. Building that key retains the body for the handler and uses the normal
-request-body limit, but it does not enable cache reads or writes. Explicit
-QUERY cache opt-in and full middleware proof remain a separate gate.
+`CacheMiddleware` bypasses QUERY unless an explicit query key callback is
+provided. Chirp's collision-safe key hashes the exact request body, media
+metadata, target URI, `Accept`, configured vary headers, and htmx render shape
+without exposing raw request content. Building the key retains the body for the
+handler and uses the normal request-body limit.
+
+To opt in explicitly, manually register `CacheMiddleware` with
+`query_key_func=query_cache_key`. The default `None` and
+`AppConfig(cache_middleware_enabled=True)` remain GET-only. Only eligible 200
+buffered responses are stored; Cookie, Authorization, `Set-Cookie`, streaming,
+and SSE paths bypass. Cached QUERY hits preserve response headers and render
+intent and re-evaluate ETag/Last-Modified conditions.
 
 See [RFC 009](https://github.com/lbliii/chirp/blob/main/docs/rfcs/009-http-query.md)
 for the compatibility tier and remaining promotion gates.

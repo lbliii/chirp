@@ -22,7 +22,13 @@ class RedisCacheBackend:
         self._redis: Any = None
 
     async def connect(self) -> None:
-        import redis.asyncio as aioredis
+        try:
+            import redis.asyncio as aioredis
+        except ImportError as exc:
+            raise RuntimeError(
+                "Redis cache support requires the optional redis extra. "
+                "Install it with: pip install 'bengal-chirp[redis]'"
+            ) from exc
 
         self._redis = aioredis.from_url(self._url)
 
