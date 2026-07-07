@@ -116,6 +116,16 @@ def test_htmx_debug_js_v3_render_plan() -> None:
     assert "X-Chirp-Render-Plan" in HTMX_DEBUG_BOOT_JS
     assert "decodeRenderPlan" in HTMX_DEBUG_BOOT_JS
     assert "formatRenderPlan" in HTMX_DEBUG_BOOT_JS
+
+
+@pytest.mark.issue(511)
+def test_devtools_exports_compiled_transition_evidence_and_coverage() -> None:
+    assert "transitionTraces" in HTMX_DEBUG_BOOT_JS
+    assert "compiledTransitionIds" in HTMX_DEBUG_BOOT_JS
+    assert "transitionDescriptions" in HTMX_DEBUG_BOOT_JS
+    assert "buildTransitionCoverage" in HTMX_DEBUG_BOOT_JS
+    assert "CH.transitionCoverage" in HTMX_DEBUG_BOOT_JS
+    assert "Compiled Transitions" in HTMX_DEBUG_BOOT_JS
     assert "renderPlan" in HTMX_DEBUG_BOOT_JS
 
 

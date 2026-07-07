@@ -412,6 +412,8 @@ function renderPanel() {
           historyEvents: state.historyEvents,
           sseConnections: state.sseConnections,
           sseEvents: state.sseEvents,
+          transitionTraces: state.transitionTraces,
+          transitionCoverage: buildTransitionCoverage([]),
           vtEvents: state.vtEvents,
         }, null, 2);
         copyText(payload);
@@ -613,6 +615,13 @@ function renderActivityLog() {
 
       if (r.returnTrace) {
         dc.appendChild(hlSection("Return Trace", hlJSON(esc(JSON.stringify(r.returnTrace, null, 2))), false));
+        if (r.returnTrace.transition_descriptions && r.returnTrace.transition_descriptions.length) {
+          dc.appendChild(hlSection(
+            "Compiled Transitions (" + r.returnTrace.transition_descriptions.length + ")",
+            esc(r.returnTrace.transition_descriptions.join("\n")),
+            true
+          ));
+        }
       }
 
       if (r.signalEmits && r.signalEmits.length) {

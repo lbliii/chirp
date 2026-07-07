@@ -5,17 +5,18 @@ to typed Request objects, dispatches through middleware and routing,
 and sends Response back through ASGI send().
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable, Mapping
 from contextvars import Token
 from dataclasses import replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kida import Environment
 
 from chirp._internal.asgi import Receive, Scope, Send
 from chirp._internal.invoke import invoke
 from chirp._internal.invoke_plan import InvokePlan
-from chirp.app.state import RuntimeDebugWiring
 from chirp.context import force_inline_sync_var, g, request_var
 from chirp.errors import HTTPError
 from chirp.http.request import Request
@@ -56,8 +57,16 @@ from chirp.server.sender import send_file_response, send_response, send_streamin
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import _active_kida_env
 from chirp.templating.oob_registry import OOBRegistry
-from chirp.templating.trace import encode_return_trace, get_return_trace
+from chirp.templating.trace import (
+    encode_return_trace,
+    get_return_trace,
+    stash_return_trace_for_request,
+)
 from chirp.tools.registry import ToolRegistry
+
+if TYPE_CHECKING:
+    from chirp.app.hypermedia_program import HypermediaProgram
+    from chirp.app.state import RuntimeDebugWiring
 
 
 def compile_middleware_chain(
@@ -201,6 +210,7 @@ def create_request_handler(
     health_path: str | None = None,
     ready_path: str | None = None,
     probe_state: Any | None = None,
+    hypermedia_program: HypermediaProgram | None = None,
 ) -> Callable[[Request], Any]:
     """Build the full middleware + dispatch chain once. Reuse per request.
 
@@ -372,6 +382,7 @@ def create_request_handler(
             suspense_error_template=suspense_error_template,
             suspense_error_block=suspense_error_block,
             fragment_block=fragment_block,
+            hypermedia_program=hypermedia_program if debug else None,
         )
 
     chain = compile_middleware_chain(middleware, dispatch)
@@ -492,6 +503,21 @@ async def handle_request(
         force_inline_sync_var.reset(sync_token)
         _active_kida_env.reset(env_token)
 
+    if debug and debug_wiring is not None and debug_wiring.trace_store is not None:
+        return_trace = get_return_trace(request)
+        if return_trace is not None and return_trace.route_path is not None:
+            spec = debug_wiring.internal_route_for_path(request.path)
+            internal = spec is not None and spec.visibility != "user"
+            owner = spec.owner if spec is not None else "app"
+            debug_wiring.trace_store.record_http(
+                phase="response",
+                path=return_trace.route_path,
+                request_id=request.request_id,
+                internal=internal,
+                owner=owner,
+                data=return_trace.payload(),
+            )
+
     # Dispatch based on response type — X-Request-ID injected at send time
     # to avoid an extra Response clone + tuple allocation per request.
     rid = request.request_id
@@ -579,6 +605,7 @@ async def _invoke_handler(
     suspense_error_template: str | None = None,
     suspense_error_block: str = "fallback",
     fragment_block: str | None = None,
+    hypermedia_program: HypermediaProgram | None = None,
 ) -> AnyResponse:
     """Call the matched route handler, converting path params and return value."""
     handler = match.route.handler
@@ -642,6 +669,25 @@ async def _invoke_handler(
         suspense_error_block=suspense_error_block,
     )
     validate_query_response(match.route, request, response)
+    if hypermedia_program is not None:
+        return_trace = get_return_trace(request)
+        if return_trace is not None:
+            from chirp.server.transition_trace import correlate_return_trace
+
+            response_status = getattr(response, "status", 200)
+            if not isinstance(response_status, int):
+                response_status = 200
+
+            stash_return_trace_for_request(
+                correlate_return_trace(
+                    return_trace,
+                    request=request,
+                    route=match.route,
+                    program=hypermedia_program,
+                    status=response_status,
+                ),
+                request,
+            )
     return response
 
 

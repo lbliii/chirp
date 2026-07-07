@@ -53,6 +53,12 @@ from chirp.testing.link_crawl import (
 )
 from chirp.testing.route_smoke import RouteSmokeCase, assert_route_smoke
 from chirp.testing.sse import SSETestResult, assert_sse_wired, extract_sse_attrs
+from chirp.testing.transitions import (
+    TransitionCoverage,
+    TransitionObservation,
+    transition_coverage,
+    transition_observation,
+)
 
 __all__ = [
     "CapturedStream",
@@ -62,6 +68,8 @@ __all__ = [
     "RouteSmokeCase",
     "SSETestResult",
     "TestClient",
+    "TransitionCoverage",
+    "TransitionObservation",
     "assert_alpine_booted",
     "assert_fragment_contains",
     "assert_fragment_not_contains",
@@ -96,4 +104,6 @@ __all__ = [
     "openai_tool_call",
     "require_playwright",
     "same_origin_paths",
+    "transition_coverage",
+    "transition_observation",
 ]

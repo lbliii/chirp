@@ -120,6 +120,15 @@ hardens and documents that surface:
 | Cache helpers | Keep provisional | Backend behavior and cache-key semantics need a public contract before stabilization. |
 | `use_chirp_ui` bridge | Keep provisional | It couples this package to `chirp-ui` runtime and manifest behavior. |
 
+## `chirp.testing` Module Surface
+
+Testing helpers are imported from `chirp.testing`, not from the top-level
+`chirp` namespace. `TransitionObservation`, `TransitionCoverage`,
+`transition_observation`, and `transition_coverage` are provisional debug/test
+evidence helpers. They consume real debug responses, correlate them with opaque
+compiled transition IDs, and report only caller-declared coverage expectations;
+they do not replace browser behavior tests.
+
 ## `chirp.security` Module Surface
 
 A few public helpers live on the `chirp.security` module rather than the top-level
