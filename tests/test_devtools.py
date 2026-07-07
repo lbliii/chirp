@@ -165,6 +165,8 @@ def test_htmx_debug_js_maps_htmx2_and_htmx4_lifecycle_events() -> None:
     assert "historyEvents" in HTMX_DEBUG_BOOT_JS
     assert "recordOobSwap" in HTMX_DEBUG_BOOT_JS
     assert "Array.isArray(d.tasks)" in HTMX_DEBUG_BOOT_JS
+    assert "ctx.text != null ? ctx.text : (d.xhr && d.xhr.responseText)" in HTMX_DEBUG_BOOT_JS
+    assert "ctx.text != null ? ctx.text : response.responseText" not in HTMX_DEBUG_BOOT_JS
 
 
 def test_htmx_debug_js_inspector_shows_inheritance_sources() -> None:

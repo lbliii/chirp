@@ -63,7 +63,11 @@ def base_url() -> Iterator[str]:
                 with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310
                     if response.status == 200:
                         break
-            except urllib.error.URLError, ConnectionError, OSError:
+            except (
+                urllib.error.URLError,
+                ConnectionError,
+                OSError,
+            ):
                 time.sleep(0.25)
         else:
             raise RuntimeError("server did not come up")

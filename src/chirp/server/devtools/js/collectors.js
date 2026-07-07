@@ -401,7 +401,7 @@ function collectAfterRequest(evt) {
     }
     if (triggerEvents.length) r.hxTriggerEvents = triggerEvents;
 
-    var responseText = ctx.text != null ? ctx.text : response.responseText;
+    var responseText = ctx.text != null ? ctx.text : (d.xhr && d.xhr.responseText);
     if (responseText) {
       var txt = String(responseText);
       r.bodyPreview =
