@@ -433,6 +433,7 @@ function collectAfterRequest(evt) {
     // Extract HX-Trigger events for devtools display
     var triggerHeaders = ["HX-Trigger", "HX-Trigger-After-Settle", "HX-Trigger-After-Swap"];
     var triggerEvents = [];
+    var triggerTier = collectHtmxCompatibility().configuredTier;
     for (var ti = 0; ti < triggerHeaders.length; ti++) {
       var tv = readResponseHeader(response, triggerHeaders[ti]);
       if (tv) {
@@ -441,13 +442,25 @@ function collectAfterRequest(evt) {
           if (typeof parsed === "object" && parsed !== null) {
             for (var ek in parsed) {
               if (Object.prototype.hasOwnProperty.call(parsed, ek)) {
-                triggerEvents.push({ name: ek, phase: triggerHeaders[ti], data: parsed[ek] });
+                triggerEvents.push({
+                  name: ek,
+                  phase: triggerHeaders[ti],
+                  data: parsed[ek],
+                  support: triggerTier === "4-preview" && triggerHeaders[ti] !== "HX-Trigger" ?
+                    "unsupported" : "wire",
+                });
               }
             }
           }
         } catch (e) {
           // Plain string event name
-          triggerEvents.push({ name: tv, phase: triggerHeaders[ti], data: null });
+          triggerEvents.push({
+            name: tv,
+            phase: triggerHeaders[ti],
+            data: null,
+            support: triggerTier === "4-preview" && triggerHeaders[ti] !== "HX-Trigger" ?
+              "unsupported" : "wire",
+          });
         }
       }
     }

@@ -107,4 +107,5 @@ class ASGIRuntime:
             fragment_target_registry=self._runtime.fragment_target_registry,
             url_for=url_for,
             debug_wiring=self._runtime.debug_wiring,
+            htmx_manifest=self._runtime.htmx_manifest,
         )

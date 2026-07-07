@@ -13,7 +13,7 @@ SPIKE = ROOT / "tests" / "spikes" / "test_htmx4_trigger_headers_preview.py"
 def test_rfc_011_records_the_trigger_timing_decision() -> None:
     text = RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Draft" in text
+    assert "**Status:** Implemented for the explicit preview lane" in text
     assert "fail loudly with migration guidance" in text
     assert "### 4. Reject a compatibility adapter" in text
     assert "htmx:before:settle" in text

@@ -19,8 +19,62 @@ threads the nonce onto the tag the same way the Alpine bootstrap does.
 
 import html
 import json
+from dataclasses import dataclass
+from typing import Any
 
 from chirp.app.htmx_manifest import HtmxProvisioningManifest, compile_htmx_manifest
+
+_REMOVED_TIMING_HEADERS = {
+    "hx-trigger-after-swap": (
+        "Response.with_hx_trigger_after_swap()",
+        "htmx:before:settle",
+    ),
+    "hx-trigger-after-settle": (
+        "Response.with_hx_trigger_after_settle()",
+        "htmx:after:settle",
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class HtmxTimingHeaderError(RuntimeError):
+    """Internal fail-loud boundary for response headers removed by htmx 4."""
+
+    header: str
+    version: str
+    helper: str
+    lifecycle_event: str
+
+    def __str__(self) -> str:
+        return (
+            f"{self.header} is unsupported by provisioned htmx {self.version}; "
+            f"{self.helper} is an htmx 2/generic wire helper. For htmx 4, render "
+            f"event data into the target's HTML and read it from an external "
+            f"{self.lifecycle_event} listener. The response was rejected before send."
+        )
+
+
+def enforce_htmx_response_compatibility(
+    response: Any,
+    *,
+    manifest: HtmxProvisioningManifest | None,
+    is_htmx_request: bool,
+) -> Any:
+    """Reject removed timing headers only for a proven managed htmx 4 request."""
+    if manifest is None or manifest.tier != "4-preview":
+        return response
+    headers = getattr(response, "headers", ())
+    for name, _value in headers:
+        removed = _REMOVED_TIMING_HEADERS.get(name.lower())
+        if removed is None:
+            continue
+        if not is_htmx_request:
+            with_vary = getattr(response, "with_vary", None)
+            return with_vary("HX-Request", "HX-Request-Type") if callable(with_vary) else response
+        helper, lifecycle_event = removed
+        canonical = "HX-" + "-".join(part.capitalize() for part in name.split("-")[1:])
+        raise HtmxTimingHeaderError(canonical, manifest.version, helper, lifecycle_event)
+    return response
 
 
 def htmx_manifest_snippet(manifest: HtmxProvisioningManifest, *, nonce: str = "") -> str:

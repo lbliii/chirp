@@ -483,3 +483,30 @@ def test_managed_preview_default_contracts(
         assert "restore" in history_kinds
     finally:
         page.close()
+
+
+@pytest.mark.issue(549)
+def test_preview_timing_migration_uses_rendered_data_and_target_lifecycle(
+    preview_base_url: str,
+    browser,
+) -> None:
+    page = browser.new_page()
+    try:
+        page.goto(preview_base_url, wait_until="load", timeout=_TIMEOUT_MS)
+        page.wait_for_function("() => !!window.htmx && Array.isArray(window.__timingEvents)")
+        page.locator("#timing-load").click()
+        page.wait_for_function("() => window.__timingEvents.length === 2")
+        assert page.evaluate("() => window.__timingEvents") == [
+            {
+                "phase": "before-settle",
+                "event": "dom-updated",
+                "target": "timing-result",
+            },
+            {
+                "phase": "after-settle",
+                "event": "ui-settled",
+                "target": "timing-result",
+            },
+        ]
+    finally:
+        page.close()

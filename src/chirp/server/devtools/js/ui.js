@@ -652,6 +652,7 @@ function renderActivityLog() {
         var tl = r.hxTriggerEvents.map(function(te) {
           var line = te.name;
           if (te.phase !== "HX-Trigger") line += "  (" + te.phase + ")";
+          if (te.support === "unsupported") line += "  [unsupported by htmx 4]";
           if (te.data && te.data !== true) line += "  " + JSON.stringify(te.data);
           return line;
         }).join("\n");

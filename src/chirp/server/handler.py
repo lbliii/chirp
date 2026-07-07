@@ -51,6 +51,7 @@ from chirp.server.fragment_targets_debug import (
     render_fragment_targets_debug,
 )
 from chirp.server.handler_kwargs import build_handler_kwargs
+from chirp.server.htmx import HtmxTimingHeaderError, enforce_htmx_response_compatibility
 from chirp.server.negotiation import negotiate
 from chirp.server.query_protocol import (
     prepare_query_discovery,
@@ -70,6 +71,7 @@ from chirp.templating.trace import (
 from chirp.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
+    from chirp.app.htmx_manifest import HtmxProvisioningManifest
     from chirp.app.hypermedia_program import HypermediaProgram
     from chirp.app.state import RuntimeDebugWiring
 
@@ -439,6 +441,7 @@ async def handle_request(
     fragment_target_registry: FragmentTargetRegistry | None = None,
     url_for: Callable[..., str] | None = None,
     debug_wiring: RuntimeDebugWiring | None = None,
+    htmx_manifest: HtmxProvisioningManifest | None = None,
 ) -> None:
     """Process a single HTTP request through the full pipeline."""
     if scope["type"] != "http":
@@ -477,6 +480,11 @@ async def handle_request(
 
     try:
         response = await compiled_handler(request)
+        response = enforce_htmx_response_compatibility(
+            response,
+            manifest=htmx_manifest,
+            is_htmx_request=bool(request.htmx),
+        )
     except HTTPError as exc:
         response = await handle_http_error(
             exc,
@@ -497,6 +505,8 @@ async def handle_request(
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
         )
+        if isinstance(exc, HtmxTimingHeaderError) and isinstance(response, Response):
+            response = response.with_vary("HX-Request", "HX-Request-Type")
     finally:
         # Release any spooled upload temp files parsed during this request so
         # spilled-to-disk uploads do not leak fds / temp files after response.

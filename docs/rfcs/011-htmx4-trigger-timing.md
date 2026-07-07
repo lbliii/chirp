@@ -1,6 +1,6 @@
 # RFC 011: htmx 4 Trigger Timing
 
-**Status:** Draft — implementation requires maintainer acceptance
+**Status:** Implemented for the explicit preview lane
 
 **Issue:** [#549](https://github.com/lbliii/chirp/issues/549)
 
@@ -24,7 +24,9 @@ and `htmx:after:settle` is the post-settle hook. Dynamic event data belongs in
 the rendered HTML block and is read by application-owned JavaScript; Chirp
 will not add a JSON response side channel or a timing emulation extension.
 
-This RFC records a design only. It does not change current runtime behavior.
+The version-aware response boundary, cache variation, testing guidance,
+DevTools labeling, and rendered-data browser migration proof are implemented.
+The public helpers remain unchanged for htmx 2 and generic consumers.
 
 ## Context
 

@@ -107,6 +107,11 @@ async def test_login_redirects():
 `hx_headers(response)` returns a dict keyed by canonical htmx casing (`HX-Push-Url`), even though the ASGI layer lowercases header names on the wire. Assert on `headers["HX-Push-Url"]` and stop worrying about `hx-push-url` vs `HX-Push-Url`.
 :::
 
+`assert_hx_trigger(..., after="swap" | "settle")` proves htmx 2/generic wire
+encoding only. A passing header assertion does not prove browser delivery in
+htmx 4, which removed both timing headers. Test the rendered data marker and
+the target's `htmx:before:settle` or `htmx:after:settle` event in a browser.
+
 ### Assert OOB swaps and mutation results
 
 A mutation that returns `OOB(...)` writes several swap targets into one response. `assert_oob_targets` confirms each `hx-swap-oob` target is present. For a route built on `FormAction`/`MutationResult`, `assert_mutation_fragments` checks the htmx path (200 + OOB targets) and `assert_mutation_redirect` checks the plain-POST path (a `303` redirect by default).
