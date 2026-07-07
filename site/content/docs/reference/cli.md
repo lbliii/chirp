@@ -18,15 +18,21 @@ production server, and inspect routes. This page is the reference for the three
 commands you reach for most — `chirp new`, `chirp check`, and
 `chirp shapes-codegen` — plus a table of the rest.
 
-Every command takes an app **import string** of the form `module:attribute`
-(for example `myapp:app`). When you omit the attribute, it defaults to `app`, so
-`myapp` resolves to `myapp.app`. A callable that is not already an `App` — an app
-factory like `create_app` — is called to produce one.
+Commands that operate on an application take an **import string** of the form
+`module:attribute` (for example `myapp:app`). When you omit the attribute, it
+defaults to `app`, so `myapp` resolves to `myapp.app`. A callable that is not
+already an `App` — an app factory like `create_app` — is called to produce one.
+Scaffolding and migration commands instead take filesystem/database arguments;
+`shapes-codegen` treats its path as an app import only with `--audit`.
 
 ```bash
 chirp --version        # chirp, kida, pounce, and Python versions
 chirp <command> --help # flags for any command
 ```
+
+The migration-grade inventory of every command, flag, default, output channel,
+exit code, lazy-import boundary, agent-exposure decision, and Milo mapping is
+maintained in [`docs/cli-compatibility-contract.md`](https://github.com/lbliii/chirp/blob/main/docs/cli-compatibility-contract.md).
 
 ## Command summary
 
@@ -39,6 +45,8 @@ chirp <command> --help # flags for any command
   - Scaffold a new project directory.
 * - `chirp check <app>`
   - Validate hypermedia contracts (mirrors `app.check()`).
+* - `chirp diff <app> --base <ref>`
+  - Diff hypermedia contracts against a git baseline; supports stable JSON output.
 * - `chirp shapes-codegen [path]`
   - Suggest `@shape` decorators and audit Shape drift.
 * - `chirp run <app>`
@@ -92,6 +100,10 @@ and a dashboard at `/dashboard`. It refuses to overwrite an existing directory.
   - SSE boilerplate — an `EventStream` route wired with `sse_scope`.
 * - `--shell`
   - A persistent [[docs/build-apps/ui-extensions/app-shell|app shell]] (topbar, sidebar) over filesystem routing.
+* - `--stream`
+  - Simulated token streaming with `TemplateStream` plus an `EventStream` activity panel.
+* - `--ai`
+  - AI chat with tools, an SSE activity feed, and the secure stack.
 * - `--with-chirpui`
   - Require [[docs/build-apps/ui-extensions/chirp-ui|chirp-ui]] templates; fail if it is not installed.
 :::
@@ -131,6 +143,12 @@ chirp check myapp:app
   - Print route/template contract coverage counters alongside the report.
 * - `--deploy`
   - Run env-aware rules with production-posture severity. Implies `--warnings-as-errors`.
+* - `--json`
+  - Emit the stable machine-readable contract report.
+* - `--baseline PATH`
+  - Compare against a JSON report from an earlier `--json` run.
+* - `--include-info`
+  - Include INFO findings in structured JSON/baseline modes.
 :::
 
 `--deploy` is the deploy preflight. Some rules — a missing secure-by-default
