@@ -1,0 +1,1278 @@
+{
+  "schema": 1,
+  "htmx_version": "4.0.0-beta5",
+  "command": [
+    "npx",
+    "--yes",
+    "htmx.org@4.0.0-beta5",
+    "upgrade-check",
+    "--",
+    "<repository-owned supported files>"
+  ],
+  "scan_policy": {
+    "extensions": [
+      ".erb",
+      ".hbs",
+      ".html",
+      ".j2",
+      ".jinja",
+      ".jinja2",
+      ".js",
+      ".php",
+      ".ts"
+    ],
+    "excluded_directories": [
+      ".git",
+      ".mypy_cache",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".venv",
+      "node_modules",
+      "ovrtx"
+    ]
+  },
+  "root": ".",
+  "scanned_files": 209,
+  "files_with_findings": 36,
+  "total_findings": 175,
+  "categories": {
+    "ext": 53,
+    "inheritance": 12,
+    "old-event": 35,
+    "removed-attr": 52,
+    "removed-header": 2,
+    "renamed-attr": 21
+  },
+  "surfaces": {
+    "examples": 144,
+    "framework": 26,
+    "tests": 5
+  },
+  "findings": [
+    {
+      "path": "examples/chirpui/contacts_shell/pages/contacts/page.html",
+      "line": 187,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/contacts_shell/pages/contacts/selection.html",
+      "line": 2,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/forum_shell/pages/boards/{board_slug}/threads/{thread_slug}/page.html",
+      "line": 5,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 37,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 41,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 44,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 48,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 51,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/components/_task_card.html",
+      "line": 55,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/page.html",
+      "line": 97,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/page.html",
+      "line": 142,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/page.html",
+      "line": 176,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/page.html",
+      "line": 177,
+      "category": "old-event",
+      "message": "old event name \"htmx:oobAfterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/task_form.html",
+      "line": 5,
+      "category": "inheritance",
+      "message": "hx-target needs :inherited suffix (descendant on line 23 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/kanban_shell/pages/task_form.html",
+      "line": 5,
+      "category": "inheritance",
+      "message": "hx-swap needs :inherited suffix (descendant on line 23 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 11,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 11,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 11,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 23,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 30,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 30,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 30,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/llm_playground/templates/playground.html",
+      "line": 42,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 152,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 152,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 152,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 213,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 232,
+      "category": "old-event",
+      "message": "old event name \"htmx:pushedIntoHistory\" \u2192 \"htmx:after:history:push\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 233,
+      "category": "old-event",
+      "message": "old event name \"htmx:replacedInHistory\" \u2192 \"htmx:after:history:replace\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 241,
+      "category": "old-event",
+      "message": "old event name \"htmx:beforeSwap\" \u2192 \"htmx:before:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/_layout.html",
+      "line": 639,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/login/page.html",
+      "line": 28,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/markets/page.html",
+      "line": 365,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/markets/page.html",
+      "line": 369,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/pages/trade/page.html",
+      "line": 13,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/static/lucky-cat-passkeys.js",
+      "line": 122,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSettle\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/static/lucky-cat-shell.js",
+      "line": 18,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSettle\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/static/lucky-cat-shell.js",
+      "line": 18,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/static/lucky-cat-shell.js",
+      "line": 124,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/lucky_cat/static/lucky-cat-shell.js",
+      "line": 125,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSettle\" \u2192 \"htmx:after:swap\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 13,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 52,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 52,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 52,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 72,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 76,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 92,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 92,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 92,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 103,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 120,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 124,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 128,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 128,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 128,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 139,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 156,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 160,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 172,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 172,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 172,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 187,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 205,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/ask.html",
+      "line": 209,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/rag_demo/templates/index.html",
+      "line": 57,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/chirpui/sortable_reorder/pages/page.html",
+      "line": 25,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/chat/templates/chat.html",
+      "line": 69,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/chat/templates/chat.html",
+      "line": 69,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/chat/templates/chat.html",
+      "line": 69,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/chat/templates/chat.html",
+      "line": 77,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/chat/templates/chat.html",
+      "line": 81,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/contacts/templates/contacts.html",
+      "line": 58,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/htmx_managed/templates/baseline.html",
+      "line": 23,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/htmx_managed/templates/baseline.html",
+      "line": 23,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/htmx_managed/templates/baseline.html",
+      "line": 23,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/htmx_managed/templates/baseline.html",
+      "line": 24,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 146,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 187,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 187,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 187,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 188,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/board.html",
+      "line": 205,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 42,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 46,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 49,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 53,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 56,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/components/_card.html",
+      "line": 60,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/task_form.html",
+      "line": 8,
+      "category": "inheritance",
+      "message": "hx-target needs :inherited suffix (descendant on line 40 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/kanban/templates/task_form.html",
+      "line": 8,
+      "category": "inheritance",
+      "message": "hx-swap needs :inherited suffix (descendant on line 40 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/llm_minimal/templates/sse_panel.html",
+      "line": 3,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/llm_minimal/templates/sse_panel.html",
+      "line": 3,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/llm_minimal/templates/sse_panel.html",
+      "line": 3,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/llm_minimal/templates/sse_panel.html",
+      "line": 5,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 269,
+      "category": "inheritance",
+      "message": "hx-target needs :inherited suffix (descendant on line 279 has hx-post)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 269,
+      "category": "inheritance",
+      "message": "hx-swap needs :inherited suffix (descendant on line 279 has hx-post)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 269,
+      "category": "inheritance",
+      "message": "hx-indicator needs :inherited suffix (descendant on line 279 has hx-post)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 288,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 288,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 288,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 290,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 320,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 320,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 320,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/ollama/templates/chat.html",
+      "line": 324,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 51,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 51,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 51,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 54,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 57,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 60,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 71,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 71,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 71,
+      "category": "inheritance",
+      "message": "hx-target needs :inherited suffix (descendant on line 80 has hx-post)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/reactive_tasks/templates/board.html",
+      "line": 71,
+      "category": "inheritance",
+      "message": "hx-swap needs :inherited suffix (descendant on line 80 has hx-post)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 77,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 78,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 92,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 120,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 120,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 120,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/returns_gallery/templates/gallery.html",
+      "line": 121,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/search/templates/search.html",
+      "line": 32,
+      "category": "inheritance",
+      "message": "hx-target needs :inherited suffix (descendant on line 36 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/search/templates/search.html",
+      "line": 32,
+      "category": "inheritance",
+      "message": "hx-swap needs :inherited suffix (descendant on line 36 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/search/templates/search.html",
+      "line": 32,
+      "category": "inheritance",
+      "message": "hx-push-url needs :inherited suffix (descendant on line 36 has hx-get)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse/templates/feed.html",
+      "line": 28,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse/templates/feed.html",
+      "line": 28,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse/templates/feed.html",
+      "line": 28,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse/templates/feed.html",
+      "line": 30,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse_reconnect/templates/feed.html",
+      "line": 33,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse_reconnect/templates/feed.html",
+      "line": 33,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse_reconnect/templates/feed.html",
+      "line": 33,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/sse_reconnect/templates/feed.html",
+      "line": 35,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/todo/templates/index.html",
+      "line": 36,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/todo/templates/index.html",
+      "line": 43,
+      "category": "renamed-attr",
+      "message": "hx-disabled-elt \u2192 rename to hx-disable",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/todo/templates/index.html",
+      "line": 54,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools/templates/notes.html",
+      "line": 134,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools/templates/notes.html",
+      "line": 134,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools/templates/notes.html",
+      "line": 134,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools/templates/notes.html",
+      "line": 135,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools_hitl/templates/notes.html",
+      "line": 61,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools_hitl/templates/notes.html",
+      "line": 61,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools_hitl/templates/notes.html",
+      "line": 61,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "examples"
+    },
+    {
+      "path": "examples/standalone/tools_hitl/templates/notes.html",
+      "line": 62,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "examples"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 314,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 323,
+      "category": "old-event",
+      "message": "old event name \"htmx:beforeRequest\" \u2192 \"htmx:before:request\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 382,
+      "category": "removed-header",
+      "message": "\"HX-Trigger-After-Swap\" is removed \u2192 use HX-Trigger or JavaScript instead",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 382,
+      "category": "removed-header",
+      "message": "\"HX-Trigger-After-Settle\" is removed \u2192 use HX-Trigger or JavaScript instead",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 415,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterRequest\" \u2192 \"htmx:after:request\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 455,
+      "category": "old-event",
+      "message": "old event name \"htmx:beforeSwap\" \u2192 \"htmx:before:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 475,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 482,
+      "category": "old-event",
+      "message": "old event name \"htmx:afterSettle\" \u2192 \"htmx:after:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 497,
+      "category": "old-event",
+      "message": "old event name \"htmx:beforeHistorySave\" \u2192 \"htmx:before:history:update\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 498,
+      "category": "old-event",
+      "message": "old event name \"htmx:pushedIntoHistory\" \u2192 \"htmx:after:history:push\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 499,
+      "category": "old-event",
+      "message": "old event name \"htmx:replacedInHistory\" \u2192 \"htmx:after:history:replace\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 501,
+      "category": "old-event",
+      "message": "old event name \"htmx:historyCacheMiss\" \u2192 \"htmx:before:history:restore\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 502,
+      "category": "old-event",
+      "message": "old event name \"htmx:historyRestore\" \u2192 \"htmx:before:history:restore\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 532,
+      "category": "old-event",
+      "message": "old event name \"htmx:oobBeforeSwap\" \u2192 \"htmx:before:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/collectors.js",
+      "line": 538,
+      "category": "old-event",
+      "message": "old event name \"htmx:oobAfterSwap\" \u2192 \"htmx:after:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 26,
+      "category": "old-event",
+      "message": "old event name \"htmx:targetError\" \u2192 \"htmx:error\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 34,
+      "category": "old-event",
+      "message": "old event name \"htmx:responseError\" \u2192 \"htmx:response:error\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 41,
+      "category": "old-event",
+      "message": "old event name \"htmx:sendError\" \u2192 \"htmx:error\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 45,
+      "category": "old-event",
+      "message": "old event name \"htmx:swapError\" \u2192 \"htmx:error\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 49,
+      "category": "old-event",
+      "message": "old event name \"htmx:timeout\" \u2192 \"htmx:error\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 95,
+      "category": "old-event",
+      "message": "old event name \"htmx:beforeSwap\" \u2192 \"htmx:before:swap\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/server/devtools/js/errors.js",
+      "line": 114,
+      "category": "old-event",
+      "message": "old event name \"htmx:configRequest\" \u2192 \"htmx:config:request\"",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/templating/macros/chirp/sse.html",
+      "line": 16,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/templating/macros/chirp/sse.html",
+      "line": 16,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/templating/macros/chirp/sse.html",
+      "line": 16,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "framework"
+    },
+    {
+      "path": "src/chirp/templating/macros/chirp/sse.html",
+      "line": 17,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "framework"
+    },
+    {
+      "path": "tests/templates/boundary/chirpui_index.html",
+      "line": 10,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "tests"
+    },
+    {
+      "path": "tests/templates/boundary/chirpui_index.html",
+      "line": 21,
+      "category": "removed-attr",
+      "message": "hx-ext is removed \u2192 include extension scripts directly (no attribute needed in v4)",
+      "surface": "tests"
+    },
+    {
+      "path": "tests/templates/boundary/chirpui_index.html",
+      "line": 21,
+      "category": "ext",
+      "message": "sse-connect \u2192 rename to hx-sse:connect",
+      "surface": "tests"
+    },
+    {
+      "path": "tests/templates/boundary/chirpui_index.html",
+      "line": 21,
+      "category": "removed-attr",
+      "message": "hx-disinherit is removed \u2192 not needed (inheritance is explicit in v4)",
+      "surface": "tests"
+    },
+    {
+      "path": "tests/templates/boundary/chirpui_index.html",
+      "line": 25,
+      "category": "ext",
+      "message": "sse-swap \u2192 removed \u2014 SSE now integrates with standard htmx request pipeline",
+      "surface": "tests"
+    }
+  ]
+}

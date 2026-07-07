@@ -57,10 +57,29 @@ not add a configurable CDN base or infer extension versions.
 
 ## Fail before the browser
 
-The `htmx_compatibility` contract category is an `ERROR`. It names the template
-and detected line when managed and manual core would load twice, preview roles
-are missing or duplicated, scripts are out of order, versions disagree, or
-htmx 2 and htmx 4 SSE markup are mixed.
+The `htmx_compatibility` contract category reports both `ERROR` and `WARNING`.
+Every template-drift diagnostic names the selected tier, exact construct,
+consequence, remediation, template, and detected line.
+
+An `ERROR` means the selected browser tier cannot safely execute the markup:
+managed and manual core would load twice, preview roles are incomplete or
+mixed, versions disagree, htmx 4-only attributes are paired with htmx 2,
+legacy SSE/WebSocket attributes are paired with htmx 4, or an old event has no
+compatibility mapping. The htmx 2 `hx-disable` attribute is also an error in
+preview because htmx 4 gives that name a different meaning; rename it to
+`hx-ignore` before upgrading.
+
+A `WARNING` identifies migration debt that the provisioned `htmx-2-compat`
+extension keeps working temporarily: renamed/removed htmx 2 attributes, old
+core lifecycle event names, old config keys, and implicit inheritance. For
+example, move an inherited `hx-confirm` to `hx-confirm:inherited` before
+removing compatibility mode.
+
+Static checks ignore markup inside `<pre>`/`<code>`, JavaScript comments,
+framework-owned templates, and dynamic attribute bundles. The optional pinned
+upstream inventory command is documented in
+[`docs/audits/htmx4-beta5-inventory.md`](https://github.com/lbliii/chirp/blob/main/docs/audits/htmx4-beta5-inventory.md);
+it does not add Node to Chirp's runtime dependencies.
 
 In debug mode, `window.ChirpHtmxDebug.getHtmxCompatibility()` reports configured
 and live versions, extension roles, source URLs, duplicates, and the resulting
