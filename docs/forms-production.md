@@ -199,6 +199,38 @@ Browsers without WebMCP ignore the extra attributes and retain the complete
 human form. Keep CSRF, authorization, validation, `FormAction`, and htmx
 negotiation on the server exactly as they were before projection.
 
+### Browser Compatibility And Trust Boundary
+
+This preview is experimental, not a cross-browser compatibility promise.
+[Chrome documents an origin trial beginning with Chrome 149](https://developer.chrome.com/docs/ai/webmcp/)
+and a local `chrome://flags/#enable-webmcp-testing` switch. Origin-trial tokens
+are origin-specific deployment credentials; Chirp does not embed or distribute
+one. The browser lane pins Playwright 1.61.0, which installs Chrome for Testing
+149.0.7827.55, and proves both flag-off and `Permissions-Policy: tools=()`
+fallbacks keep the native form usable. Chrome's documentation says WebMCP needs
+a visible browsing context, so this lane does not fabricate headless agent
+invocation coverage.
+
+The compatibility boundary remains proposal commit
+`0b676d27a08aafd3b4f8a709756eeeab342fd9bd`. Newer Chrome documentation includes
+`<select>` synthesis and `SubmitEvent.agentInvoked`/`respondWith()` behavior;
+Chirp does not support those changed surfaces yet. It also does not use the
+imperative `document.modelContext` registry. Unsupported preview changes fail
+closed at compilation or remain ordinary HTML rather than acquiring a parallel
+JSON/JavaScript execution path.
+
+Treat browser discovery as a hint, never authority:
+
+- the same route middleware authenticates anonymous, authenticated, expired,
+  and unauthorized sessions;
+- CSRF runs before the mutation handler and rejects missing/invalid tokens;
+- `form_or_errors()` repeats requiredness, types, and business constraints on
+  untrusted request bytes;
+- all POST/PUT/PATCH/DELETE projections omit `toolautosubmit`, including
+  destructive or confirmation-requiring actions; and
+- normal and htmx submissions negotiate different response shapes from the
+  same authorized handler.
+
 ## Production Checklist
 
 - Add `SessionMiddleware` before `CSRFMiddleware`.

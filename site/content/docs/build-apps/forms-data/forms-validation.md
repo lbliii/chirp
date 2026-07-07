@@ -363,3 +363,21 @@ mutation CSRF/security gaps as `webmcp` ERRORs. Each error names the operation
 and source location plus the concrete repair; there are no WebMCP style-only
 warnings. Run `chirp check myapp:app --json --coverage` to include declared and
 compiled projection/parameter counters in CI baselines and contract diffs.
+
+### Compatibility and security boundary
+
+WebMCP remains experimental. Chrome documents an origin trial starting in
+Chrome 149 and local development through
+`chrome://flags/#enable-webmcp-testing`; origin-trial tokens belong to the
+application origin and are not shipped by Chirp. The browser smoke lane pins
+Playwright 1.61.0 / Chrome for Testing 149.0.7827.55 and proves that flag-off or
+`Permissions-Policy: tools=()` leaves the native form complete. Chrome requires
+a visible browsing context for tool calls, so Chirp does not claim headless
+agent invocation coverage.
+
+Chirp stays pinned to proposal commit
+`0b676d27a08aafd3b4f8a709756eeeab342fd9bd`. Newer preview additions such as
+`<select>` synthesis and `SubmitEvent.agentInvoked`/`respondWith()` are not in
+the supported contract. Browser discovery never bypasses route authentication,
+authorization, session expiry, CSRF, or server validation. All mutation tools
+omit `toolautosubmit`; normal and htmx submissions still reach the same handler.

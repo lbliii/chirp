@@ -1,6 +1,6 @@
 # RFC 014: Universal Operation Projections
 
-**Status:** Accepted — declarative WebMCP form preview implemented; other projections pending
+**Status:** Accepted — declarative WebMCP form preview implemented; security proof implemented; other projections pending
 **Issue:** [#339](https://github.com/lbliii/chirp/issues/339)
 **Parent epic:** [#568](https://github.com/lbliii/chirp/issues/568)
 **Saga:** [#566](https://github.com/lbliii/chirp/issues/566)
@@ -10,7 +10,8 @@ This RFC decides how one typed Python operation can be projected into browser
 HTTP, htmx, a human and programmatic CLI, ordinary MCP tools, WebMCP, and MCP
 Apps without giving Chirp a REST serialization layer or giving Milo ownership
 of HTML rendering. The declarative WebMCP form slice is now implemented by
-issue #574 through an explicit `FormContract` projection. The Milo, ordinary
+issues #574–#576 through an explicit `FormContract` projection, structured
+startup checks, and a Chrome 149/server-security parity matrix. The Milo, ordinary
 MCP, and MCP Apps projections remain design-only; this document does not claim
 that those pending surfaces ship.
 
@@ -403,6 +404,20 @@ are still under discussion, Chirp documents no stronger compatibility claim.
 Tests must assert the exact emitted attributes, no mutation autosubmit, no
 duplicate imperative registration, and an unchanged no-WebMCP fallback.
 
+The executable compatibility lane pins Playwright 1.61.0 / Chrome for Testing
+149.0.7827.55. It proves the native form with WebMCP unavailable and with a
+`Permissions-Policy: tools=()` response. Chrome's documented local flag is
+`chrome://flags/#enable-webmcp-testing`; production origin-trial tokens are
+origin-specific and are never embedded by Chirp. Because Chrome documents a
+visible browsing-context requirement, the automated headless lane proves the
+fallback and server trust boundary, not a fabricated agent invocation.
+
+Newer preview additions (`<select>` synthesis and
+`SubmitEvent.agentInvoked`/`respondWith()`) are outside the pinned commit and
+remain unsupported pending a separate compatibility review. They do not gain a
+side channel around route auth, session expiry, CSRF, validation, or typed
+return negotiation.
+
 ## 11. MCP Apps boundary
 
 Milo owns MCP App protocol mechanics: `ui://` resource registration, metadata,
@@ -739,7 +754,7 @@ until Milo has an async invocation contract.
    behavior (#577).
 3. Compiler and `app.check()` projection edges.
 4. Canonical browser/htmx/CLI/ordinary-MCP slice.
-5. Declarative WebMCP preview (#574).
+5. Declarative WebMCP preview and trust-boundary proof (#574–#576).
 6. Milo MCP App resource integration (#578, Milo #74/#79).
 7. Full canonical proof and surface-diff gate (#580).
 8. Separately reviewed `chirp.tools` migration.

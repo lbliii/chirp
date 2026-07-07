@@ -349,6 +349,7 @@ async def test_projection_helpers_cannot_be_shadowed(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.issue(576)
 async def test_safe_get_form_may_explicitly_enable_autosubmit(tmp_path: Path) -> None:
     _write_template(tmp_path, tool_name="tasks.search")
     app = App(AppConfig(template_dir=tmp_path, skip_contract_checks=True))
@@ -370,3 +371,31 @@ async def test_safe_get_form_may_explicitly_enable_autosubmit(tmp_path: Path) ->
 
     assert 'toolname="tasks.search"' in response.text
     assert " toolautosubmit" in response.text
+
+
+@pytest.mark.issue(576)
+async def test_destructive_mutation_never_auto_submits(tmp_path: Path) -> None:
+    _write_template(tmp_path, tool_name="tasks.delete")
+    app = App(AppConfig(template_dir=tmp_path, skip_contract_checks=True))
+
+    @app.route("/", template="tasks.html")
+    def index() -> Page:
+        return Page("tasks.html", "form", page_block_name="page_root", errors={})
+
+    @app.route("/tasks", methods=["POST"])
+    @contract(
+        form=FormContract(
+            _TaskForm,
+            "tasks.html",
+            "form",
+            webmcp=WebMCPForm("tasks.delete", "Permanently delete the task"),
+        )
+    )
+    def delete() -> str:
+        return "ok"
+
+    async with TestClient(app) as client:
+        response = await client.get("/")
+
+    assert 'toolname="tasks.delete"' in response.text
+    assert "toolautosubmit" not in response.text
