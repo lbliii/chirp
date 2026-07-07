@@ -314,6 +314,21 @@ function collectHtmxCompatibility() {
     configuredCore.getAttribute("data-chirp-htmx-tier") : core && core.tier;
   var duplicates = Object.keys(counts).filter(function(role) { return counts[role] > 1; });
   var extensionRoles = Object.keys(counts).filter(function(role) { return role !== "core"; });
+  var policyMeta = document.querySelector('meta[data-chirp="htmx-config"]');
+  var declaredPolicy = null;
+  if (policyMeta) {
+    try { declaredPolicy = JSON.parse(policyMeta.getAttribute("content") || "{}"); }
+    catch (e) { declaredPolicy = { parseError: String(e) }; }
+  }
+  var livePolicy = window.htmx && window.htmx.config ? {
+    noSwap: window.htmx.config.noSwap || null,
+    defaultTimeout: window.htmx.config.defaultTimeout,
+    implicitInheritance: window.htmx.config.implicitInheritance,
+    history: "refetch",
+    oobOrder: "main-first",
+    deleteFormData: "explicit",
+    queue: "hx-sync",
+  } : null;
   var compatibilityState = "unmanaged";
   if (configuredTier || configuredVersion) {
     compatibilityState = "matched";
@@ -334,5 +349,9 @@ function collectHtmxCompatibility() {
     roleCounts: counts,
     duplicates: duplicates,
     compatibilityState: compatibilityState,
+    clientPolicy: {
+      declared: declaredPolicy,
+      live: livePolicy,
+    },
   };
 }

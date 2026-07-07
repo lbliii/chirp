@@ -13,6 +13,10 @@ and distinct general-error categories.
 The managed preview app uses the exact public opt-in, injects core → compat →
 SSE with one CSP nonce, and exposes configured/live compatibility metadata
 through `window.ChirpHtmxDebug.getHtmxCompatibility()`.
+Its second browser contract proves the frozen defaults: implicit compatibility
+inheritance, local 422 swaps, broad 500 suppression, main-first OOB processing,
+explicit DELETE query data, timeout cancellation, serialized `hx-sync`
+requests, and server-authoritative history refetch.
 
 Run the server from this directory:
 

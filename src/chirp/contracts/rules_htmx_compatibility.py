@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -11,6 +12,8 @@ from chirp.app.htmx_manifest import HTMX4_PREVIEW_VERSION, HtmxProvisioningManif
 from .types import ContractIssue, Severity
 
 _SOURCE_VERSION = re.compile(r"htmx\.org@([^/]+)", re.IGNORECASE)
+_QUEUE_MODIFIER = re.compile(r"(?:^|\s)queue:(?:all|first|last|none)(?=\s|$)", re.IGNORECASE)
+_SERVER_ERROR_STATUS = re.compile(r"^hx-status:(?:5\d\d|5xx|5x\d|5\dx)$", re.IGNORECASE)
 _IGNORED_ELEMENTS = frozenset({"code", "pre"})
 _VOID_ELEMENTS = frozenset(
     {
@@ -80,7 +83,6 @@ _HTMX2_ATTRIBUTE_MIGRATIONS: dict[str, tuple[str, str]] = {
         "htmx 4 removed the localStorage history cache",
         "remove it and select reload or refetch behavior with 'htmx.config.history'",
     ),
-    "hx-history-elt": ("htmx 4 removed this attribute", "remove the history-cache marker"),
 }
 _HTMX4_ONLY_ATTRIBUTES = frozenset({"hx-action", "hx-config", "hx-ignore", "hx-method"})
 
@@ -158,6 +160,7 @@ _HTMX2_REMOVED_CONFIG: dict[str, str] = {
 @dataclass(frozen=True, slots=True)
 class _Script:
     index: int
+    document_index: int
     line: int
     src: str
     marker: str | None
@@ -210,6 +213,30 @@ class _Element:
     attributes: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _Tag:
+    tag: str
+    line: int
+    attributes: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _DeleteUse:
+    line: int
+    form_line: int
+    attributes: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _HtmxConfig:
+    document_index: int
+    line: int
+    content: str
+    marker: str | None
+    tier: str | None
+    version: str | None
+
+
 class _TemplateParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -217,10 +244,15 @@ class _TemplateParser(HTMLParser):
         self.attributes: list[_Attribute] = []
         self.inline_scripts: list[_InlineScript] = []
         self.inheritance_uses: list[_InheritanceUse] = []
+        self.tags: list[_Tag] = []
+        self.delete_uses: list[_DeleteUse] = []
+        self.form_controls: dict[int, set[str]] = {}
+        self.htmx_configs: list[_HtmxConfig] = []
         self._elements: list[_Element] = []
         self._ignored_depth = 0
         self._inline_script = False
         self._inheritance_seen: set[tuple[int, str]] = set()
+        self._document_index = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
@@ -231,8 +263,23 @@ class _TemplateParser(HTMLParser):
             return
 
         line = self.getpos()[0]
+        document_index = self._document_index
+        self._document_index += 1
         values = {name.lower(): value or "" for name, value in attrs}
         attribute_names = tuple(values)
+        attribute_items = tuple(values.items())
+        self.tags.append(_Tag(tag, line, attribute_items))
+        if tag == "meta" and values.get("name", "").lower() == "htmx-config":
+            self.htmx_configs.append(
+                _HtmxConfig(
+                    document_index=document_index,
+                    line=line,
+                    content=values.get("content", ""),
+                    marker=values.get("data-chirp") or None,
+                    tier=values.get("data-chirp-htmx-tier") or None,
+                    version=values.get("data-chirp-htmx-version") or None,
+                )
+            )
         for name, value in values.items():
             if name.startswith(("hx-", "sse-", "ws-")):
                 self.attributes.append(_Attribute(tag, line, name, value))
@@ -258,6 +305,17 @@ class _TemplateParser(HTMLParser):
                         self._inheritance_seen.add(key)
                     shadowed.add(name)
 
+        form = next(
+            (element for element in reversed(self._elements) if element.tag == "form"), None
+        )
+        if form is not None:
+            if tag in {"input", "select", "textarea"}:
+                control_name = values.get("name")
+                if control_name and "disabled" not in values:
+                    self.form_controls.setdefault(form.line, set()).add(control_name)
+            if "hx-delete" in values:
+                self.delete_uses.append(_DeleteUse(line, form.line, attribute_items))
+
         if tag != "script":
             if tag not in _VOID_ELEMENTS:
                 self._elements.append(_Element(tag, line, attribute_names))
@@ -281,6 +339,7 @@ class _TemplateParser(HTMLParser):
         self.scripts.append(
             _Script(
                 index=len(self.scripts),
+                document_index=document_index,
                 line=line,
                 src=src,
                 marker=marker,
@@ -637,11 +696,194 @@ def _check_template_drift(
     return issues
 
 
+def _check_default_contract_drift(
+    template: str,
+    parsed: _TemplateParser,
+    tier: str | None,
+) -> list[ContractIssue]:
+    if tier != "4-preview":
+        return []
+    issues: list[ContractIssue] = []
+    issues.extend(
+        [
+            _drift_issue(
+                template,
+                tier=tier,
+                construct=f'hx-trigger="{attribute.value}"',
+                consequence=(
+                    "htmx 4 removed trigger queue modifiers, so the intended mutation "
+                    "serialization is silently lost"
+                ),
+                remediation="remove queue:* and add hx-sync with an explicit queue strategy",
+                line=attribute.line,
+                severity=Severity.ERROR,
+            )
+            for attribute in parsed.attributes
+            if attribute.name == "hx-trigger" and _QUEUE_MODIFIER.search(attribute.value)
+        ]
+    )
+
+    for delete in parsed.delete_uses:
+        attributes = dict(delete.attributes)
+        if attributes.get("hx-include"):
+            continue
+        controls = parsed.form_controls.get(delete.form_line, set())
+        if not controls:
+            continue
+        csrf_control = next((name for name in controls if "csrf" in name.lower()), None)
+        severity = Severity.ERROR if csrf_control is not None else Severity.WARNING
+        consequence = (
+            f"htmx 4 excludes enclosing form controls from DELETE, including CSRF field "
+            f"{csrf_control!r}, so the request can fail protection"
+            if csrf_control is not None
+            else "htmx 4 excludes enclosing form controls from DELETE, so named values are not sent"
+        )
+        issues.append(
+            _drift_issue(
+                template,
+                tier=tier,
+                construct="hx-delete inside a form without hx-include",
+                consequence=consequence,
+                remediation='add hx-include="closest form" or put required values in the URL',
+                line=delete.line,
+                severity=severity,
+            )
+        )
+
+    history_elements = [item for item in parsed.attributes if item.name == "hx-history-elt"]
+    pushed_history = [
+        item
+        for item in parsed.attributes
+        if item.name in {"hx-push-url", "hx-replace-url"}
+        and item.value.strip().lower() not in {"", "false"}
+    ]
+    if pushed_history and not history_elements:
+        first = pushed_history[0]
+        issues.append(
+            _drift_issue(
+                template,
+                tier=tier,
+                construct=first.name,
+                consequence=(
+                    "htmx 4 refetches history without a localStorage cache, and no stable "
+                    "hx-history-elt restore boundary is declared"
+                ),
+                remediation="declare one stable hx-history-elt in the shell or use full-page history",
+                line=first.line,
+                severity=Severity.WARNING,
+            )
+        )
+
+    static_ids = {
+        attributes["id"] for tag in parsed.tags if (attributes := dict(tag.attributes)).get("id")
+    }
+    broad_ids = {
+        attributes["id"]
+        for tag in parsed.tags
+        if tag.tag in {"body", "main"} and (attributes := dict(tag.attributes)).get("id")
+    }
+    for tag in parsed.tags:
+        attributes = dict(tag.attributes)
+        for name, value in tag.attributes:
+            if _SERVER_ERROR_STATUS.match(name) is None or "swap:none" in value.lower():
+                continue
+            target = attributes.get("hx-target", "this").strip()
+            target_id = target.removeprefix("#") if target.startswith("#") else None
+            unsafe = target in {"body", "html"} or target_id in broad_ids
+            unresolved = target_id is not None and target_id not in static_ids
+            if not unsafe and not unresolved:
+                continue
+            reason = "broad shell target" if unsafe else "unresolved target"
+            issues.append(
+                _drift_issue(
+                    template,
+                    tier=tier,
+                    construct=name,
+                    consequence=(
+                        f"the explicit 5xx swap uses a {reason} {target!r}, so a production "
+                        "failure can erase visible application UI"
+                    ),
+                    remediation="target a statically present local error region or use swap:none",
+                    line=tag.line,
+                    severity=Severity.ERROR,
+                )
+            )
+    return issues
+
+
 def _check_preview_bundle(
     template: str,
     scripts: list[_Script],
+    configs: list[_HtmxConfig],
 ) -> list[ContractIssue]:
     issues: list[ContractIssue] = []
+    if not configs:
+        issues.append(
+            _issue(
+                template,
+                "Htmx 4 preview bundle is missing its htmx-config policy metadata. Add the "
+                "marked noSwap/defaultTimeout/compat policy before core, or use managed injection.",
+            )
+        )
+    elif len(configs) > 1:
+        issues.append(
+            _issue(
+                template,
+                f"Htmx 4 preview bundle declares {len(configs)} htmx-config policies; "
+                "the browser contract must be declared exactly once.",
+                line=configs[1].line,
+            )
+        )
+    if configs:
+        config = configs[0]
+        if config.marker != "htmx-config":
+            issues.append(
+                _issue(
+                    template,
+                    "Htmx 4 policy metadata lacks data-chirp='htmx-config'; add the marker "
+                    "so compatibility checks can verify the selected defaults.",
+                    line=config.line,
+                )
+            )
+        if config.tier != "4-preview" or config.version != HTMX4_PREVIEW_VERSION:
+            issues.append(
+                _issue(
+                    template,
+                    "Htmx 4 policy metadata must declare tier '4-preview' and exact version "
+                    f"{HTMX4_PREVIEW_VERSION!r}.",
+                    line=config.line,
+                )
+            )
+        try:
+            payload = json.loads(config.content)
+        except TypeError, ValueError:
+            payload = None
+        valid_policy = (
+            isinstance(payload, dict)
+            and payload.get("noSwap") == [204, 304, "5xx"]
+            and payload.get("defaultTimeout") == 60_000
+            and isinstance(payload.get("compat"), dict)
+            and payload["compat"].get("swapErrorResponseCodes") is True
+        )
+        if not valid_policy:
+            issues.append(
+                _issue(
+                    template,
+                    "Htmx 4 policy metadata disagrees with Chirp's accepted defaults. Set "
+                    "noSwap to [204,304,'5xx'], defaultTimeout to 60000, and "
+                    "compat.swapErrorResponseCodes to true.",
+                    line=config.line,
+                )
+            )
+        if scripts and config.document_index > min(item.document_index for item in scripts):
+            issues.append(
+                _issue(
+                    template,
+                    "Htmx 4 policy metadata appears after a preview script. Move htmx-config "
+                    "before core so initialization cannot observe upstream defaults.",
+                    line=config.line,
+                )
+            )
     by_role = {
         role: [item for item in scripts if item.role == role] for role in ("core", "compat", "sse")
     }
@@ -732,6 +974,7 @@ def check_htmx_compatibility(
         marked = [item for item in scripts if item.marker in {"htmx", "htmx-extension"}]
         effective_tier = _effective_tier(manifest, scripts)
         issues.extend(_check_template_drift(template, parsed, effective_tier))
+        issues.extend(_check_default_contract_drift(template, parsed, effective_tier))
 
         if not scripts:
             continue
@@ -754,7 +997,7 @@ def check_htmx_compatibility(
 
         preview_observed = effective_tier == "4-preview"
         if preview_observed and (manifest.enabled or marked):
-            issues.extend(_check_preview_bundle(template, scripts))
+            issues.extend(_check_preview_bundle(template, scripts, parsed.htmx_configs))
             continue
 
         if manifest.tier != "2-managed":

@@ -176,7 +176,11 @@ async def register(request: Request):
     # ... create the user
 ```
 
-The `form_errors` block re-renders with a 422 status. On the client, hook it with `hx-target-422` (or a custom htmx error handler). Pass `retarget="#error-banner"` to add an `HX-Retarget` header so errors land in a different element than the trigger.
+The `form_errors` block re-renders with a 422 status. Chirp's htmx 4 preview
+swaps 4xx HTML by policy, so use the form's ordinary local `hx-target`. Pass
+`retarget="#error-banner"` to add an `HX-Retarget` header when errors should
+land in a different element than the trigger. Htmx 2 applications retain their
+configured response-handling behavior.
 
 :::{note} See also
 - [[docs/build-apps/forms-data/forms-validation|Forms & validation]] — the full `validate()` API, validator functions, and form patterns.

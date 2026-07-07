@@ -18,6 +18,7 @@ threads the nonce onto the tag the same way the Alpine bootstrap does.
 """
 
 import html
+import json
 
 from chirp.app.htmx_manifest import HtmxProvisioningManifest, compile_htmx_manifest
 
@@ -26,6 +27,19 @@ def htmx_manifest_snippet(manifest: HtmxProvisioningManifest, *, nonce: str = ""
     """Render an ordered managed bundle from a freeze-time manifest."""
     nonce_attr = f' nonce="{html.escape(nonce, quote=True)}"' if nonce else ""
     tags: list[str] = []
+    policy = manifest.client_policy
+    if policy is not None:
+        config = {
+            "noSwap": list(policy.no_swap_statuses),
+            "defaultTimeout": policy.default_timeout_ms,
+            "compat": {"swapErrorResponseCodes": policy.compat_swap_error_responses},
+        }
+        content = html.escape(json.dumps(config, separators=(",", ":")), quote=True)
+        tags.append(
+            f'<meta name="htmx-config" content="{content}" data-chirp="htmx-config"'
+            f' data-chirp-htmx-tier="{manifest.tier}"'
+            f' data-chirp-htmx-version="{html.escape(manifest.version, quote=True)}">'
+        )
     for asset in manifest.assets:
         marker = "htmx" if asset.role == "core" else "htmx-extension"
         role_attr = (

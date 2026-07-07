@@ -23,13 +23,35 @@ function htmxErrorHandler(evtNames, titleText, color, bodyFn, useCfg) {
   });
 }
 
-htmxErrorHandler("htmx:targetError", "Target Not Found", COLORS.error, function(d) {
+onHtmxEvents(["htmx:targetError"], function(evt) {
+  var d = evt.detail || {};
+  var ctx = htmxContext(d);
+  var underlying = d.error || ctx.error || null;
+  var message = underlying ? String(underlying.message || underlying) : "";
+  var source = htmxSource(d);
+  var localConfig = source && source.getAttribute ? source.getAttribute("hx-config") || "" : "";
+  if (!d.target && /(?:^|[,\s])timeout\s*:/.test(localConfig)) {
+    if (!firstHtmxError(d)) return;
+    toast("Timeout", message || "Request exceeded its hx-config timeout", COLORS.warning, "");
+    return;
+  }
+  // htmx-2-compat maps generic htmx:error to targetError even when no target
+  // lookup failed. Leave that synthetic event unclaimed so the native htmx 4
+  // error listener can preserve timeout/network/swap classification.
+  if (!underlying && !d.target) return;
+  if (!firstHtmxError(d)) return;
+  if (message.toLowerCase().indexOf("timeout") >= 0) {
+    toast("Timeout", message, COLORS.warning, "");
+    return;
+  }
   var target = d.target || "(unknown selector)";
   var trigger = desc(d.elt || {});
-  return target + "\nTriggered by " + trigger +
+  var body = target + "\nTriggered by " + trigger +
     "\n\nCommon cause: target is in a different fragment than the form. " +
     "Co-locate the target with the mutating element (e.g. put the result div inside the same HTMX-loaded content).";
-}, true);
+  var cfg = source ? formatConfig(getEffectiveConfig(source)) : "";
+  toast("Target Not Found", body, COLORS.error, cfg);
+});
 
 htmxErrorHandler(["htmx:responseError", "htmx:response:error"], "Response Error", COLORS.error, function(d) {
   var ctx = htmxContext(d);

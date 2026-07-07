@@ -1,6 +1,6 @@
 # RFC 013: htmx 4 Default Contracts
 
-**Status:** Draft — implementation requires maintainer acceptance
+**Status:** Implemented for the explicit preview lane
 
 **Issue:** [#548](https://github.com/lbliii/chirp/issues/548)
 
@@ -15,8 +15,9 @@ DELETE without enclosing-form data, hx-sync queuing, and a 60-second request
 timeout. Error swapping uses a deliberate hybrid: 4xx HTML swaps, while 5xx
 responses do not swap unless the application explicitly scopes them.
 
-This RFC changes no runtime behavior. It defines the configuration and proof
-required after the #545 provisioning contract is accepted.
+The explicit preview implementation now ships the accepted client policy,
+tier-aware diagnostics, DevTools evidence, and pinned browser proof. Htmx 2
+remains the default until the separate GA release gate is satisfied.
 
 ## Decision matrix
 

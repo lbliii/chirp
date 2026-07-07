@@ -306,6 +306,7 @@ function createRecord() {
     returnTrace: null,
     signalEmits: null,
     effectiveConfigDetails: null,
+    synchronization: null,
     select: "",
     selectMatched: null,
     targetExistsBefore: null,
@@ -343,6 +344,16 @@ function collectConfigRequest(evt) {
   var target = ctx.target || d.target;
   r.target = target ? desc(target) : "";
   r.effectiveConfigDetails = getEffectiveConfigDetails(elt);
+  if (elt && elt.getAttribute) {
+    var syncValue = elt.getAttribute("hx-sync");
+    if (syncValue) {
+      var separator = syncValue.lastIndexOf(":");
+      r.synchronization = {
+        owner: separator >= 0 ? syncValue.slice(0, separator).trim() : "this",
+        strategy: separator >= 0 ? syncValue.slice(separator + 1).trim() : syncValue.trim(),
+      };
+    }
+  }
   r.timing.config = Date.now();
   try {
     r.requestHeaders = copyRequestHeaders(request.headers || d.headers);
