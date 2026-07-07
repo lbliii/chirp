@@ -48,6 +48,12 @@ not collide. `CacheMiddleware` also bypasses requests carrying `Cookie` or
 feature flags, or other app-specific variants. Include those in a custom key for
 scoped pages, or leave those pages uncached.
 
+`CacheMiddleware` does not cache QUERY responses. Chirp's provisional QUERY
+key design covers exact body bytes and request metadata, but cache reads and
+writes remain disabled until the explicit opt-in, validator, streaming, and
+backend-failure contracts are complete. Do not treat the presence of a key
+builder as permission to cache body-bearing requests globally.
+
 ## SSE
 
 SSE is good for forum notifications, unread counters, active thread tails, and
