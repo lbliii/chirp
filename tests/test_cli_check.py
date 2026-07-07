@@ -1,6 +1,7 @@
 """Tests for chirp.cli._check — ``chirp check`` subcommand."""
 
 import importlib.util
+import json
 import types
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -49,6 +50,26 @@ class TestChirpCheck:
         fake_check.return_value = None
         main(["check", "_check_test_app:app", "--coverage"])
         fake_check.assert_called_once_with(warnings_as_errors=False, coverage=True, deploy=False)
+
+    def test_json_coverage_is_opt_in(
+        self,
+        fake_check: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        main(["check", "_check_test_app:app", "--json"])
+        payload = json.loads(capsys.readouterr().out)
+        assert "coverage" not in payload
+
+    def test_json_coverage_includes_webmcp_counters(
+        self,
+        fake_check: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        main(["check", "_check_test_app:app", "--json", "--coverage"])
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["coverage"]["webmcp_projections_declared"] == 0
+        assert payload["coverage"]["webmcp_projections_compiled"] == 0
+        assert payload["coverage"]["webmcp_parameters_declared"] == 0
 
     def test_deploy_flag_is_forwarded(self, fake_check: MagicMock) -> None:
         """check --deploy forwards production posture and implies strict warnings."""

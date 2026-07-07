@@ -33,9 +33,11 @@ def test_check_at_git_ref_matches_current_head() -> None:
         "examples.chirpui.forum_shell.app:app",
         head,
         repo_root=repo_root,
+        include_coverage=True,
     )
     assert "issues" in payload
     assert "routes_checked" in payload
+    assert "coverage" in payload
 
 
 @pytest.mark.issue(344)
@@ -111,3 +113,4 @@ def test_diff_json_output(capsys: pytest.CaptureFixture[str]) -> None:
     assert payload["base_ref"] == head
     assert not payload["diff"]["added"]
     assert not payload["diff"]["removed"]
+    assert not payload["diff"]["coverage"]

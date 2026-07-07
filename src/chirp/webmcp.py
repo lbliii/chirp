@@ -55,18 +55,6 @@ class WebMCPForm:
     description: str
     autosubmit: bool = False
 
-    def __post_init__(self) -> None:
-        if not _TOOL_NAME.fullmatch(self.tool_name):
-            msg = (
-                "WebMCP tool_name must start with a letter and contain only "
-                f"letters, digits, dots, dashes, or underscores; got {self.tool_name!r}."
-            )
-            raise ConfigurationError(msg)
-        if not self.description.strip():
-            raise ConfigurationError(
-                f"WebMCP tool {self.tool_name!r} requires a non-empty description."
-            )
-
 
 @dataclass(frozen=True, slots=True)
 class _CompiledControl:
@@ -84,6 +72,37 @@ class _CompiledForm:
     route: str
     methods: tuple[str, ...]
     controls: Mapping[str, _CompiledControl]
+
+
+@dataclass(frozen=True, slots=True)
+class WebMCPCompileDiagnostic:
+    """Immutable setup diagnostic consumed by ``app.check()``."""
+
+    message: str
+    route: str
+    template: str | None
+    block: str | None
+    tool_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class WebMCPProjectionLocation:
+    """Source location for one successfully compiled projection."""
+
+    route: str
+    template: str
+    block: str
+    tool_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class WebMCPCompilation:
+    """Frozen result of compiling every opted-in form projection."""
+
+    registry: WebMCPRegistry | None
+    diagnostics: tuple[WebMCPCompileDiagnostic, ...]
+    valid_tools: tuple[str, ...]
+    projections: tuple[WebMCPProjectionLocation, ...]
 
 
 class WebMCPRegistry:
@@ -145,55 +164,123 @@ class WebMCPRegistry:
             raise ConfigurationError(msg) from exc
 
 
-def compile_webmcp_registry(routes: Iterable[Any]) -> WebMCPRegistry | None:
-    """Compile route form declarations into immutable template helpers."""
+def compile_webmcp_registry(routes: Iterable[Any]) -> WebMCPCompilation:
+    """Compile declarations and retain actionable diagnostics for checks."""
     forms: dict[str, _CompiledForm] = {}
+    seen_tools: dict[str, WebMCPProjectionLocation] = {}
+    seen_descriptions: dict[str, WebMCPProjectionLocation] = {}
+    diagnostics: list[WebMCPCompileDiagnostic] = []
+    projections: dict[str, WebMCPProjectionLocation] = {}
     for route in routes:
         route_contract = getattr(route.handler, "_chirp_contract", None)
         form_contract = getattr(route_contract, "form", None)
         declaration = getattr(form_contract, "webmcp", None)
         if declaration is None:
             continue
-        if form_contract is None:
-            raise ConfigurationError(
-                f"Route {route.path!r} declares WebMCP metadata without a FormContract."
+        template = getattr(form_contract, "template", None)
+        block = getattr(form_contract, "block", None)
+        tool_name = str(getattr(declaration, "tool_name", ""))
+        diagnostic_context = (
+            route.path,
+            template if isinstance(template, str) else None,
+            block if isinstance(block, str) else None,
+            tool_name or "<missing>",
+        )
+
+        def record(
+            message: str,
+            context: tuple[str, str | None, str | None, str] = diagnostic_context,
+        ) -> None:
+            route_path, template_name, block_name, operation = context
+            diagnostics.append(
+                WebMCPCompileDiagnostic(
+                    message=message,
+                    route=route_path,
+                    template=template_name,
+                    block=block_name,
+                    tool_name=operation,
+                )
             )
+
         if not isinstance(declaration, WebMCPForm):
-            msg = (
+            record(
                 f"Route {route.path!r} FormContract.webmcp must be a WebMCPForm, "
                 f"got {type(declaration).__name__}."
             )
-            raise ConfigurationError(msg)
-        if declaration.tool_name in forms:
-            first = forms[declaration.tool_name]
-            msg = (
-                f"Duplicate WebMCP tool {declaration.tool_name!r} on routes "
-                f"{first.route!r} and {route.path!r}; tool names must be unique."
+            continue
+        if not _TOOL_NAME.fullmatch(declaration.tool_name):
+            record(
+                "WebMCP tool_name must start with a letter and contain only "
+                f"letters, digits, dots, dashes, or underscores; got {declaration.tool_name!r}."
             )
-            raise ConfigurationError(msg)
-
+            continue
+        if not declaration.description.strip():
+            record(f"WebMCP tool {declaration.tool_name!r} requires a non-empty description.")
+            continue
         methods = tuple(sorted(str(method).upper() for method in route.methods))
         if declaration.autosubmit and any(method not in _SAFE_METHODS for method in methods):
-            msg = (
+            record(
                 f"WebMCP tool {declaration.tool_name!r} on mutation route "
                 f"{route.path!r} cannot enable autosubmit. Omit autosubmit so the "
                 "browser requires human review before submission."
             )
-            raise ConfigurationError(msg)
+            continue
 
-        controls = _compile_controls(
-            form_contract.datacls,
-            tool_name=declaration.tool_name,
+        try:
+            controls = _compile_controls(
+                cast(type, getattr(form_contract, "datacls", None)),
+                tool_name=declaration.tool_name,
+                route=route.path,
+            )
+        except ConfigurationError as exc:
+            record(str(exc))
+            continue
+        if declaration.tool_name in seen_tools:
+            first = seen_tools[declaration.tool_name]
+            forms.pop(declaration.tool_name, None)
+            projections.pop(declaration.tool_name, None)
+            record(
+                f"Duplicate WebMCP tool {declaration.tool_name!r} on route "
+                f"{first.route!r}, template {first.template!r} block {first.block!r}, "
+                f"and route {route.path!r}, template {template!r} block {block!r}; "
+                "tool names must be unique."
+            )
+            continue
+        description_key = declaration.description.strip().casefold()
+        if description_key in seen_descriptions:
+            first = seen_descriptions[description_key]
+            forms.pop(first.tool_name, None)
+            projections.pop(first.tool_name, None)
+            record(
+                f"Duplicate WebMCP description {declaration.description.strip()!r} for "
+                f"operations {first.tool_name!r} on route {first.route!r}, template "
+                f"{first.template!r} block {first.block!r}, and {declaration.tool_name!r} "
+                f"on route {route.path!r}. Give each operation a distinct agent-facing "
+                "description."
+            )
+            continue
+        location = WebMCPProjectionLocation(
             route=route.path,
+            template=template if isinstance(template, str) else "<missing>",
+            block=block if isinstance(block, str) else "<missing>",
+            tool_name=declaration.tool_name,
         )
+        seen_descriptions[description_key] = location
+        seen_tools[declaration.tool_name] = location
         forms[declaration.tool_name] = _CompiledForm(
             declaration=declaration,
             route=route.path,
             methods=methods,
             controls=MappingProxyType(controls),
         )
+        projections[declaration.tool_name] = location
 
-    return WebMCPRegistry(forms) if forms else None
+    return WebMCPCompilation(
+        registry=WebMCPRegistry(forms) if forms else None,
+        diagnostics=tuple(diagnostics),
+        valid_tools=tuple(sorted(forms)),
+        projections=tuple(projections[name] for name in sorted(forms)),
+    )
 
 
 def _compile_controls(datacls: type, *, tool_name: str, route: str) -> dict[str, _CompiledControl]:

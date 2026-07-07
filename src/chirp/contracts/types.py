@@ -65,6 +65,9 @@ class ContractCoverage:
     page_shell_required_blocks: int = 0
     fragment_targets_registered: int = 0
     oob_regions_registered: int = 0
+    webmcp_projections_declared: int = 0
+    webmcp_projections_compiled: int = 0
+    webmcp_parameters_declared: int = 0
 
     @property
     def post_routes_without_form_contract(self) -> int:

@@ -4,8 +4,9 @@ import pytest
 
 from chirp.contracts import check_hypermedia_surface
 from chirp.testing import TestClient
+from tests.helpers.auth import csrf_post
 
-pytestmark = pytest.mark.issue(574)
+pytestmark = [pytest.mark.issue(574), pytest.mark.issue(575)]
 
 
 async def test_form_is_agent_visible_and_keeps_native_submission(example_app) -> None:
@@ -19,14 +20,27 @@ async def test_form_is_agent_visible_and_keeps_native_submission(example_app) ->
 
 
 async def test_same_handler_validates_and_redirects(example_app) -> None:
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     async with TestClient(example_app) as client:
-        invalid = await client.post("/tasks", body=b"priority=2", headers=headers)
-        valid = await client.post("/tasks", body=b"title=Ship&priority=1", headers=headers)
-        htmx = await client.post(
+        invalid, cookie = await csrf_post(
+            client,
             "/tasks",
-            body=b"title=Fragment&priority=3",
-            headers={**headers, "HX-Request": "true", "HX-Target": "task-form"},
+            cookie=None,
+            data={"priority": "2"},
+            htmx=False,
+        )
+        valid, cookie = await csrf_post(
+            client,
+            "/tasks",
+            cookie=cookie,
+            data={"title": "Ship", "priority": "1"},
+            htmx=False,
+        )
+        htmx, _ = await csrf_post(
+            client,
+            "/tasks",
+            cookie=cookie,
+            data={"title": "Fragment", "priority": "3"},
+            extra_headers={"HX-Target": "task-form"},
         )
 
     assert invalid.status == 422

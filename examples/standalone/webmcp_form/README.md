@@ -3,7 +3,9 @@
 This example adds experimental WebMCP discovery attributes to one real Chirp
 form. `TaskForm` remains the typed server contract, `/tasks` remains the only
 submission handler, and `FormAction`/`ValidationError` preserve normal and htmx
-behavior. There is no imperative browser-tool registry or JSON response path.
+behavior. The mutation uses the same session-backed CSRF protection for human,
+htmx, and browser-agent submissions. There is no imperative browser-tool
+registry or JSON response path.
 
 Run it from the repository root:
 

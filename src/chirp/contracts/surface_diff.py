@@ -24,12 +24,17 @@ def collect_check_json(
     *,
     deploy: bool = False,
     include_info: bool = False,
+    include_coverage: bool = False,
 ) -> tuple[Any, dict[str, Any]]:
     """Run contract validation and return ``(result, json_payload)``."""
     started = time.perf_counter()
     result = check_hypermedia_surface(app, deploy=deploy)
     result.elapsed_ms = (time.perf_counter() - started) * 1000
-    return result, result_to_dict(result, include_info=include_info)
+    return result, result_to_dict(
+        result,
+        include_info=include_info,
+        include_coverage=include_coverage,
+    )
 
 
 def collect_check_payload(
@@ -37,9 +42,15 @@ def collect_check_payload(
     *,
     deploy: bool = False,
     include_info: bool = False,
+    include_coverage: bool = False,
 ) -> dict[str, Any]:
     """Run contract validation on *app* and return a stable JSON payload."""
-    _, payload = collect_check_json(app, deploy=deploy, include_info=include_info)
+    _, payload = collect_check_json(
+        app,
+        deploy=deploy,
+        include_info=include_info,
+        include_coverage=include_coverage,
+    )
     return payload
 
 
@@ -67,6 +78,7 @@ def check_at_git_ref(
     repo_root: Path,
     deploy: bool = False,
     include_info: bool = False,
+    include_coverage: bool = False,
 ) -> dict[str, Any]:
     """Run ``chirp check --json`` against *app_import* at *base_ref* via a temp worktree."""
     with tempfile.TemporaryDirectory(prefix="chirp-diff-") as tmp:
@@ -97,6 +109,8 @@ def check_at_git_ref(
                 cmd.append("--deploy")
             if include_info:
                 cmd.append("--include-info")
+            if include_coverage:
+                cmd.append("--coverage")
 
             env = os.environ.copy()
             env.setdefault("CHIRP_SKIP_CONTRACT_CHECKS", "1")
@@ -139,13 +153,19 @@ def collect_surface_diff(
 ) -> tuple[ContractDiff, dict[str, Any]]:
     """Diff hypermedia contracts for *app* against *base_ref*."""
     root = repo_root or find_git_root()
-    current = collect_check_payload(app, deploy=deploy, include_info=include_info)
+    current = collect_check_payload(
+        app,
+        deploy=deploy,
+        include_info=include_info,
+        include_coverage=True,
+    )
     baseline = check_at_git_ref(
         app_import,
         base_ref,
         repo_root=root,
         deploy=deploy,
         include_info=include_info,
+        include_coverage=True,
     )
     diff = diff_contract_dicts(baseline, current)
     payload = {
@@ -153,7 +173,11 @@ def collect_surface_diff(
         "app_import": app_import,
         "baseline": baseline,
         "current": current,
-        "diff": {"added": list(diff.added), "removed": list(diff.removed)},
+        "diff": {
+            "added": list(diff.added),
+            "removed": list(diff.removed),
+            "coverage": list(diff.coverage_changes),
+        },
         "summary_lines": diff.summary_lines(),
     }
     return diff, payload

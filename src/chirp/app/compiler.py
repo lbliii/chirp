@@ -557,7 +557,14 @@ class AppCompiler:
 
         from chirp.webmcp import compile_webmcp_registry
 
-        webmcp_registry = compile_webmcp_registry(router.routes)
+        webmcp_compilation = compile_webmcp_registry(router.routes)
+        if webmcp_compilation.diagnostics:
+            self._mutable.contract_check_data["webmcp_compile_diagnostics"] = (
+                webmcp_compilation.diagnostics
+            )
+        if webmcp_compilation.valid_tools:
+            self._mutable.contract_check_data["webmcp_valid_tools"] = webmcp_compilation.valid_tools
+        webmcp_registry = webmcp_compilation.registry
         if webmcp_registry is not None:
             webmcp_globals = {
                 "webmcp_form_attrs": webmcp_registry.form_attrs,
@@ -570,13 +577,29 @@ class AppCompiler:
             )
             for name, helper in webmcp_globals.items():
                 if name in self._mutable.template_globals or name in custom_env_globals:
-                    from chirp.errors import ConfigurationError
+                    from chirp.webmcp import WebMCPCompileDiagnostic
 
-                    raise ConfigurationError(
-                        f"Template global {name!r} is reserved by an opted-in "
-                        "WebMCP FormContract. Remove the custom registration so "
-                        "Chirp can render the verified declarative attributes."
+                    collisions = tuple(
+                        WebMCPCompileDiagnostic(
+                            message=(
+                                f"Template global {name!r} is reserved by an opted-in "
+                                "WebMCP FormContract. Remove the custom registration so "
+                                "Chirp can render the verified declarative attributes."
+                            ),
+                            route=projection.route,
+                            template=projection.template,
+                            block=projection.block,
+                            tool_name=projection.tool_name,
+                        )
+                        for projection in webmcp_compilation.projections
                     )
+                    existing = tuple(
+                        self._mutable.contract_check_data.get("webmcp_compile_diagnostics", ())
+                    )
+                    self._mutable.contract_check_data["webmcp_compile_diagnostics"] = (
+                        existing + collisions
+                    )
+                    continue
                 self._mutable.template_globals[name] = helper
 
         from chirp.app.url_for import build_routes_by_name

@@ -9,13 +9,21 @@ from pathlib import Path
 import pytest
 
 from chirp import App, AppConfig, Page, Request, ValidationError, WebMCPForm, form_or_errors
-from chirp.contracts import FormContract, contract
-from chirp.errors import ConfigurationError
+from chirp.contracts import FormContract, check_hypermedia_surface, contract
 from chirp.middleware.csrf import CSRFMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 from chirp.testing import TestClient
 
 pytestmark = pytest.mark.issue(574)
+
+
+def _webmcp_error_messages(app: App) -> list[str]:
+    app.freeze()
+    return [
+        issue.message
+        for issue in check_hypermedia_surface(app).errors
+        if issue.category == "webmcp"
+    ]
 
 
 def test_preview_is_pinned_to_the_reviewed_proposal_commit() -> None:
@@ -257,9 +265,9 @@ async def test_unsupported_control_fails_with_actionable_guidance(
     def upload() -> str:
         return "ok"
 
-    with pytest.raises(ConfigurationError, match=rf"unsupported control '{control}'.*Supported"):
-        async with TestClient(app):
-            pass
+    messages = _webmcp_error_messages(app)
+    assert any(f"unsupported control '{control}'" in message for message in messages)
+    assert any("Supported controls" in message for message in messages)
 
 
 async def test_incompatible_constraint_fails_instead_of_silently_degrading(
@@ -290,9 +298,10 @@ async def test_incompatible_constraint_fails_instead_of_silently_degrading(
     def search() -> str:
         return "ok"
 
-    with pytest.raises(ConfigurationError, match=r"webmcp_min.*do not apply.*search"):
-        async with TestClient(app):
-            pass
+    assert any(
+        "webmcp_min" in message and "do not apply" in message and "search" in message
+        for message in _webmcp_error_messages(app)
+    )
 
 
 async def test_mutation_autosubmit_is_rejected_before_serving(tmp_path: Path) -> None:
@@ -311,9 +320,10 @@ async def test_mutation_autosubmit_is_rejected_before_serving(tmp_path: Path) ->
     def create() -> str:
         return "ok"
 
-    with pytest.raises(ConfigurationError, match=r"mutation route.*cannot enable autosubmit"):
-        async with TestClient(app):
-            pass
+    assert any(
+        "mutation route" in message and "cannot enable autosubmit" in message
+        for message in _webmcp_error_messages(app)
+    )
 
 
 async def test_projection_helpers_cannot_be_shadowed(tmp_path: Path) -> None:
@@ -333,9 +343,10 @@ async def test_projection_helpers_cannot_be_shadowed(tmp_path: Path) -> None:
     def create() -> str:
         return "ok"
 
-    with pytest.raises(ConfigurationError, match=r"reserved.*Remove the custom registration"):
-        async with TestClient(app):
-            pass
+    assert any(
+        "reserved" in message and "Remove the custom registration" in message
+        for message in _webmcp_error_messages(app)
+    )
 
 
 async def test_safe_get_form_may_explicitly_enable_autosubmit(tmp_path: Path) -> None:
