@@ -40,7 +40,7 @@ async def test_same_handler_validates_and_redirects(example_app) -> None:
             "/tasks",
             cookie=cookie,
             data={"title": "Fragment", "priority": "3"},
-            extra_headers={"HX-Target": "task-form"},
+            extra_headers={"HX-Request": "true", "HX-Target": "task-form"},
         )
 
     assert invalid.status == 422

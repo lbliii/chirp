@@ -97,7 +97,7 @@ shape may still evolve before 1.0:
 proposal commit `0b676d27a08aafd3b4f8a709756eeeab342fd9bd`. It is provisional,
 adds no imperative JavaScript registry, and never changes the ordinary form
 submission path. Mutation forms cannot enable the toolautosubmit attribute.
-The `webmcp` startup contract category validates the projection and its native
+The webmcp startup contract category validates the projection and its native
 fallback as ERROR-only safety diagnostics. `chirp check --json --coverage` and
 contract diffs include declared/compiled projection and parameter counters.
 
