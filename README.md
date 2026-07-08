@@ -152,8 +152,10 @@ uv add bengal-chirp
 
 The packaged `chirp` command uses the direct `milo-cli` 0.4.x dependency for
 typed, lazy command registration. Existing Chirp argv and exit behavior remain
-covered by a black-box compatibility suite; current commands stay CLI-only
-until a separate structured-result and safety review opts them into MCP.
+covered by a black-box compatibility suite. The read-only `check`, `diff`, and
+`routes` inspections share structured results across CLI, programmatic calls,
+MCP, and llms.txt; server, scaffold, freeze, migration, and other write-capable
+commands remain human-only.
 
 <details>
 <summary><strong>Optional extras</strong></summary>

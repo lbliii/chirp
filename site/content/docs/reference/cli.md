@@ -28,10 +28,10 @@ Scaffolding and migration commands instead take filesystem/database arguments;
 The command tree is registered through Milo 0.4.x. Existing Chirp command
 names, positionals, flags, defaults, output channels, and exit codes remain the
 compatibility contract. Help uses Milo's typed presentation and adds framework
-root operations. Current Chirp commands are CLI-only and deny-by-default for MCP
-and llms.txt. Protocol/output flags are reserved until a separate
-structured-result and safety review integrates them with Chirp-owned handlers;
-do not rely on those flags to redirect or suppress current command output.
+root operations. `check`, `diff`, and `routes` are the explicit read-only MCP
+and llms.txt allowlist; every lifecycle or write-capable command remains
+CLI-only. The selected inspections also support Milo's `--format json` and
+`--output-file` controls while preserving their existing terminal output.
 
 ```bash
 chirp --version        # chirp, kida, pounce, and Python versions
@@ -77,6 +77,20 @@ The three commands below are documented in full. For `run`/`dev` see
 [[docs/quality/deployment/production|Production deployment]]; for `freeze` see
 [[docs/quality/deployment/freeze-hybrid|Freeze and hybrid hosting]]; for
 `makemigrations` and `migrate` see [[docs/build-apps/forms-data/database|Database]].
+
+## Agent inspection
+
+Use `chirp --llms-txt` to inspect the agent-readable command contract or
+`chirp --mcp` to serve the reviewed tools to an MCP host. The allowlist is:
+
+- `check` — structured contract issues and optional coverage;
+- `diff` — the existing stable git-baseline diff payload;
+- `routes` — method, path, handler, and route-name records.
+
+These tools are read-only but open-world: importing `myapp:app` executes trusted
+project Python code, and `diff` reads git history through a temporary detached
+worktree. Scaffold, server, freeze, migration, security-check, and codegen
+commands are not discoverable or callable through MCP.
 
 ---
 

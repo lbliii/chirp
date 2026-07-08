@@ -10,50 +10,82 @@ import pytest
 
 from chirp import App, AppConfig
 from chirp.cli import main
+from chirp.contracts import CheckResult, ContractIssue, Severity, result_to_dict
 
 
 @pytest.fixture
-def fake_check(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Patch App.check and register a fake module with an App instance."""
-    mock_check = MagicMock()
-    monkeypatch.setattr(App, "check", mock_check)
-
+def fake_check(monkeypatch: pytest.MonkeyPatch) -> tuple[MagicMock, CheckResult, App]:
+    """Patch the structured contract collector and register a fake app."""
+    result = CheckResult(routes_checked=1)
     app = App()
     mod = types.ModuleType("_check_test_app")
     mod.app = app  # type: ignore[attr-defined]
     monkeypatch.setitem(__import__("sys").modules, "_check_test_app", mod)
-    return mock_check
+
+    def collect(
+        _app: App,
+        *,
+        deploy: bool,
+        include_info: bool,
+        include_coverage: bool,
+    ) -> tuple[CheckResult, dict[str, object]]:
+        return result, result_to_dict(
+            result,
+            include_info=include_info,
+            include_coverage=include_coverage,
+        )
+
+    mock_collect = MagicMock(side_effect=collect)
+    monkeypatch.setattr("chirp.cli._check.collect_check_json", mock_collect)
+    return mock_collect, result, app
 
 
 class TestChirpCheck:
-    def test_successful_check(self, fake_check: MagicMock) -> None:
-        """check exits cleanly when App.check() succeeds."""
-        fake_check.return_value = None
+    def test_successful_check(self, fake_check: tuple[MagicMock, CheckResult, App]) -> None:
+        """check exits cleanly when the structured result succeeds."""
+        collector, _, app = fake_check
         main(["check", "_check_test_app:app"])
-        fake_check.assert_called_once()
+        collector.assert_called_once_with(
+            app,
+            deploy=False,
+            include_info=False,
+            include_coverage=False,
+        )
 
-    def test_failed_check_exits_one(self, fake_check: MagicMock) -> None:
-        """check exits 1 when App.check() raises SystemExit(1)."""
-        fake_check.side_effect = SystemExit(1)
+    def test_failed_check_exits_one(self, fake_check: tuple[MagicMock, CheckResult, App]) -> None:
+        """check exits 1 when the structured result contains an error."""
+        _, result, _ = fake_check
+        result.issues.append(ContractIssue(Severity.ERROR, "test", "broken"))
         with pytest.raises(SystemExit) as exc_info:
             main(["check", "_check_test_app:app"])
         assert exc_info.value.code == 1
 
-    def test_warnings_as_errors_flag_is_forwarded(self, fake_check: MagicMock) -> None:
-        """check forwards strict warning mode to App.check()."""
-        fake_check.return_value = None
-        main(["check", "_check_test_app:app", "--warnings-as-errors"])
-        fake_check.assert_called_once_with(warnings_as_errors=True, coverage=False, deploy=False)
+    def test_warnings_as_errors_flag_changes_exit_policy(
+        self, fake_check: tuple[MagicMock, CheckResult, App]
+    ) -> None:
+        """check applies strict warning policy to the structured result."""
+        _, result, _ = fake_check
+        result.issues.append(ContractIssue(Severity.WARNING, "test", "review me"))
+        with pytest.raises(SystemExit) as exc_info:
+            main(["check", "_check_test_app:app", "--warnings-as-errors"])
+        assert exc_info.value.code == 1
 
-    def test_coverage_flag_is_forwarded(self, fake_check: MagicMock) -> None:
-        """check forwards coverage reporting to App.check()."""
-        fake_check.return_value = None
+    def test_coverage_flag_is_forwarded(
+        self, fake_check: tuple[MagicMock, CheckResult, App]
+    ) -> None:
+        """check requests coverage in the structured payload."""
+        collector, _, app = fake_check
         main(["check", "_check_test_app:app", "--coverage"])
-        fake_check.assert_called_once_with(warnings_as_errors=False, coverage=True, deploy=False)
+        collector.assert_called_once_with(
+            app,
+            deploy=False,
+            include_info=False,
+            include_coverage=True,
+        )
 
     def test_json_coverage_is_opt_in(
         self,
-        fake_check: MagicMock,
+        fake_check: tuple[MagicMock, CheckResult, App],
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         main(["check", "_check_test_app:app", "--json"])
@@ -62,7 +94,7 @@ class TestChirpCheck:
 
     def test_json_coverage_includes_webmcp_counters(
         self,
-        fake_check: MagicMock,
+        fake_check: tuple[MagicMock, CheckResult, App],
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         main(["check", "_check_test_app:app", "--json", "--coverage"])
@@ -71,11 +103,16 @@ class TestChirpCheck:
         assert payload["coverage"]["webmcp_projections_compiled"] == 0
         assert payload["coverage"]["webmcp_parameters_declared"] == 0
 
-    def test_deploy_flag_is_forwarded(self, fake_check: MagicMock) -> None:
-        """check --deploy forwards production posture and implies strict warnings."""
-        fake_check.return_value = None
+    def test_deploy_flag_is_forwarded(self, fake_check: tuple[MagicMock, CheckResult, App]) -> None:
+        """check --deploy requests production posture."""
+        collector, _, app = fake_check
         main(["check", "_check_test_app:app", "--deploy"])
-        fake_check.assert_called_once_with(warnings_as_errors=True, coverage=False, deploy=True)
+        collector.assert_called_once_with(
+            app,
+            deploy=True,
+            include_info=False,
+            include_coverage=False,
+        )
 
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """check exits 1 with error message for bad import string."""

@@ -13,6 +13,7 @@ from typing import Any
 from milo import CLI
 
 _CLI_ONLY = ("cli",)
+_INSPECTION_SURFACES = ("cli", "mcp", "llms")
 _MISSING = object()
 
 
@@ -239,6 +240,17 @@ def _version_report() -> str:
     return version_report()
 
 
+def _render_inspection_result(result: Any, _ctx: Any) -> str:
+    """Render structured inspection data only at the human CLI boundary."""
+    from chirp.cli._inspection import InspectionResult, emit_terminal_result
+
+    if not isinstance(result, InspectionResult):
+        return str(result)
+    if result.exit_code:
+        emit_terminal_result(result)
+    return result.terminal_text
+
+
 def _build_cli() -> CLI:
     """Build one registry per invocation to isolate Milo's parser state."""
     cli = CLI(
@@ -254,14 +266,17 @@ def _build_cli() -> CLI:
         description: str,
         *,
         annotations: dict[str, Any] | None = None,
+        surfaces: tuple[str, ...] = _CLI_ONLY,
+        structured: bool = False,
     ) -> None:
         cli.lazy_command(
             name,
             f"chirp.cli._milo_handlers:{name.replace('-', '_')}_command",
             description=description,
             schema=schemas[name],
-            surfaces=_CLI_ONLY,
-            display_result=False,
+            surfaces=surfaces,
+            display_result=structured,
+            terminal_renderer=_render_inspection_result if structured else None,
             annotations=annotations,
         )
 
@@ -276,9 +291,28 @@ def _build_cli() -> CLI:
         "Development server with browser reload on template/CSS changes",
         annotations={"openWorldHint": True},
     )
-    register("check", "Validate hypermedia contracts")
-    register("diff", "Diff hypermedia contracts against a git base ref")
-    register("routes", "List registered routes")
+    inspection_annotations = {"readOnlyHint": True, "openWorldHint": True}
+    register(
+        "check",
+        "Validate hypermedia contracts",
+        annotations=inspection_annotations,
+        surfaces=_INSPECTION_SURFACES,
+        structured=True,
+    )
+    register(
+        "diff",
+        "Diff hypermedia contracts against a git base ref",
+        annotations=inspection_annotations,
+        surfaces=_INSPECTION_SURFACES,
+        structured=True,
+    )
+    register(
+        "routes",
+        "List registered routes",
+        annotations=inspection_annotations,
+        surfaces=_INSPECTION_SURFACES,
+        structured=True,
+    )
     register("security-check", "Audit app config against OWASP security checklist")
     register(
         "freeze",

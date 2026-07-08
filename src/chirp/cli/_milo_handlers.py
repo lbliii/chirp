@@ -154,7 +154,7 @@ def check_command(
     json: bool = False,
     baseline: Annotated[str | None, Option(metavar="PATH")] = None,
     include_info: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Validate an application's hypermedia contracts.
 
     Args:
@@ -166,18 +166,16 @@ def check_command(
         baseline: Compare with a prior JSON baseline at this path.
         include_info: Include informational findings in structured output.
     """
-    from chirp.cli._check import run_check
+    from chirp.cli._check import collect_check_result
 
-    run_check(
-        _args(
-            app=app,
-            warnings_as_errors=warnings_as_errors,
-            coverage=coverage,
-            deploy=deploy,
-            json=json,
-            baseline=baseline,
-            include_info=include_info,
-        )
+    return collect_check_result(
+        app,
+        warnings_as_errors=warnings_as_errors,
+        coverage=coverage,
+        deploy=deploy,
+        json_output=json,
+        baseline=baseline,
+        include_info=include_info,
     )
 
 
@@ -188,7 +186,7 @@ def diff_command(
     warnings_as_errors: bool = False,
     deploy: bool = False,
     include_info: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Diff an application's hypermedia contracts.
 
     Args:
@@ -199,29 +197,27 @@ def diff_command(
         deploy: Use production-posture severity and strict warnings.
         include_info: Include informational findings in the diff.
     """
-    from chirp.cli._diff import run_diff
+    from chirp.cli._diff import collect_diff_result
 
-    run_diff(
-        _args(
-            app=app,
-            base=base,
-            json=json,
-            warnings_as_errors=warnings_as_errors,
-            deploy=deploy,
-            include_info=include_info,
-        )
+    return collect_diff_result(
+        app,
+        base,
+        json_output=json,
+        warnings_as_errors=warnings_as_errors,
+        deploy=deploy,
+        include_info=include_info,
     )
 
 
-def routes_command(app: Annotated[str, Positional("app")]) -> None:
+def routes_command(app: Annotated[str, Positional("app")]) -> dict[str, Any]:
     """List registered routes.
 
     Args:
         app: Application import string, for example myapp:app.
     """
-    from chirp.cli._routes import run_routes
+    from chirp.cli._routes import collect_routes_result
 
-    run_routes(_args(app=app))
+    return collect_routes_result(app)
 
 
 def security_check_command(app: Annotated[str, Positional("app")]) -> None:

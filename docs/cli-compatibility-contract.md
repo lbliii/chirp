@@ -1,6 +1,6 @@
 # Chirp CLI Compatibility Contract
 
-**Status:** Milo 0.4.1 migration implemented; agent exposure remains deny-by-default<br>
+**Status:** Milo 0.4.1 migration implemented; read-only agent allowlist active<br>
 **Chirp issue:** [#571](https://github.com/lbliii/chirp/issues/571)<br>
 **Migration issue:** [#572](https://github.com/lbliii/chirp/issues/572)<br>
 **Milo partner issue:** [milo-cli#75](https://github.com/lbliii/milo-cli/issues/75)
@@ -41,12 +41,12 @@ from the typed adapters.
 The legacy aliases `-h`/`--help` and `-V`/`--version` remain. There are no
 command aliases or nested commands. Milo adds its standard root operations
 (`--llms-txt`, `--mcp`, gateway registration, completions, verbosity, quiet,
-dry-run, output-file, and force) plus per-command `--format`. All eleven Chirp
-commands are currently `surfaces=("cli",)`, so MCP and llms.txt expose none of
-them until a separate safety and structured-result review opts them in. In
-this migration those extra output/protocol flags are reserved framework syntax:
-Chirp's existing handlers still own terminal writes and side effects, so #573
-must integrate structured results before those controls can govern a command.
+dry-run, output-file, and force) plus per-command `--format`. `check`, `diff`,
+and `routes` use `surfaces=("cli", "mcp", "llms")`; the other eight commands
+remain `surfaces=("cli",)`. The selected handlers return domain dictionaries,
+and Milo's terminal renderer preserves their established human text and exit
+policy. `--format json` and `--output-file` therefore govern the selected
+inspections without changing legacy `--json` behavior.
 
 ## Command, argument, and exposure inventory
 
@@ -59,9 +59,9 @@ required.
 | `new` | `name`; `--minimal`, `--stream`, `--sse`, `--shell`, `--ai`, `--with-chirpui` | Flags default `false`. If several modes are supplied, source precedence is minimal → AI → stream → SSE → shell → default. `--with-chirpui` is an independent hard requirement. | Human-only; intentionally not agent-exposed because it writes a project tree. |
 | `run` | `app`; `--host`, `--port`, `--production`, `--workers`, `--metrics`, `--rate-limit`, `--queue`, `--sentry-dsn` | Scalar overrides default to `None` then app config. Boolean capabilities OR with app config. Production is selected by `--production` or `debug=False`. | Human-only persistent process; intentionally not agent-exposed. |
 | `dev` | Same parser surface as `run` | Also forces `debug=True` and `dev_browser_reload=True`. Other resolution matches `run`. | Human-only persistent process; intentionally not agent-exposed. |
-| `check` | `app`; `--warnings-as-errors`, `--coverage`, `--deploy`, `--json`, `--baseline PATH`, `--include-info` | Flags default `false`, baseline `None`. `--deploy` implies strict warnings. `--include-info` affects structured modes. | CLI-only today. `--json` is the leading candidate for a later read-only agent projection. |
-| `diff` | `app`; required `--base REF`; `--json`, `--warnings-as-errors`, `--deploy`, `--include-info` | Flags default `false`. `--deploy` implies strict warnings. | CLI-only today. `--json` is a candidate for later structured exposure after repository/auth policy review. |
-| `routes` | `app` | No options beyond help. Freezes the app before printing. | Human-only today; intentionally not agent-exposed until a structured schema exists. |
+| `check` | `app`; `--warnings-as-errors`, `--coverage`, `--deploy`, `--json`, `--baseline PATH`, `--include-info` | Flags default `false`, baseline `None`. `--deploy` implies strict warnings. `--include-info` affects structured modes. | Read-only CLI/programmatic/MCP/llms inspection. Returns stable issues and optional coverage; imports project code. |
+| `diff` | `app`; required `--base REF`; `--json`, `--warnings-as-errors`, `--deploy`, `--include-info` | Flags default `false`. `--deploy` implies strict warnings. | Read-only CLI/programmatic/MCP/llms inspection. Reads git and uses a temporary detached worktree; imports project code at both revisions. |
+| `routes` | `app` | No options beyond help. Freezes the app before printing. | Read-only CLI/programmatic/MCP/llms inspection. Returns method, path, handler, and route name records. |
 | `security-check` | `app` | No options beyond help. | Human-only today; security findings need a stable structured schema before exposure. |
 | `freeze` | `app`, `output`; `--exclude PREFIX [PREFIX ...]` | `exclude=None`; one or more values when present. | Human-only; intentionally not agent-exposed because it writes an output tree. |
 | `makemigrations` | required `--db`, required `--schema`; `--migrations-dir` | Migrations directory defaults to `migrations`. | Human-only; intentionally not agent-exposed because it inspects a database and writes migration files. |
@@ -91,6 +91,24 @@ Environment behavior remains handler-owned:
   does not configure the `new` parser itself.
 - `makemigrations` and `migrate` consume the explicit `--db` value. Shell
   expansion such as `--db "$DATABASE_URL"` occurs before Chirp runs.
+
+## Agent discovery and trust boundary
+
+`chirp --llms-txt` describes only the three reviewed inspections. Running
+`chirp --mcp` exposes those same names and input schemas to an MCP host:
+
+```bash
+chirp --llms-txt
+chirp --mcp
+```
+
+All three tools are annotated `readOnlyHint=true` and `openWorldHint=true`.
+Read-only describes their persistent application effect, not a sandbox:
+resolving an app import executes that project's Python import/factory code.
+`diff` additionally reads the current git repository and creates then removes a
+temporary detached worktree. Run this MCP server only for a project and git
+history the host already trusts. Resolution and baseline failures return stable
+error codes, the failing app/ref/path context, and a repair suggestion.
 
 ## Output channels and exit policy
 
@@ -123,7 +141,10 @@ The Milo registry and parser are built inside each `main()` call, so concurrent
 callers do not share parser state. Registration uses fresh precomputed schema
 dicts and lazy import paths. `tests/cli/test_milo_cli_adoption.py` compares every
 precomputed schema with `function_to_schema()` on its typed adapter and builds
-parsers concurrently under `PYTHON_GIL=0`.
+parsers concurrently under `PYTHON_GIL=0`. Agent route inspection also stresses
+32 concurrent reads of one frozen app. `diff` serializes its idempotent
+process-global import-path/environment publication under a named lock; each git
+comparison still owns an independent temporary worktree and result mapping.
 
 The same-environment startup receipt on 2026-07-08 used 25 subprocesses on
 CPython 3.14.2t / macOS Apple Silicon. Root `--help` measured a 70.0 ms median
@@ -143,15 +164,16 @@ version-report, and terminal-rendering gaps identified by this contract.
 | --- | --- | --- |
 | Command registration and typed parameters | `CLI.lazy_command()`, `Positional`, `Option`, `function_to_schema()` | Eleven typed adapters; precomputed schemas are parity-tested. |
 | Deferred command imports | `LazyCommandDef` with `schema=` | Root and command help load no Chirp handler module. |
-| Human output and exit ownership | `display_result=False` plus handler `SystemExit` | Existing Chirp handlers keep terminal output and exit semantics. |
-| Surface policy | `surfaces=("cli",)` | No current command appears in MCP or llms.txt. |
+| Human output and exit ownership | `terminal_renderer` plus JSON-compatible handler results | Selected inspections preserve terminal text/streams/exits without scraping prose; other handlers retain `display_result=False`. |
+| Surface policy | Explicit per-command `surfaces` | Only `check`, `diff`, and `routes` appear in MCP and llms.txt; all mutation/lifecycle commands remain CLI-only. |
 | Version report | `version_flags` and lazy `version_report` | `-V` and `--version` retain the four-version report. |
 | Positionals and legacy option spelling | `x-milo-cli` generated by typed markers | Existing argv remains valid, including `--migrations` and one-or-more `--exclude`. |
 | Free-threaded parser lifecycle | Invocation-local `CLI` | No mutable registry/parser is shared across callers. |
 
-No terminal prose is scraped into structured results. Future agent exposure
-must refactor selected handlers to return domain values and belongs in a
-separate reviewed issue with explicit auth, mutation, and schema policy.
+No terminal prose is scraped into structured results. The JSON-compatible
+mapping is authoritative; CLI-only presentation metadata is stored outside the
+mapping and consumed only by Milo's terminal renderer. Any future allowlist
+addition requires its own auth, mutation, and schema review.
 
 ## Collateral inventory
 
@@ -172,5 +194,7 @@ separate reviewed issue with explicit auth, mutation, and schema policy.
   for their respective commands.
 - `changelog.d/572.changed.md` records parser ownership, dependency range, help
   presentation, lazy behavior, and deny-by-default agent policy.
+- `changelog.d/573.changed.md` records the reviewed read-only inspection
+  allowlist and structured-result boundary.
 - Generated site output is intentionally not hand-edited; canonical site source
   moves with this contract.

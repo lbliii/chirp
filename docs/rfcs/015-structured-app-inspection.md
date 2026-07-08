@@ -722,7 +722,8 @@ compatibility. Concrete extension needs should produce typed fields later.
 - No public compiler graph, query API, or private graph dataclass export.
 - No route table or render-plan inventory beyond finding subject IDs.
 - No runtime trace or transition coverage correlation; issue #511 owns it.
-- No Milo/MCP/llms.txt exposure; issue #573 consumes this seam later.
+- Milo/MCP/llms.txt projection remains outside this RFC. Issue #573 consumes
+  the stable check/diff and route payloads without exposing the compiler graph.
 - No change to contract severities, categories, rule behavior, or deploy rules.
 - No new CLI flag or default JSON migration.
 - No mutable metadata bag on results or findings.
@@ -842,7 +843,7 @@ result while temporarily supporting two deliberate serializers.
 5. Built-in stable identity/location/remediation migration by rule family.
 6. Downstream composition and concurrency canaries.
 7. #511 trace/coverage correlation.
-8. #573 Milo/MCP/llms.txt exposure after its CLI dependency lands.
+8. #573 Milo/MCP/llms.txt projection through the reviewed read-only allowlist.
 
 ## 18. Global sweep for accepted P0s
 
