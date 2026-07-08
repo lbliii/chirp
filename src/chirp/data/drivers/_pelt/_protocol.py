@@ -781,7 +781,8 @@ class ExtendedQueryProtocol:
         Legal only from ``READY`` after a :class:`PortalSuspendedEvent` left a portal open;
         re-binding is *not* needed — the portal carries its cursor position. ``max_rows`` is the
         next batch size (``0`` drains the rest). Calling it with no open portal is programmer
-        misuse (raises :class:`ValueError`)."""
+        misuse (raises :class:`ValueError`). A row description seeded by the connection is
+        retained because PostgreSQL does not repeat it for resumed portal batches."""
         if self.state is not ProtocolState.READY:
             msg = f"resume_execute is only valid in READY (state is {self.state.name})"
             raise ValueError(msg)
@@ -792,7 +793,6 @@ class ExtendedQueryProtocol:
             msg = f"max_rows must be >= 0 (got {max_rows})"
             raise ValueError(msg)
         self.state = ProtocolState.BUSY
-        self._row_description = None
         return (
             _builder.build_execute(portal=self._open_portal, max_rows=max_rows)
             + _builder.build_sync()
@@ -989,7 +989,8 @@ class ExtendedQueryProtocol:
         if self.state is not ProtocolState.BUSY:
             self._desync(message)
         # The portal stays open with its cursor position; resume_execute() fetches the next batch.
-        # The RowDescription is retained so resumed DataRow batches keep their layout.
+        # ReadyForQuery clears the protocol-local RowDescription; the connection keeps the
+        # prepared statement's layout and seeds it again before resume_execute().
         return PortalSuspendedEvent()
 
     def _busy_only(self, message: PGMessage, event: ProtocolEvent) -> ProtocolEvent:
