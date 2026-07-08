@@ -6,6 +6,7 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 _EVIDENCE = _ROOT / "docs" / "pelt-free-threading.md"
+_CI_WORKFLOW = _ROOT / ".github" / "workflows" / "ci.yml"
 _CURRENT_DRIVER_DOCS = (
     _ROOT / "site" / "content" / "docs" / "get-started" / "installation.md",
     _ROOT / "site" / "content" / "docs" / "build-apps" / "forms-data" / "database.md",
@@ -42,6 +43,28 @@ def test_current_postgres_docs_name_the_in_tree_pelt_driver() -> None:
 
     installation = _CURRENT_DRIVER_DOCS[0].read_text()
     assert "no extra dependency" in installation
+
+
+@pytest.mark.issue(260)
+def test_live_postgres_ci_covers_13_through_18() -> None:
+    workflow = _CI_WORKFLOW.read_text()
+    evidence = _EVIDENCE.read_text()
+
+    for image in (
+        "postgres:13.22-bookworm",
+        "postgres:14",
+        "postgres:15",
+        "postgres:16",
+        "postgres:17",
+        "postgres:18",
+    ):
+        assert f"image: {image}" in workflow
+
+    assert "fail-fast: false" in workflow
+    assert "PostgreSQL 13" in evidence
+    assert "majors 14" in evidence
+    assert "final 13.22 image" in evidence
+    assert "compatibility lane" in evidence
 
 
 @pytest.mark.issue(260)
