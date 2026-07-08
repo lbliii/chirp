@@ -1,7 +1,7 @@
 """Benchmark runner — start server, run load test, report.
 
 Usage:
-    uv run python -m benchmarks.run [chirp|fastapi|flask|starlette|litestar|chirp-uvicorn|all]
+    uv run python -m benchmarks.run [chirp|fasthtml|fastapi|flask|starlette|litestar|all]
     uv run python -m benchmarks.run all  # default
 
     # Experiments (from benchmark-pounce-chirp-deep-dive.md):
@@ -12,7 +12,7 @@ Usage:
     # Run on Python 3.14t (free-threaded) to see Chirp benefit:
     uv run --python 3.14t python -m benchmarks.run all
 
-Requires: chirp, fastapi, uvicorn, flask, gunicorn, starlette, litestar, httpx
+Requires: chirp, FastHTML, FastAPI, uvicorn, Flask, Gunicorn, Starlette, Litestar, httpx
 Install: uv sync --extra benchmark  (or pip install chirp[benchmark])
 """
 
@@ -41,7 +41,7 @@ NETWORKED_WORKLOADS = (
     ("db", "/db"),
     ("template", "/template"),
 )
-DEFAULT_TARGETS = ["chirp", "fastapi", "flask", "starlette", "litestar"]
+DEFAULT_TARGETS = ["chirp", "fasthtml", "fastapi", "flask", "starlette", "litestar"]
 EXPERIMENT_TARGETS = ["chirp-sync", "chirp-fused", "chirp-async", "chirp-uvicorn"]
 ALL_FRAMEWORKS = [*DEFAULT_TARGETS, *EXPERIMENT_TARGETS]
 
@@ -269,6 +269,28 @@ def run_fastapi(port: int) -> subprocess.Popen[bytes]:
     return proc
 
 
+def run_fasthtml(port: int) -> subprocess.Popen[bytes]:
+    """Start FastHTML via the same Uvicorn worker topology as the ASGI peers."""
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "benchmarks.apps.fasthtml_app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--workers",
+            str(WORKERS),
+        ],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return proc
+
+
 def run_flask(port: int) -> subprocess.Popen[bytes]:
     """Start Flask server via gunicorn."""
     proc = subprocess.Popen(
@@ -376,6 +398,8 @@ def run_framework(
         proc = run_chirp_uvicorn(port)
     elif name == "fastapi":
         proc = run_fastapi(port)
+    elif name == "fasthtml":
+        proc = run_fasthtml(port)
     elif name == "flask":
         proc = run_flask(port)
     elif name == "starlette":
@@ -427,7 +451,7 @@ def print_report(
 
     print()
     print("=" * 60)
-    print("  CHIRP vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR")
+    print("  CHIRP vs FASTHTML vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR")
     print("  Synthetic benchmarks")
     print(
         f"  Python {python_runtime_label()} | {NUM_REQUESTS} req, {concurrency} concurrent | "
@@ -468,7 +492,7 @@ def print_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Benchmark Chirp vs FastAPI vs Flask vs Starlette vs Litestar",
+        description="Benchmark Chirp vs FastHTML vs FastAPI vs Flask vs Starlette vs Litestar",
         epilog="Experiments: chirp --concurrency 10 | chirp --client per-request | chirp-uvicorn",
     )
     parser.add_argument(
@@ -476,7 +500,7 @@ def main() -> None:
         nargs="*",
         default=["all"],
         help=(
-            "chirp, fastapi, flask, starlette, litestar, chirp-sync, chirp-fused, "
+            "chirp, fasthtml, fastapi, flask, starlette, litestar, chirp-sync, chirp-fused, "
             "chirp-async, chirp-uvicorn, or all"
         ),
     )

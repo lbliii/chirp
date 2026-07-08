@@ -64,7 +64,8 @@ class _HasHeaders(Protocol):
     tuple of ``(name, value)`` pairs; the early-hint collector only needs that.
     """
 
-    headers: tuple[tuple[str, str], ...]
+    @property
+    def headers(self) -> tuple[tuple[str, str], ...]: ...
 
 
 def _is_early_hint_link(value: str) -> bool:
