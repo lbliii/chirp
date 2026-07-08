@@ -131,6 +131,22 @@ This is the heart of the framework, and it has its own page. The full catalog �
 every type, its signature, and a decision tree for choosing between them — lives
 in [[docs/about/core-concepts/return-values|Return Values]].
 
+## From return intent to application contract
+
+Return types are also compiler input. At application freeze, Chirp combines
+route declarations, typed return metadata, template blocks, htmx targets, and
+registries into one immutable internal application model. `app.check()` uses
+that model to catch detectable broken edges before a request reaches the
+browser; runtime traces, DevTools, and transition tests correlate observed
+requests with the same compiled transitions.
+
+The compiler does not replace request-time rendering. SQL, forms, sessions,
+streaming, and SSE still run in the live ASGI application. Static export through
+`chirp freeze` is optional and applies only to compatible routes. See
+[[docs/about/architecture|Architecture]] and the tested
+[[docs/tutorials/full-application-journey|Full-Application Journey]] for the
+complete feedback loop.
+
 :::{note} See also
 
 - [[docs/build-apps/html-fragments/fragments|Fragments]] — render named blocks for htmx swaps
