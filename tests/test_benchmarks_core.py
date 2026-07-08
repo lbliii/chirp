@@ -1,6 +1,7 @@
 """Smoke tests for the core benchmark harness."""
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -97,8 +98,11 @@ def test_networked_benchmarks_include_full_framework_matrix() -> None:
 
 
 @pytest.mark.issue(621)
-def test_fasthtml_benchmark_uses_native_ft_rendering() -> None:
+def test_fasthtml_benchmark_uses_native_ft_rendering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     pytest.importorskip("fasthtml")
+    monkeypatch.syspath_prepend(str(_CORE_PATH.parents[1]))
     from starlette.testclient import TestClient
 
     from benchmarks.apps.fasthtml_app import app
@@ -123,6 +127,88 @@ def test_networked_benchmarks_record_python_gil_mode() -> None:
     assert isinstance(metadata["gil_enabled"], bool)
     assert metadata["free_threaded"] is (not metadata["gil_enabled"])
     assert "GIL" in _RUN.python_runtime_label()
+
+
+@pytest.mark.issue(621)
+def test_networked_report_is_versioned_and_preserves_failures(tmp_path: Path) -> None:
+    results = [
+        _RUN.BenchResult(
+            framework="chirp",
+            workload="json",
+            ok=9,
+            failed=1,
+            total=10,
+            req_per_sec=123.45,
+            avg_ms=8.0,
+            p50_ms=7.0,
+            p99_ms=20.0,
+            rounds=3,
+        )
+    ]
+
+    report = _RUN.build_network_report(
+        results,
+        targets=["chirp"],
+        concurrency=10,
+        client_strategy="shared-limits",
+    )
+    output = tmp_path / "network.json"
+    _RUN.write_network_report(report, output)
+    written = json.loads(output.read_text(encoding="utf-8"))
+
+    assert written["schema_version"] == 1
+    assert written["suite"] == "chirp-networked-framework-comparison"
+    assert written["config"]["concurrency"] == 10
+    assert written["results"][0]["failed"] == 1
+    assert written["environment"]["packages"]["bengal-chirp"]
+
+
+@pytest.mark.issue(621)
+def test_networked_readme_table_is_generated_from_report(tmp_path: Path) -> None:
+    report = {
+        "captured_at": "2026-07-08T00:00:00+00:00",
+        "environment": {
+            "machine": "test-machine",
+            "python": {
+                "implementation": "CPython",
+                "version": "3.14.0",
+                "free_threaded": True,
+            },
+        },
+        "config": {
+            "requests_per_round": 10,
+            "rounds": 3,
+            "concurrency": 2,
+            "workers": 1,
+            "client_strategy": "shared-limits",
+            "targets": ["chirp"],
+            "workloads": ["json", "cpu", "db", "template"],
+        },
+        "results": [
+            {
+                "framework": "chirp",
+                "workload": workload,
+                "failed": 1 if workload == "db" else 0,
+                "req_per_sec": 100.0,
+                "p50_ms": 5.0,
+            }
+            for workload in ("json", "cpu", "db", "template")
+        ],
+    }
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        f"before\n{_RUN.README_BASELINE_START}\nold\n{_RUN.README_BASELINE_END}\nafter\n",
+        encoding="utf-8",
+    )
+
+    table = _RUN.render_baseline_table(report, artifact_link="results/network.json")
+    _RUN.update_readme_baseline(readme, table)
+    updated = readme.read_text(encoding="utf-8")
+
+    assert "| chirp | 100.0 (5.0 ms)" in updated
+    assert "| 1 |" in updated
+    assert "[Full artifact](results/network.json)" in updated
+    assert "old" not in updated
 
 
 def test_networked_db_workload_returns_stable_rows() -> None:

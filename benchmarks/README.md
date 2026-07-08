@@ -100,6 +100,11 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 > to use this repository's benchmark harness because it exercises Chirp's
 > return values, Kida rendering, SSE fanout, and fused sync path.
 
+<!-- networked-baseline:start -->
+The committed network baseline is generated from a versioned JSON artifact by
+`benchmarks.run`; run the command documented beside the artifact to refresh it.
+<!-- networked-baseline:end -->
+
 ## Core Regression Workloads
 
 `python -m benchmarks.core` emits a reproducible JSON artifact with:
