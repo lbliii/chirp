@@ -14,7 +14,7 @@ import inspect
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict
 
 from chirp.telemetry import trace_span
 from chirp.tools.events import ToolCallEvent, ToolEventBus
@@ -153,11 +153,9 @@ def compile_tools(
 
     for entry in pending:
         if len(entry) == 4:
-            name, description, handler, approval_required = cast(
-                tuple[str, str, Callable[..., Any], bool], entry
-            )
+            name, description, handler, approval_required = entry
         else:
-            name, description, handler = cast(tuple[str, str, Callable[..., Any]], entry)
+            name, description, handler = entry
             approval_required = False
         if name in seen_names:
             msg = f"Duplicate tool name: {name!r}"
