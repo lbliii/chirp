@@ -84,7 +84,7 @@ import ast
 import dataclasses
 import difflib
 import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .rules_fragment_scope import _binding_names
 from .types import ContractIssue, Severity
@@ -714,7 +714,7 @@ def _default_none_guarded_reads(block_node: Any) -> frozenset[str]:
             continue
         if getattr(node, "name", None) != "default":
             continue
-        args = getattr(node, "args", ()) or ()
+        args = cast(tuple[Any, ...], getattr(node, "args", ()) or ())
         # Only a ``default(none)`` (single ``None`` constant) guard is the one
         # the hint references; ``default('fallback')`` is a different intent.
         if len(args) != 1:

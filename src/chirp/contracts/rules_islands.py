@@ -3,6 +3,7 @@
 import html
 import json
 import re
+from typing import cast
 
 from .patterns import ID_ATTR as _ID_PATTERN
 from .types import ContractIssue, Severity
@@ -68,25 +69,28 @@ def validate_optimistic_op(op: object) -> str | None:
     points cannot drift. Phrases are suffix fragments ("op 'setAttr' needs ...")
     each caller frames for its own context.
     """
-    if not isinstance(op, dict) or not isinstance(op.get("op"), str):
+    if not isinstance(op, dict):
         return "must be an object with an 'op' name"
-    smuggled = sorted(OPTIMISTIC_FORBIDDEN_PROP_KEYS & set(op))
+    fields = cast(dict[str, object], op)
+    if not isinstance(fields.get("op"), str):
+        return "must be an object with an 'op' name"
+    smuggled = sorted(OPTIMISTIC_FORBIDDEN_PROP_KEYS & set(fields))
     if smuggled:
         return f"carries server-correlation keys ({', '.join(smuggled)})"
-    name = op.get("op")
+    name = fields.get("op")
     if name not in OPTIMISTIC_OPS:
         return f"uses an unknown op '{name}' (allowed: {', '.join(sorted(OPTIMISTIC_OPS))})"
-    if name in {"addClass", "removeClass", "toggleClass"} and not op.get("value"):
+    if name in {"addClass", "removeClass", "toggleClass"} and not fields.get("value"):
         return f"'{name}' needs a 'value' class name"
     if name == "setText":
-        expr = op.get("expr")
+        expr = fields.get("expr")
         if expr is not None and expr not in {"+1", "-1"}:
             return "'setText' expr must be '+1' or '-1'"
-        if expr is None and op.get("value") is None:
+        if expr is None and fields.get("value") is None:
             return "'setText' needs a 'value' or 'expr'"
-    if name == "setAttr" and not (op.get("name") and op.get("value") is not None):
+    if name == "setAttr" and not (fields.get("name") and fields.get("value") is not None):
         return "'setAttr' needs a 'name' and 'value'"
-    if name == "removeAttr" and not op.get("name"):
+    if name == "removeAttr" and not fields.get("name"):
         return "'removeAttr' needs a 'name'"
     return None
 
