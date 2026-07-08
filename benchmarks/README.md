@@ -1,10 +1,10 @@
 # Chirp Web Framework Benchmarks
 
-Synthetic benchmarks comparing Chirp vs FastAPI vs Flask vs Starlette vs Litestar on JSON, CPU-bound, SQLite DB, and template-rendering workloads. Designed to demonstrate free-threaded Python performance benefits when using Chirp + Pounce on Python 3.14t.
+Synthetic benchmarks comparing Chirp vs FastHTML vs FastAPI vs Flask vs Starlette vs Litestar on JSON, CPU-bound, SQLite DB, and HTML-rendering workloads. Designed to measure free-threaded Python behavior when using Chirp + Pounce on Python 3.14t.
 
 This directory has two benchmark families:
 
-- `benchmarks.run`: networked framework comparison, useful for Chirp vs FastAPI vs Flask vs Starlette vs Litestar.
+- `benchmarks.run`: networked framework comparison, useful for Chirp vs FastHTML, FastAPI, Flask, Starlette, and Litestar.
 - `benchmarks.core`: in-process Chirp regression workloads, useful for release gates and hot-path tracking.
 
 Pounce 0.7 also ships `pounce bench`, a server-level smoke/comparison command
@@ -32,6 +32,7 @@ pounce bench --workers 1 --duration 1 --connections 1
 
 # Run a single framework
 python -m benchmarks.run chirp
+python -m benchmarks.run fasthtml
 python -m benchmarks.run fastapi
 python -m benchmarks.run flask
 python -m benchmarks.run starlette
@@ -78,6 +79,7 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 
 **Servers:**
 - Chirp: Pounce (threads on 3.14t, processes on GIL), request queue disabled for benchmarks
+- FastHTML: Uvicorn (10 workers; native FastHTML FT element rendering)
 - FastAPI: Uvicorn (async)
 - Flask: Gunicorn with sync workers
 - Starlette: Uvicorn (minimal ASGI)
@@ -97,6 +99,25 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 > server behavior with generic ASGI apps. Chirp release claims should continue
 > to use this repository's benchmark harness because it exercises Chirp's
 > return values, Kida rendering, SSE fanout, and fused sync path.
+
+<!-- networked-baseline:start -->
+### Committed network baseline
+
+Captured 2026-07-08 on arm64 with CPython 3.14.2 (GIL disabled); 2000 requests x 3 rounds, 100 concurrent clients, 10 workers. [Full artifact](results/networked-2026-07-08-cpython-3.14t-macos-arm64.json).
+
+Regenerate from the repository root: `uv run python -m benchmarks.run all --concurrency 100 --client shared-limits --output benchmarks/results/networked-2026-07-08-cpython-3.14t-macos-arm64.json --readme-table benchmarks/README.md`
+
+| Framework | JSON req/s (p50) | CPU req/s (p50) | DB req/s (p50) | HTML req/s (p50) | Failed attempts |
+|---|---:|---:|---:|---:|---:|
+| chirp | 79.7 (49.4 ms) | 149.1 (108.5 ms) | 79.2 (35.4 ms) | 395.1 (42.7 ms) | 6 |
+| fasthtml | 888.7 (90.6 ms) | 233.8 (387.4 ms) | 329.0 (279.2 ms) | 304.8 (292.1 ms) | 4 |
+| fastapi | 875.9 (74.7 ms) | 399.7 (179.6 ms) | 1080.0 (66.5 ms) | 930.3 (85.1 ms) | 2 |
+| flask | 1450.9 (27.7 ms) | 536.0 (60.3 ms) | 632.5 (35.4 ms) | 617.3 (28.4 ms) | 0 |
+| starlette | 143.3 (473.5 ms) | 250.9 (342.1 ms) | 814.7 (91.8 ms) | 576.9 (140.0 ms) | 5 |
+| litestar | 795.7 (81.9 ms) | 496.6 (141.5 ms) | 813.2 (94.7 ms) | 445.7 (201.2 ms) | 6 |
+
+Values are medians across rounds. Latency and failure accounting include every attempt. This is a synthetic comparison, not a production-capacity claim.
+<!-- networked-baseline:end -->
 
 ## Core Regression Workloads
 
@@ -144,9 +165,12 @@ as a public framework comparison; it is a Chirp hot-path regression check.
 
 ## Output
 
+The values below illustrate the report format; they are not a committed current result artifact
+and must not be quoted as comparative performance evidence.
+
 ```
 ============================================================
-  CHIRP vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR
+  CHIRP vs FASTHTML vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR
   Synthetic benchmarks
   Python CPython 3.14.0 (cpython-314t; free-threaded, GIL disabled) | 2000 req, 100 concurrent | 10 workers | median of 3 rounds
 ============================================================
@@ -175,6 +199,7 @@ benchmarks/
 ├── core.py             # In-process Chirp hot-path regression workloads
 └── apps/
     ├── chirp_app.py    # Chirp + Pounce
+    ├── fasthtml_app.py # FastHTML + Uvicorn
     ├── fastapi_app.py  # FastAPI + Uvicorn
     ├── flask_app.py    # Flask + Gunicorn
     ├── starlette_app.py # Starlette + Uvicorn

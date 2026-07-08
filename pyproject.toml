@@ -89,7 +89,7 @@ all = [
     "patitas[syntax]>=0.4.0",
 ]
 
-# Benchmark suite (Chirp vs FastAPI vs Flask vs Starlette vs Litestar)
+# Benchmark suite (Chirp vs FastHTML vs FastAPI vs Flask vs Starlette vs Litestar)
 benchmark = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
@@ -98,6 +98,7 @@ benchmark = [
     "starlette>=0.40.0",
     "litestar>=2.13.0",
     "httpx>=0.27.0",
+    "python-fasthtml>=0.14.3",
 ]
 
 # Full stack: framework + data + AI

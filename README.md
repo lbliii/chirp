@@ -22,6 +22,8 @@ and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email
 integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
 
 Status: **alpha** (0.9.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+Public positioning and performance language is governed by the machine-checked
+[claims ledger](docs/design/public-claims.json).
 
 📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
 
@@ -426,14 +428,15 @@ See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deploymen
 <details>
 <summary><strong>Benchmarks</strong></summary>
 
-Synthetic benchmarks comparing Chirp, FastAPI, Flask, Starlette, and Litestar:
+Synthetic benchmarks comparing Chirp, FastHTML, FastAPI, Flask, Starlette, and Litestar:
 
 ```bash
 uv sync --extra benchmark
 uv run poe benchmark
 ```
 
-See [`benchmarks/README.md`](benchmarks/README.md) for caveats and runners.
+See the [committed baseline and full artifact](benchmarks/README.md#committed-network-baseline)
+for current results, caveats, environment metadata, and runners.
 
 </details>
 

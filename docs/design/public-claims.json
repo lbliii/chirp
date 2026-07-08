@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "claims": [
+    {
+      "id": "framework-free-threading-support",
+      "type": "concurrency",
+      "status": "covered-framework-paths",
+      "files": [
+        "README.md",
+        "site/content/_index.md",
+        "site/content/docs/about/thread-safety.md",
+        "site/content/docs/build-apps/html-fragments/rendering.md",
+        "site/content/docs/build-apps/streaming-updates/reactive-system.md",
+        "site/content/docs/quality/deployment/production.md",
+        "benchmarks/README.md"
+      ],
+      "patterns": ["free-thread", "thread-safe"],
+      "proof": [
+        ".github/workflows/ci.yml",
+        "tests/test_signals.py",
+        "tests/test_reactive_bus.py",
+        "tests/test_pelt/test_concurrency_stress.py"
+      ],
+      "notes": "The claim covers framework-owned paths exercised under Python 3.14t with PYTHON_GIL=0. Application globals, third-party extensions, and untested optional integrations require their own synchronization proof."
+    },
+    {
+      "id": "reactive-bus-thread-safety",
+      "type": "concurrency",
+      "status": "component-scoped",
+      "files": [
+        "site/content/docs/build-apps/streaming-updates/reactive-system.md"
+      ],
+      "patterns": ["thread-safe pub/sub", "thread-safe task store", "fully thread-safe"],
+      "proof": [
+        "src/chirp/pages/reactive/bus.py",
+        "tests/test_reactive_bus.py",
+        "tests/test_reactive_bus_observability.py"
+      ],
+      "notes": "ReactiveBus protects subscriber state and supports cross-thread emitters. The application-owned store shown in examples remains the application's synchronization responsibility."
+    },
+    {
+      "id": "template-render-thread-safety",
+      "type": "concurrency",
+      "status": "immutable-template-scope",
+      "files": [
+        "site/content/docs/build-apps/html-fragments/rendering.md"
+      ],
+      "patterns": ["Thread-safe"],
+      "proof": [
+        "src/chirp/templating/streaming.py",
+        "tests/test_streaming_html.py"
+      ],
+      "notes": "The claim is limited to compiled immutable templates and Chirp's context-isolated render bridge; mutable template globals supplied by applications need separate protection."
+    },
+    {
+      "id": "network-benchmark-output-example",
+      "type": "performance",
+      "status": "illustrative-not-evidence",
+      "files": ["benchmarks/README.md"],
+      "patterns": ["req/s"],
+      "proof": ["benchmarks/run.py"],
+      "notes": "The displayed values illustrate runner output only. They are not a current benchmark artifact and must not support comparative performance claims."
+    },
+    {
+      "id": "pounce-mode-scoped-rolling-reload",
+      "type": "lifecycle",
+      "status": "upstream-mode-scoped",
+      "files": ["site/content/docs/quality/deployment/production.md"],
+      "patterns": ["rolling reload"],
+      "proof": [
+        "https://github.com/lbliii/pounce/blob/main/docs/design/core-contract.md"
+      ],
+      "notes": "Pounce documents rolling reload for thread-worker mode. Single-worker, process-worker, subinterpreter, and HTTP/3 paths have different availability and downtime characteristics."
+    }
+  ],
+  "allowlist": []
+}
