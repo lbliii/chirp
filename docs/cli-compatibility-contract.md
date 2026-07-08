@@ -1,21 +1,24 @@
 # Chirp CLI Compatibility Contract
 
-**Status:** Frozen pre-Milo baseline<br>
+**Status:** Milo 0.4.1 migration implemented; agent exposure remains deny-by-default<br>
 **Chirp issue:** [#571](https://github.com/lbliii/chirp/issues/571)<br>
+**Migration issue:** [#572](https://github.com/lbliii/chirp/issues/572)<br>
 **Milo partner issue:** [milo-cli#75](https://github.com/lbliii/milo-cli/issues/75)
 
-This document freezes the observable `chirp` command contract before parser
-ownership can move from `argparse` to Milo. It is an inventory and migration
-gate, not authorization to begin that migration. `tests/cli/test_cli_compatibility_contract.py`
-executes the packaged module in subprocesses and protects command discovery,
-usage, flags, output channels, exit codes, structured output, warning policy,
-resolution failures, and lazy imports.
+This document began as the pre-Milo `argparse` baseline. Issue #572 moved parser
+ownership to Milo's public `CLI.lazy_command()` contract while keeping the
+packaged entry point and Chirp-owned handlers. The black-box suite protects
+command discovery, arguments, defaults, output channels, exit codes, structured
+output, warning policy, resolution failures, and lazy imports. A separate
+schema-parity suite prevents the precomputed lazy schemas from drifting away
+from the typed adapters.
 
 ## Invariants
 
 - `pyproject.toml` continues to install `chirp = "chirp.cli:main"`.
-- No command, flag, default, output channel, exit policy, or lazy-import boundary
-  changes as a side effect of changing parser libraries.
+- Legacy command names, arguments, defaults, output channels, exit policy, and
+  lazy-import boundaries remain compatible. Milo's help presentation and
+  framework root options are documented additive behavior.
 - Chirp owns app resolution, `AppConfig`, server startup, hypermedia checks,
   freezing, schema operations, scaffold content, and every generated file.
 - Milo may own generic command registration, parsing, help, schemas, completion,
@@ -30,13 +33,20 @@ resolution failures, and lazy imports.
 
 | Invocation | stdout | stderr | Exit | Contract |
 | --- | --- | --- | --- | --- |
-| `chirp` | Root help | Empty | `0` | No command is a successful help request. |
-| `chirp -h`, `chirp --help` | Root help | Empty | `0` | Command order and summaries are stable. |
+| `chirp` | Milo root help | Empty | `0` | No command is a successful help request. |
+| `chirp -h`, `chirp --help` | Milo root help | Empty | `0` | Command order and summaries are stable; framework root options follow them. |
 | `chirp -V`, `chirp --version` | Chirp, Kida, Bengal Pounce, and Python versions | Empty | `0` | Dependency lookup stays lazy until invoked. |
 | Parse failure or unknown option | Empty | `usage:` plus `error:` | `2` | Parser-owned failure; handler is not imported. |
 
-The only aliases are `-h`/`--help` and `-V`/`--version`. There are no command
-aliases and no nested commands today.
+The legacy aliases `-h`/`--help` and `-V`/`--version` remain. There are no
+command aliases or nested commands. Milo adds its standard root operations
+(`--llms-txt`, `--mcp`, gateway registration, completions, verbosity, quiet,
+dry-run, output-file, and force) plus per-command `--format`. All eleven Chirp
+commands are currently `surfaces=("cli",)`, so MCP and llms.txt expose none of
+them until a separate safety and structured-result review opts them in. In
+this migration those extra output/protocol flags are reserved framework syntax:
+Chirp's existing handlers still own terminal writes and side effects, so #573
+must integrate structured results before those controls can govern a command.
 
 ## Command, argument, and exposure inventory
 
@@ -49,8 +59,8 @@ required.
 | `new` | `name`; `--minimal`, `--stream`, `--sse`, `--shell`, `--ai`, `--with-chirpui` | Flags default `false`. If several modes are supplied, source precedence is minimal → AI → stream → SSE → shell → default. `--with-chirpui` is an independent hard requirement. | Human-only; intentionally not agent-exposed because it writes a project tree. |
 | `run` | `app`; `--host`, `--port`, `--production`, `--workers`, `--metrics`, `--rate-limit`, `--queue`, `--sentry-dsn` | Scalar overrides default to `None` then app config. Boolean capabilities OR with app config. Production is selected by `--production` or `debug=False`. | Human-only persistent process; intentionally not agent-exposed. |
 | `dev` | Same parser surface as `run` | Also forces `debug=True` and `dev_browser_reload=True`. Other resolution matches `run`. | Human-only persistent process; intentionally not agent-exposed. |
-| `check` | `app`; `--warnings-as-errors`, `--coverage`, `--deploy`, `--json`, `--baseline PATH`, `--include-info` | Flags default `false`, baseline `None`. `--deploy` implies strict warnings. `--include-info` affects structured modes. | Text is human-only. `--json` is structured-agent-safe read-only output. |
-| `diff` | `app`; required `--base REF`; `--json`, `--warnings-as-errors`, `--deploy`, `--include-info` | Flags default `false`. `--deploy` implies strict warnings. | Text is human-only. `--json` is structured-agent-safe read-only output. |
+| `check` | `app`; `--warnings-as-errors`, `--coverage`, `--deploy`, `--json`, `--baseline PATH`, `--include-info` | Flags default `false`, baseline `None`. `--deploy` implies strict warnings. `--include-info` affects structured modes. | CLI-only today. `--json` is the leading candidate for a later read-only agent projection. |
+| `diff` | `app`; required `--base REF`; `--json`, `--warnings-as-errors`, `--deploy`, `--include-info` | Flags default `false`. `--deploy` implies strict warnings. | CLI-only today. `--json` is a candidate for later structured exposure after repository/auth policy review. |
 | `routes` | `app` | No options beyond help. Freezes the app before printing. | Human-only today; intentionally not agent-exposed until a structured schema exists. |
 | `security-check` | `app` | No options beyond help. | Human-only today; security findings need a stable structured schema before exposure. |
 | `freeze` | `app`, `output`; `--exclude PREFIX [PREFIX ...]` | `exclude=None`; one or more values when present. | Human-only; intentionally not agent-exposed because it writes an output tree. |
@@ -109,61 +119,48 @@ errors do not import command handlers. `_new`, `_run`, `_check`, `_diff`,
 `_shapes_codegen` load only after their command is selected. `_version` loads
 only for `-V`/`--version`.
 
-The current parser is built inside each `main()` call and publishes no mutable
-global registry. A Milo replacement must finish registration before dispatch,
-keep registry publication immutable or lifecycle-bounded, and remain safe on
-free-threaded Python. Startup/import benchmarks may be added during #572, but
-this migration may not make help import application, server, data, or optional
-dependency modules.
+The Milo registry and parser are built inside each `main()` call, so concurrent
+callers do not share parser state. Registration uses fresh precomputed schema
+dicts and lazy import paths. `tests/cli/test_milo_cli_adoption.py` compares every
+precomputed schema with `function_to_schema()` on its typed adapter and builds
+parsers concurrently under `PYTHON_GIL=0`.
 
-## Milo public-API mapping and gaps
+The same-environment startup receipt on 2026-07-08 used 25 subprocesses on
+CPython 3.14.2t / macOS Apple Silicon. Root `--help` measured a 70.0 ms median
+on the argparse baseline and 149.5 ms after the lazy Milo migration. This is a
+startup-cost receipt, not a throughput claim: Milo adds a fixed import and
+registration cost, while precomputed schemas prevent command-handler imports
+and reduced the initial eager-Milo prototype from 376.4 ms. No server hot path
+or request benchmark changed.
 
-The mapping below is based on Milo 0.3.1 public exports and examples at
-[`1f537086`](https://github.com/lbliii/milo-cli/commit/1f5370861fa38bc7942111a623fa2cb5a7f567b9),
-observed on 2026-07-06. Because
-[milo-cli#75](https://github.com/lbliii/milo-cli/issues/75) is open,
-presentation compatibility remains `manual-confirmation-needed` until that
-upstream contract is reviewed.
+## Milo public-API mapping
 
-| Chirp requirement | Milo public seam | Status |
+The migration uses released `milo-cli>=0.4.1,<0.5` and no private Milo module.
+Milo issue #76 resolved the original presentation, surface-policy, lazy-error,
+version-report, and terminal-rendering gaps identified by this contract.
+
+| Chirp requirement | Milo public seam | Implemented boundary |
 | --- | --- | --- |
-| Command registration and typed parameters | `CLI`, `CommandDef`, `CLI.command()`, `function_to_schema()` | Available; #572 must use thin adapter functions rather than pass `argparse.Namespace`. |
-| Deferred command imports | `LazyCommandDef`, `CLI.lazy_command()` | Available in principle; machine tests must prove the same import boundary. |
-| Future grouping | `Group`, `GroupDef` | Available, but Chirp has no nested command contract today. |
-| Human and machine formatting | `Context`, `format_output()`, `write_output()` | Available for new structured handlers; terminal prose cannot be scraped into results. |
-| Exact argparse help order, wrapping, and successful no-command behavior | `HelpRenderer` | **GAP C1:** public docs do not promise byte/exit parity with this baseline. Reproducer: the committed help-usage subprocess matrix. |
-| stderr/stdout routing plus exit `0`/`1`/`2` | No reviewed typed command-outcome contract identified | **GAP C2:** upstream #75 must define framework-neutral channel and exit ownership or leave it explicitly adopter-owned. Reproducer: parse/resolution/strict-warning subprocess tests. |
-| Existing JSON stdout and future typed MCP results from one execution | `InvokeResult`, `Context`, output helpers | **GAP C3:** #572 needs a public way to return structured data without double-printing and without auto-exposing the command. Reproducer: `check --json` parseability test. |
-| Global `--version` with lazy adopter dependency lookup | `VersionInfo`, `check_version()` | Partial; Chirp owns its exact four-version report and lazy timing. |
-| Persistent server lifecycle and `KeyboardInterrupt` | Generic command handler | Chirp-owned. Milo must not wrap, swallow, or reinterpret server lifecycle errors. |
-| Filesystem/database mutation confirmation and MCP annotations | `CommandDef` annotations and `Context` | Available only after explicit policy design; all current mutating commands remain unexposed. |
+| Command registration and typed parameters | `CLI.lazy_command()`, `Positional`, `Option`, `function_to_schema()` | Eleven typed adapters; precomputed schemas are parity-tested. |
+| Deferred command imports | `LazyCommandDef` with `schema=` | Root and command help load no Chirp handler module. |
+| Human output and exit ownership | `display_result=False` plus handler `SystemExit` | Existing Chirp handlers keep terminal output and exit semantics. |
+| Surface policy | `surfaces=("cli",)` | No current command appears in MCP or llms.txt. |
+| Version report | `version_flags` and lazy `version_report` | `-V` and `--version` retain the four-version report. |
+| Positionals and legacy option spelling | `x-milo-cli` generated by typed markers | Existing argv remains valid, including `--migrations` and one-or-more `--exclude`. |
+| Free-threaded parser lifecycle | Invocation-local `CLI` | No mutable registry/parser is shared across callers. |
 
-Concrete gap reports belong on milo-cli#75 before #572 relies on anything
-outside these public names. No required behavior may depend on Milo private
-modules or argparse internals.
-
-## Ordered migration gate for #572
-
-1. Keep this inventory and its subprocess tests green on the argparse baseline.
-2. Resolve or explicitly assign ownership for GAP C1–C3 on milo-cli#75.
-3. Build private Chirp adapter functions with typed parameters and typed results;
-   do not change command handlers or public output in the same step.
-4. Migrate read-only structured paths first: `check --json`, `diff --json`, then
-   a newly reviewed structured route/security schema if desired.
-5. Migrate human-only commands behind the same black-box suite. Keep `new`,
-   server, freeze, and migration behavior CLI-only.
-6. Run help, exit/channel, lazy-import, free-threaded, docs, scaffold, and full
-   release proof before switching the packaged entry point implementation.
-7. Add MCP or agent exposure only in its own reviewed issue with explicit auth,
-   confirmation, mutation, and schema policy.
+No terminal prose is scraped into structured results. Future agent exposure
+must refactor selected handlers to return domain values and belongs in a
+separate reviewed issue with explicit auth, mutation, and schema policy.
 
 ## Collateral inventory
 
 - `README.md` is a quick-start subset, not the exhaustive flag reference.
 - `site/content/docs/reference/cli.md` is the user-facing command reference and
   links here for migration-grade details.
-- Scaffold behavior remains owned by `src/chirp/cli/templates/` and existing
-  scaffold runtime tests; no generated output changes in #571.
+- Scaffold behavior remains owned by `src/chirp/cli/templates/`; the dependency
+  is inherited through `bengal-chirp`, so generated project manifests do not
+  duplicate Milo.
 - Examples consume documented commands but do not register a second parser.
   Their copied invocations remain covered by the repository example and docs
   tests; #571 adds no example-only CLI behavior.
@@ -173,7 +170,7 @@ modules or argparse internals.
   compatibility layer above them.
 - Deployment, database, freeze, and DevTools guides remain the narrative owners
   for their respective commands.
-- `changelog.d/571.added.md` records the new compatibility artifact; release
-  tooling and generated site output are unchanged.
-- #571 changes no public command behavior, dependency, entry point, scaffold,
-  or application API.
+- `changelog.d/572.changed.md` records parser ownership, dependency range, help
+  presentation, lazy behavior, and deny-by-default agent policy.
+- Generated site output is intentionally not hand-edited; canonical site source
+  moves with this contract.
