@@ -44,6 +44,8 @@ def fake_prod_app(monkeypatch: pytest.MonkeyPatch) -> App:
             rate_limit_max_tracked_ips=12_345,
             forwarded_for_trusted_hops=3,
             trusted_proxies=("10.0.0.1", "10.0.0.2"),
+            max_request_body_size=3 * 1024 * 1024,
+            max_upload_size=3 * 1024 * 1024,
         )
     )
     mod = types.ModuleType("_run_test_app")
@@ -125,6 +127,18 @@ class TestChirpRun:
         assert kwargs["worker_mode"] == "async"
         assert kwargs["metrics_enabled"] is True
         assert kwargs["metrics_path"] == "/internal/metrics"
+
+    @patch("pounce.server.Server")
+    def test_production_body_limit_reaches_pounce(
+        self,
+        mock_server: MagicMock,
+        fake_prod_app: App,
+    ) -> None:
+        """CLI production launch preserves Chirp's body ceiling at the wire."""
+        main(["run", "_run_test_app:app"])
+
+        pounce_config = mock_server.call_args.args[0]
+        assert pounce_config.max_request_size == 3 * 1024 * 1024
 
     @patch("chirp.server.production.run_production_server")
     def test_production_forwards_proxy_and_rate_limit_knobs(
