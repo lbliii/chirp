@@ -1,4 +1,4 @@
-"""Black-box compatibility contract for the pre-Milo Chirp CLI (#571)."""
+"""Black-box compatibility contract across the #571 baseline and #572 migration."""
 
 from __future__ import annotations
 
@@ -13,45 +13,33 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 _CONTRACT_DOC = _ROOT / "docs" / "cli-compatibility-contract.md"
 
-_USAGE_SNAPSHOT = {
-    (): (
-        "usage: chirp [-h] [-V] "
-        "{new,run,dev,check,diff,routes,security-check,freeze,makemigrations,migrate,"
-        "shapes-codegen} ..."
-    ),
-    ("new",): (
-        "usage: chirp new [-h] [--minimal] [--stream] [--sse] [--shell] [--ai] "
-        "[--with-chirpui] name"
-    ),
-    ("run",): (
-        "usage: chirp run [-h] [--host HOST] [--port PORT] [--production] "
-        "[--workers WORKERS] [--metrics] [--rate-limit] [--queue] "
-        "[--sentry-dsn SENTRY_DSN] app"
-    ),
-    ("dev",): (
-        "usage: chirp dev [-h] [--host HOST] [--port PORT] [--production] "
-        "[--workers WORKERS] [--metrics] [--rate-limit] [--queue] "
-        "[--sentry-dsn SENTRY_DSN] app"
-    ),
-    ("check",): (
-        "usage: chirp check [-h] [--warnings-as-errors] [--coverage] [--deploy] "
-        "[--json] [--baseline PATH] [--include-info] app"
-    ),
-    ("diff",): (
-        "usage: chirp diff [-h] --base REF [--json] [--warnings-as-errors] "
-        "[--deploy] [--include-info] app"
-    ),
-    ("routes",): "usage: chirp routes [-h] app",
-    ("security-check",): "usage: chirp security-check [-h] app",
-    ("freeze",): "usage: chirp freeze [-h] [--exclude EXCLUDE [EXCLUDE ...]] app output",
-    ("makemigrations",): (
-        "usage: chirp makemigrations [-h] --db DB --schema SCHEMA [--migrations-dir MIGRATIONS_DIR]"
-    ),
-    ("migrate",): ("usage: chirp migrate [-h] --db DB [--migrations-dir MIGRATIONS_DIR]"),
-    ("shapes-codegen",): (
-        "usage: chirp shapes-codegen [-h] [--dry-run] [--audit] "
-        "[--migrations MIGRATIONS_DIR] [path]"
-    ),
+_HELP_HEADINGS = {
+    (): "chirp — Chirp — A Python web framework for the modern web platform.",
+    ("new",): "chirp new - Create a new project",
+    ("run",): "chirp run - Start dev or production server",
+    ("dev",): "chirp dev - Development server with browser reload on template/CSS changes",
+    ("check",): "chirp check - Validate hypermedia contracts",
+    ("diff",): "chirp diff - Diff hypermedia contracts against a git base ref",
+    ("routes",): "chirp routes - List registered routes",
+    ("security-check",): "chirp security-check - Audit app config against OWASP security checklist",
+    ("freeze",): "chirp freeze - Render routes to static HTML files",
+    ("makemigrations",): "chirp makemigrations - Auto-generate schema migration from SQL diff",
+    ("migrate",): "chirp migrate - Apply pending schema migrations (one-shot deploy job)",
+    ("shapes-codegen",): "chirp shapes-codegen - Suggest @shape decorators and audit Shape drift",
+}
+
+_POSITIONALS = {
+    "new": ("name",),
+    "run": ("app",),
+    "dev": ("app",),
+    "check": ("app",),
+    "diff": ("app",),
+    "routes": ("app",),
+    "security-check": ("app",),
+    "freeze": ("app", "output"),
+    "makemigrations": (),
+    "migrate": (),
+    "shapes-codegen": ("path",),
 }
 
 _FLAGS = {
@@ -118,25 +106,19 @@ def _run_cli(
     )
 
 
-def _usage_line(output: str) -> str:
-    lines = output.splitlines()
-    assert lines
-    assert lines[0].startswith("usage: ")
-    usage: list[str] = []
-    for line in lines:
-        if not line.strip():
-            break
-        usage.append(line.strip())
-    return " ".join(" ".join(usage).split())
-
-
-@pytest.mark.issue(571)
-@pytest.mark.parametrize(("command", "expected"), _USAGE_SNAPSHOT.items())
-def test_help_usage_snapshot(command: tuple[str, ...], expected: str) -> None:
+@pytest.mark.issue(572)
+@pytest.mark.parametrize(("command", "expected"), _HELP_HEADINGS.items())
+def test_milo_help_preserves_command_meaning(command: tuple[str, ...], expected: str) -> None:
     result = _run_cli(*command, "--help")
     assert result.returncode == 0
     assert result.stderr == ""
-    assert _usage_line(result.stdout) == expected
+    assert result.stdout.splitlines()[0] == expected
+    if command:
+        for positional in _POSITIONALS[command[0]]:
+            assert f"  {positional} {positional}" in result.stdout
+    else:
+        offsets = [result.stdout.index(f"  {name}") for name in _POSITIONALS]
+        assert offsets == sorted(offsets)
 
 
 @pytest.mark.issue(571)
@@ -156,7 +138,9 @@ def test_no_command_and_version_are_stdout_exit_zero() -> None:
     no_command = _run_cli()
     assert no_command.returncode == 0
     assert no_command.stderr == ""
-    assert "positional arguments:" in no_command.stdout
+    assert no_command.stdout.startswith(_HELP_HEADINGS[()] + "\n")
+    assert "  new " in no_command.stdout
+    assert "  shapes-codegen " in no_command.stdout
 
     version = _run_cli("--version")
     assert version.returncode == 0
@@ -168,7 +152,7 @@ def test_no_command_and_version_are_stdout_exit_zero() -> None:
 
 
 @pytest.mark.issue(571)
-@pytest.mark.parametrize("command", _USAGE_SNAPSHOT)
+@pytest.mark.parametrize("command", _HELP_HEADINGS)
 def test_unknown_option_is_stderr_exit_two(command: tuple[str, ...]) -> None:
     result = _run_cli(*command, "--definitely-not-a-chirp-option")
     assert result.returncode == 2
@@ -260,6 +244,7 @@ def test_warnings_as_errors_changes_only_exit_policy(tmp_path: Path) -> None:
 @pytest.mark.issue(571)
 def test_parser_and_help_keep_command_handlers_lazy() -> None:
     handlers = [
+        "_milo_handlers",
         "_new",
         "_run",
         "_check",
