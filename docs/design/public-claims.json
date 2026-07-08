@@ -53,13 +53,31 @@
       "notes": "The claim is limited to compiled immutable templates and Chirp's context-isolated render bridge; mutable template globals supplied by applications need separate protection."
     },
     {
-      "id": "network-benchmark-output-example",
+      "id": "network-benchmark-baseline",
       "type": "performance",
-      "status": "illustrative-not-evidence",
-      "files": ["benchmarks/README.md"],
-      "patterns": ["req/s"],
-      "proof": ["benchmarks/run.py"],
-      "notes": "The displayed values illustrate runner output only. They are not a current benchmark artifact and must not support comparative performance claims."
+      "status": "committed-synthetic-baseline",
+      "files": ["README.md", "benchmarks/README.md"],
+      "patterns": ["committed baseline", "req/s"],
+      "proof": [
+        "benchmarks/results/networked-2026-07-08-cpython-3.14t-macos-arm64.json",
+        "benchmarks/run.py",
+        "benchmarks/apps/fasthtml_app.py"
+      ],
+      "notes": "The committed artifact records a synthetic six-framework comparison, including failures and cases where Chirp loses. It is reproducible evidence for that captured environment, not a production-capacity or universal performance claim."
+    },
+    {
+      "id": "hypermedia-contract-compiler",
+      "type": "architecture",
+      "status": "shipped-internal-foundation",
+      "files": ["README.md", "docs/hypermedia-application-compiler.md"],
+      "patterns": ["contract compiler", "HypermediaProgram"],
+      "proof": [
+        "src/chirp/app/hypermedia_program.py",
+        "src/chirp/app/hypermedia_program_compiler.py",
+        "tests/test_app/test_hypermedia_program.py",
+        "tests/docs/test_full_application_journey.py"
+      ],
+      "notes": "The compiler foundation and observable proof loop are shipped. HypermediaProgram remains internal; this entry does not claim a stable public inspection API or complete migration of every runtime consumer."
     },
     {
       "id": "pounce-mode-scoped-rolling-reload",
