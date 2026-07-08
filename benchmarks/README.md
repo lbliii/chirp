@@ -2,10 +2,11 @@
 
 Synthetic benchmarks comparing Chirp vs FastHTML vs FastAPI vs Flask vs Starlette vs Litestar on JSON, CPU-bound, SQLite DB, and HTML-rendering workloads. Designed to measure free-threaded Python behavior when using Chirp + Pounce on Python 3.14t.
 
-This directory has two benchmark families:
+This directory has three benchmark families:
 
 - `benchmarks.run`: networked framework comparison, useful for Chirp vs FastHTML, FastAPI, Flask, Starlette, and Litestar.
 - `benchmarks.core`: in-process Chirp regression workloads, useful for release gates and hot-path tracking.
+- `benchmarks.pelt`: live-PostgreSQL Pelt concurrency and boundary workloads, useful for measuring aggregate independent-query scaling without conflating it with one cursor or sequential bulk insertion.
 
 Pounce 0.7 also ships `pounce bench`, a server-level smoke/comparison command
 with generic ASGI workloads (`/hello`, `/json`, `/body`). Treat it as a Pounce
@@ -26,6 +27,10 @@ uv run poe benchmark
 # Run Chirp core regression workloads and write a JSON artifact
 uv run poe benchmark-core
 # or: python -m benchmarks.core --output .benchmarks/core-latest.json
+
+# Run Pelt against a disposable live PostgreSQL database
+CHIRP_BENCH_PG_DSN=postgresql://chirp:chirp@localhost/chirp_bench \
+  uv run poe benchmark-pelt
 
 # Run the smallest Pounce 0.7 server smoke benchmark
 pounce bench --workers 1 --duration 1 --connections 1
@@ -118,6 +123,35 @@ Regenerate from the repository root: `uv run python -m benchmarks.run all --conc
 
 Values are medians across rounds. Latency and failure accounting include every attempt. This is a synthetic comparison, not a production-capacity claim.
 <!-- networked-baseline:end -->
+
+## Pelt Live PostgreSQL Workloads
+
+`python -m benchmarks.pelt` emits a versioned JSON artifact with the Git revision,
+Python/GIL mode, hardware, package versions, PostgreSQL server version, and exact
+configuration. It runs three deliberately separate workloads:
+
+| Workload | What it measures | What it does not prove |
+|---|---|---|
+| `aggregate_prepared_queries` | Repeated prepared `SELECT` round trips with one checked-out connection per concurrency worker | Production capacity, application query cost, or pool setup latency |
+| `single_server_cursor` | One ordered `Database.stream()` cursor with a fixed fetch batch | Scaling with pool size; one cursor still advances serially |
+| `sequential_executemany` | The current Pelt convenience loop over individual executions | PostgreSQL `COPY`, protocol pipelining, or optimized bulk ingestion |
+
+Example with smaller development settings:
+
+```bash
+CHIRP_BENCH_PG_DSN=postgresql://chirp:chirp@localhost/chirp_bench \
+  uv run python -m benchmarks.pelt \
+  --concurrency 1,2,4 \
+  --queries 300 \
+  --stream-rows 2000 \
+  --bulk-rows 200 \
+  --output .benchmarks/pelt-local.json
+```
+
+The artifact reports observed `speedup_vs_one`; it never assumes the value is
+greater than one. Compare artifacts only when PostgreSQL, Python, hardware, and
+configuration match. Loopback synthetic results are not production throughput
+claims, and no baseline should be published until repeated runs are stable.
 
 ## Core Regression Workloads
 

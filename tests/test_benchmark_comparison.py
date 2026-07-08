@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -9,9 +10,19 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.compare import COMMENT_MARKER, aggregate_reports, compare_reports, render_markdown
-
 ROOT = Path(__file__).resolve().parents[1]
+_COMPARE_PATH = ROOT / "benchmarks" / "compare.py"
+_SPEC = importlib.util.spec_from_file_location("benchmarks.compare", _COMPARE_PATH)
+assert _SPEC is not None
+assert _SPEC.loader is not None
+_COMPARE = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _COMPARE
+_SPEC.loader.exec_module(_COMPARE)
+
+COMMENT_MARKER = _COMPARE.COMMENT_MARKER
+aggregate_reports = _COMPARE.aggregate_reports
+compare_reports = _COMPARE.compare_reports
+render_markdown = _COMPARE.render_markdown
 
 
 def _report(values: dict[str, float]) -> dict[str, object]:
