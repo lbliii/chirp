@@ -5,10 +5,10 @@ Developed in-tree as a private subpackage (``chirp.data.drivers._pelt``) behind 
 mature (the seam then flips ``from . import _pelt`` → ``import pelt``). See the pelt saga
 (GitHub #252) and ``.context/pelt-design-conventions.md``.
 
-The E1 spine ships the sans-I/O core only: config + errors (public here), plus the internal
-``_messages`` / ``_framing`` / ``_builder`` / ``_codecs`` primitives. Connection, pool,
-transport, and auth land in later epics; the heavier of those (SCRAM, large codec tables, TLS)
-will be lazy-imported via ``__getattr__`` so importing pelt stays cheap.
+The in-tree package exposes config, errors, connection, pool, and construction helpers while
+keeping wire messages, framing, protocol state, codecs, transport, and auth implementation
+private. Connection and pool remain lazy-imported via ``__getattr__`` so importing pelt stays
+cheap.
 
 Part of the Bengal ecosystem:
 
@@ -40,10 +40,12 @@ from chirp.data.drivers._pelt.types import ConnectionConfig, PoolConfig  # noqa:
 
 __all__ = [
     "AuthenticationError",
+    "Connection",
     "ConnectionConfig",
     "PeltConnectionError",
     "PeltError",
     "PeltTimeoutError",
+    "Pool",
     "PoolConfig",
     "PostgresError",
     "ProtocolError",
