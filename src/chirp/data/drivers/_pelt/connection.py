@@ -115,7 +115,7 @@ class Transaction(AbstractAsyncContextManager["Transaction"]):
 class Cursor:
     """Server-side cursor over an open portal (``prefetch`` batch size)."""
 
-    __slots__ = ("_conn", "_done", "_idx", "_params", "_prefetch", "_rows", "_sql")
+    __slots__ = ("_conn", "_done", "_idx", "_params", "_prefetch", "_rows", "_sql", "_started")
 
     def __init__(
         self,
@@ -132,6 +132,7 @@ class Cursor:
         self._rows: list[Record] = []
         self._done = False
         self._idx = 0
+        self._started = False
 
     def __aiter__(self) -> Cursor:
         return self
@@ -143,7 +144,7 @@ class Cursor:
             return row
         if self._done:
             raise StopAsyncIteration
-        await self._fetch_more(first=not self._rows)
+        await self._fetch_more(first=not self._started)
         if self._idx >= len(self._rows):
             raise StopAsyncIteration
         row = self._rows[self._idx]
@@ -157,11 +158,14 @@ class Cursor:
                 self._params,
                 max_rows=self._prefetch,
             )
-            self._rows.extend(result.rows)
+            self._started = True
+            self._rows = result.rows
+            self._idx = 0
             self._done = not suspended
             return
         result, suspended = await self._conn._resume_portal(max_rows=self._prefetch)
-        self._rows.extend(result.rows)
+        self._rows = result.rows
+        self._idx = 0
         self._done = not suspended
 
 

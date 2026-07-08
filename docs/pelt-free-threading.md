@@ -1,6 +1,6 @@
 # Pelt free-threading evidence
 
-Status: implemented and continuously checked for issue #259.
+Status: implemented and continuously checked for issues #259 and #260.
 
 Pelt's free-threading contract is ownership-based. A checked-out connection owns
 its mutable protocol and prepared-statement cache. The codec registry is the one
@@ -8,6 +8,14 @@ shared mutable hot-path structure; writes take a short `threading.Lock`, and
 readers decode against an immutable `MappingProxyType` snapshot. Pool reset I/O
 finishes before the connection is published as available, so no pool lock is
 held across network I/O.
+
+## Product boundary
+
+Pelt is currently a private, in-tree implementation behind Chirp's `data-pg`
+seam. It is pure Python and speaks the PostgreSQL wire protocol without libpq,
+psycopg, asyncpg, or a compiled runtime extension. Applications should use
+`chirp.data.Database`, not import `chirp.data.drivers._pelt`; the seam is the
+planned extraction boundary for a future standalone package.
 
 ## Evidence map
 
@@ -32,12 +40,21 @@ sessions and introduce a lock into the query hot path.
 
 - `data-pg-gil-gate` runs Python 3.14t with `PYTHON_GIL=0` and
   `PYTHONWARNINGS=error`, then executes the import and concurrency stress suite.
-- `test-postgres` runs the live integration suite against PostgreSQL 17,
+- `test-postgres` runs the live integration suite against PostgreSQL 13–18,
   including failed-transaction recovery and concurrent per-connection cache
-  reuse.
+  reuse. PostgreSQL 13 is pinned to its final 13.22 image as an EOL
+  compatibility lane; majors 14–18 track their current official images.
 
 The elapsed-time test is an overlap/correctness gate, not a throughput claim.
 It intentionally uses a fixed sleeping decoder to avoid runner-speed
 assumptions. Production speed depends on row shapes, codecs, query latency,
 hardware, and pool sizing; benchmark the real workload before drawing capacity
 conclusions.
+
+A pool can overlap independent operations on different checked-out connections.
+One `Database.stream()` call still owns one connection and one server portal,
+advances through ordered batches, and does not scale with pool size. Its decoded
+buffer is bounded by `batch_size`. `Database.execute_many()` currently performs
+individual executions rather than `COPY` or protocol pipelining. Those are
+explicit single-query and bulk-performance boundaries until a reproducible Pelt
+benchmark artifact says more.

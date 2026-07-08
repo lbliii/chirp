@@ -50,7 +50,7 @@ def result_to_dict(
             item["message"],
         )
     )
-    payload = {
+    payload: dict[str, Any] = {
         "ok": result.ok,
         "routes_checked": result.routes_checked,
         "templates_scanned": result.templates_scanned,

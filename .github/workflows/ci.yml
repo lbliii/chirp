@@ -190,16 +190,33 @@ jobs:
           tests/interop/test_query_wire.py
           -q --tb=short --timeout=120
 
-  # Dedicated live-PostgreSQL backend job. The in-tree pure-Python pelt driver
-  # also runs in the free-threaded gate below; this service-backed job proves
-  # wire-level round trips, pool reuse, and failed-transaction recovery against
-  # PostgreSQL 17 (issues #143, #258, and #259).
+  # Dedicated live-PostgreSQL backend matrix. PostgreSQL 13 is pinned to its
+  # final EOL image as a compatibility lane; supported majors track their
+  # current official image. The free-threaded gate below supplies the separate
+  # no-GIL concurrency proof (issues #143, #258, #259, and #260).
   test-postgres:
+    name: PostgreSQL ${{ matrix.pg_major }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pg_major: "13"
+            image: postgres:13.22-bookworm
+          - pg_major: "14"
+            image: postgres:14
+          - pg_major: "15"
+            image: postgres:15
+          - pg_major: "16"
+            image: postgres:16
+          - pg_major: "17"
+            image: postgres:17
+          - pg_major: "18"
+            image: postgres:18
     services:
       postgres:
-        image: postgres:17
+        image: ${{ matrix.image }}
         env:
           POSTGRES_USER: chirp
           POSTGRES_PASSWORD: chirp

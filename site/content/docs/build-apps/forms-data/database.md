@@ -14,7 +14,7 @@ category: guide
 
 Chirp's data layer is a thin async query interface, not an ORM: you write SQL, and Chirp maps each row to a frozen dataclass. Reach for it when you want typed reads and writes against **SQLite** (built in, zero extra dependencies) or **PostgreSQL** (`pip install bengal-chirp[data-pg]`) without an object-relational mapper in the way.
 
-Pass a connection URL to `App(db=...)` and every handler can run queries via `app.db` or `get_db()`. SQLite is the right default for development and single-writer apps; switch the connection string to `postgresql://...` when you need write concurrency.
+Pass a connection URL to `App(db=...)` and every handler can run queries via `app.db` or `get_db()`. SQLite is the right default for development and single-writer apps; switch to a `postgresql://...` URL when you need write concurrency. The Python facade stays the same, but raw SQL still follows the selected database's placeholder and dialect rules.
 
 ## When to reach for it
 
@@ -141,7 +141,7 @@ rows_affected = await db.execute(
 
 ### `stream` — cursor-based iteration
 
-For large result sets, stream rows without loading everything into memory:
+For large result sets, stream rows through a bounded decoded batch instead of loading the full result into memory:
 
 ```python
 async for user in db.stream(User, "SELECT * FROM users", batch_size=100):
@@ -343,7 +343,7 @@ Tracking rows written by a Chirp version older than this checksum support have a
 
 ## SQLite vs PostgreSQL
 
-The only thing that changes between drivers is the connection string and the SQL placeholder style.
+The `Database` methods and mapped dataclasses stay the same between drivers. Change the connection string and placeholder style for simple queries; review database-specific SQL, column types, migrations, constraints, and transaction behavior before treating an application as portable.
 
 ::::{code-tabs}
 :sync: db
@@ -356,6 +356,12 @@ app = App(db="sqlite:///app.db")
 app = App(db="postgresql://user:pass@localhost/mydb", pool_size=10)
 ```
 ::::
+
+### What `data-pg` installs
+
+`bengal-chirp[data-pg]` selects Chirp's in-tree **pelt** backend. Pelt is pure Python and speaks PostgreSQL's wire protocol through AnyIO and the standard library; it does not load libpq or any third-party/compiled driver extension. The `data-pg` extra is currently empty because the backend ships with Chirp rather than downloading another runtime package.
+
+Pelt remains a private implementation detail while it matures. Import `Database` and related helpers from `chirp.data`; do not import `chirp.data.drivers._pelt` in application code. The driver seam is designed so a future standalone `bengal-pelt` package can replace the in-tree implementation without changing the `Database` facade.
 
 :::{note}
 **Pick one:** SQLite gives you concurrent readers and a single serialized writer — a property of WAL, not Postgres-grade write concurrency. It is the right default for development, single-writer workloads, and small apps. Reach for PostgreSQL when multiple writers must proceed in parallel: pelt's bounded connection pool runs transactions concurrently rather than behind one write lock.
@@ -421,6 +427,14 @@ Chirp's `data-pg` backend is **pelt**, an in-tree pure-Python PostgreSQL driver 
 
 CI imports the backend with `PYTHON_GIL=0` and warnings promoted to errors, then runs contention and decode-overlap stress tests. A separate PostgreSQL 17 job proves wire-level queries, concurrent checked-out caches, and failed-transaction rollback before reuse. These are correctness gates, not a production throughput benchmark; measure your own workload before choosing pool size. The auditable evidence map lives in `docs/pelt-free-threading.md` in the source repository. See [[docs/about/thread-safety|Thread Safety]] for Chirp's broader free-threading posture.
 :::{/dropdown}
+
+### Performance boundary
+
+Free-threading and a connection pool let **independent queries on different checked-out connections** overlap. They do not make one query or one server cursor automatically scale with the pool size. Chirp does not yet publish a Pelt throughput baseline, so treat the current no-GIL tests as correctness evidence rather than a speed claim.
+
+`db.stream()` owns one pooled connection and one PostgreSQL transaction/portal until iteration ends. `batch_size` controls each portal fetch and the largest decoded batch retained by the cursor; it does not parallelize PostgreSQL execution. On a GIL-disabled build, Pelt may decode a sufficiently large batch across worker threads, but a single stream still advances through portal batches in order.
+
+`db.execute_many()` is currently a convenience loop over individual executions, not PostgreSQL `COPY` or a pipelined bulk protocol. For large imports, benchmark representative data and use a purpose-built bulk path outside this facade when the loop is the bottleneck. Pure Python and libpq-free describe deployment and free-threading properties, not a promise that one query will beat a native driver.
 
 ## Real-time updates with LISTEN / NOTIFY
 
