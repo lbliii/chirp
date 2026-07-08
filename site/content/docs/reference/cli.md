@@ -25,6 +25,14 @@ already an `App` — an app factory like `create_app` — is called to produce o
 Scaffolding and migration commands instead take filesystem/database arguments;
 `shapes-codegen` treats its path as an app import only with `--audit`.
 
+The command tree is registered through Milo 0.4.x. Existing Chirp command
+names, positionals, flags, defaults, output channels, and exit codes remain the
+compatibility contract. Help uses Milo's typed presentation and adds framework
+root operations. Current Chirp commands are CLI-only and deny-by-default for MCP
+and llms.txt. Protocol/output flags are reserved until a separate
+structured-result and safety review integrates them with Chirp-owned handlers;
+do not rely on those flags to redirect or suppress current command output.
+
 ```bash
 chirp --version        # chirp, kida, pounce, and Python versions
 chirp <command> --help # flags for any command
