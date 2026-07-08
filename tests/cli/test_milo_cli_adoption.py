@@ -47,6 +47,7 @@ def test_precomputed_schemas_match_typed_lazy_handlers() -> None:
         assert command.schema == function_to_schema(handler), name
 
 
+@pytest.mark.issue(573)
 def test_agent_surfaces_use_an_explicit_read_only_allowlist() -> None:
     cli = _build_cli()
     exposed = {"check", "diff", "routes"}
@@ -91,6 +92,7 @@ def _register_agent_test_app(monkeypatch: pytest.MonkeyPatch) -> str:
     return f"{module.__name__}:app"
 
 
+@pytest.mark.issue(573)
 def test_check_and_routes_share_structured_programmatic_and_mcp_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -118,6 +120,7 @@ def test_check_and_routes_share_structured_programmatic_and_mcp_results(
     assert json.loads(invoked_routes.output) == routes
 
 
+@pytest.mark.issue(573)
 def test_diff_returns_the_existing_stable_payload_across_agent_surfaces(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -144,6 +147,7 @@ def test_diff_returns_the_existing_stable_payload_across_agent_surfaces(
     assert called.structured == payload
 
 
+@pytest.mark.issue(573)
 def test_check_mcp_preserves_finding_and_coverage_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -189,6 +193,7 @@ def test_check_mcp_preserves_finding_and_coverage_fields(
     assert called.structured == payload
 
 
+@pytest.mark.issue(573)
 def test_agent_resolution_failure_is_structured_and_repairable() -> None:
     called = MCPClient(_build_cli()).call("routes", app="missing_agent_app:app")
 
@@ -206,6 +211,7 @@ def test_agent_resolution_failure_is_structured_and_repairable() -> None:
     }
 
 
+@pytest.mark.issue(573)
 def test_concurrent_agent_route_inspection_reads_one_frozen_app(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
