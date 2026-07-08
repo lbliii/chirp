@@ -77,7 +77,8 @@ enables live UI updates with zero client-side JavaScript.
 
 :::{card} Free-Threading Native
 :icon: cpu
-Designed for Python 3.14t from the first line. Frozen config, frozen requests, ContextVar isolation, immutable data structures. Data races are structurally impossible.
+Designed for Python 3.14t from the first line. Framework-owned shared state uses frozen values,
+ContextVar isolation, and explicit locks, with covered paths exercised in free-threaded CI.
 :::{/card}
 
 :::{card} Kida Built In

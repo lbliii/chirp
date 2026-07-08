@@ -19,6 +19,8 @@ and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email
 integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
 
 Status: **alpha** (0.8.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+Public positioning and performance language is governed by the machine-checked
+[claims ledger](docs/design/public-claims.json).
 
 📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
 
