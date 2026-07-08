@@ -146,6 +146,9 @@ as a public framework comparison; it is a Chirp hot-path regression check.
 
 ## Output
 
+The values below illustrate the report format; they are not a committed current result artifact
+and must not be quoted as comparative performance evidence.
+
 ```
 ============================================================
   CHIRP vs FASTHTML vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR
