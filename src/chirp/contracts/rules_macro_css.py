@@ -59,7 +59,14 @@ _DANGLING_CLASSES: tuple[str, ...] = (
 # prefers e.g. ``field--error`` over the ``field-error`` prefix overlap.
 _DANGLING_RE = re.compile(
     r"(?<![A-Za-z0-9_-])(?:"
-    + "|".join(re.escape(c) for c in sorted(_DANGLING_CLASSES, key=len, reverse=True))
+    + "|".join(
+        re.escape(class_name)
+        for class_name in sorted(
+            _DANGLING_CLASSES,
+            key=lambda class_name: len(class_name),
+            reverse=True,
+        )
+    )
     + r")(?![A-Za-z0-9_-])",
 )
 
