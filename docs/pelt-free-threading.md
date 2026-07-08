@@ -9,6 +9,14 @@ readers decode against an immutable `MappingProxyType` snapshot. Pool reset I/O
 finishes before the connection is published as available, so no pool lock is
 held across network I/O.
 
+## Product boundary
+
+Pelt is currently a private, in-tree implementation behind Chirp's `data-pg`
+seam. It is pure Python and speaks the PostgreSQL wire protocol without libpq,
+psycopg, asyncpg, or a compiled runtime extension. Applications should use
+`chirp.data.Database`, not import `chirp.data.drivers._pelt`; the seam is the
+planned extraction boundary for a future standalone package.
+
 ## Evidence map
 
 | Invariant | Implementation | Automated proof |
@@ -41,3 +49,11 @@ It intentionally uses a fixed sleeping decoder to avoid runner-speed
 assumptions. Production speed depends on row shapes, codecs, query latency,
 hardware, and pool sizing; benchmark the real workload before drawing capacity
 conclusions.
+
+A pool can overlap independent operations on different checked-out connections.
+One `Database.stream()` call still owns one connection and one server portal,
+advances through ordered batches, and does not scale with pool size. Its decoded
+buffer is bounded by `batch_size`. `Database.execute_many()` currently performs
+individual executions rather than `COPY` or protocol pipelining. Those are
+explicit single-query and bulk-performance boundaries until a reproducible Pelt
+benchmark artifact says more.

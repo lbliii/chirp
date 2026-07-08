@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from chirp.data.drivers._pelt import _transport
@@ -11,7 +13,7 @@ from chirp.data.drivers._pelt._protocol import (
     ProtocolState,
     TransactionStatus,
 )
-from chirp.data.drivers._pelt.connection import Connection
+from chirp.data.drivers._pelt.connection import Connection, Cursor, Record, _QueryResult
 from chirp.data.drivers._pelt.errors import PostgresError
 from chirp.data.drivers._pelt.types import ConnectionConfig
 
@@ -71,6 +73,46 @@ class _ScriptedStream:
 
     async def aclose(self) -> None:
         return None
+
+
+class _BatchedConnection:
+    def __init__(self, batches: list[list[Record]]) -> None:
+        self.batches = list(batches)
+        self.max_rows: list[int] = []
+
+    async def _execute_portal(
+        self, sql: str, params: tuple[object, ...], *, max_rows: int
+    ) -> tuple[_QueryResult, bool]:
+        del sql, params
+        return self._next(max_rows)
+
+    async def _resume_portal(self, *, max_rows: int) -> tuple[_QueryResult, bool]:
+        return self._next(max_rows)
+
+    def _next(self, max_rows: int) -> tuple[_QueryResult, bool]:
+        self.max_rows.append(max_rows)
+        rows = self.batches.pop(0)
+        result = _QueryResult(rows=rows, command_tag=None)
+        return result, bool(self.batches)
+
+
+@pytest.mark.issue(260)
+async def test_cursor_releases_consumed_batches() -> None:
+    batches = [
+        [Record(("n",), (0,)), Record(("n",), (1,))],
+        [Record(("n",), (2,)), Record(("n",), (3,))],
+        [Record(("n",), (4,))],
+    ]
+    conn = _BatchedConnection(batches)
+    cursor = Cursor(cast(Connection, conn), "SELECT n", (), prefetch=2)
+
+    seen: list[int] = []
+    async for row in cursor:
+        seen.append(row["n"])
+        assert len(cursor._rows) <= 2
+
+    assert seen == [0, 1, 2, 3, 4]
+    assert conn.max_rows == [2, 2, 2]
 
 
 @pytest.mark.issue(259)

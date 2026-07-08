@@ -42,3 +42,18 @@ def test_current_postgres_docs_name_the_in_tree_pelt_driver() -> None:
 
     installation = _CURRENT_DRIVER_DOCS[0].read_text()
     assert "no extra dependency" in installation
+
+
+@pytest.mark.issue(260)
+def test_data_pg_docs_publish_driver_and_performance_boundaries() -> None:
+    database = _CURRENT_DRIVER_DOCS[1].read_text()
+    evidence = _EVIDENCE.read_text()
+
+    for text in (database, evidence):
+        assert "pure Python" in text
+        assert "libpq" in text
+
+    assert "do not import `chirp.data.drivers._pelt`" in database
+    assert "`db.stream()` owns one pooled connection" in database
+    assert "`db.execute_many()` is currently a convenience loop" in database
+    assert "does not scale with pool size" in evidence
