@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://pypi.org/project/bengal-chirp/)
 
-**A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events.**
+**A full-stack Python hypermedia framework with a built-in contract compiler.**
 
 Routes return intent — `Page`, `Fragment`, `EventStream`, `Suspense`, and friends — and Chirp
 handles content negotiation, layout composition, and htmx awareness. Install as
@@ -13,12 +13,17 @@ handles content negotiation, layout composition, and htmx awareness. Install as
 
 Chirp ships routing, templates, forms, validation, sessions, auth, streaming HTML, SSE,
 static files, security middleware, testing tools, and hypermedia contract checks in one
-framework. JSON routes and explicit `Response` objects are supported when you need them.
+framework. At startup it compiles routes, typed return declarations, template blocks,
+and registries into one immutable internal application model used by `chirp check`,
+runtime transition traces, and testing tools. JSON routes and explicit `Response`
+objects are supported when you need them.
 Database access uses [Shapes](https://lbliii.github.io/chirp/docs/build-apps/forms-data/shapes/)
 and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email delivery
 integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
 
-Status: **alpha** (0.8.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+Status: **alpha** (0.9.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+Public positioning and performance language is governed by the machine-checked
+[claims ledger](docs/design/public-claims.json).
 
 📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
 
@@ -78,6 +83,18 @@ No `make_response()`. No separate partials directory. The type *is* the intent.
 Read [Philosophy](docs/philosophy.md) and [Return values](https://lbliii.github.io/chirp/docs/about/core-concepts/return-values/)
 for the full model.
 
+The same declarations form Chirp's contract compiler input. `chirp check`
+diagnoses broken route/template/target relationships before a browser reaches
+them, while DevTools and transition tests correlate runtime requests back to
+the compiled model. The primary output is still a live ASGI application;
+`chirp freeze` is an optional static projection for compatible routes.
+
+See [Hypermedia Application Compiler](docs/hypermedia-application-compiler.md)
+for the architecture and the tested
+[Full-Application Journey](https://lbliii.github.io/chirp/docs/tutorials/full-application-journey/)
+for the database, mutation, validation, boosted-navigation, SSE, diagnostics,
+and optional-export proof.
+
 ---
 
 ## Where to go next
@@ -87,6 +104,7 @@ for the full model.
 | Learn step by step | [Learning path](https://lbliii.github.io/chirp/docs/get-started/learning-path/) · [Get Started](https://lbliii.github.io/chirp/docs/get-started/) |
 | Understand the architecture | [About](https://lbliii.github.io/chirp/docs/about/) · [Core concepts](https://lbliii.github.io/chirp/docs/about/core-concepts/) |
 | Build features | [Build Apps](https://lbliii.github.io/chirp/docs/build-apps/) |
+| Prove a complete database-backed app | [Full-Application Journey](https://lbliii.github.io/chirp/docs/tutorials/full-application-journey/) |
 | Run runnable examples | [Examples index](examples/README.md) |
 | Compare to other stacks | [When to use Chirp](https://lbliii.github.io/chirp/docs/about/comparison/) |
 | See what's intentionally out of scope | [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/) |

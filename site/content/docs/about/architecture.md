@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: Chirp's three-layer architecture
+description: Chirp's three-layer architecture and startup contract compiler
 draft: false
 weight: 20
 lang: en
@@ -76,6 +76,42 @@ flowchart TD
 :::
 
 The frozen/slots design and the `ContextVar` request state are what make Chirp safe under free-threading. See [[docs/about/thread-safety|free-threading and frozen state]] for why.
+
+## The contract compiler boundary
+
+The three layers are connected at application freeze. Chirp compiles route
+declarations, template and block metadata, htmx targets, registries, and
+declared transitions into one immutable internal `HypermediaProgram`. That
+program is not a public graph API; it is the shared internal model used by the
+first graph-backed `app.check()` rules, runtime transition traces, DevTools,
+and transition-testing helpers.
+
+```mermaid
+flowchart LR
+    Inputs["Routes + typed returns + template blocks + registries"]
+    Program["HypermediaProgram (internal, immutable)"]
+    Runtime["Live ASGI runtime"]
+    Checks["app.check()"]
+    Evidence["DevTools + transition tests"]
+    Export["Optional static export"]
+
+    Inputs --> Program
+    Program --> Runtime
+    Program --> Checks
+    Runtime --> Evidence
+    Program --> Evidence
+    Program --> Export
+```
+
+This is a contract compiler, not a static-site-first deployment model. The
+primary output is the live ASGI application: SQL, mutations, validation,
+sessions, streaming, and SSE continue to run at request time. `chirp freeze`
+is an optional projection for compatible routes from that same application.
+
+The tested [[docs/tutorials/full-application-journey|Full-Application Journey]]
+walks through the complete feedback loop: typed return values, startup checks,
+route-smoke and transition evidence, DevTools, and a deliberately bounded
+static export.
 
 :::{glossary}
 :tags: architecture, concepts, docs

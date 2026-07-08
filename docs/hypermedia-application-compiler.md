@@ -1,13 +1,13 @@
 # Hypermedia Application Compiler
 
-**Status:** Proposed product and architecture strategy
-**Updated:** 2026-07-01
-**Scope:** Directional guidance, not documentation of a shipped graph API
+**Status:** Shipped compiler foundation and observable proof loop
+**Updated:** 2026-07-08
+**Scope:** Product architecture; the compiled graph remains internal API
 
 ## Thesis
 
-Chirp is a full-stack Python hypermedia framework with the foundations of a
-built-in application compiler.
+Chirp is a full-stack Python hypermedia framework with a built-in contract
+compiler.
 
 Developers write Python routes, typed return values, and HTML templates with
 named blocks. Chirp can compile those declarations and discoverable
@@ -86,14 +86,14 @@ This direction doubles down on existing architecture rather than replacing it:
 - `chirp freeze` can already render compatible application routes into static
   output without creating a separate template system.
 
-These are compiler ingredients. Issue #509 begins connecting them through one
-authoritative internal artifact; later increments still need to migrate the
-remaining consumers onto it.
+Chirp 0.9.0 connects these ingredients through one authoritative internal
+artifact. The compiler foundation is shipped; public inspection APIs and full
+consumer consolidation remain future work rather than implied stable surface.
 
 ## The Compiled Center
 
-Issue #509 establishes the first internal increment of a frozen read model
-called `HypermediaProgram`:
+Issue #509 established a frozen internal read model called
+`HypermediaProgram`:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -103,16 +103,16 @@ class HypermediaProgram:
     blocks: tuple[BlockNode, ...]
     targets: tuple[TargetNode, ...]
     transitions: tuple[TransitionEdge, ...]
+    template_declarations: tuple[TemplateDeclaration, ...]
 ```
 
-The shipped internal increment covers stable route, template, block, target,
-and transition records, with source origin and provenance stored on each
-record. Page-shell and fragment-target
-contract rules are its first consumers. It is not a public inspection API, and
-public names or serialized shapes still require design review. The important
-decision is that this one immutable model becomes the shared source for checks,
-runtime trace correlation, DevTools, testing, documentation, and static export
-analysis as each consumer migrates.
+The shipped model covers stable route, template, block, target, and transition
+records, with source origin and provenance stored on each record. Page-shell,
+fragment-target, and template-declaration contract rules consume it. Runtime
+transition traces carry compiled transition identities into DevTools and the
+public testing helpers, so checks and behavioral observations can refer to the
+same application edges. It is not a public inspection API, and public names or
+serialized shapes still require design review.
 
 ```text
 routes + return declarations + template metadata + registries
@@ -203,18 +203,23 @@ abstraction or generated business-logic layer.
 
 ## The Product Proof
 
-The vision should be demonstrated with a real database-backed application, not
-only a static site or isolated feature gallery. A short demonstration should:
+The tested
+[Full-Application Journey](../site/content/docs/tutorials/full-application-journey.md)
+is the product proof. It composes maintained applications instead of creating a
+tutorial-only showcase, and its evidence map is enforced by
+`tests/docs/test_full_application_journey.py`.
 
-1. Run an application with SQL, search, forms, validation, boosted navigation,
-   and an SSE region.
-2. Show the same template serving full-page and named-block access patterns.
-3. Introduce a full-document-in-fragment error, a missing OOB block, and an
-   unsafe mutation path.
-4. Run `chirp check` and receive precise, actionable diagnostics.
-5. Show the matching render transitions in Chirp DevTools.
-6. Export only the static-compatible surface while leaving dynamic routes in
-   the live application.
+The short proof:
+
+1. Runs applications with SQL, forms, validation, boosted navigation, and SSE.
+2. Shows the same template serving full-page and named-block access patterns.
+3. Replays a full-document-in-fragment error, a missing OOB block, and an unsafe
+   mutation path against named regression tests.
+4. Runs `chirp check` and receives precise, actionable diagnostics.
+5. Shows matching compiled transition identities in Chirp DevTools and testing
+   observations.
+6. Exports only a static-compatible surface while leaving SQL, mutations,
+   sessions, Suspense, and SSE in the live ASGI applications.
 
 Furatena is the downstream proof that these pressures are real. It should
 remain an independent product and compatibility canary, not become framework
@@ -222,7 +227,9 @@ code or a bundled starter application.
 
 ## Delivery Strategy
 
-This should be an incremental consolidation, not a rewrite:
+This remains an incremental consolidation, not a rewrite. Steps 1–3 have
+shipped in the first internal consumers; steps 4–7 continue without changing
+the return-type or one-template contract:
 
 1. Define stable internal graph nodes, transitions, and source origins.
 2. Build the graph during the existing compilation boundary.
@@ -252,12 +259,12 @@ parallel rendering pipeline would defeat the purpose.
 
 The positioning can mature in stages:
 
-| Stage | Defensible claim |
-| --- | --- |
-| Today | Chirp is a typed hypermedia framework with unusually strong application contract checks. |
-| Compiler foundation | Chirp compiles routes, return intents, templates, and registries into one validated internal application model. |
-| Observable compiler | Static checks, runtime traces, and tests refer to the same compiled transitions. |
-| Productized compiler | Developers can inspect, diff, test, and document the compiled application through stable tooling. |
+| Stage | Status | Defensible claim |
+| --- | --- | --- |
+| Contract checks | Shipped | Chirp is a typed hypermedia framework with unusually strong application contract checks. |
+| Compiler foundation | Shipped | Chirp compiles routes, templates, blocks, targets, and transitions into one validated internal application model. |
+| Observable compiler | Shipped first increment | Contract rules, runtime traces, DevTools, and transition tests refer to compiled transition identities. |
+| Productized compiler | In progress | Stable structured inspection and broader consumer consolidation still require explicit public-API design. |
 
 Marketing should not outrun the corresponding stage.
 
@@ -287,4 +294,5 @@ The vision is credible when:
 - `plan/drafted/epic-downstream-product-success.md`
 - [GitHub saga #503](https://github.com/lbliii/chirp/issues/503) and epics
   [#504](https://github.com/lbliii/chirp/issues/504)-[#508](https://github.com/lbliii/chirp/issues/508)
-- Foundation issues #497-#502 and implementation issues #509-#513
+- Foundation issues #497-#502 and implementation issues #509-#512 are
+  complete; #513 publishes the product proof and aligned terminology.
