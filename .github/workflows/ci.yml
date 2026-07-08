@@ -38,6 +38,9 @@ jobs:
       - name: Ruff (format)
         run: uv run ruff format . --check
 
+      - name: Exception hygiene ratchet
+        run: uv run python scripts/lint_exception_hygiene.py
+
   ty:
     runs-on: ubuntu-latest
     steps:
