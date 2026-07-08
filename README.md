@@ -428,14 +428,15 @@ See the [deployment guide](https://lbliii.github.io/chirp/docs/quality/deploymen
 <details>
 <summary><strong>Benchmarks</strong></summary>
 
-Synthetic benchmarks comparing Chirp, FastAPI, Flask, Starlette, and Litestar:
+Synthetic benchmarks comparing Chirp, FastHTML, FastAPI, Flask, Starlette, and Litestar:
 
 ```bash
 uv sync --extra benchmark
 uv run poe benchmark
 ```
 
-See [`benchmarks/README.md`](benchmarks/README.md) for caveats and runners.
+See the [committed baseline and full artifact](benchmarks/README.md#committed-network-baseline)
+for current results, caveats, environment metadata, and runners.
 
 </details>
 
