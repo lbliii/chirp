@@ -85,8 +85,33 @@ def test_networked_benchmarks_include_full_workload_matrix() -> None:
 
 
 def test_networked_benchmarks_include_full_framework_matrix() -> None:
-    assert _RUN.DEFAULT_TARGETS == ["chirp", "fastapi", "flask", "starlette", "litestar"]
+    assert _RUN.DEFAULT_TARGETS == [
+        "chirp",
+        "fasthtml",
+        "fastapi",
+        "flask",
+        "starlette",
+        "litestar",
+    ]
     assert set(_RUN.DEFAULT_TARGETS).issubset(_RUN.ALL_FRAMEWORKS)
+
+
+@pytest.mark.issue(621)
+def test_fasthtml_benchmark_uses_native_ft_rendering() -> None:
+    pytest.importorskip("fasthtml")
+    from starlette.testclient import TestClient
+
+    from benchmarks.apps.fasthtml_app import app
+
+    with TestClient(app) as client:
+        json_response = client.get("/json")
+        template_response = client.get("/template")
+
+    assert json_response.json() == {"message": "hello", "count": 42}
+    assert template_response.status_code == 200
+    assert template_response.text.startswith("<main>")
+    assert "Benchmark Items" in template_response.text
+    assert template_response.text.count("<li>") == 20
 
 
 def test_networked_benchmarks_record_python_gil_mode() -> None:
