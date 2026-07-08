@@ -3,7 +3,7 @@
 import logging
 import re
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from kida import Environment
 from kida.analysis import (
@@ -15,6 +15,9 @@ from kida.analysis import (
 )
 
 from .types import ContractIssue, Severity
+
+if TYPE_CHECKING:
+    from kida.analysis.context_contracts import SupportsContextAnalysis
 
 _SKIPPED_TEMPLATE_PREFIXES = ("chirp/", "chirpui/")
 _ROUTE_HX_ATTRS = frozenset({"hx-get", "hx-post", "hx-put", "hx-patch", "hx-delete"})
@@ -294,8 +297,12 @@ def check_template_context_contracts(
         try:
             template = kida_env.get_template(template_name)
             merged_globals = env_globals | set(globals_ or ())
+            # Kida's protocol currently models ``name`` as writable, while its
+            # own immutable Template exposes it read-only. The remaining
+            # analysis members are the exact runtime contract used below.
+            analysis_template = cast("SupportsContextAnalysis", template)
             for issue in check_context_contract(
-                template,
+                analysis_template,
                 provided,
                 optional=optional,
                 globals=merged_globals,
