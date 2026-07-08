@@ -1,0 +1,141 @@
+name: Benchmarks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/benchmarks.yml"
+      - "benchmarks/**"
+      - "src/chirp/**"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: benchmarks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  core-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHON_GIL: "0"
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v7
+        with:
+          path: candidate
+
+      - name: Check out base
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14t"
+          enable-cache: true
+          cache-dependency-glob: |
+            baseline/uv.lock
+            candidate/uv.lock
+
+      - name: Install base dependencies
+        if: github.event_name == 'pull_request'
+        working-directory: baseline
+        run: uv sync --no-sources --group dev
+
+      - name: Install candidate dependencies
+        working-directory: candidate
+        run: uv sync --no-sources --group dev
+
+      - name: Run paired base and candidate benchmarks
+        if: github.event_name == 'pull_request'
+        run: |
+          for round in 1 2 3; do
+            uv run --directory baseline --no-sync python -m benchmarks.core \
+              --iterations 250 \
+              --route-count 100 \
+              --output "../benchmark-artifacts/base-${round}.json"
+            uv run --directory candidate --no-sync python -m benchmarks.core \
+              --iterations 250 \
+              --route-count 100 \
+              --output "../benchmark-artifacts/candidate-${round}.json"
+          done
+
+      - name: Run candidate benchmarks
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: candidate
+        run: >-
+          uv run --no-sync python -m benchmarks.core
+          --iterations 250
+          --route-count 100
+          --output ../benchmark-artifacts/candidate.json
+
+      - name: Compare base and candidate
+        id: comparison
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: candidate
+        run: >-
+          uv run --no-sync python -m benchmarks.compare
+          --baseline ../benchmark-artifacts/base-1.json
+          --baseline ../benchmark-artifacts/base-2.json
+          --baseline ../benchmark-artifacts/base-3.json
+          --candidate ../benchmark-artifacts/candidate-1.json
+          --candidate ../benchmark-artifacts/candidate-2.json
+          --candidate ../benchmark-artifacts/candidate-3.json
+          --markdown-output ../benchmark-artifacts/comparison.md
+
+      - name: Add comparison to job summary
+        if: github.event_name == 'pull_request' && always()
+        run: cat benchmark-artifacts/comparison.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update benchmark PR comment
+        if: github.event_name == 'pull_request' && always()
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- chirp-core-benchmark-comparison -->";
+            const body = fs.readFileSync("benchmark-artifacts/comparison.md", "utf8");
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const previous = comments.find(comment => comment.body?.includes(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-benchmarks-${{ github.sha }}
+          path: benchmark-artifacts/
+
+      - name: Enforce regression budget
+        if: github.event_name == 'pull_request' && steps.comparison.outcome == 'failure'
+        run: exit 1
