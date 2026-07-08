@@ -144,6 +144,22 @@ against the previous artifact. Treat large unexplained movement in `template_ren
 `filesystem_route_dispatch` as a release blocker until it is explained. Do not use this artifact
 as a public framework comparison; it is a Chirp hot-path regression check.
 
+### Pull-request regression gate
+
+`.github/workflows/benchmarks.yml` runs the base and candidate core suites sequentially on the
+same GitHub-hosted Python 3.14t runner. It compares each workload's median (`p50_us`), posts an
+updatable PR table, and uploads both raw JSON reports. Changes above 5% are highlighted; changes
+above 20% fail CI. Removing a baseline workload also fails so benchmark coverage cannot disappear
+silently. The deliberately broad failure threshold accounts for shared-runner noise; rerun a
+failure before attributing it to code.
+
+To reproduce the comparison locally:
+
+```bash
+python -m benchmarks.compare base.json candidate.json \
+  --markdown-output comparison.md
+```
+
 ## Output
 
 The values below illustrate the report format; they are not a committed current result artifact
