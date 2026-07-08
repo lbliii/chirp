@@ -21,6 +21,16 @@ from chirp.data.errors import DataError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+__all__ = [
+    "AuthenticationError",
+    "PeltConnectionError",
+    "PeltError",
+    "PeltTimeoutError",
+    "PostgresError",
+    "ProtocolError",
+    "TLSError",
+]
+
 
 class PeltError(DataError):
     """Root of pelt's error tree.
@@ -113,7 +123,12 @@ class PostgresError(PeltError):
         hint: str | None = None,
         doc: str | None = None,
     ) -> None:
-        super().__init__(message, code=f"PELT_PG_{sqlstate}", hint=hint, doc=doc)
+        super().__init__(
+            message,
+            code=f"PELT_PG_{sqlstate}",
+            hint=hint,
+            doc=doc or "docs/troubleshooting.md#pelt_pg_sqlstate",
+        )
         self.sqlstate = sqlstate
         self.severity = severity
         self.detail = detail
