@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta, timezone
+from decimal import Decimal
+from uuid import UUID
 
 import anyio
 import pytest
@@ -166,3 +169,86 @@ async def test_parallel_checkouts_keep_statement_caches_single_owner() -> None:
 
     assert len(statement_names) == 4
     assert set(statement_names) == {"pelt_stmt_1"}
+
+
+@requires_pg
+@pytest.mark.issue(260)
+async def test_live_leaf_codec_matrix() -> None:
+    """Every registered leaf family decodes an actual PostgreSQL text result."""
+    assert PG_DSN is not None
+    conn = await pelt_pool.connect(PG_DSN)
+    try:
+        await conn.execute("SET TIME ZONE 'UTC'")
+        row = await conn.fetchrow(
+            """
+            SELECT
+                32767::int2 AS small_int,
+                2147483647::int4 AS integer,
+                9223372036854775807::int8 AS big_int,
+                1.25::float4 AS single_float,
+                2.5::float8 AS double_float,
+                true::bool AS flag,
+                'plain'::text AS plain_text,
+                'varying'::varchar AS varying_text,
+                'fixed'::char(5) AS fixed_text,
+                12345.6789::numeric AS exact_number,
+                DATE '2024-01-02' AS calendar_date,
+                TIME '12:34:56.123456' AS wall_time,
+                TIMESTAMP '2024-01-02 03:04:05.123456' AS local_timestamp,
+                TIMESTAMPTZ '2024-01-02 03:04:05.123456+00' AS utc_timestamp,
+                TIMETZ '12:34:56.123456+02' AS zoned_time,
+                '12345678-1234-5678-1234-567812345678'::uuid AS identifier,
+                decode('00ff10', 'hex') AS binary_value,
+                '{"kind":"json","count":2}'::json AS json_value,
+                '{"kind":"jsonb","active":true}'::jsonb AS jsonb_value
+            """
+        )
+    finally:
+        await conn.close()
+
+    assert row is not None
+    assert dict(row) == {
+        "small_int": 32767,
+        "integer": 2147483647,
+        "big_int": 9223372036854775807,
+        "single_float": 1.25,
+        "double_float": 2.5,
+        "flag": True,
+        "plain_text": "plain",
+        "varying_text": "varying",
+        "fixed_text": "fixed",
+        "exact_number": Decimal("12345.6789"),
+        "calendar_date": date(2024, 1, 2),
+        "wall_time": time(12, 34, 56, 123456),
+        "local_timestamp": datetime(2024, 1, 2, 3, 4, 5, 123456),
+        "utc_timestamp": datetime(2024, 1, 2, 3, 4, 5, 123456, tzinfo=UTC),
+        "zoned_time": time(12, 34, 56, 123456, tzinfo=timezone(timedelta(hours=2))),
+        "identifier": UUID("12345678-1234-5678-1234-567812345678"),
+        "binary_value": b"\x00\xff\x10",
+        "json_value": {"kind": "json", "count": 2},
+        "jsonb_value": {"kind": "jsonb", "active": True},
+    }
+
+
+@requires_pg
+@pytest.mark.issue(260)
+async def test_live_array_and_range_types_preserve_text_when_binary_is_not_requested() -> None:
+    """Arrays and ranges stay lossless strings on the current text-result path."""
+    assert PG_DSN is not None
+    conn = await pelt_pool.connect(PG_DSN)
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT
+                ARRAY[1, 2, NULL]::int4[] AS numbers,
+                int4range(1, 4, '[)') AS span
+            """
+        )
+    finally:
+        await conn.close()
+
+    assert row is not None
+    assert dict(row) == {
+        "numbers": "{1,2,NULL}",
+        "span": "[1,4)",
+    }
