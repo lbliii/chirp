@@ -226,6 +226,10 @@ def run_production_server(
         backlog=backlog,
         keep_alive_timeout=keep_alive_timeout,
         request_timeout=request_timeout,
+        # Keep the wire-level Pounce ceiling aligned with Chirp's documented
+        # application envelope. Otherwise Pounce's 1 MiB default rejects valid
+        # Chirp requests before Request.body() can enforce the configured cap.
+        max_request_size=app.config.max_request_body_size,
         # TLS
         ssl_certfile=ssl_certfile,
         ssl_keyfile=ssl_keyfile,

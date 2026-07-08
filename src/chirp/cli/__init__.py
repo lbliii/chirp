@@ -1,373 +1,314 @@
-"""Chirp CLI — project scaffolding, dev server, and contract validation.
+"""Chirp CLI registration backed by Milo's public lazy-command APIs.
 
-Entry point registered as ``chirp`` in ``pyproject.toml``::
-
-    [project.scripts]
-    chirp = "chirp.cli:main"
+The packaged entry point remains ``chirp.cli:main``. Command implementations
+stay in their existing modules; this module owns typed metadata and lazy import
+paths without importing a handler to render help or report a parse error.
 """
 
-import argparse
+from __future__ import annotations
+
 import sys
+from typing import Any
+
+from milo import CLI
+
+_CLI_ONLY = ("cli",)
+_MISSING = object()
 
 
-class _VersionAction(argparse.Action):
-    """Print the version report and exit.
+class _PassthroughError(BaseException):
+    """Carry a Chirp-owned exception past Milo's terminal normalization."""
 
-    A custom action (rather than argparse's built-in ``version`` action) keeps
-    dependency-version lookups lazy: they run only when ``--version`` is passed,
-    not on every ``chirp`` invocation while the parser is built.
-    """
+    def __init__(self, original: Exception) -> None:
+        super().__init__(str(original))
+        self.original = original
 
-    def __init__(
-        self,
-        option_strings: list[str],
-        dest: str = argparse.SUPPRESS,
-        default: str = argparse.SUPPRESS,
-        help: str = "Show chirp, kida, pounce, and Python versions, then exit",
+
+def _property(
+    value_type: str,
+    description: str,
+    *,
+    default: Any = _MISSING,
+    presentation: dict[str, Any] | None = None,
+    items: dict[str, Any] | None = None,
+    min_items: int | None = None,
+) -> dict[str, Any]:
+    prop: dict[str, Any] = {"type": value_type, "description": description}
+    if presentation is not None:
+        prop["x-milo-cli"] = presentation
+    if items is not None:
+        prop["items"] = items
+    if min_items is not None:
+        prop["minItems"] = min_items
+    if default is not _MISSING:
+        prop["default"] = default
+    return prop
+
+
+def _positional(value_type: str, description: str, name: str, *, default: Any = _MISSING):
+    return _property(
+        value_type,
+        description,
+        default=default,
+        presentation={"kind": "positional", "metavar": name},
+    )
+
+
+def _option(value_type: str, description: str, metavar: str, *, default: Any = _MISSING):
+    return _property(
+        value_type,
+        description,
+        default=default,
+        presentation={"kind": "option", "metavar": metavar},
+    )
+
+
+def _flag(description: str) -> dict[str, Any]:
+    return _property("boolean", description, default=False)
+
+
+def _schema(
+    properties: dict[str, dict[str, Any]],
+    *required: str,
+) -> dict[str, Any]:
+    schema: dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        schema["required"] = list(required)
+    return schema
+
+
+def _server_schema() -> dict[str, Any]:
+    return _schema(
+        {
+            "app": _positional(
+                "string", "Application import string, for example myapp:app.", "app"
+            ),
+            "host": _property("string", "Bind host address.", default=None),
+            "port": _property("integer", "Bind port number.", default=None),
+            "production": _flag("Run in production mode."),
+            "workers": _property(
+                "integer", "Worker count; zero selects automatically.", default=None
+            ),
+            "metrics": _flag("Enable the Prometheus metrics endpoint."),
+            "rate_limit": _flag("Enable per-IP rate limiting."),
+            "queue": _flag("Enable request queueing."),
+            "sentry_dsn": _property("string", "Sentry DSN for error tracking.", default=None),
+        },
+        "app",
+    )
+
+
+def _schemas() -> dict[str, dict[str, Any]]:
+    """Build fresh precomputed schemas for one invocation-local registry."""
+    return {
+        "new": _schema(
+            {
+                "name": _positional("string", "Project directory name.", "name"),
+                "minimal": _flag("Generate a minimal single-file project."),
+                "stream": _flag("Include the simulated token-streaming demo."),
+                "sse": _flag("Include SSE boilerplate."),
+                "shell": _flag("Generate a project with a persistent app shell."),
+                "ai": _flag("Scaffold AI chat and its secure supporting stack."),
+                "with_chirpui": _flag("Require ChirpUI templates."),
+            },
+            "name",
+        ),
+        "run": _server_schema(),
+        "dev": _server_schema(),
+        "check": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                ),
+                "warnings_as_errors": _flag("Fail when contract warnings are present."),
+                "coverage": _flag("Show route and template coverage counters."),
+                "deploy": _flag("Use production-posture severity and strict warnings."),
+                "json": _flag("Emit the stable JSON contract report."),
+                "baseline": _option(
+                    "string",
+                    "Compare with a prior JSON baseline at this path.",
+                    "PATH",
+                    default=None,
+                ),
+                "include_info": _flag("Include informational findings in structured output."),
+            },
+            "app",
+        ),
+        "diff": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                ),
+                "base": _option("string", "Git ref to compare against.", "REF"),
+                "json": _flag("Emit a stable JSON diff payload."),
+                "warnings_as_errors": _flag("Fail when new warnings appear."),
+                "deploy": _flag("Use production-posture severity and strict warnings."),
+                "include_info": _flag("Include informational findings in the diff."),
+            },
+            "app",
+            "base",
+        ),
+        "routes": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                )
+            },
+            "app",
+        ),
+        "security-check": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                )
+            },
+            "app",
+        ),
+        "freeze": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                ),
+                "output": _positional(
+                    "string", "Output directory for frozen HTML files.", "output"
+                ),
+                "exclude": _property(
+                    "array",
+                    "One or more URL prefixes to exclude.",
+                    default=None,
+                    presentation={"kind": "option", "metavar": "EXCLUDE"},
+                    items={"type": "string"},
+                    min_items=1,
+                ),
+            },
+            "app",
+            "output",
+        ),
+        "makemigrations": _schema(
+            {
+                "db": _option("string", "Database URL.", "DB"),
+                "schema": _option(
+                    "string", "SQL schema file or Python module containing SCHEMA.", "SCHEMA"
+                ),
+                "migrations_dir": _option(
+                    "string",
+                    "Output directory for migration files.",
+                    "MIGRATIONS_DIR",
+                    default="migrations",
+                ),
+            },
+            "db",
+            "schema",
+        ),
+        "migrate": _schema(
+            {
+                "db": _option("string", "Database URL.", "DB"),
+                "migrations_dir": _option(
+                    "string",
+                    "Directory containing migration files.",
+                    "MIGRATIONS_DIR",
+                    default="migrations",
+                ),
+            },
+            "db",
+        ),
+        "shapes-codegen": _schema(
+            {
+                "path": _positional(
+                    "string",
+                    "File or directory to scan; with --audit, an app import string.",
+                    "path",
+                    default=".",
+                ),
+                "dry_run": _flag("Print suggestions without writing files."),
+                "audit": _flag("Audit surface contracts for missing Shapes."),
+                "migrations": _option(
+                    "string",
+                    "Reserved migration directory for future incremental output.",
+                    "MIGRATIONS_DIR",
+                    default="migrations",
+                ),
+            }
+        ),
+    }
+
+
+def _version_report() -> str:
+    from chirp.cli._version import version_report
+
+    return version_report()
+
+
+def _build_cli() -> CLI:
+    """Build one registry per invocation to isolate Milo's parser state."""
+    cli = CLI(
+        name="chirp",
+        description="Chirp — A Python web framework for the modern web platform.",
+        version_flags=("-V", "--version"),
+        version_report=_version_report,
+    )
+    schemas = _schemas()
+
+    def register(
+        name: str,
+        description: str,
+        *,
+        annotations: dict[str, Any] | None = None,
     ) -> None:
-        super().__init__(
-            option_strings=option_strings,
-            dest=dest,
-            default=default,
-            nargs=0,
-            help=help,
+        cli.lazy_command(
+            name,
+            f"chirp.cli._milo_handlers:{name.replace('-', '_')}_command",
+            description=description,
+            schema=schemas[name],
+            surfaces=_CLI_ONLY,
+            display_result=False,
+            annotations=annotations,
         )
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        from chirp.cli._version import version_report
-
-        print(version_report())
-        parser.exit()
-
-
-def _add_server_run_args(p: argparse.ArgumentParser) -> None:
-    """Shared ``chirp run`` / ``chirp dev`` arguments."""
-    p.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
+    register(
+        "new",
+        "Create a new project",
+        annotations={"destructiveHint": True, "openWorldHint": True},
     )
-    p.add_argument("--host", default=None, help="Bind host address")
-    p.add_argument("--port", type=int, default=None, help="Bind port number")
-    p.add_argument(
-        "--production",
-        action="store_true",
-        help="Run in production mode (multi-worker, all features enabled)",
+    register("run", "Start dev or production server", annotations={"openWorldHint": True})
+    register(
+        "dev",
+        "Development server with browser reload on template/CSS changes",
+        annotations={"openWorldHint": True},
     )
-    p.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="Worker count (0=auto-detect, production only)",
+    register("check", "Validate hypermedia contracts")
+    register("diff", "Diff hypermedia contracts against a git base ref")
+    register("routes", "List registered routes")
+    register("security-check", "Audit app config against OWASP security checklist")
+    register(
+        "freeze",
+        "Render routes to static HTML files",
+        annotations={"destructiveHint": True, "openWorldHint": True},
     )
-    p.add_argument(
-        "--metrics",
-        action="store_true",
-        help="Enable Prometheus /metrics endpoint",
+    register(
+        "makemigrations",
+        "Auto-generate schema migration from SQL diff",
+        annotations={"destructiveHint": True, "openWorldHint": True},
     )
-    p.add_argument(
-        "--rate-limit",
-        action="store_true",
-        help="Enable per-IP rate limiting",
+    register(
+        "migrate",
+        "Apply pending schema migrations (one-shot deploy job)",
+        annotations={
+            "destructiveHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
     )
-    p.add_argument(
-        "--queue",
-        action="store_true",
-        help="Enable request queueing",
-    )
-    p.add_argument(
-        "--sentry-dsn",
-        type=str,
-        default=None,
-        help="Sentry DSN for error tracking",
-    )
+    register("shapes-codegen", "Suggest @shape decorators and audit Shape drift")
+    return cli
 
 
 def main(argv: list[str] | None = None) -> None:
-    """CLI entry point for the ``chirp`` command."""
-    parser = argparse.ArgumentParser(
-        prog="chirp",
-        description="Chirp — A Python web framework for the modern web platform.",
-    )
-    parser.add_argument("-V", "--version", action=_VersionAction)
-    subparsers = parser.add_subparsers(dest="command")
-
-    # -- chirp new --------------------------------------------------------
-    new_parser = subparsers.add_parser("new", help="Create a new project")
-    new_parser.add_argument("name", help="Project directory name")
-    new_parser.add_argument(
-        "--minimal",
-        action="store_true",
-        help="Generate a minimal single-file project",
-    )
-    new_parser.add_argument(
-        "--stream",
-        action="store_true",
-        help="Simulated token streaming (TemplateStream + EventStream demo)",
-    )
-    new_parser.add_argument(
-        "--sse",
-        action="store_true",
-        help="Include SSE boilerplate (EventStream, sse_scope)",
-    )
-    new_parser.add_argument(
-        "--shell",
-        action="store_true",
-        help="Generate project with persistent app shell (topbar, sidebar)",
-    )
-    new_parser.add_argument(
-        "--ai",
-        action="store_true",
-        help="Scaffold AI chat with tools, SSE activity feed, and secure stack",
-    )
-    new_parser.add_argument(
-        "--with-chirpui",
-        action="store_true",
-        help="Require ChirpUI templates (fail if chirp-ui is not installed)",
-    )
-
-    # -- chirp run --------------------------------------------------------
-    run_parser = subparsers.add_parser("run", help="Start dev or production server")
-    _add_server_run_args(run_parser)
-
-    # -- chirp dev --------------------------------------------------------
-    dev_parser = subparsers.add_parser(
-        "dev",
-        help="Development server with browser reload on template/CSS changes",
-    )
-    _add_server_run_args(dev_parser)
-
-    # -- chirp check ------------------------------------------------------
-    check_parser = subparsers.add_parser("check", help="Validate hypermedia contracts")
-    check_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-    check_parser.add_argument(
-        "--warnings-as-errors",
-        action="store_true",
-        help="Exit with code 1 if contract warnings are present",
-    )
-    check_parser.add_argument(
-        "--coverage",
-        action="store_true",
-        help="Show route/template contract coverage counters",
-    )
-    check_parser.add_argument(
-        "--deploy",
-        action="store_true",
-        help=(
-            "Run checks with production-posture severity (deploy preflight); "
-            "implies --warnings-as-errors"
-        ),
-    )
-    check_parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Emit a stable JSON contract report (for baselines and CI diff)",
-    )
-    check_parser.add_argument(
-        "--baseline",
-        metavar="PATH",
-        help="Compare the current check against a JSON baseline from a prior --json run",
-    )
-    check_parser.add_argument(
-        "--include-info",
-        action="store_true",
-        help="Include INFO-severity issues in --json / --baseline output",
-    )
-
-    # -- chirp diff -------------------------------------------------------
-    diff_parser = subparsers.add_parser(
-        "diff",
-        help="Diff hypermedia contracts against a git base ref",
-    )
-    diff_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-    diff_parser.add_argument(
-        "--base",
-        required=True,
-        metavar="REF",
-        help="Git ref to compare against (e.g. origin/main)",
-    )
-    diff_parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Emit a stable JSON diff payload for CI and agents",
-    )
-    diff_parser.add_argument(
-        "--warnings-as-errors",
-        action="store_true",
-        help="Exit with code 1 if new contract warnings appear",
-    )
-    diff_parser.add_argument(
-        "--deploy",
-        action="store_true",
-        help=(
-            "Run checks with production-posture severity on both sides; "
-            "implies --warnings-as-errors"
-        ),
-    )
-    diff_parser.add_argument(
-        "--include-info",
-        action="store_true",
-        help="Include INFO-severity issues in the diff",
-    )
-
-    # -- chirp routes -----------------------------------------------------
-    routes_parser = subparsers.add_parser("routes", help="List registered routes")
-    routes_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-
-    # -- chirp security-check ---------------------------------------------
-    sec_parser = subparsers.add_parser(
-        "security-check",
-        help="Audit app config against OWASP security checklist",
-    )
-    sec_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-
-    # -- chirp freeze -----------------------------------------------------
-    freeze_parser = subparsers.add_parser(
-        "freeze",
-        help="Render routes to static HTML files",
-    )
-    freeze_parser.add_argument(
-        "app",
-        help="Import string (e.g. myapp:app)",
-    )
-    freeze_parser.add_argument(
-        "output",
-        help="Output directory for frozen HTML files",
-    )
-    freeze_parser.add_argument(
-        "--exclude",
-        nargs="+",
-        default=None,
-        help="URL prefixes to exclude (e.g. /search)",
-    )
-
-    # -- chirp makemigrations ---------------------------------------------
-    mig_parser = subparsers.add_parser(
-        "makemigrations",
-        help="Auto-generate schema migration from SQL diff",
-    )
-    mig_parser.add_argument(
-        "--db",
-        required=True,
-        help="Database URL (e.g. sqlite:///app.db)",
-    )
-    mig_parser.add_argument(
-        "--schema",
-        required=True,
-        help="Schema file path (SQL or Python with SCHEMA variable)",
-    )
-    mig_parser.add_argument(
-        "--migrations-dir",
-        default="migrations",
-        help="Output directory for migration files (default: migrations)",
-    )
-
-    # -- chirp migrate ----------------------------------------------------
-    migrate_parser = subparsers.add_parser(
-        "migrate",
-        help="Apply pending schema migrations (one-shot deploy job)",
-    )
-    migrate_parser.add_argument(
-        "--db",
-        required=True,
-        help="Database URL (e.g. sqlite:///app.db)",
-    )
-    migrate_parser.add_argument(
-        "--migrations-dir",
-        default="migrations",
-        help="Directory containing migration files (default: migrations)",
-    )
-
-    # -- chirp shapes-codegen ---------------------------------------------
-    shapes_parser = subparsers.add_parser(
-        "shapes-codegen",
-        help="Suggest @shape decorators for dataclass/SELECT pairs and audit Shape drift",
-    )
-    shapes_parser.add_argument(
-        "path",
-        nargs="?",
-        default=".",
-        help=(
-            "Directory or file to scan for dataclass/SELECT pairs (default: .); "
-            "with --audit this is an app import string (e.g. myapp:app)"
-        ),
-    )
-    shapes_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print suggested @shape decorators without writing files (default behavior)",
-    )
-    shapes_parser.add_argument(
-        "--audit",
-        action="store_true",
-        help="Audit the app's surface_contracts registry for names with no backing Shape",
-    )
-    shapes_parser.add_argument(
-        "--migrations",
-        dest="migrations_dir",
-        default="migrations",
-        help="Migrations directory (reserved for future incremental codegen output)",
-    )
-
-    args = parser.parse_args(argv)
-
-    if args.command is None:
-        parser.print_help()
-        sys.exit(0)
-
-    if args.command == "new":
-        from chirp.cli._new import create_project
-
-        create_project(args)
-    elif args.command == "run":
-        from chirp.cli._run import run_server
-
-        run_server(args)
-    elif args.command == "dev":
-        from chirp.cli._run import run_server
-
-        args.dev_browser_reload = True
-        run_server(args)
-    elif args.command == "check":
-        from chirp.cli._check import run_check
-
-        run_check(args)
-    elif args.command == "diff":
-        from chirp.cli._diff import run_diff
-
-        run_diff(args)
-    elif args.command == "routes":
-        from chirp.cli._routes import run_routes
-
-        run_routes(args)
-    elif args.command == "security-check":
-        from chirp.cli._security_check import run_security_check
-
-        run_security_check(args)
-    elif args.command == "freeze":
-        from chirp.cli._freeze import run_freeze
-
-        run_freeze(args)
-    elif args.command == "makemigrations":
-        from chirp.cli._makemigrations import run_makemigrations
-
-        run_makemigrations(args)
-    elif args.command == "migrate":
-        from chirp.cli._migrate import run_migrate
-
-        run_migrate(args)
-    elif args.command == "shapes-codegen":
-        from chirp.cli._shapes_codegen import run_shapes_codegen
-
-        run_shapes_codegen(args)
+    """Run the packaged ``chirp`` command through an invocation-local Milo CLI."""
+    resolved_argv = list(sys.argv[1:] if argv is None else argv)
+    try:
+        _build_cli().run(resolved_argv)
+    except _PassthroughError as exc:
+        raise exc.original.with_traceback(exc.original.__traceback__) from None
+    if not resolved_argv:
+        raise SystemExit(0)

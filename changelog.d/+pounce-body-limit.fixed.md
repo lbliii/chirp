@@ -1,0 +1,1 @@
+**Production request limits** — Chirp now forwards `AppConfig.max_request_body_size` to Pounce, so valid bodies above Pounce's former 1 MiB default reach the application while oversized requests still receive 413 responses at the wire boundary.
