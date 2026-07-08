@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -137,6 +138,46 @@ def compare_reports(
     )
 
 
+def aggregate_reports(
+    reports: list[dict[str, Any]],
+    *,
+    metric: str = DEFAULT_METRIC,
+) -> dict[str, Any]:
+    """Collapse repeated reports to the median metric for each workload."""
+    if not reports:
+        raise BenchmarkReportError("At least one benchmark report is required for aggregation.")
+    first = reports[0]
+    first_values = _workloads(first, metric=metric)
+    samples = {name: [value] for name, value in first_values.items()}
+    for report in reports[1:]:
+        for field in ("iterations", "route_count", "units"):
+            expected = first.get("config", {}).get(field)
+            observed = report.get("config", {}).get(field)
+            if observed != expected:
+                raise BenchmarkReportError(
+                    f"Repeated benchmark config {field!r} must match; "
+                    f"expected={expected!r}, observed={observed!r}."
+                )
+        values = _workloads(report, metric=metric)
+        if values.keys() != first_values.keys():
+            raise BenchmarkReportError(
+                "Repeated benchmark reports must contain the same workload names."
+            )
+        for name, value in values.items():
+            samples[name].append(value)
+
+    return {
+        "schema_version": first["schema_version"],
+        "suite": first["suite"],
+        "environment": first.get("environment", {}),
+        "config": {**first.get("config", {}), "comparison_rounds": len(reports)},
+        "workloads": [
+            {"name": name, metric: statistics.median(values)}
+            for name, values in sorted(samples.items())
+        ],
+    }
+
+
 def _runtime_label(report: dict[str, Any]) -> str:
     python = report.get("environment", {}).get("python", {})
     version = python.get("version", "unknown")
@@ -211,8 +252,8 @@ def render_markdown(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("baseline", type=Path)
-    parser.add_argument("candidate", type=Path)
+    parser.add_argument("--baseline", type=Path, action="append", required=True)
+    parser.add_argument("--candidate", type=Path, action="append", required=True)
     parser.add_argument("--metric", default=DEFAULT_METRIC)
     parser.add_argument("--warning-percent", type=float, default=DEFAULT_WARNING_PERCENT)
     parser.add_argument("--failure-percent", type=float, default=DEFAULT_FAILURE_PERCENT)
@@ -223,8 +264,14 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        baseline = load_report(args.baseline)
-        candidate = load_report(args.candidate)
+        baseline = aggregate_reports(
+            [load_report(path) for path in args.baseline],
+            metric=args.metric,
+        )
+        candidate = aggregate_reports(
+            [load_report(path) for path in args.candidate],
+            metric=args.metric,
+        )
         result = compare_reports(
             baseline,
             candidate,

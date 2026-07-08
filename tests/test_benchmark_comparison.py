@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.compare import COMMENT_MARKER, compare_reports, render_markdown
+from benchmarks.compare import COMMENT_MARKER, aggregate_reports, compare_reports, render_markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,6 +73,17 @@ def test_comparison_rejects_mismatched_workload_configuration() -> None:
         compare_reports(baseline, candidate)
 
 
+def test_aggregation_uses_median_of_repeated_p50_results() -> None:
+    aggregated = aggregate_reports(
+        [_report({"render": 10.0}), _report({"render": 30.0}), _report({"render": 11.0})]
+    )
+
+    config = aggregated["config"]
+    assert isinstance(config, dict)
+    assert config["comparison_rounds"] == 3
+    assert aggregated["workloads"] == [{"name": "render", "p50_us": 11.0}]
+
+
 @pytest.mark.issue(620)
 def test_benchmark_comparison_cli_fails_ci_and_writes_pr_summary(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
@@ -86,7 +97,9 @@ def test_benchmark_comparison_cli_fails_ci_and_writes_pr_summary(tmp_path: Path)
             sys.executable,
             "-m",
             "benchmarks.compare",
+            "--baseline",
             str(baseline),
+            "--candidate",
             str(candidate),
             "--markdown-output",
             str(summary),

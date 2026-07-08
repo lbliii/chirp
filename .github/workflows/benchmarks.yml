@@ -52,24 +52,30 @@ jobs:
         working-directory: baseline
         run: uv sync --no-sources --group dev
 
-      - name: Run base benchmarks
-        if: github.event_name == 'pull_request'
-        working-directory: baseline
-        run: >-
-          uv run --no-sync python -m benchmarks.core
-          --iterations 500
-          --route-count 100
-          --output ../benchmark-artifacts/base.json
-
       - name: Install candidate dependencies
         working-directory: candidate
         run: uv sync --no-sources --group dev
 
+      - name: Run paired base and candidate benchmarks
+        if: github.event_name == 'pull_request'
+        run: |
+          for round in 1 2 3; do
+            uv run --directory baseline --no-sync python -m benchmarks.core \
+              --iterations 250 \
+              --route-count 100 \
+              --output "../benchmark-artifacts/base-${round}.json"
+            uv run --directory candidate --no-sync python -m benchmarks.core \
+              --iterations 250 \
+              --route-count 100 \
+              --output "../benchmark-artifacts/candidate-${round}.json"
+          done
+
       - name: Run candidate benchmarks
+        if: github.event_name == 'workflow_dispatch'
         working-directory: candidate
         run: >-
           uv run --no-sync python -m benchmarks.core
-          --iterations 500
+          --iterations 250
           --route-count 100
           --output ../benchmark-artifacts/candidate.json
 
@@ -80,8 +86,12 @@ jobs:
         working-directory: candidate
         run: >-
           uv run --no-sync python -m benchmarks.compare
-          ../benchmark-artifacts/base.json
-          ../benchmark-artifacts/candidate.json
+          --baseline ../benchmark-artifacts/base-1.json
+          --baseline ../benchmark-artifacts/base-2.json
+          --baseline ../benchmark-artifacts/base-3.json
+          --candidate ../benchmark-artifacts/candidate-1.json
+          --candidate ../benchmark-artifacts/candidate-2.json
+          --candidate ../benchmark-artifacts/candidate-3.json
           --markdown-output ../benchmark-artifacts/comparison.md
 
       - name: Add comparison to job summary
