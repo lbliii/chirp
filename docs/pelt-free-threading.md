@@ -1,6 +1,6 @@
 # Pelt free-threading evidence
 
-Status: implemented and continuously checked for issue #259.
+Status: implemented and continuously checked for issues #259 and #260.
 
 Pelt's free-threading contract is ownership-based. A checked-out connection owns
 its mutable protocol and prepared-statement cache. The codec registry is the one
@@ -32,9 +32,10 @@ sessions and introduce a lock into the query hot path.
 
 - `data-pg-gil-gate` runs Python 3.14t with `PYTHON_GIL=0` and
   `PYTHONWARNINGS=error`, then executes the import and concurrency stress suite.
-- `test-postgres` runs the live integration suite against PostgreSQL 17,
+- `test-postgres` runs the live integration suite against PostgreSQL 13–18,
   including failed-transaction recovery and concurrent per-connection cache
-  reuse.
+  reuse. PostgreSQL 13 is pinned to its final 13.22 image as an EOL
+  compatibility lane; majors 14–18 track their current official images.
 
 The elapsed-time test is an overlap/correctness gate, not a throughput claim.
 It intentionally uses a fixed sleeping decoder to avoid runner-speed
