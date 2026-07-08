@@ -11,6 +11,12 @@ import pytest
 _CORE_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "core.py"
 _RUN_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "run.py"
 _WORKLOADS_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "apps" / "workloads.py"
+_BASELINE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "benchmarks"
+    / "results"
+    / "networked-2026-07-08-cpython-3.14t-macos-arm64.json"
+)
 _SPEC = importlib.util.spec_from_file_location("benchmarks.core", _CORE_PATH)
 assert _SPEC is not None
 assert _SPEC.loader is not None
@@ -209,6 +215,25 @@ def test_networked_readme_table_is_generated_from_report(tmp_path: Path) -> None
     assert "| 1 |" in updated
     assert "[Full artifact](results/network.json)" in updated
     assert "old" not in updated
+
+
+@pytest.mark.issue(621)
+def test_committed_networked_baseline_is_complete_and_generates_readme() -> None:
+    report = json.loads(_BASELINE_PATH.read_text(encoding="utf-8"))
+    readme = (_BASELINE_PATH.parent.parent / "README.md").read_text(encoding="utf-8")
+    artifact_link = f"results/{_BASELINE_PATH.name}"
+    generated = _RUN.render_baseline_table(report, artifact_link=artifact_link)
+
+    assert report["schema_version"] == 1
+    assert report["source"]["dirty"] is False
+    assert len(report["results"]) == 24
+    assert {item["framework"] for item in report["results"]} == set(_RUN.DEFAULT_TARGETS)
+    assert {item["workload"] for item in report["results"]} == {
+        workload for workload, _path in _RUN.NETWORKED_WORKLOADS
+    }
+    assert all(item["ok"] + item["failed"] == item["total"] for item in report["results"])
+    assert all(item["rounds"] == 3 for item in report["results"])
+    assert f"{_RUN.README_BASELINE_START}\n{generated}\n{_RUN.README_BASELINE_END}" in readme
 
 
 def test_networked_db_workload_returns_stable_rows() -> None:

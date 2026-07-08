@@ -101,8 +101,22 @@ PYTHONPATH=../pounce/src python -m benchmarks.run chirp --profile --client share
 > return values, Kida rendering, SSE fanout, and fused sync path.
 
 <!-- networked-baseline:start -->
-The committed network baseline is generated from a versioned JSON artifact by
-`benchmarks.run`; run the command documented beside the artifact to refresh it.
+### Committed network baseline
+
+Captured 2026-07-08 on arm64 with CPython 3.14.2 (GIL disabled); 2000 requests x 3 rounds, 100 concurrent clients, 10 workers. [Full artifact](results/networked-2026-07-08-cpython-3.14t-macos-arm64.json).
+
+Regenerate from the repository root: `uv run python -m benchmarks.run all --concurrency 100 --client shared-limits --output benchmarks/results/networked-2026-07-08-cpython-3.14t-macos-arm64.json --readme-table benchmarks/README.md`
+
+| Framework | JSON req/s (p50) | CPU req/s (p50) | DB req/s (p50) | HTML req/s (p50) | Failed attempts |
+|---|---:|---:|---:|---:|---:|
+| chirp | 79.7 (49.4 ms) | 149.1 (108.5 ms) | 79.2 (35.4 ms) | 395.1 (42.7 ms) | 6 |
+| fasthtml | 888.7 (90.6 ms) | 233.8 (387.4 ms) | 329.0 (279.2 ms) | 304.8 (292.1 ms) | 4 |
+| fastapi | 875.9 (74.7 ms) | 399.7 (179.6 ms) | 1080.0 (66.5 ms) | 930.3 (85.1 ms) | 2 |
+| flask | 1450.9 (27.7 ms) | 536.0 (60.3 ms) | 632.5 (35.4 ms) | 617.3 (28.4 ms) | 0 |
+| starlette | 143.3 (473.5 ms) | 250.9 (342.1 ms) | 814.7 (91.8 ms) | 576.9 (140.0 ms) | 5 |
+| litestar | 795.7 (81.9 ms) | 496.6 (141.5 ms) | 813.2 (94.7 ms) | 445.7 (201.2 ms) | 6 |
+
+Values are medians across rounds. Latency and failure accounting include every attempt. This is a synthetic comparison, not a production-capacity claim.
 <!-- networked-baseline:end -->
 
 ## Core Regression Workloads
