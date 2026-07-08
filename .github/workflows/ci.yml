@@ -253,6 +253,19 @@ jobs:
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
         run: uv run pytest tests/test_schema_introspect.py tests/test_pelt/test_connection_integration.py -q --tb=short --timeout=60
 
+      - name: Pelt benchmark smoke
+        env:
+          CHIRP_BENCH_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+        run: >-
+          uv run python -m benchmarks.pelt
+          --concurrency 1,2
+          --queries 4
+          --warmup 1
+          --stream-rows 10
+          --stream-batch-size 5
+          --bulk-rows 4
+          --output /tmp/pelt-smoke.json
+
   # Free-threaded GIL gate for the in-tree data-pg backend (pelt E0.2/E6,
   # issues #262 and #259). PYTHONWARNINGS=error turns an import that silently
   # re-enables the GIL into a build failure; stress tests prove shared-state

@@ -90,6 +90,27 @@ async def test_database_executemany_and_stream() -> None:
 
 
 @requires_pg
+@pytest.mark.issue(260)
+async def test_database_stream_resumes_across_multiple_portal_batches() -> None:
+    assert PG_DSN is not None
+    db = Database(PG_DSN)
+    await db.connect()
+    try:
+        streamed = [
+            row
+            async for row in db.stream(
+                IdRow,
+                "SELECT generate_series(1, 5) AS id",
+                batch_size=2,
+            )
+        ]
+    finally:
+        await db.disconnect()
+
+    assert streamed == [IdRow(1), IdRow(2), IdRow(3), IdRow(4), IdRow(5)]
+
+
+@requires_pg
 @pytest.mark.issue(258)
 async def test_standalone_connect_and_close() -> None:
     conn = await pelt_pool.connect(PG_DSN)

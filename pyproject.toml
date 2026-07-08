@@ -388,6 +388,7 @@ changelog-check = { cmd = "towncrier check --compare-with origin/main", help = "
 # Benchmarks
 benchmark = { cmd = "python -m benchmarks.run all", help = "Run Chirp vs FastAPI vs Flask vs Starlette vs Litestar benchmarks" }
 benchmark-core = { cmd = "python -m benchmarks.core", help = "Run Chirp core regression benchmarks and emit JSON" }
+benchmark-pelt = { cmd = "python -m benchmarks.pelt", help = "Run Pelt live-PostgreSQL concurrency and boundary benchmarks" }
 benchmark-mixed = { cmd = "python -m benchmarks.run_mixed", help = "Mixed workload (JSON + SSE) — verifies adaptive handoff" }
 
 # Cleanup

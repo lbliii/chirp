@@ -456,7 +456,7 @@ def test_statement_names_are_stable_and_unique():
 # --- server-side cursor: PortalSuspended → resume ---------------------------
 
 
-@pytest.mark.issue(256)
+@pytest.mark.issue(256, 260)
 def test_portal_suspended_then_resumed_execute():
     proto = ExtendedQueryProtocol()
     statement, _ = proto.prepare("SELECT n FROM big", ())
@@ -472,9 +472,10 @@ def test_portal_suspended_then_resumed_execute():
         + _builder.build_execute(portal="", max_rows=2)
         + _builder.build_sync()
     )
+    description = _row_description(("n", 23))
     batch1 = (
         _bind_complete()
-        + _row_description(("n", 23))
+        + description
         + _data_row(b"1")
         + _data_row(b"2")
         + _portal_suspended()
@@ -492,16 +493,19 @@ def test_portal_suspended_then_resumed_execute():
     assert proto.state is ProtocolState.READY
 
     # RESUME: another Execute on the same open portal (no re-Bind) → the rest, then complete.
+    # PostgreSQL does not send another RowDescription for a resumed portal, so the connection
+    # restores the prepared statement's known layout before asking the protocol to resume.
+    row_description = next(
+        event.description for event in events if isinstance(event, RowDescriptionEvent)
+    )
+    proto.seed_row_description(row_description)
     resume = proto.resume_execute(max_rows=2)
     assert resume == (_builder.build_execute(portal="", max_rows=2) + _builder.build_sync())
     assert proto.state is ProtocolState.BUSY
 
-    batch2 = (
-        _row_description(("n", 23)) + _data_row(b"3") + _command_complete("SELECT 3") + _ready(b"I")
-    )
+    batch2 = _data_row(b"3") + _command_complete("SELECT 3") + _ready(b"I")
     events = proto.receive_bytes(batch2)
     assert [type(e) for e in events] == [
-        RowDescriptionEvent,
         DataRowEvent,
         CommandCompleteEvent,
         ReadyEvent,
