@@ -14,6 +14,10 @@ sys.path.insert(0, str(ROOT))
 from examples.inventory import load_inventory, validate_inventory  # noqa: E402
 
 JOURNEY = ROOT / "site/content/docs/tutorials/full-application-journey.md"
+README = ROOT / "README.md"
+COMPILER_DOC = ROOT / "docs/hypermedia-application-compiler.md"
+ARCHITECTURE = ROOT / "site/content/docs/about/architecture.md"
+HYPERMEDIA_MODEL = ROOT / "site/content/docs/about/core-concepts/hypermedia-model.md"
 FURATENA_CANARY_REVISION = "da584bf9fe19ec1376fdc0b23c7fb1b657b026b8"
 
 REQUIRED_CAPABILITIES = {
@@ -127,3 +131,31 @@ def test_journey_links_to_pinned_furatena_canary_evidence() -> None:
     assert FURATENA_CANARY_REVISION in text
     assert "built Chirp wheel" in text
     assert "Furatena lockfile" in text
+
+
+@pytest.mark.issue(513)
+def test_compiler_product_story_is_aligned_and_source_backed() -> None:
+    readme = README.read_text(encoding="utf-8")
+    compiler = COMPILER_DOC.read_text(encoding="utf-8")
+    architecture = ARCHITECTURE.read_text(encoding="utf-8")
+    model = HYPERMEDIA_MODEL.read_text(encoding="utf-8")
+    journey = JOURNEY.read_text(encoding="utf-8")
+
+    positioning = "full-stack Python hypermedia framework with a built-in contract compiler"
+    assert positioning in readme
+    assert positioning in " ".join(compiler.split())
+    assert "Shipped compiler foundation and observable proof loop" in compiler
+
+    for text in (readme, compiler, architecture, model, journey):
+        assert "live ASGI" in text
+        assert "static" in text.lower()
+
+    assert "## Five-minute compiler proof" in journey
+    assert "test_plain_add_redirects_after_persisting" in journey
+    assert "test_empty_text_returns_422" in journey
+    assert "test_index_boosted_fragment_keeps_page_content_contract" in journey
+    assert "test_sse_includes_oob_swaps" in journey
+    assert "test_program_compiles_stable_route_template_block_target_graph" in journey
+    assert "test_same_route_has_distinct_normal_boosted_and_targeted_observations" in journey
+    assert "chirp check examples.chirpui.kanban_shell.app:app" in journey
+    assert "PYTHONPATH=src:. uv run chirp freeze examples.standalone.freeze_site.app:app" in journey

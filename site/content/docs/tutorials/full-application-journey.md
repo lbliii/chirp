@@ -33,6 +33,44 @@ The inventory check proves that every application below still exists, declares
 its dependencies and capabilities, has the documented README status, and owns
 an executable test entrypoint.
 
+## Five-minute compiler proof
+
+Run this focused slice before taking the longer journey:
+
+```bash
+uv run pytest \
+  examples/standalone/todo/test_app.py::TestTodoOperations::test_plain_add_redirects_after_persisting \
+  examples/standalone/todo/test_app.py::TestTodoOperations::test_empty_text_returns_422 \
+  examples/chirpui/kanban_shell/test_app.py::TestBoard::test_index_boosted_fragment_keeps_page_content_contract \
+  examples/chirpui/kanban_shell/test_app.py::TestSSE::test_sse_includes_oob_swaps \
+  -q --tb=short
+
+PYTHONPATH=src:. uv run chirp check examples.chirpui.kanban_shell.app:app
+
+uv run pytest \
+  tests/test_app/test_hypermedia_program.py::test_program_compiles_stable_route_template_block_target_graph \
+  tests/test_transition_trace.py::test_same_route_has_distinct_normal_boosted_and_targeted_observations \
+  -q --tb=short
+
+PYTHONPATH=src:. uv run chirp freeze examples.standalone.freeze_site.app:app /tmp/chirp-frozen
+```
+
+That bounded loop proves each layer rather than asking you to trust a diagram:
+
+- Todo executes SQLite-backed mutation and `ValidationError` paths through one
+  template.
+- Kanban exercises boosted outlet selection and post-load SSE/OOB updates.
+- `chirp check` validates the assembled route/template/target contract.
+- The compiler and transition tests show that the internal immutable program
+  and runtime observations share stable transition identities.
+- `chirp freeze` exports only the deliberately static-compatible example; the
+  SQL, mutation, session, and SSE applications remain live ASGI programs.
+
+For the visual half of the loop, start Lucky Cat with `CHIRP_DEBUG=1`, press
+`Ctrl+Shift+D`, and compare its compiled transition IDs across normal,
+boosted, targeted, mutation, Suspense, and SSE requests. The longer sections
+below explain each piece and the three deliberate failure drills.
+
 ## The path
 
 | Stage | Executable reference | New application pressure | Proof |
@@ -161,7 +199,7 @@ Static export is an optional projection, not Chirp's deployment model.
 Use Freeze Site to learn the eligible path:
 
 ```bash
-uv run chirp freeze examples.standalone.freeze_site.app:app /tmp/chirp-frozen
+PYTHONPATH=src:. uv run chirp freeze examples.standalone.freeze_site.app:app /tmp/chirp-frozen
 ```
 
 Do not freeze a mutation or SSE route and describe the output as equivalent to
