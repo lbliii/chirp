@@ -87,7 +87,7 @@ jobs:
       - name: Tests
         env:
           PYTHON_GIL: "0"
-        run: uv run pytest -q --tb=short --timeout=60 -m "not slow" --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py -n 4 --dist loadgroup
+        run: uv run pytest -q --tb=short --timeout=60 -m "not slow" --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py -n 4 --dist loadgroup --cov --cov-report=term
 
   # Real-browser smoke for the Lucky Cat shell (issue #286). Playwright needs
   # Chromium system deps that we install via `playwright install --with-deps`;
