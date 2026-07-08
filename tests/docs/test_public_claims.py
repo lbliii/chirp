@@ -63,6 +63,22 @@ class TestPublicClaims:
                 assert pattern.lower() in combined, f"stale claim pattern {claim_id}: {pattern}"
 
     @pytest.mark.issue(621)
+    def test_evidence_program_claims_cite_committed_proof(self) -> None:
+        claims = {claim["id"]: claim for claim in self._ledger()["claims"]}
+
+        benchmark = claims["network-benchmark-baseline"]
+        assert benchmark["status"] == "committed-synthetic-baseline"
+        assert (
+            "benchmarks/results/networked-2026-07-08-cpython-3.14t-macos-arm64.json"
+            in benchmark["proof"]
+        )
+        assert "benchmarks/apps/fasthtml_app.py" in benchmark["proof"]
+
+        compiler = claims["hypermedia-contract-compiler"]
+        assert compiler["status"] == "shipped-internal-foundation"
+        assert "tests/test_app/test_hypermedia_program.py" in compiler["proof"]
+
+    @pytest.mark.issue(621)
     def test_risky_public_claims_are_registered(self) -> None:
         ledger = self._ledger()
         allowed: dict[Path, list[str]] = {}
