@@ -65,3 +65,18 @@ def test_live_postgres_ci_covers_13_through_18() -> None:
     assert "majors 14" in evidence
     assert "final 13.22 image" in evidence
     assert "compatibility lane" in evidence
+
+
+@pytest.mark.issue(260)
+def test_data_pg_docs_publish_driver_and_performance_boundaries() -> None:
+    database = _CURRENT_DRIVER_DOCS[1].read_text()
+    evidence = _EVIDENCE.read_text()
+
+    for text in (database, evidence):
+        assert "pure Python" in text
+        assert "libpq" in text
+
+    assert "do not import `chirp.data.drivers._pelt`" in database
+    assert "`db.stream()` owns one pooled connection" in database
+    assert "`db.execute_many()` is currently a convenience loop" in database
+    assert "does not scale with pool size" in evidence
