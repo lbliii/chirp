@@ -216,15 +216,40 @@ class TestServerLauncherErrorHandling:
             debug=False,
             worker_mode="async",
             metrics_path="/internal/metrics",
+            max_request_body_size=2 * 1024 * 1024,
+            max_upload_size=2 * 1024 * 1024,
         )
         launcher = ServerLauncher(config, MutableAppState())
+        from chirp import App
 
-        launcher.run(MagicMock(), host=None, port=None, lifecycle_collector=collector)
+        app = App(config=config)
+        launcher.run(app, host=None, port=None, lifecycle_collector=collector)
 
         kwargs = mock_production.call_args.kwargs
         assert kwargs["lifecycle_collector"] is collector
         assert kwargs["worker_mode"] == "async"
         assert kwargs["metrics_path"] == "/internal/metrics"
+        assert mock_production.call_args.args[0] is app
+
+    @patch("pounce.server.Server")
+    def test_app_run_body_limit_reaches_pounce(self, mock_server: MagicMock) -> None:
+        from chirp import App
+        from chirp.config import AppConfig
+
+        body_limit = 2 * 1024 * 1024
+        app = App(
+            config=AppConfig(
+                debug=False,
+                worker_mode="async",
+                max_request_body_size=body_limit,
+                max_upload_size=body_limit,
+            )
+        )
+
+        app.run(host="127.0.0.1", port=0)
+
+        pounce_config = mock_server.call_args.args[0]
+        assert pounce_config.max_request_size == body_limit
 
 
 class TestProductionServerLaunch:

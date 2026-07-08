@@ -7,9 +7,10 @@ import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
-from chirp import App
+from chirp import App, Request
 from chirp.config import AppConfig
 from chirp.errors import ConfigurationError
 
@@ -352,6 +353,113 @@ class TestProductionServerConfigMapping:
         assert config.rate_limit_max_tracked_ips == 100_000
         assert config.forwarded_for_trusted_hops == 1
         assert config.trusted_hosts == frozenset()
+
+    @patch("pounce.server.Server")
+    def test_request_body_limit_reaches_server_config(self, mock_server: MagicMock) -> None:
+        from chirp.server.production import run_production_server
+
+        body_limit = 2 * 1024 * 1024
+        app = App(
+            config=AppConfig(
+                debug=False,
+                max_request_body_size=body_limit,
+                max_upload_size=body_limit,
+            )
+        )
+
+        run_production_server(app)
+
+        config = mock_server.call_args.args[0]
+        assert config.max_request_size == body_limit
+
+
+class TestPounceRequestBodyLimitIntegration:
+    """The production adapter and real Pounce agree on Chirp's body ceiling."""
+
+    def test_wire_accepts_above_pounce_default_and_rejects_above_chirp_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from pounce.server import Server as PounceServer
+
+        from chirp.server.production import run_production_server
+
+        body_limit = 2 * 1024 * 1024
+        accepted_body = b"x" * (1024 * 1024 + 1)
+        rejected_body = b"x" * (body_limit + 1)
+        seen: list[int] = []
+        app = App(
+            config=AppConfig(
+                debug=False,
+                worker_mode="async",
+                max_request_body_size=body_limit,
+                max_upload_size=body_limit,
+            )
+        )
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request) -> str:
+            body = await request.body()
+            seen.append(len(body))
+            return f"got {len(body)}"
+
+        servers: list[PounceServer] = []
+        server_configs: list[Any] = []
+
+        def capture_server(*args: Any, **kwargs: Any) -> PounceServer:
+            server_configs.append(args[0])
+            server = PounceServer(*args, **kwargs)
+            servers.append(server)
+            return server
+
+        monkeypatch.setattr("pounce.server.Server", capture_server)
+        thread = threading.Thread(
+            target=run_production_server,
+            kwargs={
+                "app": app,
+                "host": "127.0.0.1",
+                "port": 0,
+                "workers": 1,
+                "worker_mode": "async",
+                "metrics_enabled": False,
+                "log_level": "warning",
+            },
+            daemon=True,
+        )
+
+        try:
+            thread.start()
+            deadline = time.monotonic() + 5.0
+            while not servers and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert servers, "production adapter did not construct Pounce Server"
+            server = servers[0]
+            assert server._started_event.wait(5.0)
+            assert server.bound_addr is not None
+            host, port = server.bound_addr
+
+            accepted = httpx.post(
+                f"http://{host}:{port}/upload",
+                content=accepted_body,
+                trust_env=False,
+                timeout=10.0,
+            )
+            rejected = httpx.post(
+                f"http://{host}:{port}/upload",
+                content=rejected_body,
+                trust_env=False,
+                timeout=10.0,
+            )
+        finally:
+            if servers:
+                servers[0].shutdown()
+            thread.join(5.0)
+
+        assert not thread.is_alive()
+        assert server_configs[0].max_request_size == body_limit
+        assert accepted.status_code == 200
+        assert accepted.text == f"got {len(accepted_body)}"
+        assert rejected.status_code == 413
+        assert seen == [len(accepted_body)]
 
 
 class TestPounceWorkerLifecycleIntegration:
