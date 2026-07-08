@@ -141,7 +141,10 @@ Pounce handles these for every Chirp app, no configuration required:
 - HTTP and WebSocket compression — ordinary responses are compressed; `text/event-stream` is left uncompressed so [[docs/build-apps/streaming-updates/server-sent-events|SSE]] events are not buffered behind a compression window.
 - HTTP/2 with multiplexed streams (enabled when you set `ssl_certfile`/`ssl_keyfile`).
 - Graceful shutdown — active requests finish on `SIGTERM`.
-- Zero-downtime reload — `kill -SIGUSR1` swaps in new code.
+- Mode-scoped rolling reload — send `SIGHUP` to replace thread-worker generations while old
+  requests drain. Single-worker, process-worker, subinterpreter, and HTTP/3 behavior differs;
+  review [Pounce's current lifecycle matrix](https://github.com/lbliii/pounce/blob/main/docs/design/core-contract.md#lifecycle-mode-matrix)
+  before treating a reload as lossless.
 - OpenTelemetry distributed tracing (configurable).
 
 These you opt into through `AppConfig` or CLI flags:

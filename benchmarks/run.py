@@ -1,7 +1,7 @@
 """Benchmark runner — start server, run load test, report.
 
 Usage:
-    uv run python -m benchmarks.run [chirp|fastapi|flask|starlette|litestar|chirp-uvicorn|all]
+    uv run python -m benchmarks.run [chirp|fasthtml|fastapi|flask|starlette|litestar|all]
     uv run python -m benchmarks.run all  # default
 
     # Experiments (from benchmark-pounce-chirp-deep-dive.md):
@@ -12,20 +12,25 @@ Usage:
     # Run on Python 3.14t (free-threaded) to see Chirp benefit:
     uv run --python 3.14t python -m benchmarks.run all
 
-Requires: chirp, fastapi, uvicorn, flask, gunicorn, starlette, litestar, httpx
+Requires: chirp, FastHTML, FastAPI, uvicorn, Flask, Gunicorn, Starlette, Litestar, httpx
 Install: uv sync --extra benchmark  (or pip install chirp[benchmark])
 """
 
 import argparse
 import contextlib
+import json
 import os
 import platform
+import shutil
 import statistics
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import httpx
 
@@ -41,9 +46,25 @@ NETWORKED_WORKLOADS = (
     ("db", "/db"),
     ("template", "/template"),
 )
-DEFAULT_TARGETS = ["chirp", "fastapi", "flask", "starlette", "litestar"]
+DEFAULT_TARGETS = ["chirp", "fasthtml", "fastapi", "flask", "starlette", "litestar"]
 EXPERIMENT_TARGETS = ["chirp-sync", "chirp-fused", "chirp-async", "chirp-uvicorn"]
 ALL_FRAMEWORKS = [*DEFAULT_TARGETS, *EXPERIMENT_TARGETS]
+REPORT_SCHEMA_VERSION = 1
+README_BASELINE_START = "<!-- networked-baseline:start -->"
+README_BASELINE_END = "<!-- networked-baseline:end -->"
+BENCHMARK_PACKAGES = (
+    "bengal-chirp",
+    "bengal-pounce",
+    "kida-templates",
+    "python-fasthtml",
+    "fastapi",
+    "flask",
+    "starlette",
+    "litestar",
+    "uvicorn",
+    "gunicorn",
+    "httpx",
+)
 
 
 @dataclass
@@ -84,6 +105,157 @@ def python_runtime_label() -> str:
     return (
         f"{metadata['implementation']} {metadata['version']} ({metadata['cache_tag']}; {gil_mode})"
     )
+
+
+def _package_versions() -> dict[str, str]:
+    packages: dict[str, str] = {}
+    for package in BENCHMARK_PACKAGES:
+        try:
+            packages[package] = version(package)
+        except PackageNotFoundError:
+            packages[package] = "not-installed"
+    return packages
+
+
+def _source_revision() -> dict[str, str | bool]:
+    root = Path(__file__).resolve().parents[1]
+    git = shutil.which("git")
+    if git is None:
+        return {"commit": "unknown", "dirty": True}
+    try:
+        commit = subprocess.run(
+            [git, "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                [git, "status", "--porcelain"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+    except OSError, subprocess.CalledProcessError:
+        return {"commit": "unknown", "dirty": True}
+    return {"commit": commit, "dirty": dirty}
+
+
+def build_network_report(
+    results: list[BenchResult],
+    *,
+    targets: list[str],
+    concurrency: int,
+    client_strategy: str,
+) -> dict[str, object]:
+    """Build a versioned, self-describing cross-framework benchmark artifact."""
+    return {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "suite": "chirp-networked-framework-comparison",
+        "captured_at": datetime.now(UTC).isoformat(),
+        "source": _source_revision(),
+        "environment": {
+            "python": python_runtime_metadata(),
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "logical_cpus": os.cpu_count(),
+            "packages": _package_versions(),
+        },
+        "config": {
+            "requests_per_round": NUM_REQUESTS,
+            "concurrency": concurrency,
+            "workers": WORKERS,
+            "rounds": ROUNDS,
+            "client_strategy": client_strategy,
+            "targets": targets,
+            "workloads": [name for name, _path in NETWORKED_WORKLOADS],
+        },
+        "results": [asdict(result) for result in results],
+    }
+
+
+def write_network_report(report: dict[str, object], output: Path) -> None:
+    """Write a network benchmark artifact with deterministic formatting."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def render_baseline_table(report: dict[str, object], *, artifact_link: str) -> str:
+    """Render the committed README table from a versioned benchmark artifact."""
+    config = report["config"]
+    environment = report["environment"]
+    assert isinstance(config, dict)
+    assert isinstance(environment, dict)
+    targets = config["targets"]
+    workloads = config["workloads"]
+    results = report["results"]
+    python = environment["python"]
+    assert isinstance(targets, list)
+    assert isinstance(workloads, list)
+    assert isinstance(results, list)
+    assert isinstance(python, dict)
+    by_key = {(item["framework"], item["workload"]): item for item in results}
+
+    gil_mode = "GIL disabled" if python["free_threaded"] else "GIL enabled"
+    captured_at = str(report["captured_at"])
+    target_args = "all" if targets == DEFAULT_TARGETS else " ".join(targets)
+    output_arg = (Path("benchmarks") / artifact_link).as_posix()
+    command = (
+        f"uv run python -m benchmarks.run {target_args} "
+        f"--concurrency {config['concurrency']} --client {config['client_strategy']} "
+        f"--output {output_arg} --readme-table benchmarks/README.md"
+    )
+    lines = [
+        "### Committed network baseline",
+        "",
+        (
+            f"Captured {captured_at[:10]} on {environment['machine']} with "
+            f"{python['implementation']} {python['version']} ({gil_mode}); "
+            f"{config['requests_per_round']} requests x {config['rounds']} rounds, "
+            f"{config['concurrency']} concurrent clients, {config['workers']} workers. "
+            f"[Full artifact]({artifact_link})."
+        ),
+        "",
+        f"Regenerate from the repository root: `{command}`",
+        "",
+        "| Framework | JSON req/s (p50) | CPU req/s (p50) | DB req/s (p50) | HTML req/s (p50) | Failed attempts |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for target in targets:
+        cells: list[str] = []
+        failed = 0
+        for workload in workloads:
+            item = by_key.get((target, workload))
+            if item is None:
+                cells.append("not measured")
+                continue
+            cells.append(f"{item['req_per_sec']:.1f} ({item['p50_ms']:.1f} ms)")
+            failed += int(item["failed"])
+        lines.append(f"| {target} | {' | '.join(cells)} | {failed} |")
+    lines.extend(
+        [
+            "",
+            "Values are medians across rounds. Latency and failure accounting include every attempt. "
+            "This is a synthetic comparison, not a production-capacity claim.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def update_readme_baseline(readme: Path, table: str) -> None:
+    """Replace the generated baseline section between stable README markers."""
+    content = readme.read_text(encoding="utf-8")
+    if README_BASELINE_START not in content or README_BASELINE_END not in content:
+        msg = f"{readme} is missing networked baseline markers"
+        raise ValueError(msg)
+    before, remainder = content.split(README_BASELINE_START, 1)
+    _old, after = remainder.split(README_BASELINE_END, 1)
+    replacement = f"{README_BASELINE_START}\n{table}\n{README_BASELINE_END}"
+    readme.write_text(f"{before}{replacement}{after}", encoding="utf-8")
 
 
 def wait_for_server(url: str, timeout: float = 15.0) -> bool:
@@ -269,6 +441,28 @@ def run_fastapi(port: int) -> subprocess.Popen[bytes]:
     return proc
 
 
+def run_fasthtml(port: int) -> subprocess.Popen[bytes]:
+    """Start FastHTML via the same Uvicorn worker topology as the ASGI peers."""
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "benchmarks.apps.fasthtml_app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--workers",
+            str(WORKERS),
+        ],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return proc
+
+
 def run_flask(port: int) -> subprocess.Popen[bytes]:
     """Start Flask server via gunicorn."""
     proc = subprocess.Popen(
@@ -376,6 +570,8 @@ def run_framework(
         proc = run_chirp_uvicorn(port)
     elif name == "fastapi":
         proc = run_fastapi(port)
+    elif name == "fasthtml":
+        proc = run_fasthtml(port)
     elif name == "flask":
         proc = run_flask(port)
     elif name == "starlette":
@@ -427,7 +623,7 @@ def print_report(
 
     print()
     print("=" * 60)
-    print("  CHIRP vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR")
+    print("  CHIRP vs FASTHTML vs FASTAPI vs FLASK vs STARLETTE vs LITESTAR")
     print("  Synthetic benchmarks")
     print(
         f"  Python {python_runtime_label()} | {NUM_REQUESTS} req, {concurrency} concurrent | "
@@ -468,7 +664,7 @@ def print_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Benchmark Chirp vs FastAPI vs Flask vs Starlette vs Litestar",
+        description="Benchmark Chirp vs FastHTML vs FastAPI vs Flask vs Starlette vs Litestar",
         epilog="Experiments: chirp --concurrency 10 | chirp --client per-request | chirp-uvicorn",
     )
     parser.add_argument(
@@ -476,7 +672,7 @@ def main() -> None:
         nargs="*",
         default=["all"],
         help=(
-            "chirp, fastapi, flask, starlette, litestar, chirp-sync, chirp-fused, "
+            "chirp, fasthtml, fastapi, flask, starlette, litestar, chirp-sync, chirp-fused, "
             "chirp-async, chirp-uvicorn, or all"
         ),
     )
@@ -498,7 +694,19 @@ def main() -> None:
         action="store_true",
         help="Enable POUNCE_PROFILE for Chirp (logs read/parse/app/drain timings to stderr)",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write a versioned JSON result artifact",
+    )
+    parser.add_argument(
+        "--readme-table",
+        type=Path,
+        help="Regenerate the marked baseline table (requires --output)",
+    )
     args = parser.parse_args()
+    if args.readme_table is not None and args.output is None:
+        parser.error("--readme-table requires --output")
 
     targets = args.targets if args.targets != ["all"] else DEFAULT_TARGETS
     if "all" in targets:
@@ -529,6 +737,20 @@ def main() -> None:
             concurrency=args.concurrency,
             client_strategy=args.client,
         )
+        if args.output is not None:
+            report = build_network_report(
+                all_results,
+                targets=targets,
+                concurrency=args.concurrency,
+                client_strategy=args.client,
+            )
+            write_network_report(report, args.output)
+            if args.readme_table is not None:
+                artifact_link = os.path.relpath(args.output, args.readme_table.parent)
+                update_readme_baseline(
+                    args.readme_table,
+                    render_baseline_table(report, artifact_link=Path(artifact_link).as_posix()),
+                )
 
 
 if __name__ == "__main__":
