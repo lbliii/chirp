@@ -93,7 +93,24 @@ body and swaps the same template's named results block. There is no JSON
 response path, duplicate partial, or JavaScript build pipeline.
 
 Cross-origin Fetch triggers a CORS preflight. Add QUERY to
-`CORSConfig.allow_methods` and allow the declared `Content-Type` header.
+`CORSConfig.allow_methods`; routes restricted to non-safelisted media ranges
+also need the declared `Content-Type` in `allow_headers`.
+
+## Catch literal wiring mistakes at startup
+
+`app.check()` recognizes literal `fetch("/path", {method: "QUERY", ...})` and
+`htmx.ajax("QUERY", "/path", ...)` calls. It errors when the URL is missing,
+the route does not allow QUERY, the literal `Content-Type` is unsupported, or
+the call declares no headers. Dynamic URLs and header objects remain unknown;
+the checker does not guess.
+
+If `CORSMiddleware` allows origins for an app with QUERY routes, its
+`allow_methods` must include QUERY. Routes that accept only non-CORS-safelisted
+media ranges also need `Content-Type` or `*` in `allow_headers`; a route that can
+accept form-urlencoded, multipart-form, or plain-text content does not. Run
+`chirp routes`, autodoc, or the debug route explorer to inspect normalized
+`query_media_types`. Inspection, static freeze, speculation rules, and contract
+discovery never execute QUERY handlers.
 
 ## Redirects, validators, and result identity
 
@@ -168,7 +185,7 @@ for operator details.
 | Request/response protocol, typed rendering, cache opt-in, and tested transport matrix | Implemented |
 | Filesystem/test-client ergonomics (#527) | Open |
 | Declarative htmx plus no-JavaScript GET proof (#528) | Open |
-| Complete static diagnostics (#533) | Open |
+| Literal-client diagnostics and non-execution proof (#533) | Implemented |
 | Canonical complex-search example (#534) | Implemented and browser-tested |
 | Stable/first-class promotion | Not approved |
 

@@ -245,6 +245,19 @@ def create_request_handler(
     ``Set-Cookie``, and never touch the session.
     """
     routes = discovered_routes or []
+    explorer_routes = list(routes)
+    explorer_route_keys: set[tuple[str, frozenset[str]]] = set()
+    for route in explorer_routes:
+        path = str(getattr(route, "url_path", getattr(route, "path", "")))
+        methods = frozenset(str(method) for method in getattr(route, "methods", ()))
+        explorer_route_keys.add((path, methods))
+    for route in router.routes:
+        if route.query_media_types is None:
+            continue
+        key = (route.path, route.methods)
+        if key not in explorer_route_keys:
+            explorer_routes.append(route)
+            explorer_route_keys.add(key)
 
     # Probe paths the app does NOT claim with a user route. A user route wins
     # (mirrors metrics_path precedence): if the app registered a route at the
@@ -367,7 +380,10 @@ def create_request_handler(
         if req.path == ROUTE_EXPLORER_PATH:
             if debug:
                 path_filter = req.query.get("path", "")
-                html_body = render_route_explorer(routes, path_filter=path_filter or None)
+                html_body = render_route_explorer(
+                    explorer_routes,
+                    path_filter=path_filter or None,
+                )
                 return _internal_response(
                     req,
                     Response(

@@ -139,6 +139,29 @@ async def test_route_explorer_404_when_debug_false(pages_tree: Path) -> None:
     assert response.status == 404
 
 
+@pytest.mark.issue(533)
+@pytest.mark.asyncio
+async def test_route_explorer_shows_explicit_query_media_types() -> None:
+    app = App(AppConfig(debug=True))
+
+    @app.route(
+        "/search",
+        methods=["QUERY"],
+        query_media_types=("application/json",),
+    )
+    def search() -> str:
+        return "ok"
+
+    async with TestClient(app) as client:
+        response = await client.get("/__chirp/routes")
+
+    assert response.status == 200
+    assert "/search" in response.text
+    assert "QUERY" in response.text
+    assert "Accept-Query: application/json" in response.text
+    assert "&quot;query_media_types&quot;: [" in response.text
+
+
 @pytest.mark.asyncio
 async def test_route_explorer_filter_by_path(pages_tree: Path) -> None:
     """Route explorer filter query param filters routes."""

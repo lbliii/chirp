@@ -82,6 +82,7 @@ def introspect_routes(routes: list[Route]) -> tuple[RouteDoc, ...]:
                 docstring=docstring,
                 parameters=params,
                 template=route.template,
+                query_media_types=route.query_media_types,
             )
         )
     return tuple(docs)
@@ -196,6 +197,8 @@ def _route_doc_to_markdown(rd: RouteDoc) -> str:
     lines = [f"# {rd.path}", ""]
     lines.append(f"**Methods:** {', '.join(sorted(rd.methods))}")
     lines.append(f"**Handler:** `{rd.handler_name}`")
+    if rd.query_media_types:
+        lines.append(f"**Accept-Query:** {', '.join(rd.query_media_types)}")
     if rd.template:
         lines.append(f"**Template:** `{rd.template}`")
     lines.append("")

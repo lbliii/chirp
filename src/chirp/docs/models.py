@@ -108,7 +108,11 @@ class ParamDoc:
 
 @dataclass(frozen=True, slots=True)
 class RouteDoc:
-    """Autodoc-generated from a single ``Route``."""
+    """Autodoc-generated from a single ``Route``.
+
+    ``query_media_types`` carries normalized accepted request media ranges for
+    provisional HTTP QUERY routes and remains ``None`` for ordinary routes.
+    """
 
     path: str
     methods: frozenset[str]
@@ -117,6 +121,7 @@ class RouteDoc:
     parameters: tuple[ParamDoc, ...]
     template: str | None = None
     layout_chain: tuple[str, ...] | None = None
+    query_media_types: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -114,6 +114,30 @@ subset, while `htmx.ajax("QUERY", ...)` sends the larger faceted input and swaps
 the named results block. It uses no response JSON, duplicate partial, or
 JavaScript build pipeline.
 
+## Startup checks and inspection
+
+`app.check()` recognizes the two browser-proven literal client forms:
+`fetch("/path", {method: "QUERY", ...})` and
+`htmx.ajax("QUERY", "/path", ...)`. It reports an `ERROR` when the literal URL
+has no route, the route does not allow QUERY, an explicit literal
+`Content-Type` is outside `query_media_types`, or the call has no headers at
+all. Calls that construct the URL, method, or headers dynamically are left
+unknown rather than guessed.
+
+When `CORSMiddleware` allows origins for an app with QUERY routes, `app.check()`
+requires QUERY in `CORSConfig.allow_methods`. Routes that accept only
+non-CORS-safelisted media ranges also require `Content-Type` (or `*`) in
+`CORSConfig.allow_headers`; routes that can accept form-urlencoded,
+multipart-form, or plain-text bodies do not need that header allowance. The
+`query_route`, `query_target`, `query_method`, `query_media_type`, and
+`query_cors` categories are `ERROR` by default because each statically known
+mismatch prevents the request from reaching the declared render surface.
+
+`chirp routes`, autodoc route pages, and the debug route explorer expose each
+route's normalized `query_media_types`. These inspection paths, contract
+discovery, static freeze, and browser speculation never execute a QUERY route;
+only an explicit request with a body and media type does.
+
 ## Redirects, equivalent resources, and validators
 
 Existing response primitives carry the protocol:
@@ -179,8 +203,8 @@ production experiments.
 
 ## Deployment checklist
 
-- Add `QUERY` to `CORSConfig.allow_methods` and allow the request
-  `Content-Type` header for cross-origin browser calls.
+- Add `QUERY` to `CORSConfig.allow_methods`; when the route accepts only
+  non-safelisted media ranges, also allow the request `Content-Type` header.
 - Verify every proxy and CDN preserves the method and body. Never rewrite
   QUERY to POST as a compatibility workaround.
 - Align Pounce and Chirp request-size limits; the lower ceiling wins.
@@ -207,7 +231,7 @@ The experimental release gate is met; the stable promotion gate is not.
 | Browser, ASGI, Pounce, proxy, retry, limit, and observability matrix | Met | #532 and the interoperability report |
 | Filesystem/test-client ergonomics | Open | #527 requires a separate public-API decision |
 | Declarative htmx transport with native GET fallback | Open | #528 requires an approved client contract |
-| Complete static wiring diagnostics and freeze/speculation proof | Open | #533 |
+| Literal-client diagnostics, inspection metadata, and freeze/speculation proof | Met | #533 and `tests/contracts/test_query_contracts.py` |
 | Canonical complex-search example and no-JavaScript browser proof | Met | #534 and `examples/standalone/query_search` |
 | Canonical docs, compatibility statement, and release decision | Met | #535 and this guide |
 

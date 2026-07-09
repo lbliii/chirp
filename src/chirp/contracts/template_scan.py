@@ -5,7 +5,8 @@ import posixpath
 import re
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from .patterns import ID_ATTR as _ID_PATTERN
 from .patterns import METHOD_POST
@@ -62,6 +63,154 @@ _TARGET_IN_MUTATING = re.compile(
     r"(?:hx-(?:post|put|patch|delete)|hx_post|hx_put|hx_patch|hx_delete)",
     re.IGNORECASE | re.DOTALL,
 )
+_HTMX_QUERY_PREFIX = re.compile(
+    r"\bhtmx\.ajax\(\s*([\"'])QUERY\1\s*,\s*([\"'])(?P<url>/[^\"']*)\2",
+    re.IGNORECASE,
+)
+_FETCH_PREFIX = re.compile(r"\bfetch\(\s*([\"'])(?P<url>/[^\"']*)\1", re.IGNORECASE)
+_QUERY_METHOD_OPTION = re.compile(
+    r"(?:\bmethod\b|[\"']method[\"'])\s*:\s*([\"'])QUERY\1",
+    re.IGNORECASE,
+)
+_HEADERS_OPTION = re.compile(r"(?:\bheaders\b|[\"']headers[\"'])\s*:", re.IGNORECASE)
+_CONTENT_TYPE_OPTION = re.compile(
+    r"([\"'])content-type\1\s*:\s*([\"'])(?P<content_type>[^\"']+)\2",
+    re.IGNORECASE,
+)
+_SCRIPT_BLOCK = re.compile(
+    r"<script\b(?P<attrs>[^>]*)>(?P<body>.*?)</script\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_SCRIPT_TYPE_ATTR = re.compile(
+    r"(?<![-\w])type\s*=\s*(?:[\"'](?P<quoted>[^\"']*)[\"']|(?P<bare>[^\s>]+))",
+    re.IGNORECASE,
+)
+_SCRIPT_SRC_ATTR = re.compile(r"(?<![-\w])src\s*=", re.IGNORECASE)
+_JAVASCRIPT_TYPES = frozenset(
+    {
+        "application/ecmascript",
+        "application/javascript",
+        "module",
+        "text/ecmascript",
+        "text/javascript",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class QueryClientReference:
+    """One statically knowable programmatic HTTP QUERY client call."""
+
+    client: Literal["fetch", "htmx.ajax"]
+    url: str
+    content_type: str | None
+    content_type_known: bool
+
+
+def _javascript_call_suffix(source: str, start: int) -> str:
+    """Return the remainder of one call, stopping at its balanced ``)``."""
+    depth = 1
+    quote: str | None = None
+    escaped = False
+    index = start
+    while index < len(source):
+        char = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {"'", '"', "`"}:
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return source[start:index]
+        index += 1
+    return source[start:]
+
+
+def _query_client_reference(
+    client: Literal["fetch", "htmx.ajax"],
+    url: str,
+    options: str,
+) -> QueryClientReference:
+    content_type_match = _CONTENT_TYPE_OPTION.search(options)
+    content_type = (
+        content_type_match.group("content_type").strip() if content_type_match is not None else None
+    )
+    return QueryClientReference(
+        client=client,
+        url=url,
+        content_type=content_type,
+        content_type_known=content_type is not None or _HEADERS_OPTION.search(options) is None,
+    )
+
+
+def _executable_script_bodies(source: str) -> tuple[str, ...]:
+    bodies: list[str] = []
+    for match in _SCRIPT_BLOCK.finditer(source):
+        attrs = match.group("attrs")
+        if _SCRIPT_SRC_ATTR.search(attrs) is not None:
+            continue
+        type_match = _SCRIPT_TYPE_ATTR.search(attrs)
+        if type_match is not None:
+            script_type = (type_match.group("quoted") or type_match.group("bare") or "").strip()
+            script_type = script_type.split(";", 1)[0].lower()
+            if script_type and script_type not in _JAVASCRIPT_TYPES:
+                continue
+        bodies.append(match.group("body"))
+    return tuple(bodies)
+
+
+def _strip_javascript_comments(source: str) -> str:
+    output: list[str] = []
+    quote: str | None = None
+    escaped = False
+    index = 0
+    while index < len(source):
+        char = source[index]
+        next_char = source[index + 1] if index + 1 < len(source) else ""
+        if quote is not None:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in {"'", '"', "`"}:
+            quote = char
+            output.append(char)
+            index += 1
+            continue
+        if char == "/" and next_char == "/":
+            output.extend((" ", " "))
+            index += 2
+            while index < len(source) and source[index] not in {"\r", "\n"}:
+                output.append(" ")
+                index += 1
+            continue
+        if char == "/" and next_char == "*":
+            output.extend((" ", " "))
+            index += 2
+            while index < len(source):
+                if source[index] == "*" and index + 1 < len(source) and source[index + 1] == "/":
+                    output.extend((" ", " "))
+                    index += 2
+                    break
+                output.append(source[index] if source[index] in {"\r", "\n"} else " ")
+                index += 1
+            continue
+        output.append(char)
+        index += 1
+    return "".join(output)
 
 
 def _is_static_url_candidate(url: str) -> bool:
@@ -146,6 +295,39 @@ def extract_targets_from_source(source: str) -> list[tuple[str, str, str | None]
         _append_target("confirm_url", url, method_override)
 
     return targets
+
+
+def extract_query_client_references(source: str) -> tuple[QueryClientReference, ...]:
+    """Extract literal, browser-proven QUERY calls from template scripts.
+
+    Chirp does not publish a declarative ``hx-query`` attribute. This scanner
+    intentionally recognizes only the programmatic Fetch and ``htmx.ajax``
+    forms covered by the QUERY browser contract, and only when the URL and
+    method are literal. Dynamic headers remain unknown instead of becoming a
+    false-positive media-type diagnostic.
+    """
+    references: list[QueryClientReference] = []
+    seen: set[QueryClientReference] = set()
+
+    for raw_script in _executable_script_bodies(source):
+        script = _strip_javascript_comments(raw_script)
+        for match in _HTMX_QUERY_PREFIX.finditer(script):
+            options = _javascript_call_suffix(script, match.end())
+            reference = _query_client_reference("htmx.ajax", match.group("url"), options)
+            if reference not in seen:
+                seen.add(reference)
+                references.append(reference)
+
+        for match in _FETCH_PREFIX.finditer(script):
+            options = _javascript_call_suffix(script, match.end())
+            if _QUERY_METHOD_OPTION.search(options) is None:
+                continue
+            reference = _query_client_reference("fetch", match.group("url"), options)
+            if reference not in seen:
+                seen.add(reference)
+                references.append(reference)
+
+    return tuple(references)
 
 
 def extract_href_references(source: str) -> set[str]:

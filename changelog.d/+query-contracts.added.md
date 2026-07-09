@@ -1,0 +1,1 @@
+**HTTP QUERY contracts** — `app.check()` now errors on statically detectable literal Fetch/`htmx.ajax()` route, method, media-type, and CORS mismatches; route inspection exposes normalized QUERY media ranges without executing handlers.

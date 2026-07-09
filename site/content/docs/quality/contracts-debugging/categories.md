@@ -57,6 +57,11 @@ app would fare in production without changing your config, use `chirp check
 | `page_handlers` | ERROR / WARNING | Add a recognized `page.py` handler (`get`, `post`, another HTTP method, or `handler`) and fix handler-shaped typos. |
 | `method` | ERROR | Ensure handlers are callable and route methods are supported. |
 | `target` | ERROR | Fix route target declarations that point at missing routes. |
+| `query_route` | ERROR | Restore consistent frozen QUERY methods and normalized `query_media_types`; ordinary registration catches this before the defensive check. |
+| `query_target` | ERROR | Point a literal Fetch or `htmx.ajax()` QUERY call at a registered route. |
+| `query_method` | ERROR | Add QUERY to the targeted route or change the literal client method. |
+| `query_media_type` | ERROR | Send an explicit literal `Content-Type` accepted by the route's `query_media_types`; dynamic header objects are not guessed. |
+| `query_cors` | ERROR | When CORS allows origins for QUERY routes, allow the QUERY method and allow `Content-Type` (or `*`) for routes restricted to non-safelisted media ranges. |
 | `page_context` | WARNING | Move page block dependencies into the context available to direct fragment renders. |
 | `page_shell` | ERROR | Register or correct app-shell targets, outlets, and shell contracts used by filesystem pages. |
 | `layout_chain` | INFO / WARNING | Fix duplicate layout targets, default inner `body` targets, broad `hx-disinherit`, or inheritance inside composed layouts. |
