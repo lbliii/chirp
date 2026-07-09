@@ -26,4 +26,4 @@ def test_routes_document_head_fallback_and_wire_semantics() -> None:
 def test_pounce_dependency_requires_head_fix_release() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     pounce = next(dep for dep in project["dependencies"] if dep.startswith("bengal-pounce"))
-    assert pounce == "bengal-pounce>=0.8.2"
+    assert pounce == "bengal-pounce>=0.9.0"
