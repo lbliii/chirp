@@ -108,7 +108,17 @@ def session() -> Mapping[str, Any]:
     return active
 
 
-_regenerate_var: ContextVar[str | None] = ContextVar("chirp_regenerate_old_id", default=None)
+@dataclass(slots=True)
+class _RegenerationState:
+    """Mutable request-local state shared with sync handler context copies."""
+
+    requested: bool = False
+    old_id: str | None = None
+
+
+_regeneration_state_var: ContextVar[_RegenerationState | None] = ContextVar(
+    "chirp_regeneration_state", default=None
+)
 
 
 def regenerate_session() -> dict[str, Any]:
@@ -131,7 +141,10 @@ def regenerate_session() -> dict[str, Any]:
     session = get_session()
     old_id = session.get("__session_id")
     session.clear()
-    _regenerate_var.set(old_id)
+    regeneration_state = _regeneration_state_var.get()
+    if regeneration_state is not None:
+        regeneration_state.requested = True
+        regeneration_state.old_id = old_id
     return session
 
 
@@ -567,6 +580,9 @@ class SessionMiddleware:
 
     async def __call__(self, request: Request, next: Next) -> AnyResponse:
         """Load session, dispatch, then save session to response."""
+        store_config = getattr(self._store, "_config", None)
+        cookie_name = getattr(store_config, "cookie_name", self._config.cookie_name)
+        had_session_cookie = cookie_name in request.cookies
         session = await self._store.load(request)
         if (
             self._config.idle_timeout_seconds is not None
@@ -576,15 +592,21 @@ class SessionMiddleware:
             session.setdefault(self._config.created_at_key, now)
             session[self._config.last_seen_at_key] = now
         token = _session_var.set(session)
+        regeneration_state = _RegenerationState()
+        regeneration_token = _regeneration_state_var.set(regeneration_state)
 
         try:
-            response = await next(request)
-        finally:
-            _session_var.reset(token)
+            try:
+                response = await next(request)
+            finally:
+                _session_var.reset(token)
 
-        regenerate_old_id = _regenerate_var.get()
-        try:
-            _regenerate_var.set(None)
-            return await self._store.save(response, session, regenerate_old_id=regenerate_old_id)
+            if not had_session_cookie and not session and not regeneration_state.requested:
+                return response
+            return await self._store.save(
+                response,
+                session,
+                regenerate_old_id=regeneration_state.old_id,
+            )
         finally:
-            _regenerate_var.set(None)
+            _regeneration_state_var.reset(regeneration_token)

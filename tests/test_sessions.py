@@ -2,7 +2,7 @@
 
 import hashlib
 import importlib.util
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 
@@ -28,6 +28,33 @@ def _set_cookie_header(response: object, cookie_name: str = "chirp_session") -> 
         if hname.lower() == "set-cookie" and hvalue.startswith(f"{cookie_name}="):
             return hvalue
     return None
+
+
+class _SpySessionStore:
+    """Session store spy that records persistence without adding a cookie."""
+
+    def __init__(self, loaded_session: dict[str, Any] | None = None) -> None:
+        self.loaded_session = loaded_session or {}
+        self.load_calls = 0
+        self.save_calls = 0
+        self.saved_session: dict[str, Any] | None = None
+        self.regenerate_old_id: str | None = None
+
+    async def load(self, request: object) -> dict[str, Any]:
+        self.load_calls += 1
+        return dict(self.loaded_session)
+
+    async def save(
+        self,
+        response: Any,
+        session: dict[str, Any],
+        *,
+        regenerate_old_id: str | None = None,
+    ) -> Any:
+        self.save_calls += 1
+        self.saved_session = dict(session)
+        self.regenerate_old_id = regenerate_old_id
+        return response
 
 
 class TestSessionConfig:
@@ -152,6 +179,7 @@ class TestSessionBasicOperations:
         async with TestClient(app) as client:
             response = await client.get("/check")
             assert response.text == "empty=True"
+            assert _set_cookie_header(response) is None
 
     async def test_session_counter(self) -> None:
         """Session state persists across requests via cookies."""
@@ -367,10 +395,12 @@ class TestSessionDataTypes:
             r2 = await client.get("/remove", headers={"Cookie": f"chirp_session={cookie}"})
             assert r2.text == "keys=['keep']"
 
-    async def test_empty_session_still_gets_cookie(self) -> None:
-        """Even an empty session should receive a Set-Cookie (for sliding expiration)."""
+    async def test_existing_empty_session_still_gets_cookie(self) -> None:
+        """An existing empty session receives Set-Cookie for sliding expiration."""
+        secret = "test-secret"
+        empty_cookie = CookieSessionStore(SessionConfig(secret_key=secret))._serializer.dumps({})
         app = App()
-        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret")))
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key=secret)))
 
         @app.route("/empty")
         def empty():
@@ -378,10 +408,111 @@ class TestSessionDataTypes:
             return "ok"
 
         async with TestClient(app) as client:
-            response = await client.get("/empty")
+            response = await client.get(
+                "/empty",
+                headers={"Cookie": f"chirp_session={empty_cookie}"},
+            )
             assert response.status == 200
             cookie = extract_session_cookie(response, "chirp_session")
             assert cookie is not None
+
+
+@pytest.mark.issue(618)
+class TestAnonymousSessionPersistence:
+    async def test_anonymous_untouched_get_skips_custom_store_save(self) -> None:
+        store = _SpySessionStore()
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret", store=store)))
+
+        @app.route("/public")
+        def public():
+            return "public"
+
+        async with TestClient(app) as client:
+            response = await client.get("/public")
+
+        assert response.status == 200
+        assert _set_cookie_header(response) is None
+        assert store.load_calls == 1
+        assert store.save_calls == 0
+
+    async def test_existing_cookie_preserves_custom_store_refresh(self) -> None:
+        store = _SpySessionStore()
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret", store=store)))
+
+        @app.route("/public")
+        def public():
+            return "public"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/public",
+                headers={"Cookie": "chirp_session=existing"},
+            )
+
+        assert response.status == 200
+        assert store.save_calls == 1
+        assert store.saved_session == {}
+
+    async def test_timeout_metadata_still_persists_new_session(self) -> None:
+        store = _SpySessionStore()
+        config = SessionConfig(
+            secret_key="test-secret",
+            idle_timeout_seconds=60,
+            store=store,
+        )
+        app = App()
+        app.add_middleware(SessionMiddleware(config))
+
+        @app.route("/public")
+        def public():
+            return "public"
+
+        async with TestClient(app) as client:
+            response = await client.get("/public")
+
+        assert response.status == 200
+        assert store.save_calls == 1
+        assert store.saved_session is not None
+        assert config.created_at_key in store.saved_session
+        assert config.last_seen_at_key in store.saved_session
+
+    async def test_regeneration_without_incoming_cookie_still_persists(self) -> None:
+        store = _SpySessionStore()
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret", store=store)))
+
+        @app.route("/regenerate")
+        def regenerate():
+            regenerate_session()
+            return "regenerated"
+
+        async with TestClient(app) as client:
+            response = await client.get("/regenerate")
+
+        assert response.status == 200
+        assert store.save_calls == 1
+
+    async def test_nested_mutation_is_saved_for_existing_session(self) -> None:
+        store = _SpySessionStore({"cart": []})
+        app = App()
+        app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test-secret", store=store)))
+
+        @app.route("/cart")
+        def cart():
+            get_session()["cart"].append("item")
+            return "updated"
+
+        async with TestClient(app) as client:
+            response = await client.get(
+                "/cart",
+                headers={"Cookie": "chirp_session=existing"},
+            )
+
+        assert response.status == 200
+        assert store.save_calls == 1
+        assert store.saved_session == {"cart": ["item"]}
 
 
 class TestSessionCookieAttributes:
