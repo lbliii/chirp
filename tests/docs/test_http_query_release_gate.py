@@ -51,7 +51,10 @@ def test_readme_and_public_api_do_not_overclaim_query_support() -> None:
 
     assert "Experimental HTTP QUERY" in readme
     assert "stable promotion and universal proxy/CDN support are **not** claimed" in compact_readme
-    assert "complete static wiring checks" in public_api
+    assert "Literal Fetch" in public_api
+    assert "normalized media ranges" in public_api
+    assert "RouteDoc.query_media_types" in public_api
+    assert "canonical complex-search example" in public_api
     assert "configuration-managed caching remains GET-only" in public_api
     assert "#535 experimental release decision documented" in rfc
     assert "Stable or first-class promotion is not approved" in rfc

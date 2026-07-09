@@ -62,7 +62,7 @@ maintained in [`docs/cli-compatibility-contract.md`](https://github.com/lbliii/c
 * - `chirp dev <app>`
   - Dev server with browser reload on template/CSS changes.
 * - `chirp routes <app>`
-  - Print the registered route table.
+  - Print the registered route table, including normalized QUERY media ranges.
 * - `chirp security-check <app>`
   - Audit config against an OWASP checklist.
 * - `chirp freeze <app> <out>`

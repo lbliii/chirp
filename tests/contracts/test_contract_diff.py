@@ -62,6 +62,35 @@ def test_diff_reports_added_and_removed_issues() -> None:
     assert "old warning" in diff.summary_lines()[2]
 
 
+@pytest.mark.issue(533)
+def test_diff_preserves_query_contract_identity() -> None:
+    result = CheckResult(
+        issues=[
+            ContractIssue(
+                Severity.ERROR,
+                "query_target",
+                "Template 'search.html' targets missing QUERY route '/search'.",
+                template="search.html",
+                route="/search",
+            )
+        ]
+    )
+
+    current = result_to_dict(result)
+    diff = diff_contract_dicts({"issues": []}, current)
+
+    assert diff.added == (
+        {
+            "severity": "error",
+            "category": "query_target",
+            "message": "Template 'search.html' targets missing QUERY route '/search'.",
+            "template": "search.html",
+            "route": "/search",
+            "details": None,
+        },
+    )
+
+
 @pytest.mark.issue(344)
 def test_markdown_comment_lists_added_errors() -> None:
     diff = diff_contract_dicts(

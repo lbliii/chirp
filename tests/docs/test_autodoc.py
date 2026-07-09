@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from chirp import App, AppConfig
 from chirp.docs.models import DocSource
 from chirp.testing import TestClient
@@ -73,6 +75,27 @@ class TestIntrospectRoutes:
             [Route("/page", handler, frozenset({"GET"}), template="page.html")]
         )
         assert docs[0].template == "page.html"
+
+    @pytest.mark.issue(533)
+    def test_extracts_query_media_types(self) -> None:
+        from chirp.docs.autodoc import introspect_routes
+        from chirp.routing.route import Route
+
+        def search():
+            pass
+
+        docs = introspect_routes(
+            [
+                Route(
+                    "/search",
+                    search,
+                    frozenset({"QUERY"}),
+                    query_media_types=("application/json",),
+                )
+            ]
+        )
+
+        assert docs[0].query_media_types == ("application/json",)
 
 
 # ── Tool introspection ───────────────────────────────────────────────────
@@ -195,6 +218,24 @@ class TestDocPageGeneration:
         assert "Get a user by ID" in page.raw
         assert page.metadata.category == "API Reference"
         assert page.html  # non-empty
+
+    @pytest.mark.issue(533)
+    def test_query_route_page_lists_accept_query(self) -> None:
+        from chirp.docs.autodoc import _route_doc_to_page
+        from chirp.docs.models import RouteDoc
+
+        rd = RouteDoc(
+            path="/search",
+            methods=frozenset({"QUERY"}),
+            handler_name="search",
+            docstring=None,
+            parameters=(),
+            query_media_types=("application/json",),
+        )
+
+        page = _route_doc_to_page(rd, order=0)
+
+        assert "**Accept-Query:** application/json" in page.raw
 
     def test_tool_to_page(self) -> None:
         from chirp.docs.autodoc import _tool_doc_to_page

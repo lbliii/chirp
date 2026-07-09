@@ -157,6 +157,10 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "route_names": "Routing",
     "method": "Routing",
     "target": "Routing",
+    "query_route": "Routing",
+    "query_target": "Routing",
+    "query_method": "Routing",
+    "query_media_type": "Routing",
     "orphan": "Routing",
     "htmx_partial": "Routing",
     # Templates
@@ -225,6 +229,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "sse_speculation": "Production Safety",
     "csrf_session": "Production Safety",
     "security_stack": "Production Safety",
+    "query_cors": "Production Safety",
     "static_streaming": "Production Safety",
     "middleware_signature": "Production Safety",
     "secret_key": "Production Safety",

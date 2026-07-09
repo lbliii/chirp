@@ -30,8 +30,8 @@ def _esc(s: str) -> str:
 
 
 def _route_to_dict(route: Any) -> dict[str, Any]:
-    """Serialize a PageRoute to a JSON-serializable dict."""
-    meta = route.meta
+    """Serialize a discovered page or frozen runtime route."""
+    meta = getattr(route, "meta", None)
     meta_dict: dict[str, Any] = {}
     if meta is not None:
         meta_dict = {
@@ -46,7 +46,7 @@ def _route_to_dict(route: Any) -> dict[str, Any]:
             "target": getattr(lay, "target", ""),
             "depth": getattr(lay, "depth", 0),
         }
-        for lay in getattr(route.layout_chain, "layouts", ())
+        for lay in getattr(getattr(route, "layout_chain", None), "layouts", ())
     ]
     providers = [
         {
@@ -73,17 +73,18 @@ def _route_to_dict(route: Any) -> dict[str, Any]:
             "block": getattr(form_contract, "block", None),
         }
     return {
-        "url_path": route.url_path,
-        "kind": getattr(route, "kind", "page"),
-        "methods": list(getattr(route, "methods", [])),
-        "template_name": route.template_name,
+        "url_path": getattr(route, "url_path", getattr(route, "path", "")),
+        "kind": getattr(route, "kind", "route"),
+        "methods": sorted(getattr(route, "methods", [])),
+        "query_media_types": sorted(getattr(route, "query_media_types", None) or ()),
+        "template_name": getattr(route, "template_name", None) or getattr(route, "template", None),
         "has_contract": contract is not None,
         "form_contract": form_contract_dict,
         "meta": meta_dict,
         "layout_count": len(layouts),
         "context_provider_count": len(providers),
         "action_count": len(actions),
-        "has_viewmodel": route.viewmodel_provider is not None,
+        "has_viewmodel": getattr(route, "viewmodel_provider", None) is not None,
         "layouts": layouts,
         "providers": providers,
         "actions": actions,
@@ -99,7 +100,11 @@ def render_route_explorer(
     filtered = routes
     if path_filter:
         pf = path_filter.lower().strip()
-        filtered = [r for r in routes if pf in (getattr(r, "url_path", "") or "").lower()]
+        filtered = [
+            route
+            for route in routes
+            if pf in (getattr(route, "url_path", None) or getattr(route, "path", "") or "").lower()
+        ]
 
     route_dicts = [_route_to_dict(r) for r in filtered]
     path_param = path_filter or ""
@@ -109,6 +114,10 @@ def render_route_explorer(
         path = rd["url_path"]
         kind = rd["kind"]
         methods = ", ".join(rd["methods"])
+        query_media = ", ".join(rd["query_media_types"])
+        query_media_badge = (
+            f'<span class="badge">Accept-Query: {_esc(query_media)}</span>' if query_media else ""
+        )
         meta_str = json.dumps(rd["meta"]) if rd["meta"] else "{}"
         contract_badge = '<span class="badge">contract</span>' if rd["has_contract"] else ""
         form_contract = rd["form_contract"]
@@ -129,6 +138,7 @@ def render_route_explorer(
             f'<span class="route-path">{_esc(path)}</span>'
             f'<span class="badge">{_esc(kind)}</span>'
             f'<span class="badge">{_esc(methods)}</span>'
+            f"{query_media_badge}"
             f"{contract_badge}"
             f'<div class="route-meta">meta: {_esc(meta_str)}</div>'
             f"{form_meta}"

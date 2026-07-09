@@ -73,6 +73,7 @@ from .rules_oob_targets import check_oob_targets
 from .rules_page_handlers import check_page_handlers
 from .rules_page_shell import check_page_shell_contracts
 from .rules_plugin_quarantine import check_plugin_quarantine
+from .rules_query import check_query_contracts
 from .rules_reactive import (
     check_reactive_audience_scopes,
     check_reactive_block_existence,
@@ -524,9 +525,10 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     check_inline_templates(router, result)
 
     template_sources = snapshot.template_sources
+    if kida_env is not None and kida_env.loader is not None and not template_sources:
+        template_sources = load_template_sources(kida_env)
+    result.issues.extend(check_query_contracts(router, template_sources, middleware_list))
     if kida_env is not None and kida_env.loader is not None:
-        if not template_sources:
-            template_sources = load_template_sources(kida_env)
         result.templates_scanned = len(template_sources)
         result.issues.extend(check_chirpui_runtime_registration(template_sources, snapshot.extras))
         template_aliases = getattr(kida_env, "template_aliases", None)

@@ -83,8 +83,10 @@ previously generic method-token behavior: an existing route registered with
 `methods=["QUERY"]` must now add a non-empty `query_media_types=(...)`
 declaration or freeze fails with migration guidance. Routes for every other
 method are unchanged. QUERY remains provisional and ASGI-only while client and
-filesystem ergonomics, complete static wiring checks, the canonical example,
-and stable promotion remain gated. Discovery and response semantics reuse
+filesystem ergonomics and stable promotion remain gated. Literal Fetch and
+`htmx.ajax()` QUERY wiring is checked statically where the URL, method, and
+headers are knowable; CLI routes, autodoc, and the debug route explorer expose
+the normalized media ranges. Discovery and response semantics reuse
 existing `Response`, `Redirect`, `HTTPError`, and header APIs. Explicit
 response caching requires manual `CacheMiddleware(query_key_func=...)`
 registration; configuration-managed caching remains GET-only. Chirp adds no
@@ -127,7 +129,7 @@ shape may still evolve before 1.0:
 | Reactive pages | `ReactiveBus`, `ChangeEvent`, `DependencyIndex`, `BlockRef`, `reactive_stream` |
 | Signals (server reactive values) | App methods `app.signal` / `app.derived` / `app.emit`; version-aware template globals signal()/signal_block()/signal_bind() (signal_attrs alias)/signal_connect(); the auto-registered `/_chirp/live` merge stream; the `app.check()` signal_dead_binding (ERROR) / signal_orphan (INFO) / signal_connect_budget (INFO) categories |
 | Dynamic template reachability | App method `app.declare_template(template, *, blocks=())`; surrounding name whitespace is normalized, template_declaration errors validate names, and the dead-template check treats only declared templates as reachable |
-| Experimental HTTP QUERY | App method `app.route(..., methods=["QUERY"], query_media_types=(...))`; declarations freeze as normalized immutable media ranges and the ASGI path enforces Content-Type, body limits, and response Accept negotiation. Manual response-cache experiments use `chirp.cache.key.query_cache_key` with `CacheMiddleware(query_key_func=...)`; configuration-managed caching stays GET-only. |
+| Experimental HTTP QUERY | App method `app.route(..., methods=["QUERY"], query_media_types=(...))`; declarations freeze as normalized immutable media ranges and the ASGI path enforces Content-Type, body limits, and response Accept negotiation. Structured `chirp routes` rows expose the ranges, and the public optional `chirp.docs.RouteDoc.query_media_types` field carries the same frozen tuple for autodoc consumers. Manual response-cache experiments use `chirp.cache.key.query_cache_key` with `CacheMiddleware(query_key_func=...)`; configuration-managed caching stays GET-only. |
 | Shell actions | `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface` |
 | Cache | `DeferredCache`, `get_cache`, `cache_view` |
 | Health probes | `HealthCheck` (register via `app.add_health_check`; auto-mounted `/health` + `/ready`) |
@@ -166,7 +168,7 @@ hardens and documents that surface:
 | HTMX details and `STOP_POLLING` | Keep provisional | Header parsing and polling semantics need their own public contract before stabilization. |
 | Reactive pages | Keep provisional | The free-threaded event story is tested, but the app-author API and examples are still settling. |
 | Dynamic template reachability | Keep provisional | The setup declaration is validated and immutable, but registry patterns may broaden before 1.0. |
-| Experimental HTTP QUERY | Keep provisional | Explicit ASGI routes now have request/response enforcement, discovery, typed-render proof, opt-in body-aware caching, and a tested browser/server/proxy matrix. Client/filesystem ergonomics, complete static checks, the canonical example, and stable promotion remain gated. |
+| Experimental HTTP QUERY | Keep provisional | Explicit ASGI routes now have request/response enforcement, discovery, typed-render proof, opt-in body-aware caching, literal-client startup checks, inspection metadata, a canonical complex-search example, and a tested browser/server/proxy matrix. Client/filesystem ergonomics and stable promotion remain gated. |
 | Signals (server reactive values) | Keep provisional | The single-node `signal()`/`@app.derived` surface ships, but the multi-worker `SignalBus` backplane + the pure-derived contract are still in design (see `plan/drafted/rfc-live-sse-topics.md` §12). |
 | Shell actions | Keep provisional | They depend on the ChirpUI app-shell contract and should stabilize with that integration. |
 | Tool registry/events | **Stabilized (2026-06-22)** | Phase 1 (#421/#430): MCP server surface, event bus, OTel spans, and integration tests meet the stable bar. |

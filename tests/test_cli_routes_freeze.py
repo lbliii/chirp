@@ -26,7 +26,7 @@ import pytest
 
 from chirp import App
 from chirp.cli._freeze import run_freeze
-from chirp.cli._routes import run_routes
+from chirp.cli._routes import collect_routes_result, run_routes
 from chirp.config import AppConfig
 
 
@@ -100,6 +100,34 @@ class TestChirpRoutes:
 
         assert exc_info.value.code == 1
         assert "No routes registered." in capsys.readouterr().err
+
+    @pytest.mark.issue(533)
+    def test_query_media_types_are_inspectable(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        app = App(config=AppConfig(template_dir="nonexistent"))
+
+        @app.route(
+            "/search",
+            methods=["QUERY"],
+            query_media_types=("application/json",),
+        )
+        def search():
+            return "ok"
+
+        result = collect_routes_result(_register_app_module(monkeypatch, app))
+
+        route = next(row for row in result["routes"] if row["path"] == "/search")
+        assert route == {
+            "methods": ["QUERY"],
+            "path": "/search",
+            "handler": "search",
+            "name": None,
+            "query_media_types": ["application/json"],
+        }
+        assert "QUERY MEDIA" in result.terminal_text
+        assert "application/json" in result.terminal_text
 
     def test_invalid_import_string_exits_one(
         self,

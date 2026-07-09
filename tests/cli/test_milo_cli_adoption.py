@@ -111,6 +111,7 @@ def test_check_and_routes_share_structured_programmatic_and_mcp_results(
         "path": "/",
         "handler": "home (home)",
         "name": "home",
+        "query_media_types": [],
     } in routes["routes"]
     assert called_routes.is_error is False
     assert called_check.is_error is False

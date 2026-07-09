@@ -596,8 +596,9 @@ Issue #533 owns startup checks. Detectable failures include:
 - approved client syntax targeting a route without QUERY or with a mismatched
   content type;
 - statically knowable mutation-oriented actions on QUERY;
-- CORS declarations that claim cross-origin QUERY without allowing the method
-  and content header; and
+- CORS declarations that claim cross-origin QUERY without allowing the method,
+  or without allowing the content header when the route accepts only
+  non-CORS-safelisted media ranges; and
 - route/template/target mismatches already covered for other methods.
 
 Messages name the template, route, method, media type, or target. Existing

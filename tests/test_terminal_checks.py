@@ -158,11 +158,13 @@ class TestFormatterConcernGroups:
         [
             ("page_handlers", "Routing"),
             ("route_names", "Routing"),
+            ("query_target", "Routing"),
             ("hx-target", "HTMX"),
             ("hx-indicator", "HTMX"),
             ("hx-boost", "HTMX"),
             ("csrf_form", "Forms"),
             ("security_stack", "Production Safety"),
+            ("query_cors", "Production Safety"),
             ("mount_app_merge", "Setup"),
         ],
     )
