@@ -21,11 +21,13 @@ def test_pelt_conformance_map_names_live_proofs_and_open_boundaries() -> None:
         "test_database_executemany_and_stream",
         "test_database_fetch_execute_transaction",
         "test_pool_rolls_back_failed_transaction_before_reuse",
+        "test_listen_notify_delivery_unsubscribe_and_close",
     ):
         assert proof in conformance
         assert f"def {proof}" in live_tests
 
-    assert "Missing live lifecycle proof" in conformance
+    assert "exactly one socket reader" in conformance
+    assert "Missing live lifecycle proof" not in conformance
     assert "live binary-result negotiation remains open" in conformance
     assert "Missing live server-assigned OID proof" in conformance
     assert "INTERVAL" in conformance

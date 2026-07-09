@@ -244,13 +244,16 @@ class Connection:
     async def add_listener(
         self, channel: str, callback: Callable[[Connection, int, str, str], None]
     ) -> None:
-        listeners = self._listeners.setdefault(channel, [])
-        if callback in listeners:
+        listeners = self._listeners.get(channel)
+        if listeners is not None and callback in listeners:
             return
-        listeners.append(callback)
-        if len(listeners) == 1:
+
+        if listeners is None:
             await self.execute(f"LISTEN {_quote_ident(channel)}")
-            await self._ensure_listen_reader()
+            self._listeners[channel] = [callback]
+        else:
+            listeners.append(callback)
+        await self._ensure_listen_reader()
 
     async def remove_listener(
         self, channel: str, callback: Callable[[Connection, int, str, str], None]
@@ -261,9 +264,12 @@ class Connection:
         listeners.remove(callback)
         if not listeners:
             del self._listeners[channel]
-            await self.execute(f"UNLISTEN {_quote_ident(channel)}")
-        if not self._listeners and self._listener_tg is not None:
-            await self._stop_listen_reader()
+            try:
+                await self.execute(f"UNLISTEN {_quote_ident(channel)}")
+            except BaseException:
+                self._listeners[channel] = [callback]
+                await self._ensure_listen_reader()
+                raise
 
     async def close(self) -> None:
         if self._closed:
@@ -338,6 +344,24 @@ class Connection:
         return self._protocol.cache.get(sql, param_oids) or statement
 
     async def _roundtrip(
+        self,
+        outbound: bytes,
+        *,
+        protocol: ExtendedQueryProtocol | SimpleQueryProtocol | None = None,
+    ) -> list[Any]:
+        # PostgreSQL delivers asynchronous notifications on the query socket.
+        # Keep exactly one receiver: a command temporarily takes ownership from
+        # the idle notification reader, then restores it for live subscriptions.
+        restart_listen_reader = self._listener_tg_cm is not None
+        if restart_listen_reader:
+            await self._stop_listen_reader()
+        try:
+            return await self._roundtrip_exclusive(outbound, protocol=protocol)
+        finally:
+            if restart_listen_reader and self._listeners and not self._closed:
+                await self._ensure_listen_reader()
+
+    async def _roundtrip_exclusive(
         self,
         outbound: bytes,
         *,
@@ -429,11 +453,16 @@ class Connection:
         self._listener_tg.start_soon(self._listen_forever)
 
     async def _stop_listen_reader(self) -> None:
-        if self._listener_tg_cm is None:
+        task_group_cm = self._listener_tg_cm
+        task_group = self._listener_tg
+        if task_group_cm is None or task_group is None:
             return
-        await self._listener_tg_cm.__aexit__(None, None, None)
         self._listener_tg = None
         self._listener_tg_cm = None
+        # __aexit__ waits for child tasks; cancel first so an idle socket read
+        # cannot hold LISTEN/UNLISTEN, an ordinary query, or close indefinitely.
+        task_group.cancel_scope.cancel()
+        await task_group_cm.__aexit__(None, None, None)
 
     async def _listen_forever(self) -> None:
         while not self._closed:
