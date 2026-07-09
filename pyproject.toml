@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "kida-templates>=0.11.0", # Component/template checkpoint; no 0.10 API migration
     "anyio>=4.0",            # Async runtime (backend-agnostic, structured concurrency)
-    "bengal-pounce>=0.8.2",  # HEAD body suppression across H1/H2/H3 (#554)
+    "bengal-pounce>=0.9.0",  # HEAD body suppression across H1/H2/H3 (#554)
     "milo-cli>=0.4.1,<0.5",  # Typed CLI registration and deny-by-default agent surfaces (#572)
 ]
 
