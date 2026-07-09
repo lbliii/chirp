@@ -246,13 +246,11 @@ def create_request_handler(
     """
     routes = discovered_routes or []
     explorer_routes = list(routes)
-    explorer_route_keys = {
-        (
-            getattr(route, "url_path", getattr(route, "path", "")),
-            frozenset(getattr(route, "methods", ())),
-        )
-        for route in explorer_routes
-    }
+    explorer_route_keys: set[tuple[str, frozenset[str]]] = set()
+    for route in explorer_routes:
+        path = str(getattr(route, "url_path", getattr(route, "path", "")))
+        methods = frozenset(str(method) for method in getattr(route, "methods", ()))
+        explorer_route_keys.add((path, methods))
     for route in router.routes:
         if route.query_media_types is None:
             continue
