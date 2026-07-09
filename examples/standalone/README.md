@@ -62,6 +62,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - [`passkeys_minimal`](passkeys_minimal/) — supporting, tier 3
 - [`pokedex`](pokedex/) — supporting, tier 2
 - [`production`](production/) — canonical, tier 3
+- [`query_search`](query_search/) — canonical, tier 3
 - [`reactive_tasks`](reactive_tasks/) — canonical, tier 3
 - [`returns_gallery`](returns_gallery/) — canonical, tier 2
 - [`search`](search/) — supporting, tier 1

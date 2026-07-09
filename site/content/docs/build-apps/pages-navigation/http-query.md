@@ -85,6 +85,13 @@ unenhanced path. Programmatic Fetch and `htmx.ajax("QUERY", ...)` are covered
 by browser tests, but Chirp does not publish a declarative `hx-query` syntax or
 stable adapter. Do not invent one in application docs.
 
+The canonical
+[complex QUERY search](https://github.com/lbliii/chirp/tree/main/examples/standalone/query_search)
+is executable proof: its JavaScript-disabled form submits only a compact,
+bookmarkable GET subset, while htmx sends the larger faceted input in a QUERY
+body and swaps the same template's named results block. There is no JSON
+response path, duplicate partial, or JavaScript build pipeline.
+
 Cross-origin Fetch triggers a CORS preflight. Add QUERY to
 `CORSConfig.allow_methods` and allow the declared `Content-Type` header.
 
@@ -146,7 +153,7 @@ for operator details.
 | Filesystem/test-client ergonomics (#527) | Open |
 | Declarative htmx plus no-JavaScript GET proof (#528) | Open |
 | Complete static diagnostics (#533) | Open |
-| Canonical complex-search example (#534) | Open |
+| Canonical complex-search example (#534) | Implemented and browser-tested |
 | Stable/first-class promotion | Not approved |
 
 The allowed claim is **experimental early-adopter HTTP QUERY support**. Do not

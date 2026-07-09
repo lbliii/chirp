@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complex Research Search</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { max-width: 820px; margin: 2rem auto; padding: 0 1rem; font: 16px/1.5 system-ui, sans-serif; color: #172033; }
+    h1 { margin-bottom: 0.25rem; }
+    .lede, .criteria, .meta { color: #526078; }
+    form, #results { border: 1px solid #d8deea; border-radius: 0.75rem; padding: 1rem; margin-top: 1.25rem; }
+    .row { display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem; }
+    .advanced { margin-top: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    label, legend { font-weight: 650; }
+    input, select, textarea, button { width: 100%; padding: 0.55rem; font: inherit; }
+    fieldset { border: 0; padding: 0; margin: 0.75rem 0; }
+    .topics { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+    .topics label { font-weight: 400; }
+    .topics input { width: auto; }
+    button { border: 0; border-radius: 0.4rem; background: #3157d5; color: white; font-weight: 700; cursor: pointer; }
+    .paper { padding: 1rem 0; border-top: 1px solid #e5e9f1; }
+    .paper:first-of-type { border-top: 0; }
+    .paper h2 { margin: 0; font-size: 1.1rem; }
+    .paper p { margin: 0.25rem 0; }
+    .tag { display: inline-block; margin-right: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #eef2ff; }
+    .errors { padding: 0.75rem; border-left: 4px solid #b42318; background: #fff1f0; color: #7a271a; }
+    .empty { padding: 1.5rem 0; color: #526078; }
+    code { background: #f3f5f8; padding: 0.1rem 0.3rem; }
+    @media (max-width: 650px) { .row, .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Complex Research Search</h1>
+  <p class="lede">
+    The native form bookmarks the common text/topic subset with GET. With htmx,
+    the advanced controls travel in an HTTP QUERY body and only the results block swaps.
+  </p>
+
+  <form id="search-form" method="get" action="{{ url_for('search') }}">
+    <div class="row">
+      <label>Text
+        <input name="q" value="{{ fields.q }}" placeholder="title, author, or abstract">
+      </label>
+      <label>Primary topic
+        <select name="topic">
+          <option value="">Any topic</option>
+          {% for key, label in topics %}
+          <option value="{{ key }}" {{ 'selected' if fields.topic == key else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <details class="advanced" open>
+      <summary>Advanced QUERY-only facets</summary>
+      <fieldset>
+        <legend>Require all selected topics</legend>
+        <div class="topics">
+          {% for key, label in topics %}
+          <label><input type="checkbox" data-query-topic value="{{ key }}" {{ 'checked' if key in fields.topics else '' }}> {{ label }}</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="grid">
+        <label>From year <input id="year-from" type="number" value="{{ fields.year_from }}"></label>
+        <label>Through year <input id="year-to" type="number" value="{{ fields.year_to }}"></label>
+        <label>Minimum citations <input id="min-citations" type="number" min="0" value="{{ fields.min_citations }}"></label>
+      </div>
+      <label>Required abstract terms, one per line
+        <textarea id="terms" rows="4">{{ fields.terms }}</textarea>
+      </label>
+      <label><input id="open-access" type="checkbox" value="1" {{ 'checked' if fields.open_access else '' }}> Open access only</label>
+    </details>
+
+    <button id="search-submit" type="submit">Search papers</button>
+    <p class="meta">Without JavaScript or htmx, submit still performs a normal GET using only <code>q</code> and <code>topic</code>.</p>
+  </form>
+
+  {% block results %}
+  <section id="results" data-method="{{ method }}" aria-live="polite">
+    {% if errors %}
+    <div class="errors" role="alert">
+      <strong>Fix the advanced query:</strong>
+      <ul>{% for field, messages in errors.items() %}{% for message in messages %}<li>{{ field }}: {{ message }}</li>{% endfor %}{% endfor %}</ul>
+    </div>
+    {% else %}
+    <p class="criteria"><strong>{{ result_count }}</strong> paper{{ 's' if result_count != 1 else '' }} for {{ criteria }} via {{ method }}</p>
+    {% unless papers %}
+    <p class="empty">No papers match. Relax a facet or use the bookmarkable GET subset.</p>
+    {% else %}
+      {% for paper in papers %}
+      <article class="paper">
+        <h2>{{ paper.title }}</h2>
+        <p>{{ paper.authors }} · {{ paper.year }} · {{ paper.citations }} citations{% if paper.open_access %} · open access{% endif %}</p>
+        <p>{% for topic in paper.topics %}<span class="tag">{{ topic }}</span>{% endfor %}</p>
+        <p>{{ paper.summary }}</p>
+      </article>
+      {% endfor %}
+    {% end %}
+    {% endif %}
+  </section>
+  {% endblock %}
+
+  <script>
+    (() => {
+      const form = document.querySelector("#search-form");
+      form.addEventListener("submit", (event) => {
+        if (!window.htmx) return;
+        event.preventDefault();
+        const values = {
+          q: form.elements.q.value,
+          topic: form.elements.topic.value,
+          topics: Array.from(form.querySelectorAll("[data-query-topic]:checked"), (item) => item.value),
+          year_from: document.querySelector("#year-from").value,
+          year_to: document.querySelector("#year-to").value,
+          min_citations: document.querySelector("#min-citations").value,
+          terms: document.querySelector("#terms").value,
+          open_access: document.querySelector("#open-access").checked ? "1" : "",
+        };
+        window.htmx.ajax("QUERY", form.action, {
+          source: form,
+          target: "#results",
+          swap: "outerHTML",
+          headers: {"Content-Type": "application/x-www-form-urlencoded"},
+          values,
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

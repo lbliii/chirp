@@ -422,6 +422,17 @@ readme = "present"
 test_entrypoint = "examples/standalone/production"
 
 [[examples]]
+path = "standalone/query_search"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = []
+network = "optional"
+capabilities = ["forms", "fragments", "no-js", "pages", "query", "routing", "validation"]
+readme = "present"
+test_entrypoint = "examples/standalone/query_search"
+
+[[examples]]
 path = "standalone/reactive_tasks"
 lane = "standalone"
 status = "canonical"
